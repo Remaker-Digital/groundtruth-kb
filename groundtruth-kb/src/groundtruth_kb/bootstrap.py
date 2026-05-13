@@ -113,6 +113,16 @@ legal_footer = "{escaped_footer}"
 # Plug-in governance gates (dotted import paths)
 # plugins = ["my_package.gates:MyCustomGate"]
 
+[backup]
+# Optional database snapshot settings. Defaults keep snapshots outside the
+# adopter root and stage them in a non-synced user-local directory.
+# snapshot_output_dir = ""
+# snapshot_staging_dir = ""
+# retain_recent = 7
+# retain_daily_days = 30
+# include_chroma = false
+# sync_paths = []
+
 [service]
 # Phase 4 service-endpoint template (GTKB-ISOLATION-017 Slice 3).
 # Override per environment. Per ADR-ISOLATION-APPLICATION-PLACEMENT-001,
@@ -254,7 +264,9 @@ def bootstrap_summary(target: Path, *, include_ci: bool, init_git: bool, seed_ex
         "  - groundtruth.toml",
         "  - groundtruth.db",
         "  - CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md",
-        "  - bridge-os-poller-setup-prompt.md (DEPRECATED compatibility stub; smart poller retired in Slice 4. Bridge dispatch is automated by the cross-harness event-driven trigger registered in .claude/settings.json and .codex/hooks.json.)",
+        "  - bridge-os-poller-setup-prompt.md (DEPRECATED compatibility stub; smart poller retired "
+        "in Slice 4. Bridge dispatch is automated by the cross-harness event-driven trigger "
+        "registered in .claude/settings.json and .codex/hooks.json.)",
         "  - .claude/hooks and .claude/rules",
         f"  - CI workflows: {'yes' if include_ci else 'no'}",
         f"  - Git initialized: {'yes' if init_git else 'no'}",

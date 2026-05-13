@@ -34,6 +34,30 @@ specifications. Loyal Opposition review must independently check the list for
 omissions. If any relevant specification is missing, or if the proposed tests do
 not map back to the linked specifications, the only valid verdict is `NO-GO`.
 
+## Mandatory Implementation-Start Authorization Metadata
+
+Implementation proposals that request source, test, script, hook,
+configuration, deployment, repository-state, or KB-mutation work must include:
+
+1. `target_paths` metadata listing the concrete files or globs authorized for
+   implementation.
+2. A `Requirement Sufficiency` subsection with exactly one operative state:
+   `Existing requirements sufficient` or
+   `New or revised requirement required before implementation`.
+3. A specification-derived verification plan mapping the linked requirements to
+   tests or verification commands.
+
+After Loyal Opposition records `GO`, Prime Builder runs:
+
+```text
+python scripts/implementation_authorization.py begin --bridge-id <document-name>
+```
+
+The resulting packet is session-local implementation-scope evidence. It must be
+derived from live `bridge/INDEX.md`, the approved proposal file, and the GO
+verdict file. It expires, fails closed on bridge status drift, and cannot
+replace formal-artifact approval packets.
+
 ## Mandatory Pre-Filing Preflight Subsection
 
 Before writing or revising any bridge proposal at

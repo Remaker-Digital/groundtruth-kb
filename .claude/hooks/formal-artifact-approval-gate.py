@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,13 +60,17 @@ FORMAL_MUTATION_PATTERNS = [
         r"(?:specifications|deliberations|current_deliberations)\b",
         re.IGNORECASE | re.DOTALL,
     ),
-    re.compile(
-        r"\b(?:scripts[/\\])?"
-        r"(?:harvest_session_deliberations|archive_claude_design_handoff|backfill_lo_reports)\.py\b",
-        re.IGNORECASE,
-    ),
     re.compile(r"\bscripts[/\\]archive[/\\]record_[A-Za-z0-9_ -]+\.py\b", re.IGNORECASE),
 ]
+
+SCRIPT_MUTATION_POLICIES = {
+    "harvest_session_deliberations.py": "requires_apply",
+    "archive_claude_design_handoff.py": "invocation",
+    "backfill_lo_reports.py": "invocation",
+}
+SCRIPT_HELP_FLAGS = {"-h", "--help"}
+COMMAND_SEPARATORS = {";", "&&", "||", "|"}
+PYTHON_RUNNERS = {"python", "python.exe", "python3", "python3.exe", "py", "py.exe"}
 
 REQUIRED_PACKET_FIELDS = {
     "artifact_type",
@@ -121,7 +126,65 @@ def _extract_packet_path(command: str) -> str | None:
 
 
 def _is_formal_mutation(command: str) -> bool:
-    return any(pattern.search(command) for pattern in FORMAL_MUTATION_PATTERNS)
+    return any(pattern.search(command) for pattern in FORMAL_MUTATION_PATTERNS) or _has_mutating_script_invocation(
+        command
+    )
+
+
+def _command_tokens(command: str) -> list[str]:
+    try:
+        return shlex.split(command, posix=False)
+    except ValueError:
+        return re.findall(r"""[^\s"']+|"[^"]*"|'[^']*'""", command)
+
+
+def _clean_token(token: str) -> str:
+    return token.strip().strip("'\"`").strip()
+
+
+def _token_basename(token: str) -> str:
+    cleaned = _clean_token(token).rstrip(";,)")
+    normalized = cleaned.replace("\\", "/")
+    return normalized.rsplit("/", 1)[-1].lower()
+
+
+def _is_command_separator(token: str) -> bool:
+    cleaned = _clean_token(token)
+    return cleaned in COMMAND_SEPARATORS or cleaned.endswith(";")
+
+
+def _is_script_invocation(tokens: list[str], index: int) -> bool:
+    if index == 0:
+        return True
+    previous = [_token_basename(token) for token in tokens[max(0, index - 4) : index]]
+    if any(token in PYTHON_RUNNERS for token in previous):
+        return True
+    return _is_command_separator(tokens[index - 1])
+
+
+def _script_args(tokens: list[str], index: int) -> list[str]:
+    args: list[str] = []
+    for token in tokens[index + 1 :]:
+        if _is_command_separator(token):
+            break
+        args.append(_clean_token(token))
+    return args
+
+
+def _has_mutating_script_invocation(command: str) -> bool:
+    tokens = _command_tokens(command)
+    for index, token in enumerate(tokens):
+        script_name = _token_basename(token)
+        policy = SCRIPT_MUTATION_POLICIES.get(script_name)
+        if policy is None or not _is_script_invocation(tokens, index):
+            continue
+        args = _script_args(tokens, index)
+        if any(arg in SCRIPT_HELP_FLAGS for arg in args):
+            continue
+        if policy == "requires_apply":
+            return "--apply" in args
+        return True
+    return False
 
 
 def _content_hash(content: str) -> str:

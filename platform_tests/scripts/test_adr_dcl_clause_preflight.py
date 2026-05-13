@@ -379,6 +379,35 @@ def test_report_only_emits_non_authorization_banner(preflight, tmp_path):
     assert "Owner waiver:" in report  # The banner advertises the bypass mechanism.
 
 
+def test_missing_operative_file_fails_closed(preflight, tmp_path):
+    """NO-GO F1: a missing bridge id cannot satisfy the mandatory gate."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    index = bridge_dir / "INDEX.md"
+    index.write_text("# Bridge Index\n", encoding="utf-8")
+    out = tmp_path / "report.md"
+
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            "missing-bridge-id",
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(bridge_dir),
+            "--index",
+            str(index),
+            "--out",
+            str(out),
+        ]
+    )
+
+    assert rc == preflight.EXIT_CANNOT_EVALUATE
+    report = out.read_text(encoding="utf-8")
+    assert "Operative file: (not found" in report
+    assert "gate fails closed" in report
+
+
 def test_explicit_owner_waiver_clears_blocking_gap(preflight, tmp_path):
     """Change 2: an explicit ``Owner waiver: <clause_id> — <DELIB-ID> — <reason>``
     line in the bridge content satisfies the gate without satisfying-evidence text.
@@ -411,3 +440,90 @@ def test_explicit_owner_waiver_clears_blocking_gap(preflight, tmp_path):
         ]
     )
     assert rc == 0, f"explicit owner-waiver line for the offending clause must clear the blocking gap; got exit {rc}"
+
+
+def test_content_file_mode_matches_indexed_mode_for_equivalent_content(preflight, tmp_path):
+    """Candidate-content mode should evaluate the same content without requiring
+    the bridge file to be live in INDEX first."""
+    bridge_id = "test-content-file-pass"
+    content = (
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- ADR-ISOLATION-APPLICATION-PLACEMENT-001 - project root boundary\n\n"
+        "## Files Changed\n\n"
+        "- scripts/foo.py (new, under E:\\GT-KB\\scripts\\)\n"
+        "All outputs reside in-root under E:\\GT-KB.\n"
+    )
+    _bridge_file, index, bridge_dir = _stage_bridge(tmp_path, bridge_id, content)
+    candidate = tmp_path / "candidate.md"
+    candidate.write_text(content, encoding="utf-8")
+
+    indexed_rc = preflight.main(
+        [
+            "--bridge-id",
+            bridge_id,
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(bridge_dir),
+            "--index",
+            str(index),
+            "--out",
+            str(tmp_path / "indexed.md"),
+        ]
+    )
+    candidate_rc = preflight.main(
+        [
+            "--bridge-id",
+            bridge_id,
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(tmp_path / "missing-bridge"),
+            "--index",
+            str(tmp_path / "missing-index.md"),
+            "--content-file",
+            str(candidate),
+            "--out",
+            str(tmp_path / "candidate-report.md"),
+        ]
+    )
+
+    assert indexed_rc == 0
+    assert candidate_rc == indexed_rc
+
+
+def test_content_file_mode_reports_blocking_gap_before_index_entry(preflight, tmp_path):
+    """Candidate-content mode must fail closed before a live INDEX row exists."""
+    bridge_id = "test-content-file-gap"
+    candidate = tmp_path / "candidate-gap.md"
+    candidate.write_text(
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- ADR-ISOLATION-APPLICATION-PLACEMENT-001 - project root boundary\n\n"
+        "Implementation will write outputs under C:\\Users\\evil\\out (out-of-root).\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "candidate-gap-report.md"
+
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            bridge_id,
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(tmp_path / "bridge"),
+            "--index",
+            str(tmp_path / "bridge" / "INDEX.md"),
+            "--content-file",
+            str(candidate),
+            "--out",
+            str(out),
+        ]
+    )
+
+    assert rc == preflight.EXIT_BLOCKING_GAP
+    report = out.read_text(encoding="utf-8")
+    assert "Blocking Gaps" in report
+    assert f"Operative file: `{candidate}" in report or "candidate-gap.md" in report

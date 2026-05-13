@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-12T20:11:05Z",
+  "generated_at": "2026-05-13T14:27:23Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -101,7 +101,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 21,
+      "count": 22,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/assertion-check.py",
@@ -113,6 +113,7 @@
         ".claude/hooks/formal-artifact-approval-gate.py",
         ".claude/hooks/glossary-expansion.py",
         ".claude/hooks/gov09-capture.py",
+        ".claude/hooks/implementation-start-gate.py",
         ".claude/hooks/intake-classifier.py",
         ".claude/hooks/narrative-artifact-approval-gate.py",
         ".claude/hooks/owner-decision-capture.py",
@@ -128,13 +129,17 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 8,
+      "count": 12,
       "items": [
+        ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
         ".codex/gtkb-hooks/glossary-expansion.py",
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
+        ".codex/gtkb-hooks/bridge-compliance-audit.cmd",
+        ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
         ".codex/gtkb-hooks/formal-artifact-approval.cmd",
+        ".codex/gtkb-hooks/implementation-start-gate.cmd",
         ".codex/gtkb-hooks/session-start.cmd",
         ".codex/gtkb-hooks/session-stop.cmd",
         ".codex/gtkb-hooks/workstream-focus.cmd"
@@ -208,7 +213,7 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 26,
+      "count": 27,
       "items": [
         "alternatives-investigation",
         "arch-audit",
@@ -229,6 +234,7 @@
         "kb-session-wrap-scan",
         "kb-spec",
         "kb-work-item",
+        "projects",
         "proposal-review",
         "release-candidate-gate",
         "run-tests",

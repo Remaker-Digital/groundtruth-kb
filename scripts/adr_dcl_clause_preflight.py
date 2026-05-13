@@ -343,6 +343,7 @@ def _is_under(path: Path, root: Path) -> bool:
 
 
 EXIT_BLOCKING_GAP = 5  # matches scripts/bridge_applicability_preflight.py convention
+EXIT_CANNOT_EVALUATE = EXIT_BLOCKING_GAP
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -351,6 +352,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--clauses-config", type=Path, default=DEFAULT_CLAUSES_CONFIG)
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--index", type=Path, default=DEFAULT_INDEX_PATH)
+    parser.add_argument(
+        "--content-file",
+        type=Path,
+        help="Evaluate candidate Markdown content from this file instead of resolving the operative INDEX entry.",
+    )
     parser.add_argument("--out", type=Path, help="optional: write report to this path instead of stdout")
     parser.add_argument(
         "--report-only",
@@ -369,10 +375,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0  # config-missing is a non-fatal warn (no clauses to evaluate)
 
     clauses = load_clauses(args.clauses_config)
-    operative_file = find_operative_file(args.bridge_id, args.index, args.bridge_dir)
+    operative_file = (
+        args.content_file
+        if args.content_file is not None
+        else find_operative_file(args.bridge_id, args.index, args.bridge_dir)
+    )
     content = ""
     blocking_gaps_count = 0
     if operative_file is None:
+        blocking_gaps_count = 1
         title = (
             "## Clause Applicability (Slice 2; mandatory gate)"
             if not args.report_only
@@ -383,7 +394,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{prefix}{title}\n\n"
             f"- Bridge id: `{args.bridge_id}`\n"
             f"- Operative file: (not found — no INDEX entry and no matching `bridge/{args.bridge_id}-NNN.md`)\n"
-            "- Mode: cannot evaluate without an operative file; gate neither passes nor fails.\n"
+            f"- Mode: cannot evaluate without an operative file; gate fails closed with exit {EXIT_CANNOT_EVALUATE}.\n"
         )
     else:
         content = operative_file.read_text(encoding="utf-8")

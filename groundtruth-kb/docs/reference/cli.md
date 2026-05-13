@@ -132,6 +132,38 @@ No additional options. Output includes:
 
 ---
 
+### gt status
+
+Report deterministic local operating state for a GT-KB project.
+
+```
+gt status [--json] [--startup] [--component <name> ...]
+```
+
+Bridge-related components use the standard read-only bridge status driver.
+`bridge` reports live `bridge/INDEX.md` latest-status counts plus role-correct
+actionable queues: Prime Builder sees only latest `GO` / `NO-GO`; Loyal
+Opposition sees only latest `NEW` / `REVISED`; latest `VERIFIED`, `WITHDRAWN`,
+and `ADVISORY` are non-actionable. `bridge-dispatch` reports local
+cross-harness trigger state, hook registration evidence, active-session locks,
+dispatch-state recipients, and retired/external automation inventory without
+spawning harnesses or mutating bridge state.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--json` | flag | off | Emit structured JSON including bridge queue lists and automation evidence |
+| `--startup` | flag | off | Emit compact startup-safe text |
+| `--component <name>` | choice | all | Limit output to one component; repeat for multiple components |
+
+**Examples:**
+
+```bash
+gt status --component bridge --component bridge-dispatch --json
+gt status --startup
+```
+
+---
+
 ### gt history
 
 Print recent changes across all artifact types.
@@ -214,6 +246,39 @@ No additional options. Output includes:
 
 See [Configuration Reference](configuration.md) for the full list of
 settings and resolution order.
+
+---
+
+### gt db snapshot
+
+Create a consistent, integrity-checked SQLite snapshot.
+
+```
+gt db snapshot [options]
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--output-dir` | path | `[backup].snapshot_output_dir` or user-local default | Snapshot publish directory |
+| `--staging-dir` | path | `[backup].snapshot_staging_dir` or user-local default | Temporary staging directory |
+| `--retain` | integer | `7` | Most-recent snapshots to retain |
+| `--daily-days` | integer | `30` | Daily retention window |
+| `--fast` | flag | off | Use `sqlite3.Connection.backup()` instead of `VACUUM INTO` |
+| `--include-chroma` | flag | off | Reserved for ChromaDB snapshots; currently fails closed |
+| `--json` | flag | off | Emit structured JSON |
+
+The command writes the SQLite output to staging first, runs
+`PRAGMA integrity_check`, then publishes with an atomic same-volume
+`os.replace`. It refuses synced staging paths and cross-volume staging/output
+pairs so backup tools do not observe a partially written database file.
+
+Exit codes:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Snapshot succeeded |
+| `1` | Integrity check failed; staged file was quarantined |
+| `2` | Configuration or safety refusal |
 
 ---
 

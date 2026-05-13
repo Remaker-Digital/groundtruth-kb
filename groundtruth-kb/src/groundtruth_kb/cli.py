@@ -32,7 +32,9 @@ from groundtruth_kb.cli_deliberations_record import (
 from groundtruth_kb.cli_spec_record import SPEC_RECORD_TYPES, SpecRecordError, SpecRecordRequest, record_spec
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
+from groundtruth_kb.project.lifecycle import PROJECTS_CHANGED_BY, ProjectLifecycleError, ProjectLifecycleService
 
 if TYPE_CHECKING:
     from groundtruth_kb.dashboard import DashboardPaths
@@ -53,6 +55,16 @@ brand_color = "#2563eb"
 [gates]
 # Plug-in governance gates (dotted import paths)
 # plugins = ["my_package.gates:MyCustomGate"]
+
+[backup]
+# Optional database snapshot settings. Defaults keep snapshots outside the
+# adopter root and stage them in a non-synced user-local directory.
+# snapshot_output_dir = ""
+# snapshot_staging_dir = ""
+# retain_recent = 7
+# retain_daily_days = 30
+# include_chroma = false
+# sync_paths = []
 """
 
 
@@ -267,6 +279,9 @@ def summary(ctx: click.Context) -> None:
         click.echo(f"  Work items:         {s['work_item_total']}")
         for status, count in sorted(s["work_item_counts"].items()):
             click.echo(f"    {status}: {count}")
+        click.echo(f"  Projects:           {s['project_total']}")
+        for status, count in sorted(s["project_counts"].items()):
+            click.echo(f"    {status}: {count}")
         click.echo(f"  Documents:          {s['document_count']}")
         a_pass, a_fail = s["assertions_passed"], s["assertions_failed"]
         click.echo(f"  Assertions run:     {s['assertions_total']} ({a_pass} passed, {a_fail} failed)")
@@ -437,6 +452,393 @@ def backlog_list(ctx: click.Context, json_output: bool, include_verified: bool) 
         status = item.get("status_detail") or item.get("resolution_status")
         title = item.get("title") or item["id"]
         click.echo(f"{order_prefix}\t{item['id']}\t{status}\t{title}")
+
+
+# ---------------------------------------------------------------------------
+# gt projects
+# ---------------------------------------------------------------------------
+
+
+@main.group(name="projects")
+def projects_cmd() -> None:
+    """Project artifact commands backed by MemBase projects over work_items."""
+
+
+def _project_service(ctx: click.Context) -> tuple[KnowledgeDB, ProjectLifecycleService]:
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    return db, ProjectLifecycleService(db)
+
+
+@projects_cmd.command("list")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--all", "include_terminal", is_flag=True, help="Include completed/retired/cancelled projects.")
+@click.pass_context
+def projects_list(ctx: click.Context, json_output: bool, include_terminal: bool) -> None:
+    """List first-class project records."""
+    db, service = _project_service(ctx)
+    try:
+        projects = service.list_projects(include_terminal=include_terminal)
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(projects, indent=2, sort_keys=True))
+        return
+    if not projects:
+        click.echo("No projects found.")
+        return
+    for project in projects:
+        rank = project.get("rank")
+        rank_prefix = "-" if rank is None else str(rank)
+        click.echo(f"{rank_prefix}\t{project['id']}\t{project['status']}\t{project['name']}")
+
+
+@projects_cmd.command("show")
+@click.argument("project_id")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> None:
+    """Show a project with its work items, dependencies, and artifact links."""
+    db, service = _project_service(ctx)
+    try:
+        payload = service.show_project(project_id)
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    project = payload["project"]
+    work_items = payload["work_items"]
+    dependencies = payload["dependencies"]
+    artifact_links = payload["artifact_links"]
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+
+    click.echo(f"{project['id']}: {project['name']} [{project['status']}]")
+    if work_items:
+        click.echo("Work items:")
+        for item in work_items:
+            status = item.get("status_detail") or item.get("resolution_status")
+            click.echo(f"  - {item['work_item_id']}: {status} - {item['work_item_title']}")
+    if dependencies:
+        click.echo("Dependencies:")
+        for dep in dependencies:
+            click.echo(
+                f"  - {dep['from_project_id']} {dep['dependency_type']} {dep['to_project_id']}"
+                f" [{dep['blocking_status']}]"
+            )
+    if artifact_links:
+        click.echo("Artifact links:")
+        for link in artifact_links:
+            click.echo(f"  - {link['artifact_type']}:{link['artifact_ref']} ({link['relationship']})")
+
+
+@projects_cmd.command("create")
+@click.argument("name")
+@click.option("--id", "project_id", default=None, help="Explicit project id. Defaults to stable id from name.")
+@click.option("--rank", type=int, default=None, help="Project ordering rank.")
+@click.option("--parent-project-id", default=None, help="Parent project id for sub-project grouping.")
+@click.option("--purpose", default=None, help="Project purpose.")
+@click.option("--target-outcome", default=None, help="Expected project outcome.")
+@click.option("--scope-note", default=None, help="Scope boundary note.")
+@click.option("--start-date", default=None, help="Project start date.")
+@click.option("--target-date", default=None, help="Project target date.")
+@click.option("--notes", default=None, help="Project notes.")
+@click.option("--source-project-name", default=None, help="Compatibility source project name.")
+@click.option("--source-subproject-name", default=None, help="Compatibility source sub-project name.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the new project version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_create(
+    ctx: click.Context,
+    name: str,
+    project_id: str | None,
+    rank: int | None,
+    parent_project_id: str | None,
+    purpose: str | None,
+    target_outcome: str | None,
+    scope_note: str | None,
+    start_date: str | None,
+    target_date: str | None,
+    notes: str | None,
+    source_project_name: str | None,
+    source_subproject_name: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Create a first-class project record."""
+    db, service = _project_service(ctx)
+    try:
+        project = service.create_project(
+            name,
+            project_id=project_id,
+            rank=rank,
+            parent_project_id=parent_project_id,
+            purpose=purpose,
+            target_outcome=target_outcome,
+            scope_note=scope_note,
+            start_date=start_date,
+            target_date=target_date,
+            notes=notes,
+            source_project_name=source_project_name,
+            source_subproject_name=source_subproject_name,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(project, indent=2, sort_keys=True))
+        return
+    click.echo(f"Created project {project['id']}: {project['name']}")
+
+
+@projects_cmd.command("update")
+@click.argument("project_id")
+@click.option("--name", default=None, help="New project name.")
+@click.option("--status", default=None, help="New project status.")
+@click.option("--rank", type=int, default=None, help="New project ordering rank.")
+@click.option("--parent-project-id", default=None, help="New parent project id.")
+@click.option("--purpose", default=None, help="New project purpose.")
+@click.option("--target-outcome", default=None, help="New expected project outcome.")
+@click.option("--scope-note", default=None, help="New scope boundary note.")
+@click.option("--start-date", default=None, help="New project start date.")
+@click.option("--target-date", default=None, help="New project target date.")
+@click.option("--completed-at", default=None, help="Completion timestamp/date.")
+@click.option("--notes", default=None, help="New project notes.")
+@click.option("--source-project-name", default=None, help="Compatibility source project name.")
+@click.option("--source-subproject-name", default=None, help="Compatibility source sub-project name.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the new project version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_update(
+    ctx: click.Context,
+    project_id: str,
+    name: str | None,
+    status: str | None,
+    rank: int | None,
+    parent_project_id: str | None,
+    purpose: str | None,
+    target_outcome: str | None,
+    scope_note: str | None,
+    start_date: str | None,
+    target_date: str | None,
+    completed_at: str | None,
+    notes: str | None,
+    source_project_name: str | None,
+    source_subproject_name: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Update a project by appending a new project version."""
+    updates = {
+        key: value
+        for key, value in {
+            "name": name,
+            "status": status,
+            "rank": rank,
+            "parent_project_id": parent_project_id,
+            "purpose": purpose,
+            "target_outcome": target_outcome,
+            "scope_note": scope_note,
+            "start_date": start_date,
+            "target_date": target_date,
+            "completed_at": completed_at,
+            "notes": notes,
+            "source_project_name": source_project_name,
+            "source_subproject_name": source_subproject_name,
+        }.items()
+        if value is not None
+    }
+    if not updates:
+        raise click.ClickException("At least one update option is required.")
+
+    db, service = _project_service(ctx)
+    try:
+        project = service.update_project(
+            project_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            **updates,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(project, indent=2, sort_keys=True))
+        return
+    click.echo(f"Updated project {project['id']}: {project['name']} [{project['status']}]")
+
+
+@projects_cmd.command("add-item")
+@click.argument("project_id")
+@click.argument("work_item_id")
+@click.option("--role", "membership_role", default="member", show_default=True, help="Membership role.")
+@click.option("--order", "membership_order", type=int, default=None, help="Membership order.")
+@click.option("--source", default="gt projects add-item", show_default=True, help="Membership source.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the new membership version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_add_item(
+    ctx: click.Context,
+    project_id: str,
+    work_item_id: str,
+    membership_role: str,
+    membership_order: int | None,
+    source: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Add one work item to a project."""
+    db, service = _project_service(ctx)
+    try:
+        membership = service.add_project_item(
+            project_id,
+            work_item_id,
+            membership_role=membership_role,
+            membership_order=membership_order,
+            source=source,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(membership, indent=2, sort_keys=True))
+        return
+    click.echo(f"Linked {membership['work_item_id']} to {membership['project_id']} as {membership['membership_role']}")
+
+
+@projects_cmd.command("reorder")
+@click.argument("project_id")
+@click.argument("work_item_ids", nargs=-1)
+@click.option("--start-at", type=int, default=1, show_default=True, help="First membership_order value.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the new membership versions.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_reorder(
+    ctx: click.Context,
+    project_id: str,
+    work_item_ids: tuple[str, ...],
+    start_at: int,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Reorder all active work-item memberships in one project."""
+    if not work_item_ids:
+        raise click.ClickException("At least one work item id is required.")
+    db, service = _project_service(ctx)
+    try:
+        memberships = service.reorder_project_items(
+            project_id,
+            list(work_item_ids),
+            start_at=start_at,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(memberships, indent=2, sort_keys=True))
+        return
+    click.echo(f"Reordered {len(memberships)} work item(s) in {project_id}.")
+
+
+@projects_cmd.command("retire")
+@click.argument("project_id")
+@click.option("--completed-at", default=None, help="Completion timestamp/date. Defaults to current UTC time.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the retired project version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_retire(
+    ctx: click.Context,
+    project_id: str,
+    completed_at: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Retire a project by appending a terminal project version."""
+    db, service = _project_service(ctx)
+    try:
+        project = service.retire_project(
+            project_id,
+            completed_at=completed_at,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(project, indent=2, sort_keys=True))
+        return
+    click.echo(f"Retired project {project['id']}: {project['name']}")
+
+
+@projects_cmd.command("link-bridge")
+@click.argument("project_id")
+@click.argument("bridge_id")
+@click.option("--relationship", default="related", show_default=True, help="Artifact relationship.")
+@click.option("--notes", default=None, help="Optional link note.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the new artifact-link version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_link_bridge(
+    ctx: click.Context,
+    project_id: str,
+    bridge_id: str,
+    relationship: str,
+    notes: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Link a project to a bridge thread artifact without editing bridge/INDEX.md."""
+    db, service = _project_service(ctx)
+    try:
+        link = service.link_bridge_thread(
+            project_id,
+            bridge_id,
+            relationship=relationship,
+            notes=notes,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(link, indent=2, sort_keys=True))
+        return
+    click.echo(f"Linked bridge thread {link['artifact_ref']} to {link['project_id']}.")
 
 
 # ---------------------------------------------------------------------------
@@ -848,6 +1250,10 @@ _IMPORTABLE_TABLES = frozenset(
         "test_plans",
         "test_plan_phases",
         "work_items",
+        "projects",
+        "project_work_item_memberships",
+        "project_dependencies",
+        "project_artifact_links",
         "backlog_snapshots",
         "testable_elements",
         "quality_scores",
@@ -999,6 +1405,68 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# gt db
+# ---------------------------------------------------------------------------
+
+
+@main.group("db")
+def db_cmd() -> None:
+    """Database operations."""
+
+
+@db_cmd.command("snapshot")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=None, help="Snapshot publish directory")
+@click.option("--staging-dir", type=click.Path(path_type=Path), default=None, help="Temporary staging directory")
+@click.option("--retain", "retain_recent", type=int, default=None, help="Recent snapshots to retain")
+@click.option("--daily-days", "retain_daily_days", type=int, default=None, help="Daily snapshot retention window")
+@click.option("--fast", is_flag=True, help="Use sqlite3 backup API instead of VACUUM INTO")
+@click.option("--include-chroma", is_flag=True, help="Also snapshot ChromaDB data; fails closed in this slice")
+@click.option("--json", "json_output", is_flag=True, help="Emit structured JSON")
+@click.pass_context
+def db_snapshot_cmd(
+    ctx: click.Context,
+    output_dir: Path | None,
+    staging_dir: Path | None,
+    retain_recent: int | None,
+    retain_daily_days: int | None,
+    fast: bool,
+    include_chroma: bool,
+    json_output: bool,
+) -> None:
+    """Create a consistent, integrity-checked SQLite snapshot."""
+    cfg = _resolve_config(ctx)
+    try:
+        result = create_snapshot(
+            cfg,
+            output_dir=output_dir,
+            staging_dir=staging_dir,
+            retain_recent=retain_recent,
+            retain_daily_days=retain_daily_days,
+            fast=fast,
+            include_chroma=include_chroma or None,
+        )
+    except SnapshotError as exc:
+        if json_output:
+            click.echo(json.dumps({"status": "error", "exit_code": exc.exit_code, "message": str(exc)}, indent=2))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        raise SystemExit(exc.exit_code) from exc
+
+    if json_output:
+        click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
+        return
+
+    click.echo(f"Snapshot created: {result.final_path}")
+    click.echo(f"Manifest: {result.manifest_path}")
+    click.echo(f"Method: {result.method}")
+    click.echo(f"Integrity: {result.integrity_result}")
+    if result.warnings:
+        for warning in result.warnings:
+            click.echo(f"WARNING: {warning}", err=True)
+    click.echo(f"Retention: retained {result.retained_count}, deleted {result.deleted_count}")
+
+
+# ---------------------------------------------------------------------------
 # gt config
 # ---------------------------------------------------------------------------
 
@@ -1029,6 +1497,9 @@ def config(ctx: click.Context) -> None:
         except ImportError:
             click.echo("  chroma_path:       (unset — chromadb not installed)")
     click.echo(f"  governance_gates:  {cfg.governance_gates or '(builtins only)'}")
+    click.echo(f"  backup_output_dir: {cfg.backup.snapshot_output_dir or '(default)'}")
+    click.echo(f"  backup_staging_dir:{cfg.backup.snapshot_staging_dir or '(default)'}")
+    click.echo(f"  backup_retain:     {cfg.backup.retain_recent} recent, {cfg.backup.retain_daily_days} daily days")
     click.echo(f"{'=' * 50}\n")
 
 

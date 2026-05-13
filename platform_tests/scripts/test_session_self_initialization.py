@@ -21,12 +21,33 @@ def _isolate_lifecycle_guard_env(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "session-lifecycle-guard.json"))
 
 
-def _load_module():
+def _load_module(*, live_dashboard_probes: bool = False):
     spec = importlib.util.spec_from_file_location("session_self_initialization", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["session_self_initialization"] = module
     spec.loader.exec_module(module)
+    if not live_dashboard_probes:
+        module._dashboard_reachability_probes = lambda: [
+            {
+                "source": "Grafana health endpoint",
+                "kind": "live_probe",
+                "required": False,
+                "status": "queried",
+                "queried_at": "2026-05-13T00:00:00Z",
+                "detail": module.GRAFANA_HEALTH_URL,
+                "http_status": 200,
+            },
+            {
+                "source": "GT-KB dashboard URL",
+                "kind": "live_probe",
+                "required": False,
+                "status": "queried",
+                "queried_at": "2026-05-13T00:00:00Z",
+                "detail": module.GRAFANA_DASHBOARD_URL,
+                "http_status": 200,
+            },
+        ]
     return module
 
 
@@ -372,6 +393,104 @@ def test_fast_hook_startup_model_skips_optional_live_network_probes(monkeypatch)
     assert posture["latest_main_probe_error"] == "skipped_fast_hook"
     assert github["gh_auth_status"] == "skipped_fast_hook"
     assert github["latest_run_source"] == "skipped_fast_hook"
+
+
+def test_dashboard_probe_returns_queried_when_endpoint_returns_200(monkeypatch) -> None:
+    module = _load_module(live_dashboard_probes=True)
+    observed: dict[str, object] = {}
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def getcode(self):
+            return 200
+
+    def fake_urlopen(request, *, timeout):
+        observed["url"] = request.full_url
+        observed["user_agent"] = request.get_header("User-agent")
+        observed["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+
+    result = module._probe_http_url("Grafana health endpoint", module.GRAFANA_HEALTH_URL)
+
+    assert result["status"] == "queried"
+    assert result["http_status"] == 200
+    assert observed == {
+        "url": module.GRAFANA_HEALTH_URL,
+        "user_agent": "gtkb-startup-reachability-probe/1.0",
+        "timeout": 3.0,
+    }
+
+
+def test_dashboard_probe_returns_unavailable_on_connection_refused(monkeypatch) -> None:
+    module = _load_module(live_dashboard_probes=True)
+
+    def fake_urlopen(_request, *, timeout):
+        assert timeout == 3.0
+        raise module.urllib.error.URLError(ConnectionRefusedError("refused"))
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+
+    result = module._probe_http_url("GT-KB dashboard URL", module.GRAFANA_DASHBOARD_URL)
+
+    assert result["status"] == "unavailable"
+    assert result["required"] is False
+    assert result["timeout_seconds"] == 3.0
+    assert "refused" in result["error"]
+
+
+def test_dashboard_reachability_probes_feed_payload_and_disclosure(monkeypatch) -> None:
+    module = _load_module(live_dashboard_probes=True)
+    monkeypatch.setattr(
+        module,
+        "_dashboard_reachability_probes",
+        lambda: [
+            {
+                "source": "Grafana health endpoint",
+                "kind": "live_probe",
+                "required": False,
+                "status": "queried",
+                "queried_at": "2026-05-13T00:00:00Z",
+                "detail": module.GRAFANA_HEALTH_URL,
+                "http_status": 200,
+            },
+            {
+                "source": "GT-KB dashboard URL",
+                "kind": "live_probe",
+                "required": False,
+                "status": "unavailable",
+                "queried_at": "2026-05-13T00:00:00Z",
+                "detail": module.GRAFANA_DASHBOARD_URL,
+                "error": "connection refused",
+            },
+        ],
+    )
+
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+    report = module.render_report(model, module.GRAFANA_DASHBOARD_URL, REPO_ROOT)
+    freshness = module._startup_freshness_metadata(
+        project_root=REPO_ROOT,
+        model=model,
+        request_started_at=model["generated_at"],
+        payload_emitted_at=model["generated_at"],
+        report_origin="in_memory_model_render",
+    )
+
+    probes = model["infrastructure"]["dashboard_reachability"]
+    assert [probe["source"] for probe in probes] == ["Grafana health endpoint", "GT-KB dashboard URL"]
+    assert "Dashboard reachability: Grafana health endpoint: queried (HTTP 200)" in report
+    assert "Dashboard reachability: GT-KB dashboard URL: unavailable" in report
+    assert "Dashboard recovery hint:" in report
+    assert "GT-KB dashboard URL" in freshness["validation"]["live_probe_gaps"]
+    assert freshness["validation"]["status"] == "fresh_with_gaps"
 
 
 def test_harness_role_assignment_map_is_startup_source_of_truth(tmp_path, capsys, monkeypatch) -> None:
@@ -1308,22 +1427,26 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert hook_output["hookEventName"] == "SessionStart"
     assert "Programmatic Startup Payload" in context
     assert "gtkb-startup-service-v2" in context
-    assert "User-visible startup content below was generated programmatically by the startup service." in context
-    assert "relay the generated startup message verbatim as the first durable assistant answer" in context
+    assert (
+        "User-visible startup content below was generated programmatically by the startup service and cached for lazy injection."
+        in context
+    )
+    assert "relay the generated startup message verbatim as the first durable assistant answer" not in context
     assert "Do not summarize, paraphrase, shorten, reorder, or omit any startup section" in context
     assert (
         "Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label"
         in context
     )
     assert "the A/B/C recommendations and D full focus list must remain present" in context
-    assert "The first durable assistant answer should be the startup disclosure itself" in context
     assert "routes the first owner message through the init-keyword matcher" in context
     assert "The startup disclosure is generated at SessionStart time and cached for lazy injection" in context
-    assert "Never map the first owner message to `Continue Last Session` or any other focus option." in context
-    assert "Codex Desktop durability rule" in context
-    assert "first durable assistant answer" in context
-    assert "not in transient progress/intermediary output" in context
-    assert "Do not replace the startup message with a shorter final answer" in context
+    assert "Only an init-keyword match relays startup disclosure" in context
+    assert "a non-matching first owner message is ordinary task input and may be mapped normally" in context
+    assert "Codex Desktop durability rule" not in context
+    assert "first durable assistant answer" not in context
+    assert "not in transient progress/intermediary output" not in context
+    assert "When the init-keyword path renders cached startup content" in context
+    assert "do not replace the startup message with a shorter final answer" in context
     assert "The AI harness is not responsible for composing role, mode, bridge, process, or focus content" in context
     assert "## User-Visible Startup Message" in context
     assert "## Startup Disclosure" in context

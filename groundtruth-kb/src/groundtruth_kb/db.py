@@ -81,6 +81,12 @@ WORK_ITEM_TERMINAL_RESOLUTION_STATUSES = (
     "not_a_defect",
 )
 
+PROJECT_TERMINAL_STATUSES = (
+    "completed",
+    "retired",
+    "cancelled",
+)
+
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS specifications (
@@ -286,6 +292,78 @@ CREATE TABLE IF NOT EXISTS work_items (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS projects (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    rank INTEGER,
+    parent_project_id TEXT,
+    purpose TEXT,
+    target_outcome TEXT,
+    scope_note TEXT,
+    start_date TEXT,
+    target_date TEXT,
+    completed_at TEXT,
+    notes TEXT,
+    source_project_name TEXT,
+    source_subproject_name TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS project_work_item_memberships (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    project_id TEXT NOT NULL,
+    work_item_id TEXT NOT NULL,
+    membership_role TEXT NOT NULL DEFAULT 'member',
+    membership_order INTEGER,
+    status TEXT NOT NULL DEFAULT 'active',
+    source TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS project_dependencies (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    from_project_id TEXT NOT NULL,
+    to_project_id TEXT NOT NULL,
+    dependency_type TEXT NOT NULL DEFAULT 'depends_on',
+    rationale TEXT,
+    blocking_status TEXT NOT NULL DEFAULT 'open',
+    related_work_item_id TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS project_artifact_links (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    project_id TEXT NOT NULL,
+    artifact_type TEXT NOT NULL,
+    artifact_ref TEXT NOT NULL,
+    relationship TEXT NOT NULL DEFAULT 'related',
+    status TEXT NOT NULL DEFAULT 'active',
+    notes TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS backlog_snapshots (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -461,6 +539,19 @@ CREATE INDEX IF NOT EXISTS idx_tpp_plan_id ON test_plan_phases(plan_id);
 CREATE INDEX IF NOT EXISTS idx_work_items_id_version ON work_items(id, version);
 CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(resolution_status);
 CREATE INDEX IF NOT EXISTS idx_work_items_origin ON work_items(origin);
+CREATE INDEX IF NOT EXISTS idx_projects_id_version ON projects(id, version);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_rank ON projects(rank);
+CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_project_id);
+CREATE INDEX IF NOT EXISTS idx_project_memberships_id_version ON project_work_item_memberships(id, version);
+CREATE INDEX IF NOT EXISTS idx_project_memberships_project ON project_work_item_memberships(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_memberships_work_item ON project_work_item_memberships(work_item_id);
+CREATE INDEX IF NOT EXISTS idx_project_dependencies_id_version ON project_dependencies(id, version);
+CREATE INDEX IF NOT EXISTS idx_project_dependencies_from ON project_dependencies(from_project_id);
+CREATE INDEX IF NOT EXISTS idx_project_dependencies_to ON project_dependencies(to_project_id);
+CREATE INDEX IF NOT EXISTS idx_project_artifact_links_id_version ON project_artifact_links(id, version);
+CREATE INDEX IF NOT EXISTS idx_project_artifact_links_project ON project_artifact_links(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_artifact_links_artifact ON project_artifact_links(artifact_type, artifact_ref);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
@@ -528,6 +619,28 @@ CREATE VIEW IF NOT EXISTS current_work_items AS
 SELECT w.* FROM work_items w
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM work_items GROUP BY id) m
 ON w.id = m.id AND w.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_projects AS
+SELECT p.* FROM projects p
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM projects GROUP BY id) m
+ON p.id = m.id AND p.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_project_work_item_memberships AS
+SELECT m.* FROM project_work_item_memberships m
+INNER JOIN (
+    SELECT id, MAX(version) AS max_v FROM project_work_item_memberships GROUP BY id
+) latest
+ON m.id = latest.id AND m.version = latest.max_v;
+
+CREATE VIEW IF NOT EXISTS current_project_dependencies AS
+SELECT d.* FROM project_dependencies d
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM project_dependencies GROUP BY id) m
+ON d.id = m.id AND d.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_project_artifact_links AS
+SELECT l.* FROM project_artifact_links l
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM project_artifact_links GROUP BY id) m
+ON l.id = m.id AND l.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
@@ -667,6 +780,22 @@ def _validate_provisional_until(provisional_until: Any) -> None:
             raise ValueError("provisional_until must be a non-empty string")
 
 
+def _stable_slug(value: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", value.upper()).strip("-")
+    return slug or "UNNAMED"
+
+
+def _project_id_from_names(project_name: str, subproject_name: str | None = None) -> str:
+    base = f"PROJECT-{_stable_slug(project_name)}"
+    if subproject_name and subproject_name.strip():
+        return f"{base}-{_stable_slug(subproject_name)}"
+    return base
+
+
+def _stable_project_link_id(prefix: str, *parts: str) -> str:
+    return f"{prefix}-{'-'.join(_stable_slug(part) for part in parts if part)}"
+
+
 class KnowledgeDB:
     """Append-only knowledge database."""
 
@@ -760,6 +889,149 @@ class KnowledgeDB:
         conn.commit()
         if added_work_item_cols:
             _log.info("Applied migration: unified backlog work item columns %s", added_work_item_cols)
+
+        # Migration 6: first-class project layer over canonical work_items.
+        self._backfill_project_artifacts_from_work_items()
+
+    def _backfill_project_artifacts_from_work_items(self) -> None:
+        """Backfill project rows from compatibility work-item project strings.
+
+        This keeps ``work_items`` / ``current_work_items`` as the canonical
+        backlog authority and creates only organizing project records plus
+        memberships. The migration is idempotent and never deletes rows.
+        """
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT id, project_name, subproject_name, implementation_order
+               FROM current_work_items
+               WHERE project_name IS NOT NULL AND TRIM(project_name) <> ''
+               ORDER BY project_name, subproject_name, implementation_order IS NULL, implementation_order, id"""
+        ).fetchall()
+        changed = False
+        now = _now()
+        for row in rows:
+            project_name = str(row["project_name"]).strip()
+            subproject_name = str(row["subproject_name"]).strip() if row["subproject_name"] else None
+            work_item_id = str(row["id"])
+            order = row["implementation_order"]
+            project_id = _project_id_from_names(project_name)
+            if not self._project_exists(project_id):
+                conn.execute(
+                    """INSERT INTO projects
+                       (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
+                        scope_note, start_date, target_date, completed_at, notes, source_project_name,
+                        source_subproject_name, changed_by, changed_at, change_reason)
+                       VALUES (?, 1, ?, 'active', ?, NULL, NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, NULL,
+                               'project-backfill', ?, ?)""",
+                    (
+                        project_id,
+                        project_name,
+                        order,
+                        "Backfilled from current_work_items.project_name compatibility field.",
+                        project_name,
+                        now,
+                        "Create first-class project record from work_items.project_name compatibility data.",
+                    ),
+                )
+                changed = True
+            changed = (
+                self._insert_project_membership_if_missing(
+                    project_id=project_id,
+                    work_item_id=work_item_id,
+                    membership_role="member",
+                    membership_order=order,
+                    source="work_items.project_name",
+                    changed_by="project-backfill",
+                    change_reason="Backfill project membership from work_items.project_name compatibility data.",
+                    changed_at=now,
+                )
+                or changed
+            )
+
+            if subproject_name:
+                subproject_id = _project_id_from_names(project_name, subproject_name)
+                if not self._project_exists(subproject_id):
+                    conn.execute(
+                        """INSERT INTO projects
+                           (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
+                            scope_note, start_date, target_date, completed_at, notes, source_project_name,
+                            source_subproject_name, changed_by, changed_at, change_reason)
+                           VALUES (?, 1, ?, 'active', ?, ?, NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, ?,
+                                   'project-backfill', ?, ?)""",
+                        (
+                            subproject_id,
+                            subproject_name,
+                            order,
+                            project_id,
+                            "Backfilled from current_work_items.subproject_name compatibility field.",
+                            project_name,
+                            subproject_name,
+                            now,
+                            "Create first-class subproject record from work_items.subproject_name compatibility data.",
+                        ),
+                    )
+                    changed = True
+                changed = (
+                    self._insert_project_membership_if_missing(
+                        project_id=subproject_id,
+                        work_item_id=work_item_id,
+                        membership_role="subproject_member",
+                        membership_order=order,
+                        source="work_items.subproject_name",
+                        changed_by="project-backfill",
+                        change_reason="Backfill project membership from work_items.subproject_name compatibility data.",
+                        changed_at=now,
+                    )
+                    or changed
+                )
+        if changed:
+            conn.commit()
+
+    def _project_exists(self, project_id: str) -> bool:
+        row = self._get_conn().execute("SELECT 1 FROM current_projects WHERE id = ?", (project_id,)).fetchone()
+        return row is not None
+
+    def _project_membership_exists(self, membership_id: str) -> bool:
+        row = (
+            self._get_conn()
+            .execute("SELECT 1 FROM current_project_work_item_memberships WHERE id = ?", (membership_id,))
+            .fetchone()
+        )
+        return row is not None
+
+    def _insert_project_membership_if_missing(
+        self,
+        *,
+        project_id: str,
+        work_item_id: str,
+        membership_role: str,
+        membership_order: int | None,
+        source: str,
+        changed_by: str,
+        change_reason: str,
+        changed_at: str | None = None,
+    ) -> bool:
+        membership_id = _stable_project_link_id("PWM", project_id, work_item_id)
+        if self._project_membership_exists(membership_id):
+            return False
+        self._get_conn().execute(
+            """INSERT INTO project_work_item_memberships
+               (id, version, project_id, work_item_id, membership_role, membership_order, status,
+                source, changed_by, changed_at, change_reason)
+               VALUES (?, 1, ?, ?, ?, ?, 'active', ?, ?, ?, ?)""",
+            (
+                membership_id,
+                project_id,
+                work_item_id,
+                membership_role,
+                membership_order,
+                source,
+                changed_by,
+                changed_at or _now(),
+                change_reason,
+            ),
+        )
+        return True
 
     @staticmethod
     def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
@@ -3062,14 +3334,14 @@ class KnowledgeDB:
                     "component": component,
                     "priority": priority,
                     "resolution_status": resolution_status,
-                        "stage": stage,
-                        "project_name": project_name,
-                        "subproject_name": subproject_name,
-                        "implementation_order": implementation_order,
-                        "status_detail": status_detail,
-                        "source_spec_id": source_spec_id,
-                        "source_test_id": source_test_id,
-                    },
+                    "stage": stage,
+                    "project_name": project_name,
+                    "subproject_name": subproject_name,
+                    "implementation_order": implementation_order,
+                    "status_detail": status_detail,
+                    "source_spec_id": source_spec_id,
+                    "source_test_id": source_test_id,
+                },
             )
             conn.commit()
         except Exception:
@@ -3112,9 +3384,7 @@ class KnowledgeDB:
         priority = fields.get("priority", current["priority"])
         current_stage = current.get("stage", "created")
         new_stage = fields.get("stage", current_stage)
-        backlog_values = {
-            field: fields.get(field, current.get(field)) for field in WORK_ITEM_BACKLOG_FIELDS
-        }
+        backlog_values = {field: fields.get(field, current.get(field)) for field in WORK_ITEM_BACKLOG_FIELDS}
         # Enforce stage transitions (includes GOV-15 owner approval gate)
         self._validate_stage_transition(
             id,
@@ -3277,6 +3547,334 @@ class KnowledgeDB:
             )
             .fetchall()
         )
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Projects
+    # ------------------------------------------------------------------
+
+    def _next_project_version(self, project_id: str) -> int:
+        row = self._get_conn().execute("SELECT MAX(version) FROM projects WHERE id = ?", (project_id,)).fetchone()
+        return (row[0] or 0) + 1
+
+    def _next_project_membership_version(self, membership_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM project_work_item_memberships WHERE id = ?", (membership_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def _next_project_dependency_version(self, dependency_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM project_dependencies WHERE id = ?", (dependency_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def _next_project_artifact_link_version(self, link_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM project_artifact_links WHERE id = ?", (link_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_project(
+        self,
+        name: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        id: str | None = None,
+        status: str = "active",
+        rank: int | None = None,
+        parent_project_id: str | None = None,
+        purpose: str | None = None,
+        target_outcome: str | None = None,
+        scope_note: str | None = None,
+        start_date: str | None = None,
+        target_date: str | None = None,
+        completed_at: str | None = None,
+        notes: str | None = None,
+        source_project_name: str | None = None,
+        source_subproject_name: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Insert a new project version.
+
+        Projects are lifecycle/planning artifacts over work items. They do not
+        replace ``work_items`` or ``current_work_items`` as backlog authority.
+        """
+        project_id = id or _project_id_from_names(name)
+        version = self._next_project_version(project_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO projects
+               (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
+                scope_note, start_date, target_date, completed_at, notes, source_project_name,
+                source_subproject_name, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                project_id,
+                version,
+                name,
+                status,
+                rank,
+                parent_project_id,
+                purpose,
+                target_outcome,
+                scope_note,
+                start_date,
+                target_date,
+                completed_at,
+                notes,
+                source_project_name,
+                source_subproject_name,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_project(project_id)
+
+    def get_project(self, project_id: str) -> dict[str, Any] | None:
+        row = self._get_conn().execute("SELECT * FROM current_projects WHERE id = ?", (project_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_projects(
+        self,
+        *,
+        status: str | None = None,
+        include_terminal: bool = False,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM current_projects WHERE 1=1"
+        params: list[Any] = []
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        elif not include_terminal:
+            placeholders = ", ".join("?" for _ in PROJECT_TERMINAL_STATUSES)
+            query += f" AND status NOT IN ({placeholders})"
+            params.extend(PROJECT_TERMINAL_STATUSES)
+        query += " ORDER BY rank IS NULL, rank, name, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def link_project_work_item(
+        self,
+        project_id: str,
+        work_item_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        membership_role: str = "member",
+        membership_order: int | None = None,
+        status: str = "active",
+        source: str | None = None,
+        id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Link a project to a canonical work item without duplicating the work item."""
+        if self.get_project(project_id) is None:
+            raise ValueError(f"Project {project_id} not found")
+        if self.get_work_item(work_item_id) is None:
+            raise ValueError(f"Work item {work_item_id} not found")
+        membership_id = id or _stable_project_link_id("PWM", project_id, work_item_id)
+        version = self._next_project_membership_version(membership_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO project_work_item_memberships
+               (id, version, project_id, work_item_id, membership_role, membership_order,
+                status, source, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                membership_id,
+                version,
+                project_id,
+                work_item_id,
+                membership_role,
+                membership_order,
+                status,
+                source,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_project_work_item_membership(membership_id)
+
+    def get_project_work_item_membership(self, membership_id: str) -> dict[str, Any] | None:
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_project_work_item_memberships WHERE id = ?", (membership_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def list_project_work_items(
+        self,
+        project_id: str,
+        *,
+        include_inactive: bool = False,
+    ) -> list[dict[str, Any]]:
+        query = """SELECT
+                      m.id AS membership_id,
+                      m.project_id AS project_id,
+                      m.membership_role AS membership_role,
+                      m.membership_order AS membership_order,
+                      m.status AS membership_status,
+                      m.source AS membership_source,
+                      w.id AS work_item_id,
+                      w.title AS work_item_title,
+                      w.description AS work_item_description,
+                      w.origin AS work_item_origin,
+                      w.component AS work_item_component,
+                      w.resolution_status AS resolution_status,
+                      w.priority AS priority,
+                      w.stage AS stage,
+                      w.project_name AS compatibility_project_name,
+                      w.subproject_name AS compatibility_subproject_name,
+                      w.implementation_order AS implementation_order,
+                      w.status_detail AS status_detail
+                   FROM current_project_work_item_memberships m
+                   INNER JOIN current_work_items w ON w.id = m.work_item_id
+                   WHERE m.project_id = ?"""
+        params: list[Any] = [project_id]
+        if not include_inactive:
+            query += " AND m.status = 'active'"
+        query += " ORDER BY m.membership_order IS NULL, m.membership_order, w.implementation_order IS NULL, w.implementation_order, w.id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def add_project_dependency(
+        self,
+        from_project_id: str,
+        to_project_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        dependency_type: str = "depends_on",
+        rationale: str | None = None,
+        blocking_status: str = "open",
+        related_work_item_id: str | None = None,
+        status: str = "active",
+        id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if self.get_project(from_project_id) is None:
+            raise ValueError(f"Project {from_project_id} not found")
+        if self.get_project(to_project_id) is None:
+            raise ValueError(f"Project {to_project_id} not found")
+        if related_work_item_id and self.get_work_item(related_work_item_id) is None:
+            raise ValueError(f"Work item {related_work_item_id} not found")
+        dependency_id = id or _stable_project_link_id("PDEP", from_project_id, to_project_id, dependency_type)
+        version = self._next_project_dependency_version(dependency_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO project_dependencies
+               (id, version, from_project_id, to_project_id, dependency_type, rationale,
+                blocking_status, related_work_item_id, status, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                dependency_id,
+                version,
+                from_project_id,
+                to_project_id,
+                dependency_type,
+                rationale,
+                blocking_status,
+                related_work_item_id,
+                status,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_project_dependency(dependency_id)
+
+    def get_project_dependency(self, dependency_id: str) -> dict[str, Any] | None:
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_project_dependencies WHERE id = ?", (dependency_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def list_project_dependencies(
+        self,
+        project_id: str,
+        *,
+        include_inactive: bool = False,
+    ) -> list[dict[str, Any]]:
+        query = """SELECT * FROM current_project_dependencies
+                   WHERE (from_project_id = ? OR to_project_id = ?)"""
+        params: list[Any] = [project_id, project_id]
+        if not include_inactive:
+            query += " AND status = 'active'"
+        query += " ORDER BY blocking_status, dependency_type, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def add_project_artifact_link(
+        self,
+        project_id: str,
+        artifact_type: str,
+        artifact_ref: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        relationship: str = "related",
+        status: str = "active",
+        notes: str | None = None,
+        id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if self.get_project(project_id) is None:
+            raise ValueError(f"Project {project_id} not found")
+        link_id = id or _stable_project_link_id("PAL", project_id, artifact_type, artifact_ref, relationship)
+        version = self._next_project_artifact_link_version(link_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO project_artifact_links
+               (id, version, project_id, artifact_type, artifact_ref, relationship, status,
+                notes, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                link_id,
+                version,
+                project_id,
+                artifact_type,
+                artifact_ref,
+                relationship,
+                status,
+                notes,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_project_artifact_link(link_id)
+
+    def get_project_artifact_link(self, link_id: str) -> dict[str, Any] | None:
+        row = (
+            self._get_conn().execute("SELECT * FROM current_project_artifact_links WHERE id = ?", (link_id,)).fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def list_project_artifact_links(
+        self,
+        project_id: str,
+        *,
+        include_inactive: bool = False,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM current_project_artifact_links WHERE project_id = ?"
+        params: list[Any] = [project_id]
+        if not include_inactive:
+            query += " AND status = 'active'"
+        query += " ORDER BY artifact_type, artifact_ref, relationship, id"
+        rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -3798,6 +4396,10 @@ class KnowledgeDB:
             "test_plans",
             "test_plan_phases",
             "work_items",
+            "projects",
+            "project_work_item_memberships",
+            "project_dependencies",
+            "project_artifact_links",
             "backlog_snapshots",
             "quality_scores",
             "testable_elements",
@@ -4934,6 +5536,14 @@ class KnowledgeDB:
         ).fetchall()
         work_item_counts = {r["resolution_status"]: r["cnt"] for r in wi_stats}
 
+        project_stats = conn.execute("SELECT status, COUNT(*) as cnt FROM current_projects GROUP BY status").fetchall()
+        project_counts = {r["status"]: r["cnt"] for r in project_stats}
+        project_membership_count = conn.execute(
+            "SELECT COUNT(*) FROM current_project_work_item_memberships"
+        ).fetchone()[0]
+        project_dependency_count = conn.execute("SELECT COUNT(*) FROM current_project_dependencies").fetchone()[0]
+        project_artifact_link_count = conn.execute("SELECT COUNT(*) FROM current_project_artifact_links").fetchone()[0]
+
         backlog_count = conn.execute("SELECT COUNT(*) FROM current_backlog_snapshots").fetchone()[0]
 
         te_count = conn.execute("SELECT COUNT(*) FROM current_testable_elements").fetchone()[0]
@@ -4958,6 +5568,11 @@ class KnowledgeDB:
             "test_plan_phase_count": test_plan_phase_count,
             "work_item_counts": work_item_counts,
             "work_item_total": sum(work_item_counts.values()),
+            "project_counts": project_counts,
+            "project_total": sum(project_counts.values()),
+            "project_membership_count": project_membership_count,
+            "project_dependency_count": project_dependency_count,
+            "project_artifact_link_count": project_artifact_link_count,
             "backlog_snapshot_count": backlog_count,
             "testable_element_count": te_count,
             "deliberation_count": delib_count,

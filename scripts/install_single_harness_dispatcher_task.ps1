@@ -35,6 +35,11 @@
 .PARAMETER IntervalMinutes
     The wake interval in minutes. Default 5.
 
+.PARAMETER MaxItems
+    Maximum actionable bridge entries to include per role in each dispatch
+    prompt. Default 999 so the regular automation drains the live queue rather
+    than preserving the dispatcher script's conservative manual default.
+
 .PARAMETER DryRun
     If set, print 'WOULD REGISTER TaskName=... Execute=... Arguments=...' to
     stdout and exit 0 WITHOUT calling Register-ScheduledTask.
@@ -44,6 +49,7 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$ProjectRoot,
     [int]$IntervalMinutes = 5,
+    [int]$MaxItems = 999,
     [switch]$DryRun
 )
 
@@ -62,7 +68,7 @@ if (-not $DryRun -and -not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) 
 
 # F4 fix: pythonw.exe (GUI-subsystem; no console allocation).
 $execName = "pythonw.exe"
-$argString = "`"$scriptPath`" --project-root `"$ProjectRoot`""
+$argString = "`"$scriptPath`" --project-root `"$ProjectRoot`" --max-items $MaxItems"
 
 if ($DryRun) {
     Write-Output "WOULD REGISTER TaskName=$TaskName Execute=$execName Arguments=$argString"
@@ -97,4 +103,4 @@ Register-ScheduledTask -TaskName $TaskName `
     -RunLevel Limited `
     -Description "GroundTruth-KB single-harness bridge dispatcher (Slice 2 of gtkb-single-harness-bridge-dispatcher-slice-2; SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 + DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001)." | Out-Null
 
-Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes Execute=$execName ScriptPath=$scriptPath"
+Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes MaxItems=$MaxItems Execute=$execName ScriptPath=$scriptPath"

@@ -13,6 +13,16 @@
         ]
       },
       {
+        "matcher": "Write|Edit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/implementation-start-gate.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit",
         "hooks": [
           {
@@ -35,6 +45,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode session-start --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/single_harness_bridge_automation.py\" --ensure --project-root \"$CLAUDE_PROJECT_DIR\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\" --max-items 999",
+            "timeout": 15
           },
           {
             "type": "command",
@@ -66,6 +81,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 10
           }
         ]
       },
@@ -81,6 +101,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 10
           }
         ]
       }
@@ -110,8 +135,18 @@
           },
           {
             "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode session-stop --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/single_harness_bridge_automation.py\" --ensure --dispatch-now --project-root \"$CLAUDE_PROJECT_DIR\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\" --max-items 999",
+            "timeout": 15
           }
         ]
       }

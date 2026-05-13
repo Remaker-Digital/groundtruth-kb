@@ -43,6 +43,9 @@ def test_defaults():
     assert cfg.logo_url is None
     assert cfg.legal_footer == ""
     assert cfg.governance_gates == []
+    assert cfg.backup.retain_recent == 7
+    assert cfg.backup.retain_daily_days == 30
+    assert cfg.backup.include_chroma is False
 
 
 def test_load_from_toml(tmp_path):
@@ -65,6 +68,32 @@ def test_load_from_toml(tmp_path):
     assert cfg.brand_mark == "MP"
     assert cfg.brand_color == "#ff0000"
     assert cfg.governance_gates == ["my_module:MyGate"]
+
+
+def test_loads_backup_section(tmp_path):
+    """Config loads optional [backup] values and anchors relative paths."""
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text(
+        "[groundtruth]\n"
+        'db_path = "groundtruth.db"\n'
+        "\n"
+        "[backup]\n"
+        'snapshot_output_dir = "snapshots"\n'
+        'snapshot_staging_dir = "stage"\n'
+        "retain_recent = 3\n"
+        "retain_daily_days = 14\n"
+        "include_chroma = true\n"
+        'sync_paths = ["cloud"]\n'
+    )
+
+    cfg = GTConfig.load(config_path=toml_file)
+
+    assert cfg.backup.snapshot_output_dir == tmp_path / "snapshots"
+    assert cfg.backup.snapshot_staging_dir == tmp_path / "stage"
+    assert cfg.backup.retain_recent == 3
+    assert cfg.backup.retain_daily_days == 14
+    assert cfg.backup.include_chroma is True
+    assert cfg.backup.sync_paths == (tmp_path / "cloud",)
 
 
 def test_env_overrides_toml(tmp_path, monkeypatch):

@@ -463,9 +463,7 @@ class TestBootstrapDesktop:
                     "--no-include-ci",
                 ],
             )
-            assert result.exit_code == 0, (
-                f"init failed: output={result.output!r} exc={result.exception!r}"
-            )
+            assert result.exit_code == 0, f"init failed: output={result.output!r} exc={result.exception!r}"
             assert (target / "BRIDGE-INVENTORY.md").exists()
             assert (target / "bridge-os-poller-setup-prompt.md").exists()
 

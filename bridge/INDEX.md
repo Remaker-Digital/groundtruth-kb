@@ -14,12 +14,98 @@
        - 3fbe6a81 feat(startup,docs): startup payload + Codex bootstrap mirror + test bank
        - 38e254dd feat(governance): title claims AGENTS.md+CLAUDE.md but stat shows
          only bridge/INDEX.md + 2 bridge files; the message overpromised the diff
-       - this commit feat(governance): actual AGENTS.md+CLAUDE.md content landing,
+     - this commit feat(governance): actual AGENTS.md+CLAUDE.md content landing,
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 
+Document: gtkb-implementation-start-gate-repository-finalization
+VERIFIED: bridge/gtkb-implementation-start-gate-repository-finalization-004.md
+NEW: bridge/gtkb-implementation-start-gate-repository-finalization-003.md
+GO: bridge/gtkb-implementation-start-gate-repository-finalization-002.md
+NEW: bridge/gtkb-implementation-start-gate-repository-finalization-001.md
+
+Document: gtkb-formal-artifact-approval-hook-false-positive-fix-001
+VERIFIED: bridge/gtkb-formal-artifact-approval-hook-false-positive-fix-001-007.md
+NEW: bridge/gtkb-formal-artifact-approval-hook-false-positive-fix-001-006.md
+GO: bridge/gtkb-formal-artifact-approval-hook-false-positive-fix-001-005.md
+REVISED: bridge/gtkb-formal-artifact-approval-hook-false-positive-fix-001-004.md
+GO: bridge/gtkb-formal-artifact-approval-hook-false-positive-fix-001-003.md
+REVISED: bridge/gtkb-formal-artifact-approval-hook-false-positive-fix-001-002.md
+NEW: bridge/gtkb-formal-artifact-approval-hook-false-positive-fix-001-001.md
+
+Document: gtkb-projects-skill-001
+VERIFIED: bridge/gtkb-projects-skill-001-007.md
+NEW: bridge/gtkb-projects-skill-001-006.md
+NEW: bridge/gtkb-projects-skill-001-005.md
+GO: bridge/gtkb-projects-skill-001-004.md
+REVISED: bridge/gtkb-projects-skill-001-003.md
+NO-GO: bridge/gtkb-projects-skill-001-002.md
+NEW: bridge/gtkb-projects-skill-001-001.md
+
+Document: gtkb-bridge-impl-report-skill-001
+VERIFIED: bridge/gtkb-bridge-impl-report-skill-001-004.md
+NEW: bridge/gtkb-bridge-impl-report-skill-001-003.md
+GO: bridge/gtkb-bridge-impl-report-skill-001-002.md
+NEW: bridge/gtkb-bridge-impl-report-skill-001-001.md
+
+Document: gtkb-bridge-verified-backlog-retirement
+VERIFIED: bridge/gtkb-bridge-verified-backlog-retirement-010.md
+NEW: bridge/gtkb-bridge-verified-backlog-retirement-009.md
+GO: bridge/gtkb-bridge-verified-backlog-retirement-008.md
+REVISED: bridge/gtkb-bridge-verified-backlog-retirement-007.md
+NO-GO: bridge/gtkb-bridge-verified-backlog-retirement-006.md
+NEW: bridge/gtkb-bridge-verified-backlog-retirement-005.md
+GO: bridge/gtkb-bridge-verified-backlog-retirement-004.md
+REVISED: bridge/gtkb-bridge-verified-backlog-retirement-003.md
+GO: bridge/gtkb-bridge-verified-backlog-retirement-002.md
+NEW: bridge/gtkb-bridge-verified-backlog-retirement-001.md
+
+Document: gtkb-single-harness-bridge-activation-manager
+VERIFIED: bridge/gtkb-single-harness-bridge-activation-manager-004.md
+NEW: bridge/gtkb-single-harness-bridge-activation-manager-003.md
+GO: bridge/gtkb-single-harness-bridge-activation-manager-002.md
+NEW: bridge/gtkb-single-harness-bridge-activation-manager-001.md
+
+Document: gtkb-implementation-start-authorization-gate
+VERIFIED: bridge/gtkb-implementation-start-authorization-gate-010.md
+NEW: bridge/gtkb-implementation-start-authorization-gate-009.md
+GO: bridge/gtkb-implementation-start-authorization-gate-008.md
+REVISED: bridge/gtkb-implementation-start-authorization-gate-007.md
+NO-GO: bridge/gtkb-implementation-start-authorization-gate-006.md
+REVISED: bridge/gtkb-implementation-start-authorization-gate-005.md
+NO-GO: bridge/gtkb-implementation-start-authorization-gate-004.md
+NEW: bridge/gtkb-implementation-start-authorization-gate-003.md
+GO: bridge/gtkb-implementation-start-authorization-gate-002.md
+NEW: bridge/gtkb-implementation-start-authorization-gate-001.md
+
+Document: gtkb-bridge-automation-status-driver
+VERIFIED: bridge/gtkb-bridge-automation-status-driver-006.md
+REVISED: bridge/gtkb-bridge-automation-status-driver-005.md
+NO-GO: bridge/gtkb-bridge-automation-status-driver-004.md
+NEW: bridge/gtkb-bridge-automation-status-driver-003.md
+GO: bridge/gtkb-bridge-automation-status-driver-002.md
+NEW: bridge/gtkb-bridge-automation-status-driver-001.md
+
+Document: gtkb-first-class-project-artifacts
+VERIFIED: bridge/gtkb-first-class-project-artifacts-009.md
+REVISED: bridge/gtkb-first-class-project-artifacts-008.md
+NO-GO: bridge/gtkb-first-class-project-artifacts-007.md
+VERIFIED: bridge/gtkb-first-class-project-artifacts-006.md
+NEW: bridge/gtkb-first-class-project-artifacts-005.md
+GO: bridge/gtkb-first-class-project-artifacts-004.md
+REVISED: bridge/gtkb-first-class-project-artifacts-003.md
+NO-GO: bridge/gtkb-first-class-project-artifacts-002.md
+NEW: bridge/gtkb-first-class-project-artifacts-001.md
+
 Document: gtkb-bridge-revision-skill-001
+VERIFIED: bridge/gtkb-bridge-revision-skill-001-009.md
+REVISED: bridge/gtkb-bridge-revision-skill-001-008.md
+NO-GO: bridge/gtkb-bridge-revision-skill-001-007.md
+VERIFIED: bridge/gtkb-bridge-revision-skill-001-006.md
+NEW: bridge/gtkb-bridge-revision-skill-001-005.md
+GO: bridge/gtkb-bridge-revision-skill-001-004.md
+REVISED: bridge/gtkb-bridge-revision-skill-001-003.md
 NO-GO: bridge/gtkb-bridge-revision-skill-001-002.md
 NEW: bridge/gtkb-bridge-revision-skill-001-001.md
 
@@ -264,6 +350,7 @@ NO-GO: bridge/gtkb-da-harvest-catchup-002.md
 NEW: bridge/gtkb-da-harvest-catchup-001.md
 
 Document: gtkb-artifact-recorder-cli
+WITHDRAWN: bridge/gtkb-artifact-recorder-cli-005.md
 GO: bridge/gtkb-artifact-recorder-cli-004.md
 REVISED: bridge/gtkb-artifact-recorder-cli-003.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-002.md
@@ -338,6 +425,8 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+VERIFIED: bridge/gtkb-bridge-advisory-status-001-016.md
+NEW: bridge/gtkb-bridge-advisory-status-001-015.md
 GO: bridge/gtkb-bridge-advisory-status-001-014.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-013.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-012.md
@@ -354,9 +443,11 @@ NO-GO: bridge/gtkb-bridge-advisory-status-001-002.md
 NEW: bridge/gtkb-bridge-advisory-status-001-001.md
 
 Document: gtkb-advisory-report-message-type-2026-05-09
+WITHDRAWN: bridge/gtkb-advisory-report-message-type-2026-05-09-002.md
 NO-GO: bridge/gtkb-advisory-report-message-type-2026-05-09-001.md
 
 Document: gtkb-mcp-stable-harness-surface-advisory-2026-05-09
+WITHDRAWN: bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-002.md
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-001.md
 
 Document: gtkb-scaffold-upgrade-tier-a
@@ -424,6 +515,7 @@ NO-GO: bridge/gtkb-canonical-init-keyword-syntax-001-002.md
 NEW: bridge/gtkb-canonical-init-keyword-syntax-001.md
 
 Document: gtkb-claude-code-bridge-status-thread-automation-001
+WITHDRAWN: bridge/gtkb-claude-code-bridge-status-thread-automation-001-005.md
 NO-GO: bridge/gtkb-claude-code-bridge-status-thread-automation-001-004.md
 REVISED: bridge/gtkb-claude-code-bridge-status-thread-automation-001-003.md
 NO-GO: bridge/gtkb-claude-code-bridge-status-thread-automation-001-002.md
@@ -456,6 +548,8 @@ NO-GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-
 NEW: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001.md
 
 Document: gtkb-loyal-opposition-startup-symmetry-001
+VERIFIED: bridge/gtkb-loyal-opposition-startup-symmetry-001-010.md
+NEW: bridge/gtkb-loyal-opposition-startup-symmetry-001-009.md
 GO: bridge/gtkb-loyal-opposition-startup-symmetry-001-008.md
 REVISED: bridge/gtkb-loyal-opposition-startup-symmetry-001-007.md
 NO-GO: bridge/gtkb-loyal-opposition-startup-symmetry-001-006.md
@@ -476,6 +570,16 @@ NO-GO: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-active-session-suppression-001.md
 
 Document: gtkb-session-start-formalization-001
+VERIFIED: bridge/gtkb-session-start-formalization-001-012.md
+NEW: bridge/gtkb-session-start-formalization-001-011.md
+GO: bridge/gtkb-session-start-formalization-001-010.md
+REVISED: bridge/gtkb-session-start-formalization-001-009.md
+NO-GO: bridge/gtkb-session-start-formalization-001-008.md
+NEW: bridge/gtkb-session-start-formalization-001-007.md
+GO: bridge/gtkb-session-start-formalization-001-006.md
+REVISED: bridge/gtkb-session-start-formalization-001-005.md
+NO-GO: bridge/gtkb-session-start-formalization-001-004.md
+REVISED: bridge/gtkb-session-start-formalization-001-003.md
 NO-GO: bridge/gtkb-session-start-formalization-001-002.md
 NEW: bridge/gtkb-session-start-formalization-001.md
 
@@ -544,6 +648,8 @@ NO-GO: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-002.md
 NEW: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-001.md
 
 Document: gtkb-bridge-skill-unified-001
+VERIFIED: bridge/gtkb-bridge-skill-unified-001-006.md
+REVISED: bridge/gtkb-bridge-skill-unified-001-005.md
 NO-GO: bridge/gtkb-bridge-skill-unified-001-004.md
 NEW: bridge/gtkb-bridge-skill-unified-001-003.md
 GO: bridge/gtkb-bridge-skill-unified-001-002.md
@@ -570,6 +676,10 @@ NO-GO: bridge/gtkb-da-read-surface-correction-phase-0-formalization-002.md
 NEW: bridge/gtkb-da-read-surface-correction-phase-0-formalization-001.md
 
 Document: gtkb-startup-dashboard-reachability-probe
+VERIFIED: bridge/gtkb-startup-dashboard-reachability-probe-006.md
+NEW: bridge/gtkb-startup-dashboard-reachability-probe-005.md
+GO: bridge/gtkb-startup-dashboard-reachability-probe-004.md
+REVISED: bridge/gtkb-startup-dashboard-reachability-probe-003.md
 NO-GO: bridge/gtkb-startup-dashboard-reachability-probe-002.md
 NEW: bridge/gtkb-startup-dashboard-reachability-probe-001.md
 
@@ -625,6 +735,7 @@ NO-GO: bridge/gtkb-canonical-terminology-system-context-model-001-002.md
 NEW: bridge/gtkb-canonical-terminology-system-context-model-001-001.md
 
 Document: gtkb-canonical-terminology-system-context-model-advisory-2026-05-07
+WITHDRAWN: bridge/gtkb-canonical-terminology-system-context-model-advisory-2026-05-07-002.md
 NO-GO: bridge/gtkb-canonical-terminology-system-context-model-advisory-2026-05-07-001.md
 
 Document: gtkb-isolation-018-slice-e3-platform-test-disposition
@@ -654,6 +765,7 @@ GO: bridge/gtkb-docs-quality-remediation-002.md
 NEW: bridge/gtkb-docs-quality-remediation-001.md
 
 Document: gtkb-isolation-018-slice-e-code-cluster
+WITHDRAWN: bridge/gtkb-isolation-018-slice-e-code-cluster-005.md
 GO: bridge/gtkb-isolation-018-slice-e-code-cluster-004.md
 REVISED: bridge/gtkb-isolation-018-slice-e-code-cluster-003.md
 NO-GO: bridge/gtkb-isolation-018-slice-e-code-cluster-002.md
@@ -674,6 +786,8 @@ NO-GO: bridge/gtkb-lift-feature-freeze-002.md
 NEW: bridge/gtkb-lift-feature-freeze-001.md
 
 Document: gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion
+VERIFIED: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-008.md
+REVISED: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-007.md
 NO-GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-006.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-005.md
 GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-004.md
@@ -739,6 +853,10 @@ NO-GO: bridge/gtkb-kb-attribution-harness-aware-002.md
 NEW: bridge/gtkb-kb-attribution-harness-aware-001.md
 
 Document: gtkb-codex-bridge-compliance-gate-parity
+VERIFIED: bridge/gtkb-codex-bridge-compliance-gate-parity-012.md
+REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-011.md
+NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-010.md
+NEW: bridge/gtkb-codex-bridge-compliance-gate-parity-009.md
 GO: bridge/gtkb-codex-bridge-compliance-gate-parity-008.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-007.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-006.md
@@ -765,6 +883,10 @@ NO-GO: bridge/gtkb-harness-parity-baseline-002.md
 NEW: bridge/gtkb-harness-parity-baseline-001.md
 
 Document: gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan
+VERIFIED: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-010.md
+REVISED: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-009.md
+NO-GO: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-008.md
+NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-007.md
 VERIFIED: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-006.md
 REVISED: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-005.md
 NO-GO: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-004.md
@@ -831,6 +953,8 @@ NO-GO: bridge/gtkb-ci-coverage-for-platform-001-002.md
 NEW: bridge/gtkb-ci-coverage-for-platform-001-001.md
 
 Document: agent-red-ruff-cleanup-001
+VERIFIED: bridge/agent-red-ruff-cleanup-001-006.md
+NEW: bridge/agent-red-ruff-cleanup-001-005.md
 GO: bridge/agent-red-ruff-cleanup-001-004.md
 REVISED: bridge/agent-red-ruff-cleanup-001-003.md
 NO-GO: bridge/agent-red-ruff-cleanup-001-002.md
@@ -1017,6 +1141,7 @@ NO-GO: bridge/gtkb-isolation-018-pending-migration-waiver-002.md
 NEW: bridge/gtkb-isolation-018-pending-migration-waiver-001.md
 
 Document: gtkb-isolation-018-agent-red-file-migration
+WITHDRAWN: bridge/gtkb-isolation-018-agent-red-file-migration-010.md
 GO: bridge/gtkb-isolation-018-agent-red-file-migration-009.md
 REVISED: bridge/gtkb-isolation-018-agent-red-file-migration-008.md
 NEW: bridge/gtkb-isolation-018-agent-red-file-migration-007.md
@@ -1223,6 +1348,8 @@ NO-GO: bridge/gtkb-isolation-017-slice1-doctor-checks-002.md
 NEW: bridge/gtkb-isolation-017-slice1-doctor-checks-001.md
 
 Document: gtkb-isolation-017-scoping
+VERIFIED: bridge/gtkb-isolation-017-scoping-006.md
+NEW: bridge/gtkb-isolation-017-scoping-005.md
 GO: bridge/gtkb-isolation-017-scoping-004.md
 REVISED: bridge/gtkb-isolation-017-scoping-003.md
 NO-GO: bridge/gtkb-isolation-017-scoping-002.md
@@ -1251,6 +1378,8 @@ NO-GO: bridge/gtkb-phantom-index-cleanup-2026-04-30-002.md
 NEW: bridge/gtkb-phantom-index-cleanup-2026-04-30-001.md
 
 Document: gtkb-bridge-propose-helper-index-parity-2026-04-30
+VERIFIED: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-008.md
+NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-007.md
 GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-006.md
 REVISED: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-005.md
 NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-004.md
@@ -1273,6 +1402,7 @@ NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-002.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-001.md
 
 Document: gtkb-adr-evaluation-enforcement-2026-04-30
+WITHDRAWN: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-007.md
 GO: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-006.md
 REVISED: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-005.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-004.md
@@ -1293,15 +1423,18 @@ NO-GO: bridge/active-workspace-declaration-architecture-2026-04-29-002.md
 NEW: bridge/active-workspace-declaration-architecture-2026-04-29-001.md
 
 Document: gtkb-membase-effective-use-recovery-2026-04-29
+WITHDRAWN: bridge/gtkb-membase-effective-use-recovery-2026-04-29-003.md
 GO: bridge/gtkb-membase-effective-use-recovery-2026-04-29-002.md
 NEW: bridge/gtkb-membase-effective-use-recovery-2026-04-29-001.md
 
 Document: spec-smart-poller-auto-trigger-2026-04-29
+WITHDRAWN: bridge/spec-smart-poller-auto-trigger-2026-04-29-003.md
 GO: bridge/spec-smart-poller-auto-trigger-2026-04-29-002.md
 NEW: bridge/spec-smart-poller-auto-trigger-2026-04-29-001.md
 
 
 Document: gtkb-platform-spec-coverage-architecture-2026-04-29
+WITHDRAWN: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-007.md
 GO: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-006.md
 REVISED: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-005.md
 NO-GO: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-004.md
@@ -1311,6 +1444,7 @@ NEW: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-001.md
 
 
 Document: gtkb-isolation-completion-plan-2026-04-28
+WITHDRAWN: bridge/gtkb-isolation-completion-plan-2026-04-28-011.md
 GO: bridge/gtkb-isolation-completion-plan-2026-04-28-010.md
 REVISED: bridge/gtkb-isolation-completion-plan-2026-04-28-009.md
 NO-GO: bridge/gtkb-isolation-completion-plan-2026-04-28-008.md
@@ -1324,6 +1458,7 @@ NEW: bridge/gtkb-isolation-completion-plan-2026-04-28-001.md
 
 
 Document: gtkb-directive-enforcement-registry
+WITHDRAWN: bridge/gtkb-directive-enforcement-registry-005.md
 GO: bridge/gtkb-directive-enforcement-registry-004.md
 REVISED: bridge/gtkb-directive-enforcement-registry-003.md
 NO-GO: bridge/gtkb-directive-enforcement-registry-002.md
@@ -1331,6 +1466,8 @@ NEW: bridge/gtkb-directive-enforcement-registry-001.md
 
 
 Document: generator-hardening-002
+VERIFIED: bridge/generator-hardening-002-012.md
+NEW: bridge/generator-hardening-002-011.md
 GO: bridge/generator-hardening-002-010.md
 REVISED: bridge/generator-hardening-002-009.md
 NO-GO: bridge/generator-hardening-002-008.md
@@ -1344,6 +1481,8 @@ NEW: bridge/generator-hardening-002-001.md
 
 
 Document: gtkb-bridge-poller-p2-5-verification-spike
+VERIFIED: bridge/gtkb-bridge-poller-p2-5-verification-spike-006.md
+NEW: bridge/gtkb-bridge-poller-p2-5-verification-spike-005.md
 GO: bridge/gtkb-bridge-poller-p2-5-verification-spike-004.md
 REVISED: bridge/gtkb-bridge-poller-p2-5-verification-spike-003.md
 NO-GO: bridge/gtkb-bridge-poller-p2-5-verification-spike-002.md
@@ -1351,6 +1490,8 @@ NEW: bridge/gtkb-bridge-poller-p2-5-verification-spike-001.md
 
 
 Document: gtkb-bridge-poller-p2-registry
+VERIFIED: bridge/gtkb-bridge-poller-p2-registry-008.md
+NEW: bridge/gtkb-bridge-poller-p2-registry-007.md
 GO: bridge/gtkb-bridge-poller-p2-registry-006.md
 REVISED: bridge/gtkb-bridge-poller-p2-registry-005.md
 NO-GO: bridge/gtkb-bridge-poller-p2-registry-004.md
@@ -1360,6 +1501,8 @@ NEW: bridge/gtkb-bridge-poller-p2-registry-001.md
 
 
 Document: gtkb-bridge-poller-p1-detector
+VERIFIED: bridge/gtkb-bridge-poller-p1-detector-006.md
+NEW: bridge/gtkb-bridge-poller-p1-detector-005.md
 GO: bridge/gtkb-bridge-poller-p1-detector-004.md
 REVISED: bridge/gtkb-bridge-poller-p1-detector-003.md
 NO-GO: bridge/gtkb-bridge-poller-p1-detector-002.md
@@ -1367,6 +1510,7 @@ NEW: bridge/gtkb-bridge-poller-p1-detector-001.md
 
 
 Document: gtkb-bridge-poller-001-smart-poller
+WITHDRAWN: bridge/gtkb-bridge-poller-001-smart-poller-008.md
 GO: bridge/gtkb-bridge-poller-001-smart-poller-007.md
 REVISED: bridge/gtkb-bridge-poller-001-smart-poller-006.md
 NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-005.md
@@ -1377,6 +1521,10 @@ NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
 
 
 Document: gtkb-db-backup-001-snapshot-daemon
+VERIFIED: bridge/gtkb-db-backup-001-snapshot-daemon-010.md
+REVISED: bridge/gtkb-db-backup-001-snapshot-daemon-009.md
+NO-GO: bridge/gtkb-db-backup-001-snapshot-daemon-008.md
+NEW: bridge/gtkb-db-backup-001-snapshot-daemon-007.md
 GO: bridge/gtkb-db-backup-001-snapshot-daemon-006.md
 NEW: bridge/gtkb-db-backup-001-snapshot-daemon-005.md
 GO: bridge/gtkb-db-backup-001-snapshot-daemon-004.md
@@ -1386,6 +1534,7 @@ NEW: bridge/gtkb-db-backup-001-snapshot-daemon-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-implementation
+WITHDRAWN: bridge/gtkb-isolation-016-phase8-wave2-implementation-005.md
 GO: bridge/gtkb-isolation-016-phase8-wave2-implementation-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-implementation-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-implementation-002.md
@@ -1393,6 +1542,7 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-implementation-001.md
 
 
 Document: gtkb-adr-isolation-application-placement
+WITHDRAWN: bridge/gtkb-adr-isolation-application-placement-005.md
 GO: bridge/gtkb-adr-isolation-application-placement-004.md
 REVISED: bridge/gtkb-adr-isolation-application-placement-003.md
 NO-GO: bridge/gtkb-adr-isolation-application-placement-002.md

@@ -489,6 +489,26 @@ related_specs = []
 related_deliberations = []
 
 [[systems]]
+id = "implementation-start-gate"
+canonical_name = "implementation-start authorization gate"
+accepted_aliases = ["implementation authorization", "implementation-start gate", "GO authorization packet"]
+discouraged_aliases = ["bridge queue", "formal artifact approval"]
+forbidden_aliases = []
+concept_vs_artifact = "cross_harness_enforcement_surface"
+authoritative_source = "scripts/implementation_authorization.py and scripts/implementation_start_gate.py"
+generated_or_authoritative = "configured_control_surface"
+read_method = "Inspect live bridge/INDEX.md, .gtkb-state/implementation-authorizations/current.json, .claude/settings.json, and .codex/hooks.json."
+mutation_method = "Update through GO'd bridge work; do not bypass formal artifact approval gates."
+role_permissions = "Prime Builder may create a scoped authorization packet only after latest GO; Loyal Opposition verifies packet scope and hook parity."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Authorization packets prove session-local scope for protected implementation edits; they do not replace bridge GO or formal artifact approval evidence."
+verification_method = "platform_tests/scripts/test_implementation_start_gate.py and platform_tests/scripts/test_hook_registration_parity.py"
+lifecycle_state = "active"
+related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001", "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001", "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001"]
+related_deliberations = ["DELIB-S321-IMPL-PROPOSAL-SPEC-LINKAGE", "DELIB-S321-SPEC-CREATION-STANDING-AUTH"]
+
+[[systems]]
 id = "hook"
 canonical_name = "hook"
 accepted_aliases = ["hook", "hooks", "Claude hook", "Codex hook"]
@@ -597,13 +617,13 @@ forbidden_aliases = []
 concept_vs_artifact = "axis-1-dispatchable"
 authoritative_source = "scripts/single_harness_bridge_dispatcher.py"
 generated_or_authoritative = "authoritative_runtime"
-read_method = "Inspect Task Scheduler entry GTKB-SingleHarnessBridgeDispatcher via Get-ScheduledTask, or run scripts/single_harness_bridge_dispatcher.py --diagnose for a structured liveness summary."
-mutation_method = "Use scripts/install_single_harness_dispatcher_task.ps1 (-ProjectRoot <root> [-TaskName <name>] [-IntervalMinutes <n>] [-DryRun]) to register or update; scripts/uninstall_single_harness_dispatcher_task.ps1 ([-TaskName <name>] [-DryRun]) to remove. Editing the dispatcher script itself is governed via the bridge protocol."
+read_method = "Inspect Task Scheduler entry GTKB-SingleHarnessBridgeDispatcher via Get-ScheduledTask, run scripts/single_harness_bridge_dispatcher.py --diagnose for dispatch liveness, or inspect .gtkb-state/bridge-poller/single-harness-automation-state.json for activation-manager state."
+mutation_method = "Use scripts/single_harness_bridge_automation.py --ensure to activate/deactivate from live role-map topology. Low-level registration remains available through scripts/install_single_harness_dispatcher_task.ps1 (-ProjectRoot <root> [-TaskName <name>] [-IntervalMinutes <n>] [-MaxItems <n>] [-DryRun]) and scripts/uninstall_single_harness_dispatcher_task.ps1 ([-TaskName <name>] [-DryRun]). Editing the dispatcher or activation scripts is governed via the bridge protocol."
 role_permissions = "Prime Builder owns dispatcher script + installer + tests; Loyal Opposition reviews changes and audits topology gating."
 startup_visibility = "topology_conditional"
 dashboard_visibility = "summary_only"
-harness_caveats = "Mutually exclusive with the cross-harness event-driven trigger at runtime; applicability gated by role-set cardinality (multi-element role-set on a single harness ID -> applicable). Authoritative source is the Python script at scripts/single_harness_bridge_dispatcher.py; wake substrate is Windows scheduled task GTKB-SingleHarnessBridgeDispatcher (registered via scripts/install_single_harness_dispatcher_task.ps1). Slice 2 ships Windows Task Scheduler primary substrate; macOS launchd / Linux systemd installers are DECISION DEFERRED to a future slice."
-verification_method = "platform_tests/scripts/test_single_harness_bridge_dispatcher.py"
+harness_caveats = "Mutually exclusive with the cross-harness event-driven trigger at runtime; applicability gated by role-set cardinality (multi-element role-set on a single harness ID -> applicable). The harness-neutral activation manager is scripts/single_harness_bridge_automation.py and is registered from both .claude/settings.json and .codex/hooks.json. It enables the Windows scheduled task only in single-harness topology and removes it otherwise; Stop hooks may also invoke an immediate one-shot dispatch after the active-session lock is cleared. Slice 2 ships Windows Task Scheduler primary substrate; macOS launchd / Linux systemd installers are DECISION DEFERRED to a future slice."
+verification_method = "platform_tests/scripts/test_single_harness_bridge_dispatcher.py; platform_tests/scripts/test_single_harness_bridge_automation.py"
 lifecycle_state = "active"
 related_specs = ["ADR-SINGLE-HARNESS-OPERATING-MODE-001", "SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001", "DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001", "SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001", "DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001", "PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001"]
 related_deliberations = ["DELIB-1511", "DELIB-S319-LIFECYCLE-INDEPENDENCE-CONTRACT"]

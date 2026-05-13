@@ -67,6 +67,35 @@ def test_formal_deliberation_write_blocks_without_packet() -> None:
     assert "does not reference" in response["reason"]
 
 
+def test_harvester_help_command_is_not_formal_mutation() -> None:
+    response = _run_hook("python scripts/harvest_session_deliberations.py --help")
+
+    assert response == {}
+
+
+def test_harvester_dry_run_command_is_not_formal_mutation() -> None:
+    response = _run_hook("python scripts/harvest_session_deliberations.py --json-output .gtkb-state/wrap.json")
+
+    assert response == {}
+
+
+def test_harvester_apply_blocks_without_packet() -> None:
+    response = _run_hook("python scripts/harvest_session_deliberations.py --apply")
+
+    assert response["decision"] == "block"
+    assert "GOV-ARTIFACT-APPROVAL-001" in response["reason"]
+
+
+def test_session_prompt_handoff_can_mention_harvester_help() -> None:
+    response = _run_hook(
+        'python -c "from groundtruth_kb.db import KnowledgeDB; '
+        "KnowledgeDB().insert_session_prompt('S345', "
+        "'Blocked command: python scripts/harvest_session_deliberations.py --help')\""
+    )
+
+    assert response == {}
+
+
 def test_formal_write_allows_manual_approval_packet(tmp_path: Path) -> None:
     packet_path = _packet(tmp_path)
 

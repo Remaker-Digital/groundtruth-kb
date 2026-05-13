@@ -54,6 +54,11 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in codex_hooks["hooks"]["SessionStart"]
         for hook in group["hooks"]
     )
+    assert any(
+        "single_harness_bridge_automation.py" in hook["command"] and "--ensure" in hook["command"]
+        for group in codex_hooks["hooks"]["SessionStart"]
+        for hook in group["hooks"]
+    )
     assert all(
         hook.get("timeout", 0) >= 60
         for group in codex_hooks["hooks"]["SessionStart"]
@@ -74,13 +79,23 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         group.get("matcher") == "Bash" and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
         for group in codex_hooks["hooks"]["PreToolUse"]
     )
+    assert any(
+        group.get("matcher") == "Bash"
+        and any("bridge-compliance-gate.cmd" in hook["command"] for hook in group["hooks"])
+        for group in codex_hooks["hooks"]["PreToolUse"]
+    )
+    assert any(
+        group.get("matcher") == "Bash"
+        and any("bridge-compliance-audit.cmd" in hook["command"] for hook in group["hooks"])
+        for group in codex_hooks["hooks"]["PostToolUse"]
+    )
     # Per bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations
     # Codex GO at -004: Slice 3 registers a Codex `Stop` hook that invokes
     # scripts/cross_harness_bridge_trigger.py with --stop-hook. The hook satisfies
     # the OpenAI Codex Stop output contract by emitting `{}` JSON to stdout. The
-    # previous absence assertion is replaced with a presence assertion scoped to
-    # the cross-harness trigger; non-trigger Stop registrations remain banned per
-    # the existing prohibition on Codex lifecycle wrap-up via Stop.
+    # previous absence assertion is replaced with presence assertions scoped to
+    # bridge dispatch substrates. Codex Stop may invoke the cross-harness trigger
+    # and the single-harness activation manager; lifecycle wrap-up remains banned.
     assert "Stop" in codex_hooks["hooks"], (
         "Codex Stop hook must be registered (Slice 3 cross-harness trigger). "
         "Pre-Slice-3 baseline (`Stop` absent from `.codex/hooks.json`) is "
@@ -89,32 +104,33 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     codex_stop_hooks = codex_hooks["hooks"]["Stop"]
     # Stop matchers are not supported by Codex; entries must be matcher-less.
     for group in codex_stop_hooks:
-        assert group.get("matcher") in (None, ""), (
-            "Codex Stop entries must not declare a matcher (Codex hooks docs)"
-        )
+        assert group.get("matcher") in (None, ""), "Codex Stop entries must not declare a matcher (Codex hooks docs)"
     assert any(
-        "cross_harness_bridge_trigger.py" in hook.get("command", "")
-        and "--stop-hook" in hook.get("command", "")
+        "cross_harness_bridge_trigger.py" in hook.get("command", "") and "--stop-hook" in hook.get("command", "")
         for group in codex_stop_hooks
         for hook in group["hooks"]
     ), (
         "Codex Stop must invoke cross_harness_bridge_trigger.py with --stop-hook "
         "(satisfies OpenAI Codex Stop JSON output contract by emitting `{}` on stdout)"
     )
+    assert any(
+        "single_harness_bridge_automation.py" in hook.get("command", "")
+        and "--ensure" in hook.get("command", "")
+        and "--dispatch-now" in hook.get("command", "")
+        for group in codex_stop_hooks
+        for hook in group["hooks"]
+    ), (
+        "Codex Stop must invoke single_harness_bridge_automation.py so single-harness "
+        "topology gets an immediate post-session dispatch and multi-harness topology "
+        "keeps the scheduled task deactivated."
+    )
     # Lifecycle wrap-up scripts must NOT be registered through Codex Stop —
     # the parity test continues to ban that surface (the active wrap-up
     # mechanism is the release-candidate gate / harness-specific tooling).
-    codex_stop_commands = [
-        hook["command"]
-        for group in codex_stop_hooks
-        for hook in group["hooks"]
-    ]
-    assert not any(
-        "session_wrapup" in cmd or "session_self_initialization.py" in cmd
-        for cmd in codex_stop_commands
-    ), (
-        "Codex Stop must not register lifecycle wrap-up scripts. The cross-harness "
-        "trigger is the only Codex Stop surface authorized by Slice 3."
+    codex_stop_commands = [hook["command"] for group in codex_stop_hooks for hook in group["hooks"]]
+    assert not any("session_wrapup" in cmd or "session_self_initialization.py" in cmd for cmd in codex_stop_commands), (
+        "Codex Stop must not register lifecycle wrap-up scripts. Stop is limited "
+        "to bridge dispatch substrates, not session wrap-up."
     )
     # Per bridge/gtkb-startup-enhancements-p1-003.md §2.4 (Codex GO at -004):
     # the previously-registered owner-decision-tracker-ups.cmd entry has been
@@ -150,9 +166,15 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for cmd in session_start_hooks
     )
     dispatcher_match = any("session_start_dispatch.py" in cmd for cmd in session_start_hooks)
+    single_harness_automation_match = any(
+        "single_harness_bridge_automation.py" in cmd and "--ensure" in cmd for cmd in session_start_hooks
+    )
     assert direct_match or dispatcher_match, (
         "Claude SessionStart must register either the canonical service directly "
         "or a dispatcher under .claude/hooks/ that delegates to it"
+    )
+    assert single_harness_automation_match, (
+        "Claude SessionStart must register the single-harness bridge automation activation hook"
     )
     if dispatcher_match:
         from pathlib import Path as _P
@@ -230,6 +252,14 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     )
     assert any(
         "gtkb-hooks" in command and "workstream-focus.cmd" in command and command.startswith("cmd /d /s /c ")
+        for command in commands
+    )
+    assert any(
+        "gtkb-hooks" in command and "bridge-compliance-gate.cmd" in command and command.startswith("cmd /d /s /c ")
+        for command in commands
+    )
+    assert any(
+        "gtkb-hooks" in command and "bridge-compliance-audit.cmd" in command and command.startswith("cmd /d /s /c ")
         for command in commands
     )
 
@@ -326,6 +356,133 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "GTKB_HARNESS_NAME=codex" in workstream_text
     assert "GTKB_HARNESS_ID=A" not in workstream_text
 
+    bridge_wrapper = REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-gate.cmd"
+    bridge_wrapper_text = bridge_wrapper.read_text(encoding="utf-8")
+    assert "bridge-compliance-gate-bash-adapter.py" in bridge_wrapper_text
+    assert "bridge-compliance-gate.py" in bridge_wrapper_text
+
+    bridge_adapter = REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-gate-bash-adapter.py"
+    bridge_adapter_text = bridge_adapter.read_text(encoding="utf-8")
+    assert "BRIDGE_FILE_WRITE_PATTERNS" in bridge_adapter_text
+    assert "synthetic Claude-shape" in bridge_adapter_text
+
+    bridge_audit = REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-audit.cmd"
+    bridge_audit_text = bridge_audit.read_text(encoding="utf-8")
+    assert "bridge-compliance-gate.py" in bridge_audit_text
+    assert "--audit-only" in bridge_audit_text
+
+
+def test_codex_parity_requires_bridge_compliance_gate_when_hooks_enabled(tmp_path) -> None:
+    """SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001 A1."""
+    module = _load_module()
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".claude" / "hooks").mkdir(parents=True)
+    (tmp_path / ".claude").mkdir(exist_ok=True)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "harness-state").mkdir()
+    (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
+    (tmp_path / ".codex" / "hooks.json").write_text(
+        json.dumps(
+            {"hooks": {"PreToolUse": [], "PostToolUse": [], "SessionStart": [], "UserPromptSubmit": [], "Stop": []}}
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text("print('{}')\n", encoding="utf-8")
+    (tmp_path / ".claude" / "hooks" / "workstream-focus.py").write_text("print('{}')\n", encoding="utf-8")
+    (tmp_path / ".claude" / "hooks" / "bridge-compliance-gate.py").write_text("print('{}')\n", encoding="utf-8")
+    (tmp_path / "scripts" / "session_self_initialization.py").write_text("print('startup')\n", encoding="utf-8")
+    (tmp_path / "harness-state" / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}) + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "harness-state" / "role-assignments.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"A": {"harness_type": "codex", "role": "prime-builder"}}})
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".claude" / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "Write|Edit",
+                            "hooks": [{"type": "command", "command": "python .claude/hooks/bridge-compliance-gate.py"}],
+                        },
+                        {
+                            "matcher": "Write|Edit",
+                            "hooks": [
+                                {"type": "command", "command": "python .claude/hooks/formal-artifact-approval-gate.py"}
+                            ],
+                        },
+                    ],
+                    "SessionStart": [],
+                    "Stop": [],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors = module.check_project(tmp_path)
+
+    assert any(
+        "bridge-compliance" in error.lower() and "SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001" in error for error in errors
+    ), f"Expected bridge-compliance SPEC A1 error; got errors: {errors}"
+
+
+def test_codex_parity_repository_configuration_wires_bridge_compliance() -> None:
+    module = _load_module()
+
+    errors = module.check_project(REPO_ROOT)
+
+    assert not errors
+
+
+def test_codex_parity_skips_bridge_compliance_gate_when_hooks_disabled(tmp_path) -> None:
+    module = _load_module()
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".claude" / "hooks").mkdir(parents=True)
+    (tmp_path / ".claude").mkdir(exist_ok=True)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "harness-state").mkdir()
+    (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = false\n", encoding="utf-8")
+    (tmp_path / ".codex" / "hooks.json").write_text(json.dumps({"hooks": {}}), encoding="utf-8")
+    (tmp_path / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text("print('{}')\n", encoding="utf-8")
+    (tmp_path / ".claude" / "hooks" / "workstream-focus.py").write_text("print('{}')\n", encoding="utf-8")
+    (tmp_path / ".claude" / "hooks" / "bridge-compliance-gate.py").write_text("print('{}')\n", encoding="utf-8")
+    (tmp_path / "scripts" / "session_self_initialization.py").write_text("print('startup')\n", encoding="utf-8")
+    (tmp_path / "harness-state" / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}) + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "harness-state" / "role-assignments.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"A": {"harness_type": "codex", "role": "prime-builder"}}})
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".claude" / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "Write|Edit",
+                            "hooks": [{"type": "command", "command": "python .claude/hooks/bridge-compliance-gate.py"}],
+                        }
+                    ],
+                    "SessionStart": [],
+                    "Stop": [],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors = module.check_project(tmp_path)
+
+    assert not any("bridge-compliance" in error.lower() for error in errors)
+
 
 def test_codex_hook_parity_reports_missing_codex_hooks(tmp_path) -> None:
     module = _load_module()
@@ -380,6 +537,10 @@ def test_codex_hook_parity_requires_bash_matcher(tmp_path) -> None:
         encoding="utf-8",
     )
     (tmp_path / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text(
+        "print('{}')\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".claude" / "hooks" / "bridge-compliance-gate.py").write_text(
         "print('{}')\n",
         encoding="utf-8",
     )

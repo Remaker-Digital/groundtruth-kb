@@ -56,7 +56,7 @@ status = "native"
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "ae8b62209bb2e20cfd10a92a43fd3c84fb0fda349bf81e94c5b4036cce7a3df0"
+source_sha256 = "d446eaba9fb6974446f4d39b38aa248c9d559efe38077552cafc8f1e39f238c9"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -345,6 +345,24 @@ surface = ".codex/skills/kb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-work-item/SKILL.md"
 source_sha256 = "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
+[[capabilities]]
+id = "skill.projects"
+kind = "skill"
+canonical_name = "projects"
+canonical_purpose = "Operate MemBase-backed first-class project lifecycle commands without creating a second backlog authority."
+canonical_source = ".claude/skills/projects/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/projects/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/projects/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/projects/SKILL.md"
+source_sha256 = "8c7a418096dd28e0a13ca6290ad6feb1c545aa24f1913fcd6899e78eedb177c7"
 [[capabilities]]
 id = "skill.proposal-review"
 kind = "skill"

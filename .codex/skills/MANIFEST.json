@@ -19,7 +19,7 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "ae8b62209bb2e20cfd10a92a43fd3c84fb0fda349bf81e94c5b4036cce7a3df0"
+      "source_sha256": "d446eaba9fb6974446f4d39b38aa248c9d559efe38077552cafc8f1e39f238c9"
     },
     {
       "adapter_relative_path": ".codex/skills/bridge-propose/SKILL.md",
@@ -132,6 +132,13 @@
       "capability_id": "skill.kb-work-item",
       "source_relative_path": ".claude/skills/kb-work-item/SKILL.md",
       "source_sha256": "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/projects/SKILL.md",
+      "canonical_name": "projects",
+      "capability_id": "skill.projects",
+      "source_relative_path": ".claude/skills/projects/SKILL.md",
+      "source_sha256": "8c7a418096dd28e0a13ca6290ad6feb1c545aa24f1913fcd6899e78eedb177c7"
     },
     {
       "adapter_relative_path": ".codex/skills/proposal-review/SKILL.md",

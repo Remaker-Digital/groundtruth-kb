@@ -22,11 +22,11 @@ App-scope normalization:
   -> ``"gtkb"``.
 - ``agent_red`` | ``agent-red`` | ``agent red`` -> ``"agent_red"``.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-
 
 # Canonical regex (case-insensitive). Object is mandatory after verbs; bare
 # verbs do not match. Standalone form: ``GT-KB startup`` / ``GroundTruth-KB

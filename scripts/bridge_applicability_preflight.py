@@ -29,7 +29,7 @@ DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 
 INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
 INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/\S+\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s+(bridge/\S+\.md)\s*$"
 )
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
@@ -118,7 +118,11 @@ def parse_index_for_document(index_path: Path, bridge_id: str) -> list[BridgeVer
 
 
 def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | None:
-    for status_set in ({"NEW", "REVISED"}, {"VERIFIED", "GO", "NO-GO"}):
+    if versions:
+        latest = max(versions, key=lambda v: v.version_number)
+        if latest.status == "WITHDRAWN":
+            return latest
+    for status_set in ({"NEW", "REVISED"}, {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"}):
         candidates = [v for v in versions if v.status in status_set]
         if candidates:
             return max(candidates, key=lambda v: v.version_number)

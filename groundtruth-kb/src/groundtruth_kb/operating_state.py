@@ -12,6 +12,7 @@ from typing import Any
 
 from groundtruth_kb import __version__
 from groundtruth_kb import db as _db_module
+from groundtruth_kb.bridge.status_driver import collect_bridge_status
 from groundtruth_kb.config import GTConfig
 
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "WARN": 2, "FAIL": 3}
@@ -230,20 +231,17 @@ def _probe_bridge(root: Path) -> tuple[str, str, str, dict[str, Any]]:
     index = root / "bridge" / "INDEX.md"
     if not index.exists():
         return "UNKNOWN", "bridge/INDEX.md not found", str(index), {}
-    entries = _latest_bridge_statuses(index)
-    prime = sum(1 for status in entries.values() if status in {"GO", "NO-GO"})
-    loyal = sum(1 for status in entries.values() if status in {"NEW", "REVISED"})
-    verified = sum(1 for status in entries.values() if status == "VERIFIED")
+    snapshot = collect_bridge_status(root)
+    queue = snapshot.queue
+    status = "WARN" if queue.parse_error_count else "PASS"
     return (
-        "PASS",
-        f"{len(entries)} bridge thread(s); Prime actionable={prime}; Loyal Opposition actionable={loyal}",
+        status,
+        (
+            f"{queue.threads} bridge thread(s); Prime actionable={len(queue.prime_actionable)}; "
+            f"Loyal Opposition actionable={len(queue.loyal_opposition_actionable)}"
+        ),
         str(index),
-        {
-            "threads": len(entries),
-            "prime_actionable": prime,
-            "loyal_opposition_actionable": loyal,
-            "verified": verified,
-        },
+        queue.to_json_dict(top_n=10),
     )
 
 
@@ -254,24 +252,41 @@ def _probe_bridge_dispatch(root: Path) -> tuple[str, str, str, dict[str, Any]]:
     ``.gtkb-state/bridge-poller/dispatch-state.json`` written by
     ``scripts/cross_harness_bridge_trigger.py`` on each trigger fire.
     """
-    state_root = root / ".gtkb-state" / "bridge-poller"
-    dispatch_state_path = state_root / "dispatch-state.json"
     trigger_script = root / "scripts" / "cross_harness_bridge_trigger.py"
 
     if not trigger_script.exists():
-        return "FAIL", "cross-harness-trigger script not found", str(trigger_script), {}
-    if not state_root.exists():
-        return "UNKNOWN", "bridge dispatch state directory not yet created", str(state_root), {}
-    if not dispatch_state_path.exists():
-        return "UNKNOWN", "dispatch-state.json not yet written by the trigger", str(dispatch_state_path), {}
+        return "UNKNOWN", "cross-harness-trigger script not found", str(trigger_script), {}
+    snapshot = collect_bridge_status(root).automation
+    dispatch_state = snapshot.dispatch_state
+    default_dispatch_state_path = str(root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json")
+    dispatch_state_path = dispatch_state.get("path", default_dispatch_state_path)
+    if not dispatch_state.get("exists"):
+        return (
+            "UNKNOWN",
+            "dispatch-state.json not yet written by the trigger",
+            dispatch_state_path,
+            snapshot.to_json_dict(),
+        )
+    if not dispatch_state.get("parseable"):
+        return "FAIL", "dispatch-state.json unreadable", dispatch_state_path, snapshot.to_json_dict()
 
-    try:
-        payload = json.loads(dispatch_state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return "FAIL", f"dispatch-state.json unreadable: {exc}", str(dispatch_state_path), {}
-
-    recipients = payload.get("recipients", {}) if isinstance(payload, dict) else {}
-    return "PASS", f"{len(recipients)} dispatch recipient(s) tracked", str(dispatch_state_path), {"recipients": sorted(recipients.keys())}
+    hook_values = snapshot.hook_registrations.values()
+    hooks_registered = all(
+        hook.get("cross_harness_trigger_registered") and hook.get("active_session_heartbeat_registered")
+        for hook in hook_values
+        if hook.get("exists")
+    )
+    status = "PASS" if hooks_registered else "WARN"
+    retired_count = len(snapshot.system_inventory.get("retired_systems", []))
+    external_count = len(snapshot.system_inventory.get("external_thread_automations", []))
+    detail = (
+        f"{dispatch_state.get('recipient_count', 0)} dispatch recipient(s) tracked; "
+        f"cross-harness trigger registered; retired systems={retired_count}; "
+        f"external thread automations={external_count}"
+    )
+    if not hooks_registered:
+        detail += "; hook registration incomplete"
+    return status, detail, dispatch_state_path, snapshot.to_json_dict()
 
 
 def _probe_dashboard(root: Path) -> tuple[str, str, str, dict[str, Any]]:

@@ -177,7 +177,7 @@ def _is_single_harness_topology_applicable(project_root: Path) -> tuple[bool, st
     harnesses = role_map.get("harnesses", {})
     if not isinstance(harnesses, dict) or len(harnesses) != 1:
         return (False, None)
-    (harness_id, record), = harnesses.items()
+    ((harness_id, record),) = harnesses.items()
     if not isinstance(record, dict):
         return (False, None)
     raw_role = record.get("role")
@@ -206,6 +206,8 @@ def _acquire_lock(state_dir: Path) -> bool:
     try:
         sanity_ttl = int(os.environ.get(LOCK_SANITY_TTL_ENV_VAR, LOCK_SANITY_TTL_DEFAULT_SECONDS))
     except (TypeError, ValueError):
+        sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
+    if sanity_ttl <= 0:
         sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
     if lock_path.exists():
         try:
@@ -262,6 +264,8 @@ def _foreground_session_active(state_dir: Path, harness_id: str, project_root: P
     try:
         sanity_ttl = int(os.environ.get(LOCK_SANITY_TTL_ENV_VAR, LOCK_SANITY_TTL_DEFAULT_SECONDS))
     except (TypeError, ValueError):
+        sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
+    if sanity_ttl <= 0:
         sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
     try:
         age_seconds = dt.datetime.now().timestamp() - lock_path.stat().st_mtime
@@ -335,10 +339,7 @@ def _spawn_worker(
     the canonical init keyword as first line + dispatch env vars set.
     """
     prompt = _build_prompt(target_mode, items, max_items, trigger)
-    dispatch_id = (
-        f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}"
-        f"-{needed_role_label}-{uuid.uuid4().hex[:6]}"
-    )
+    dispatch_id = f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{needed_role_label}-{uuid.uuid4().hex[:6]}"
 
     if command_handle == "codex":
         command = ["codex", "exec", prompt, "--cd", str(project_root)]
@@ -393,9 +394,7 @@ def _spawn_worker(
         "stderr_path": str(stderr_path),
     }
     try:
-        with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open(
-            "w", encoding="utf-8"
-        ) as err:
+        with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open("w", encoding="utf-8") as err:
             process = subprocess.Popen(
                 command,
                 cwd=str(project_root),
@@ -452,9 +451,7 @@ def run_dispatcher(
     try:
         trigger = _load_trigger_module()
         index_text = trigger._read_index_live(project_root)
-        actionable_for_prime, actionable_for_codex = trigger._compute_actionable(
-            index_text, project_root
-        )
+        actionable_for_prime, actionable_for_codex = trigger._compute_actionable(index_text, project_root)
 
         command_handle = _resolve_command_handle(project_root, harness_id)
         if command_handle is None:
@@ -513,9 +510,7 @@ def run_dispatcher(
             }
 
             if not selected:
-                recipient_state["last_result"] = (
-                    "no_pending_after_filter" if items else "no_pending"
-                )
+                recipient_state["last_result"] = "no_pending_after_filter" if items else "no_pending"
                 recipient_state["signature"] = signature
                 results[needed_role_label] = {
                     "launched": False,
@@ -540,9 +535,7 @@ def run_dispatcher(
                     dry_run=dry_run,
                     trigger=trigger,
                 )
-                recipient_state["last_result"] = (
-                    "launched" if launch.get("launched") else "launch_failed"
-                )
+                recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                 recipient_state["last_launch"] = launch
                 recipient_state["last_dispatched_signature"] = signature
                 recipient_state["signature"] = signature
@@ -680,10 +673,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--diagnose",
         action="store_true",
-        help=(
-            "Emit a structured liveness summary to stdout WITHOUT performing "
-            "dispatch or mutating state."
-        ),
+        help=("Emit a structured liveness summary to stdout WITHOUT performing dispatch or mutating state."),
     )
     return parser
 
@@ -694,9 +684,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         project_root = _resolve_project_root(args.project_root)
         state_dir = (
-            args.state_dir.resolve()
-            if args.state_dir is not None
-            else project_root.joinpath(*DEFAULT_STATE_SUBDIR)
+            args.state_dir.resolve() if args.state_dir is not None else project_root.joinpath(*DEFAULT_STATE_SUBDIR)
         )
         if args.diagnose:
             print(_emit_diagnose_summary(state_dir, project_root))

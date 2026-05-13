@@ -51,15 +51,17 @@ def test_bridge_probe_counts_latest_role_actionable_statuses(project_dir: Path) 
         ),
         encoding="utf-8",
     )
+    for name in ("first-001", "first-002", "second-001", "third-001", "third-002"):
+        (bridge_dir / f"{name}.md").write_text("bridge_kind: implementation_proposal\n", encoding="utf-8")
 
     state = collect_operating_state(project_dir, config=_config(project_dir), components=("bridge",))
     bridge = state.components[0]
 
     assert bridge.status == "PASS"
     assert bridge.evidence["threads"] == 3
-    assert bridge.evidence["prime_actionable"] == 1
-    assert bridge.evidence["loyal_opposition_actionable"] == 1
-    assert bridge.evidence["verified"] == 1
+    assert bridge.evidence["prime_actionable_count"] == 1
+    assert bridge.evidence["loyal_opposition_actionable_count"] == 1
+    assert bridge.evidence["status_counts"]["VERIFIED"] == 1
 
 
 def test_archive_path_is_rejected(tmp_path: Path) -> None:

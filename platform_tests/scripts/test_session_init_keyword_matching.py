@@ -21,7 +21,6 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import _session_init_keyword as ik  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Positive: verb-led forms
 # ---------------------------------------------------------------------------
@@ -80,9 +79,7 @@ def test_standalone_legacy_phrasings_match(prompt: str, expected_mode: str) -> N
 
 @pytest.mark.parametrize("prompt", ["start", "begin", "open", "init", "initialize"])
 def test_bare_verbs_do_not_match(prompt: str) -> None:
-    assert ik.match_init_keyword(prompt) is None, (
-        f"bare verb {prompt!r} must not match (per F2 fix; object mandatory)"
-    )
+    assert ik.match_init_keyword(prompt) is None, f"bare verb {prompt!r} must not match (per F2 fix; object mandatory)"
 
 
 # ---------------------------------------------------------------------------

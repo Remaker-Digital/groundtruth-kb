@@ -93,6 +93,7 @@ ADVISORY_REPORT_SECTIONS = (
     "Recommended Prime Action",
     "Classification Slot",
 )
+AUDIT_OUTPUT_RELATIVE_PATH = Path(".codex") / "gtkb-hooks" / "last-bridge-audit.json"
 
 
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
@@ -218,7 +219,7 @@ def _advisory_report_template_gaps(content: str) -> list[str]:
         if not re.search(rf"^{re.escape(field)}\s*:", content, re.IGNORECASE | re.MULTILINE):
             gaps.append(f"header field {field}")
     for section in ADVISORY_REPORT_SECTIONS:
-        if not re.search(rf"^#{1,6}\s*{re.escape(section)}\s*$", content, re.IGNORECASE | re.MULTILINE):
+        if not re.search(rf"^#{{1,6}}\s*{re.escape(section)}\s*$", content, re.IGNORECASE | re.MULTILINE):
             gaps.append(f"section ## {section}")
     return gaps
 
@@ -370,6 +371,128 @@ def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
     return paths
 
 
+def _deny_reason_for_content(
+    *,
+    cwd_path: Path,
+    file_path: str,
+    content: str,
+    run_pending_preflight: bool = True,
+) -> str | None:
+    if _is_bridge_markdown_file(file_path) and content:
+        first_line = _first_nonblank_line(content)
+        if first_line == "ADVISORY" and not _is_template_shaped_advisory_report(content):
+            return (
+                "[Governance] ADVISORY bridge reports must match the verified ADVISORY report template: "
+                "first line ADVISORY; header fields bridge_kind, Document, Version, Author, Date; "
+                "sections ## Source, ## Claim, ## Owner Decision Needed, "
+                "## Recommended Prime Action, and ## Classification Slot."
+            )
+        if first_line in {"GO", "VERIFIED"} and not _has_clean_applicability_preflight(content):
+            return (
+                "[Governance] GO and VERIFIED bridge verdicts must include a clean "
+                "Applicability Preflight section with packet_hash and "
+                "missing_required_specs: []. Generate it with "
+                "python scripts/bridge_applicability_preflight.py --bridge-id <document-name>. "
+                "(Hard-block per mechanical cross-cutting specification applicability gate.)"
+            )
+        if first_line == "VERIFIED" and not _has_spec_derived_verification(content):
+            return (
+                "[Governance] VERIFIED bridge reports must carry Specification Links, "
+                "a spec-to-test mapping, and executed test command evidence. "
+                "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
+                "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
+            )
+        if (
+            first_line != "ADVISORY"
+            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+            and not _has_concrete_spec_links(content)
+        ):
+            return (
+                "[Governance] Implementation proposals must include concrete Specification Links "
+                "before bridge submission. "
+                "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
+            )
+        if (
+            first_line != "ADVISORY"
+            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+            and _proposal_claims_owner_approval(content)
+            and not _has_concrete_owner_decisions_section(content)
+        ):
+            return (
+                "[Governance] Bridge proposals/reports that claim owner-approval scope must "
+                "include a non-empty Owner Decisions / Input section enumerating the "
+                "AskUserQuestion answers that authorize the work. "
+                "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
+                "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)"
+            )
+        if run_pending_preflight and first_line in PENDING_PREFLIGHT_STATUSES:
+            bridge_id = _extract_bridge_id_from_path(file_path)
+            if bridge_id:
+                preflight_ok, error_msg = _run_pending_applicability_preflight(
+                    cwd=cwd_path,
+                    file_path=file_path,
+                    bridge_id=bridge_id,
+                    content=content,
+                )
+                if not preflight_ok:
+                    return (
+                        "[Governance] Pre-filing applicability preflight failed: "
+                        f"file_path={file_path}; "
+                        f"missing_required_specs={error_msg}. Run "
+                        f"python scripts/bridge_applicability_preflight.py --bridge-id {bridge_id} "
+                        "for full output. (Hard-block per "
+                        "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
+                        "mechanical enforcement.)"
+                    )
+    return None
+
+
+def _write_audit_result(*, cwd_path: Path, file_path: str, content: str, reason: str | None) -> None:
+    output_path = cwd_path / AUDIT_OUTPUT_RELATIVE_PATH
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output = {
+        "audit_mode": True,
+        "file_path": file_path,
+        "preflight_passed": reason is None,
+        "decision": "pass" if reason is None else "deny",
+        "reason": reason,
+    }
+    output_path.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _audit_only(argv: list[str]) -> int:
+    cwd_path = Path.cwd().resolve()
+    file_path = ""
+    if "--file-path" in argv:
+        idx = argv.index("--file-path")
+        if idx + 1 < len(argv):
+            file_path = argv[idx + 1]
+    if not file_path:
+        try:
+            payload = json.loads(sys.stdin.read() or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+        cwd_path = Path(str(payload.get("cwd") or ".")).resolve()
+        tool_input = payload.get("tool_input") or {}
+        file_path = str(tool_input.get("file_path") or "")
+        content = str(tool_input.get("content") or "")
+    else:
+        target = (cwd_path / file_path).resolve()
+        try:
+            content = target.read_text(encoding="utf-8")
+        except OSError:
+            content = ""
+    reason = _deny_reason_for_content(
+        cwd_path=cwd_path,
+        file_path=file_path,
+        content=content,
+        run_pending_preflight=True,
+    )
+    _write_audit_result(cwd_path=cwd_path, file_path=file_path, content=content, reason=reason)
+    print("{}")
+    return 0
+
+
 def main() -> None:
     try:
         from groundtruth_kb.governance.output import emit_ask, emit_deny, emit_pass
@@ -400,6 +523,9 @@ def main() -> None:
         def emit_pass() -> None:  # type: ignore[misc]
             print("{}")
 
+    if "--audit-only" in sys.argv:
+        sys.exit(_audit_only(sys.argv[1:]))
+
     if "--self-test" in sys.argv:
         emit_ask(
             "PreToolUse",
@@ -428,88 +554,15 @@ def main() -> None:
         sys.exit(0)
 
     content = str(tool_input.get("content", ""))
-    if _is_bridge_markdown_file(file_path) and content:
-        first_line = _first_nonblank_line(content)
-        if first_line == "ADVISORY" and not _is_template_shaped_advisory_report(content):
-            emit_deny(
-                "PreToolUse",
-                "[Governance] ADVISORY bridge reports must match the verified ADVISORY report template: "
-                "first line ADVISORY; header fields bridge_kind, Document, Version, Author, Date; "
-                "sections ## Source, ## Claim, ## Owner Decision Needed, "
-                "## Recommended Prime Action, and ## Classification Slot.",
-            )
-            sys.exit(0)
-        if first_line in {"GO", "VERIFIED"} and not _has_clean_applicability_preflight(content):
-            emit_deny(
-                "PreToolUse",
-                "[Governance] GO and VERIFIED bridge verdicts must include a clean "
-                "Applicability Preflight section with packet_hash and "
-                "missing_required_specs: []. Generate it with "
-                "python scripts/bridge_applicability_preflight.py --bridge-id <document-name>. "
-                "(Hard-block per mechanical cross-cutting specification applicability gate.)",
-            )
-            sys.exit(0)
-        if first_line == "VERIFIED" and not _has_spec_derived_verification(content):
-            emit_deny(
-                "PreToolUse",
-                "[Governance] VERIFIED bridge reports must carry Specification Links, "
-                "a spec-to-test mapping, and executed test command evidence. "
-                "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
-                "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)",
-            )
-            sys.exit(0)
-        if (
-            first_line != "ADVISORY"
-            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
-            and not _has_concrete_spec_links(content)
-        ):
-            emit_deny(
-                "PreToolUse",
-                "[Governance] Implementation proposals must include concrete Specification Links "
-                "before bridge submission. "
-                "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)",
-            )
-            sys.exit(0)
-        # Owner Decisions / Input gate (Sub-slice C). Conditional: fires only when
-        # proposal/report content indicates owner-approval scope, AND only on
-        # non-verdict files (verdict files are evidence narratives per Codex
-        # -004 GO condition).
-        if (
-            first_line != "ADVISORY"
-            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
-            and _proposal_claims_owner_approval(content)
-            and not _has_concrete_owner_decisions_section(content)
-        ):
-            emit_deny(
-                "PreToolUse",
-                "[Governance] Bridge proposals/reports that claim owner-approval scope must "
-                "include a non-empty Owner Decisions / Input section enumerating the "
-                "AskUserQuestion answers that authorize the work. "
-                "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
-                "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)",
-            )
-            sys.exit(0)
-        if tool_name == "Write" and first_line in PENDING_PREFLIGHT_STATUSES:
-            bridge_id = _extract_bridge_id_from_path(file_path)
-            if bridge_id:
-                preflight_ok, error_msg = _run_pending_applicability_preflight(
-                    cwd=cwd_path,
-                    file_path=file_path,
-                    bridge_id=bridge_id,
-                    content=content,
-                )
-                if not preflight_ok:
-                    emit_deny(
-                        "PreToolUse",
-                        "[Governance] Pre-filing applicability preflight failed: "
-                        f"file_path={file_path}; "
-                        f"missing_required_specs={error_msg}. Run "
-                        f"python scripts/bridge_applicability_preflight.py --bridge-id {bridge_id} "
-                        "for full output. (Hard-block per "
-                        "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
-                        "mechanical enforcement.)",
-                    )
-                    sys.exit(0)
+    reason = _deny_reason_for_content(
+        cwd_path=cwd_path,
+        file_path=file_path,
+        content=content,
+        run_pending_preflight=tool_name == "Write",
+    )
+    if reason:
+        emit_deny("PreToolUse", reason)
+        sys.exit(0)
 
     index_path = cwd_path / BRIDGE_INDEX_FILENAME
     if not index_path.exists():

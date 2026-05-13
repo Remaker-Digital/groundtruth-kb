@@ -78,6 +78,10 @@ Semantic search configuration for the Deliberation Archive (DA).
 ```toml
 [search]
 chroma_path = "./.groundtruth-chroma"
+
+[backup]
+retain_recent = 7
+retain_daily_days = 30
 ```
 
 | Field | Type | Default | Description |
@@ -100,6 +104,34 @@ The `chroma_path` setting has three levels:
     ```bash
     pip install "groundtruth-kb[search]"
     ```
+
+### `[backup]` section
+
+Database snapshot settings for `gt db snapshot`.
+
+```toml
+[backup]
+snapshot_output_dir = "C:/Users/alex/AppData/Local/gtkb-snapshots/my-project"
+snapshot_staging_dir = "C:/Users/alex/AppData/Local/gtkb-snapshots/staging"
+retain_recent = 7
+retain_daily_days = 30
+include_chroma = false
+sync_paths = ["C:/Users/alex/OneDrive", "D:/Google Drive"]
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `snapshot_output_dir` | path | user-local `gtkb-snapshots/<project>` | Published snapshot directory |
+| `snapshot_staging_dir` | path | user-local `gtkb-snapshots/staging` | Temporary staging directory used before atomic publish |
+| `retain_recent` | integer | `7` | Number of most-recent snapshots always retained |
+| `retain_daily_days` | integer | `30` | Keep one daily snapshot for this many days |
+| `include_chroma` | boolean | `false` | Reserved for ChromaDB snapshots; currently fails closed when enabled |
+| `sync_paths` | list of paths | `[]` | Host-specific sync roots used by the safety detector |
+
+Relative backup paths are resolved against the config file's directory.
+Staging paths that appear to be managed by sync tools are refused. Output paths
+that appear sync-managed are allowed with a warning because publishing an
+already-complete snapshot into a synced location is a supported backup pattern.
 
 ## Environment Variables
 

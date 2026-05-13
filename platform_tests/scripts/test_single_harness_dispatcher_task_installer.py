@@ -76,6 +76,7 @@ def test_installer_dry_run_does_not_register() -> None:
         assert result.returncode == 0, f"installer exit={result.returncode}: {result.stderr}"
         assert "WOULD REGISTER" in result.stdout
         assert f"TaskName={task_name}" in result.stdout
+        assert "--max-items 999" in result.stdout
         # Task must NOT exist.
         check = _run_powershell(
             "-Command",
@@ -101,14 +102,10 @@ def test_uninstaller_dry_run_does_not_unregister() -> None:
             "-TaskName",
             task_name,
         )
-        assert register_result.returncode == 0, (
-            f"pre-register failed: {register_result.stderr}"
-        )
+        assert register_result.returncode == 0, f"pre-register failed: {register_result.stderr}"
 
         # Dry-run uninstall.
-        uninstall_result = _run_powershell(
-            "-File", str(UNINSTALLER), "-TaskName", task_name, "-DryRun"
-        )
+        uninstall_result = _run_powershell("-File", str(UNINSTALLER), "-TaskName", task_name, "-DryRun")
         assert uninstall_result.returncode == 0
         assert "WOULD UNREGISTER" in uninstall_result.stdout
         assert f"TaskName={task_name}" in uninstall_result.stdout
@@ -242,11 +239,9 @@ def test_installer_preserves_non_targeted_task() -> None:
             "-Command",
             f"$p = Get-ScheduledTask -TaskName '{preserve_name}' -ErrorAction SilentlyContinue; "
             f"$t = Get-ScheduledTask -TaskName '{target_name}' -ErrorAction SilentlyContinue; "
-            f"Write-Output \"$($null -ne $p)|$($null -ne $t)\"",
+            f'Write-Output "$($null -ne $p)|$($null -ne $t)"',
         )
-        assert "True|True" in check.stdout, (
-            f"preserve task or target task missing: {check.stdout!r}"
-        )
+        assert "True|True" in check.stdout, f"preserve task or target task missing: {check.stdout!r}"
     finally:
         _unregister_silent(preserve_name)
         _unregister_silent(target_name)
@@ -271,16 +266,14 @@ def test_installer_task_action_uses_absolute_script_path() -> None:
         probe = _run_powershell(
             "-Command",
             f"$t = Get-ScheduledTask -TaskName '{task_name}'; "
-            f"Write-Output \"EXEC=$($t.Actions[0].Execute)\"; "
-            f"Write-Output \"ARGS=$($t.Actions[0].Arguments)\"",
+            f'Write-Output "EXEC=$($t.Actions[0].Execute)"; '
+            f'Write-Output "ARGS=$($t.Actions[0].Arguments)"',
         )
         assert probe.returncode == 0
         lines = probe.stdout.splitlines()
         exec_line = next((l for l in lines if l.startswith("EXEC=")), "")
         args_line = next((l for l in lines if l.startswith("ARGS=")), "")
-        assert exec_line.endswith("pythonw.exe"), (
-            f"F4: Execute must be pythonw.exe (got {exec_line!r})"
-        )
+        assert exec_line.endswith("pythonw.exe"), f"F4: Execute must be pythonw.exe (got {exec_line!r})"
         # Tokenize Arguments respecting quoted segments. First token = script path.
         args_value = args_line[len("ARGS=") :]
         # Drive-anchored absolute path ending in scripts\single_harness_bridge_dispatcher.py.
@@ -295,6 +288,7 @@ def test_installer_task_action_uses_absolute_script_path() -> None:
         )
         # Verify --project-root is separately present.
         assert "--project-root" in args_value, "F3: --project-root flag missing"
+        assert "--max-items 999" in args_value, "regular automation must dispatch the full selected queue"
     finally:
         _unregister_silent(task_name)
 
@@ -334,17 +328,18 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
     harness_state = tmp_path / "harness-state"
     harness_state.mkdir(exist_ok=True)
     import json as _json
+
     (harness_state / "harness-identities.json").write_text(
         _json.dumps({"schema_version": 1, "harnesses": {"claude": {"id": "B"}}}),
         encoding="utf-8",
     )
     (harness_state / "role-assignments.json").write_text(
-        _json.dumps({
-            "schema_version": 1,
-            "harnesses": {
-                "B": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "claude"}
-            },
-        }),
+        _json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {"B": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "claude"}},
+            }
+        ),
         encoding="utf-8",
     )
     state_dir = tmp_path / ".gtkb-state" / "bridge-poller"
@@ -355,7 +350,7 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
     dispatcher_path = str(PROJECT_ROOT / "scripts" / "single_harness_bridge_dispatcher.py")
     register_cmd = (
         f"$action = New-ScheduledTaskAction -Execute 'pythonw.exe' "
-        f"-Argument '\"{dispatcher_path}\" --project-root \"{tmp_path}\" --dry-run' "
+        f'-Argument \'"{dispatcher_path}" --project-root "{tmp_path}" --dry-run\' '
         f"-WorkingDirectory '{tmp_path}'; "
         f"$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddYears(1); "
         f"$settings = New-ScheduledTaskSettingsSet -Hidden; "
@@ -374,6 +369,7 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         # Wait for completion. The dispatcher should run + exit quickly
         # (no subprocess spawn under --dry-run).
         import time
+
         deadline = time.time() + 30
         dispatch_state_path = state_dir / "dispatch-state.json"
         while time.time() < deadline:
@@ -382,8 +378,8 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
             time.sleep(1)
 
         assert dispatch_state_path.is_file(), (
-            f"dispatch-state.json not created within 30s; scheduled task did not "
-            f"invoke the dispatcher successfully. Task may have failed to run."
+            "dispatch-state.json not created within 30s; scheduled task did not "
+            "invoke the dispatcher successfully. Task may have failed to run."
         )
 
         # Inspect the written state. Applicability passed; LO had pending work;
@@ -394,9 +390,7 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         lo_state = recipients["loyal-opposition"]
         # Dry-run path leaves last_result either as the dry_run reason in last_launch
         # or as a dispatched signature update.
-        assert lo_state.get("pending_count", 0) >= 1, (
-            f"LO should have had pending work; got {lo_state}"
-        )
+        assert lo_state.get("pending_count", 0) >= 1, f"LO should have had pending work; got {lo_state}"
 
         # Verify no real subprocess artifacts (no .stdout.log/.stderr.log in dispatch-runs).
         runs_dir = state_dir / "dispatch-runs"
@@ -404,9 +398,7 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         # --dry-run it should be absent OR empty.
         if runs_dir.exists():
             run_logs = list(runs_dir.glob("*.log"))
-            assert run_logs == [], (
-                f"--dry-run should not produce dispatch-runs/*.log files; found: {run_logs}"
-            )
+            assert run_logs == [], f"--dry-run should not produce dispatch-runs/*.log files; found: {run_logs}"
     finally:
         _unregister_silent(task_name)
 
@@ -428,17 +420,13 @@ def test_installer_task_action_uses_no_console_settings() -> None:
         probe = _run_powershell(
             "-Command",
             f"$t = Get-ScheduledTask -TaskName '{task_name}'; "
-            f"Write-Output \"EXEC=$($t.Actions[0].Execute)\"; "
-            f"Write-Output \"HIDDEN=$($t.Settings.Hidden)\"",
+            f'Write-Output "EXEC=$($t.Actions[0].Execute)"; '
+            f'Write-Output "HIDDEN=$($t.Settings.Hidden)"',
         )
         lines = probe.stdout.splitlines()
         exec_line = next((l for l in lines if l.startswith("EXEC=")), "")
         hidden_line = next((l for l in lines if l.startswith("HIDDEN=")), "")
-        assert exec_line.endswith("pythonw.exe"), (
-            f"F4: Execute must be pythonw.exe (got {exec_line!r})"
-        )
-        assert "True" in hidden_line, (
-            f"F4: Settings.Hidden must be True (got {hidden_line!r})"
-        )
+        assert exec_line.endswith("pythonw.exe"), f"F4: Execute must be pythonw.exe (got {exec_line!r})"
+        assert "True" in hidden_line, f"F4: Settings.Hidden must be True (got {hidden_line!r})"
     finally:
         _unregister_silent(task_name)

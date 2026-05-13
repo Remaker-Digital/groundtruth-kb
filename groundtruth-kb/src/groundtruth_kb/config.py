@@ -39,6 +39,18 @@ class GTConfigError(Exception):
 
 
 @dataclass
+class BackupConfig:
+    """Database snapshot configuration."""
+
+    snapshot_output_dir: Path | None = None
+    snapshot_staging_dir: Path | None = None
+    retain_recent: int = 7
+    retain_daily_days: int = 30
+    include_chroma: bool = False
+    sync_paths: tuple[Path, ...] = ()
+
+
+@dataclass
 class GTConfig:
     """Configuration for a GroundTruth KB project."""
 
@@ -52,6 +64,7 @@ class GTConfig:
     legal_footer: str = ""
     governance_gates: list[str] = field(default_factory=list)
     gate_config: dict[str, dict[str, Any]] = field(default_factory=dict)
+    backup: BackupConfig = field(default_factory=BackupConfig)
 
     @classmethod
     def load(cls, config_path: Path | None = None, **overrides: object) -> GTConfig:
@@ -87,6 +100,9 @@ class GTConfig:
                 if not p.is_absolute():
                     p = anchor / p
                 merged[key] = p
+
+        if "backup" in merged:
+            merged["backup"] = _coerce_backup_config(merged["backup"], anchor=anchor)
 
         # Convert governance_gates string to list if needed
         if "governance_gates" in merged and isinstance(merged["governance_gates"], str):
@@ -184,7 +200,36 @@ def _load_toml(config_path: Path | None) -> dict[str, Any]:
     if "chroma_path" in search_section:
         result["chroma_path"] = search_section["chroma_path"]
 
+    backup_section = data.get("backup", {})
+    if backup_section:
+        result["backup"] = dict(backup_section)
+
     return result
+
+
+def _coerce_backup_config(value: object, *, anchor: Path) -> BackupConfig:
+    """Convert raw TOML/Python backup config values into ``BackupConfig``."""
+    if isinstance(value, BackupConfig):
+        return value
+    if not isinstance(value, dict):
+        raise TypeError("backup config must be a mapping or BackupConfig")
+
+    raw = dict(value)
+    for key in ("snapshot_output_dir", "snapshot_staging_dir"):
+        if key in raw and raw[key] is not None:
+            raw[key] = _anchor_path(raw[key], anchor=anchor)
+
+    if "sync_paths" in raw and raw["sync_paths"] is not None:
+        raw["sync_paths"] = tuple(_anchor_path(path, anchor=anchor) for path in raw["sync_paths"])
+
+    return BackupConfig(**{k: v for k, v in raw.items() if k in BackupConfig.__dataclass_fields__})
+
+
+def _anchor_path(value: object, *, anchor: Path) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = anchor / path
+    return path
 
 
 def _find_config() -> Path | None:

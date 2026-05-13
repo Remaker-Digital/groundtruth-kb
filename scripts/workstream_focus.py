@@ -711,7 +711,7 @@ def render_startup_focus_lines(
     if include_operational_instructions:
         lines.extend(
             [
-                "- First owner message in a fresh session is a session-start stimulus only; do not map it to a task, focus, approval, or answer.",
+                "- First owner message in a fresh session is routed through the init-keyword matcher: matches relay startup disclosure; non-matches pass through as ordinary task input.",
                 "- Live bridge authority: `bridge/INDEX.md` is the canonical handoff/review record; poller status, scan-freshness files, and startup snapshots are non-canonical.",
             ]
         )
@@ -932,11 +932,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
                     f"both `{current_harness}` and `{harness}` have role=`{overlap_label}` "
                     "— counterpart bridge roles may collide; verify harness-state/role-assignments.json."
                 )
-            elif (
-                role_set & TOGGLEABLE_ROLE_PROFILES
-                and our_role_set & TOGGLEABLE_ROLE_PROFILES
-                and not overlap
-            ):
+            elif role_set & TOGGLEABLE_ROLE_PROFILES and our_role_set & TOGGLEABLE_ROLE_PROFILES and not overlap:
                 warnings.append(
                     f"`{current_harness}` is `{our_label}`; counterpart `{harness}` is `{their_label}`. "
                     "Treat bridge message authority per harness-state/role-assignments.json."
@@ -1132,11 +1128,7 @@ def _startup_gate_response(project_root: Path | None = None) -> dict[str, Any]:
     cached_disclosure = _cached_startup_disclosure(project_root)
     additional_context = message
     if cached_disclosure:
-        additional_context = (
-            f"{message}\n\n"
-            "## Cached User-Visible Startup Message\n\n"
-            f"{cached_disclosure}"
-        )
+        additional_context = f"{message}\n\n## Cached User-Visible Startup Message\n\n{cached_disclosure}"
     return {
         "systemMessage": message,
         "hookSpecificOutput": {

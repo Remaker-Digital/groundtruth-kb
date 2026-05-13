@@ -39,8 +39,8 @@ _STATUS_LINE_RE = re.compile(
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+(?P<name>[A-Za-z0-9._-]+)\s*$")
 _HEADING_LINE_RE = re.compile(r"^\s*#")
 _SINGLE_LINE_COMMENT_RE = re.compile(r"^\s*<!--.*-->\s*$")
-_MULTILINE_COMMENT_OPEN_RE = re.compile(r"^\s*<!--\s*$")
-_MULTILINE_COMMENT_CLOSE_RE = re.compile(r"^\s*-->\s*$")
+_MULTILINE_COMMENT_OPEN_RE = re.compile(r"^\s*<!--")
+_MULTILINE_COMMENT_CLOSE_RE = re.compile(r".*-->\s*$")
 
 WarningKind = Literal[
     "referenced_file_missing",

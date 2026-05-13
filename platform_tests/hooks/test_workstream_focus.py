@@ -263,6 +263,49 @@ def test_startup_gate_no_match_passes_prompt_through(tmp_path, monkeypatch) -> N
     assert guard_state["startup_gate_no_match_passed_through"] is True
 
 
+def test_sessionstart_plus_dispatch_prompt_without_marker_processes_bridge_task(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    guard_path = tmp_path / "guard.json"
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": True,
+                "startup_guard_id": "test-guard",
+                "startup_response_pending": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    dispatch_prompt = """::init gtkb pb
+
+Single-harness bridge dispatcher notification (Slice 2 scheduled task).
+
+This is an automated bridge dispatch from the single-harness dispatcher, not a fresh-session owner stimulus; do not wait for another owner message before processing the selected entries.
+
+Read bridge/INDEX.md directly before acting.
+"""
+
+    response = module.handle_hook_payload(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": dispatch_prompt,
+        },
+        REPO_ROOT,
+    )
+
+    assert "GTKB STARTUP INPUT GATE" not in response["systemMessage"]
+    assert "hookSpecificOutput" not in response
+    assert "additionalContext" not in json.dumps(response)
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["discard_next_user_prompt"] is False
+    assert guard_state["startup_prompt_discarded"] is False
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["startup_gate_no_match_passed_through"] is True
+    assert guard_state["startup_prompt_preview"].startswith("::init gtkb pb Single-harness bridge dispatcher")
+
+
 def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None:
     module = _load_module()
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
@@ -774,7 +817,7 @@ def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeyp
 # ---- GTKB-ISOLATION-015 Slice 1 §A / §C / §E regression coverage ----------
 
 
-def test_startup_focus_lines_include_role_slot_topology_mode_stimulus_and_bridge_authority(
+def test_startup_focus_lines_include_role_slot_topology_mode_init_keyword_and_bridge_authority(
     tmp_path, monkeypatch
 ) -> None:
     module = _load_module()
@@ -790,7 +833,7 @@ def test_startup_focus_lines_include_role_slot_topology_mode_stimulus_and_bridge
     assert "Harness topology:" in lines
     assert module.TOPOLOGY_MODE_SINGLE in lines
     assert "First owner message" in lines
-    assert "stimulus" in lines
+    assert "init-keyword matcher" in lines
     assert "bridge/INDEX.md" in lines
     assert "canonical handoff/review" in lines
 

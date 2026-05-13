@@ -113,6 +113,13 @@ The bridge protocol has TWO live dispatch substrates as of Slice 2 of
    role-set ``["prime-builder", "loyal-opposition"]`` per
    ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``.
 
+   Activation is managed by ``scripts/single_harness_bridge_automation.py``,
+   which is registered from both ``.claude/settings.json`` and
+   ``.codex/hooks.json``. That manager enables or updates the scheduled task
+   only when the live role map is single-harness, deactivates it when the
+   topology is multi-harness, and may run a one-shot dispatch after Stop once
+   the active-session lock has been cleared.
+
 Both substrates honor the same actionable-signature scheme (byte-identical
 ``_signature`` computation), the same active-session-suppression contract
 (per ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md``

@@ -13,6 +13,8 @@ import sqlite3
 import subprocess
 import sys
 import tomllib
+import urllib.error
+import urllib.request
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -134,6 +136,7 @@ GTKB_HARNESS_STATE_ROOT = PROJECT_ROOT / "harness-state"
 # fallback for --project-root, never as internal output/read-path fallback.
 DEFAULT_USER_STARTUP_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
 GRAFANA_DASHBOARD_URL = "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard"
+GRAFANA_HEALTH_URL = "http://localhost:3000/api/health"
 DASHBOARD_OPEN_MODE_HARNESS = "harness_browser"
 DASHBOARD_OPEN_MODE_SYSTEM = "system_default_browser"
 PDF_EXPORT_FILENAME = "groundtruth-kb-project-dashboard.pdf"
@@ -375,6 +378,45 @@ def _dashboard_opening_state(path: Path | None = None) -> dict[str, Any]:
         "mechanism": mechanism,
         "system_browser_opt_in_required": True,
     }
+
+
+def _probe_http_url(source: str, url: str, *, timeout: float = 3.0) -> dict[str, Any]:
+    queried_at = _now_iso()
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "gtkb-startup-reachability-probe/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - local operator-configured URL.
+            status_code = int(getattr(response, "status", response.getcode()))
+    except (OSError, urllib.error.URLError, TimeoutError) as exc:
+        return {
+            "source": source,
+            "kind": "live_probe",
+            "required": False,
+            "status": "unavailable",
+            "queried_at": queried_at,
+            "detail": url,
+            "timeout_seconds": timeout,
+            "error": str(exc),
+        }
+    return {
+        "source": source,
+        "kind": "live_probe",
+        "required": False,
+        "status": "queried" if status_code == 200 else "unavailable",
+        "queried_at": queried_at,
+        "detail": url,
+        "timeout_seconds": timeout,
+        "http_status": status_code,
+    }
+
+
+def _dashboard_reachability_probes() -> list[dict[str, Any]]:
+    return [
+        _probe_http_url("Grafana health endpoint", GRAFANA_HEALTH_URL),
+        _probe_http_url("GT-KB dashboard URL", GRAFANA_DASHBOARD_URL),
+    ]
 
 
 def _open_dashboard_url_in_system_browser(url: str) -> bool:
@@ -3091,6 +3133,7 @@ def build_startup_model(
         "harness_parity": harness_parity,
         "gtkb_upgrade_posture": _gtkb_upgrade_posture(project_root, fast_hook=fast_hook),
         "testing_service_integrations": _testing_service_integrations(project_root, plugins, fast_hook=fast_hook),
+        "dashboard_reachability": _dashboard_reachability_probes(),
     }
     infrastructure["delivery_timeline"] = _delivery_timeline(project_root, infrastructure)
     dashboard_intelligence = _dashboard_intelligence(
@@ -3950,6 +3993,30 @@ def _is_loyal_opposition_model(model: dict[str, Any]) -> bool:
     return model.get("role", {}).get("assumed_role") == "Loyal Opposition"
 
 
+def _render_dashboard_reachability_lines(model: dict[str, Any]) -> list[str]:
+    probes = model.get("infrastructure", {}).get("dashboard_reachability") or []
+    if not probes:
+        return []
+    lines: list[str] = []
+    unavailable: list[str] = []
+    for probe in probes:
+        source = str(probe.get("source") or "dashboard probe")
+        status = str(probe.get("status") or "unknown")
+        detail = str(probe.get("detail") or "")
+        status_detail = status
+        if probe.get("http_status") is not None:
+            status_detail = f"{status} (HTTP {probe['http_status']})"
+        lines.append(f"- Dashboard reachability: {source}: {status_detail}; target: {detail}")
+        if status != "queried":
+            unavailable.append(source)
+    if unavailable:
+        lines.append(
+            "- Dashboard recovery hint: Grafana is optional for startup; start or restart the local Grafana service "
+            "and re-open the dashboard link when reachability is unavailable."
+        )
+    return lines
+
+
 def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
     return "\n".join(
         [
@@ -3966,8 +4033,8 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
-            "- If the live bridge verification succeeds, report the live scan result. The Loyal Opposition harness's auto-process default begins processing the bridge queue unless the session was opened in advisory mode via the init keyword `init gtkb advisory` (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).",
-            "- Expected owner reply: `yes` to begin processing the bridge queue, or `no` / a custom instruction to stay in advisory mode.",
+            "- If the live bridge verification succeeds, report the live scan result and auto-process actionable NEW/REVISED bridge entries oldest-to-newest by default (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).",
+            "- Advisory mode opt-in: when the session was opened with `init gtkb advisory`, report the scan and ask Mike whether to switch to auto-process; do not write verdict files in advisory mode.",
             "- If the bridge is not functioning, diagnose and repair the bridge before ordinary review work.",
             "- Bridge authority: Loyal Opposition has permanent owner permission to diagnose and repair bridge function/use and downstream bridge-dependent artifacts needed to sustain the bridge.",
         ]
@@ -4489,6 +4556,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "### Live Project Dashboard",
             "",
             f"- Dashboard: GroundTruth-KB Project Dashboard: {dashboard_link}",
+            *_render_dashboard_reachability_lines(model),
             f"- Browser opening: use the harness-controlled browser for live dashboard inspection; startup open request: {dashboard_open_requested}; current mode: `{dashboard_open_mode}`. Startup hooks must not launch the operating system default browser unless explicitly configured with `dashboard_open_mode: system_default_browser`.",
             "- KPI coverage: GT-KB backlog, MemBase work items, Deliberation Archive records, tests, specifications, drift, regression, contention, and tokens consumed at session start before user input.",
             f"- Dashboard scope: {model['dashboard_requirements']['scope_note']}",
@@ -5999,6 +6067,7 @@ def _startup_freshness_metadata(
         _workflow_inventory_observation(project_root),
     ]
     live_probes = [
+        *infrastructure.get("dashboard_reachability", []),
         {
             "source": "GitHub Actions via gh",
             "kind": "live_probe",
@@ -6121,9 +6190,9 @@ def _startup_service_context(result: dict[str, Any]) -> str:
     loyal_opposition_context: list[str] = []
     if _is_loyal_opposition_model(model):
         startup_relay_instruction = (
-            "- The AI harness must relay the generated startup message verbatim as the first durable assistant answer, "
-            "then execute the harness-only Loyal Opposition startup action before ordinary task work; Loyal Opposition "
-            "mode does not wait for a Prime Builder focus selection."
+            "- SessionStart caches the generated Loyal Opposition startup disclosure for later init-keyword rendering. "
+            "Do not render it directly from this SessionStart payload; execute bridge review work only when an "
+            "init-keyword match or explicit bridge dispatch task makes it applicable."
         )
         loyal_opposition_context = [
             "",
@@ -6136,8 +6205,9 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         ]
     else:
         startup_relay_instruction = (
-            "- The AI harness must relay the generated startup message verbatim as the first durable assistant answer "
-            "and then wait for Mike's focus selection."
+            "- SessionStart caches the generated Prime Builder startup disclosure for later init-keyword rendering. "
+            "Do not render it directly from this SessionStart payload or wait for a focus selection unless the "
+            "UserPromptSubmit init-keyword matcher returns a match."
         )
     return "\n".join(
         [
@@ -6146,7 +6216,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             f"- Contract: {STARTUP_SERVICE_CONTRACT_VERSION}",
             "- Source: `scripts/session_self_initialization.py`",
             f"- Generated: {model['generated_at']}",
-            "- User-visible startup content below was generated programmatically by the startup service.",
+            "- User-visible startup content below was generated programmatically by the startup service and cached for lazy injection.",
             startup_relay_instruction,
             "- Do not summarize, paraphrase, shorten, reorder, or omit any startup section or any Session Startup focus-selector detail.",
             "- Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label exactly as written.",
@@ -6154,11 +6224,9 @@ def _startup_service_context(result: dict[str, Any]) -> str:
                 f"- Prime Builder focus-menu preservation rule: when the startup message contains a session-focus menu, "
                 f"the A/B/C recommendations and D full focus list must remain present; the full focus list must include all {focus_option_count} labels in order."
             ),
-            "- The first durable assistant answer should be the startup disclosure itself, not a meta-summary about the startup disclosure.",
             "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the startup disclosure and wait for the next message; on no-match, process the prompt as normal task content. The startup disclosure is generated at SessionStart time and cached for lazy injection by the matcher; it is not unconditionally relayed.",
-            "- Never map the first owner message to `Continue Last Session` or any other focus option.",
-            "- Codex Desktop durability rule: relay the startup message in the first durable assistant answer, not in transient progress/intermediary output.",
-            "- Do not replace the startup message with a shorter final answer after rendering it.",
+            "- Only an init-keyword match relays startup disclosure; a non-matching first owner message is ordinary task input and may be mapped normally.",
+            "- When the init-keyword path renders cached startup content, do not replace the startup message with a shorter final answer after rendering it.",
             "- The AI harness is not responsible for composing role, mode, bridge, process, or focus content during startup.",
             *startup_instruction_context,
             *loyal_opposition_context,

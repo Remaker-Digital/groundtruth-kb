@@ -204,6 +204,59 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["missing_advisory_specs"] == []
 
 
+def test_withdrawn_status_is_parsed_as_terminal_operative_version(tmp_path: Path) -> None:
+    bridge_id = "retired-thread"
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / f"{bridge_id}-001.md").write_text(
+        """
+# Old Review
+
+## Specification Links
+
+- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001
+""",
+        encoding="utf-8",
+    )
+    (bridge / f"{bridge_id}-002.md").write_text(
+        """
+# Supersession Notice
+
+## Specification Links
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001
+""",
+        encoding="utf-8",
+    )
+    (bridge / "INDEX.md").write_text(
+        "\n".join(
+            [
+                "# Bridge Index",
+                "",
+                f"Document: {bridge_id}",
+                f"WITHDRAWN: bridge/{bridge_id}-002.md",
+                f"NEW: bridge/{bridge_id}-001.md",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        index_path=bridge / "INDEX.md",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+    )
+
+    assert packet["operative_version"]["status"] == "WITHDRAWN"
+    assert packet["operative_version"]["path"] == f"bridge/{bridge_id}-002.md"
+    assert packet["preflight_passed"] is True
+
+
 def test_markdown_output_contains_hook_readable_clean_fields(tmp_path: Path) -> None:
     bridge_id = "application-move"
     _write_bridge(

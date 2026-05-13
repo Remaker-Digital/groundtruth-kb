@@ -11,12 +11,13 @@ This skill body presents **identical content** to both Claude Code and Codex age
 
 ## Bridge protocol summary
 
-Five operations, six lifecycle states. Operations:
+Six operations, six lifecycle states. Operations:
 
 | Operation | Who runs it | What it produces |
 |---|---|---|
 | **Propose** | Prime Builder | New or revised proposal file `bridge/<topic>-NNN.md` + INDEX entry |
 | **Scan** | Both harnesses | List of actionable items needing review or implementation |
+| **Revise** | Prime Builder | Non-dispatchable REVISED draft or completed `REVISED:` filing after a NO-GO |
 | **Respond** | Loyal Opposition | Review file with verdict GO/NO-GO/VERIFIED + INDEX update |
 | **Verify** | Prime Builder | Post-implementation report + INDEX entry (status NEW; the post-impl report itself awaits VERIFIED) |
 | **Status** | Both harnesses | Read-only inspection of thread state without mutation |
@@ -61,9 +62,25 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 1. Read `bridge/INDEX.md`. Each `Document:` block lists versions with the **latest at top**. The latest line per document defines the queue state.
 2. Filter for actionable status given the current role:
    - **Loyal Opposition** acts on `NEW` and `REVISED` (proposals/reports awaiting verdict).
-   - **Prime Builder** acts on `NO-GO` (revise) and `GO` (implement) for proposals; on `VERIFIED` (close) for post-impl reports.
+   - **Prime Builder** acts only on `NO-GO` (revise) and `GO` (implement). `VERIFIED` is terminal closure for both roles, not queue work.
 3. For each actionable thread, read **the full version chain** (all prior entries) before responding. The protocol requires reading the whole thread, not just the latest version.
 4. Optional: cross-check with `.gtkb-state/bridge-poller/dispatch-state.json` (or successor under `.gtkb-state/cross-harness-trigger/`) to deduplicate against already-dispatched signatures.
+
+### Revise
+
+**Purpose**: help Prime Builder respond to a latest `NO-GO` without filing incomplete skeletons as actionable bridge state.
+
+**Helper**: `.claude/skills/bridge/helpers/revise_bridge.py`
+
+**Action**:
+
+1. Read the live `bridge/INDEX.md` entry for the exact `Document: <topic-slug>` and the full version chain.
+2. Use `plan` or `scaffold` mode to compute the next version and generate a finding-by-finding draft. Scaffold drafts live under `.gtkb-state/bridge-revisions/drafts/` and are non-dispatchable; they must not appear in `bridge/INDEX.md`.
+3. Complete the revision content manually: fill every finding response, specification link, prior-deliberation note, owner-decision section when applicable, verification plan, and risk/rollback section.
+4. Use `file` mode only for completed content. It refuses draft placeholders, runs the bridge-propose credential scan policy, runs `bridge_applicability_preflight.py --content-file`, runs `adr_dcl_clause_preflight.py --content-file`, refuses existing live target files, and checks for `bridge/INDEX.md` drift before inserting the live `REVISED:` line.
+5. After filing, the thread is Loyal Opposition-actionable because the helper inserts `REVISED: bridge/<topic-slug>-<next>.md` at the top of the existing document entry.
+
+The helper creates drafts; it does not author the substantive correction. Prime Builder remains responsible for completing the revision before live filing.
 
 ### Respond
 
@@ -86,12 +103,21 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 
 **Purpose**: file a post-implementation report after a GO is implemented.
 
+**Helper**: `.claude/skills/bridge/helpers/impl_report_bridge.py`
+
 **Action**:
 
 1. Implement the work per the GO d proposal scope. Run the spec-derived tests; capture the exact commands and observed results.
-2. Draft the post-implementation report carrying forward: `Specification Links` (verbatim from the proposal), spec-to-test mapping, tests executed, observed results, files changed, baseline accounting (per `.claude/rules/file-bridge-protocol.md` "Mandatory Specification-Derived Verification Gate" + the F2 baseline-discipline pattern from prior threads).
-3. File the report as a NEW entry on the same thread (`bridge/<topic-slug>-<next-version>.md`); update `bridge/INDEX.md` with `NEW:` line on top.
-4. Wait for Loyal Opposition VERIFIED or NO-GO response.
+2. Use the helper's `plan` mode to read the live `bridge/INDEX.md` entry, require latest `GO`, load the approved proposal and GO verdict, compute the next version, carry forward linked specifications, capture dirty files via `git diff --name-only HEAD --`, and show the proposed `NEW:` INDEX line without mutation:
+   ```powershell
+   python .claude/skills/bridge/helpers/impl_report_bridge.py plan <topic-slug>
+   ```
+3. Use `scaffold` mode when you need a non-dispatchable draft under `.gtkb-state/bridge-impl-reports/drafts/`; complete the implementation claim, command evidence, observed results, spec-to-test mapping, acceptance status, and risk/rollback before live filing.
+4. Use `file` mode only when the report content is ready for Loyal Opposition verification. The helper refuses non-`GO` latest status, exact-document mismatches, existing target files, credential-shaped content, and `bridge/INDEX.md` drift. It writes `bridge/<topic-slug>-<next-version>.md` and inserts `NEW: bridge/<topic-slug>-<next-version>.md` at the top of the existing document entry:
+   ```powershell
+   python .claude/skills/bridge/helpers/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
+   ```
+5. The helper does not bypass Loyal Opposition verification. After filing, the thread is Loyal Opposition-actionable; wait for VERIFIED or NO-GO response.
 
 ### Status
 

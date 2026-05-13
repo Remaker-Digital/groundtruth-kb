@@ -13,8 +13,10 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FORMAL_APPROVAL_HOOK = ".claude/hooks/formal-artifact-approval-gate.py"
+BRIDGE_COMPLIANCE_HOOK = ".claude/hooks/bridge-compliance-gate.py"
 WORKSTREAM_FOCUS_HOOK = ".claude/hooks/workstream-focus.py"
 SESSION_SELF_INITIALIZATION_SCRIPT = "scripts/session_self_initialization.py"
+SINGLE_HARNESS_AUTOMATION_SCRIPT = "scripts/single_harness_bridge_automation.py"
 HARNESS_IDENTITY_RECORD = "harness-state/harness-identities.json"
 ROLE_ASSIGNMENT_RECORD = "harness-state/role-assignments.json"
 CODEX_CONFIG = ".codex/config.toml"
@@ -23,6 +25,9 @@ CLAUDE_SETTINGS = ".claude/settings.json"
 CLAUDE_SESSION_START_DISPATCHER = ".claude/hooks/session_start_dispatch.py"
 CODEX_WRAPPER_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 CODEX_FORMAL_APPROVAL_WRAPPER = CODEX_WRAPPER_DIR / "formal-artifact-approval.cmd"
+CODEX_BRIDGE_COMPLIANCE_WRAPPER = CODEX_WRAPPER_DIR / "bridge-compliance-gate.cmd"
+CODEX_BRIDGE_COMPLIANCE_ADAPTER = CODEX_WRAPPER_DIR / "bridge-compliance-gate-bash-adapter.py"
+CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER = CODEX_WRAPPER_DIR / "bridge-compliance-audit.cmd"
 CODEX_WORKSTREAM_FOCUS_WRAPPER = CODEX_WRAPPER_DIR / "workstream-focus.cmd"
 CODEX_SESSION_START_WRAPPER = CODEX_WRAPPER_DIR / "session-start.cmd"
 CODEX_SESSION_START_DISPATCHER = CODEX_WRAPPER_DIR / "session_start_dispatch.py"
@@ -200,6 +205,21 @@ def _codex_formal_hook_groups(codex_hooks: dict[str, Any]) -> list[dict[str, Any
     return groups
 
 
+def _codex_bridge_compliance_hook_groups(codex_hooks: dict[str, Any], event_name: str) -> list[dict[str, Any]]:
+    """Return Codex hook groups whose commands reference the bridge-compliance family."""
+    groups: list[dict[str, Any]] = []
+    for group in codex_hooks.get("hooks", {}).get(event_name, []):
+        commands = [hook.get("command", "") for hook in group.get("hooks", []) if isinstance(hook.get("command"), str)]
+        if any(
+            _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK)
+            or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_WRAPPER)
+            or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER)
+            for command in commands
+        ):
+            groups.append(group)
+    return groups
+
+
 def _codex_workstream_hook_groups(codex_hooks: dict[str, Any], event_name: str) -> list[dict[str, Any]]:
     groups: list[dict[str, Any]] = []
     for group in codex_hooks.get("hooks", {}).get(event_name, []):
@@ -221,6 +241,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     codex_hooks_path = project_root / CODEX_HOOKS
     claude_settings_path = project_root / CLAUDE_SETTINGS
     formal_hook_path = project_root / FORMAL_APPROVAL_HOOK
+    bridge_compliance_hook_path = project_root / BRIDGE_COMPLIANCE_HOOK
     workstream_hook_path = project_root / WORKSTREAM_FOCUS_HOOK
     session_startup_path = project_root / SESSION_SELF_INITIALIZATION_SCRIPT
     harness_identity_path = project_root / HARNESS_IDENTITY_RECORD
@@ -231,6 +252,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         codex_hooks_path,
         claude_settings_path,
         formal_hook_path,
+        bridge_compliance_hook_path,
         workstream_hook_path,
         session_startup_path,
         harness_identity_path,
@@ -261,12 +283,10 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     # the same governance contract: a SessionStart hookSpecificOutput envelope
     # is produced from the canonical service.
     direct_session = any(
-        _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
-        for command in claude_session_commands
+        _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT) for command in claude_session_commands
     )
     dispatcher_session = any(
-        _contains_hook_path(command, CLAUDE_SESSION_START_DISPATCHER)
-        for command in claude_session_commands
+        _contains_hook_path(command, CLAUDE_SESSION_START_DISPATCHER) for command in claude_session_commands
     )
     if not (direct_session or dispatcher_session):
         errors.append(
@@ -279,27 +299,17 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         # Dispatcher pattern: verify dispatcher source delegates correctly.
         dispatcher_path = PROJECT_ROOT / CLAUDE_SESSION_START_DISPATCHER
         if not dispatcher_path.is_file():
-            errors.append(
-                f"{CLAUDE_SESSION_START_DISPATCHER} referenced by SessionStart hook does not exist"
-            )
+            errors.append(f"{CLAUDE_SESSION_START_DISPATCHER} referenced by SessionStart hook does not exist")
         else:
             dispatcher_source = dispatcher_path.read_text(encoding="utf-8")
             if "session_self_initialization.py" not in dispatcher_source:
-                errors.append(
-                    "Claude SessionStart dispatcher must delegate to session_self_initialization.py"
-                )
+                errors.append("Claude SessionStart dispatcher must delegate to session_self_initialization.py")
             if "--emit-startup-service-payload" not in dispatcher_source:
-                errors.append(
-                    "Claude SessionStart dispatcher must use the --emit-startup-service-payload contract"
-                )
+                errors.append("Claude SessionStart dispatcher must use the --emit-startup-service-payload contract")
             if "--fast-hook" not in dispatcher_source:
-                errors.append(
-                    "Claude SessionStart dispatcher must use the fast lifecycle hook path"
-                )
+                errors.append("Claude SessionStart dispatcher must use the fast lifecycle hook path")
             if "--harness-name" not in dispatcher_source or "claude" not in dispatcher_source:
-                errors.append(
-                    "Claude SessionStart dispatcher must identify the Claude harness type"
-                )
+                errors.append("Claude SessionStart dispatcher must identify the Claude harness type")
     elif direct_session:
         # Legacy direct-invocation pattern: preserve the original assertions.
         if not any("--emit-report" in command for command in claude_session_commands):
@@ -312,6 +322,11 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude SessionStart hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must discover the role profile instead of forcing one")
+    if not any(
+        _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT) and "--ensure" in command
+        for command in claude_session_commands
+    ):
+        errors.append(".claude/settings.json does not register the single-harness bridge automation SessionStart hook")
 
     claude_stop_commands = _commands_for_event(claude_settings, "Stop")
     if not any(_contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT) for command in claude_stop_commands):
@@ -326,6 +341,13 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude Stop hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must discover the role profile instead of forcing one")
+    if not any(
+        _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT)
+        and "--ensure" in command
+        and "--dispatch-now" in command
+        for command in claude_stop_commands
+    ):
+        errors.append(".claude/settings.json does not register the single-harness bridge automation Stop hook")
 
     formal_groups = _codex_formal_hook_groups(codex_hooks)
     if not formal_groups:
@@ -351,6 +373,84 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
                 errors.append("Codex formal artifact hook timeout must be an integer no greater than 10 seconds")
 
     errors.extend(_wrapper_errors(CODEX_FORMAL_APPROVAL_WRAPPER, [FORMAL_APPROVAL_HOOK.replace("/", "\\")]))
+
+    claude_has_bridge_compliance = any(
+        _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK) for command in claude_pre_tool_commands
+    )
+    codex_hooks_enabled = codex_config.get("features", {}).get("codex_hooks") is True
+    if claude_has_bridge_compliance and codex_hooks_enabled:
+        bridge_pre_groups = _codex_bridge_compliance_hook_groups(codex_hooks, "PreToolUse")
+        if not bridge_pre_groups:
+            errors.append(
+                ".codex/hooks.json must register the bridge-compliance PreToolUse:Bash hook when "
+                "Claude's bridge-compliance-gate.py is active "
+                "(per SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001 A1)"
+            )
+        for group in bridge_pre_groups:
+            if group.get("matcher") != "Bash":
+                errors.append("Codex bridge-compliance PreToolUse hook must use matcher = 'Bash'")
+            for hook in group.get("hooks", []):
+                command = hook.get("command", "")
+                if not isinstance(command, str) or not (
+                    _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK)
+                    or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_WRAPPER)
+                ):
+                    continue
+                if hook.get("type") != "command":
+                    errors.append("Codex bridge-compliance hook must be a command hook")
+                if _uses_shell_command_substitution(command):
+                    errors.append("Codex bridge-compliance hook command must avoid shell command substitution")
+                if not _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_WRAPPER):
+                    errors.append("Codex bridge-compliance hook command must call the no-space wrapper")
+                timeout = hook.get("timeout")
+                if not isinstance(timeout, int) or timeout > 5:
+                    errors.append("Codex bridge-compliance hook timeout must be an integer no greater than 5 seconds")
+
+        bridge_post_groups = _codex_bridge_compliance_hook_groups(codex_hooks, "PostToolUse")
+        if not bridge_post_groups:
+            errors.append(
+                ".codex/hooks.json must register the bridge-compliance PostToolUse:Bash audit hook when "
+                "Claude's bridge-compliance-gate.py is active "
+                "(per SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001 A1)"
+            )
+        for group in bridge_post_groups:
+            if group.get("matcher") not in ("Bash", None, ""):
+                errors.append("Codex bridge-compliance PostToolUse hook must use matcher = 'Bash' or no matcher")
+            for hook in group.get("hooks", []):
+                command = hook.get("command", "")
+                if not isinstance(command, str) or not (
+                    _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK)
+                    or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER)
+                ):
+                    continue
+                if hook.get("type") != "command":
+                    errors.append("Codex bridge-compliance audit hook must be a command hook")
+                if _uses_shell_command_substitution(command):
+                    errors.append("Codex bridge-compliance audit command must avoid shell command substitution")
+                if not _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER):
+                    errors.append("Codex bridge-compliance audit command must call the no-space wrapper")
+                timeout = hook.get("timeout")
+                if not isinstance(timeout, int) or timeout > 5:
+                    errors.append("Codex bridge-compliance audit timeout must be an integer no greater than 5 seconds")
+
+        errors.extend(
+            _wrapper_errors(
+                CODEX_BRIDGE_COMPLIANCE_WRAPPER,
+                [BRIDGE_COMPLIANCE_HOOK.replace("/", "\\"), "bridge-compliance-gate-bash-adapter.py"],
+            )
+        )
+        errors.extend(
+            _wrapper_errors(
+                CODEX_BRIDGE_COMPLIANCE_ADAPTER,
+                ["bridge-compliance-gate.py", "BRIDGE_FILE_WRITE_PATTERNS", "synthetic Claude-shape"],
+            )
+        )
+        errors.extend(
+            _wrapper_errors(
+                CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER,
+                [BRIDGE_COMPLIANCE_HOOK.replace("/", "\\"), "--audit-only"],
+            )
+        )
 
     workstream_pre_tool_groups = _codex_workstream_hook_groups(codex_hooks, "PreToolUse")
     if not workstream_pre_tool_groups:
@@ -423,6 +523,13 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     ):
         errors.append("Codex legacy session_stop_dispatch.py must discover the role profile instead of forcing one")
     stop_commands = _commands_for_event(codex_hooks, "Stop")
+    if not any(
+        _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT)
+        and "--ensure" in command
+        and "--dispatch-now" in command
+        for command in stop_commands
+    ):
+        errors.append(".codex/hooks.json does not register the single-harness bridge automation Stop hook")
     if any(
         _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
         or _contains_hook_wrapper(command, CODEX_SESSION_STOP_DISPATCHER)
@@ -460,6 +567,13 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
             if not _contains_hook_wrapper(command, wrapper_path):
                 errors.append(f"Codex {event_name} hook command must call the no-space wrapper")
         if event_name == "SessionStart":
+            if not any(
+                _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT) and "--ensure" in command
+                for command in commands
+            ):
+                errors.append(
+                    ".codex/hooks.json does not register the single-harness bridge automation SessionStart hook"
+                )
             for hook in hook_entries:
                 command = hook["command"]
                 if not (
@@ -469,9 +583,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
                     continue
                 timeout = hook.get("timeout")
                 if not isinstance(timeout, int) or timeout < 60:
-                    errors.append(
-                        "Codex SessionStart hook timeout must be at least 60 seconds"
-                    )
+                    errors.append("Codex SessionStart hook timeout must be at least 60 seconds")
         if event_name == "UserPromptSubmit":
             errors.extend(_wrapup_trigger_errors(wrapper_path))
         else:

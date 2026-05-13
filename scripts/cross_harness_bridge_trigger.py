@@ -471,10 +471,10 @@ class DispatchTarget:
       - dispatch-state operations (use ``dispatch_state_key``).
     """
 
-    needed_role_label: str    # "prime-builder" or "loyal-opposition"
-    harness_id: str           # "A", "B", etc. — durable identity from harness-identities.json
-    command_handle: str       # "claude" / "codex" — from inverted harness-identities.json
-    canonical_mode: str       # "pb" / "lo" — the canonical-init-keyword mode
+    needed_role_label: str  # "prime-builder" or "loyal-opposition"
+    harness_id: str  # "A", "B", etc. — durable identity from harness-identities.json
+    command_handle: str  # "claude" / "codex" — from inverted harness-identities.json
+    canonical_mode: str  # "pb" / "lo" — the canonical-init-keyword mode
 
     @property
     def active_session_lock_name(self) -> str:
@@ -605,19 +605,13 @@ def _resolve_dispatch_target(needed_role_label: str, project_root: Path) -> Disp
     if not matching:
         raise ValueError(f"no harness assigned role {needed_role_label!r}")
     if len(matching) > 1:
-        raise ValueError(
-            f"multiple harnesses assigned role {needed_role_label!r}: "
-            f"{[h_id for h_id, _ in matching]}"
-        )
+        raise ValueError(f"multiple harnesses assigned role {needed_role_label!r}: {[h_id for h_id, _ in matching]}")
     harness_id, role_record = matching[0]
 
     identities = _read_harness_identities(project_root)
     id_to_handle = _invert_identities(identities)
     if harness_id not in id_to_handle:
-        raise ValueError(
-            f"role-assignments references harness ID {harness_id!r} not present "
-            f"in harness-identities"
-        )
+        raise ValueError(f"role-assignments references harness ID {harness_id!r} not present in harness-identities")
     identity_handle = id_to_handle[harness_id]
 
     # Drift detection: role record's denormalized harness_type (if present)
@@ -675,9 +669,9 @@ def check_counterpart_active(target: DispatchTarget, state_dir: Path) -> bool:
         sanity_ttl = int(os.environ.get("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "120"))
     except (TypeError, ValueError):
         sanity_ttl = 120
-    if age_seconds > sanity_ttl:
-        return False
-    return True
+    if sanity_ttl <= 0:
+        sanity_ttl = 120
+    return age_seconds <= sanity_ttl
 
 
 def _spawn_harness(
@@ -719,10 +713,7 @@ def _spawn_harness(
     prompt = _dispatch_prompt(target, items, max_items)
     command = _harness_command(target, prompt, project_root)
     recipient_key = target.dispatch_state_key
-    dispatch_id = (
-        f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}"
-        f"-{recipient_key}-{uuid.uuid4().hex[:6]}"
-    )
+    dispatch_id = f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{recipient_key}-{uuid.uuid4().hex[:6]}"
 
     if command is None:
         meta = {
@@ -789,9 +780,7 @@ def _spawn_harness(
         "stderr_path": str(stderr_path),
     }
     try:
-        with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open(
-            "w", encoding="utf-8"
-        ) as err:
+        with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open("w", encoding="utf-8") as err:
             process = subprocess.Popen(
                 command,
                 cwd=str(project_root),
@@ -835,7 +824,7 @@ def _is_single_harness_topology(project_root: Path) -> bool:
     harnesses = role_map.get("harnesses", {})
     if not isinstance(harnesses, dict) or len(harnesses) != 1:
         return False
-    (_, record), = harnesses.items()
+    ((_, record),) = harnesses.items()
     if not isinstance(record, dict):
         return False
     raw_role = record.get("role")
@@ -933,9 +922,7 @@ def run_trigger(
         return {"skipped": True, "reason": "single_harness_topology_not_applicable"}
 
     index_text = _read_index_live(project_root)
-    actionable_for_prime, actionable_for_codex = _compute_actionable(
-        index_text, project_root
-    )
+    actionable_for_prime, actionable_for_codex = _compute_actionable(index_text, project_root)
 
     state = _load_dispatch_state(state_dir)
     recipients_state = state.get("recipients") if isinstance(state, dict) else {}
@@ -1035,9 +1022,7 @@ def run_trigger(
         }
 
         if not selected:
-            recipient_state["last_result"] = (
-                "no_pending_after_filter" if items else "no_pending"
-            )
+            recipient_state["last_result"] = "no_pending_after_filter" if items else "no_pending"
             # Empty pending: keep legacy `signature` aligned to the empty
             # state for back-compat with Slice 2 readers (which expected
             # the field to track current signature, including empty).
@@ -1074,9 +1059,7 @@ def run_trigger(
                 max_items=max_items,
                 dry_run=dry_run,
             )
-            recipient_state["last_result"] = (
-                "launched" if launch.get("launched") else "launch_failed"
-            )
+            recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
             recipient_state["last_launch"] = launch
             recipient_state["last_dispatched_signature"] = signature
             # Dispatch supersedes any prior suppression.
@@ -1255,10 +1238,7 @@ def _build_argparser() -> argparse.ArgumentParser:
         "--state-dir",
         type=Path,
         default=None,
-        help=(
-            "Dispatch-state directory. Default: <project_root>/.gtkb-state/"
-            "cross-harness-trigger/."
-        ),
+        help=("Dispatch-state directory. Default: <project_root>/.gtkb-state/cross-harness-trigger/."),
     )
     parser.add_argument(
         "--max-items",
@@ -1269,10 +1249,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help=(
-            "Compute signatures and update dispatch-state but do NOT spawn the "
-            "recipient harness."
-        ),
+        help=("Compute signatures and update dispatch-state but do NOT spawn the recipient harness."),
     )
     parser.add_argument(
         "--verbose",
@@ -1322,9 +1299,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         project_root = _resolve_project_root(args.project_root)
         state_dir = (
-            args.state_dir.resolve()
-            if args.state_dir is not None
-            else project_root.joinpath(*DEFAULT_STATE_SUBDIR)
+            args.state_dir.resolve() if args.state_dir is not None else project_root.joinpath(*DEFAULT_STATE_SUBDIR)
         )
         if args.diagnose:
             # Diagnose mode: read-only liveness summary; no dispatch, no state mutation.

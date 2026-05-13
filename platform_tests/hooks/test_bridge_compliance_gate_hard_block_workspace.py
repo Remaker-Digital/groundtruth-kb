@@ -111,6 +111,93 @@ def test_proposal_lacking_spec_links_blocked_with_deny() -> None:
     assert "Specification Links" in hsoutput.get("permissionDecisionReason", "")
 
 
+def _template_shaped_advisory_content() -> str:
+    return """ADVISORY
+
+bridge_kind: loyal_opposition_advisory
+Document: test-advisory-report
+Version: 001
+Author: Loyal Opposition
+Date: 2026-05-13 UTC
+
+## Source
+
+Owner requested advisory review.
+
+## Claim
+
+This is advisory material, not an implementation proposal.
+
+## Owner Decision Needed
+
+None.
+
+## Recommended Prime Action
+
+Review and decide whether to convert, defer, or reject.
+
+## Classification Slot
+
+Axis-2 advisory.
+"""
+
+
+def test_template_shaped_advisory_without_spec_links_passes() -> None:
+    """Verifies bridge/gtkb-bridge-advisory-status-001-013.md IP-12:
+    a template-shaped first-line ADVISORY report is not treated as an
+    implementation proposal requiring Specification Links.
+    """
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-advisory-report-001.md",
+                "content": _template_shaped_advisory_content(),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, result.stderr
+    if result.stdout.strip():
+        output = json.loads(result.stdout)
+        decision = output.get("hookSpecificOutput", {}).get("permissionDecision")
+        assert decision != "deny", f"Template-shaped ADVISORY incorrectly denied. Output: {output}"
+
+
+def test_malformed_advisory_report_blocked_with_template_message() -> None:
+    """Verifies bridge/gtkb-bridge-advisory-status-001-013.md IP-12:
+    malformed first-line ADVISORY reports are denied with the ADVISORY
+    template-specific message.
+    """
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-advisory-report-001.md",
+                "content": "ADVISORY\n\n## Claim\n\nMissing required template fields.",
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    hsoutput = output.get("hookSpecificOutput", {})
+    assert hsoutput.get("permissionDecision") == "deny"
+    reason = hsoutput.get("permissionDecisionReason", "")
+    assert "ADVISORY bridge reports must match" in reason
+    assert "verified ADVISORY report template" in reason
+
+
 def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
     """Verifies DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001.A1:
     hook MUST hard-block (emit_deny) VERIFIED bridge reports lacking

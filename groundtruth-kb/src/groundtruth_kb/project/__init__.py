@@ -1,6 +1,12 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Project scaffold, profiles, doctor, and upgrade — Layers 2 & 3."""
 
+from groundtruth_kb.project.lifecycle import (
+    PROJECT_TERMINAL_STATUS,
+    PROJECTS_CHANGED_BY,
+    ProjectLifecycleError,
+    ProjectLifecycleService,
+)
 from groundtruth_kb.project.managed_registry import (
     DivergencePolicyEnum,
     OwnershipEnum,
@@ -25,7 +31,11 @@ __all__ = [
     "OwnershipMeta",
     "OwnershipRecord",
     "OwnershipResolver",
+    "PROJECTS_CHANGED_BY",
+    "PROJECT_TERMINAL_STATUS",
     "ProjectManifest",
+    "ProjectLifecycleError",
+    "ProjectLifecycleService",
     "ProjectProfile",
     "UpgradePolicyEnum",
     "get_profile",

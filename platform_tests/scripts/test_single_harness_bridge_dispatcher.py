@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -121,9 +120,7 @@ def test_dispatcher_no_op_in_multi_harness_topology(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
 
     dispatcher = _load_dispatcher()
-    summary = dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary["skipped"] is True
     assert summary["reason"] == "not_applicable_multi_harness_topology"
 
@@ -142,15 +139,42 @@ def test_dispatcher_spawns_in_single_harness_topology_on_signature_change(
     state_dir = tmp_path / "state"
 
     dispatcher = _load_dispatcher()
-    summary = dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary["skipped"] is False
     assert summary["harness_id"] == "B"
     assert summary["command_handle"] == "claude"
     # In dry_run mode at least one role had pending work (NEW entry triggers LO).
     lo_result = summary["results"].get("loyal-opposition", {})
     assert lo_result.get("reason") == "dry_run"
+
+
+def test_dispatcher_resolves_codex_single_harness_command_handle(tmp_path: Path) -> None:
+    """Single-harness operation must work when Codex is the only active harness."""
+    root = _make_synthetic_project(tmp_path, single_harness=False)
+    (root / "harness-state" / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "A": {
+                        "role": ["prime-builder", "loyal-opposition"],
+                        "harness_type": "codex",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_index(root, _index_with_one_new(root))
+    state_dir = tmp_path / "state"
+
+    dispatcher = _load_dispatcher()
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert summary["skipped"] is False
+    assert summary["harness_id"] == "A"
+    assert summary["command_handle"] == "codex"
+    assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -204,9 +228,7 @@ def test_dispatcher_suppresses_on_active_session_lock(tmp_path: Path) -> None:
     lock_path.write_text(json.dumps({"role": "claude"}), encoding="utf-8")
 
     dispatcher = _load_dispatcher()
-    summary = dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary["skipped"] is True
     assert summary["reason"] == "foreground_session_active"
 
@@ -227,14 +249,10 @@ def test_dispatcher_loop_prevention_via_signature_dedup(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
 
     dispatcher = _load_dispatcher()
-    first = dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    first = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
-    second = dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    second = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert second["results"]["loyal-opposition"]["reason"] == "unchanged"
 
 
@@ -250,15 +268,12 @@ def test_signature_byte_identical_to_trigger(tmp_path: Path) -> None:
     root = _make_synthetic_project(tmp_path, single_harness=True)
     _write_index(root, _index_with_one_new(root))
     state_dir_a = tmp_path / "state-dispatcher"
-    state_dir_b = tmp_path / "state-trigger"
 
     dispatcher = _load_dispatcher()
     trigger = dispatcher._load_trigger_module()
 
     # Dispatcher run: produces signature for loyal-opposition.
-    summary = dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir_a, dry_run=True
-    )
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir_a, dry_run=True)
     dispatch_sig = summary["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
 
     # Compute the same signature via trigger module helpers directly.
@@ -276,16 +291,13 @@ def test_signature_byte_identical_to_trigger(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_dispatcher_records_dispatch_failures_jsonl(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dispatcher_records_dispatch_failures_jsonl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2: audit-log on failure."""
     root = _make_synthetic_project(tmp_path, single_harness=True)
     _write_index(root, _index_with_one_new(root))
     state_dir = tmp_path / "state"
 
     dispatcher = _load_dispatcher()
-    trigger = dispatcher._load_trigger_module()
 
     def _boom_popen(*_args, **_kwargs):
         raise OSError("simulated spawn failure")
@@ -294,9 +306,7 @@ def test_dispatcher_records_dispatch_failures_jsonl(
 
     monkeypatch.setattr(_subprocess, "Popen", _boom_popen)
 
-    dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir, dry_run=False
-    )
+    dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=False)
 
     failures_path = state_dir / "dispatch-failures.jsonl"
     assert failures_path.is_file(), "dispatch-failures.jsonl not written on spawn failure"
@@ -304,10 +314,7 @@ def test_dispatcher_records_dispatch_failures_jsonl(
     assert lines, "dispatch-failures.jsonl was empty"
     # At least one line should reference the simulated failure.
     parsed = [json.loads(line) for line in lines]
-    assert any(
-        rec.get("launched") is False and "simulated" in str(rec.get("error_message", ""))
-        for rec in parsed
-    )
+    assert any(rec.get("launched") is False and "simulated" in str(rec.get("error_message", "")) for rec in parsed)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -349,9 +356,7 @@ def test_dispatcher_diagnose_emits_liveness_summary(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_dispatcher_respects_manual_disable_env_var(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dispatcher_respects_manual_disable_env_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Operator opt-out: GTKB_NO_SINGLE_HARNESS_DISPATCHER=1 -> short-circuit."""
     root = _make_synthetic_project(tmp_path, single_harness=True)
     _write_index(root, _index_with_one_new(root))
@@ -360,8 +365,6 @@ def test_dispatcher_respects_manual_disable_env_var(
     monkeypatch.setenv("GTKB_NO_SINGLE_HARNESS_DISPATCHER", "1")
 
     dispatcher = _load_dispatcher()
-    summary = dispatcher.run_dispatcher(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary == {"skipped": True, "reason": "loop_prevention_env_var"}
     assert not (state_dir / "dispatch-state.json").exists()

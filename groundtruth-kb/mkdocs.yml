@@ -85,6 +85,7 @@ nav:
   - Reference:
       - CLI Reference: reference/cli.md
       - Configuration: reference/configuration.md
+      - DB Snapshot: gt-db-snapshot.md
       - Assertion Language: reference/assertion-language.md
       - Canonical Terminology: reference/canonical-terminology.md
       - Templates: reference/templates.md
