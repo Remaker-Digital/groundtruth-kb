@@ -1,50 +1,49 @@
 # Audit Session Checklist
 
-Every 5th session is an **audit session** (S185, S190, S195, ...). Add these extra steps to the standard wrap-up.
+Every 5th session is an audit session. Add these checks to the standard knowledge-first wrap-up.
 
-## 1. Stale Work Item Review
+## 1. Work Item And Spec Reconciliation
 
-Close any WIs open > 3 sessions without progress:
+- List current open work items touched in the last five sessions.
+- Flag work items with stale stage/resolution, missing source spec, missing bridge thread, or missing completion evidence.
+- Flag implemented or verified specs without current test/assertion evidence.
+- Flag specified implementation-bearing specs that have no active work item or explicit deferral.
 
-```python
-open_wis = db.get_open_work_items()
-for wi in open_wis:
-    created = wi.get('created_at', '')
-    print(f"  {wi['id']}: {wi['title']} (created: {created})")
-```
+## 2. Deliberation Archive Freshness
 
-## 2. Assertion Coverage
+- Search for owner decisions, approvals, rejections, and requirements discussed since the previous audit wrap.
+- Confirm each durable decision is captured in the Deliberation Archive or explicitly marked as brainstorming/no-op.
+- Confirm new or updated specs cite originating DA evidence where required.
+- Record unharvested or uncited deliberations as blockers or backlog candidates.
 
-Check `assertion_coverage` metric from quality dashboard:
+## 3. Bridge Closure
 
-```python
-summary = db.get_summary()
-coverage = summary.get('assertions_total', 0)
-passed = summary.get('assertions_passed', 0)
-print(f"Assertion coverage: {passed}/{coverage}")
-```
+- Read live `bridge/INDEX.md`.
+- Identify latest `NEW`, `REVISED`, `GO`, `NO-GO`, and unverified post-implementation entries relevant to this session.
+- Confirm implementation reports and VERIFIED entries exist for completed bridge-backed work.
+- Create a blocker entry when bridge closure cannot be completed during wrap.
 
-## 3. Spec Drift Detection
+## 4. Session Prompt Continuity
 
-Flag any implemented specs without tests:
+- Verify the newest `session_prompts` entry is current, GT-KB-specific, and self-contained.
+- Confirm it includes branch, HEAD, bridge state, MemBase state, DA state, verification, blockers, and next actions.
+- If insertion failed, confirm the handoff prompt was preserved in a wrap report and the `session_prompts` blocker is explicit.
 
-```python
-untested = db.get_untested_specs()
-for s in untested:
-    if s['status'] == 'implemented':
-        print(f"  DRIFT: {s['id']} implemented but no tests")
-```
+## 5. Memory And Procedure Freshness
 
-## 4. Procedure Freshness
+- Keep `memory/MEMORY.md` concise and evidence-based.
+- Update procedure/skill references only when behavior changed.
+- Remove or correct stale project names, branch assumptions, path assumptions, and deprecated command snippets.
+- Do not expand memory with raw transcripts or speculative conclusions.
 
-Flag procedures not verified in > 10 sessions:
+## 6. Wrap Scanner Trend
 
-```python
-procedures = db.list_op_procedures()
-for p in procedures:
-    print(f"  {p['id']}: {p['title']} [verified: {p.get('last_verified_at', 'never')}]")
-```
+- Review the last several wrap scanner outputs under `.groundtruth/session/snapshots/`.
+- Promote repeated warning/error findings into MemBase backlog candidates when they indicate persistent drift.
+- Keep generated scanner output ignored unless an explicit governance process says otherwise.
 
-## 5. MEMORY.md Size Management
+## 7. Ignored Evidence And Git Hygiene
 
-Ensure Recent Sessions doesn't exceed ~20 entries. Archive older ones to CLAUDE_ARCHIVE.md.
+- List ignored evidence paths that matter for future review, such as `.groundtruth/session/...` snapshots or `.gtkb-state/...` packets.
+- Confirm ignored database, snapshot, transcript, log, and environment files were not force-added.
+- Confirm the committed diff contains only intentional tracked artifacts.

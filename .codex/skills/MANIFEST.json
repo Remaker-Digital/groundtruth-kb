@@ -110,7 +110,7 @@
       "canonical_name": "kb-session-wrap",
       "capability_id": "skill.kb-session-wrap",
       "source_relative_path": ".claude/skills/kb-session-wrap/SKILL.md",
-      "source_sha256": "7030afc18af9f3a471bafcf4bbf982004f0e0e7fc2bafe1a15927119ad0e57c6"
+      "source_sha256": "46ac37d278c3f4d892816802051437759737b013b75badb7d7886bee892a945b"
     },
     {
       "adapter_relative_path": ".codex/skills/kb-session-wrap-scan/SKILL.md",

@@ -18,6 +18,12 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-session-wrap-knowledge-collection
+VERIFIED: bridge/gtkb-session-wrap-knowledge-collection-004.md
+NEW: bridge/gtkb-session-wrap-knowledge-collection-003.md
+GO: bridge/gtkb-session-wrap-knowledge-collection-002.md
+NEW: bridge/gtkb-session-wrap-knowledge-collection-001.md
+
 Document: gtkb-project-scoped-implementation-authorization
 VERIFIED: bridge/gtkb-project-scoped-implementation-authorization-010.md
 NEW: bridge/gtkb-project-scoped-implementation-authorization-009.md
