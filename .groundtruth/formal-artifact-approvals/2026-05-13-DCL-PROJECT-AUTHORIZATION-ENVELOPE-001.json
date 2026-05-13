@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "Mike",
+  "artifact_id": "DCL-PROJECT-AUTHORIZATION-ENVELOPE-001",
+  "artifact_type": "design_constraint",
+  "change_reason": "Record project authorization envelope constraint from DELIB-S347",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION: Owner approved project authorization records with explicit scope, status, owner decision, inclusions, exclusions, and audit evidence.",
+  "full_content": "## Constraint\n\nProject authorization records must preserve an explicit, auditable authorization envelope. Each current authorization state must include project id, status, authorization name, owner-decision deliberation id, scope summary, allowed mutation classes, forbidden operations, included and excluded work item ids, included and excluded spec ids, optional expiration, optional supersession links, changed-by, changed-at, and change reason.\n\n## Required Behavior\n\n- Project authorization changes are append-only versions.\n- Current-state reads must resolve from the highest version per authorization id.\n- Authorization creation must fail when the project id or owner-decision deliberation id does not exist.\n- Revocation or supersession must create a new version rather than deleting history.\n- Machine-readable command output must expose parsed list fields for automation.\n\n## Evidence\n\nOwner decision: `DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION`.\nBridge approval: `bridge/gtkb-project-scoped-implementation-authorization-004.md`.\n",
+  "full_content_sha256": "171f1cd2334f7f5f3fae365554437d760ed889ee324c9003b8d0778e47445d92",
+  "presented_to_user": true,
+  "source_ref": "DCL-PROJECT-AUTHORIZATION-ENVELOPE-001",
+  "transcript_captured": true
+}

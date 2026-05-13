@@ -154,6 +154,140 @@ def _get_now() -> str:
     return db_now()
 
 
+def _stable_work_item_id_for_spec(spec_id: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", spec_id.upper()).strip("-")
+    return f"WI-AUTO-{slug}"
+
+
+def _parsed_json_field(row: dict[str, Any], field: str, default: Any) -> Any:
+    parsed = row.get(f"{field}_parsed")
+    if parsed is not None:
+        return parsed
+    raw = row.get(field)
+    if isinstance(raw, str) and raw.strip():
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return default
+    return default
+
+
+def _is_implementation_bearing_spec(spec: dict[str, Any]) -> bool:
+    constraints = _parsed_json_field(spec, "constraints", {})
+    tags = _parsed_json_field(spec, "tags", [])
+    if isinstance(constraints, dict) and constraints.get("implementation_bearing") is True:
+        return True
+    if isinstance(constraints, dict) and constraints.get("implementation_bearing") is False:
+        return False
+    if isinstance(tags, list) and "implementation-bearing" in tags:
+        return True
+
+    spec_type = str(spec.get("type") or "requirement")
+    if spec_type in {"architecture_decision", "design_constraint"}:
+        return False
+    return spec_type in {"requirement", "specification", "functional", "feature", "protected_behavior"}
+
+
+def _active_work_items_for_spec(db: KnowledgeDB, spec_id: str) -> list[dict[str, Any]]:
+    from groundtruth_kb.db import WORK_ITEM_TERMINAL_RESOLUTION_STATUSES
+
+    return [
+        item
+        for item in db.list_work_items(source_spec_id=spec_id)
+        if item.get("resolution_status") not in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES
+    ]
+
+
+def _explicit_project_ids_from_spec(db: KnowledgeDB, spec: dict[str, Any]) -> list[str]:
+    project_ids: list[str] = []
+    constraints = _parsed_json_field(spec, "constraints", {})
+    if isinstance(constraints, dict):
+        raw_ids = constraints.get("project_ids")
+        if isinstance(raw_ids, list):
+            project_ids.extend(str(value).strip() for value in raw_ids if str(value).strip())
+        raw_id = constraints.get("project_id")
+        if isinstance(raw_id, str) and raw_id.strip():
+            project_ids.append(raw_id.strip())
+
+    for link in db.list_project_artifact_links_for_artifact("spec", str(spec["id"])):
+        project_id = str(link.get("project_id") or "").strip()
+        if project_id:
+            project_ids.append(project_id)
+
+    active_ids: list[str] = []
+    for project_id in dict.fromkeys(project_ids):
+        project = db.get_project(project_id)
+        if project and project.get("status") == "active":
+            active_ids.append(project_id)
+    return active_ids
+
+
+def ensure_backlog_for_confirmed_spec(
+    db: KnowledgeDB,
+    spec: dict[str, Any],
+    *,
+    deliberation_id: str,
+    changed_by: str,
+) -> dict[str, Any]:
+    """Create/link backlog work for one newly confirmed implementation-bearing spec."""
+    if spec.get("status") != "specified":
+        return {"action": "skipped", "reason": "spec status is not specified", "spec_id": spec.get("id")}
+    if not _is_implementation_bearing_spec(spec):
+        return {"action": "skipped", "reason": "spec is not implementation-bearing", "spec_id": spec.get("id")}
+
+    active_items = _active_work_items_for_spec(db, str(spec["id"]))
+    created = False
+    if active_items:
+        work_item = active_items[0]
+        action = "linked_existing"
+    else:
+        work_item = db.insert_work_item(
+            _stable_work_item_id_for_spec(str(spec["id"])),
+            f"Implement {spec['id']}: {spec.get('title', 'Untitled')}",
+            "new",
+            "implementation_intake",
+            "open",
+            changed_by,
+            f"Automatic backlog intake for confirmed implementation-bearing spec {spec['id']}",
+            source_spec_id=str(spec["id"]),
+            priority=spec.get("priority"),
+            stage="backlogged",
+            status_detail="unassigned implementation intake",
+            source_deliberation_query=deliberation_id,
+            related_deliberation_ids=json.dumps([deliberation_id]),
+            related_spec_ids_at_creation=json.dumps([spec["id"]]),
+            acceptance_summary=f"Implement and verify the behavior specified by {spec['id']}.",
+        )
+        if work_item is None:
+            raise RuntimeError(f"auto backlog: insert_work_item returned None for {spec['id']}")
+        created = True
+        action = "created"
+
+    db.link_deliberation_work_item(deliberation_id, str(work_item["id"]), role="auto_backlog")
+
+    project_ids = _explicit_project_ids_from_spec(db, spec)
+    attachment: dict[str, Any] = {"action": "unassigned", "reason": "no deterministic project fit"}
+    if len(project_ids) == 1:
+        membership = db.link_project_work_item(
+            project_ids[0],
+            str(work_item["id"]),
+            changed_by,
+            f"Automatic project attachment for confirmed spec {spec['id']}",
+            source="spec-auto-backlog",
+        )
+        attachment = {"action": "attached", "project_id": project_ids[0], "membership": membership}
+    elif len(project_ids) > 1:
+        attachment = {"action": "unassigned", "reason": "ambiguous deterministic project fit", "project_ids": project_ids}
+
+    return {
+        "action": action,
+        "created": created,
+        "spec_id": spec["id"],
+        "work_item": work_item,
+        "project_attachment": attachment,
+    }
+
+
 def classify_requirement(
     db: KnowledgeDB,
     text: str,
@@ -298,12 +432,27 @@ def confirm_intake(
 
     # Constraints
     constraints = db.check_constraints_for_spec(spec["id"]) if created_spec else []
+    if created_spec:
+        db.link_deliberation_spec(deliberation_id, spec["id"], role="originating_intake")
+        auto_backlog = ensure_backlog_for_confirmed_spec(
+            db,
+            created_spec,
+            deliberation_id=deliberation_id,
+            changed_by=changed_by,
+        )
+    else:
+        auto_backlog = {
+            "action": "skipped",
+            "reason": "confirmed spec could not be loaded",
+            "spec_id": spec["id"],
+        }
 
     # Update deliberation (new version — append-only)
     content["intake_status"] = "confirmed"
     content["confirmed_spec_id"] = spec["id"]
     content["quality_tier"] = quality.get("tier")
     content["quality_score"] = quality.get("overall")
+    content["auto_backlog"] = auto_backlog
     db.insert_deliberation(
         id=deliberation_id,
         title=delib.get("title", f"Intake: {content.get('proposed_title', '')}"),
@@ -320,6 +469,7 @@ def confirm_intake(
         "quality": quality,
         "impact": impact,
         "constraints": constraints,
+        "auto_backlog": auto_backlog,
         "confirmed_spec_id": spec["id"],
     }
 

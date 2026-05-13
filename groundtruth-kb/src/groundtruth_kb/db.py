@@ -364,6 +364,30 @@ CREATE TABLE IF NOT EXISTS project_artifact_links (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS project_authorizations (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    project_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    authorization_name TEXT NOT NULL,
+    owner_decision_deliberation_id TEXT NOT NULL,
+    scope_summary TEXT NOT NULL,
+    allowed_mutation_classes TEXT,
+    forbidden_operations TEXT,
+    included_work_item_ids TEXT,
+    excluded_work_item_ids TEXT,
+    included_spec_ids TEXT,
+    excluded_spec_ids TEXT,
+    expires_at TEXT,
+    supersedes TEXT,
+    superseded_by TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS backlog_snapshots (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -552,6 +576,11 @@ CREATE INDEX IF NOT EXISTS idx_project_dependencies_to ON project_dependencies(t
 CREATE INDEX IF NOT EXISTS idx_project_artifact_links_id_version ON project_artifact_links(id, version);
 CREATE INDEX IF NOT EXISTS idx_project_artifact_links_project ON project_artifact_links(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_artifact_links_artifact ON project_artifact_links(artifact_type, artifact_ref);
+CREATE INDEX IF NOT EXISTS idx_project_authorizations_id_version ON project_authorizations(id, version);
+CREATE INDEX IF NOT EXISTS idx_project_authorizations_project ON project_authorizations(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_authorizations_status ON project_authorizations(status);
+CREATE INDEX IF NOT EXISTS idx_project_authorizations_owner_decision
+    ON project_authorizations(owner_decision_deliberation_id);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
@@ -641,6 +670,11 @@ CREATE VIEW IF NOT EXISTS current_project_artifact_links AS
 SELECT l.* FROM project_artifact_links l
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM project_artifact_links GROUP BY id) m
 ON l.id = m.id AND l.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_project_authorizations AS
+SELECT a.* FROM project_authorizations a
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM project_authorizations GROUP BY id) m
+ON a.id = m.id AND a.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
@@ -3581,6 +3615,14 @@ class KnowledgeDB:
         )
         return (row[0] or 0) + 1
 
+    def _next_project_authorization_version(self, authorization_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM project_authorizations WHERE id = ?", (authorization_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
     def insert_project(
         self,
         name: str,
@@ -3876,6 +3918,199 @@ class KnowledgeDB:
         query += " ORDER BY artifact_type, artifact_ref, relationship, id"
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+    def list_project_artifact_links_for_artifact(
+        self,
+        artifact_type: str,
+        artifact_ref: str,
+        *,
+        include_inactive: bool = False,
+    ) -> list[dict[str, Any]]:
+        query = """SELECT * FROM current_project_artifact_links
+                   WHERE artifact_type = ? AND artifact_ref = ?"""
+        params: list[Any] = [artifact_type, artifact_ref]
+        if not include_inactive:
+            query += " AND status = 'active'"
+        query += " ORDER BY project_id, relationship, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def insert_project_authorization(
+        self,
+        project_id: str,
+        authorization_name: str,
+        owner_decision_deliberation_id: str,
+        scope_summary: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        id: str | None = None,
+        status: str = "active",
+        allowed_mutation_classes: list[str] | None = None,
+        forbidden_operations: list[str] | None = None,
+        included_work_item_ids: list[str] | None = None,
+        excluded_work_item_ids: list[str] | None = None,
+        included_spec_ids: list[str] | None = None,
+        excluded_spec_ids: list[str] | None = None,
+        expires_at: str | None = None,
+        supersedes: list[str] | None = None,
+        superseded_by: list[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Insert a new append-only project authorization version."""
+        if self.get_project(project_id) is None:
+            raise ValueError(f"Project {project_id} not found")
+        if self.get_deliberation(owner_decision_deliberation_id) is None:
+            raise ValueError(f"Owner decision deliberation {owner_decision_deliberation_id} not found")
+        if not authorization_name.strip():
+            raise ValueError("authorization_name is required")
+        if not scope_summary.strip():
+            raise ValueError("scope_summary is required")
+
+        authorization_id = id or _stable_project_link_id("PAUTH", project_id, authorization_name)
+        version = self._next_project_authorization_version(authorization_id)
+
+        def encode(values: list[str] | None) -> str | None:
+            if values is None:
+                return None
+            return json.dumps([str(value).strip() for value in values if str(value).strip()])
+
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO project_authorizations
+               (id, version, project_id, status, authorization_name, owner_decision_deliberation_id,
+                scope_summary, allowed_mutation_classes, forbidden_operations, included_work_item_ids,
+                excluded_work_item_ids, included_spec_ids, excluded_spec_ids, expires_at, supersedes,
+                superseded_by, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                authorization_id,
+                version,
+                project_id,
+                status,
+                authorization_name,
+                owner_decision_deliberation_id,
+                scope_summary,
+                encode(allowed_mutation_classes),
+                encode(forbidden_operations),
+                encode(included_work_item_ids),
+                encode(excluded_work_item_ids),
+                encode(included_spec_ids),
+                encode(excluded_spec_ids),
+                expires_at,
+                encode(supersedes),
+                encode(superseded_by),
+                changed_by,
+                _now(),
+                change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_project_authorization(authorization_id)
+
+    def get_project_authorization(self, authorization_id: str) -> dict[str, Any] | None:
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_project_authorizations WHERE id = ?", (authorization_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def list_project_authorizations(
+        self,
+        project_id: str | None = None,
+        *,
+        status: str | None = None,
+        include_terminal: bool = False,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM current_project_authorizations WHERE 1=1"
+        params: list[Any] = []
+        if project_id:
+            query += " AND project_id = ?"
+            params.append(project_id)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        elif not include_terminal:
+            query += " AND status = 'active'"
+        query += " ORDER BY project_id, authorization_name, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def update_project_authorization(
+        self,
+        authorization_id: str,
+        changed_by: str,
+        change_reason: str,
+        **fields: Any,
+    ) -> dict[str, Any] | None:
+        current = self.get_project_authorization(authorization_id)
+        if current is None:
+            raise ValueError(f"Project authorization {authorization_id} not found")
+        allowed_fields = {
+            "project_id",
+            "status",
+            "authorization_name",
+            "owner_decision_deliberation_id",
+            "scope_summary",
+            "allowed_mutation_classes",
+            "forbidden_operations",
+            "included_work_item_ids",
+            "excluded_work_item_ids",
+            "included_spec_ids",
+            "excluded_spec_ids",
+            "expires_at",
+            "supersedes",
+            "superseded_by",
+        }
+        unknown = sorted(set(fields) - allowed_fields)
+        if unknown:
+            raise ValueError(f"Unsupported project authorization fields: {', '.join(unknown)}")
+
+        def current_json(field: str) -> list[str] | None:
+            parsed = current.get(f"{field}_parsed")
+            if isinstance(parsed, list):
+                return [str(value) for value in parsed]
+            return None
+
+        values = {
+            "project_id": fields.get("project_id", current["project_id"]),
+            "status": fields.get("status", current["status"]),
+            "authorization_name": fields.get("authorization_name", current["authorization_name"]),
+            "owner_decision_deliberation_id": fields.get(
+                "owner_decision_deliberation_id", current["owner_decision_deliberation_id"]
+            ),
+            "scope_summary": fields.get("scope_summary", current["scope_summary"]),
+            "allowed_mutation_classes": fields.get(
+                "allowed_mutation_classes", current_json("allowed_mutation_classes")
+            ),
+            "forbidden_operations": fields.get("forbidden_operations", current_json("forbidden_operations")),
+            "included_work_item_ids": fields.get("included_work_item_ids", current_json("included_work_item_ids")),
+            "excluded_work_item_ids": fields.get("excluded_work_item_ids", current_json("excluded_work_item_ids")),
+            "included_spec_ids": fields.get("included_spec_ids", current_json("included_spec_ids")),
+            "excluded_spec_ids": fields.get("excluded_spec_ids", current_json("excluded_spec_ids")),
+            "expires_at": fields.get("expires_at", current["expires_at"]),
+            "supersedes": fields.get("supersedes", current_json("supersedes")),
+            "superseded_by": fields.get("superseded_by", current_json("superseded_by")),
+        }
+        return self.insert_project_authorization(
+            values["project_id"],
+            values["authorization_name"],
+            values["owner_decision_deliberation_id"],
+            values["scope_summary"],
+            changed_by,
+            change_reason,
+            id=authorization_id,
+            status=values["status"],
+            allowed_mutation_classes=values["allowed_mutation_classes"],
+            forbidden_operations=values["forbidden_operations"],
+            included_work_item_ids=values["included_work_item_ids"],
+            excluded_work_item_ids=values["excluded_work_item_ids"],
+            included_spec_ids=values["included_spec_ids"],
+            excluded_spec_ids=values["excluded_spec_ids"],
+            expires_at=values["expires_at"],
+            supersedes=values["supersedes"],
+            superseded_by=values["superseded_by"],
+        )
 
     # ------------------------------------------------------------------
     # Backlog Snapshots
@@ -4339,6 +4574,8 @@ class KnowledgeDB:
             "test_plans": ("id", "test_plans", "title"),
             "test_plan_phases": ("id", "test_plan_phases", "title"),
             "work_items": ("id", "work_items", "title"),
+            "projects": ("id", "projects", "name"),
+            "project_authorizations": ("id", "project_authorizations", "authorization_name"),
             "backlog_snapshots": ("id", "backlog_snapshots", "title"),
         }
 
@@ -4400,6 +4637,7 @@ class KnowledgeDB:
             "project_work_item_memberships",
             "project_dependencies",
             "project_artifact_links",
+            "project_authorizations",
             "backlog_snapshots",
             "quality_scores",
             "testable_elements",
@@ -5543,6 +5781,7 @@ class KnowledgeDB:
         ).fetchone()[0]
         project_dependency_count = conn.execute("SELECT COUNT(*) FROM current_project_dependencies").fetchone()[0]
         project_artifact_link_count = conn.execute("SELECT COUNT(*) FROM current_project_artifact_links").fetchone()[0]
+        project_authorization_count = conn.execute("SELECT COUNT(*) FROM current_project_authorizations").fetchone()[0]
 
         backlog_count = conn.execute("SELECT COUNT(*) FROM current_backlog_snapshots").fetchone()[0]
 
@@ -5573,6 +5812,7 @@ class KnowledgeDB:
             "project_membership_count": project_membership_count,
             "project_dependency_count": project_dependency_count,
             "project_artifact_link_count": project_artifact_link_count,
+            "project_authorization_count": project_authorization_count,
             "backlog_snapshot_count": backlog_count,
             "testable_element_count": te_count,
             "deliberation_count": delib_count,
@@ -5607,6 +5847,12 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "blocks_work_items",
         "supersedes",
         "superseded_by",
+        "allowed_mutation_classes",
+        "forbidden_operations",
+        "included_work_item_ids",
+        "excluded_work_item_ids",
+        "included_spec_ids",
+        "excluded_spec_ids",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:

@@ -12,6 +12,8 @@ import fnmatch
 import hashlib
 import json
 import re
+import sqlite3
+import tomllib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -26,6 +28,9 @@ TARGET_PATHS_RE = re.compile(
     r"(?:\*\*)?target_paths(?:\*\*)?\s*:(?:\*\*)?\s*(\[[^\n]+\])",
     re.IGNORECASE,
 )
+PROJECT_AUTHORIZATION_KEYS = frozenset({"project authorization", "project authorization id"})
+PROJECT_KEYS = frozenset({"project", "project id"})
+WORK_ITEM_KEYS = frozenset({"work item", "work item id", "backlog item", "backlog item id"})
 
 
 class AuthorizationError(RuntimeError):
@@ -60,6 +65,12 @@ def parse_iso(value: str) -> datetime:
     return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
 
+def parse_optional_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return parse_iso(value)
+
+
 def project_root_from_arg(value: str | None = None) -> Path:
     if value:
         return Path(value).resolve()
@@ -68,6 +79,17 @@ def project_root_from_arg(value: str | None = None) -> Path:
 
 def packet_path(project_root: Path) -> Path:
     return project_root / DEFAULT_PACKET_RELATIVE_PATH
+
+
+def groundtruth_db_path(project_root: Path) -> Path:
+    config_path = project_root / "groundtruth.toml"
+    if config_path.is_file():
+        data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        db_value = data.get("groundtruth", {}).get("db_path")
+        if isinstance(db_value, str) and db_value.strip():
+            db_path = Path(db_value)
+            return db_path if db_path.is_absolute() else project_root / db_path
+    return project_root / "groundtruth.db"
 
 
 def parse_bridge_index(project_root: Path) -> dict[str, BridgeEntry]:
@@ -164,6 +186,172 @@ def extract_target_paths(markdown: str) -> list[str]:
     return targets
 
 
+def _clean_metadata_value(raw: str) -> str:
+    ticked = re.search(r"`([^`]+)`", raw)
+    if ticked:
+        return ticked.group(1).strip()
+    value = raw.strip().strip("*").strip()
+    return value.split()[0].strip("`.,;") if value else ""
+
+
+def extract_metadata_value(markdown: str, keys: set[str]) -> str | None:
+    for raw_line in markdown.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        while stripped.startswith(("-", "*")):
+            stripped = stripped[1:].strip()
+        candidate = stripped.replace("**", "")
+        if ":" not in candidate:
+            continue
+        raw_key, raw_value = candidate.split(":", 1)
+        key = raw_key.strip().lower()
+        if key in keys:
+            value = _clean_metadata_value(raw_value)
+            return value or None
+    return None
+
+
+def _json_list(row: sqlite3.Row, field: str) -> list[str]:
+    raw = row[field]
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(value) for value in parsed]
+
+
+def _project_authorization_row(project_root: Path, authorization_id: str) -> sqlite3.Row:
+    db_path = groundtruth_db_path(project_root)
+    if not db_path.is_file():
+        raise AuthorizationError(f"GroundTruth DB not found for project authorization: {db_path}")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT * FROM current_project_authorizations WHERE id = ?",
+            (authorization_id,),
+        ).fetchone()
+    except sqlite3.OperationalError as exc:
+        raise AuthorizationError("GroundTruth DB is missing project authorization schema") from exc
+    finally:
+        conn.close()
+    if row is None:
+        raise AuthorizationError(f"Project authorization not found: {authorization_id}")
+    return row
+
+
+def packet_spec_links(packet: dict[str, Any]) -> list[str]:
+    raw_links = packet.get("spec_links")
+    if not isinstance(raw_links, list):
+        raise AuthorizationError("Implementation authorization packet has invalid spec_links metadata")
+    spec_links = [link.strip() for link in raw_links if isinstance(link, str) and link.strip()]
+    if len(spec_links) != len(raw_links):
+        raise AuthorizationError("Implementation authorization packet has invalid spec_links metadata")
+    if not spec_links:
+        raise AuthorizationError("Implementation authorization packet has empty spec_links metadata")
+    return spec_links
+
+
+def _project_is_active(project_root: Path, project_id: str) -> bool:
+    conn = sqlite3.connect(groundtruth_db_path(project_root))
+    try:
+        row = conn.execute("SELECT status FROM current_projects WHERE id = ?", (project_id,)).fetchone()
+    finally:
+        conn.close()
+    return bool(row and row[0] == "active")
+
+
+def _work_item_in_project(project_root: Path, project_id: str, work_item_id: str) -> bool:
+    conn = sqlite3.connect(groundtruth_db_path(project_root))
+    try:
+        row = conn.execute(
+            """SELECT 1 FROM current_project_work_item_memberships
+               WHERE project_id = ? AND work_item_id = ? AND status = 'active'""",
+            (project_id, work_item_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    return row is not None
+
+
+def validate_project_authorization_row(
+    project_root: Path,
+    row: sqlite3.Row,
+    *,
+    proposal_project_id: str | None = None,
+    work_item_id: str | None = None,
+    spec_links: list[str] | None = None,
+) -> dict[str, Any]:
+    authorization_id = str(row["id"])
+    project_id = str(row["project_id"])
+    if row["status"] != "active":
+        raise AuthorizationError(f"Project authorization {authorization_id} is not active")
+    try:
+        expires_at = parse_optional_iso(row["expires_at"])
+    except ValueError as exc:
+        raise AuthorizationError(f"Project authorization {authorization_id} has invalid expires_at") from exc
+    if expires_at is not None and expires_at < now_utc():
+        raise AuthorizationError(f"Project authorization {authorization_id} has expired")
+    if proposal_project_id and proposal_project_id != project_id:
+        raise AuthorizationError(
+            f"Project authorization {authorization_id} is for {project_id}, not proposal project {proposal_project_id}"
+        )
+    if not _project_is_active(project_root, project_id):
+        raise AuthorizationError(f"Project authorization {authorization_id} is not attached to an active project")
+
+    included_items = set(_json_list(row, "included_work_item_ids"))
+    excluded_items = set(_json_list(row, "excluded_work_item_ids"))
+    if work_item_id:
+        if work_item_id in excluded_items:
+            raise AuthorizationError(f"Work item {work_item_id} is excluded by project authorization {authorization_id}")
+        if work_item_id not in included_items and not _work_item_in_project(project_root, project_id, work_item_id):
+            raise AuthorizationError(
+                f"Work item {work_item_id} is neither included in nor an active member of project {project_id}"
+            )
+
+    excluded_specs = set(_json_list(row, "excluded_spec_ids"))
+    blocked_specs = sorted(excluded_specs.intersection(spec_links or []))
+    if blocked_specs:
+        raise AuthorizationError(
+            f"Spec link(s) excluded by project authorization {authorization_id}: {', '.join(blocked_specs)}"
+        )
+
+    return {
+        "id": authorization_id,
+        "project_id": project_id,
+        "status": row["status"],
+        "authorization_name": row["authorization_name"],
+        "owner_decision_deliberation_id": row["owner_decision_deliberation_id"],
+        "scope_summary": row["scope_summary"],
+        "expires_at": row["expires_at"],
+        "proposal_project_id": proposal_project_id,
+        "work_item_id": work_item_id,
+    }
+
+
+def extract_and_validate_project_authorization(
+    project_root: Path,
+    proposal: str,
+    spec_links: list[str],
+) -> dict[str, Any] | None:
+    authorization_id = extract_metadata_value(proposal, PROJECT_AUTHORIZATION_KEYS)
+    if not authorization_id:
+        return None
+    row = _project_authorization_row(project_root, authorization_id)
+    return validate_project_authorization_row(
+        project_root,
+        row,
+        proposal_project_id=extract_metadata_value(proposal, PROJECT_KEYS),
+        work_item_id=extract_metadata_value(proposal, WORK_ITEM_KEYS),
+        spec_links=spec_links,
+    )
+
+
 def requirement_sufficiency_state(markdown: str) -> str:
     body = section_body(markdown, "Requirement Sufficiency")
     if not body:
@@ -216,6 +404,7 @@ def create_authorization_packet(
     proposal = proposal_path.read_text(encoding="utf-8-sig")
     spec_links = extract_spec_links(proposal)
     target_paths = extract_target_paths(proposal)
+    project_authorization = extract_and_validate_project_authorization(project_root, proposal, spec_links)
     if not has_spec_derived_verification(proposal):
         raise AuthorizationError("Approved proposal is missing a spec-derived verification plan")
 
@@ -240,6 +429,8 @@ def create_authorization_packet(
         "created_at": created_at.isoformat().replace("+00:00", "Z"),
         "expires_at": (created_at + timedelta(minutes=expires_minutes)).isoformat().replace("+00:00", "Z"),
     }
+    if project_authorization is not None:
+        packet["project_authorization"] = project_authorization
     packet["packet_hash"] = packet_hash(packet)
     return packet
 
@@ -270,6 +461,21 @@ def load_packet(project_root: Path) -> dict[str, Any]:
         raise AuthorizationError(f"Bridge latest status drifted to {entry.latest_status}; latest GO required")
     if entry.latest_path != packet.get("go_file"):
         raise AuthorizationError("Bridge GO file drifted since authorization packet creation")
+    project_authorization = packet.get("project_authorization")
+    if isinstance(project_authorization, dict):
+        authorization_id = str(project_authorization.get("id") or "")
+        if not authorization_id:
+            raise AuthorizationError("Implementation authorization packet has invalid project_authorization metadata")
+        row = _project_authorization_row(project_root, authorization_id)
+        current = validate_project_authorization_row(
+            project_root,
+            row,
+            proposal_project_id=project_authorization.get("proposal_project_id"),
+            work_item_id=project_authorization.get("work_item_id"),
+            spec_links=packet_spec_links(packet),
+        )
+        if current["project_id"] != project_authorization.get("project_id"):
+            raise AuthorizationError("Project authorization project_id drifted since packet creation")
     return packet
 
 

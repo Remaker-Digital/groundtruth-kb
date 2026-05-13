@@ -512,6 +512,7 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
     work_items = payload["work_items"]
     dependencies = payload["dependencies"]
     artifact_links = payload["artifact_links"]
+    authorizations = payload["authorizations"]
     if json_output:
         click.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
@@ -533,6 +534,10 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
         click.echo("Artifact links:")
         for link in artifact_links:
             click.echo(f"  - {link['artifact_type']}:{link['artifact_ref']} ({link['relationship']})")
+    if authorizations:
+        click.echo("Authorizations:")
+        for authorization in authorizations:
+            click.echo(f"  - {authorization['id']}: {authorization['status']} - {authorization['authorization_name']}")
 
 
 @projects_cmd.command("create")
@@ -839,6 +844,131 @@ def projects_link_bridge(
         click.echo(json.dumps(link, indent=2, sort_keys=True))
         return
     click.echo(f"Linked bridge thread {link['artifact_ref']} to {link['project_id']}.")
+
+
+@projects_cmd.command("authorize")
+@click.argument("project_id")
+@click.option("--id", "authorization_id", default=None, help="Explicit authorization id.")
+@click.option("--owner-decision", required=True, help="Owner-decision deliberation id.")
+@click.option("--name", required=True, help="Authorization name.")
+@click.option("--scope", "scope_summary", required=True, help="Bounded authorization scope summary.")
+@click.option("--allowed-mutation", "allowed_mutation_classes", multiple=True, help="Allowed mutation class.")
+@click.option("--forbid", "forbidden_operations", multiple=True, help="Forbidden operation.")
+@click.option("--include-work-item", "included_work_item_ids", multiple=True, help="Explicitly included work item.")
+@click.option("--exclude-work-item", "excluded_work_item_ids", multiple=True, help="Explicitly excluded work item.")
+@click.option("--include-spec", "included_spec_ids", multiple=True, help="Explicitly included spec.")
+@click.option("--exclude-spec", "excluded_spec_ids", multiple=True, help="Explicitly excluded spec.")
+@click.option("--expires-at", default=None, help="Optional ISO-8601 expiration timestamp.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the authorization version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_authorize(
+    ctx: click.Context,
+    project_id: str,
+    authorization_id: str | None,
+    owner_decision: str,
+    name: str,
+    scope_summary: str,
+    allowed_mutation_classes: tuple[str, ...],
+    forbidden_operations: tuple[str, ...],
+    included_work_item_ids: tuple[str, ...],
+    excluded_work_item_ids: tuple[str, ...],
+    included_spec_ids: tuple[str, ...],
+    excluded_spec_ids: tuple[str, ...],
+    expires_at: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Authorize a bounded project for implementation work."""
+    db, service = _project_service(ctx)
+    try:
+        authorization = service.authorize_project(
+            project_id,
+            authorization_id=authorization_id,
+            owner_decision=owner_decision,
+            name=name,
+            scope=scope_summary,
+            allowed_mutation_classes=list(allowed_mutation_classes) or None,
+            forbidden_operations=list(forbidden_operations) or None,
+            included_work_item_ids=list(included_work_item_ids) or None,
+            excluded_work_item_ids=list(excluded_work_item_ids) or None,
+            included_spec_ids=list(included_spec_ids) or None,
+            excluded_spec_ids=list(excluded_spec_ids) or None,
+            expires_at=expires_at,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(authorization, indent=2, sort_keys=True))
+        return
+    click.echo(f"Authorized project {authorization['project_id']} with {authorization['id']}.")
+
+
+@projects_cmd.command("authorizations")
+@click.argument("project_id")
+@click.option("--all", "include_terminal", is_flag=True, help="Include revoked/terminal authorizations.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_authorizations(ctx: click.Context, project_id: str, include_terminal: bool, json_output: bool) -> None:
+    """List project-scoped implementation authorizations."""
+    db, service = _project_service(ctx)
+    try:
+        authorizations = service.list_project_authorizations(project_id, include_terminal=include_terminal)
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(authorizations, indent=2, sort_keys=True))
+        return
+    if not authorizations:
+        click.echo("No project authorizations found.")
+        return
+    for authorization in authorizations:
+        click.echo(
+            f"{authorization['id']}\t{authorization['project_id']}\t"
+            f"{authorization['status']}\t{authorization['authorization_name']}"
+        )
+
+
+@projects_cmd.command("revoke-authorization")
+@click.argument("authorization_id")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for revocation.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_revoke_authorization(
+    ctx: click.Context,
+    authorization_id: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Revoke a project-scoped implementation authorization."""
+    db, service = _project_service(ctx)
+    try:
+        authorization = service.revoke_project_authorization(
+            authorization_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(authorization, indent=2, sort_keys=True))
+        return
+    click.echo(f"Revoked project authorization {authorization['id']}.")
 
 
 # ---------------------------------------------------------------------------
@@ -1254,6 +1384,7 @@ _IMPORTABLE_TABLES = frozenset(
         "project_work_item_memberships",
         "project_dependencies",
         "project_artifact_links",
+        "project_authorizations",
         "backlog_snapshots",
         "testable_elements",
         "quality_scores",

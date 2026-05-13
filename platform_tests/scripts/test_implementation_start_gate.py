@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.db import KnowledgeDB
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -79,6 +80,57 @@ def _write_thread(
     (bridge / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _seed_project_authorization(root: Path, *, link_work_item: bool = True, status: str = "active") -> None:
+    db = KnowledgeDB(root / "groundtruth.db")
+    try:
+        db.insert_deliberation(
+            "DELIB-PROJECT-AUTH",
+            "owner_conversation",
+            "Owner approved project authorization",
+            "Owner approved project implementation scope.",
+            "{}",
+            "test",
+            "seed project authorization decision",
+            outcome="owner_decision",
+        )
+        db.insert_project(
+            "Authorized Project",
+            "test",
+            "seed project",
+            id="PROJECT-AUTH",
+            status="active",
+        )
+        db.insert_work_item(
+            "WI-AUTH-001",
+            "Authorized work item",
+            "new",
+            "platform",
+            "open",
+            "test",
+            "seed work item",
+            stage="backlogged",
+        )
+        if link_work_item:
+            db.link_project_work_item(
+                "PROJECT-AUTH",
+                "WI-AUTH-001",
+                "test",
+                "seed work item membership",
+            )
+        db.insert_project_authorization(
+            "PROJECT-AUTH",
+            "Authorized implementation project",
+            "DELIB-PROJECT-AUTH",
+            "Bounded project implementation scope.",
+            "test",
+            "seed project authorization",
+            id="PAUTH-AUTH",
+            status=status,
+        )
+    finally:
+        db.close()
+
+
 def test_go_authorization_packet_allows_in_scope_apply_patch(tmp_path: Path) -> None:
     _write_thread(tmp_path)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
@@ -131,6 +183,62 @@ def test_requirement_gap_blocks_authorization(tmp_path: Path) -> None:
     )
 
     with pytest.raises(auth.AuthorizationError, match="new or revised requirements"):
+        auth.create_authorization_packet(tmp_path, "sample-implementation")
+
+
+def test_project_authorization_metadata_is_carried_in_packet(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path)
+    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    _write_thread(tmp_path, proposal=proposal)
+
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+
+    assert packet["project_authorization"]["id"] == "PAUTH-AUTH"
+    assert packet["project_authorization"]["project_id"] == "PROJECT-AUTH"
+    assert packet["project_authorization"]["work_item_id"] == "WI-AUTH-001"
+    assert auth.load_packet(tmp_path)["project_authorization"]["id"] == "PAUTH-AUTH"
+
+
+def test_project_authorization_load_revalidates_current_spec_exclusions(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path)
+    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    _write_thread(tmp_path, proposal=proposal)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.update_project_authorization(
+            "PAUTH-AUTH",
+            "test",
+            "exclude linked governing spec",
+            excluded_spec_ids=["GOV-FILE-BRIDGE-AUTHORITY-001"],
+        )
+    finally:
+        db.close()
+
+    with pytest.raises(auth.AuthorizationError, match="Spec link\\(s\\) excluded"):
+        auth.load_packet(tmp_path)
+
+
+def test_project_authorization_does_not_broaden_target_scope(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path)
+    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    _write_thread(tmp_path, proposal=proposal)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+
+    with pytest.raises(auth.AuthorizationError, match="outside implementation authorization scope"):
+        auth.validate_targets(tmp_path, ["groundtruth-kb/src/groundtruth_kb/db.py"])
+
+
+def test_project_authorization_requires_work_item_membership_or_inclusion(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, link_work_item=False)
+    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    _write_thread(tmp_path, proposal=proposal)
+
+    with pytest.raises(auth.AuthorizationError, match="neither included in nor an active member"):
         auth.create_authorization_packet(tmp_path, "sample-implementation")
 
 

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.project.authorization import ACTIVE_PROJECT_AUTHORIZATION_STATUS
 
 PROJECT_TERMINAL_STATUS = "retired"
 PROJECTS_CHANGED_BY = "gt-projects"
@@ -84,6 +85,7 @@ class ProjectLifecycleService:
             "work_items": self.db.list_project_work_items(project["id"]),
             "dependencies": self.db.list_project_dependencies(project["id"]),
             "artifact_links": self.db.list_project_artifact_links(project["id"]),
+            "authorizations": self.db.list_project_authorizations(project["id"]),
         }
 
     def update_project(
@@ -262,3 +264,76 @@ class ProjectLifecycleService:
         if link is None:
             raise ProjectLifecycleError("Project artifact link insert did not return a current link")
         return link
+
+    def authorize_project(
+        self,
+        project_id: str,
+        *,
+        owner_decision: str,
+        name: str,
+        scope: str,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+        authorization_id: str | None = None,
+        allowed_mutation_classes: list[str] | None = None,
+        forbidden_operations: list[str] | None = None,
+        included_work_item_ids: list[str] | None = None,
+        excluded_work_item_ids: list[str] | None = None,
+        included_spec_ids: list[str] | None = None,
+        excluded_spec_ids: list[str] | None = None,
+        expires_at: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            authorization = self.db.insert_project_authorization(
+                _require_nonempty(project_id, "project_id"),
+                _require_nonempty(name, "name"),
+                _require_nonempty(owner_decision, "owner_decision"),
+                _require_nonempty(scope, "scope"),
+                _require_nonempty(changed_by, "changed_by"),
+                _require_nonempty(change_reason, "change_reason"),
+                id=authorization_id,
+                status=ACTIVE_PROJECT_AUTHORIZATION_STATUS,
+                allowed_mutation_classes=allowed_mutation_classes,
+                forbidden_operations=forbidden_operations,
+                included_work_item_ids=included_work_item_ids,
+                excluded_work_item_ids=excluded_work_item_ids,
+                included_spec_ids=included_spec_ids,
+                excluded_spec_ids=excluded_spec_ids,
+                expires_at=expires_at,
+            )
+        except ValueError as exc:
+            raise ProjectLifecycleError(str(exc)) from exc
+        if authorization is None:
+            raise ProjectLifecycleError("Project authorization insert did not return a current authorization")
+        return authorization
+
+    def list_project_authorizations(
+        self,
+        project_id: str,
+        *,
+        include_terminal: bool = False,
+    ) -> list[dict[str, Any]]:
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        if self.db.get_project(normalized_project_id) is None:
+            raise ProjectLifecycleError(f"Project not found: {normalized_project_id}")
+        return self.db.list_project_authorizations(normalized_project_id, include_terminal=include_terminal)
+
+    def revoke_project_authorization(
+        self,
+        authorization_id: str,
+        *,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+    ) -> dict[str, Any]:
+        try:
+            authorization = self.db.update_project_authorization(
+                _require_nonempty(authorization_id, "authorization_id"),
+                _require_nonempty(changed_by, "changed_by"),
+                _require_nonempty(change_reason, "change_reason"),
+                status="revoked",
+            )
+        except ValueError as exc:
+            raise ProjectLifecycleError(str(exc)) from exc
+        if authorization is None:
+            raise ProjectLifecycleError("Project authorization update did not return a current authorization")
+        return authorization

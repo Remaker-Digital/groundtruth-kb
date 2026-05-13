@@ -32,6 +32,8 @@ gt projects list
 gt projects list --json
 gt projects show <PROJECT-ID>
 gt projects show <PROJECT-ID> --json
+gt projects authorizations <PROJECT-ID>
+gt projects authorizations <PROJECT-ID> --json
 ```
 
 Mutating operations require `--change-reason` and append a new MemBase version:
@@ -43,6 +45,8 @@ gt projects add-item <PROJECT-ID> <WI-ID> --order 1 --change-reason "<reason>"
 gt projects reorder <PROJECT-ID> <WI-ID> <WI-ID> --change-reason "<reason>"
 gt projects retire <PROJECT-ID> --change-reason "<reason>"
 gt projects link-bridge <PROJECT-ID> <bridge-thread-slug> --change-reason "<reason>"
+gt projects authorize <PROJECT-ID> --owner-decision <DELIB-ID> --name "<name>" --scope "<scope>" --change-reason "<reason>"
+gt projects revoke-authorization <PAUTH-ID> --change-reason "<reason>"
 ```
 
 Use `--json` when another tool or agent needs machine-readable output.
@@ -58,6 +62,9 @@ Use `--json` when another tool or agent needs machine-readable output.
   membership set exactly, so omitted or extra work items fail closed.
 - If a requested operation would update multiple projects or bulk-update work
   items, stop and file a follow-on bridge proposal or dry-run inventory packet.
+- A project authorization is owner-approval evidence for a bounded project; it
+  does not bypass bridge proposal review, `GO`, `target_paths`, implementation
+  reports, or Loyal Opposition verification.
 
 ## Verification
 
@@ -67,6 +74,7 @@ proposal, normally:
 
 ```powershell
 python -m pytest platform_tests/scripts/test_projects_cli.py -q
+python -m pytest platform_tests/scripts/test_project_authorization.py -q
 python scripts/generate_codex_skill_adapters.py --check --update-registry
 python -m pytest platform_tests/scripts/test_projects_skill_adapter.py -q
 python -m pytest platform_tests/scripts/test_check_harness_parity.py -q

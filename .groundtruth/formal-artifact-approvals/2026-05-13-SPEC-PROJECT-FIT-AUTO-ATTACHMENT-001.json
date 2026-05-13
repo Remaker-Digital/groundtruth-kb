@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "Mike",
+  "artifact_id": "SPEC-PROJECT-FIT-AUTO-ATTACHMENT-001",
+  "artifact_type": "requirement",
+  "change_reason": "Record deterministic project-fit attachment requirement from DELIB-S347",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION: Owner approved attaching generated work to an existing project when it fits, without auto-creating projects or using fuzzy matching.",
+  "full_content": "## Specification\n\nWhen GT-KB auto-creates or links a work item for a newly confirmed implementation-bearing specification, the work item may attach to an existing active project only through deterministic project-fit evidence. If no single active project is deterministically identified, the work item remains unassigned in implementation intake.\n\n## Required Behavior\n\n- Deterministic project-fit evidence includes an explicit project id or project_ids value in spec constraints, or an active project artifact link whose artifact type is `spec` and artifact ref is the spec id.\n- Exactly one active matching project attaches the work item to that project.\n- Zero matching projects leaves the work item unassigned with a no-fit reason.\n- More than one matching project leaves the work item unassigned with an ambiguous-fit reason.\n- Semantic, fuzzy, or LLM project matching is out of scope for automatic attachment.\n\n## Evidence\n\nOwner decision: `DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION`.\nBridge approval: `bridge/gtkb-project-scoped-implementation-authorization-004.md`.\n",
+  "full_content_sha256": "fe5fa34528aef00fabd4d4be219529e307fe7752a07386d625d481d16172b21b",
+  "presented_to_user": true,
+  "source_ref": "SPEC-PROJECT-FIT-AUTO-ATTACHMENT-001",
+  "transcript_captured": true
+}

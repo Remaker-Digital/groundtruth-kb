@@ -47,6 +47,15 @@ configuration, deployment, repository-state, or KB-mutation work must include:
 3. A specification-derived verification plan mapping the linked requirements to
    tests or verification commands.
 
+When an implementation proposal depends on a project-scoped implementation
+authorization, it should also cite machine-readable metadata lines for
+`Project Authorization`, `Project`, and the applicable `Work Item`. These lines
+let `scripts/implementation_authorization.py` validate that the authorization is
+current, active, unexpired, tied to the cited project, and either includes the
+work item or covers it through active project membership. Project authorization
+metadata never broadens `target_paths` and never replaces the live latest-`GO`
+requirement.
+
 After Loyal Opposition records `GO`, Prime Builder runs:
 
 ```text

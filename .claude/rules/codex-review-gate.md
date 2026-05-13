@@ -39,6 +39,12 @@ is scoped to one GO'd bridge proposal. It is not a substitute for the bridge
 `GO`, it does not authorize formal GOV/ADR/DCL/SPEC mutation, and it does not
 weaken any formal-artifact approval gate.
 
+Project-scoped implementation authorization records may satisfy the
+owner-approval evidence for a bounded project scope, but they are additive to
+this gate. A project authorization does not authorize implementation until a
+bridge proposal cites the applicable project/work evidence, Loyal Opposition
+records `GO`, and the implementation-start packet is created from that GO.
+
 The hook `scripts/implementation_start_gate.py` must deny protected source,
 test, script, hook, configuration, deployment, repository-state, and KB-mutation
 work when the packet is missing, corrupt, expired, stale relative to live
@@ -109,11 +115,13 @@ If Loyal Opposition is verifying an implementation:
 This applies even when:
 - The change "seems too small to review"
 - The owner has given pre-approval on a work list
+- The owner has authorized the containing project for implementation
 - The tests are already passing
 - The change is "just a KB status promotion"
 
-Pre-approval on the work list means "you may proceed through the bridge
-protocol autonomously" — it does NOT mean "skip the bridge protocol."
+Pre-approval on the work list, or project-scoped authorization in MemBase, means
+"you may proceed through the bridge protocol autonomously" - it does NOT mean
+"skip the bridge protocol."
 
 ## Rationale
 

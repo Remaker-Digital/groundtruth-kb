@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "Mike",
+  "artifact_id": "PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001",
+  "artifact_type": "protected_behavior",
+  "change_reason": "Record no-bridge-bypass protected behavior from DELIB-S347",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION: Owner rejected skipping per-proposal bridge review or implementation-start controls under project authorization.",
+  "full_content": "## Protected Behavior\n\nProject authorization must not bypass the Prime Builder / Loyal Opposition bridge lifecycle. A valid project authorization can satisfy the owner-approval portion of bounded project work, but implementation still requires proposal review, latest bridge GO, implementation-start target-path authorization, spec-derived tests, implementation report, and Loyal Opposition verification.\n\n## Required Behavior\n\n- Implementation-start authorization must still require latest bridge GO and approved proposal target paths.\n- A project authorization must not broaden target paths beyond the approved proposal.\n- A project authorization must be current, active, unexpired, and tied to the cited project.\n- If a proposal cites a work item, that work item must be an active member of the authorized project or explicitly included by the authorization record.\n\n## Evidence\n\nOwner decision: `DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION`.\nBridge approval: `bridge/gtkb-project-scoped-implementation-authorization-004.md`.\n",
+  "full_content_sha256": "1d461c5cc98e7e43ce47e6e593be17a015c76ce414a7eed891cd39e8134cfbef",
+  "presented_to_user": true,
+  "source_ref": "PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001",
+  "transcript_captured": true
+}

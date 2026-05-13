@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "Mike",
+  "artifact_id": "SPEC-AUTO-BACKLOG-FOR-IMPLEMENTATION-BEARING-SPECS-001",
+  "artifact_type": "requirement",
+  "change_reason": "Record automatic backlog intake requirement from DELIB-S347",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION: Owner approved automatic backlog creation or linkage when confirmed unmet specs are implementation-bearing.",
+  "full_content": "## Specification\n\nWhen a newly confirmed unmet specification is implementation-bearing, GT-KB must create or link one canonical MemBase work item for that specification. The work item must preserve the confirmed spec id, the originating deliberation id, and visible intake status so the owner can see the implementation consequence of confirming the spec.\n\n## Required Behavior\n\n- Confirming an implementation-bearing requirement, governance spec, protected behavior, or explicitly tagged implementation-bearing spec creates or reuses exactly one non-terminal work item keyed by source spec id.\n- Architecture decision and design constraint records do not create implementation work by default unless explicitly marked implementation-bearing.\n- Reconfirming an already confirmed intake must not create duplicate backlog items.\n- Automatic backlog creation must be visible in the confirmation result and in the updated deliberation content.\n\n## Evidence\n\nOwner decision: `DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION`.\nBridge approval: `bridge/gtkb-project-scoped-implementation-authorization-004.md`.\n",
+  "full_content_sha256": "155874aba3f8a69ab7de38cb821cb3fafe4366500a8a7d74cd41b9f2b0408eba",
+  "presented_to_user": true,
+  "source_ref": "SPEC-AUTO-BACKLOG-FOR-IMPLEMENTATION-BEARING-SPECS-001",
+  "transcript_captured": true
+}

@@ -102,7 +102,16 @@ against library regressions — not a recoverable user state.
 ``changed_by="prime-builder/spec-intake-skill"``. The call creates a
 KB spec (``status="specified"``) and records a confirmation-version
 deliberation (``outcome="owner_decision"``). Both rows record the
-skill actor.
+skill actor. If the confirmed spec is implementation-bearing, confirmation also
+creates or links exactly one canonical MemBase work item for that spec and
+records the result in the returned ``auto_backlog`` payload. ADR and DCL specs
+do not create implementation work by default unless they are explicitly marked
+implementation-bearing.
+
+Automatic project attachment is deterministic only: an auto-created work item
+attaches to exactly one active project only when the spec constraints or an
+active project artifact link identify that project. No match or multiple matches
+leave the item unassigned for implementation intake.
 
 If ``intake.confirm_intake`` returns an error dict (unknown ID,
 non-intake deliberation, ``insert_spec`` returned None),

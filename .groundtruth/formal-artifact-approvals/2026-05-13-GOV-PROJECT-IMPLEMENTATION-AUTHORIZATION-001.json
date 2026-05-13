@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "Mike",
+  "artifact_id": "GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001",
+  "artifact_type": "governance",
+  "change_reason": "Record project-scoped implementation authorization governance from DELIB-S347",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION: Owner approved project-scoped implementation authorization while preserving bridge review and implementation-start controls.",
+  "full_content": "## Governance\n\nProject-scoped implementation authorization is a bounded owner approval source for a named active project. It reduces repeated owner approval overhead for coherent project work, but it does not replace bridge proposal review, bridge GO, proposal target-path scoping, implementation-start authorization packets, spec-derived verification, implementation reporting, or Loyal Opposition verification.\n\n## Required Behavior\n\n- A project authorization must be represented as an append-only MemBase artifact tied to a project id and owner-decision deliberation id.\n- An active project authorization may be cited by implementation proposals as owner authorization evidence for the project scope.\n- A project authorization may not authorize production deployment, credential lifecycle changes, destructive cleanup, external-system mutation, history rewrite, or work outside the cited project scope unless a separate approval gate authorizes those actions.\n- Backlog membership alone is not implementation authorization.\n\n## Evidence\n\nOwner decision: `DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION`.\nBridge approval: `bridge/gtkb-project-scoped-implementation-authorization-004.md`.\n",
+  "full_content_sha256": "2ca58fd311f8786375dd3058c16962a953f634920e6ff948b5fc3d11a79a1a92",
+  "presented_to_user": true,
+  "source_ref": "GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001",
+  "transcript_captured": true
+}

@@ -305,6 +305,33 @@ atomic known-work unit).
 **Source:** `.claude/rules/operating-model.md` §2 "project"; owner
 clarification, 2026-05-06.
 
+### project authorization
+
+**Canonical aliases:** project-scoped implementation authorization; project
+implementation authorization.
+
+**Definition:** A MemBase-backed, append-only owner authorization envelope for
+a named active project. It records the owner-decision deliberation id, scope,
+allowed mutation classes, forbidden operations, included/excluded work items
+and specs, optional expiration, and audit metadata. It can remove repeated
+owner-approval prompts for bounded project implementation work, but it does not
+replace implementation proposals, Loyal Opposition review, bridge `GO`,
+proposal `target_paths`, implementation-start packets, spec-derived tests,
+implementation reports, or verification.
+
+**Not to be confused with:** backlog membership (known work, not approval);
+bridge `GO` (review approval for one proposal); implementation-start
+authorization packet (session-local proof for one GO'd proposal).
+
+**Source:** `DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION`;
+`GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`;
+`DCL-PROJECT-AUTHORIZATION-ENVELOPE-001`;
+`PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`.
+
+**Implementation pointer:** `project_authorizations` table and
+`current_project_authorizations` view in `groundtruth.db`; `gt projects authorize`,
+`gt projects authorizations`, and `gt projects revoke-authorization`.
+
 ### sub-project
 
 **Canonical aliases:** sub-project; subproject.
