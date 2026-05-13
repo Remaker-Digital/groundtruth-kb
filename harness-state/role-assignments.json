@@ -2,18 +2,27 @@
   "description": "Maps durable harness installation IDs to operating roles. Harness IDs are defined by harness-state/harness-identities.json.",
   "harnesses": {
     "A": {
-      "assigned_at": "2026-05-12T12:56:45Z",
+      "assigned_at": "2026-05-13T21:34:35Z",
       "assigned_by": "owner-current-session-role-switch-request",
-      "assigned_reason": "owner asked Codex to switch to Prime Builder and prepare for single-harness operation",
+      "assigned_reason": "owner asked Codex to switch to Loyal Opposition",
       "harness_type": "codex",
       "role": [
-        "loyal-opposition",
+        "loyal-opposition"
+      ],
+      "source": "owner-current-session-role-switch-request"
+    },
+    "B": {
+      "assigned_at": "2026-05-13T21:34:35Z",
+      "assigned_by": "owner-current-session-role-switch-request",
+      "assigned_reason": "owner asked Codex to switch to Loyal Opposition; Claude assigned Prime Builder to preserve a Prime Builder slot",
+      "harness_type": "claude",
+      "role": [
         "prime-builder"
       ],
-      "source": "owner-current-session-single-harness-request"
+      "source": "owner-current-session-role-switch-request"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness role assignments",
-  "updated_at": "2026-05-12T12:56:45Z"
+  "updated_at": "2026-05-13T21:34:35Z"
 }

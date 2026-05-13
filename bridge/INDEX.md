@@ -18,6 +18,9 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-owner-role-switch-codex-loyal-opposition
+ADVISORY: bridge/gtkb-owner-role-switch-codex-loyal-opposition-001.md
+
 Document: gtkb-session-wrap-knowledge-collection
 VERIFIED: bridge/gtkb-session-wrap-knowledge-collection-004.md
 NEW: bridge/gtkb-session-wrap-knowledge-collection-003.md

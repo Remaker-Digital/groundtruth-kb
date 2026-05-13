@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-13T14:27:23Z",
+  "generated_at": "2026-05-13T21:40:31Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -58,7 +58,13 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "loyal-opposition",
+          "loyal-opposition"
+        ],
+        "status": "verified"
+      },
+      "B": {
+        "harness_type": "claude",
+        "role": [
           "prime-builder"
         ],
         "status": "verified"
@@ -248,7 +254,7 @@
   "role_by_harness_compatibility": [
     {
       "assignment": {
-        "current_role": "unknown",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "B",
         "matrix_role": "prime-builder",
@@ -325,7 +331,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition', 'prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -402,7 +408,7 @@
     },
     {
       "assignment": {
-        "current_role": "unknown",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "B",
         "matrix_role": "loyal-opposition",
@@ -479,7 +485,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition', 'prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
