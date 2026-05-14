@@ -18,11 +18,27 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-completed-bridge-wi-hygiene-2026-05-13
+VERIFIED: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-008.md
+REVISED: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-007.md
+NO-GO: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-006.md
+REVISED: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-005.md
+NO-GO: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-004.md
+NEW: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-003.md
+GO: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-002.md
+NEW: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-001.md
+
 Document: gtkb-implementation-gate-friction-hygiene
+NO-GO: bridge/gtkb-implementation-gate-friction-hygiene-004.md
+REVISED: bridge/gtkb-implementation-gate-friction-hygiene-003.md
 NO-GO: bridge/gtkb-implementation-gate-friction-hygiene-002.md
 NEW: bridge/gtkb-implementation-gate-friction-hygiene-001.md
 
 Document: gtkb-operating-mode-transaction-001
+GO: bridge/gtkb-operating-mode-transaction-001-009.md
+REVISED: bridge/gtkb-operating-mode-transaction-001-008.md
+NO-GO: bridge/gtkb-operating-mode-transaction-001-007.md
+REVISED: bridge/gtkb-operating-mode-transaction-001-006.md
 NO-GO: bridge/gtkb-operating-mode-transaction-001-005.md
 GO: bridge/gtkb-operating-mode-transaction-001-004.md
 REVISED: bridge/gtkb-operating-mode-transaction-001-003.md
@@ -30,6 +46,12 @@ NO-GO: bridge/gtkb-operating-mode-transaction-001-002.md
 NEW: bridge/gtkb-operating-mode-transaction-001-001.md
 
 Document: gtkb-governed-spec-retirement
+VERIFIED: bridge/gtkb-governed-spec-retirement-010.md
+REVISED: bridge/gtkb-governed-spec-retirement-009.md
+NO-GO: bridge/gtkb-governed-spec-retirement-008.md
+NEW: bridge/gtkb-governed-spec-retirement-007.md
+GO: bridge/gtkb-governed-spec-retirement-006.md
+REVISED: bridge/gtkb-governed-spec-retirement-005.md
 NO-GO: bridge/gtkb-governed-spec-retirement-004.md
 REVISED: bridge/gtkb-governed-spec-retirement-003.md
 NO-GO: bridge/gtkb-governed-spec-retirement-002.md
@@ -81,6 +103,8 @@ NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-002.md
 NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-001.md
 
 Document: gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-012.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-011.md
 GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-010.md
 REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md
 NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-008.md
