@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-13T21:40:31Z",
+  "generated_at": "2026-05-14T04:20:57Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -101,15 +101,16 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 22,
+      "count": 23,
       "items": [
         ".claude/hooks/_delib_common.py",
+        ".claude/hooks/advisory-router-scan.py",
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-axis-2-surface.py",
         ".claude/hooks/bridge-compliance-gate.py",
@@ -219,10 +220,11 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 27,
+      "count": 29,
       "items": [
         "alternatives-investigation",
         "arch-audit",
+        "assertion-triage",
         "bridge",
         "bridge-propose",
         "check-deliberations",
@@ -230,6 +232,7 @@
         "codex-report",
         "decision-capture",
         "deploy",
+        "gtkb-benchmarks",
         "harness-parity-review",
         "kb-adr",
         "kb-assert",

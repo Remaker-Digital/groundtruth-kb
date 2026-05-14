@@ -18,6 +18,94 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-implementation-gate-friction-hygiene
+NO-GO: bridge/gtkb-implementation-gate-friction-hygiene-002.md
+NEW: bridge/gtkb-implementation-gate-friction-hygiene-001.md
+
+Document: gtkb-operating-mode-transaction-001
+NO-GO: bridge/gtkb-operating-mode-transaction-001-005.md
+GO: bridge/gtkb-operating-mode-transaction-001-004.md
+REVISED: bridge/gtkb-operating-mode-transaction-001-003.md
+NO-GO: bridge/gtkb-operating-mode-transaction-001-002.md
+NEW: bridge/gtkb-operating-mode-transaction-001-001.md
+
+Document: gtkb-governed-spec-retirement
+NO-GO: bridge/gtkb-governed-spec-retirement-004.md
+REVISED: bridge/gtkb-governed-spec-retirement-003.md
+NO-GO: bridge/gtkb-governed-spec-retirement-002.md
+NEW: bridge/gtkb-governed-spec-retirement-001.md
+
+Document: gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene
+VERIFIED: bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-007.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-006.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-005.md
+GO: bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-004.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-003.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-002.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-001.md
+
+Document: gtkb-backlog-hygiene-bundle-s349
+VERIFIED: bridge/gtkb-backlog-hygiene-bundle-s349-016.md
+NEW: bridge/gtkb-backlog-hygiene-bundle-s349-015.md
+GO: bridge/gtkb-backlog-hygiene-bundle-s349-014.md
+REVISED: bridge/gtkb-backlog-hygiene-bundle-s349-013.md
+NO-GO: bridge/gtkb-backlog-hygiene-bundle-s349-012.md
+NEW: bridge/gtkb-backlog-hygiene-bundle-s349-011.md
+GO: bridge/gtkb-backlog-hygiene-bundle-s349-010.md
+REVISED: bridge/gtkb-backlog-hygiene-bundle-s349-009.md
+NO-GO: bridge/gtkb-backlog-hygiene-bundle-s349-008.md
+REVISED: bridge/gtkb-backlog-hygiene-bundle-s349-007.md
+NO-GO: bridge/gtkb-backlog-hygiene-bundle-s349-006.md
+REVISED: bridge/gtkb-backlog-hygiene-bundle-s349-005.md
+GO: bridge/gtkb-backlog-hygiene-bundle-s349-004.md
+REVISED: bridge/gtkb-backlog-hygiene-bundle-s349-003.md
+NO-GO: bridge/gtkb-backlog-hygiene-bundle-s349-002.md
+NEW: bridge/gtkb-backlog-hygiene-bundle-s349-001.md
+
+Document: gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage
+VERIFIED: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-016.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-015.md
+GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-014.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-013.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-012.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-011.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-010.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-009.md
+GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-008.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-007.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-006.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-005.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-004.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-003.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-002.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-001.md
+
+Document: gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite
+GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-010.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-008.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-007.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-006.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-005.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-004.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-003.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-002.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-001.md
+
+Document: gtkb-self-diagnostic-leak-closure-slice-1-advisory-router
+VERIFIED: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-012.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-011.md
+GO: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-010.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-009.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-008.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-007.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-006.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-005.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-004.md
+REVISED: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-003.md
+NO-GO: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-002.md
+NEW: bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-001.md
+
 Document: gtkb-owner-role-switch-codex-loyal-opposition
 ADVISORY: bridge/gtkb-owner-role-switch-codex-loyal-opposition-001.md
 
