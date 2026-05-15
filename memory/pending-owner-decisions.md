@@ -7161,6 +7161,18 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-15T01:58:51.049003Z
   answer: "User has answered your questions: \"How should we operationalize the deterministic-services preference for artifact production?\"=\"Reframe session: stop LLM-bridge-proposals, build gt-bridge-propose-template CLI\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0597
+  asked_at: 2026-05-15T06:04:35.812279Z
+  question: "Uncommitted work has accumulated since commit 1f4e30e2 (the WI-3315 IP-3 test edit, the WI-3314 -013 and WI-3315 -009 post-implementation reports, INDEX.md updates, plus inbound parallel-session bridge files). How should I handle it?"
+  options:
+    - "Commit now"
+    - "Leave for next checkpoint"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d3627f0485a4e534
+  resolved_at: 2026-05-15T06:04:35.812279Z
+  answer: "User has answered your questions: \"Uncommitted work has accumulated since commit 1f4e30e2 (the WI-3315 IP-3 test edit, the WI-3314 -013 and WI-3315 -009 post-implementation reports, INDEX.md updates, plus inbound parallel-session bridge files). How should I handle it?\"=\"Commit now\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

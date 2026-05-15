@@ -34,7 +34,12 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
-from groundtruth_kb.project.lifecycle import PROJECTS_CHANGED_BY, ProjectLifecycleError, ProjectLifecycleService
+from groundtruth_kb.project.lifecycle import (
+    PROJECTS_CHANGED_BY,
+    ProjectAuthorizationSpecLinkageError,
+    ProjectLifecycleError,
+    ProjectLifecycleService,
+)
 
 if TYPE_CHECKING:
     from groundtruth_kb.dashboard import DashboardPaths
@@ -900,6 +905,9 @@ def projects_authorize(
             changed_by=changed_by,
             change_reason=change_reason,
         )
+    except ProjectAuthorizationSpecLinkageError as exc:
+        # WI-3312: spec-linkage rejection is an owner-correctable usage error.
+        raise click.UsageError(str(exc)) from exc
     except ProjectLifecycleError as exc:
         raise click.ClickException(str(exc)) from exc
     finally:

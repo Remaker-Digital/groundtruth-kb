@@ -19,6 +19,8 @@
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 Document: gtkb-hook-import-latency-chromadb-lazy
+REVISED: bridge/gtkb-hook-import-latency-chromadb-lazy-003.md
+NO-GO: bridge/gtkb-hook-import-latency-chromadb-lazy-002.md
 NEW: bridge/gtkb-hook-import-latency-chromadb-lazy-001.md
 
 Document: gtkb-gt-bridge-propose-deterministic-cli
@@ -83,24 +85,31 @@ Document: gtkb-standing-backlog-harvest-audit-maintenance
 NEW: bridge/gtkb-standing-backlog-harvest-audit-maintenance-001.md
 
 Document: gtkb-bridge-dispatcher-deferral-enforcement-repair
+NO-GO: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-002.md
 NEW: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-001.md
 
 Document: gtkb-governance-adoption-doctor-check
+NO-GO: bridge/gtkb-governance-adoption-doctor-check-002.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-001.md
 
 Document: gtkb-release-candidate-gate-managed-skill
+NO-GO: bridge/gtkb-release-candidate-gate-managed-skill-002.md
 NEW: bridge/gtkb-release-candidate-gate-managed-skill-001.md
 
 Document: gtkb-tier-a-managed-skill-adoption-apply
+NO-GO: bridge/gtkb-tier-a-managed-skill-adoption-apply-002.md
 NEW: bridge/gtkb-tier-a-managed-skill-adoption-apply-001.md
 
 Document: gtkb-core-spec-intake-default
+NO-GO: bridge/gtkb-core-spec-intake-default-002.md
 NEW: bridge/gtkb-core-spec-intake-default-001.md
 
 Document: gtkb-adr-dcl-clause-test-enforcement-slice-2
+NO-GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-002.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-001.md
 
 Document: gtkb-early-project-specs-quality-audit
+NO-GO: bridge/gtkb-early-project-specs-quality-audit-002.md
 NEW: bridge/gtkb-early-project-specs-quality-audit-001.md
 
 Document: gtkb-work-list-md-gov-010-path-correction
@@ -217,6 +226,7 @@ NO-GO: bridge/gtkb-project-verified-completion-auq-trigger-002.md
 NEW: bridge/gtkb-project-verified-completion-auq-trigger-001.md
 
 Document: gtkb-bridge-compliance-wi-project-membership
+VERIFIED: bridge/gtkb-bridge-compliance-wi-project-membership-010.md
 NEW: bridge/gtkb-bridge-compliance-wi-project-membership-009.md
 GO: bridge/gtkb-bridge-compliance-wi-project-membership-008.md
 REVISED: bridge/gtkb-bridge-compliance-wi-project-membership-007.md
@@ -228,6 +238,7 @@ NO-GO: bridge/gtkb-bridge-compliance-wi-project-membership-002.md
 NEW: bridge/gtkb-bridge-compliance-wi-project-membership-001.md
 
 Document: gtkb-bridge-compliance-project-metadata
+VERIFIED: bridge/gtkb-bridge-compliance-project-metadata-014.md
 NEW: bridge/gtkb-bridge-compliance-project-metadata-013.md
 NO-GO: bridge/gtkb-bridge-compliance-project-metadata-012.md
 NEW: bridge/gtkb-bridge-compliance-project-metadata-011.md
@@ -243,6 +254,8 @@ NO-GO: bridge/gtkb-bridge-compliance-project-metadata-002.md
 NEW: bridge/gtkb-bridge-compliance-project-metadata-001.md
 
 Document: gtkb-project-auth-spec-amendment-gate
+VERIFIED: bridge/gtkb-project-auth-spec-amendment-gate-008.md
+NEW: bridge/gtkb-project-auth-spec-amendment-gate-007.md
 GO: bridge/gtkb-project-auth-spec-amendment-gate-006.md
 REVISED: bridge/gtkb-project-auth-spec-amendment-gate-005.md
 NO-GO: bridge/gtkb-project-auth-spec-amendment-gate-004.md
@@ -251,6 +264,8 @@ NO-GO: bridge/gtkb-project-auth-spec-amendment-gate-002.md
 NEW: bridge/gtkb-project-auth-spec-amendment-gate-001.md
 
 Document: gtkb-project-authorize-spec-linkage-gate
+VERIFIED: bridge/gtkb-project-authorize-spec-linkage-gate-008.md
+NEW: bridge/gtkb-project-authorize-spec-linkage-gate-007.md
 GO: bridge/gtkb-project-authorize-spec-linkage-gate-006.md
 REVISED: bridge/gtkb-project-authorize-spec-linkage-gate-005.md
 NO-GO: bridge/gtkb-project-authorize-spec-linkage-gate-004.md

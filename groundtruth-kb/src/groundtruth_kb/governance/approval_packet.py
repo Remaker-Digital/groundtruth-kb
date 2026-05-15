@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -46,6 +47,60 @@ def content_hash(content: str) -> str:
     """Return the formal packet SHA-256 hash for a native content string."""
 
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+# WI-3313: project-authorization spec-amendment approval-packet helpers
+# (DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001).
+# The filename portion permits path separators so traversal citations are
+# matched (and then rejected by the caller's in-root check); non-greedy so it
+# stops at the first ``.json``.
+_PACKET_PATH_RE = re.compile(
+    r"\.groundtruth[/\\]formal-artifact-approvals[/\\][\w./\\-]+?\.json"
+)
+
+
+def parse_packet_path_from_change_reason(change_reason: str) -> str | None:
+    """Return the relative formal-artifact-approval packet path cited in a
+    ``change_reason`` string, normalized to forward slashes, or None when no
+    such path is present.
+
+    Resolution of the relative path against the project root is the caller's
+    responsibility (so this helper stays free of filesystem assumptions).
+    """
+    match = _PACKET_PATH_RE.search(change_reason or "")
+    if match is None:
+        return None
+    return match.group(0).replace("\\", "/")
+
+
+def packet_covers_amendment(
+    packet: Mapping[str, object],
+    project_id: str,
+    authorization_id: str,
+    added_specs: set[str],
+    removed_specs: set[str],
+) -> tuple[bool, str]:
+    """Return ``(covers, reason)`` for whether an approval packet covers a
+    project-authorization spec amendment.
+
+    A packet covers the amendment when its textual fields mention the project
+    id (or the authorization id) AND every added and removed spec id. ``reason``
+    explains the gap when ``covers`` is False.
+    """
+    packet_text = "\n".join(
+        str(packet.get(field, "") or "")
+        for field in ("artifact_id", "full_content", "explicit_change_request", "change_reason")
+    )
+    if project_id not in packet_text and authorization_id not in packet_text:
+        return False, (
+            f"packet does not mention project {project_id} or "
+            f"authorization {authorization_id}"
+        )
+    amended = sorted(added_specs | removed_specs)
+    missing = [spec_id for spec_id in amended if spec_id not in packet_text]
+    if missing:
+        return False, f"packet does not mention amended spec id(s): {', '.join(missing)}"
+    return True, "covered"
 
 
 def validate_packet(packet: Mapping[str, object]) -> ValidationResult:

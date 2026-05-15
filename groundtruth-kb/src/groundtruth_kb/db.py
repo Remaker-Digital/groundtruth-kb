@@ -3935,6 +3935,123 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def _validate_active_authorization_specs(self, included_spec_ids: list[str] | None) -> None:
+        """Raise ValueError if an active project authorization cites no approved
+        specification (GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001 / WI-3312).
+
+        A cited spec id satisfies the requirement when it resolves via
+        ``get_spec()`` to a current ``specifications``-table row whose lifecycle
+        ``status`` is in the approved set ``{specified, implemented, verified}``.
+        No ``type`` allowlist is applied: membership in the ``specifications``
+        table is itself the "is a specification" predicate -- the ``type``
+        column is heterogeneous descriptive metadata, not an authorization
+        discriminator.
+        """
+        approved_lifecycle = {"specified", "implemented", "verified"}
+        if not included_spec_ids:
+            raise ValueError(
+                "Project authorization status='active' requires at least one "
+                "included_spec_id "
+                "(GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001)."
+            )
+        resolved = 0
+        invalid: list[str] = []
+        for spec_id in included_spec_ids:
+            row = self.get_spec(spec_id)
+            if row is None:
+                invalid.append(f"{spec_id}: not-found")
+            elif row.get("status") not in approved_lifecycle:
+                invalid.append(f"{spec_id}: status={row.get('status')}-not-approved")
+            else:
+                resolved += 1
+        if resolved == 0:
+            raise ValueError(
+                "Project authorization status='active' requires at least one "
+                "approved specification "
+                "(GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001). "
+                f"Cited spec IDs failed resolution: {'; '.join(invalid)}"
+            )
+
+    def _validate_spec_amendment_approval_packet(
+        self,
+        *,
+        prior_included: list[str] | None,
+        prior_excluded: list[str] | None,
+        new_included: list[str] | None,
+        new_excluded: list[str] | None,
+        change_reason: str,
+        project_id: str,
+        authorization_id: str,
+    ) -> None:
+        """Raise ValueError when a project-authorization version mutates its
+        included/excluded spec sets without a real, owner-approved, covering
+        formal-artifact-approval packet cited in ``change_reason``
+        (DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001 / WI-3313).
+
+        Substring text alone is insufficient: the cited packet must resolve
+        inside the project root's ``.groundtruth/formal-artifact-approvals/``,
+        exist, parse as JSON, pass ``validate_packet()``, carry
+        ``approved_by == "owner"``, and textually cover the amendment.
+        """
+        from groundtruth_kb.governance.approval_packet import (
+            packet_covers_amendment,
+            parse_packet_path_from_change_reason,
+            validate_packet,
+        )
+
+        prior_inc, prior_exc = set(prior_included or []), set(prior_excluded or [])
+        new_inc, new_exc = set(new_included or []), set(new_excluded or [])
+        if prior_inc == new_inc and prior_exc == new_exc:
+            return  # no spec amendment -- nothing to gate
+
+        clause = (
+            "DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001/"
+            "CLAUSE-AMENDMENT-APPROVAL-REQUIRED"
+        )
+        added = (new_inc - prior_inc) | (new_exc - prior_exc)
+        removed = (prior_inc - new_inc) | (prior_exc - new_exc)
+
+        rel_path = parse_packet_path_from_change_reason(change_reason or "")
+        if rel_path is None:
+            raise ValueError(
+                "Project-authorization spec amendment requires an owner-approved "
+                f"approval-packet path in change_reason ({clause}). "
+                "No packet path detected."
+            )
+        project_root = self.db_path.resolve().parent
+        packet_path = (project_root / rel_path).resolve()
+        try:
+            packet_path.relative_to(project_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"Approval-packet path resolves outside the project root ({clause}): {rel_path}"
+            ) from exc
+        if not packet_path.is_file():
+            raise ValueError(f"Cited approval packet not found ({clause}): {rel_path}")
+        try:
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise ValueError(
+                f"Cited approval packet is not readable JSON ({clause}): {rel_path}: {exc}"
+            ) from exc
+        if not isinstance(packet, dict):
+            raise ValueError(f"Cited approval packet is not a JSON object ({clause}): {rel_path}")
+        result = validate_packet(packet)
+        if not result.is_valid:
+            detail = result.errors[0] if result.errors else "invalid packet"
+            raise ValueError(
+                f"Cited approval packet fails schema validation ({clause}): {rel_path}: {detail}"
+            )
+        if packet.get("approved_by") != "owner":
+            raise ValueError(
+                f"Cited approval packet is not owner-approved ({clause}): {rel_path}"
+            )
+        covers, reason = packet_covers_amendment(packet, project_id, authorization_id, added, removed)
+        if not covers:
+            raise ValueError(
+                f"Cited approval packet does not cover the amendment ({clause}): {rel_path}: {reason}"
+            )
+
     def insert_project_authorization(
         self,
         project_id: str,
@@ -3965,9 +4082,23 @@ class KnowledgeDB:
             raise ValueError("authorization_name is required")
         if not scope_summary.strip():
             raise ValueError("scope_summary is required")
+        if status == "active":
+            self._validate_active_authorization_specs(included_spec_ids)
 
         authorization_id = id or _stable_project_link_id("PAUTH", project_id, authorization_name)
         version = self._next_project_authorization_version(authorization_id)
+        if version > 1:
+            prior_authorization = self.get_project_authorization(authorization_id)
+            if prior_authorization is not None:
+                self._validate_spec_amendment_approval_packet(
+                    prior_included=prior_authorization.get("included_spec_ids_parsed"),
+                    prior_excluded=prior_authorization.get("excluded_spec_ids_parsed"),
+                    new_included=included_spec_ids,
+                    new_excluded=excluded_spec_ids,
+                    change_reason=change_reason,
+                    project_id=project_id,
+                    authorization_id=authorization_id,
+                )
 
         def encode(values: list[str] | None) -> str | None:
             if values is None:

@@ -16,6 +16,16 @@ class ProjectLifecycleError(ValueError):
     """Raised when a project lifecycle request is invalid."""
 
 
+class ProjectAuthorizationSpecLinkageError(ProjectLifecycleError):
+    """Raised when authorize_project() rejects an active authorization that
+    cites no approved specification
+    (GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001 / WI-3312).
+
+    A typed subclass of ProjectLifecycleError so the CLI can surface a
+    user-facing usage error distinct from generic lifecycle failures.
+    """
+
+
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -302,7 +312,13 @@ class ProjectLifecycleService:
                 expires_at=expires_at,
             )
         except ValueError as exc:
-            raise ProjectLifecycleError(str(exc)) from exc
+            message = str(exc)
+            # WI-3312: the spec-linkage validator's ValueError cites the source
+            # spec; re-raise it as the typed subclass so the CLI can map it to a
+            # usage error. All other ValueErrors stay generic lifecycle errors.
+            if "GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001" in message:
+                raise ProjectAuthorizationSpecLinkageError(message) from exc
+            raise ProjectLifecycleError(message) from exc
         if authorization is None:
             raise ProjectLifecycleError("Project authorization insert did not return a current authorization")
         return authorization
