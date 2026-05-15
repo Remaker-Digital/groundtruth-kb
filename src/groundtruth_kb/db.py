@@ -22,7 +22,7 @@ import logging
 import re
 import sqlite3
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -588,6 +588,74 @@ def _validate_provisional_until(provisional_until: Any) -> None:
             raise ValueError("provisional_until must be a non-empty string")
 
 
+def _trust_result(spec: dict[str, Any], state: str, reason: str) -> dict[str, Any]:
+    """Build a normalized spec trust-state result."""
+    return {
+        "spec_id": spec.get("id"),
+        "spec_status": spec.get("status"),
+        "trust_state": state,
+        "reason": reason,
+        "pbc_anchor": spec.get("pbc_anchor"),
+    }
+
+
+def _evidence_state_from_assertion(assertion_run: dict[str, Any] | None) -> str:
+    if not assertion_run:
+        return "missing"
+    return "pass" if bool(assertion_run.get("overall_passed")) else "fail"
+
+
+def _evidence_state_from_tests(tests: list[dict[str, Any]]) -> str:
+    if not tests:
+        return "missing"
+    results = {test.get("last_result") for test in tests}
+    if "fail" in results:
+        return "fail"
+    if results and all(result == "pass" for result in results):
+        return "pass"
+    return "missing"
+
+
+def _trust_stale_reason(
+    spec: dict[str, Any],
+    assertion_run: dict[str, Any] | None,
+    *,
+    now: str | None,
+) -> str | None:
+    expires_after = spec.get("verification_expires_after_days")
+    if expires_after is None:
+        return None
+    try:
+        days = int(expires_after)
+    except (TypeError, ValueError):
+        return "invalid_verification_lease"
+    if days < 0:
+        return "invalid_verification_lease"
+    current_time = _parse_datetime(now) if now else datetime.now(UTC)
+    if current_time is None:
+        current_time = datetime.now(UTC)
+    evidence_time = _parse_datetime(spec.get("verified_at"))
+    if assertion_run and assertion_run.get("run_at"):
+        evidence_time = _parse_datetime(assertion_run.get("run_at")) or evidence_time
+    if evidence_time is None:
+        return "verification_timestamp_missing"
+    if evidence_time + timedelta(days=days) < current_time:
+        return "verification_lease_expired"
+    return None
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 class KnowledgeDB:
     """Append-only knowledge database."""
 
@@ -669,6 +737,23 @@ class KnowledgeDB:
             conn.commit()
             _log.info("Applied migration: add source_paths column")
 
+        # Migration 5: Trust integration metadata for PBC anchors and verification leases.
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
+        trust_columns = {
+            "pbc_anchor": "TEXT DEFAULT NULL",
+            "verified_at": "TEXT DEFAULT NULL",
+            "verification_expires_after_days": "INTEGER DEFAULT NULL",
+            "required_evidence": "TEXT DEFAULT NULL",
+        }
+        added_trust = []
+        for col_name, col_type in trust_columns.items():
+            if col_name not in cols:
+                conn.execute(f"ALTER TABLE specifications ADD COLUMN {col_name} {col_type}")
+                added_trust.append(col_name)
+        conn.commit()
+        if added_trust:
+            _log.info("Applied migration: trust integration columns %s", added_trust)
+
     @staticmethod
     def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
         """Auto-detect spec type from ID prefix when declared as default 'requirement'."""
@@ -731,6 +816,10 @@ class KnowledgeDB:
         affected_by: list[str] | None = None,
         testability: str | None = None,
         source_paths: list[str] | None = None,
+        pbc_anchor: str | None = None,
+        verified_at: str | None = None,
+        verification_expires_after_days: int | None = None,
+        required_evidence: list[str] | None = None,
     ) -> dict[str, Any] | None:
         """Insert a new version of a specification.
 
@@ -752,6 +841,12 @@ class KnowledgeDB:
             source_paths: Optional list of relative file paths or glob patterns this spec
                   covers. JSON-encoded into the source_paths TEXT column. Used by the
                   spec-before-code governance hook.
+            pbc_anchor: Stable PBC behavior/rule/config anchor this spec provides evidence for.
+            verified_at: ISO timestamp for the evidence lease start. Defaults to now when
+                  inserting a verified spec and omitted.
+            verification_expires_after_days: Optional freshness lease in days.
+            required_evidence: Optional evidence classes required for trust, e.g.
+                  ["assertions", "tests", "tau_task_replay"].
         """
         type = self._auto_detect_spec_type(id, type)
 
@@ -780,6 +875,9 @@ class KnowledgeDB:
         constraints_json = json.dumps(constraints) if constraints is not None else None
         affected_by_json = json.dumps(affected_by) if affected_by is not None else None
         source_paths_json = json.dumps(source_paths) if source_paths is not None else None
+        required_evidence_json = json.dumps(required_evidence) if required_evidence is not None else None
+        if verified_at is None and status == "verified":
+            verified_at = _now()
 
         # Run governance gates on initial insert (for status enforcement)
         if self._gate_registry is not None:
@@ -788,6 +886,7 @@ class KnowledgeDB:
                 "assertions": json.dumps(assertions) if assertions else None,
                 "title": title,
                 "status": status,
+                "pbc_anchor": pbc_anchor,
             }
             if status == "verified":
                 spec_data["linked_tests"] = self.get_tests_for_spec(id)
@@ -801,9 +900,10 @@ class KnowledgeDB:
                (id, version, title, description, priority, scope, section,
                 handle, tags, status, assertions, type,
                 authority, provisional_until, constraints, affected_by, testability,
-                source_paths,
+                source_paths, pbc_anchor, verified_at, verification_expires_after_days,
+                required_evidence,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -823,6 +923,10 @@ class KnowledgeDB:
                 affected_by_json,
                 testability,
                 source_paths_json,
+                pbc_anchor,
+                verified_at,
+                verification_expires_after_days,
+                required_evidence_json,
                 changed_by,
                 _now(),
                 change_reason,
@@ -957,6 +1061,19 @@ class KnowledgeDB:
         else:
             source_paths_raw = current.get("source_paths")  # raw JSON string from _row_to_dict
 
+        pbc_anchor = fields.get("pbc_anchor", current.get("pbc_anchor"))
+        verified_at = fields.get("verified_at", current.get("verified_at"))
+        verification_expires_after_days = fields.get(
+            "verification_expires_after_days", current.get("verification_expires_after_days")
+        )
+        if status == "verified" and current["status"] != "verified" and verified_at is None:
+            verified_at = _now()
+        if "required_evidence" in fields:
+            required_evidence_val = fields["required_evidence"]
+            required_evidence_raw = json.dumps(required_evidence_val) if required_evidence_val is not None else None
+        else:
+            required_evidence_raw = current.get("required_evidence")
+
         # Run governance gates before spec promotion
         if self._gate_registry is not None:
             spec_data = {
@@ -964,6 +1081,7 @@ class KnowledgeDB:
                 "assertions": assertions_json,
                 "title": title,
                 "status": status,
+                "pbc_anchor": pbc_anchor,
             }
             if status == "verified":
                 spec_data["linked_tests"] = self.get_tests_for_spec(id)
@@ -976,9 +1094,10 @@ class KnowledgeDB:
                (id, version, title, description, priority, scope, section,
                 handle, tags, status, assertions, type,
                 authority, provisional_until, constraints, affected_by, testability,
-                source_paths,
+                source_paths, pbc_anchor, verified_at, verification_expires_after_days,
+                required_evidence,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -998,6 +1117,10 @@ class KnowledgeDB:
                 affected_by_raw,
                 testability,
                 source_paths_raw,
+                pbc_anchor,
+                verified_at,
+                verification_expires_after_days,
+                required_evidence_raw,
                 changed_by,
                 _now(),
                 change_reason,
@@ -3332,6 +3455,93 @@ class KnowledgeDB:
         )
         return [_row_to_dict(r) for r in rows]
 
+    def get_spec_trust_state(self, spec_id: str, *, now: str | None = None) -> dict[str, Any]:
+        """Return the current evidence-derived trust state for a spec.
+
+        Lifecycle status is historical and append-only; this method computes whether
+        the latest evidence still supports authoritative use of that lifecycle claim.
+        """
+        spec = self.get_spec(spec_id)
+        if not spec:
+            raise ValueError(f"Spec {spec_id} not found")
+        return self.compute_spec_trust_state(spec, now=now)
+
+    def compute_spec_trust_state(self, spec: dict[str, Any], *, now: str | None = None) -> dict[str, Any]:
+        """Compute trust from lifecycle, latest assertions, linked tests, and lease freshness."""
+        status = spec.get("status")
+        spec_id = spec.get("id")
+        if status == "retired":
+            return {
+                "spec_id": spec_id,
+                "trust_state": "not_applicable",
+                "reason": "retired_spec",
+                "pbc_anchor": spec.get("pbc_anchor"),
+            }
+        if status not in {"implemented", "verified"}:
+            return {
+                "spec_id": spec_id,
+                "trust_state": "blocked",
+                "reason": "lifecycle_not_authoritative",
+                "pbc_anchor": spec.get("pbc_anchor"),
+            }
+
+        latest_assertion = self.get_latest_assertion_run(str(spec_id))
+        tests = self.get_tests_for_spec(str(spec_id))
+        required = spec.get("required_evidence_parsed") or []
+        if not isinstance(required, list):
+            required = []
+
+        assertion_state = _evidence_state_from_assertion(latest_assertion)
+        test_state = _evidence_state_from_tests(tests)
+
+        if "assertions" in required and assertion_state == "missing":
+            return _trust_result(spec, "stale", "required_assertion_evidence_missing")
+        if "tests" in required and test_state == "missing":
+            return _trust_result(spec, "stale", "required_test_evidence_missing")
+        unsupported_required = sorted(set(required) - {"assertions", "tests"})
+        if unsupported_required:
+            return _trust_result(spec, "stale", f"required_evidence_missing:{','.join(unsupported_required)}")
+
+        observed_states = [s for s in (assertion_state, test_state) if s != "missing"]
+        if "fail" in observed_states and "pass" in observed_states:
+            return _trust_result(spec, "disputed", "conflicting_evidence")
+        if "fail" in observed_states:
+            return _trust_result(spec, "failing", "latest_evidence_failed")
+
+        stale_reason = _trust_stale_reason(spec, latest_assertion, now=now)
+        if stale_reason:
+            return _trust_result(spec, "stale", stale_reason)
+
+        if "pass" in observed_states:
+            return _trust_result(spec, "passing", "latest_evidence_passed")
+        return _trust_result(spec, "blocked", "no_executable_evidence")
+
+    def list_spec_trust_states(self, *, now: str | None = None) -> list[dict[str, Any]]:
+        """Return computed trust states for all current specs."""
+        return [self.compute_spec_trust_state(spec, now=now) for spec in self.list_specs()]
+
+    def export_pbc_evidence(self, *, now: str | None = None) -> list[dict[str, Any]]:
+        """Export machine-readable GT-KB evidence summaries keyed by PBC anchor."""
+        summaries: list[dict[str, Any]] = []
+        for spec in self.list_specs():
+            anchor = spec.get("pbc_anchor")
+            if not anchor:
+                continue
+            trust = self.compute_spec_trust_state(spec, now=now)
+            latest = self.get_latest_assertion_run(spec["id"])
+            summaries.append(
+                {
+                    "pbc_anchor": anchor,
+                    "spec_id": spec["id"],
+                    "spec_status": spec.get("status"),
+                    "trust_state": trust["trust_state"],
+                    "reason": trust["reason"],
+                    "latest_assertion_run_at": latest.get("run_at") if latest else None,
+                    "latest_assertion_passed": latest.get("overall_passed") if latest else None,
+                }
+            )
+        return summaries
+
     # ------------------------------------------------------------------
     # Session Prompts
     # ------------------------------------------------------------------
@@ -4808,6 +5018,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "constraints",
         "affected_by",
         "source_paths",
+        "required_evidence",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:

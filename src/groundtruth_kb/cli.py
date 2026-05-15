@@ -1884,6 +1884,13 @@ def kb() -> None:
     default=False,
     help="Run expired-provisional detector.",
 )
+@click.option(
+    "--trust",
+    "run_trust",
+    is_flag=True,
+    default=False,
+    help="Run evidence-derived trust-state detector.",
+)
 @click.option("--all", "run_all", is_flag=True, default=False, help="Run every detector.")
 @click.option(
     "--project-root",
@@ -1900,6 +1907,7 @@ def kb_reconcile(
     run_authority: bool,
     run_duplicates: bool,
     run_provisionals: bool,
+    run_trust: bool,
     run_all: bool,
     project_root: str | None,
 ) -> None:
@@ -1919,13 +1927,14 @@ def kb_reconcile(
     #   No flags at all is treated as --all for convenience.
     #   Any combination of individual flags runs just those detectors.
     nothing_selected = not any(
-        [run_orphans, stale_threshold is not None, run_authority, run_duplicates, run_provisionals]
+        [run_orphans, stale_threshold is not None, run_authority, run_duplicates, run_provisionals, run_trust]
     )
     if run_all or nothing_selected:
         run_orphans = True
         run_authority = True
         run_duplicates = True
         run_provisionals = True
+        run_trust = True
         if stale_threshold is None:
             stale_threshold = 5
 
@@ -1942,6 +1951,8 @@ def kb_reconcile(
         reports.append(reconciliation.find_duplicate_specs(db))
     if run_provisionals:
         reports.append(reconciliation.find_expired_provisionals(db))
+    if run_trust:
+        reports.append(reconciliation.find_trust_state_drift(db))
 
     total_findings = 0
     for report in reports:

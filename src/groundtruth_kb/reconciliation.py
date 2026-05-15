@@ -13,6 +13,8 @@ Five detectors that inspect the knowledge database for provenance drift:
   - ``find_expired_provisionals`` — provisional specs whose replacement
     (looked up via ``provisional_until``) has reached lifecycle
     ``status in {'implemented', 'verified'}``
+  - ``find_trust_state_drift`` — implemented/verified specs whose current
+    evidence-derived trust state is failing, stale, disputed, or missing PBC anchors
 
 All detectors return a :class:`ReconciliationReport` holding a category label
 and a list of finding dicts.  Reports are deterministic: callers can pass them
@@ -215,6 +217,43 @@ def find_orphaned_assertions(
             )
 
     return ReconciliationReport(category="orphaned_assertions", findings=findings)
+
+
+def find_trust_state_drift(
+    db: KnowledgeDB,
+    *,
+    now: str | None = None,
+) -> ReconciliationReport:
+    """Find active specs whose lifecycle claim is not backed by current trust evidence."""
+    findings: list[dict[str, Any]] = []
+    for spec in db.list_specs():
+        if spec.get("status") not in {"implemented", "verified"}:
+            continue
+        trust = db.compute_spec_trust_state(spec, now=now)
+        trust_state = trust.get("trust_state")
+        if trust_state in {"failing", "stale", "disputed", "blocked"}:
+            findings.append(
+                {
+                    "type": f"{spec.get('status')}_but_{trust_state}",
+                    "spec_id": spec.get("id"),
+                    "spec_status": spec.get("status"),
+                    "trust_state": trust_state,
+                    "reason": trust.get("reason"),
+                    "pbc_anchor": spec.get("pbc_anchor"),
+                }
+            )
+        if spec.get("type") == "protected_behavior" and not spec.get("pbc_anchor"):
+            findings.append(
+                {
+                    "type": "pbc_anchor_missing",
+                    "spec_id": spec.get("id"),
+                    "spec_status": spec.get("status"),
+                    "trust_state": trust_state,
+                    "reason": "protected_behavior_missing_pbc_anchor",
+                    "pbc_anchor": None,
+                }
+            )
+    return ReconciliationReport(category="trust_state_drift", findings=findings)
 
 
 def _resolve_project_root(

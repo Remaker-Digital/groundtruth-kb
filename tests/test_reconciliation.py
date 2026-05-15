@@ -706,4 +706,5 @@ class TestReconcileCLI:
         assert "[authority_conflicts]" in output
         assert "[duplicate_specs]" in output
         assert "[expired_provisionals]" in output
-        assert "Total findings across 5 detector(s):" in output
+        assert "[trust_state_drift]" in output
+        assert "Total findings across 6 detector(s):" in output
