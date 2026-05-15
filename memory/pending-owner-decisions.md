@@ -6,23 +6,24 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0593
-  asked_at: 2026-05-14T22:26:54.849483Z
-  question: "Standing by for direction: address the WI-3314 NO-GO now, or continue with another action?"
-  detected_via: prose:standing_by_for_q
-  status: pending
-  question_hash: 5516604829acbf8b
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0596
-  asked_at: 2026-05-15T06:01:05.897121Z
-  question: "Want me to fold those into a follow-up commit, or leave them for the next checkpoint?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 8a176029bee7c9ac
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
+- id: DECISION-0596
+  asked_at: 2026-05-15T06:01:05.897121Z
+  question: "Want me to fold those into a follow-up commit, or leave them for the next checkpoint? (Stale prose-ask from a prior 2026-05-15 early session. Referent of 'those' not recoverable from the record or session context. Resolved per owner AUQ 2026-05-15 S353: 'Dismiss as unrecoverable' — cleared with no action.)"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 8a176029bee7c9ac
+  notes: ""
+- id: DECISION-0593
+  asked_at: 2026-05-14T22:26:54.849483Z
+  question: "Standing by for direction: address the WI-3314 NO-GO now, or continue with another action? (Stale prose-ask from a prior 2026-05-14 session. Resolved per owner AUQ 2026-05-15 S353: 'Dismiss as stale' — no WI-3314 action taken; WI-3314 enforcement code is already live, the work item remains status=open for a future session.)"
+  detected_via: prose:standing_by_for_q
+  status: resolved
+  question_hash: 5516604829acbf8b
+  notes: ""
 - id: DECISION-0494
   asked_at: 2026-05-09T17:16:53.121114Z
   question: "(prose decision-ask captured by tracker; pattern over-match included decorative prefix/suffix; question was formalized as AUQ later in the same turn S339 2026-05-09 and answered 'Wait — status sharing only'. Manually resolved here per AUQ 'Combine — clear -0494 now AND file the bridge proposal' 2026-05-09.)"
@@ -7358,6 +7359,122 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 064f1224423bb136
   resolved_at: 2026-05-15T13:19:14.151971Z
   answer: "User has answered your questions: \"WI-3317 is implemented (report filed, awaiting Codex VERIFIED). WI-3316 is GO'd at -006 — the last unimplemented WI of GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001 — but it's a substantial 9-file feature (scanner + Claude/Codex parity hooks + lifecycle service method + 3 test files). The screenshot you shared shows four unrelated NEW bridge threads. What should I do next?\"=\"Wrap up the session\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0612
+  asked_at: 2026-05-15T15:41:09.753122Z
+  question: "Requirement candidate INTAKE-45c006c4 is captured at outcome=deferred. Confirming it promotes it to a KB spec (status=specified) and auto-creates the linked work item. How should I proceed?"
+  options:
+    - "Confirm into a spec"
+    - "Revise the text first"
+    - "Reject the candidate"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 783339e681a606ad
+  resolved_at: 2026-05-15T15:41:09.753122Z
+  answer: "User has answered your questions: \"Requirement candidate INTAKE-45c006c4 is captured at outcome=deferred. Confirming it promotes it to a KB spec (status=specified) and auto-creates the linked work item. How should I proceed?\"=\"Confirm into a spec\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0613
+  asked_at: 2026-05-15T16:11:49.606506Z
+  question: "Codex NO-GO F1: work item WI-AUTO-SPEC-INTAKE-1262C1 (the grill-me-for-clarification skill) must trace to a project with an active project authorization before the bridge proposal can get GO. None of the 23 existing project authorizations has a scope that fits a new owner-clarification skill. Where should this work item be homed?"
+  options:
+    - "New dedicated project"
+    - "Under SESSION-LIFECYCLE-UX"
+    - "Under SPEC-TEST-QUALITY"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 376da3cfc89321a2
+  resolved_at: 2026-05-15T16:11:49.606506Z
+  answer: "User has answered your questions: \"Codex NO-GO F1: work item WI-AUTO-SPEC-INTAKE-1262C1 (the grill-me-for-clarification skill) must trace to a project with an active project authorization before the bridge proposal can get GO. None of the 23 existing project authorizations has a scope that fits a new owner-clarification skill. Where should this work item be homed?\"=\"New dedicated project\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0614
+  asked_at: 2026-05-15T16:29:30.395534Z
+  question: "Implementation-gate friction hygiene NO-GO at bridge/gtkb-implementation-gate-friction-hygiene-018.md: how should IP-D coverage be closed (current 19 of approved 32 regression tests; the WI-3310 traceability fix from -017 is closed)?"
+  options:
+    - "Land 13 missing IP-D tests (Recommended)"
+    - "File scope-reduction REVISED proposal"
+    - "Explicit owner waiver"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 34418fbe0a2e30b6
+  resolved_at: 2026-05-15T16:29:30.395534Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0615
+  asked_at: 2026-05-15T16:30:18.958600Z
+  question: "The bridge auto-dispatch surfaced two actionable entries (GO at gtkb-spec-lifecycle-schema-slice-1-004; NO-GO at gtkb-implementation-gate-friction-hygiene-018). My first source-file Edit to db.py was permission-blocked (`Claude requested permissions... but you haven't granted it yet`). The system rule is to not re-attempt the exact same tool call after denial. How should I proceed in this dispatched session?"
+  options:
+    - "Retry source Edits — permission grant pending"
+    - "Defer impl; AUQ friction-hygiene only"
+    - "Report state; stand by"
+    - "Stop and end this turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1bfc399940470985
+  resolved_at: 2026-05-15T16:30:18.958600Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0616
+  asked_at: 2026-05-15T16:30:25.620540Z
+  question: "Codex NO-GO at bridge/gtkb-implementation-gate-friction-hygiene-018.md cites the IP-D regression-test count: the approved scope from -005/-011 is 32 tests (11 redirect/null-sink + 12 sqlite safe-read/disqualifier + 9 chain-walk), but the implementation report at -017 substantiates 19 tests (14 IP-A/IP-B/F3 start-gate + 4 IP-C chain-walk + 1 updated drift). The 52-test pytest sweep is green; the gap is approved-scope coverage, not failing tests. Which remediation path do you authorize for the next REVISED report?"
+  options:
+    - "Land remaining 13 tests (Recommended)"
+    - "REVISED proposal narrowing IP-D to 19"
+    - "Owner waiver for 32 to 19 reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 11831624399d5056
+  resolved_at: 2026-05-15T16:30:25.620540Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0617
+  asked_at: 2026-05-15T16:46:04.742986Z
+  question: "The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?"
+  options:
+    - "Continue — file -009"
+    - "Ship Claude-side only"
+    - "Pause this thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 65f5172fafe465ab
+  resolved_at: 2026-05-15T16:46:04.742986Z
+  answer: "User has answered your questions: \"The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?\"=\"Continue — file -009\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0618
+  asked_at: 2026-05-15T17:14:51.674715Z
+  question: "The grill-me-for-clarification skill thread is VERIFIED (terminal). The change is ready to commit. How should I proceed?"
+  options:
+    - "Commit now (scoped)"
+    - "Hold the commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c176c7e9a0cea3b3
+  resolved_at: 2026-05-15T17:14:51.674715Z
+  answer: "User has answered your questions: \"The grill-me-for-clarification skill thread is VERIFIED (terminal). The change is ready to commit. How should I proceed?\"=\"Commit now (scoped)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0619
+  asked_at: 2026-05-15T17:21:04.717689Z
+  question: "DECISION-0593 (auto-captured 2026-05-14, prior session): 'address the WI-3314 NO-GO now, or continue with another action?' WI-3314's bridge-compliance-gate project-metadata enforcement is already live in the code, but the work item is still status=open and its bridge thread has rotated out of INDEX. How should this pending decision be resolved?"
+  options:
+    - "Investigate WI-3314 now"
+    - "Defer to a future session"
+    - "Dismiss as stale"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d78fdc77d17b0ab8
+  resolved_at: 2026-05-15T17:21:04.717689Z
+  answer: "User has answered your questions: \"DECISION-0593 (auto-captured 2026-05-14, prior session): 'address the WI-3314 NO-GO now, or continue with another action?' WI-3314's bridge-compliance-gate project-metadata enforcement is already live in the code, but the work item is still status=open and its bridge thread has rotated out of INDEX. How should this pending decision be resolved?\"=\"Dismiss as stale\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0620
+  asked_at: 2026-05-15T17:21:04.717689Z
+  question: "DECISION-0596 (auto-captured 2026-05-15T06:01, prior session): 'Want me to fold those into a follow-up commit, or leave them for the next checkpoint?' The referent of 'those' is not recoverable from the pending-decisions record or this session's context. How should this pending decision be resolved?"
+  options:
+    - "Dismiss as unrecoverable"
+    - "I'll tell you what 'those' were"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 724141eece248e79
+  resolved_at: 2026-05-15T17:21:04.717689Z
+  answer: "User has answered your questions: \"DECISION-0596 (auto-captured 2026-05-15T06:01, prior session): 'Want me to fold those into a follow-up commit, or leave them for the next checkpoint?' The referent of 'those' is not recoverable from the pending-decisions record or this session's context. How should this pending decision be resolved?\"=\"Dismiss as unrecoverable\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
