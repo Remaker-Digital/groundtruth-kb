@@ -11,7 +11,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADAPTER_PATH = REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-gate-bash-adapter.py"
 CANONICAL_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
-AUDIT_PATH = REPO_ROOT / ".codex" / "gtkb-hooks" / "last-bridge-audit.json"
 SKIPPED_PATH = REPO_ROOT / ".codex" / "gtkb-hooks" / "last-bridge-audit-skipped.json"
 
 
@@ -122,14 +121,21 @@ def test_adapter_writes_skipped_extraction_diagnostic() -> None:
     assert "unclosed heredoc" in diagnostic["reason"]
 
 
-def test_audit_only_detects_non_compliant_files_without_blocking() -> None:
-    if AUDIT_PATH.exists():
-        AUDIT_PATH.unlink()
+def test_audit_only_detects_non_compliant_files_without_blocking(tmp_path) -> None:
+    audit_path = tmp_path / "last-bridge-audit.json"
     target = REPO_ROOT / "bridge" / "test-audit-non-compliant-001.md"
     target.write_text("NEW\n\n# Missing spec links\n", encoding="utf-8")
     try:
         result = subprocess.run(
-            ["python", str(CANONICAL_HOOK), "--audit-only", "--file-path", "bridge/test-audit-non-compliant-001.md"],
+            [
+                "python",
+                str(CANONICAL_HOOK),
+                "--audit-only",
+                "--file-path",
+                "bridge/test-audit-non-compliant-001.md",
+                "--audit-output",
+                str(audit_path),
+            ],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT),
@@ -140,15 +146,14 @@ def test_audit_only_detects_non_compliant_files_without_blocking() -> None:
         target.unlink(missing_ok=True)
 
     assert result.returncode == 0
-    diagnostic = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+    diagnostic = json.loads(audit_path.read_text(encoding="utf-8"))
     assert diagnostic["preflight_passed"] is False
     assert diagnostic["decision"] == "deny"
     assert "Specification Links" in diagnostic["reason"]
 
 
-def test_audit_only_accepts_compliant_files_without_blocking() -> None:
-    if AUDIT_PATH.exists():
-        AUDIT_PATH.unlink()
+def test_audit_only_accepts_compliant_files_without_blocking(tmp_path) -> None:
+    audit_path = tmp_path / "last-bridge-audit.json"
     target = REPO_ROOT / "bridge" / "test-audit-compliant-002.md"
     target.write_text(
         "GO\n\n"
@@ -159,7 +164,15 @@ def test_audit_only_accepts_compliant_files_without_blocking() -> None:
     )
     try:
         result = subprocess.run(
-            ["python", str(CANONICAL_HOOK), "--audit-only", "--file-path", "bridge/test-audit-compliant-002.md"],
+            [
+                "python",
+                str(CANONICAL_HOOK),
+                "--audit-only",
+                "--file-path",
+                "bridge/test-audit-compliant-002.md",
+                "--audit-output",
+                str(audit_path),
+            ],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT),
@@ -170,6 +183,6 @@ def test_audit_only_accepts_compliant_files_without_blocking() -> None:
         target.unlink(missing_ok=True)
 
     assert result.returncode == 0
-    diagnostic = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+    diagnostic = json.loads(audit_path.read_text(encoding="utf-8"))
     assert diagnostic["preflight_passed"] is True
     assert diagnostic["decision"] == "pass"

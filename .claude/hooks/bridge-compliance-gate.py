@@ -628,8 +628,15 @@ def _deny_reason_for_content(
     return None
 
 
-def _write_audit_result(*, cwd_path: Path, file_path: str, content: str, reason: str | None) -> None:
-    output_path = cwd_path / AUDIT_OUTPUT_RELATIVE_PATH
+def _write_audit_result(
+    *, cwd_path: Path, file_path: str, content: str, reason: str | None, audit_output: str = ""
+) -> None:
+    if audit_output:
+        output_path = Path(audit_output)
+        if not output_path.is_absolute():
+            output_path = cwd_path / output_path
+    else:
+        output_path = cwd_path / AUDIT_OUTPUT_RELATIVE_PATH
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output = {
         "audit_mode": True,
@@ -644,6 +651,11 @@ def _write_audit_result(*, cwd_path: Path, file_path: str, content: str, reason:
 def _audit_only(argv: list[str]) -> int:
     cwd_path = Path.cwd().resolve()
     file_path = ""
+    audit_output = ""
+    if "--audit-output" in argv:
+        idx = argv.index("--audit-output")
+        if idx + 1 < len(argv):
+            audit_output = argv[idx + 1]
     if "--file-path" in argv:
         idx = argv.index("--file-path")
         if idx + 1 < len(argv):
@@ -669,7 +681,13 @@ def _audit_only(argv: list[str]) -> int:
         content=content,
         run_pending_preflight=True,
     )
-    _write_audit_result(cwd_path=cwd_path, file_path=file_path, content=content, reason=reason)
+    _write_audit_result(
+        cwd_path=cwd_path,
+        file_path=file_path,
+        content=content,
+        reason=reason,
+        audit_output=audit_output,
+    )
     print("{}")
     return 0
 
