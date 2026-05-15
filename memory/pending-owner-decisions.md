@@ -13,6 +13,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: 5516604829acbf8b
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0596
+  asked_at: 2026-05-15T06:01:05.897121Z
+  question: "Want me to fold those into a follow-up commit, or leave them for the next checkpoint?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 8a176029bee7c9ac
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 

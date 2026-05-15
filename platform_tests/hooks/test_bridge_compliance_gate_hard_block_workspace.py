@@ -293,10 +293,16 @@ def _pending_preflight_content(*, include_application_spec: bool) -> str:
     return (
         "NEW\n\n"
         "# Implementation Proposal\n\n"
+        # bridge_kind: spec_intake (WI-3315 IP-3) makes this fixture exempt from
+        # BOTH the WI-3314 project-metadata-presence gate AND the WI-3315
+        # WI/project membership gate -- both live inside the
+        # `not _bridge_kind_is_metadata_exempt` branch. The fixture then reaches
+        # the pending applicability-preflight path (the behavior these tests
+        # exist to exercise) without depending on live MemBase membership rows.
+        "bridge_kind: spec_intake\n\n"
         'target_paths: ["applications/Agent_Red/src/app.py"]\n\n'
-        # Project-linkage metadata (WI-3314 / DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-
-        # MANDATORY-001). Required so the metadata gate does not fire before the
-        # preflight behavior these tests intend to exercise.
+        # Placeholder project-linkage metadata; harmless under the bridge_kind
+        # exemption above (retained for a minimal diff vs WI-3314 IP-8).
         "Project Authorization: PAUTH-TEST-PENDING-PREFLIGHT\n"
         "Project: PROJECT-TEST-PENDING-PREFLIGHT\n"
         "Work Item: WI-0000\n\n"

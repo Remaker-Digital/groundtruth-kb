@@ -18,6 +18,9 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-hook-import-latency-chromadb-lazy
+NEW: bridge/gtkb-hook-import-latency-chromadb-lazy-001.md
+
 Document: gtkb-gt-bridge-propose-deterministic-cli
 NO-GO: bridge/gtkb-gt-bridge-propose-deterministic-cli-002.md
 NEW: bridge/gtkb-gt-bridge-propose-deterministic-cli-001.md
@@ -101,15 +104,19 @@ Document: gtkb-early-project-specs-quality-audit
 NEW: bridge/gtkb-early-project-specs-quality-audit-001.md
 
 Document: gtkb-work-list-md-gov-010-path-correction
+NO-GO: bridge/gtkb-work-list-md-gov-010-path-correction-002.md
 NEW: bridge/gtkb-work-list-md-gov-010-path-correction-001.md
 
 Document: gtkb-audit-script-withdrawn-regex-fix
+NO-GO: bridge/gtkb-audit-script-withdrawn-regex-fix-002.md
 NEW: bridge/gtkb-audit-script-withdrawn-regex-fix-001.md
 
 Document: gtkb-isolation-019-program-closeout
+NO-GO: bridge/gtkb-isolation-019-program-closeout-002.md
 NEW: bridge/gtkb-isolation-019-program-closeout-001.md
 
 Document: gtkb-isolation-017-adopter-packaging
+NO-GO: bridge/gtkb-isolation-017-adopter-packaging-002.md
 NEW: bridge/gtkb-isolation-017-adopter-packaging-001.md
 
 Document: gtkb-isolation-015-phase7-root-enforcement
@@ -210,6 +217,7 @@ NO-GO: bridge/gtkb-project-verified-completion-auq-trigger-002.md
 NEW: bridge/gtkb-project-verified-completion-auq-trigger-001.md
 
 Document: gtkb-bridge-compliance-wi-project-membership
+NEW: bridge/gtkb-bridge-compliance-wi-project-membership-009.md
 GO: bridge/gtkb-bridge-compliance-wi-project-membership-008.md
 REVISED: bridge/gtkb-bridge-compliance-wi-project-membership-007.md
 GO: bridge/gtkb-bridge-compliance-wi-project-membership-006.md
@@ -220,6 +228,7 @@ NO-GO: bridge/gtkb-bridge-compliance-wi-project-membership-002.md
 NEW: bridge/gtkb-bridge-compliance-wi-project-membership-001.md
 
 Document: gtkb-bridge-compliance-project-metadata
+NEW: bridge/gtkb-bridge-compliance-project-metadata-013.md
 NO-GO: bridge/gtkb-bridge-compliance-project-metadata-012.md
 NEW: bridge/gtkb-bridge-compliance-project-metadata-011.md
 NO-GO: bridge/gtkb-bridge-compliance-project-metadata-010.md
