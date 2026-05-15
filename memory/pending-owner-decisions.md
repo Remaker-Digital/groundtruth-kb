@@ -7346,6 +7346,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-15T13:16:08.568663Z
   answer: "Answer questions?"
   notes: ""
+- id: DECISION-0611
+  asked_at: 2026-05-15T13:19:14.151971Z
+  question: "WI-3317 is implemented (report filed, awaiting Codex VERIFIED). WI-3316 is GO'd at -006 — the last unimplemented WI of GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001 — but it's a substantial 9-file feature (scanner + Claude/Codex parity hooks + lifecycle service method + 3 test files). The screenshot you shared shows four unrelated NEW bridge threads. What should I do next?"
+  options:
+    - "Implement WI-3316 now"
+    - "Triage the 4 shown threads"
+    - "Wrap up the session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 064f1224423bb136
+  resolved_at: 2026-05-15T13:19:14.151971Z
+  answer: "User has answered your questions: \"WI-3317 is implemented (report filed, awaiting Codex VERIFIED). WI-3316 is GO'd at -006 — the last unimplemented WI of GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001 — but it's a substantial 9-file feature (scanner + Claude/Codex parity hooks + lifecycle service method + 3 test files). The screenshot you shared shows four unrelated NEW bridge threads. What should I do next?\"=\"Wrap up the session\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

@@ -1,6 +1,41 @@
 # Agent Red Memory
 
 ## Current Status
+- **Fresh-session handoff (S352 addendum, 2026-05-15 UTC):**
+  Governance-chain mechanical enforcement closed. Live bridge shows the recent
+  work threads verified: WI-3312/3313/3314/3315 were already verified and
+  committed; WI-3317 `gtkb-impl-start-gate-format-spec-fix` is `VERIFIED` at
+  `bridge/gtkb-impl-start-gate-format-spec-fix-008.md`; WI-3316
+  `gtkb-project-verified-completion-auq-trigger` is `VERIFIED` at
+  `bridge/gtkb-project-verified-completion-auq-trigger-008.md`; WI-3320
+  `gtkb-bridge-compliance-audit-path-isolation` is `VERIFIED` at
+  `bridge/gtkb-bridge-compliance-audit-path-isolation-006.md`; the chromadb
+  hook-latency and reliability fast-lane threads also show `VERIFIED`.
+
+  Owner approved project completion. Deliberation
+  `DELIB-S352-GOVERNANCE-CHAIN-PROJECT-COMPLETION` was recorded, project
+  authorization
+  `PAUTH-GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001-MECHANICAL-ENFORCEMENT-OF-THE-GOVERNANCE-CHAIN`
+  is `completed`, and project `GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001`
+  / "GTKB Governance Chain Mechanical Enforcement" is `retired`.
+
+  Current live bridge scan at wrap: `VERIFIED=160`, `NO-GO=63`, `GO=24`,
+  `NEW=3`, `WITHDRAWN=27`, `ADVISORY=1`. Loyal Opposition-actionable latest
+  `NEW` entries are `gtkb-in-source-provenance-anchors-001-prop`,
+  `gtkb-commit-scope-bundling-detection-001-prop`, and
+  `gtkb-auto-push-investigation-001-prop`. Prime Builder has 87 latest
+  `GO`/`NO-GO` entries; `gtkb-gt-bridge-propose-deterministic-cli` remains
+  `NO-GO` at `bridge/gtkb-gt-bridge-propose-deterministic-cli-002.md`.
+
+  Focused verification rerun during wrap: project completion surface/lifecycle
+  tests 25/25 passed; implementation-start-gate plus bridge-compliance
+  audit-path tests 47/47 passed; targeted `ruff check` passed. Wrap evidence is
+  under `.groundtruth/session/snapshots/S352-20260515/`; hygiene reported 35
+  ERROR / 2238 WARN and consistency reported 2 ERROR / 1903 WARN, matching known
+  snapshot report, old missing isolation-018 bridge-file citation, and
+  historical orphan bridge-file classes. DA harvest apply is still blocked by
+  `GOV-ARTIFACT-APPROVAL-001` without a native formal approval packet.
+
 - **Fresh-session handoff (S352 wrap, 2026-05-14 UTC):**
   S352 was a Codex Loyal Opposition bridge-monitoring and wrap session. Branch
   is `develop`; HEAD at wrap was `d1448d43`. The branch is ahead 2 and the
@@ -375,6 +410,7 @@
 ## Recent Sessions
 Detailed session content lives in git history (commits referenced) and `bridge/*-NNN.md`. Single-line hooks here. For deeper context use `git log --oneline --grep=S<NNN>` or read the cited bridge files.
 
+- S352 addendum: **Governance-chain mechanical enforcement closed and project retired.** Recent bridge work now shows VERIFIED for WI-3316 (`gtkb-project-verified-completion-auq-trigger-008`), WI-3317 (`gtkb-impl-start-gate-format-spec-fix-008`), WI-3320 (`gtkb-bridge-compliance-audit-path-isolation-006`), the chromadb hook-latency thread, and the reliability fast-lane thread. Owner approved completion; `DELIB-S352-GOVERNANCE-CHAIN-PROJECT-COMPLETION` supports completing `PAUTH-GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001-MECHANICAL-ENFORCEMENT-OF-THE-GOVERNANCE-CHAIN`, and `current_projects` now marks `GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001` retired. Live bridge count at wrap: `VERIFIED=160`, `NO-GO=63`, `GO=24`, `NEW=3`, `WITHDRAWN=27`, `ADVISORY=1`; LO queue has 3 NEW items, Prime queue has 87 GO/NO-GO items. Verification rerun: 25/25 project-completion tests, 47/47 implementation-start-gate + bridge-compliance tests, targeted ruff clean. Wrap evidence: `.groundtruth/session/snapshots/S352-20260515/`; DA harvest still blocked by `GOV-ARTIFACT-APPROVAL-001`.
 - S352: **Bridge monitoring wrap with active parallel dispatch and large remaining queue.** Final live scan at `2026-05-14T20:49:11Z`: `VERIFIED=150`, `WITHDRAWN=24`, `GO=17`, `NO-GO=13`, `NEW=10`, `ADVISORY=1`; LO-actionable 10 latest NEW, Prime-actionable 30 latest GO/NO-GO. Concurrent Codex workers produced six observed NO-GO verdict files during wrap. Wrap scanners wrote `.groundtruth/session/snapshots/S352/` with hygiene 33 ERROR / 2482 WARN and consistency 2 ERROR / 1904 WARN. `session_prompts` insertion succeeded for S352 v1. DA harvest blocked by `GOV-ARTIFACT-APPROVAL-001`; commit/push skipped because `develop` is ahead 2 with a broad mixed dirty tree.
 - S350: **Topology-misreport investigation + operating-mode-transaction proposal filed/REVISED-1 GO'd; Slice 4 implementation-gate-hygiene VERIFIED at -007 (parallel-session -006 superseded this session's -005, Codex verified -006).** Owner asked Prime to investigate the startup disclosure's `single_harness` topology report given two installed harnesses with singleton role sets. Root cause: `.claude/session/work-subject.json` stores `topology_mode` as canonical state; `scripts/session_self_initialization.py:4129` reads stored value rather than deriving from live role-map; 2026-05-13 role switch updated `role-assignments.json` but not `work-subject.json`. Discovered `SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001` (approved 2026-05-13) + open P1 orphan `WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001` already on the books. Filed `bridge/gtkb-operating-mode-transaction-001-001.md` (NEW), Codex `NO-GO` at `-002` (F1 hypothetical owner-waiver for deferred next-session-effectiveness; F2 test paths under `tests/**` violating `pyproject.toml:9 testpaths = ["platform_tests", "applications/Agent_Red/tests"]`); filed REVISED-1 at `-003` folding next-session-effectiveness into Slice 1 (new `groundtruth_kb.mode_switch.pending` module + SessionStart application + 6 new spec-derived tests) and relocating all test paths under `platform_tests/**`. Both preflights pass on `-003` (`preflight_passed: true`; 0 missing required; 0 blocking gaps). Picked up Slice 4 (`gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene`) at the `-004` GO via owner AUQ; auth packet `sha256:1a45db13...`; audit revealed IP-1/IP-2/IP-3/IP-5 already landed by a parallel S349 Prime session (working-tree diff +209 lines in `scripts/implementation_authorization.py` + +97 lines in `.claude/hooks/assertion-check.py`, plus `config/governance/assertion-runs-retention.toml`, plus `WI-3295` inserted at 02:42:48Z by parallel session). Added one missing test `test_gate_unchanged_reads_current_json_only` to `platform_tests/scripts/test_implementation_start_gate.py`. **42/42 tests PASS.** Filed post-impl `-005` with full per-IP accounting + transparent parallel-session-coordination disclosure; both preflights pass. Wrap caveats: implementation-start gate fired false-positives on read-only `python -c "...SELECT..."` Bash three times (same friction class as S349 IP-3 follow-on candidates); INDEX has pre-existing defect `gtkb-single-harness-bridge-dispatcher-001.md` missing version suffix that surfaced via gate error; DA harvest/`session_prompts` writes not applied; many S349 parallel-session staged files remain uncommitted in working tree.
 - S349: **Self-diagnostic leak-closure and backlog hygiene bridge cycle continued under active Prime/LO split; Codex LO cleared the live review queue during wrap.** Codex role resolved to Loyal Opposition (harness A), with Claude as Prime Builder (harness B). Bridge scans processed Slice 4 `gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene`: NEW at `-001`, Codex NO-GO at `-002` because the proposed multi-active implementation authorization packet model changed the one-GO'd-proposal session-scope rule without updating the governing rule surface and did not define overlapping-target handling for shared paths such as `groundtruth.db`. During wrap, a fresh implementation report for `gtkb-backlog-hygiene-bundle-s349` appeared at `-015`; Codex verified it at `-016` after applicability and ADR/DCL clause preflights passed and live MemBase checks confirmed `WI-3282` through `WI-3293` latest `change_reason` values map to Findings 1-12 and cite `bridge/gtkb-backlog-hygiene-bundle-s349-013.md`. Final LO scan: no latest `NEW`/`REVISED`; latest counts 140 `VERIFIED`, 20 `GO`, 12 `NO-GO`, 1 `ADVISORY`. Wrap caveats: worktree remains dirty with many Prime-authored/staged S349 changes, scanner report writes and some read-only shell forms were blocked by the implementation-start gate after bridge status drifted, DA harvest/session_prompts writes were not applied, and git commit/push was skipped to avoid bundling unrelated active work.
