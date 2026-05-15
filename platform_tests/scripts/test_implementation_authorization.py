@@ -54,7 +54,15 @@ def _write_index(project_root: Path, blocks: list[str]) -> Path:
     return index_path
 
 
-def _write_proposal(project_root: Path, slug: str, version: int = 1, *, target_paths: list[str] | None = None) -> Path:
+def _write_proposal(
+    project_root: Path,
+    slug: str,
+    version: int = 1,
+    *,
+    target_paths: list[str] | None = None,
+    verification_heading: str = "Verification Plan",
+    verification_body: str = "Fixture verification plan: derived from the linked specs above.",
+) -> Path:
     """Write a minimal-compliant bridge proposal file."""
     if target_paths is None:
         target_paths = ["scripts/dummy.py"]
@@ -70,8 +78,8 @@ def _write_proposal(project_root: Path, slug: str, version: int = 1, *, target_p
         f"- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 — spec linkage.\n\n"
         f"## Requirement Sufficiency\n\n"
         f"Existing requirements sufficient.\n\n"
-        f"## Verification Plan\n\n"
-        f"Fixture verification plan: derived from the linked specs above.\n"
+        f"## {verification_heading}\n\n"
+        f"{verification_body}\n"
     )
     proposal_path.write_text(body, encoding="utf-8")
     return proposal_path
@@ -399,3 +407,86 @@ def test_packet_path_for_bridge_rejects_path_traversal_bridge_id(auth_module, tm
         auth_module.packet_path_for_bridge(tmp_path, "foo/bar")
     with pytest.raises(auth_module.AuthorizationError):
         auth_module.packet_path_for_bridge(tmp_path, "")
+
+
+# ---------------------------------------------------------------------------
+# WI GTKB-IMPL-AUTH-VERIFICATION-HEADING-GATE-ALIGNMENT:
+# has_spec_derived_verification heading-token recognition (bridge thread
+# gtkb-impl-auth-verification-heading-gate-alignment).
+# ---------------------------------------------------------------------------
+
+
+def test_has_spec_derived_verification_accepts_legacy_headings(auth_module):
+    """All four legacy exact headings remain recognized (regression-safe)."""
+    for heading in (
+        "Specification-Derived Verification",
+        "Specification-Derived Verification Plan",
+        "Spec-Derived Test Plan",
+        "Verification Plan",
+    ):
+        markdown = f"## {heading}\n\nDerived from the linked specs.\n"
+        assert auth_module.has_spec_derived_verification(markdown), heading
+
+
+def test_has_spec_derived_verification_accepts_test_plan_spec_to_test_heading(auth_module):
+    """A 'Test Plan (spec-to-test mapping)' heading with command evidence is
+    recognized -- the S351 case the begin gate previously rejected."""
+    markdown = (
+        "## Test Plan (spec-to-test mapping)\n\n"
+        "Run `python -m pytest platform_tests/scripts/test_x.py -q` to verify.\n"
+    )
+    assert auth_module.has_spec_derived_verification(markdown)
+
+
+def test_has_spec_derived_verification_accepts_spec_to_test_mapping_heading(auth_module):
+    """A 'Spec-to-Test Mapping' heading is recognized via the spec-to-test token."""
+    markdown = "## Spec-to-Test Mapping\n\nEach linked spec maps to a test below.\n"
+    assert auth_module.has_spec_derived_verification(markdown)
+
+
+def test_has_spec_derived_verification_rejects_bare_test_plan_without_evidence(auth_module):
+    """A bare 'Test Plan' heading with no test-command evidence is rejected
+    (governance floor preserved)."""
+    markdown = "## Test Plan\n\nWe will think carefully about correctness.\n"
+    assert not auth_module.has_spec_derived_verification(markdown)
+
+
+def test_has_spec_derived_verification_rejects_missing_verification_section(auth_module):
+    """A proposal with no verification section returns False."""
+    markdown = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    assert not auth_module.has_spec_derived_verification(markdown)
+
+
+def test_section_body_exact_match_preserved(auth_module):
+    """section_body keeps exact, first-match, case-insensitive heading semantics
+    after the _iter_sections refactor."""
+    markdown = (
+        "## Verification Plan\n\nfirst body\n\n"
+        "## Other\n\nother body\n\n"
+        "## Verification Plan\n\nsecond body\n"
+    )
+    assert auth_module.section_body(markdown, "Verification Plan") == "first body"
+    assert auth_module.section_body(markdown, "verification plan") == "first body"
+    assert auth_module.section_body(markdown, "Test Plan (spec-to-test mapping)") == ""
+
+
+def test_create_authorization_packet_accepts_test_plan_spec_to_test_heading(auth_module, tmp_path):
+    """Integration: a GO'd proposal whose verification heading is
+    'Test Plan (spec-to-test mapping)' yields a valid authorization packet
+    rather than raising -- reproduces and closes the S351 friction."""
+    slug = "fixture-bridge"
+    _write_proposal(
+        tmp_path,
+        slug,
+        version=1,
+        target_paths=["scripts/dummy.py", ".gtkb-state/**"],
+        verification_heading="Test Plan (spec-to-test mapping)",
+        verification_body="Run `python -m pytest platform_tests/scripts/test_dummy.py -q`.",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(
+        tmp_path,
+        [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
+    )
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    assert packet["bridge_id"] == slug

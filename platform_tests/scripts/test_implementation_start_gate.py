@@ -117,6 +117,15 @@ def _seed_project_authorization(root: Path, *, link_work_item: bool = True, stat
                 "test",
                 "seed work item membership",
             )
+        # WI-3312 spec-linkage gate: an active project authorization must cite
+        # an approved specification. Seed one so this fixture stays compliant.
+        db.insert_spec(
+            id="SPEC-AUTH-SEED",
+            title="Authorized seed specification",
+            status="verified",
+            changed_by="test",
+            change_reason="seed spec for project authorization fixture",
+        )
         db.insert_project_authorization(
             "PROJECT-AUTH",
             "Authorized implementation project",
@@ -126,6 +135,7 @@ def _seed_project_authorization(root: Path, *, link_work_item: bool = True, stat
             "seed project authorization",
             id="PAUTH-AUTH",
             status=status,
+            included_spec_ids=["SPEC-AUTH-SEED"],
         )
     finally:
         db.close()
@@ -200,6 +210,36 @@ def test_project_authorization_metadata_is_carried_in_packet(tmp_path: Path) -> 
     assert auth.load_packet(tmp_path)["project_authorization"]["id"] == "PAUTH-AUTH"
 
 
+def _write_amendment_packet(tmp_path: Path, filename: str, content: str) -> str:
+    """Write a valid owner-approved formal-artifact-approval packet under the
+    test project root and return the cited relative path. Required so a
+    project-authorization spec amendment satisfies the WI-3313 amendment gate
+    (DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001)."""
+    import json
+
+    from groundtruth_kb.governance.approval_packet import content_hash
+
+    packet_dir = tmp_path / ".groundtruth" / "formal-artifact-approvals"
+    packet_dir.mkdir(parents=True, exist_ok=True)
+    packet = {
+        "artifact_type": "design_constraint",
+        "artifact_id": "PAUTH-AUTH",
+        "action": "amend",
+        "source_ref": "owner conversation",
+        "full_content": content,
+        "full_content_sha256": content_hash(content),
+        "approval_mode": "approve",
+        "presented_to_user": True,
+        "transcript_captured": True,
+        "explicit_change_request": "owner authorizes the project-authorization spec amendment",
+        "changed_by": "owner",
+        "change_reason": "owner-approved amendment",
+        "approved_by": "owner",
+    }
+    (packet_dir / filename).write_text(json.dumps(packet), encoding="utf-8")
+    return f".groundtruth/formal-artifact-approvals/{filename}"
+
+
 def test_project_authorization_load_revalidates_current_spec_exclusions(tmp_path: Path) -> None:
     _seed_project_authorization(tmp_path)
     proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
@@ -209,10 +249,19 @@ def test_project_authorization_load_revalidates_current_spec_exclusions(tmp_path
 
     db = KnowledgeDB(tmp_path / "groundtruth.db")
     try:
+        # WI-3313 amendment gate: a spec-set amendment must cite an
+        # owner-approved covering packet in change_reason. Fixture setup only;
+        # the assertion below is unchanged.
+        amendment_packet = _write_amendment_packet(
+            tmp_path,
+            "exclude-gov-spec.json",
+            "Owner-approved amendment of project PROJECT-AUTH authorization "
+            "PAUTH-AUTH excluding spec GOV-FILE-BRIDGE-AUTHORITY-001.",
+        )
         db.update_project_authorization(
             "PAUTH-AUTH",
             "test",
-            "exclude linked governing spec",
+            f"exclude linked governing spec per {amendment_packet}",
             excluded_spec_ids=["GOV-FILE-BRIDGE-AUTHORITY-001"],
         )
     finally:
@@ -474,6 +523,31 @@ def test_gate_blocks_stdout_numbered_redirect_to_file() -> None:
 
 def test_gate_blocks_combined_redirect_to_file() -> None:
     assert gate._is_mutating_command("cmd &> out.txt") is True
+
+
+# WI-3317: MUTATING_COMMAND_RE format-spec false-positive fix.
+# The redirect alternation (?<![:>-])>{1,2}(?![&]) must NOT flag Python
+# format-spec right-alignment (:>) or arrow tokens (->), while still
+# flagging every real shell redirect form.
+
+
+def test_gate_allows_python_format_spec_right_align() -> None:
+    # `:>` is Python format-spec right alignment, not a shell redirect.
+    assert gate._is_mutating_command("python -c \"print(f'{n:>2}')\"") is False
+
+
+def test_gate_allows_python_arrow_token() -> None:
+    # `->` is a Python return-annotation arrow, not a shell redirect.
+    assert gate._is_mutating_command('python -c "def f() -> int: return 1"') is False
+
+
+def test_gate_blocks_append_redirect_to_file() -> None:
+    assert gate._is_mutating_command("cmd >> out.txt") is True
+
+
+def test_gate_blocks_no_space_redirect_to_file() -> None:
+    # A redirect with no space before `>` is still a real file write.
+    assert gate._is_mutating_command("cmd>out.txt") is True
 
 
 # IP-B/F3: sqlite safe-read tests

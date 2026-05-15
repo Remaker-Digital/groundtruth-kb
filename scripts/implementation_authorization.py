@@ -25,6 +25,25 @@ DEFAULT_EXPIRY_MINUTES = 480
 BOOTSTRAP_BRIDGE_IDS = frozenset({"gtkb-implementation-start-authorization-gate"})
 PLACEHOLDER_RE = re.compile(r"\b(?:TBD|TODO|pending|no relevant|not applicable|n/a)\b", re.IGNORECASE)
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+# Heading substrings that mark a section as a spec-derived verification plan.
+# Substring match (not equality) so a heading like "Test Plan (spec-to-test
+# mapping)" is accepted, matching what the bridge clause-preflight already
+# accepts at Codex GO (config/governance/adr-dcl-clauses.toml evidence_pattern
+# for DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001).
+VERIFICATION_HEADING_TOKENS = (
+    "specification-derived verification",
+    "spec-derived verification",
+    "spec-derived test plan",
+    "spec-to-test",
+    "specification-to-test",
+    "verification plan",
+)
+# Test-command / test-file evidence. A heading containing only "test plan"
+# qualifies as a spec-derived verification plan when its body carries this.
+VERIFICATION_TEST_EVIDENCE_RE = re.compile(
+    r"(?i)(?:\bpython -m pytest\b|\bpytest\b|\bruff\b|\bnpm test\b|\bpnpm test\b"
+    r"|\buv run\b|\bmake test\b|\btest_[\w./-]+\.py\b|spec-to-test)"
+)
 TARGET_PATHS_RE = re.compile(
     r"(?:\*\*)?target_paths(?:\*\*)?\s*:(?:\*\*)?\s*(\[[^\n]+\])",
     re.IGNORECASE,
@@ -196,13 +215,19 @@ def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
     raise AuthorizationError(f"No approved proposal file found under latest GO for {entry.bridge_id}")
 
 
-def section_body(markdown: str, heading: str) -> str:
+def _iter_sections(markdown: str):
+    """Yield ``(heading, body)`` for each ``## `` section in the document."""
     matches = list(SECTION_RE.finditer(markdown))
     for index, match in enumerate(matches):
-        if match.group(1).strip().lower() == heading.lower():
-            start = match.end()
-            end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
-            return markdown[start:end].strip()
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
+        yield match.group(1).strip(), markdown[start:end].strip()
+
+
+def section_body(markdown: str, heading: str) -> str:
+    for found_heading, body in _iter_sections(markdown):
+        if found_heading.lower() == heading.lower():
+            return body
     return ""
 
 
@@ -427,13 +452,26 @@ def requirement_sufficiency_state(markdown: str) -> str:
 
 
 def has_spec_derived_verification(markdown: str) -> bool:
-    headings = (
-        "Specification-Derived Verification",
-        "Specification-Derived Verification Plan",
-        "Spec-Derived Test Plan",
-        "Verification Plan",
-    )
-    return any(section_body(markdown, heading) for heading in headings)
+    """Return True when the proposal carries a spec-derived verification plan.
+
+    A ``## `` section qualifies when its body is non-empty AND either its
+    heading contains a verification token (``VERIFICATION_HEADING_TOKENS``) or
+    its heading contains "test plan" and the body carries spec-to-test command
+    evidence. This keeps the implementation-start gate at least as permissive
+    as the GO-time clause-preflight detector for
+    DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 while staying
+    heading-anchored, so a proposal Loyal Opposition can legitimately GO is not
+    then rejected by ``begin`` purely on verification-section heading wording.
+    """
+    for heading, body in _iter_sections(markdown):
+        if not body:
+            continue
+        normalized = heading.lower().replace("–", "-").replace("—", "-")
+        if any(token in normalized for token in VERIFICATION_HEADING_TOKENS):
+            return True
+        if "test plan" in normalized and VERIFICATION_TEST_EVIDENCE_RE.search(body):
+            return True
+    return False
 
 
 def normalize_relative_path(project_root: Path, path_text: str) -> str:

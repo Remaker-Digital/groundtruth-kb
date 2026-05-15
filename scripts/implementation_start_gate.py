@@ -64,7 +64,7 @@ MUTATING_COMMAND_RE = re.compile(
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
     r"apply_patch|git\s+(?:commit|reset|checkout|merge|rebase|tag|push)|"
     r"python\s+.*(?:write_text|open\(.+,\s*['\"]w|sqlite3|insert_|update_|delete_)"
-    r")\b|(^|[^>])>{1,2}($|[^&])",
+    r")\b|(?<![:>-])>{1,2}(?![&])",
     re.IGNORECASE,
 )
 NULL_SINK_REDIRECT_STRIP_RE = re.compile(

@@ -17,6 +17,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import logging
 import re
@@ -36,14 +37,36 @@ if TYPE_CHECKING:
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
 
-# ChromaDB optional dependency (ignore_missing_imports configured in pyproject.toml)
+# ChromaDB optional dependency (ignore_missing_imports configured in pyproject.toml).
+# Availability is resolved cheaply at import time via find_spec, which locates the
+# module spec WITHOUT executing the package (~17ms vs. chromadb's ~6s import chain).
+# The chromadb module itself is imported lazily on first semantic-search use via
+# _load_chromadb(), so `import groundtruth_kb` stays fast for hooks and the CLI.
 try:
-    import chromadb
-
-    HAS_CHROMADB = True
-except ImportError:
-    chromadb = None  # type: ignore[assignment]
+    HAS_CHROMADB = importlib.util.find_spec("chromadb") is not None
+except (ImportError, ValueError):
     HAS_CHROMADB = False
+
+chromadb = None  # type: ignore[assignment]  # populated lazily by _load_chromadb()
+
+
+def _load_chromadb() -> Any | None:
+    """Import and cache the chromadb module on first use.
+
+    Returns the chromadb module, or None when chromadb is unavailable or when the
+    lazy import fails. On lazy ImportError, HAS_CHROMADB is flipped to False so the
+    optional-dependency contract — treat chromadb as unavailable, fall back to
+    SQLite LIKE search — is preserved exactly as in the prior eager-import design.
+    """
+    global chromadb, HAS_CHROMADB
+    if chromadb is None and HAS_CHROMADB:
+        try:
+            import chromadb as _chromadb
+        except ImportError:
+            HAS_CHROMADB = False
+            return None
+        chromadb = _chromadb
+    return chromadb
 
 # Semantic search constants
 SEMANTIC_MAX_DISTANCE = 1.5  # L2 distance threshold for relevance filtering
@@ -5585,7 +5608,10 @@ class KnowledgeDB:
                 chroma_path = self.db_path.parent / ".groundtruth-chroma"
             chroma_path = Path(chroma_path)
             chroma_path.mkdir(parents=True, exist_ok=True)
-            self._chroma_client = chromadb.PersistentClient(path=str(chroma_path))
+            _chromadb = _load_chromadb()
+            if _chromadb is None:
+                return None
+            self._chroma_client = _chromadb.PersistentClient(path=str(chroma_path))
         return self._chroma_client.get_or_create_collection(
             name=_CHROMA_COLLECTION_NAME,
             metadata={"hnsw:space": "l2"},
