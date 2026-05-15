@@ -113,6 +113,7 @@ Document: gtkb-isolation-017-adopter-packaging
 NEW: bridge/gtkb-isolation-017-adopter-packaging-001.md
 
 Document: gtkb-isolation-015-phase7-root-enforcement
+NO-GO: bridge/gtkb-isolation-015-phase7-root-enforcement-002.md
 NEW: bridge/gtkb-isolation-015-phase7-root-enforcement-001.md
 
 Document: gtkb-legacy-gov-wi-cleanup
@@ -209,6 +210,7 @@ NO-GO: bridge/gtkb-project-verified-completion-auq-trigger-002.md
 NEW: bridge/gtkb-project-verified-completion-auq-trigger-001.md
 
 Document: gtkb-bridge-compliance-wi-project-membership
+GO: bridge/gtkb-bridge-compliance-wi-project-membership-008.md
 REVISED: bridge/gtkb-bridge-compliance-wi-project-membership-007.md
 GO: bridge/gtkb-bridge-compliance-wi-project-membership-006.md
 REVISED: bridge/gtkb-bridge-compliance-wi-project-membership-005.md
