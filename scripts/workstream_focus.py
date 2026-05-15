@@ -502,6 +502,20 @@ def save_state(
             "source": source or _infer_source(updated_by),
         }
     )
+    # Slice 1 of gtkb-operating-mode-transaction-001: derive topology_mode
+    # from the live role-map rather than relying on the canonical default.
+    # When derivation fails (missing/unreadable role map), keep the canonical
+    # default so legacy behavior is preserved.
+    try:
+        from groundtruth_kb.mode_switch.derive import topology_from_role_map
+
+        root = project_root if project_root is not None else _project_root_from_env()
+        role_map_path = root / "harness-state" / "role-assignments.json"
+        if role_map_path.exists():
+            role_map = json.loads(role_map_path.read_text(encoding="utf-8"))
+            state["topology_mode"] = topology_from_role_map(role_map)
+    except Exception:  # noqa: BLE001 - fail-soft to canonical default
+        pass
     path = state_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")

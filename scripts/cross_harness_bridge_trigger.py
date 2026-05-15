@@ -912,6 +912,17 @@ def run_trigger(
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
 
+    # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
+    # mode-switch transactions BEFORE recipient resolution so a deferred
+    # role/topology change takes effect for the dispatch target selection
+    # below. Fail-soft per design: failures do not abort the trigger.
+    try:
+        from groundtruth_kb.mode_switch.pending import apply_pending as _apply_pending
+
+        _apply_pending(project_root)
+    except Exception:  # noqa: BLE001 - fail-soft per spec acceptance criterion #6
+        pass
+
     # IP-8 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
     # (Codex GO at -006): trigger is inert in single-harness topology per
     # SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 Coexistence clause. The

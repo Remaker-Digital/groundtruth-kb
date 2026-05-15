@@ -294,6 +294,12 @@ def _pending_preflight_content(*, include_application_spec: bool) -> str:
         "NEW\n\n"
         "# Implementation Proposal\n\n"
         'target_paths: ["applications/Agent_Red/src/app.py"]\n\n'
+        # Project-linkage metadata (WI-3314 / DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-
+        # MANDATORY-001). Required so the metadata gate does not fire before the
+        # preflight behavior these tests intend to exercise.
+        "Project Authorization: PAUTH-TEST-PENDING-PREFLIGHT\n"
+        "Project: PROJECT-TEST-PENDING-PREFLIGHT\n"
+        "Work Item: WI-0000\n\n"
         "This proposal touches Agent Red application isolation.\n\n"
         "## Specification Links\n\n" + "\n".join(spec_lines) + "\n\n"
         "## Specification-Derived Verification\n\n"

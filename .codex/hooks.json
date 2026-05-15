@@ -207,6 +207,12 @@
             "command": "python E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --dispatch-now --project-root E:\\GT-KB --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --max-items 999",
             "statusMessage": "Single-harness bridge dispatch",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.claude\\hooks\\advisory-router-scan.py",
+            "statusMessage": "Advisory-to-backlog router scan",
+            "timeout": 10
           }
         ]
       }

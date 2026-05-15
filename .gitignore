@@ -329,6 +329,8 @@ legal/contracts/signed/
 
 # Knowledge DB exports (local only)
 tools/knowledge-db/knowledge-export-*.json
+# Root-level KB exports are large transient artifacts (~1.6 GB observed S350).
+/knowledge-export-*.json
 
 # Codex auto-generated dependencies (local only)
 .codex_pydeps/

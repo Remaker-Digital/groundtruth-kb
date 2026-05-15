@@ -15,18 +15,25 @@
       "source_sha256": "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
     },
     {
+      "adapter_relative_path": ".codex/skills/assertion-triage/SKILL.md",
+      "canonical_name": "assertion-triage",
+      "capability_id": "skill.assertion-triage",
+      "source_relative_path": ".claude/skills/assertion-triage/SKILL.md",
+      "source_sha256": "8c5952e056cee721c923e2d797587d7691071ca931bf209b9e5d0bbddd47d8ba"
+    },
+    {
       "adapter_relative_path": ".codex/skills/bridge/SKILL.md",
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "d446eaba9fb6974446f4d39b38aa248c9d559efe38077552cafc8f1e39f238c9"
+      "source_sha256": "561406bf00e2acdd143d48cfa0c1401687d5dcb6c82a0cc37526f87093347d73"
     },
     {
       "adapter_relative_path": ".codex/skills/bridge-propose/SKILL.md",
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
-      "source_sha256": "a59bd08404a142cb74fdd05e2bff8726570d8dd1dbf204a35f05d403a384ad36"
+      "source_sha256": "f0438c6479fb2e1e625ebf12fbe04e64f13c864528cc7e1d62b4dde4e45bc901"
     },
     {
       "adapter_relative_path": ".codex/skills/check-deliberations/SKILL.md",
@@ -188,6 +195,13 @@
       "capability_id": "skill.structural-hygiene-review",
       "source_relative_path": ".claude/skills/structural-hygiene-review/SKILL.md",
       "source_sha256": "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/gtkb-benchmarks/SKILL.md",
+      "canonical_name": "gtkb-benchmarks",
+      "capability_id": "skill.gtkb-benchmarks",
+      "source_relative_path": ".claude/skills/gtkb-benchmarks/SKILL.md",
+      "source_sha256": "95940f9fecb54eee364558ad2c15b6f34395a1e2a0d8d6e760b90e80c62926be"
     }
   ],
   "generated_by": "scripts/generate_codex_skill_adapters.py",

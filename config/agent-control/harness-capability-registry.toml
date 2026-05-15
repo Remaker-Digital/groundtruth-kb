@@ -40,6 +40,24 @@ status = "adapter"
 adapter_source = ".claude/skills/arch-audit/SKILL.md"
 source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
 [[capabilities]]
+id = "skill.assertion-triage"
+kind = "skill"
+canonical_name = "assertion-triage"
+canonical_purpose = "Categorize currently-failing assertions into genuine_drift/chronic_noise/flaky/healthy and route chronic_noise candidates through one-at-a-time owner AUQ."
+canonical_source = ".claude/skills/assertion-triage/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/assertion-triage/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/assertion-triage/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/assertion-triage/SKILL.md"
+source_sha256 = "8c5952e056cee721c923e2d797587d7691071ca931bf209b9e5d0bbddd47d8ba"
+[[capabilities]]
 id = "skill.bridge"
 kind = "skill"
 canonical_name = "gtkb-bridge"
@@ -56,7 +74,7 @@ status = "native"
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "d446eaba9fb6974446f4d39b38aa248c9d559efe38077552cafc8f1e39f238c9"
+source_sha256 = "13d20fd64ed053ccba316c777313f630386d549973a3cd7f9a6a0501b717bee0"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -489,3 +507,38 @@ surface = ".codex/skills/structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/structural-hygiene-review/SKILL.md"
 source_sha256 = "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"
+[[capabilities]]
+id = "hook.advisory-router-scan"
+kind = "hook"
+canonical_name = "advisory-router-scan"
+canonical_purpose = "Stop-event hook that invokes the advisory-to-backlog router scan."
+canonical_source = ".claude/hooks/advisory-router-scan.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+notes = "Both harnesses invoke the canonical script directly; no adapter file needed. Registered in .claude/settings.json (Claude) and .codex/hooks.json (Codex)."
+
+[capabilities.claude]
+surface = ".claude/hooks/advisory-router-scan.py"
+status = "native"
+
+[capabilities.codex]
+surface = ".claude/hooks/advisory-router-scan.py"
+status = "native"
+[[capabilities]]
+id = "skill.gtkb-benchmarks"
+kind = "skill"
+canonical_name = "gtkb-benchmarks"
+canonical_purpose = "Run GT-KB read-only measurement benchmarks (assertion signal/noise, advisory latency, deliberation recall, linkage heat map, recall coverage, tool identification). Outputs JSON plus markdown summary."
+canonical_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/gtkb-benchmarks/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/gtkb-benchmarks/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
+source_sha256 = "95940f9fecb54eee364558ad2c15b6f34395a1e2a0d8d6e760b90e80c62926be"

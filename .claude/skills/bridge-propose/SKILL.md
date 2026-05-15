@@ -18,6 +18,19 @@ PII excluded), writes ``bridge/<topic>-001.md``, and inserts a
 ``Document: <topic>`` + ``NEW: bridge/<topic>-001.md`` entry at the
 top of ``bridge/INDEX.md``.
 
+**Project-linkage metadata (per ``DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001``)**:
+the proposal body for an implementation-targeting NEW/REVISED proposal MUST
+include three machine-readable header lines near the top::
+
+    Project Authorization: PAUTH-<authorization-id>
+    Project: <PROJECT-ID>
+    Work Item: <WI-NNNN | GTKB-* | WORKLIST-*>
+
+``bridge-compliance-gate.py`` hard-blocks the Write when any line is absent.
+Non-implementation proposals self-declare exemption with a ``bridge_kind:``
+header in ``{spec_intake, governance_review, loyal_opposition_advisory}``;
+verdict files (GO/NO-GO/VERIFIED/WITHDRAWN) are exempt by status.
+
 Two options are offered on a credential hit:
 
 - **Abort** — no file is written, no INDEX entry is added.

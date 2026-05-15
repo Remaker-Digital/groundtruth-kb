@@ -16,8 +16,8 @@ Exit:   Always 0
 """
 
 import json
-import sys
 import os
+import sys
 from pathlib import Path
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
@@ -474,20 +474,45 @@ def _read_handoff_prompt(db, consume: bool = True) -> list[str]:
         return [f"Session handoff read error: {e}"]
 
 
+def _read_retention_cap(project_dir: Path) -> tuple[int, list[str]]:
+    """Resolve the per-spec assertion_runs retention cap.
+
+    Reads `config/governance/assertion-runs-retention.toml` (per Slice 4 IP-3).
+    Default is 50 so SPEC-1662's chronic-noise classification threshold is
+    reachable. Returns `(cap, log_lines)` where log_lines surfaces fallback
+    diagnostics when the config is missing or malformed.
+    """
+    config_path = project_dir / "config" / "governance" / "assertion-runs-retention.toml"
+    if not config_path.is_file():
+        return 50, []
+    try:
+        import tomllib
+        data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return 50, [f"assertion-runs-retention config fallback to default 50: {exc}"]
+    cap = data.get("default_runs_per_spec", 50)
+    if not isinstance(cap, int) or cap <= 0:
+        return 50, ["assertion-runs-retention default_runs_per_spec invalid; fallback to 50"]
+    return cap, []
+
+
 def _prune_assertion_runs(db) -> list[str]:
     """Prune old assertion_runs to keep DB size manageable.
 
-    Keeps only the latest 5 runs per spec_id. Each session generates ~1,874
-    assertion rows; without pruning, the table grows unboundedly (~229K+ rows,
-    ~30MB+ of the 92MB DB). Keeping 5 runs per spec preserves enough history
-    for trend analysis while reducing storage ~97%.
+    Reads the retention cap from `config/governance/assertion-runs-retention.toml`
+    (default 50, the SPEC-1662 chronic-noise threshold). Each session generates
+    ~1,874 assertion rows; without pruning, the table grows unboundedly. Keeping
+    the configured cap per spec_id preserves enough history for trend analysis
+    plus the chronic-noise classification window per SPEC-1662 (GOV-18).
     """
+    cap, log_lines = _read_retention_cap(PROJECT_DIR)
     try:
         conn = db._get_conn()
         before = conn.execute("SELECT COUNT(*) FROM assertion_runs").fetchone()[0]
 
-        # Delete all but the latest 5 runs per spec
-        conn.execute("""
+        # Delete all but the latest `cap` runs per spec
+        conn.execute(
+            """
             DELETE FROM assertion_runs
             WHERE rowid NOT IN (
                 SELECT rowid FROM (
@@ -495,18 +520,68 @@ def _prune_assertion_runs(db) -> list[str]:
                         PARTITION BY spec_id ORDER BY run_at DESC
                     ) AS rn
                     FROM assertion_runs
-                ) WHERE rn <= 5
+                ) WHERE rn <= ?
             )
-        """)
+            """,
+            (cap,),
+        )
         conn.commit()
 
         after = conn.execute("SELECT COUNT(*) FROM assertion_runs").fetchone()[0]
         pruned = before - after
+        lines = list(log_lines)
         if pruned > 0:
-            return [f"Assertion runs pruned: {before} -> {after} ({pruned} old runs removed)"]
-        return []
+            lines.append(f"Assertion runs pruned: {before} -> {after} ({pruned} old runs removed; cap={cap})")
+        return lines
     except Exception as e:
         return [f"Assertion pruning error: {e}"]
+
+
+def _check_assertion_triage_advisory() -> list[str]:
+    """Surface latest assertion-triage categorization counts as advisory.
+
+    Reads `.gtkb-state/assertion-triage/<run_id>/summary.json` for the most
+    recent categorization run produced by `scripts/assertion_categorize.py`
+    (Slice 3 IP-1) and emits a non-blocking summary of per-category counts.
+
+    The check is read-only: no KB writes, no AUQ trigger, no state mutation.
+    Returns an empty list when no run has occurred yet so first-session use
+    surfaces no surprises.
+    """
+    triage_dir = PROJECT_DIR / ".gtkb-state" / "assertion-triage"
+    if not triage_dir.is_dir():
+        return []
+    run_dirs = sorted(
+        [d for d in triage_dir.iterdir() if d.is_dir() and d.name != "categories"],
+        reverse=True,
+    )
+    if not run_dirs:
+        return []
+    summary_path = run_dirs[0] / "summary.json"
+    if not summary_path.is_file():
+        return []
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    counts = summary.get("counts_by_category", {}) or {}
+    examined = summary.get("total_assertions_examined", 0)
+    failing = summary.get("currently_failing", 0)
+    run_id = summary.get("run_id", run_dirs[0].name)
+    lines = [
+        "",
+        f"Assertion triage advisory (run {run_id}; {examined} examined, {failing} currently failing):",
+        f"  genuine_drift:  {counts.get('genuine_drift', 0)}",
+        f"  chronic_noise:  {counts.get('chronic_noise', 0)}",
+        f"  flaky:          {counts.get('flaky', 0)}",
+        f"  healthy:        {counts.get('healthy', 0)}",
+        f"  uncategorized:  {counts.get('uncategorized', 0)}",
+    ]
+    if counts.get("genuine_drift", 0) > 0:
+        lines.append("  ^ genuine_drift entries are highest-priority for review.")
+    if counts.get("chronic_noise", 0) > 0:
+        lines.append("  ^ review chronic_noise candidates via `python scripts/assertion_retirement_workflow.py review-candidates`")
+    return lines
 
 
 def main():
@@ -539,6 +614,7 @@ def main():
                 lines.extend(_check_dcl_compliance(db))
                 lines.extend(_untested_spec_report(db))
                 lines.extend(_quality_dashboard(db))
+                lines.extend(_check_assertion_triage_advisory())
                 lines.extend(_read_handoff_prompt(db, consume=False))
             else:
                 lines = _run_assertions(db)
@@ -547,6 +623,7 @@ def main():
                 lines.extend(_check_dcl_compliance(db))
                 lines.extend(_untested_spec_report(db))
                 lines.extend(_quality_dashboard(db))
+                lines.extend(_check_assertion_triage_advisory())
                 lines.extend(_prune_assertion_runs(db))
                 lines.extend(_read_handoff_prompt(db, consume=True))
         finally:

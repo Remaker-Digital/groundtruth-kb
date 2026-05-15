@@ -1,0 +1,138 @@
+---
+name: assertion-triage
+description: "Categorize currently-failing GT-KB assertions into genuine_drift / chronic_noise / flaky / healthy, then surface chronic_noise retirement candidates with one-at-a-time owner AUQ."
+argument-hint: "[categorize | review-candidates | ask <assertion_id> | apply-decision <assertion_id> --decision <retire|accept|keep> --packet <path>]"
+allowed-tools: Bash, Read
+license: "Proprietary - Remaker Digital"
+compatibility:
+  - claude-code >= 1.0
+metadata:
+  project: groundtruth-kb
+  category: governance
+  governance: GOV-18
+---
+
+# Assertion Signal/Noise Triage
+
+Categorize currently-failing GT-KB assertions and route chronic-noise candidates
+through a one-at-a-time owner decision. Read-only inference over the
+`assertion_runs` table; the only authoritative mutation is spec retirement,
+which is gated by an explicit AskUserQuestion approval packet.
+
+This skill operationalizes `SPEC-1662 (GOV-18: Assertion Quality Standard -
+meaningfulness over coverage)` per `bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-007.md`
+(Codex GO at `-008`).
+
+## Categories
+
+| Category | Definition |
+|----------|------------|
+| `genuine_drift` | Latest FAIL after prior PASS streak; transition within drift window. Highest priority. |
+| `chronic_noise` | All recent runs FAIL. Retirement-or-accept candidate per GOV-15. |
+| `flaky` | Recent runs include both PASS and FAIL with at least one transition. Flag for repair. |
+| `healthy` | Stable PASS, or expected FAIL for a `specified`-status spec. |
+| `uncategorized` | Latest FAIL but data insufficient for drift/chronic/flaky classification. |
+
+## Subcommands
+
+### `categorize`
+
+Run the read-only categorization pass and write per-assertion JSON records to
+`.gtkb-state/assertion-triage/categories/` plus a per-run `summary.json` and
+`summary.md` under `.gtkb-state/assertion-triage/<run_id>/`.
+
+```bash
+python scripts/assertion_categorize.py
+```
+
+Options: `--chronic-threshold N`, `--flaky-window N`, `--drift-prior-pass N`,
+`--drift-window-days N`, `--dry-run`, `--format text|json`.
+
+Default `--chronic-threshold=5` matches the current `assertion_runs` retention
+cap in `.claude/hooks/assertion-check.py`. When the retention cap is widened
+(Slice 4 of the umbrella), raise the threshold via the flag.
+
+### `review-candidates`
+
+List `chronic_noise` retirement candidates from the latest categorization run.
+
+```bash
+python scripts/assertion_retirement_workflow.py review-candidates
+```
+
+Read-only. Renders a markdown report identifying each candidate's spec, status,
+description, and rationale.
+
+### `ask <assertion_id>`
+
+Emit an AskUserQuestion envelope for one chronic-noise assertion. The owner
+answers the AUQ inline; the harness writes the resulting packet to disk.
+
+```bash
+python scripts/assertion_retirement_workflow.py ask <assertion_id>
+```
+
+The envelope offers three mutually-exclusive options:
+
+- **Retire the assertion** — promote spec to status `retired`.
+- **Accept the failure as expected** — record acceptance; spec status unchanged.
+- **Keep and schedule repair** — flag for test-quality repair; no retirement.
+
+One assertion per call per `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
+§127-130 (one-at-a-time owner-action protocol).
+
+### `apply-decision <assertion_id> --decision <retire|accept|keep> --packet <path>`
+
+Apply an AUQ-approved decision against the canonical spec. The packet must:
+
+- have `tool == "AskUserQuestion"`
+- have `approved_by == "owner"`
+- have `assertion_id` matching the CLI argument
+- have `decision` matching the CLI flag
+- include `approved_at`
+
+`decision == "retire"` inserts a new `specifications` row with
+`status="retired"` and `changed_by="assertion-retirement-workflow@1.0"`.
+`accept` and `keep` write only the decision record to
+`.gtkb-state/assertion-triage/decisions/<assertion_id>.json`; the spec is
+not mutated.
+
+```bash
+python scripts/assertion_retirement_workflow.py apply-decision <assertion_id> \
+    --decision retire \
+    --packet .gtkb-state/assertion-triage/packets/<assertion_id>.json
+```
+
+## SessionStart Advisory Surface
+
+`.claude/hooks/assertion-check.py` reads the latest run summary and surfaces
+the per-category counts at SessionStart as `additionalContext`. The advisory
+is non-blocking: no AUQ trigger, no KB write. First-session use surfaces no
+output when no run has occurred yet.
+
+## When To Run
+
+- After any session whose work touched implementation paths governed by
+  protected behavior or DCL assertions.
+- Before promoting any spec to `verified` (per GOV-18: meaningfulness over
+  coverage).
+- Periodically as a hygiene pass during release-readiness phases.
+
+## Outputs (Non-Authoritative)
+
+- `.gtkb-state/assertion-triage/<run_id>/summary.json` — per-run rollup.
+- `.gtkb-state/assertion-triage/<run_id>/summary.md` — human-readable summary.
+- `.gtkb-state/assertion-triage/categories/<assertion_id>.json` — per-assertion record.
+- `.gtkb-state/assertion-triage/decisions/<assertion_id>.json` — applied decision record.
+
+All outputs are derived from MemBase `assertion_runs` and `specifications` rows;
+they are non-authoritative and may be regenerated by re-running `categorize`.
+
+## Governance Pointers
+
+- `SPEC-1662 (GOV-18: Assertion Quality Standard)` — meaningfulness over coverage.
+- `GOV-15 TEST-FIX-GATE` — no fixing failed tests without owner approval; retire is the structured path.
+- `DCL-CONCEPT-ON-CONTACT-001` — load-bearing concepts have canonical glossary entries; see `.claude/rules/canonical-terminology.md`.
+- `bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-008.md` — GO under which this skill ships.
+
+Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

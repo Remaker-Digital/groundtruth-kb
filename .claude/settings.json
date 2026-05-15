@@ -147,6 +147,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/single_harness_bridge_automation.py\" --ensure --dispatch-now --project-root \"$CLAUDE_PROJECT_DIR\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\" --max-items 999",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/advisory-router-scan.py\"",
+            "timeout": 10
           }
         ]
       }

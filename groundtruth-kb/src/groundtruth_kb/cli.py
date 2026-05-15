@@ -3791,3 +3791,122 @@ def check_adrs_cmd(ctx: click.Context, profile: str, json_output: bool) -> None:
                 click.echo(f"    unanswered sections: {', '.join(entry.unanswered_sections)}")
 
     ctx.exit(0 if report.all_answered() else 1)
+
+
+# ---------------------------------------------------------------------------
+# `gt mode` subcommands (Operating-Mode Transaction Component, Slice 1)
+# Per SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001 and bridge thread
+# gtkb-operating-mode-transaction-001 (Codex GO@017 on REVISED-7 at -016).
+# ---------------------------------------------------------------------------
+
+
+@main.group("mode")
+def mode_group() -> None:
+    """Operating-mode transaction component (Slice 1)."""
+
+
+@mode_group.command("set-role")
+@click.option("--harness", "harness", required=True, help="Harness id or name")
+@click.option(
+    "--role",
+    "role",
+    required=True,
+    type=click.Choice(["prime-builder", "loyal-opposition"]),
+    help="Role to assign",
+)
+@click.option(
+    "--reason", "reason", default="manual role-switch via gt mode set-role"
+)
+@click.option(
+    "--defer-to-next-session",
+    "defer",
+    is_flag=True,
+    help="Queue for SessionStart application instead of mid-session apply",
+)
+@click.pass_context
+def mode_set_role(
+    ctx: click.Context, harness: str, role: str, reason: str, defer: bool
+) -> None:
+    """Apply (or defer) a role-switch transaction."""
+    import json as _json
+    from pathlib import Path
+
+    from groundtruth_kb.mode_switch.pending import defer_role_switch
+    from groundtruth_kb.mode_switch.transaction import (
+        TransactionValidationError,
+        apply_role_switch,
+    )
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root)
+    if defer:
+        path = defer_role_switch(root, harness, role, change_reason=reason)
+        click.echo(_json.dumps({"deferred": True, "pending_path": str(path)}, indent=2))
+        return
+    try:
+        result = apply_role_switch(root, harness, role, change_reason=reason)
+    except TransactionValidationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        _json.dumps(
+            {
+                "applied": True,
+                "harness_id": result.harness_id,
+                "new_role_set": list(result.new_role_set),
+                "previous_role_set": list(result.previous_role_set),
+                "derived_topology": result.derived_topology,
+                "audit_record_path": str(result.audit_record_path),
+                "applied_at": result.applied_at.isoformat().replace("+00:00", "Z"),
+            },
+            indent=2,
+        )
+    )
+
+
+@mode_group.command("list-pending")
+@click.pass_context
+def mode_list_pending(ctx: click.Context) -> None:
+    """List pending mode-switch transactions."""
+    import json as _json
+    from pathlib import Path
+
+    from groundtruth_kb.mode_switch.pending import list_pending
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root)
+    pending = list_pending(root)
+    payload = [
+        {
+            "path": str(entry.path),
+            "harness_id_or_name": entry.harness_id_or_name,
+            "role": entry.role,
+            "change_reason": entry.change_reason,
+            "scheduled_at": entry.scheduled_at.isoformat().replace("+00:00", "Z"),
+        }
+        for entry in pending
+    ]
+    click.echo(_json.dumps(payload, indent=2))
+
+
+@mode_group.command("apply-pending")
+@click.pass_context
+def mode_apply_pending(ctx: click.Context) -> None:
+    """Drain the pending queue."""
+    import json as _json
+    from pathlib import Path
+
+    from groundtruth_kb.mode_switch.pending import apply_pending
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root)
+    results = apply_pending(root)
+    payload = [
+        {
+            "pending_path": str(r.pending_path),
+            "applied": r.applied,
+            "error": r.error,
+            "applied_path": str(r.applied_path) if r.applied_path else None,
+        }
+        for r in results
+    ]
+    click.echo(_json.dumps(payload, indent=2))

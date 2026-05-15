@@ -427,6 +427,19 @@ def main() -> int:
     stderr_path = OUT_DIR / "last-session-start.err"
     request_started_at = _now_iso()
     _purge_previous_diagnostics(stdout_path, stderr_path)
+    # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
+    # mode-switch transactions BEFORE role resolution, so a next-session-
+    # effective mode/role switch takes effect for the dispatch decision
+    # below. Fail-soft per design: failures are logged but do not abort
+    # SessionStart.
+    try:
+        from pathlib import Path as _Path
+
+        from groundtruth_kb.mode_switch.pending import apply_pending as _apply_pending
+
+        _apply_pending(_Path(__file__).resolve().parents[2])
+    except Exception:  # noqa: BLE001 - fail-soft per spec acceptance criterion #6
+        pass
     # IP-4: receiver-side StartupDecision dispatch per bridge -005.
     decision, _reason = _bridge_dispatch_keyword_check()
     if decision == StartupDecision.STRICT_DROP:

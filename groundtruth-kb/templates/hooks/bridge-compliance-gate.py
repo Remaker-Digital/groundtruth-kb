@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -83,6 +84,45 @@ OWNER_APPROVAL_MARKER_RES = (
         r"\b(?:AUQ|AskUserQuestion)\b[^.]{0,200}\b(?:answer|approval|decision|directive|authorize|authorization)\b",
         re.IGNORECASE,
     ),
+)
+
+# Project-linkage metadata gate (DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001).
+# WI-3314: metadata-presence enabling slice. Implementation bridge proposals
+# (NEW/REVISED status, not bridge_kind-exempt) must carry three machine-readable
+# metadata lines so a proposal self-documents its project provenance.
+# CLAUSE-PROJECT-METADATA-PRESENT is enforced here; CLAUSE-VERDICT-FILES-EXCLUDED
+# is satisfied by the NEW/REVISED-only status gate; CLAUSE-NON-IMPLEMENTATION-EXEMPT
+# is satisfied by the bridge_kind exempt set. CLAUSE-PROJECT-AUTH-LIVE-CHECK
+# (live MemBase authorization lookup) is deferred to WI-3315.
+PROJECT_AUTHORIZATION_LINE_RE = re.compile(
+    r"^Project Authorization:\s*PAUTH-[A-Z0-9-]+\s*$", re.MULTILINE
+)
+PROJECT_LINE_RE = re.compile(r"^Project:\s*[A-Z0-9-]+\s*$", re.MULTILINE)
+WORK_ITEM_LINE_RE = re.compile(
+    r"^Work Item:\s*(?:WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
+)
+BRIDGE_KIND_LINE_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
+BRIDGE_KIND_METADATA_EXEMPT = frozenset(
+    {"spec_intake", "governance_review", "loyal_opposition_advisory"}
+)
+PROJECT_METADATA_STATUSES = frozenset({"NEW", "REVISED"})
+
+# WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
+# CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-
+# MANDATORY-001/CLAUSE-PROJECT-AUTH-LIVE-CHECK).
+# WI-3315: when a NEW/REVISED implementation proposal carries all three
+# project-linkage metadata lines, the cited Work Item must have an active
+# membership in the cited Project, and the cited Project Authorization must be
+# active, unexpired, project-matched, and must include (not exclude) the Work
+# Item. The check fails open on any DB-access error so the gate never blocks on
+# infrastructure failure. Verdict files (GO/NO-GO/VERIFIED) never reach this
+# check because it lives inside the NEW/REVISED metadata branch.
+PROJECT_AUTHORIZATION_VALUE_RE = re.compile(
+    r"^Project Authorization:\s*(PAUTH-[A-Z0-9-]+)\s*$", re.MULTILINE
+)
+PROJECT_VALUE_RE = re.compile(r"^Project:\s*([A-Z0-9-]+)\s*$", re.MULTILINE)
+WORK_ITEM_VALUE_RE = re.compile(
+    r"^Work Item:\s*(WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
 )
 
 ADVISORY_REPORT_HEADER_FIELDS = ("bridge_kind", "Document", "Version", "Author", "Date")
@@ -208,6 +248,121 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
         return False
     nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
+
+
+def _bridge_kind_is_metadata_exempt(content: str) -> bool:
+    """Return True when the proposal's bridge_kind header exempts it from the
+    project-metadata gate (CLAUSE-NON-IMPLEMENTATION-EXEMPT).
+
+    Non-implementation proposal classes (spec_intake, governance_review,
+    loyal_opposition_advisory) self-declare via the bridge_kind header and are
+    not subject to project-linkage metadata.
+    """
+    match = BRIDGE_KIND_LINE_RE.search(content)
+    if not match:
+        return False
+    return match.group(1).strip().lower() in BRIDGE_KIND_METADATA_EXEMPT
+
+
+def _project_metadata_gaps(content: str) -> list[str]:
+    """Return the list of missing project-linkage metadata lines.
+
+    Empty list means all three lines are present
+    (CLAUSE-PROJECT-METADATA-PRESENT satisfied).
+    """
+    gaps: list[str] = []
+    if not PROJECT_AUTHORIZATION_LINE_RE.search(content):
+        gaps.append("Project Authorization:")
+    if not PROJECT_LINE_RE.search(content):
+        gaps.append("Project:")
+    if not WORK_ITEM_LINE_RE.search(content):
+        gaps.append("Work Item:")
+    return gaps
+
+
+def _extract_project_metadata(content: str) -> tuple[str | None, str | None, str | None]:
+    """Return (authorization_id, project_id, work_item_id) captured from the
+    three project-linkage metadata lines, or None per field when absent."""
+    auth = PROJECT_AUTHORIZATION_VALUE_RE.search(content)
+    proj = PROJECT_VALUE_RE.search(content)
+    wi = WORK_ITEM_VALUE_RE.search(content)
+    return (
+        auth.group(1) if auth else None,
+        proj.group(1) if proj else None,
+        wi.group(1) if wi else None,
+    )
+
+
+def _parse_json_id_list(raw: object) -> list[str]:
+    """Parse a JSON-encoded list-of-strings column; tolerate None/empty/garbage."""
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if isinstance(parsed, list):
+        return [str(x) for x in parsed]
+    return []
+
+
+def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
+    """Return a specific failed-condition token when the cited Work Item /
+    Project / Project Authorization fails the live MemBase membership +
+    authorization check, or None when all conditions pass.
+
+    Fails open: missing DB or any sqlite/OS error returns None (with a stderr
+    warning) so the gate never blocks on infrastructure failure. The check only
+    runs when all three metadata lines are present (the metadata-presence gate
+    handles absence). Condition tokens, in evaluation order:
+    wi-not-found-in-project, wi-membership-inactive, authorization-not-found,
+    authorization-inactive, authorization-expired, wi-excluded-from-authorization,
+    wi-not-included-by-authorization.
+    """
+    authorization_id, project_id, work_item_id = _extract_project_metadata(content)
+    if not (authorization_id and project_id and work_item_id):
+        return None
+    db_path = cwd_path / "groundtruth.db"
+    if not db_path.is_file():
+        return None
+    conn: sqlite3.Connection | None = None
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+        conn.row_factory = sqlite3.Row
+        membership = conn.execute(
+            "SELECT status FROM current_project_work_item_memberships "
+            "WHERE work_item_id = ? AND project_id = ?",
+            (work_item_id, project_id),
+        ).fetchone()
+        if membership is None:
+            return "wi-not-found-in-project"
+        if membership["status"] != "active":
+            return "wi-membership-inactive"
+        auth = conn.execute(
+            "SELECT project_id, status, "
+            "(expires_at IS NOT NULL AND expires_at <= datetime('now')) AS is_expired, "
+            "included_work_item_ids, excluded_work_item_ids "
+            "FROM current_project_authorizations WHERE id = ?",
+            (authorization_id,),
+        ).fetchone()
+        if auth is None or auth["project_id"] != project_id:
+            return "authorization-not-found"
+        if auth["status"] != "active":
+            return "authorization-inactive"
+        if auth["is_expired"]:
+            return "authorization-expired"
+        if work_item_id in _parse_json_id_list(auth["excluded_work_item_ids"]):
+            return "wi-excluded-from-authorization"
+        included = _parse_json_id_list(auth["included_work_item_ids"])
+        if included and work_item_id not in included:
+            return "wi-not-included-by-authorization"
+    except (sqlite3.Error, OSError) as exc:
+        print(f"[Governance] WI-project membership check warning: {exc}", file=sys.stderr)
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+    return None
 
 
 def _advisory_report_template_gaps(content: str) -> list[str]:
@@ -425,6 +580,32 @@ def _deny_reason_for_content(
                 "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
                 "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)"
             )
+        if first_line in PROJECT_METADATA_STATUSES and not _bridge_kind_is_metadata_exempt(content):
+            metadata_gaps = _project_metadata_gaps(content)
+            if metadata_gaps:
+                return (
+                    "[Governance] Implementation bridge proposals must include "
+                    "project-linkage metadata lines: missing "
+                    f"{', '.join(metadata_gaps)}. Add the absent line(s), or set "
+                    "bridge_kind: spec_intake|governance_review|loyal_opposition_advisory "
+                    "for a non-implementation proposal. "
+                    "(Hard-block per DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
+                    "CLAUSE-PROJECT-METADATA-PRESENT.)"
+                )
+            membership_gap = _wi_project_membership_gap(content, cwd_path)
+            if membership_gap:
+                authorization_id, project_id, work_item_id = _extract_project_metadata(content)
+                return (
+                    "[Governance] Bridge proposal fails the live work-item/project "
+                    f"membership check: {membership_gap}. Cited WI={work_item_id}, "
+                    f"Project={project_id}, Project Authorization={authorization_id}. "
+                    "The cited metadata must resolve to an active project membership and "
+                    "an active, unexpired, including authorization in MemBase. "
+                    "(Hard-block per DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/"
+                    "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
+                    "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
+                    "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
+                )
         if run_pending_preflight and first_line in PENDING_PREFLIGHT_STATUSES:
             bridge_id = _extract_bridge_id_from_path(file_path)
             if bridge_id:

@@ -4124,9 +4124,30 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
             context=f"{subject_label} release readiness",
         )
 
-    workstream = model.get("workstream_focus") or {}
-    role_slot = str(workstream.get("role_slot") or "shared")
-    topology_mode = str(workstream.get("topology_mode") or "single_harness")
+    # Render-time canonical derivation per gtkb-startup-payload-canonical-state-drift -006 F1.
+    # Always pass through canonical helpers (including for missing or malformed role-map state)
+    # so fail-closed semantics (multi_harness / shared) survive every failure mode. The earlier
+    # implementation's literal single_harness/shared defaults were the bug F1 of -006 cited.
+    role_slot = "shared"
+    topology_mode = "multi_harness"
+    role_map: dict[str, Any] = {}
+    try:
+        from groundtruth_kb.mode_switch.derive import (
+            role_slot_from_active_harness,
+            topology_from_role_map,
+        )
+
+        role_map_path = _PROJECT_ROOT_FOR_IMPORTS / "harness-state" / "role-assignments.json"
+        if role_map_path.exists():
+            try:
+                role_map = json.loads(role_map_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                role_map = {}  # malformed/unreadable -> empty -> canonical helper fail-closed
+        topology_mode = topology_from_role_map(role_map)
+        active_harness_id = model.get("role", {}).get("harness_id")
+        role_slot = role_slot_from_active_harness(role_map, active_harness_id)
+    except Exception:  # noqa: BLE001 - ImportError or other unexpected; defaults already set
+        pass
     return "\n".join(
         [
             f"- {subject_label} release blockers: {release.get('blocker_count', metrics['regression'].get('release_blocker_count'))}",
@@ -6510,6 +6531,16 @@ def main(argv: list[str] | None = None) -> int:
             f"e.g., 'E:\\\\GT-KB' (escaped backslash) or 'E:/GT-KB' (forward slashes)."
         )
     project_root = args.project_root.resolve()
+    # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
+    # mode-switch transactions BEFORE topology derivation so a deferred
+    # role/topology change takes effect for this session's reported state.
+    # Fail-soft per design: failures do not abort startup.
+    try:
+        from groundtruth_kb.mode_switch.pending import apply_pending as _apply_pending
+
+        _apply_pending(project_root)
+    except Exception:  # noqa: BLE001 - fail-soft per spec acceptance criterion #6
+        pass
     if args.user_preferences_path is not None:
         # Per bridge/harness-state-preferences-path-cli-2026-04-28-002.md Codex
         # GO Candidate B: bridge the CLI arg into the existing

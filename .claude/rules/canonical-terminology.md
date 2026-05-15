@@ -1345,6 +1345,113 @@ enforced through normal Prime Builder spec-first discipline at code-touch
 time. The terminology-layer mirror (`DCL-CONCEPT-ON-CONTACT-001`) is
 staged across Phase 3 (Stage A) and Phase 6 (Stages B and C).
 
+### assertion category
+
+**Definition:** One of four classifications produced by `scripts/assertion_categorize.py` for currently-failing assertions: `genuine_drift`, `chronic_noise`, `flaky`, `healthy`. Categorization is deterministic inference over `assertion_runs` history; outputs are read-only at `.gtkb-state/assertion-triage/categories/<assertion_id>.json`.
+
+**Not to be confused with:** assertion (the GT-KB machine-verifiable check primitive itself).
+
+**Source:** S349 self-diagnostic; `bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-007.md` (Codex GO at -008); SPEC-1662 (GOV-18).
+
+**Implementation pointer:** `scripts/assertion_categorize.py`; `scripts/assertion_retirement_workflow.py`; `.claude/skills/assertion-triage/SKILL.md`.
+
+### genuine_drift
+
+**Definition:** Assertion category indicating: latest run FAIL, prior PASS streak (default >=2 consecutive PASS runs), transition within configurable window (default 7 days). Drift detection per SPEC-1662 (GOV-18). Highest-priority assertion-triage category.
+
+**Not to be confused with:** chronic_noise (all recent runs FAIL) or flaky (transitions in both directions).
+
+**Source:** S349 self-diagnostic; `scripts/assertion_categorize.py` `_categorize()` function.
+
+**Implementation pointer:** `_categorize()` applying `drift_prior_pass` and `drift_window_days` thresholds.
+
+### chronic_noise
+
+**Definition:** Assertion category indicating: all available recent runs FAIL, count meets configurable threshold (default 5; the SPEC-default 50 becomes reachable once the `assertion_runs` retention cap is widened). Candidate for retirement-or-accept owner decision per GOV-15 (test fix gate).
+
+**Not to be confused with:** genuine_drift (recently transitioned from PASS) or flaky (mixed PASS/FAIL).
+
+**Source:** S349 self-diagnostic; SPEC-1662 (GOV-18); `scripts/assertion_retirement_workflow.py` review-candidates / ask / apply-decision flow.
+
+**Implementation pointer:** `scripts/assertion_categorize.py` `_categorize()`; `scripts/assertion_retirement_workflow.py` (one-at-a-time AUQ retirement path).
+
+### flaky
+
+**Definition:** Assertion category indicating: recent runs window includes both PASS and FAIL with at least one transition. Flag for test-quality repair, NOT for retirement.
+
+**Not to be confused with:** chronic_noise (all FAIL, retirement candidate) or genuine_drift (clear FAIL after PASS streak).
+
+**Source:** S349 self-diagnostic; `scripts/assertion_categorize.py` `_categorize()` function.
+
+**Implementation pointer:** `_categorize()` lines computing transitions and PASS/FAIL counts within `flaky_window`.
+
+
+### advisory-router
+
+**Definition:** A source-read-only, MemBase-mutating Python service that scans
+`independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md` and bridge
+`ADVISORY` entries, and creates one `work_items` row per unhandled advisory under
+`GOV-STANDING-BACKLOG-001` authority. Service contract: idempotent on rerun, never
+modifies source advisory files, uses `origin='hygiene'` and
+`source_spec_id='GOV-STANDING-BACKLOG-001'`.
+
+**Canonical alias:** advisory backlog router.
+
+**Not to be confused with:** the broader peer-solution-advisory-loop procedure.
+
+**Source:** S349 self-diagnostic investigation (2026-05-13); `bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-009.md` (Codex GO at -010).
+
+**Implementation pointer:** `scripts/advisory_backlog_router.py`; Stop-event surface at `.claude/hooks/advisory-router-scan.py` registered in `.claude/settings.json` and `.codex/hooks.json`.
+
+### benchmark
+
+**Definition:** A read-only, deterministic GT-KB measurement script that computes one or more metrics over project artifacts (MemBase rows, bridge files, advisory reports, assertion run history) and emits structured output (JSON + markdown summary) to `.gtkb-state/benchmarks/<run_id>/`. Each benchmark is a standalone module exposing a `run(window_start, window_end, project_root) -> BenchmarkResult` entry point; results are idempotent for fixed inputs. Distinct from MemBase mutation: benchmarks observe state and write only to runtime evidence directories, never to canonical tables.
+
+**Canonical alias:** measurement script; metric collector.
+
+**Not to be confused with:** test (PASS/FAIL primitive against a specification); assertion (machine-verifiable check attached to a spec); doctor check (health verification with WARN/FAIL severity).
+
+**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` (Codex GO at -010); `SPEC-1662` (GOV-18 Assertion Quality Standard); `INSIGHTS-2026-05-10-13-26-GTKB-SELF-MEASUREMENT-SYSTEM.md`.
+
+**Implementation pointer:** `scripts/benchmarks/*.py` modules; `scripts/benchmarks/cli.py` for `run` / `report` / `compare` subcommands; output convention `.gtkb-state/benchmarks/<run_id>/`.
+
+### linkage heat map
+
+**Definition:** A 5x5 matrix benchmark output that scores cross-artifact reference rates between five GT-KB artifact classes (specifications, tests, work_items, deliberations, bridge threads). Each cell records the count of from-class entries that cite to-class entries within a configured time window. Used to detect under-linkage (e.g., specifications without test coverage citations) and over-coupling (e.g., work_items with excessive cross-class fanout).
+
+**Canonical alias:** cross-artifact linkage matrix.
+
+**Not to be confused with:** dependency graph (directional, edge-typed); spec-to-test mapping (one-to-many per spec, not a class-level summary).
+
+**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` IP-2 (Benchmark 1); `INSIGHTS-2026-05-10-13-26-GTKB-SELF-MEASUREMENT-SYSTEM.md`.
+
+**Implementation pointer:** `scripts/benchmarks/linkage_heatmap.py`; output JSON written to `.gtkb-state/benchmarks/<run_id>/linkage_heatmap.json`.
+
+### advisory latency
+
+**Definition:** A benchmark output that measures the elapsed time between Loyal Opposition advisory creation (INSIGHTS-*.md file ctime in `CODEX-INSIGHT-DROPBOX/` or bridge `ADVISORY` entry filing) and Prime Builder action on the advisory (conversion proposal filing, rejection deliberation, or owner-decision capture). Expressed as a per-advisory duration plus aggregate dimensions (median, p90, count by classification state). Used to detect advisory backlog accumulation and slow-path advisory handling.
+
+**Canonical alias:** advisory-to-action latency; advisory turnaround time.
+
+**Not to be confused with:** dispatch latency (cross-harness trigger spawn timing); review latency (NEW/REVISED to GO/NO-GO duration).
+
+**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` IP-2 (Benchmark 5); `.claude/rules/peer-solution-advisory-loop.md` (the advisory-handling procedure measured).
+
+**Implementation pointer:** `scripts/benchmarks/advisory_latency.py`; output JSON written to `.gtkb-state/benchmarks/<run_id>/advisory_latency.json`.
+
+### metric snapshot
+
+**Definition:** The atomic output unit produced by a single benchmark run. A snapshot is a `BenchmarkResult` dataclass instance carrying: `run_id`, `benchmark_id`, `window_start`, `window_end`, `value`, `dimensions` (dict of named axes), `source_commit` (git HEAD at run time), `source_query` (the parameterized query used), and `generated_at` (UTC ISO timestamp). Multiple snapshots from one benchmark run are written together as JSON to `.gtkb-state/benchmarks/<run_id>/<benchmark_id>.json` with a markdown summary at `<run_id>/<benchmark_id>.md`.
+
+**Canonical alias:** benchmark result; measurement snapshot.
+
+**Not to be confused with:** session snapshot (point-in-time KB summary used for handoff); backlog snapshot (the `backlog_snapshots` MemBase table); assertion run record (single PASS/FAIL captured in `assertion_runs`).
+
+**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` IP-1 (shared common module); `groundtruth_kb.benchmarks.common` dataclass definition.
+
+**Implementation pointer:** `scripts/benchmarks/common.py` `BenchmarkResult` dataclass; `write_run_outputs(run_id, results)` helper that emits JSON + markdown pairs.
+
+
 ---
 
 ## Alias / Canonical Disposition

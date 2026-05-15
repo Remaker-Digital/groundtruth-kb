@@ -142,8 +142,37 @@ def _validate_packet(packet_path: Path) -> dict[str, Any]:
     return packet
 
 
+def _validate_formal_packet(packet_path: Path) -> dict[str, Any]:
+    """Validate a formal-artifact approval packet via the shared schema validator.
+
+    Delegates schema/hash/expiry validation to
+    ``groundtruth_kb.governance.approval_packet.validate_packet`` and additionally
+    enforces ``presented_to_user=True`` and ``transcript_captured=True``.
+
+    Returns the parsed packet on success; raises ``SystemExit`` otherwise.
+    """
+    if not packet_path.is_file():
+        raise SystemExit(f"Formal-approval packet file not found: {packet_path}")
+    try:
+        packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"Formal-approval packet is not valid JSON: {e}") from e
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(project_root / "groundtruth-kb" / "src"))
+    from groundtruth_kb.governance.approval_packet import validate_packet
+    result = validate_packet(packet)
+    if not result.is_valid:
+        raise SystemExit("Formal-approval packet invalid: " + "; ".join(result.errors))
+    if packet.get("presented_to_user") is not True:
+        raise SystemExit("Formal-approval packet requires presented_to_user=true")
+    if packet.get("transcript_captured") is not True:
+        raise SystemExit("Formal-approval packet requires transcript_captured=true")
+    return packet
+
+
 def apply_decision(project_root: Path, triage_dir: Path, assertion_id: str,
-                   decision: str, packet_path: Path) -> dict[str, Any]:
+                   decision: str, packet_path: Path,
+                   formal_packet_path: Path | None = None) -> dict[str, Any]:
     if decision not in VALID_DECISIONS:
         raise SystemExit(f"Invalid decision: {decision!r}")
     packet = _validate_packet(packet_path)
@@ -155,11 +184,16 @@ def apply_decision(project_root: Path, triage_dir: Path, assertion_id: str,
     target = next((r for r in records if r["assertion_id"] == assertion_id), None)
     if target is None:
         raise SystemExit(f"assertion_id not found: {assertion_id}")
+    spec_update_result = None
     if decision == "retire":
-        raise SystemExit(
-            "Refusing retire decision: governed spec retirement requires the "
-            "follow-on bridge gtkb-governed-spec-retirement-001 to land first. "
-            "Use `accept` or `keep` for this assertion, or wait for the follow-on bridge."
+        if formal_packet_path is None:
+            raise SystemExit(
+                "retire decision requires --formal-approval-packet pointing at a "
+                "formal-artifact approval packet matching the spec's artifact_type"
+            )
+        formal_packet = _validate_formal_packet(formal_packet_path)
+        spec_update_result = _retire_spec(
+            project_root, target["spec_id"], assertion_id, packet, formal_packet
         )
     decisions_dir = triage_dir / "decisions"
     decisions_dir.mkdir(parents=True, exist_ok=True)
@@ -169,14 +203,91 @@ def apply_decision(project_root: Path, triage_dir: Path, assertion_id: str,
         "spec_id": target["spec_id"],
         "decision": decision,
         "packet_path": str(packet_path),
+        "formal_packet_path": str(formal_packet_path) if formal_packet_path else None,
         "applied_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "category_at_decision": target.get("category"),
         "description": target["description"],
-        "spec_update_result": None,
+        "spec_update_result": spec_update_result,
     }
     decision_path.write_text(json.dumps(decision_record, indent=2, sort_keys=True), encoding="utf-8")
     return {"decision_path": str(decision_path), "decision": decision,
-            "assertion_id": assertion_id, "spec_update_result": None}
+            "assertion_id": assertion_id, "spec_update_result": spec_update_result}
+
+
+def _retire_spec(project_root: Path, spec_id: str, assertion_id: str,
+                 auq_packet: dict[str, Any], formal_packet: dict[str, Any]) -> dict[str, Any]:
+    """Retire a spec via KnowledgeDB.update_spec, gated by tightly-bound formal packet.
+
+    Tight binding (per REVISED-2 F1 fix at bridge/gtkb-governed-spec-retirement-005.md):
+    - formal_packet["artifact_id"] == spec_id
+    - formal_packet["action"] == "retire"
+    - formal_packet["full_content"] matches the canonical transition marker
+      f"spec_id={spec_id};from_status={current_status};to_status=retired;current_version={current_version}"
+    - formal_packet["artifact_type"] == current spec's "type" field
+    """
+    sys.path.insert(0, str(project_root / "tools" / "knowledge-db"))
+    from db import KnowledgeDB
+
+    db = KnowledgeDB(str(project_root / "groundtruth.db"))
+    try:
+        current = db.get_spec(spec_id)
+        if not current:
+            raise SystemExit(f"Spec {spec_id} not found")
+        if current["status"] == "retired":
+            raise SystemExit(f"Spec {spec_id} is already retired")
+
+        if formal_packet.get("artifact_id") != spec_id:
+            raise SystemExit(
+                f"Formal-artifact packet artifact_id mismatch: packet says "
+                f"{formal_packet.get('artifact_id')!r} but retirement target is {spec_id!r}"
+            )
+
+        if formal_packet.get("action") != "retire":
+            raise SystemExit(
+                f"Formal-artifact packet action mismatch: packet says "
+                f"{formal_packet.get('action')!r}, but governed retirement requires action='retire'"
+            )
+
+        expected_marker = (
+            f"spec_id={spec_id};"
+            f"from_status={current['status']};"
+            f"to_status=retired;"
+            f"current_version={current['version']}"
+        )
+        full_content = formal_packet.get("full_content", "")
+        if not (full_content == expected_marker or full_content.startswith(expected_marker + "\n")):
+            raise SystemExit(
+                f"Formal-artifact packet full_content does not match expected transition marker. "
+                f"Expected: {expected_marker!r}. Got prefix: {full_content[:120]!r}"
+            )
+
+        expected_artifact_type = current["type"]
+        if formal_packet.get("artifact_type") != expected_artifact_type:
+            raise SystemExit(
+                f"Formal-artifact packet artifact_type mismatch: packet says "
+                f"{formal_packet.get('artifact_type')!r} but spec {spec_id} is type "
+                f"{expected_artifact_type!r}"
+            )
+
+        new_row = db.update_spec(
+            id=spec_id,
+            changed_by="assertion-retirement-workflow@2.0",
+            change_reason=(
+                f"Retired via assertion_retirement_workflow.py for assertion {assertion_id} "
+                f"(chronic_noise category, owner AUQ approved {auq_packet.get('approved_at', '?')}, "
+                f"formal-artifact approval packet sha256:{str(formal_packet.get('full_content_sha256', '?'))[:12]}... "
+                f"at {formal_packet.get('source_ref', '?')})"
+            ),
+            status="retired",
+        )
+        return {
+            "spec_id": spec_id,
+            "previous_version": current["version"],
+            "new_version": new_row["version"],
+            "new_status": "retired",
+        }
+    finally:
+        db.close()
 
 
 def main() -> int:
@@ -191,7 +302,8 @@ def main() -> int:
     sub_apply = sub.add_parser("apply-decision")
     sub_apply.add_argument("assertion_id")
     sub_apply.add_argument("--decision", choices=sorted(VALID_DECISIONS), required=True)
-    sub_apply.add_argument("--packet", required=True)
+    sub_apply.add_argument("--packet", required=True, help="AUQ owner-decision packet path")
+    sub_apply.add_argument("--formal-approval-packet", help="Formal-artifact approval packet; required for retire")
     args = parser.parse_args()
     project_root = _resolve_project_root(args.project_root)
     triage_dir = (Path(args.triage_dir).resolve() if args.triage_dir
@@ -205,9 +317,12 @@ def main() -> int:
         print(json.dumps(envelope, indent=2, sort_keys=True))
         return 0 if "error" not in envelope else 1
     if args.mode == "apply-decision":
+        formal_path = (Path(args.formal_approval_packet).resolve()
+                       if args.formal_approval_packet else None)
         result = apply_decision(project_root=project_root, triage_dir=triage_dir,
                                 assertion_id=args.assertion_id, decision=args.decision,
-                                packet_path=Path(args.packet).resolve())
+                                packet_path=Path(args.packet).resolve(),
+                                formal_packet_path=formal_path)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     return 1

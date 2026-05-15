@@ -166,6 +166,11 @@ def _is_single_harness_topology_applicable(project_root: Path) -> tuple[bool, st
     harness ID whose role-set contains BOTH ``prime-builder`` AND
     ``loyal-opposition`` (multi-element set).
 
+    Per Slice 1 of ``gtkb-operating-mode-transaction-001``, the applicability
+    decision delegates to ``groundtruth_kb.mode_switch.derive.topology_from_role_map``
+    so the dispatcher, startup, and ``workstream_focus.save_state`` all
+    compute byte-identical results.
+
     Fail-closed: unreadable role-map -> not applicable; the dispatcher
     no-ops rather than guessing the topology.
     """
@@ -174,19 +179,23 @@ def _is_single_harness_topology_applicable(project_root: Path) -> tuple[bool, st
         role_map = trigger._read_role_assignments(project_root)
     except ValueError:
         return (False, None)
+
+    try:
+        from groundtruth_kb.mode_switch.derive import (
+            SINGLE_HARNESS,
+            topology_from_role_map,
+        )
+    except ImportError:
+        # Fail-closed fallback if the package is unavailable for any reason.
+        return (False, None)
+
+    if topology_from_role_map(role_map) != SINGLE_HARNESS:
+        return (False, None)
     harnesses = role_map.get("harnesses", {})
     if not isinstance(harnesses, dict) or len(harnesses) != 1:
         return (False, None)
-    ((harness_id, record),) = harnesses.items()
-    if not isinstance(record, dict):
-        return (False, None)
-    raw_role = record.get("role")
-    if not isinstance(raw_role, list):
-        return (False, None)
-    role_set = {str(r).strip().lower() for r in raw_role if isinstance(r, str)}
-    if "prime-builder" in role_set and "loyal-opposition" in role_set:
-        return (True, str(harness_id))
-    return (False, None)
+    ((harness_id, _record),) = harnesses.items()
+    return (True, str(harness_id))
 
 
 # ---------------------------------------------------------------------------

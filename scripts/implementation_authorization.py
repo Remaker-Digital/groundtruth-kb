@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_PACKET_RELATIVE_PATH = Path(".gtkb-state/implementation-authorizations/current.json")
+BY_BRIDGE_DIRECTORY_RELATIVE_PATH = Path(".gtkb-state/implementation-authorizations/by-bridge")
 DEFAULT_EXPIRY_MINUTES = 480
 BOOTSTRAP_BRIDGE_IDS = frozenset({"gtkb-implementation-start-authorization-gate"})
 PLACEHOLDER_RE = re.compile(r"\b(?:TBD|TODO|pending|no relevant|not applicable|n/a)\b", re.IGNORECASE)
@@ -81,6 +82,18 @@ def packet_path(project_root: Path) -> Path:
     return project_root / DEFAULT_PACKET_RELATIVE_PATH
 
 
+def packet_path_for_bridge(project_root: Path, bridge_id: str) -> Path:
+    """Return the named-cache packet path for `bridge_id`.
+
+    Per-bridge packets live at `.gtkb-state/implementation-authorizations/by-bridge/<bridge-id>.json`
+    and survive overwrites of the `current.json` active pointer.
+    """
+    safe_id = bridge_id.strip()
+    if not safe_id or "/" in safe_id or "\\" in safe_id or safe_id in {".", ".."}:
+        raise AuthorizationError(f"Invalid bridge_id for named packet path: {bridge_id!r}")
+    return project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH / f"{safe_id}.json"
+
+
 def groundtruth_db_path(project_root: Path) -> Path:
     config_path = project_root / "groundtruth.toml"
     if config_path.is_file():
@@ -90,6 +103,21 @@ def groundtruth_db_path(project_root: Path) -> Path:
             db_path = Path(db_value)
             return db_path if db_path.is_absolute() else project_root / db_path
     return project_root / "groundtruth.db"
+
+
+def _filename_matches_doc(path: str, doc_id: str) -> bool:
+    """Return True iff path is bridge/<doc_id>.md or bridge/<doc_id>-NNN.md.
+
+    Accepts both the v1 form (no version suffix; e.g. bridge/foo.md) and the
+    v2+ form (zero-padded version suffix; e.g. bridge/foo-022.md). Boundary
+    based matching avoids the disambiguation problem when a doc_id itself
+    ends in -NNN (e.g. gtkb-single-harness-bridge-dispatcher-001).
+    """
+    prefix = f"bridge/{doc_id}"
+    if not path.startswith(prefix):
+        return False
+    suffix = path[len(prefix):]
+    return suffix == ".md" or re.match(r"^-\d{3,}\.md$", suffix) is not None
 
 
 def parse_bridge_index(project_root: Path) -> dict[str, BridgeEntry]:
@@ -109,13 +137,48 @@ def parse_bridge_index(project_root: Path) -> dict[str, BridgeEntry]:
             continue
         match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/.+\.md)$", line)
         if current_id and match:
-            current_versions.append((match.group(1), match.group(2)))
+            status, path = match.group(1), match.group(2)
+            if not _filename_matches_doc(path, current_id):
+                # Misattributed status line: silently skip in parse_bridge_index.
+                # Strict per-bridge consistency is enforced by bridge_entry()
+                # for the specific queried bridge_id, so unrelated malformed
+                # entries elsewhere in the index do not globally block the gate.
+                continue
+            current_versions.append((status, path))
     if current_id is not None and current_versions:
         entries[current_id] = BridgeEntry(current_id, current_versions)
     return entries
 
 
+def _validate_bridge_index_for(project_root: Path, bridge_id: str) -> None:
+    """Strict per-bridge consistency check: raise if any status line under
+    bridge_id's Document section has a filename that does not match bridge_id
+    via _filename_matches_doc(). This is the gate's fail-closed enforcement
+    point for the specific queried bridge.
+    """
+    index_path = project_root / "bridge" / "INDEX.md"
+    if not index_path.is_file():
+        raise AuthorizationError("bridge/INDEX.md not found")
+    in_target = False
+    for raw_line in index_path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if line.startswith("Document: "):
+            doc_id = line.removeprefix("Document: ").strip()
+            in_target = doc_id == bridge_id
+            continue
+        if in_target:
+            match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/.+\.md)$", line)
+            if match:
+                path = match.group(2)
+                if not _filename_matches_doc(path, bridge_id):
+                    raise AuthorizationError(
+                        f"Bridge INDEX status line filename does not match enclosing Document: "
+                        f"{line!r} under Document: {bridge_id!r}; refusing to authorize"
+                    )
+
+
 def bridge_entry(project_root: Path, bridge_id: str) -> BridgeEntry:
+    _validate_bridge_index_for(project_root, bridge_id)
     entries = parse_bridge_index(project_root)
     entry = entries.get(bridge_id)
     if entry is None:
@@ -402,19 +465,48 @@ def create_authorization_packet(
         raise AuthorizationError("Approved proposal or GO file is missing on disk")
 
     proposal = proposal_path.read_text(encoding="utf-8-sig")
-    spec_links = extract_spec_links(proposal)
-    target_paths = extract_target_paths(proposal)
-    project_authorization = extract_and_validate_project_authorization(project_root, proposal, spec_links)
+
+    # Accumulate all format-check failures in a single pass so authors see every
+    # issue at once instead of discovering them serially. Per owner directive
+    # 2026-05-14 S350 "When you find a problem, fix it" addressing the
+    # deterministic-services-principle friction: fail-fast was consuming session
+    # budget across repeated bridge revisions where each attempt revealed one
+    # more format defect.
+    errors: list[str] = []
+    spec_links: list[str] = []
+    target_paths: list[str] = []
+    project_authorization: dict[str, Any] | None = None
+
+    try:
+        spec_links = extract_spec_links(proposal)
+    except AuthorizationError as exc:
+        errors.append(str(exc))
+
+    try:
+        target_paths = extract_target_paths(proposal)
+    except AuthorizationError as exc:
+        errors.append(str(exc))
+
+    try:
+        project_authorization = extract_and_validate_project_authorization(
+            project_root, proposal, spec_links
+        )
+    except AuthorizationError as exc:
+        errors.append(str(exc))
+
     if not has_spec_derived_verification(proposal):
-        raise AuthorizationError("Approved proposal is missing a spec-derived verification plan")
+        errors.append("Approved proposal is missing a spec-derived verification plan")
 
     sufficiency = requirement_sufficiency_state(proposal)
     if sufficiency == "gap":
-        raise AuthorizationError(
+        errors.append(
             "Approved proposal says new or revised requirements are required before implementation"
         )
-    if sufficiency == "missing" and bridge_id not in BOOTSTRAP_BRIDGE_IDS:
-        raise AuthorizationError("Approved proposal is missing ## Requirement Sufficiency")
+    elif sufficiency == "missing" and bridge_id not in BOOTSTRAP_BRIDGE_IDS:
+        errors.append("Approved proposal is missing ## Requirement Sufficiency")
+
+    if errors:
+        raise AuthorizationError("; ".join(errors))
 
     created_at = now_utc()
     packet = {
@@ -442,25 +534,76 @@ def write_packet(project_root: Path, packet: dict[str, Any]) -> Path:
     return path
 
 
-def load_packet(project_root: Path) -> dict[str, Any]:
-    path = packet_path(project_root)
-    if not path.is_file():
-        raise AuthorizationError(
-            "Implementation authorization packet is missing; run implementation_authorization.py begin"
-        )
-    try:
-        packet = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise AuthorizationError("Implementation authorization packet is corrupt JSON") from exc
+def write_named_packet(project_root: Path, packet: dict[str, Any], bridge_id: str) -> Path:
+    """Persist `packet` to the by-bridge named cache for `bridge_id`.
+
+    Companion to `write_packet()` (which writes the active pointer at
+    `current.json`). The named cache at
+    `.gtkb-state/implementation-authorizations/by-bridge/<bridge_id>.json`
+    survives subsequent `begin --bridge-id Y` operations so an earlier
+    bridge's packet can be recovered via `activate --bridge-id X`.
+    """
+    path = packet_path_for_bridge(project_root, bridge_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
+    """Validate packet hash, expiry, bridge latest-status, GO-file drift, and
+    optional project-authorization drift. Raises AuthorizationError on any
+    failure. Shared by `load_packet()` (active pointer) and `load_named_packet()`
+    (by-bridge named cache).
+    """
     if packet_hash(packet) != packet.get("packet_hash"):
         raise AuthorizationError("Implementation authorization packet hash mismatch")
     if parse_iso(str(packet["expires_at"])) < now_utc():
         raise AuthorizationError("Implementation authorization packet has expired")
+
     entry = bridge_entry(project_root, str(packet["bridge_id"]))
-    if entry.latest_status != "GO":
-        raise AuthorizationError(f"Bridge latest status drifted to {entry.latest_status}; latest GO required")
-    if entry.latest_path != packet.get("go_file"):
-        raise AuthorizationError("Bridge GO file drifted since authorization packet creation")
+    go_file = packet.get("go_file")
+
+    found_go = False
+    statuses_after_go: list[str] = []
+
+    for status, path in entry.versions:
+        if path == go_file:
+            if status == "GO":
+                found_go = True
+                break
+            raise AuthorizationError(
+                f"Bridge GO file status changed: {go_file} is now {status}"
+            )
+        statuses_after_go.append(status)
+
+    if not found_go:
+        raise AuthorizationError(f"Bridge GO file not found in chain: {go_file}")
+
+    if any(status == "REVISED" for status in statuses_after_go):
+        raise AuthorizationError(
+            f"Bridge GO at {go_file} superseded by REVISED proposal in chain; "
+            f"re-issue the implementation-authorization packet from the new GO."
+        )
+    if any(status == "GO" for status in statuses_after_go):
+        raise AuthorizationError(
+            f"Newer GO exists in bridge chain after {go_file}; "
+            f"re-issue the implementation-authorization packet from the new GO."
+        )
+    if statuses_after_go:
+        latest_status = statuses_after_go[0]
+        if latest_status == "NEW":
+            raise AuthorizationError(
+                f"Post-implementation report at {entry.latest_path} is awaiting "
+                f"Loyal Opposition review; additional mutations during review "
+                f"would invalidate the report snapshot. Wait for VERIFIED or "
+                f"NO-GO before resuming work."
+            )
+        if latest_status == "VERIFIED":
+            raise AuthorizationError(
+                f"Bridge thread is VERIFIED (terminal at {entry.latest_path}); "
+                f"the implementation phase for this proposal is closed. File a "
+                f"new bridge proposal for further work on this surface."
+            )
     project_authorization = packet.get("project_authorization")
     if isinstance(project_authorization, dict):
         authorization_id = str(project_authorization.get("id") or "")
@@ -476,7 +619,98 @@ def load_packet(project_root: Path) -> dict[str, Any]:
         )
         if current["project_id"] != project_authorization.get("project_id"):
             raise AuthorizationError("Project authorization project_id drifted since packet creation")
+
+
+def load_packet(project_root: Path) -> dict[str, Any]:
+    path = packet_path(project_root)
+    if not path.is_file():
+        raise AuthorizationError(
+            "Implementation authorization packet is missing; run implementation_authorization.py begin"
+        )
+    try:
+        packet = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise AuthorizationError("Implementation authorization packet is corrupt JSON") from exc
+    _validate_packet(project_root, packet)
     return packet
+
+
+def load_named_packet(project_root: Path, bridge_id: str) -> dict[str, Any]:
+    """Load and validate the named-cache packet for `bridge_id` from
+    `.gtkb-state/implementation-authorizations/by-bridge/<bridge_id>.json`.
+    Validates the same invariants as `load_packet()` (hash, expiry, drift).
+    """
+    path = packet_path_for_bridge(project_root, bridge_id)
+    if not path.is_file():
+        raise AuthorizationError(
+            f"Named packet for bridge {bridge_id!r} not found; "
+            f"run implementation_authorization.py begin --bridge-id {bridge_id}"
+        )
+    try:
+        packet = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise AuthorizationError(
+            f"Named packet for bridge {bridge_id!r} is corrupt JSON"
+        ) from exc
+    _validate_packet(project_root, packet)
+    return packet
+
+
+def activate_packet(project_root: Path, bridge_id: str) -> dict[str, Any]:
+    """Restore the named-cache packet for `bridge_id` to `current.json`.
+
+    Reads and validates `by-bridge/<bridge_id>.json` (hash, expiry, bridge
+    latest-status, GO-file drift, optional project-authorization drift), then
+    writes it to `current.json`. This is the explicit recovery path when
+    `current.json` has been overwritten by a concurrent `begin --bridge-id Y`.
+    """
+    packet = load_named_packet(project_root, bridge_id)
+    write_packet(project_root, packet)
+    return packet
+
+
+def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
+    """Enumerate all named-cache packets under
+    `.gtkb-state/implementation-authorizations/by-bridge/`. Each row reports
+    `(bridge_id, expires_at, target_path_globs, valid, error)`. A row is
+    `valid=True` iff the packet would pass `_validate_packet()` against live
+    INDEX state right now.
+    """
+    by_bridge_dir = project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH
+    if not by_bridge_dir.is_dir():
+        return []
+    rows: list[dict[str, Any]] = []
+    for path in sorted(by_bridge_dir.glob("*.json")):
+        rel = path.relative_to(project_root).as_posix()
+        try:
+            packet = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            rows.append({
+                "path": rel,
+                "bridge_id": None,
+                "expires_at": None,
+                "target_path_globs": [],
+                "valid": False,
+                "error": f"corrupt or unreadable: {exc}",
+            })
+            continue
+        bridge_id = packet.get("bridge_id")
+        try:
+            _validate_packet(project_root, packet)
+            valid = True
+            error: str | None = None
+        except AuthorizationError as exc:
+            valid = False
+            error = str(exc)
+        rows.append({
+            "path": rel,
+            "bridge_id": bridge_id,
+            "expires_at": packet.get("expires_at"),
+            "target_path_globs": packet.get("target_path_globs", []),
+            "valid": valid,
+            "error": error,
+        })
+    return rows
 
 
 def path_authorized(packet: dict[str, Any], relative_path: str) -> bool:
@@ -507,10 +741,21 @@ def main(argv: list[str] | None = None) -> int:
     begin = subparsers.add_parser("begin")
     begin.add_argument("--bridge-id", required=True)
     begin.add_argument("--expires-minutes", type=int, default=DEFAULT_EXPIRY_MINUTES)
-    begin.add_argument("--no-write", action="store_true", help="Print packet without writing current.json")
+    begin.add_argument("--no-write", action="store_true", help="Print packet without writing current.json or the named-cache packet")
 
     validate = subparsers.add_parser("validate")
     validate.add_argument("--target", action="append", required=True)
+
+    activate = subparsers.add_parser(
+        "activate",
+        help="Restore a previously-issued named-cache packet to current.json",
+    )
+    activate.add_argument("--bridge-id", required=True)
+
+    subparsers.add_parser(
+        "list",
+        help="Enumerate named-cache packets under .gtkb-state/implementation-authorizations/by-bridge/",
+    )
 
     args = parser.parse_args(argv)
     root = project_root_from_arg(args.project_root)
@@ -519,11 +764,20 @@ def main(argv: list[str] | None = None) -> int:
             packet = create_authorization_packet(root, args.bridge_id, expires_minutes=args.expires_minutes)
             if not args.no_write:
                 write_packet(root, packet)
+                write_named_packet(root, packet, args.bridge_id)
             print(json.dumps(packet, indent=2, sort_keys=True))
             return 0
         if args.command == "validate":
             result = validate_targets(root, args.target)
             print(json.dumps({"authorized": True, "targets": result["targets"]}, indent=2, sort_keys=True))
+            return 0
+        if args.command == "activate":
+            packet = activate_packet(root, args.bridge_id)
+            print(json.dumps(packet, indent=2, sort_keys=True))
+            return 0
+        if args.command == "list":
+            rows = list_named_packets(root)
+            print(json.dumps(rows, indent=2, sort_keys=True))
             return 0
     except AuthorizationError as exc:
         print(json.dumps({"authorized": False, "error": str(exc)}, indent=2, sort_keys=True))

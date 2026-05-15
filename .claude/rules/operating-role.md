@@ -112,3 +112,7 @@ When the on-disk record uses legacy scalar form AND the next WRITE upgrades it
 to list form, the upgrade preserves the role identity (scalar `"prime-builder"`
 becomes `["prime-builder"]`; never silently promotes a single-role harness
 into a multi-role harness).
+
+## Mode-Switch Transaction Component (Slice 1 of gtkb-operating-mode-transaction-001)
+
+Agents MUST use the deterministic mode-switch transaction component for role/topology changes rather than ad-hoc direct edits to `harness-state/role-assignments.json`. The CLI surface is `gt mode set-role --harness <id|name> --role <prime-builder|loyal-opposition> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to `harness-state/role-assignments.json` are still possible but bypass the validators (role/bridge/session-state artifact validation) and the audit-trail record; the transaction component is the supported path.

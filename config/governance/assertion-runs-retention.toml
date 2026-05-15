@@ -1,0 +1,19 @@
+# Assertion-runs retention configuration
+#
+# Authority: GTKB-SELF-DIAGNOSTIC-LEAK-CLOSURE Slice 4 IP-3 (named-packet cache
+# proposal at bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-003.md;
+# Codex GO at -004).
+# Spec:      SPEC-1662 (GOV-18: Assertion Quality Standard — meaningfulness over coverage).
+#
+# `default_runs_per_spec` is the maximum number of `assertion_runs` rows retained
+# per `spec_id` by the SessionStart prune logic in `.claude/hooks/assertion-check.py`.
+# The default is 50 so the SPEC-1662 chronic-noise classification threshold
+# (default 50 consecutive FAIL runs) is reachable; the prior hardcoded cap of 5
+# made that threshold structurally unreachable.
+#
+# Storage impact projection at default=50: ~10x the prior table size (~5 -> ~50
+# rows per spec); projected DB growth ~270MB (from ~30MB at cap=5), within the
+# operational ceiling.
+
+schema_version = 1
+default_runs_per_spec = 50

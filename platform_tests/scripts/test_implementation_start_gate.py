@@ -399,3 +399,116 @@ def test_chained_git_commit_with_protected_write_still_blocks(tmp_path: Path) ->
 
     assert result["decision"] == "block"
     assert "authorization packet" in result["reason"]
+
+
+def test_gate_unchanged_reads_current_json_only(tmp_path: Path) -> None:
+    """IP-2 contract invariant (per Slice 4 REVISED-1, GO at -004):
+    the gate reads current.json only and never auto-discovers a named
+    packet from by-bridge/. A valid named packet is not sufficient
+    authorization on its own; the explicit `activate --bridge-id X`
+    subcommand is the only deterministic path from named cache to
+    current.json.
+
+    Setup: thread is GO, a valid by-bridge/<bridge>.json exists, but
+    current.json is absent. Assert: gate blocks a protected mutation.
+    """
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+
+    # Write ONLY the named-cache packet. Do NOT call write_packet (which
+    # writes current.json). This isolates the gate's input contract:
+    # if it ever silently reads from by-bridge/, this test breaks.
+    named_path = auth.write_named_packet(tmp_path, packet, "sample-implementation")
+    assert named_path.is_file(), "test setup: named packet must be on disk"
+    assert not auth.packet_path(tmp_path).is_file(), (
+        "test setup: current.json must be absent so any positive gate decision "
+        "could only come from reading by-bridge/, which would be a contract violation"
+    )
+
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "apply_patch",
+        "tool_input": {
+            "patch": (
+                "*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n"
+            )
+        },
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result.get("decision") == "block", (
+        "Gate must block when current.json is absent, even though a valid named "
+        "packet exists at by-bridge/sample-implementation.json. The gate's contract "
+        "is current.json-only; named packets require explicit `activate`."
+    )
+    assert "authorization packet" in result.get("reason", "")
+
+
+# IP-A: Null-sink redirect classifier tests (F1 closures)
+
+
+def test_gate_allows_stderr_redirect_to_dev_null() -> None:
+    assert gate._is_mutating_command("python script.py 2>/dev/null") is False
+
+
+def test_gate_allows_stderr_redirect_to_powershell_null() -> None:
+    assert gate._is_mutating_command("python script.py 2>$null") is False
+
+
+def test_gate_allows_stderr_redirect_to_windows_nul() -> None:
+    assert gate._is_mutating_command("python script.py 2>NUL") is False
+
+
+def test_gate_blocks_unnumbered_redirect_to_file() -> None:
+    assert gate._is_mutating_command("cmd > out.txt") is True
+
+
+def test_gate_blocks_stderr_numbered_redirect_to_real_file() -> None:
+    assert gate._is_mutating_command("cmd 2> err.txt") is True
+
+
+def test_gate_blocks_stdout_numbered_redirect_to_file() -> None:
+    assert gate._is_mutating_command("cmd 1> out.txt") is True
+
+
+def test_gate_blocks_combined_redirect_to_file() -> None:
+    assert gate._is_mutating_command("cmd &> out.txt") is True
+
+
+# IP-B/F3: sqlite safe-read tests
+
+
+def test_gate_allows_python_sqlite_select_read() -> None:
+    cmd = "python -c \"import sqlite3; sqlite3.connect('a.db').execute('SELECT COUNT(*) FROM t').fetchone()\""
+    assert gate._is_mutating_command(cmd) is False
+
+
+def test_gate_allows_python_sqlite_with_read() -> None:
+    cmd = "python -c \"import sqlite3; sqlite3.connect('a.db').execute('WITH cte AS (SELECT id FROM t) SELECT * FROM cte')\""
+    assert gate._is_mutating_command(cmd) is False
+
+
+def test_gate_blocks_python_sqlite_pragma_function_call_form() -> None:
+    cmd = "python -c \"import sqlite3; sqlite3.connect('a.db').execute('PRAGMA table_info(t)')\""
+    assert gate._is_mutating_command(cmd) is True
+
+
+def test_gate_blocks_python_sqlite_pragma_assignment() -> None:
+    cmd = "python -c \"import sqlite3; sqlite3.connect('a.db').execute('PRAGMA journal_mode = WAL')\""
+    assert gate._is_mutating_command(cmd) is True
+
+
+def test_gate_blocks_python_sqlite_user_version_assignment() -> None:
+    cmd = "python -c \"import sqlite3; sqlite3.connect('a.db').execute('PRAGMA user_version = 7')\""
+    assert gate._is_mutating_command(cmd) is True
+
+
+def test_gate_blocks_python_sqlite_literal_insert() -> None:
+    cmd = "python -c \"import sqlite3; sqlite3.connect('a.db').execute('INSERT INTO t VALUES (1)')\""
+    assert gate._is_mutating_command(cmd) is True
+
+
+def test_gate_blocks_python_sqlite_commit_after_select() -> None:
+    cmd = "python -c \"import sqlite3; c=sqlite3.connect('a.db'); c.execute('SELECT * FROM t'); c.commit()\""
+    assert gate._is_mutating_command(cmd) is True

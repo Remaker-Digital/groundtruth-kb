@@ -1,0 +1,31 @@
+"""GT-KB benchmark suite (Self-Diagnostic Leak Closure Slice 2).
+
+Read-only measurement benchmarks. Each benchmark module exposes:
+
+    run(window_start, window_end, project_root) -> BenchmarkResult
+
+Outputs land under ``.gtkb-state/benchmarks/<run_id>/``. No MemBase writes.
+
+Governing artifacts: SPEC-1662 (GOV-18), GOV-ARTIFACT-ORIENTED-GOVERNANCE-001,
+GOV-STANDING-BACKLOG-001, ADR-DA-READ-SURFACE-PLACEMENT-001,
+DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE,
+INSIGHTS-2026-05-10-13-26-GTKB-SELF-MEASUREMENT-SYSTEM.
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
+from scripts.benchmarks.common import (
+    BenchmarkResult,
+    benchmark_output_dir,
+    compute_idempotency_key,
+    new_run_id,
+    write_run_outputs,
+)
+
+__all__ = [
+    "BenchmarkResult",
+    "benchmark_output_dir",
+    "compute_idempotency_key",
+    "new_run_id",
+    "write_run_outputs",
+]

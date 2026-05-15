@@ -67,6 +67,19 @@ MUTATING_COMMAND_RE = re.compile(
     r")\b|(^|[^>])>{1,2}($|[^&])",
     re.IGNORECASE,
 )
+NULL_SINK_REDIRECT_STRIP_RE = re.compile(
+    r"\s*(?:\d+|&)?>{1,2}(?!&)\s*(?:/dev/null|\$null|NUL)\b",
+    re.IGNORECASE,
+)
+SAFE_SQLITE_READ_RE = re.compile(
+    r"sqlite3\b.*?\.execute\(\s*['\"](?:SELECT|WITH|EXPLAIN)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+SQLITE_WRITE_DISQUALIFIERS_RE = re.compile(
+    r"\.executescript\(|\.executemany\(|\.commit\(|"
+    r"\b(?:INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|TRUNCATE|PRAGMA)\b",
+    re.IGNORECASE,
+)
 PATH_TOKEN_RE = re.compile(
     r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
 )
@@ -172,8 +185,52 @@ def _clean_shell_token(token: str) -> str:
     return token.strip().strip("'\"")
 
 
+def _all_mutating_signal_is_null_sink_redirect(command: str) -> bool:
+    """True iff the only mutating signal in the command is one or more null-sink redirects.
+
+    Strips null-sink redirect tokens (e.g. ``2>/dev/null``, ``2>$null``, ``2>NUL``,
+    ``&>/dev/null``) from the command and re-tests the residue against
+    MUTATING_COMMAND_RE. If the original command matched MUTATING_COMMAND_RE but
+    the stripped residue does not, the only mutating signal was a null-sink
+    redirect — those are diagnostic suppression, not file mutation, and the
+    command is exempt from the gate. Real-file redirects survive the strip and
+    keep MUTATING_COMMAND_RE matching.
+    """
+    if not command:
+        return False
+    if not MUTATING_COMMAND_RE.search(command):
+        return False
+    stripped = NULL_SINK_REDIRECT_STRIP_RE.sub("", command)
+    return not bool(MUTATING_COMMAND_RE.search(stripped))
+
+
+def _is_safe_sqlite_read(command: str) -> bool:
+    """True iff the command is a literal-read sqlite probe.
+
+    Required: matches SAFE_SQLITE_READ_RE (literal SELECT/WITH/EXPLAIN keyword
+    inside an execute() call after a sqlite3 reference).
+
+    Disqualifying: any of executescript(, executemany(, .commit(, a SQL write
+    keyword (INSERT/UPDATE/DELETE/REPLACE/CREATE/DROP/ALTER/TRUNCATE), or any
+    PRAGMA keyword (function-call or assignment form) appears anywhere in the
+    command. PRAGMA is dropped from the safe-read set because PRAGMA is not
+    categorically read-only; assignment forms like ``PRAGMA user_version = 7``
+    mutate database state. Variable-sourced execute(sql) calls do not match
+    SAFE_SQLITE_READ_RE because their argument is not a literal string starting
+    with a read keyword.
+    """
+    if not SAFE_SQLITE_READ_RE.search(command):
+        return False
+    return not SQLITE_WRITE_DISQUALIFIERS_RE.search(command)
+
+
 def _is_mutating_command(command: str) -> bool:
-    return bool(MUTATING_COMMAND_RE.search(command or ""))
+    cmd = command or ""
+    if not MUTATING_COMMAND_RE.search(cmd):
+        return False
+    if _all_mutating_signal_is_null_sink_redirect(cmd):
+        return False
+    return not ("sqlite3" in cmd.lower() and _is_safe_sqlite_read(cmd))
 
 
 def _is_apply_patch_tool(tool: str) -> bool:
