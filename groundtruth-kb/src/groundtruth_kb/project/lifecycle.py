@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.authorization import ACTIVE_PROJECT_AUTHORIZATION_STATUS
 
 PROJECT_TERMINAL_STATUS = "retired"
+COMPLETED_PROJECT_AUTHORIZATION_STATUS = "completed"
 PROJECTS_CHANGED_BY = "gt-projects"
+
+# Bridge proposal/report metadata line: ``Work Item: WI-1234`` (or a GTKB-/
+# WORKLIST- descriptive id), optionally backtick-wrapped.
+_WORK_ITEM_LINE_RE = re.compile(
+    r"^Work Item:\s*`?(WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
+    re.MULTILINE,
+)
 
 
 class ProjectLifecycleError(ValueError):
@@ -353,3 +364,162 @@ class ProjectLifecycleService:
         if authorization is None:
             raise ProjectLifecycleError("Project authorization update did not return a current authorization")
         return authorization
+
+    @staticmethod
+    def _authorization_work_item_ids(authorization: dict[str, Any]) -> list[str]:
+        """Decode an authorization's ``included_work_item_ids`` to a list."""
+        parsed = authorization.get("included_work_item_ids_parsed")
+        if isinstance(parsed, list):
+            return [str(value) for value in parsed]
+        raw = authorization.get("included_work_item_ids")
+        if not raw:
+            return []
+        try:
+            decoded = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+        return [str(value) for value in decoded] if isinstance(decoded, list) else []
+
+    @staticmethod
+    def _verified_work_items(project_root: Path) -> set[str]:
+        """Return work-item ids covered by a bridge thread whose latest
+        ``bridge/INDEX.md`` status is ``VERIFIED``.
+
+        Mirrors the IP-1 scanner's readiness check using the canonical bridge
+        index parser directly. A cross-layer import of the ``scripts/`` scanner
+        from package code was rejected as fragile; both call sites delegate to
+        the same ``groundtruth_kb.bridge.detector.parse_index`` parser.
+        """
+        from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
+
+        root = Path(project_root)
+        index_path = root / "bridge" / "INDEX.md"
+        if not index_path.is_file():
+            return set()
+        result = parse_index(index_path.read_text(encoding="utf-8"), project_root=root)
+        verified: set[str] = set()
+        for document in result.documents:
+            top = document.current_top
+            if top is None or top.status != BridgeStatus.VERIFIED:
+                continue
+            for version in document.versions:
+                file_path = root / version.file_path
+                if not file_path.is_file():
+                    continue
+                text = file_path.read_text(encoding="utf-8", errors="replace")
+                for match in _WORK_ITEM_LINE_RE.finditer(text):
+                    verified.add(match.group(1).strip())
+        return verified
+
+    def complete_project_authorization(
+        self,
+        authorization_id: str,
+        owner_decision_deliberation_id: str,
+        *,
+        project_root: Path,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+    ) -> dict[str, Any]:
+        """Transition an active project authorization to ``completed`` and, when
+        it was the project's sole active authorization, retire the project.
+
+        IP-3 of WI-3316 (``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001``).
+        Owner confirmation is mandatory and auto-transition is prohibited:
+        ``owner_decision_deliberation_id`` must resolve to a genuine
+        owner-decision deliberation (``source_type='owner_conversation'`` AND
+        ``outcome='owner_decision'``) whose text records the completion context
+        for THIS project or authorization. An LO-review, informational, or
+        no-go deliberation, or an owner decision recorded for a different
+        project, is rejected.
+        """
+        norm_auth_id = _require_nonempty(authorization_id, "authorization_id")
+        norm_delib_id = _require_nonempty(owner_decision_deliberation_id, "owner_decision_deliberation_id")
+
+        # Step 1: load the authorization; it must be active.
+        authorization = self.db.get_project_authorization(norm_auth_id)
+        if authorization is None:
+            raise ProjectLifecycleError(f"Project authorization not found: {norm_auth_id}")
+        if authorization.get("status") != ACTIVE_PROJECT_AUTHORIZATION_STATUS:
+            raise ProjectLifecycleError(
+                f"Project authorization {norm_auth_id} is not active "
+                f"(status={authorization.get('status')!r}); cannot complete."
+            )
+        project_id = str(authorization.get("project_id") or "")
+
+        # Step 2: owner-confirmation gate (existence is insufficient).
+        deliberation = self.db.get_deliberation(norm_delib_id)
+        if deliberation is None:
+            raise ProjectLifecycleError(
+                f"Owner-decision deliberation not found: {norm_delib_id}. "
+                "Auto-transition is prohibited; an owner-decision deliberation is required."
+            )
+        if deliberation.get("source_type") != "owner_conversation":
+            raise ProjectLifecycleError(
+                f"Deliberation {norm_delib_id} is not an owner conversation "
+                f"(source_type={deliberation.get('source_type')!r}); completion requires "
+                "a genuine owner decision."
+            )
+        if deliberation.get("outcome") != "owner_decision":
+            raise ProjectLifecycleError(
+                f"Deliberation {norm_delib_id} is not an owner decision "
+                f"(outcome={deliberation.get('outcome')!r}); an LO-review, informational, "
+                "or no-go deliberation cannot confirm completion."
+            )
+        context_text = " ".join(
+            str(deliberation.get(field) or "")
+            for field in ("content", "source_ref", "change_reason", "title", "summary")
+        )
+        if project_id not in context_text and norm_auth_id not in context_text:
+            raise ProjectLifecycleError(
+                f"Deliberation {norm_delib_id} does not record the completion context for "
+                f"project {project_id} / authorization {norm_auth_id}; the owner decision "
+                "must reference this project or authorization."
+            )
+
+        # Step 3: re-run the IP-1 readiness check for this authorization.
+        included = self._authorization_work_item_ids(authorization)
+        if not included:
+            raise ProjectLifecycleError(
+                f"Project authorization {norm_auth_id} lists no work items; "
+                "completion readiness cannot be established."
+            )
+        verified = self._verified_work_items(project_root)
+        unverified = [wi for wi in included if wi not in verified]
+        if unverified:
+            raise ProjectLifecycleError(
+                f"Project authorization {norm_auth_id} is not completion-ready; work item(s) "
+                f"without a VERIFIED bridge thread: {', '.join(unverified)}."
+            )
+
+        # Step 4: transition the authorization to completed (status-only change).
+        try:
+            completed = self.db.update_project_authorization(
+                norm_auth_id,
+                _require_nonempty(changed_by, "changed_by"),
+                _require_nonempty(change_reason, "change_reason"),
+                status=COMPLETED_PROJECT_AUTHORIZATION_STATUS,
+            )
+        except ValueError as exc:
+            raise ProjectLifecycleError(str(exc)) from exc
+        if completed is None:
+            raise ProjectLifecycleError("Project authorization completion did not return a current authorization")
+
+        # Step 5: retire the project iff no other active authorization remains.
+        other_active = [
+            a
+            for a in self.db.list_project_authorizations(project_id, status="active")
+            if a.get("id") != norm_auth_id
+        ]
+        project_retired = False
+        if not other_active:
+            self.retire_project(
+                project_id,
+                changed_by=changed_by,
+                change_reason=(
+                    f"Auto-retired: sole active authorization {norm_auth_id} completed "
+                    f"per owner decision {norm_delib_id}."
+                ),
+            )
+            project_retired = True
+
+        return {"authorization": completed, "project_retired": project_retired}

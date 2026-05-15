@@ -50,6 +50,12 @@
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\glossary-expansion.py",
             "statusMessage": "Glossary expansion (Phase 3 of GTKB-DA-READ-SURFACE-CORRECTION)",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\project-completion-surface.py",
+            "statusMessage": "Checking project completion readiness",
+            "timeout": 5
           }
         ]
       }

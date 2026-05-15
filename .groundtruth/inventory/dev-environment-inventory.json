@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-14T04:20:57Z",
+  "generated_at": "2026-05-15T13:58:56Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -107,7 +107,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 23,
+      "count": 24,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -125,6 +125,7 @@
         ".claude/hooks/narrative-artifact-approval-gate.py",
         ".claude/hooks/owner-decision-capture.py",
         ".claude/hooks/owner-decision-tracker.py",
+        ".claude/hooks/project-completion-surface.py",
         ".claude/hooks/scanner-safe-writer.py",
         ".claude/hooks/scheduler.py",
         ".claude/hooks/session_start_dispatch.py",
@@ -136,10 +137,11 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 12,
+      "count": 13,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
         ".codex/gtkb-hooks/glossary-expansion.py",
+        ".codex/gtkb-hooks/project-completion-surface.py",
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",

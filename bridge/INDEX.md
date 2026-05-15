@@ -19,6 +19,8 @@
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 Document: gtkb-bridge-compliance-audit-path-isolation
+VERIFIED: bridge/gtkb-bridge-compliance-audit-path-isolation-006.md
+NEW: bridge/gtkb-bridge-compliance-audit-path-isolation-005.md
 GO: bridge/gtkb-bridge-compliance-audit-path-isolation-004.md
 REVISED: bridge/gtkb-bridge-compliance-audit-path-isolation-003.md
 NO-GO: bridge/gtkb-bridge-compliance-audit-path-isolation-002.md
@@ -39,6 +41,8 @@ NO-GO: bridge/gtkb-reliability-fast-lane-002.md
 NEW: bridge/gtkb-reliability-fast-lane-001.md
 
 Document: gtkb-hook-import-latency-chromadb-lazy
+VERIFIED: bridge/gtkb-hook-import-latency-chromadb-lazy-010.md
+REVISED: bridge/gtkb-hook-import-latency-chromadb-lazy-009.md
 NO-GO: bridge/gtkb-hook-import-latency-chromadb-lazy-008.md
 NEW: bridge/gtkb-hook-import-latency-chromadb-lazy-007.md
 GO: bridge/gtkb-hook-import-latency-chromadb-lazy-006.md
@@ -265,6 +269,8 @@ NO-GO: bridge/gtkb-bridge-preflight-path-warning-002.md
 NEW: bridge/gtkb-bridge-preflight-path-warning-001.md
 
 Document: gtkb-project-verified-completion-auq-trigger
+VERIFIED: bridge/gtkb-project-verified-completion-auq-trigger-008.md
+NEW: bridge/gtkb-project-verified-completion-auq-trigger-007.md
 GO: bridge/gtkb-project-verified-completion-auq-trigger-006.md
 REVISED: bridge/gtkb-project-verified-completion-auq-trigger-005.md
 NO-GO: bridge/gtkb-project-verified-completion-auq-trigger-004.md
