@@ -18,6 +18,20 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-grill-me-for-clarification-skill
+VERIFIED: bridge/gtkb-grill-me-for-clarification-skill-012.md
+NEW: bridge/gtkb-grill-me-for-clarification-skill-011.md
+GO: bridge/gtkb-grill-me-for-clarification-skill-010.md
+REVISED: bridge/gtkb-grill-me-for-clarification-skill-009.md
+NO-GO: bridge/gtkb-grill-me-for-clarification-skill-008.md
+REVISED: bridge/gtkb-grill-me-for-clarification-skill-007.md
+GO: bridge/gtkb-grill-me-for-clarification-skill-006.md
+REVISED: bridge/gtkb-grill-me-for-clarification-skill-005.md
+NO-GO: bridge/gtkb-grill-me-for-clarification-skill-004.md
+REVISED: bridge/gtkb-grill-me-for-clarification-skill-003.md
+NO-GO: bridge/gtkb-grill-me-for-clarification-skill-002.md
+NEW: bridge/gtkb-grill-me-for-clarification-skill-001.md
+
 Document: gtkb-bridge-compliance-audit-path-isolation
 VERIFIED: bridge/gtkb-bridge-compliance-audit-path-isolation-006.md
 NEW: bridge/gtkb-bridge-compliance-audit-path-isolation-005.md

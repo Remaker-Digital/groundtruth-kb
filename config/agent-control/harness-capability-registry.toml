@@ -74,7 +74,7 @@ status = "native"
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "13d20fd64ed053ccba316c777313f630386d549973a3cd7f9a6a0501b717bee0"
+source_sha256 = "561406bf00e2acdd143d48cfa0c1401687d5dcb6c82a0cc37526f87093347d73"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -92,7 +92,7 @@ status = "native"
 surface = ".codex/skills/bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge-propose/SKILL.md"
-source_sha256 = "a59bd08404a142cb74fdd05e2bff8726570d8dd1dbf204a35f05d403a384ad36"
+source_sha256 = "f0438c6479fb2e1e625ebf12fbe04e64f13c864528cc7e1d62b4dde4e45bc901"
 [[capabilities]]
 id = "skill.check-deliberations"
 kind = "skill"
@@ -542,3 +542,21 @@ surface = ".codex/skills/gtkb-benchmarks/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
 source_sha256 = "95940f9fecb54eee364558ad2c15b6f34395a1e2a0d8d6e760b90e80c62926be"
+[[capabilities]]
+id = "skill.grill-me-for-clarification"
+kind = "skill"
+canonical_name = "grill-me-for-clarification"
+canonical_purpose = "Interview the owner one question at a time down a dependency-ordered decision tree until shared understanding, resolving codebase-answerable questions by exploration and persisting each resolved branch via gtkb-decision-capture or gtkb-spec-intake."
+canonical_source = ".claude/skills/grill-me-for-clarification/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/grill-me-for-clarification/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/grill-me-for-clarification/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/grill-me-for-clarification/SKILL.md"
+source_sha256 = "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"

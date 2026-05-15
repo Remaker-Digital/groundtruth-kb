@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-05-15T13:58:56Z
+Generated: 2026-05-15T17:10:32Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8)
 
 ## Project
@@ -34,7 +34,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986
 
 - Harness identity source present: True
 - Role assignment source present: True
-- Skills: 29
+- Skills: 30
 - Claude hooks: 24
 - Codex hooks: 13
 - GitHub workflows: 16

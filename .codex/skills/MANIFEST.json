@@ -202,6 +202,13 @@
       "capability_id": "skill.gtkb-benchmarks",
       "source_relative_path": ".claude/skills/gtkb-benchmarks/SKILL.md",
       "source_sha256": "95940f9fecb54eee364558ad2c15b6f34395a1e2a0d8d6e760b90e80c62926be"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/grill-me-for-clarification/SKILL.md",
+      "canonical_name": "grill-me-for-clarification",
+      "capability_id": "skill.grill-me-for-clarification",
+      "source_relative_path": ".claude/skills/grill-me-for-clarification/SKILL.md",
+      "source_sha256": "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
     }
   ],
   "generated_by": "scripts/generate_codex_skill_adapters.py",
