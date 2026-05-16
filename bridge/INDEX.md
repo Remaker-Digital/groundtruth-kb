@@ -18,10 +18,43 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-harness-lifecycle-fsm
+VERIFIED: bridge/gtkb-harness-lifecycle-fsm-004.md
+NEW: bridge/gtkb-harness-lifecycle-fsm-003.md
+GO: bridge/gtkb-harness-lifecycle-fsm-002.md
+NEW: bridge/gtkb-harness-lifecycle-fsm-001.md
+
+Document: gtkb-harness-registry-hot-path-projection
+VERIFIED: bridge/gtkb-harness-registry-hot-path-projection-004.md
+NEW: bridge/gtkb-harness-registry-hot-path-projection-003.md
+GO: bridge/gtkb-harness-registry-hot-path-projection-002.md
+NEW: bridge/gtkb-harness-registry-hot-path-projection-001.md
+
+Document: gtkb-harness-registry-table-schema
+VERIFIED: bridge/gtkb-harness-registry-table-schema-008.md
+REVISED: bridge/gtkb-harness-registry-table-schema-007.md
+NO-GO: bridge/gtkb-harness-registry-table-schema-006.md
+NEW: bridge/gtkb-harness-registry-table-schema-005.md
+GO: bridge/gtkb-harness-registry-table-schema-004.md
+REVISED: bridge/gtkb-harness-registry-table-schema-003.md
+GO: bridge/gtkb-harness-registry-table-schema-002.md
+NEW: bridge/gtkb-harness-registry-table-schema-001.md
+
+Document: gtkb-bridge-compliance-gate-fenced-code-parser-fix
+GO: bridge/gtkb-bridge-compliance-gate-fenced-code-parser-fix-002.md
+NEW: bridge/gtkb-bridge-compliance-gate-fenced-code-parser-fix-001.md
+
+Document: gtkb-startup-relay-pretooluse-read-exemption
+GO: bridge/gtkb-startup-relay-pretooluse-read-exemption-003.md
+REVISED: bridge/gtkb-startup-relay-pretooluse-read-exemption-002.md
+NEW: bridge/gtkb-startup-relay-pretooluse-read-exemption-001.md
+
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
+GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-002.md
 NEW: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-001.md
 
 Document: gtkb-bridge-compliance-gate-index-exemption
+VERIFIED: bridge/gtkb-bridge-compliance-gate-index-exemption-004.md
 NEW: bridge/gtkb-bridge-compliance-gate-index-exemption-003.md
 GO: bridge/gtkb-bridge-compliance-gate-index-exemption-002.md
 NEW: bridge/gtkb-bridge-compliance-gate-index-exemption-001.md
@@ -31,10 +64,16 @@ GO: bridge/gtkb-bridge-compliance-gate-wi-auto-regex-fix-002.md
 NEW: bridge/gtkb-bridge-compliance-gate-wi-auto-regex-fix-001.md
 
 Document: gtkb-impl-auth-parser-false-positive-fix
+VERIFIED: bridge/gtkb-impl-auth-parser-false-positive-fix-006.md
+NEW: bridge/gtkb-impl-auth-parser-false-positive-fix-005.md
+GO: bridge/gtkb-impl-auth-parser-false-positive-fix-004.md
+REVISED: bridge/gtkb-impl-auth-parser-false-positive-fix-003.md
 NO-GO: bridge/gtkb-impl-auth-parser-false-positive-fix-002.md
 NEW: bridge/gtkb-impl-auth-parser-false-positive-fix-001.md
 
 Document: gtkb-owner-decision-tracker-startup-relay-known-match-suppression
+VERIFIED: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-008.md
+REVISED: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-007.md
 NO-GO: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-006.md
 NEW: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-005.md
 GO: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-004.md
@@ -299,10 +338,12 @@ NO-GO: bridge/gtkb-codex-feedback-pattern-lints-002.md
 NEW: bridge/gtkb-codex-feedback-pattern-lints-001.md
 
 Document: gtkb-commit-scope-bundling-detection-001-prop
+WITHDRAWN: bridge/gtkb-commit-scope-bundling-detection-001-prop-003.md
 NO-GO: bridge/gtkb-commit-scope-bundling-detection-001-prop-002.md
 NEW: bridge/gtkb-commit-scope-bundling-detection-001-prop.md
 
 Document: gtkb-auto-push-investigation-001-prop
+WITHDRAWN: bridge/gtkb-auto-push-investigation-001-prop-003.md
 NO-GO: bridge/gtkb-auto-push-investigation-001-prop-002.md
 NEW: bridge/gtkb-auto-push-investigation-001-prop.md
 
@@ -330,6 +371,7 @@ NO-GO: bridge/gtkb-bridge-skill-protected-write-helper-002.md
 NEW: bridge/gtkb-bridge-skill-protected-write-helper-001.md
 
 Document: gtkb-generate-approval-packet-cli
+GO: bridge/gtkb-generate-approval-packet-cli-010.md
 REVISED: bridge/gtkb-generate-approval-packet-cli-009.md
 NO-GO: bridge/gtkb-generate-approval-packet-cli-008.md
 REVISED: bridge/gtkb-generate-approval-packet-cli-007.md
@@ -367,6 +409,7 @@ NO-GO: bridge/gtkb-artifact-recorder-cli-scoping-advance-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-scoping-advance-001.md
 
 Document: gtkb-proposal-standards-wi-id-collision-gate
+GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-008.md
 REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-007.md
 NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-006.md
 REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-005.md
@@ -552,6 +595,8 @@ NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-002.md
 NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-001.md
 
 Document: gtkb-prime-worker-context-aware-auq-slice-2
+GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-004.md
+REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-003.md
 NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-002.md
 NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-001.md
 
