@@ -1019,3 +1019,176 @@ def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evi
     assert recipients["loyal-opposition"]["last_result"] == "single_harness_topology_not_applicable"
     assert "updated_at" in recipients["prime-builder"]
     assert "updated_at" in recipients["loyal-opposition"]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# WI-3265 — dispatch-state-lag diagnostic instrumentation (IP-2)
+# Per bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md (Codex GO -004).
+# Diagnostic-only: instrumentation must observe, never alter, dispatch behavior.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _read_diagnostics(state_dir: Path) -> list[dict]:
+    """Read all records from the WI-3265 trigger-diagnostic.jsonl log."""
+    path = state_dir / "trigger-diagnostic.jsonl"
+    if not path.is_file():
+        return []
+    out: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            out.append(json.loads(line))
+    return out
+
+
+def test_diagnostic_emitted_per_invocation(tmp_path: Path) -> None:
+    """WI-3265 IP-2: a diagnostic record is emitted for every recipient on
+    every normal-path invocation; the log grows by len(recipients) each fire.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = _read_diagnostics(state_dir)
+    assert len(first) == 2, "one diagnostic record per recipient (prime-builder + loyal-opposition)"
+    assert {r["recipient"] for r in first} == {"prime-builder", "loyal-opposition"}
+
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    second = _read_diagnostics(state_dir)
+    assert len(second) == 4, "instrumentation fires on every invocation"
+
+
+def test_diagnostic_classifies_suppressed(tmp_path: Path) -> None:
+    """WI-3265 IP-2: a fresh counterpart active-session lock drives the
+    loyal-opposition recipient to the `active_session_suppressed` class.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    _write_index(root, _index_with_one_new(root))
+    # codex is the loyal-opposition harness in the default fixture; a fresh
+    # active-codex-session.lock suppresses its dispatch.
+    (state_dir / "active-codex-session.lock").write_text("lock", encoding="utf-8")
+
+    trigger = _load_trigger()
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
+    assert len(lo) == 1
+    assert lo[0]["last_result"] == "counterpart_active_session_present"
+    assert lo[0]["classification"] == "active_session_suppressed"
+
+
+def test_diagnostic_classifies_dispatched(tmp_path: Path) -> None:
+    """WI-3265 IP-2: when the dispatch branch is entered for a recipient, its
+    diagnostic record classifies as `dispatched`. dry-run yields a
+    `launch_failed` last_result, which the classifier maps to `dispatched`
+    because the dispatch branch was reached.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
+    assert len(lo) == 1
+    assert lo[0]["last_result"] in {"launched", "launch_failed"}
+    assert lo[0]["classification"] == "dispatched"
+
+
+def test_diagnostic_classifies_no_change(tmp_path: Path) -> None:
+    """WI-3265 IP-2: a second invocation on an unchanged INDEX classifies the
+    recipient as `no_change` (signature dedup → last_result `unchanged`).
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
+    assert len(lo) == 2
+    assert lo[-1]["last_result"] == "unchanged"
+    assert lo[-1]["classification"] == "no_change"
+
+
+def test_diagnostic_classifies_selected_batch(tmp_path: Path) -> None:
+    """WI-3265 IP-2: when actionable work exists but the selected batch is
+    empty (forced deterministically here via max_items=0), the recipient
+    classifies as `selected_batch_skipped`.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=0, dry_run=True)
+
+    lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
+    assert len(lo) == 1
+    assert lo[0]["last_result"] == "no_pending_after_filter"
+    assert lo[0]["classification"] == "selected_batch_skipped"
+
+
+def test_diagnostic_jsonl_parseable(tmp_path: Path) -> None:
+    """WI-3265 IP-2: every emitted line is valid JSON carrying the full schema;
+    classification stays within the documented vocabulary.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    path = state_dir / "trigger-diagnostic.jsonl"
+    assert path.is_file()
+    raw = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert raw, "diagnostic log must contain at least one record"
+    expected_keys = {
+        "timestamp", "invocation_source", "pid", "session_id",
+        "index_mtime", "index_signature_pre", "index_signature_post",
+        "dispatch_state_mtime_pre", "dispatch_state_mtime_post",
+        "classification", "last_dispatched_signature",
+        "last_suppressed_signature", "elapsed_ms", "recipient", "last_result",
+    }
+    for ln in raw:
+        rec = json.loads(ln)  # raises on malformed JSON -> test fails
+        missing = expected_keys - rec.keys()
+        assert not missing, f"diagnostic record missing keys: {missing}"
+        assert rec["classification"] in trigger.TRIGGER_DIAGNOSTIC_CLASSIFICATIONS
+
+
+def test_dispatch_decision_unchanged_with_instrumentation(tmp_path: Path) -> None:
+    """WI-3265 IP-2: instrumentation is observational — the dispatch decision
+    (results + dispatch-state) is exactly the pre-instrumentation contract,
+    and no diagnostic field leaks into dispatch-state.json.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+
+    # NEW present -> loyal-opposition dispatched, prime-builder idle.
+    s1 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert s1["results"]["loyal-opposition"]["reason"] == "dry_run"
+    assert s1["results"]["prime-builder"]["reason"] in {"no_pending", "no_pending_after_filter"}
+
+    # Re-fire on unchanged INDEX -> dedup holds.
+    s2 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert s2["results"]["loyal-opposition"]["reason"] == "unchanged"
+
+    # Promote NEW -> GO -> prime-builder dispatched, loyal-opposition idle.
+    _write_index(root, _index_with_one_go(root))
+    s3 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert s3["results"]["prime-builder"]["reason"] == "dry_run"
+    assert s3["results"]["loyal-opposition"]["reason"] in {"no_pending", "no_pending_after_filter"}
+
+    # Instrumentation did not leak into dispatch-state.json.
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    for rec in state["recipients"].values():
+        for leaked in ("classification", "index_signature_pre", "elapsed_ms", "invocation_source"):
+            assert leaked not in rec, f"diagnostic field {leaked!r} leaked into dispatch-state"
+    # The diagnostic log is a separate artifact and was written.
+    assert (state_dir / "trigger-diagnostic.jsonl").is_file()

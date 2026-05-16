@@ -91,6 +91,41 @@ DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 # ``-008`` flagged unilateral cap changes as scope creep.
 DEFAULT_MAX_ITEMS = 2
 
+# WI-3265 (bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md, Codex
+# GO at -004): per-invocation diagnostic instrumentation. Observational only —
+# the trigger's dispatch behavior is unchanged. Records are appended to
+# ``<state-dir>/trigger-diagnostic.jsonl`` (runtime state; not committed).
+TRIGGER_DIAGNOSTIC_FILENAME = "trigger-diagnostic.jsonl"
+
+# Diagnostic classification vocabulary. ``missed_stop_recovered`` is reserved
+# for the future behavior-changing fix proposal and is intentionally NOT
+# emitted by this observational pass (which only records the outcomes of
+# existing dispatch branches; detecting a missed Stop would require new
+# behavior that the -004 GO explicitly excludes from scope).
+TRIGGER_DIAGNOSTIC_CLASSIFICATIONS = frozenset(
+    {
+        "active_session_suppressed",
+        "dispatched",
+        "no_change",
+        "selected_batch_skipped",
+        "missed_stop_recovered",
+        "other",
+    }
+)
+
+# Maps a per-recipient ``last_result`` (the existing dispatch-branch outcome)
+# to a diagnostic classification. Unmapped results classify as ``other``.
+# ``launch_failed`` maps to ``dispatched`` because it means the dispatch branch
+# was entered (dry-run or a real spawn failure); the raw ``last_result`` is
+# also recorded verbatim so the two remain distinguishable.
+_LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
+    "counterpart_active_session_present": "active_session_suppressed",
+    "launched": "dispatched",
+    "launch_failed": "dispatched",
+    "unchanged": "no_change",
+    "no_pending_after_filter": "selected_batch_skipped",
+}
+
 
 def _now_iso() -> str:
     return dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
@@ -288,6 +323,47 @@ def _record_dispatch_failure(state_dir: Path, payload: dict[str, Any]) -> None:
         target = state_dir / DISPATCH_FAILURES_FILENAME
         with target.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def _path_mtime_iso(path: Path) -> str | None:
+    """Return ``path``'s mtime as a UTC ISO-8601 string, or None if unavailable.
+
+    Used by WI-3265 diagnostic instrumentation; read-only, never raises.
+    """
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return None
+    return dt.datetime.fromtimestamp(mtime, dt.UTC).isoformat(timespec="seconds")
+
+
+def _classify_invocation_outcome(last_result: str) -> str:
+    """Map a per-recipient ``last_result`` to a WI-3265 diagnostic class.
+
+    Vocabulary per bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md
+    (Codex GO at -004). ``missed_stop_recovered`` is reserved for a future
+    behavior-changing fix proposal and is never produced by this observational
+    pass. Unmapped results (e.g. ``no_pending``,
+    ``dispatch_target_resolution_failed``) classify as ``other``.
+    """
+    return _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION.get(last_result, "other")
+
+
+def _emit_trigger_diagnostic(state_dir: Path, record: dict[str, Any]) -> None:
+    """Append one fire-and-forget diagnostic record to trigger-diagnostic.jsonl.
+
+    WI-3265 (bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md, Codex
+    GO at -004): observational instrumentation only. Mirrors
+    ``_record_dispatch_failure`` — never raises, so an instrumentation I/O
+    error cannot perturb the trigger's fire-and-forget dispatch contract.
+    """
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        target = state_dir / TRIGGER_DIAGNOSTIC_FILENAME
+        with target.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
     except OSError:
         pass
 
@@ -902,12 +978,19 @@ def run_trigger(
     state_dir: Path,
     max_items: int = DEFAULT_MAX_ITEMS,
     dry_run: bool = False,
+    invocation_source: str = "manual",
 ) -> dict[str, Any]:
     """Run one detection + dispatch cycle.
 
     Returns a summary dict. Always succeeds (fire-and-forget); errors during
     dispatch are surfaced via the per-recipient ``last_result`` field but the
     function returns normally.
+
+    ``invocation_source`` (``"PostToolUse"`` / ``"Stop"`` / ``"manual"``) is
+    recorded in the WI-3265 diagnostic instrumentation only; it does not
+    influence dispatch. Defaults to ``"manual"`` for direct/programmatic calls;
+    ``main()`` passes ``"Stop"`` under ``--stop-hook`` and ``"PostToolUse"``
+    otherwise.
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
@@ -932,7 +1015,16 @@ def run_trigger(
         _record_single_harness_topology_skip(state_dir)
         return {"skipped": True, "reason": "single_harness_topology_not_applicable"}
 
+    # WI-3265 diagnostic instrumentation: capture the baseline at the start of
+    # the normal (multi-harness) dispatch path. Observational only — these
+    # locals never influence the dispatch decision. Per
+    # bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md (Codex GO -004).
+    _diag_start = time.monotonic()
+    _diag_index_mtime = _path_mtime_iso(project_root / "bridge" / "INDEX.md")
+    _diag_dispatch_state_mtime_pre = _path_mtime_iso(state_dir / DISPATCH_STATE_FILENAME)
+
     index_text = _read_index_live(project_root)
+    _diag_index_signature_pre = hashlib.sha256(index_text.encode("utf-8")).hexdigest()
     actionable_for_prime, actionable_for_codex = _compute_actionable(index_text, project_root)
 
     state = _load_dispatch_state(state_dir)
@@ -1087,6 +1179,44 @@ def run_trigger(
         "recipients": recipients_state,
     }
     _write_dispatch_state(state_dir, payload)
+
+    # WI-3265 diagnostic instrumentation: emit one observational record per
+    # recipient processed this invocation. The cross-harness trigger handles
+    # two recipients per invocation with independent outcomes, so the GO'd
+    # schema's per-recipient fields (classification, last_*_signature) are
+    # realized as one record per recipient. Emission runs after dispatch state
+    # is written and never alters the return value. Per
+    # bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md (Codex GO -004).
+    _diag_common = {
+        "timestamp": _now_iso(),
+        "invocation_source": invocation_source,
+        "pid": os.getpid(),
+        "session_id": os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID", ""),
+        "index_mtime": _diag_index_mtime,
+        "index_signature_pre": _diag_index_signature_pre,
+        "index_signature_post": hashlib.sha256(
+            _read_index_live(project_root).encode("utf-8")
+        ).hexdigest(),
+        "dispatch_state_mtime_pre": _diag_dispatch_state_mtime_pre,
+        "dispatch_state_mtime_post": _path_mtime_iso(state_dir / DISPATCH_STATE_FILENAME),
+        "elapsed_ms": int((time.monotonic() - _diag_start) * 1000),
+    }
+    for _diag_recipient in results:
+        _diag_state = recipients_state.get(_diag_recipient)
+        if not isinstance(_diag_state, dict):
+            _diag_state = {}
+        _diag_last_result = str(_diag_state.get("last_result") or "")
+        _emit_trigger_diagnostic(
+            state_dir,
+            {
+                **_diag_common,
+                "recipient": _diag_recipient,
+                "last_result": _diag_last_result,
+                "classification": _classify_invocation_outcome(_diag_last_result),
+                "last_dispatched_signature": _diag_state.get("last_dispatched_signature"),
+                "last_suppressed_signature": _diag_state.get("last_suppressed_signature"),
+            },
+        )
     return {"skipped": False, "results": results, "dispatch_state": payload}
 
 
@@ -1321,6 +1451,7 @@ def main(argv: list[str] | None = None) -> int:
             state_dir=state_dir,
             max_items=args.max_items,
             dry_run=args.dry_run,
+            invocation_source=("Stop" if args.stop_hook else "PostToolUse"),
         )
         if args.stop_hook:
             # Codex Stop contract: exactly one parseable JSON object on stdout,
