@@ -99,7 +99,7 @@ PROJECT_AUTHORIZATION_LINE_RE = re.compile(
 )
 PROJECT_LINE_RE = re.compile(r"^Project:\s*[A-Z0-9-]+\s*$", re.MULTILINE)
 WORK_ITEM_LINE_RE = re.compile(
-    r"^Work Item:\s*(?:WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
+    r"^Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
 )
 BRIDGE_KIND_LINE_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
 BRIDGE_KIND_METADATA_EXEMPT = frozenset(
@@ -122,7 +122,7 @@ PROJECT_AUTHORIZATION_VALUE_RE = re.compile(
 )
 PROJECT_VALUE_RE = re.compile(r"^Project:\s*([A-Z0-9-]+)\s*$", re.MULTILINE)
 WORK_ITEM_VALUE_RE = re.compile(
-    r"^Work Item:\s*(WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
+    r"^Work Item:\s*(WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
 )
 
 ADVISORY_REPORT_HEADER_FIELDS = ("bridge_kind", "Document", "Version", "Author", "Date")
@@ -526,6 +526,43 @@ def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
     return paths
 
 
+def _is_bridge_index_file(file_path: str) -> bool:
+    """True when file_path points at the canonical bridge index.
+
+    Edits to bridge/INDEX.md are intrinsic bridge protocol (every proposal
+    filing, verdict, and status transition edits it) and are never the gated
+    "implementation" of a pending proposal - even when a proposal legitimately
+    lists bridge/INDEX.md in its target_paths.
+    """
+    normalized = file_path.replace("\\", "/")
+    return f"/{normalized}".endswith("/bridge/INDEX.md")
+
+
+def _pending_proposal_ask_reason(index_path: Path, file_path: str) -> str | None:
+    """Return an ask-checkpoint reason when file_path matches a pending
+    proposal's target_paths, or None. bridge/INDEX.md is always exempt."""
+    if _is_bridge_index_file(file_path):
+        return None
+    doc_statuses = _parse_bridge_index(index_path)
+    file_path_normalized = file_path.replace("\\", "/")
+    for doc_name, status in doc_statuses.items():
+        if status not in ("NEW", "REVISED", "NO-GO"):
+            continue
+        for tp in _read_proposal_target_paths(index_path, doc_name):
+            tp_norm = tp.replace("\\", "/")
+            if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
+                if status == "NO-GO":
+                    return (
+                        "[Governance] Bridge proposal for this module has NO-GO status. "
+                        f"Review Codex findings at bridge/{doc_name} before implementing."
+                    )
+                return (
+                    f"[Governance] Bridge proposal for {doc_name} is pending Codex review ({status}). "
+                    "Wait for GO verdict before implementing."
+                )
+    return None
+
+
 def _deny_reason_for_content(
     *,
     cwd_path: Path,
@@ -768,28 +805,10 @@ def main() -> None:
         emit_pass()
         sys.exit(0)
 
-    doc_statuses = _parse_bridge_index(index_path)
-    file_path_normalized = file_path.replace("\\", "/")
-
-    for doc_name, status in doc_statuses.items():
-        if status in ("NEW", "REVISED", "NO-GO"):
-            target_paths = _read_proposal_target_paths(index_path, doc_name)
-            for tp in target_paths:
-                tp_norm = tp.replace("\\", "/")
-                if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
-                    if status == "NO-GO":
-                        emit_ask(
-                            "PreToolUse",
-                            f"[Governance] Bridge proposal for this module has NO-GO status. "
-                            f"Review Codex findings at bridge/{doc_name} before implementing.",
-                        )
-                    else:
-                        emit_ask(
-                            "PreToolUse",
-                            f"[Governance] Bridge proposal for {doc_name} is pending Codex review ({status}). "
-                            f"Wait for GO verdict before implementing.",
-                        )
-                    sys.exit(0)
+    ask_reason = _pending_proposal_ask_reason(index_path, file_path)
+    if ask_reason:
+        emit_ask("PreToolUse", ask_reason)
+        sys.exit(0)
 
     emit_pass()
     sys.exit(0)
