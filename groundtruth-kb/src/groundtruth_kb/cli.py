@@ -30,6 +30,7 @@ from groundtruth_kb.cli_deliberations_record import (
     record_deliberation,
 )
 from groundtruth_kb.cli_spec_record import SPEC_RECORD_TYPES, SpecRecordError, SpecRecordRequest, record_spec
+from groundtruth_kb.cli_spec_update import SpecUpdateError, SpecUpdateRequest, update_spec
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
@@ -2708,6 +2709,103 @@ def spec_record_cmd(
     click.echo(result["id"])
 
 
+@spec_cmd.command("update")
+@click.option("--id", "spec_id", required=True, help="Existing specification ID to version")
+@click.option(
+    "--content-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="In-root file whose contents become the new spec description",
+)
+@click.option("--change-reason", required=True, help="Reason to store with the new spec version")
+@click.option("--auq-id", required=True, help="AskUserQuestion / AUQ evidence identifier")
+@click.option("--auq-answer", required=True, help="Owner answer text or concise answer summary")
+@click.option("--owner-presented", is_flag=True, default=False, help="Assert native-format content was shown to owner")
+@click.option("--approved-by", default=None, help="Manual approval identity (default: owner)")
+@click.option("--title", default=None, help="Updated title (carried forward when omitted)")
+@click.option("--status", default=None, help="Updated lifecycle status (carried forward when omitted)")
+@click.option("--priority", default=None)
+@click.option("--scope", default=None)
+@click.option("--section", default=None)
+@click.option("--handle", default=None)
+@click.option(
+    "--testability",
+    type=click.Choice(["automatable", "observable", "structural", "untestable"]),
+    default=None,
+)
+@click.option("--tags-json", default=None, help="JSON list of tag strings")
+@click.option("--assertions-json", default=None, help="JSON list of assertion objects")
+@click.option("--constraints-json", default=None, help="JSON object of constraint metadata")
+@click.option("--affected-by-json", default=None, help="JSON list of spec IDs affecting this spec")
+@click.option("--source-paths-json", default=None, help="JSON list of source path strings")
+@click.option("--dry-run", is_flag=True, default=False, help="Validate and print the proposed packet without writing")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def spec_update_cmd(
+    ctx: click.Context,
+    spec_id: str,
+    content_file: Path,
+    change_reason: str,
+    auq_id: str,
+    auq_answer: str,
+    owner_presented: bool,
+    approved_by: str | None,
+    title: str | None,
+    status: str | None,
+    priority: str | None,
+    scope: str | None,
+    section: str | None,
+    handle: str | None,
+    testability: str | None,
+    tags_json: str | None,
+    assertions_json: str | None,
+    constraints_json: str | None,
+    affected_by_json: str | None,
+    source_paths_json: str | None,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Create a new version of an existing AUQ-backed specification."""
+
+    config = _resolve_config(ctx)
+    request = SpecUpdateRequest(
+        spec_id=spec_id,
+        content_file=content_file,
+        change_reason=change_reason,
+        auq_id=auq_id,
+        auq_answer=auq_answer,
+        owner_presented=owner_presented,
+        approved_by=approved_by,
+        title=title,
+        status=status,
+        priority=priority,
+        scope=scope,
+        section=section,
+        handle=handle,
+        testability=testability,
+        tags_json=tags_json,
+        assertions_json=assertions_json,
+        constraints_json=constraints_json,
+        affected_by_json=affected_by_json,
+        source_paths_json=source_paths_json,
+        dry_run=dry_run,
+    )
+    try:
+        result = update_spec(config, request)
+    except SpecUpdateError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+        return
+    if dry_run:
+        click.echo(f"Dry run: would update spec {result['id']} to version {result['to_version']}.")
+        click.echo(f"Approval packet path: {result['approval_packet_path']}")
+        click.echo(json.dumps(result["approval_packet"], indent=2, sort_keys=True))
+        return
+    click.echo(f"{result['id']} v{result['to_version']}")
+
+
 # ── gt deliberations ──────────────────────────────────────────────
 
 
@@ -4013,3 +4111,219 @@ def mode_apply_pending(ctx: click.Context) -> None:
         for r in results
     ]
     click.echo(_json.dumps(payload, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# gt harness — harness registry command group (REQ-HARNESS-REGISTRY-001 FR3)
+# ---------------------------------------------------------------------------
+
+_HARNESS_CLI_ACTOR = "gt-harness-cli"
+
+
+@main.group("harness")
+def harness_group() -> None:
+    """Harness registry: registration, lifecycle, role, and precedence (FR3)."""
+
+
+def _harness_emit(record: object) -> None:
+    """Echo a harness record (or list of records) as indented, key-sorted JSON."""
+    import json as _json
+
+    click.echo(_json.dumps(record, indent=2, sort_keys=True, default=str))
+
+
+def _run_harness_transition(
+    ctx: click.Context,
+    harness_id: str,
+    target_status: str,
+    expected_source: str | None,
+    reason: str,
+) -> None:
+    """Apply a lifecycle transition, refresh the FR5 projection, and echo the record."""
+    from groundtruth_kb import harness_ops
+    from groundtruth_kb.harness_projection import generate_harness_projection
+
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        record = harness_ops.transition_harness(
+            db,
+            harness_id,
+            target_status,
+            changed_by=_HARNESS_CLI_ACTOR,
+            change_reason=reason,
+            expected_source=expected_source,
+        )
+    except harness_ops.HarnessOperationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    generate_harness_projection(db, config.project_root)
+    _harness_emit(record)
+
+
+@harness_group.command("register")
+@click.option("--id", "harness_id", required=True, help="Durable harness id (e.g. A, B, C)")
+@click.option("--name", "harness_name", required=True, help="Harness name")
+@click.option("--type", "harness_type", required=True, help="Harness type (e.g. claude-code, codex-cli)")
+@click.option("--role", "roles", multiple=True, help="Initial role token (repeatable; default: none)")
+@click.option("--precedence", "precedence", type=int, default=None, help="Reviewer precedence (integer)")
+@click.option("--capabilities-ref", "capabilities_ref", default=None, help="Capabilities registry reference")
+@click.option(
+    "--invocation-surfaces",
+    "invocation_surfaces_json",
+    default=None,
+    help="Invocation surfaces as a JSON object string",
+)
+@click.option("--reason", "reason", default="register harness via gt harness register", help="Change reason")
+@click.pass_context
+def harness_register(
+    ctx: click.Context,
+    harness_id: str,
+    harness_name: str,
+    harness_type: str,
+    roles: tuple[str, ...],
+    precedence: int | None,
+    capabilities_ref: str | None,
+    invocation_surfaces_json: str | None,
+    reason: str,
+) -> None:
+    """Register a new harness at status 'registered'."""
+    import json as _json
+
+    from groundtruth_kb import harness_ops
+    from groundtruth_kb.harness_projection import generate_harness_projection
+
+    surfaces: dict[str, object] | None = None
+    if invocation_surfaces_json is not None:
+        try:
+            parsed = _json.loads(invocation_surfaces_json)
+        except _json.JSONDecodeError as exc:
+            raise click.ClickException(f"--invocation-surfaces is not valid JSON: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise click.ClickException("--invocation-surfaces must be a JSON object")
+        surfaces = parsed
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        record = harness_ops.register_harness(
+            db,
+            id=harness_id,
+            harness_name=harness_name,
+            harness_type=harness_type,
+            role=list(roles),
+            reviewer_precedence=precedence,
+            invocation_surfaces=surfaces,
+            capabilities_ref=capabilities_ref,
+            changed_by=_HARNESS_CLI_ACTOR,
+            change_reason=reason,
+        )
+    except harness_ops.HarnessOperationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    generate_harness_projection(db, config.project_root)
+    _harness_emit(record)
+
+
+@harness_group.command("activate")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.option("--reason", "reason", default="activate harness via gt harness activate", help="Change reason")
+@click.pass_context
+def harness_activate(ctx: click.Context, harness_id: str, reason: str) -> None:
+    """Activate a registered harness (registered -> active)."""
+    _run_harness_transition(ctx, harness_id, "active", "registered", reason)
+
+
+@harness_group.command("suspend")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.option("--reason", "reason", default="suspend harness via gt harness suspend", help="Change reason")
+@click.pass_context
+def harness_suspend(ctx: click.Context, harness_id: str, reason: str) -> None:
+    """Suspend an active harness (active -> suspended)."""
+    _run_harness_transition(ctx, harness_id, "suspended", "active", reason)
+
+
+@harness_group.command("resume")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.option("--reason", "reason", default="resume harness via gt harness resume", help="Change reason")
+@click.pass_context
+def harness_resume(ctx: click.Context, harness_id: str, reason: str) -> None:
+    """Resume a suspended harness (suspended -> active)."""
+    _run_harness_transition(ctx, harness_id, "active", "suspended", reason)
+
+
+@harness_group.command("retire")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.option("--reason", "reason", default="retire harness via gt harness retire", help="Change reason")
+@click.pass_context
+def harness_retire(ctx: click.Context, harness_id: str, reason: str) -> None:
+    """Retire a harness. A suspended harness retires directly; an active harness auto-suspends first."""
+    _run_harness_transition(ctx, harness_id, "retired", None, reason)
+
+
+@harness_group.command("set-precedence")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.option("--precedence", "precedence", type=int, required=True, help="Reviewer precedence (integer)")
+@click.option(
+    "--reason",
+    "reason",
+    default="set reviewer precedence via gt harness set-precedence",
+    help="Change reason",
+)
+@click.pass_context
+def harness_set_precedence(ctx: click.Context, harness_id: str, precedence: int, reason: str) -> None:
+    """Set a harness's reviewer precedence."""
+    from groundtruth_kb import harness_ops
+    from groundtruth_kb.harness_projection import generate_harness_projection
+
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        record = harness_ops.set_harness_precedence(
+            db,
+            harness_id,
+            precedence,
+            changed_by=_HARNESS_CLI_ACTOR,
+            change_reason=reason,
+        )
+    except harness_ops.HarnessOperationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    generate_harness_projection(db, config.project_root)
+    _harness_emit(record)
+
+
+@harness_group.command("set-role")
+@click.option("--harness", "harness_id", default=None, help="Harness id (eventual interface)")
+@click.option("--role", "role", default=None, help="Role to assign (eventual interface)")
+def harness_set_role(harness_id: str | None, role: str | None) -> None:
+    """Assign an operating role to a harness.
+
+    Not yet available: DB-backed role assignment is REQ-HARNESS-REGISTRY-001
+    FR9, delivered by WI-3341. Use 'gt mode set-role' for role changes.
+    """
+    raise click.ClickException(
+        "gt harness set-role is not yet available. DB-backed role assignment "
+        "(REQ-HARNESS-REGISTRY-001 FR9 - assign prime-builder to an active harness, "
+        "atomic demotion, and the single-prime-builder invariant) is delivered by "
+        "WI-3341 and depends on the harness-registry reader migration (WI-3342). "
+        "Use 'gt mode set-role' for role changes until then."
+    )
+
+
+@harness_group.command("list")
+@click.pass_context
+def harness_list(ctx: click.Context) -> None:
+    """List all harness registry records (current versions)."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    _harness_emit(db.list_harnesses())
+
+
+@harness_group.command("show")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.pass_context
+def harness_show(ctx: click.Context, harness_id: str) -> None:
+    """Show one harness registry record (current version)."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    record = db.get_harness(harness_id)
+    if record is None:
+        raise click.ClickException(f"unknown harness {harness_id!r}; no such harness in the registry")
+    _harness_emit(record)
