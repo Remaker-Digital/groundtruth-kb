@@ -1392,3 +1392,87 @@ class TestProjectAuthorizationSpecAmendment:
             packet, "PROJECT-MISSING", "PAUTH-MISSING", {"SPEC-1"}, set(),
         )
         assert covers_no_project is False and "PROJECT-MISSING" in reason
+
+
+class TestHarnesses:
+    """Tests for the harnesses registry table (REQ-HARNESS-REGISTRY-001 FR1)."""
+
+    def test_harnesses_table_created(self, db):
+        # list_harnesses() selects from the current_harnesses view, which selects
+        # from the harnesses table; a clean empty result on a fresh DB proves
+        # both the table and the view were created at schema initialization.
+        assert db.list_harnesses() == []
+        assert db.get_harness("B") is None
+
+    def test_insert_harness_creates_v1(self, db):
+        result = db.insert_harness(
+            id="B",
+            harness_name="claude",
+            harness_type="claude",
+            role=["prime-builder"],
+            changed_by="test",
+            change_reason="initial registration",
+            invocation_surfaces={"interactive": "claude", "headless": "claude -p"},
+            capabilities_ref="config/agent-control/harness-capability-registry.toml",
+        )
+        assert result is not None
+        assert result["id"] == "B"
+        assert result["version"] == 1
+        assert result["harness_name"] == "claude"
+        assert result["harness_type"] == "claude"
+        assert result["status"] == "registered"
+        assert result["role"] == '["prime-builder"]'
+        assert result["reviewer_precedence"] is None
+        assert result["invocation_surfaces"] == '{"interactive": "claude", "headless": "claude -p"}'
+        assert result["capabilities_ref"].endswith("harness-capability-registry.toml")
+
+    def test_insert_harness_version_bumps(self, db):
+        v1 = db.insert_harness(
+            id="A", harness_name="codex", harness_type="codex",
+            role=["loyal-opposition"], changed_by="test", change_reason="v1",
+        )
+        v2 = db.insert_harness(
+            id="A", harness_name="codex", harness_type="codex",
+            role=["loyal-opposition"], changed_by="test", change_reason="v2",
+            status="suspended",
+        )
+        assert v1["version"] == 1
+        assert v2["version"] == 2
+        assert v2["status"] == "suspended"
+
+    def test_get_harness_returns_latest(self, db):
+        db.insert_harness(
+            id="C", harness_name="antigravity", harness_type="antigravity",
+            role=["loyal-opposition"], changed_by="test", change_reason="v1",
+        )
+        db.insert_harness(
+            id="C", harness_name="antigravity", harness_type="antigravity",
+            role=["loyal-opposition"], changed_by="test", change_reason="v2",
+            status="active",
+        )
+        result = db.get_harness("C")
+        assert result is not None
+        assert result["version"] == 2
+        assert result["status"] == "active"
+        assert db.get_harness("NO-SUCH-HARNESS") is None
+
+    def test_list_harnesses_returns_current_set(self, db):
+        db.insert_harness(
+            id="A", harness_name="codex", harness_type="codex",
+            role=["loyal-opposition"], changed_by="test", change_reason="v1",
+        )
+        db.insert_harness(
+            id="B", harness_name="claude", harness_type="claude",
+            role=["prime-builder"], changed_by="test", change_reason="v1",
+        )
+        db.insert_harness(
+            id="B", harness_name="claude", harness_type="claude",
+            role=["prime-builder"], changed_by="test", change_reason="v2",
+            status="active",
+        )
+        harnesses = db.list_harnesses()
+        assert len(harnesses) == 2
+        by_id = {h["id"]: h for h in harnesses}
+        assert by_id["A"]["version"] == 1
+        assert by_id["B"]["version"] == 2
+        assert by_id["B"]["status"] == "active"

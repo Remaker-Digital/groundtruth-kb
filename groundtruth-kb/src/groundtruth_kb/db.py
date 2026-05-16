@@ -564,6 +564,25 @@ CREATE TABLE IF NOT EXISTS canonical_terms (
     UNIQUE(id, version)
 );
 
+-- Harness registry: append-only authoritative store of AI coding harness
+-- records (REQ-HARNESS-REGISTRY-001 FR1). Topology is derived, never stored.
+CREATE TABLE IF NOT EXISTS harnesses (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    harness_name TEXT NOT NULL,
+    harness_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'registered',
+    role TEXT NOT NULL,
+    reviewer_precedence INTEGER,
+    invocation_surfaces TEXT,
+    capabilities_ref TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -718,6 +737,11 @@ CREATE VIEW IF NOT EXISTS current_canonical_terms AS
 SELECT c.* FROM canonical_terms c
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM canonical_terms GROUP BY id) m
 ON c.id = m.id AND c.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_harnesses AS
+SELECT h.* FROM harnesses h
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM harnesses GROUP BY id) m
+ON h.id = m.id AND h.version = m.max_v;
 """
 
 
@@ -4188,6 +4212,83 @@ class KnowledgeDB:
             query += " AND status = 'active'"
         query += " ORDER BY project_id, authorization_name, id"
         rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def insert_harness(
+        self,
+        id: str,
+        harness_name: str,
+        harness_type: str,
+        role: list[str],
+        changed_by: str,
+        change_reason: str,
+        *,
+        status: str = "registered",
+        reviewer_precedence: int | None = None,
+        invocation_surfaces: dict[str, Any] | None = None,
+        capabilities_ref: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Insert a new append-only harness registry version.
+
+        Implements REQ-HARNESS-REGISTRY-001 FR1. ``id`` is the durable harness
+        identity (e.g. ``A`` / ``B`` / ``C``); each call appends the next
+        version for that id. ``role`` is the role-set wire form (a list of
+        role tokens) and is JSON-encoded; ``invocation_surfaces`` is an
+        optional dict (interactive + headless surfaces) JSON-encoded.
+        """
+        if not str(id).strip():
+            raise ValueError("harness id is required")
+        if not harness_name.strip():
+            raise ValueError("harness_name is required")
+        if not harness_type.strip():
+            raise ValueError("harness_type is required")
+        conn = self._get_conn()
+        version = int(
+            conn.execute(
+                "SELECT COALESCE(MAX(version), 0) + 1 FROM harnesses WHERE id = ?",
+                (id,),
+            ).fetchone()[0]
+        )
+        conn.execute(
+            """INSERT INTO harnesses
+               (id, version, harness_name, harness_type, status, role,
+                reviewer_precedence, invocation_surfaces, capabilities_ref,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                id,
+                version,
+                harness_name,
+                harness_type,
+                status,
+                json.dumps(list(role)),
+                reviewer_precedence,
+                json.dumps(invocation_surfaces) if invocation_surfaces is not None else None,
+                capabilities_ref,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_harness(id)
+
+    def get_harness(self, harness_id: str) -> dict[str, Any] | None:
+        """Return the current (latest-version) harness row, or None."""
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_harnesses WHERE id = ?", (harness_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def list_harnesses(self) -> list[dict[str, Any]]:
+        """Return all current-version harness rows ordered by harness id."""
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM current_harnesses ORDER BY id")
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def update_project_authorization(
