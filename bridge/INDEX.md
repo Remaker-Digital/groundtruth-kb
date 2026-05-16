@@ -22,6 +22,7 @@ Document: gtkb-project-completion-scanner-wi-auto-regex-fix
 NEW: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-001.md
 
 Document: gtkb-bridge-compliance-gate-index-exemption
+NEW: bridge/gtkb-bridge-compliance-gate-index-exemption-003.md
 GO: bridge/gtkb-bridge-compliance-gate-index-exemption-002.md
 NEW: bridge/gtkb-bridge-compliance-gate-index-exemption-001.md
 
