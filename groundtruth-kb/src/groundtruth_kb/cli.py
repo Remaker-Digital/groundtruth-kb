@@ -432,6 +432,101 @@ def backlog_migrate_work_list(
             click.echo(f"  - {item_id}")
 
 
+@backlog.command("add")
+@click.option("--title", required=True, help="Work item title.")
+@click.option(
+    "--origin",
+    required=True,
+    type=click.Choice(["new", "hygiene", "improvement", "defect", "regression"]),
+    help="Work item origin classification.",
+)
+@click.option("--component", required=True, help="Component taxonomy value.")
+@click.option(
+    "--priority",
+    type=click.Choice(["P0", "P1", "P2", "P3"]),
+    default="P3",
+    show_default=True,
+    help="Candidate priority.",
+)
+@click.option("--project-name", default=None, help="Project grouping for the candidate.")
+@click.option("--subproject-name", default=None, help="Sub-project grouping for the candidate.")
+@click.option("--description", default=None, help="Longer description of the candidate work.")
+@click.option("--source-owner-directive", default=None, help="Owner directive that motivated this candidate.")
+@click.option("--source-spec-id", default=None, help="Specification this work item relates to.")
+@click.option("--source-deliberation-query", default=None, help="Deliberation search query that surfaced this work.")
+@click.option("--related-spec-ids", default=None, help="JSON array of related spec ids.")
+@click.option("--related-deliberation-ids", default=None, help="JSON array of related DELIB ids.")
+@click.option("--related-bridge-threads", default=None, help="JSON array of related bridge file paths.")
+@click.option("--depends-on-work-items", default=None, help="JSON array of WI ids this candidate depends on.")
+@click.option("--acceptance-summary", default=None, help="Acceptance summary for the candidate.")
+@click.option("--regression-visibility", default=None, help="Regression-visibility note for the candidate.")
+@click.option("--change-reason", required=True, help="History reason for the insert.")
+@click.option("--dry-run", is_flag=True, help="Report the allocated id without writing the row.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_add(
+    ctx: click.Context,
+    title: str,
+    origin: str,
+    component: str,
+    priority: str,
+    project_name: str | None,
+    subproject_name: str | None,
+    description: str | None,
+    source_owner_directive: str | None,
+    source_spec_id: str | None,
+    source_deliberation_query: str | None,
+    related_spec_ids: str | None,
+    related_deliberation_ids: str | None,
+    related_bridge_threads: str | None,
+    depends_on_work_items: str | None,
+    acceptance_summary: str | None,
+    regression_visibility: str | None,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Capture a single MemBase work_items backlog candidate row.
+
+    Capture is not implementation approval — the new row records a candidate
+    for future consideration. The command writes only to MemBase work_items;
+    it never mutates memory/MEMORY.md or memory/work_list.md.
+    """
+    from groundtruth_kb.cli_backlog_add import BacklogAddError, BacklogAddRequest, add_backlog_item
+
+    config = _resolve_config(ctx)
+    request = BacklogAddRequest(
+        title=title,
+        origin=origin,
+        component=component,
+        priority=priority,
+        project_name=project_name,
+        subproject_name=subproject_name,
+        description=description,
+        source_owner_directive=source_owner_directive,
+        source_spec_id=source_spec_id,
+        source_deliberation_query=source_deliberation_query,
+        related_spec_ids_at_creation=related_spec_ids,
+        related_deliberation_ids=related_deliberation_ids,
+        related_bridge_threads=related_bridge_threads,
+        depends_on_work_items=depends_on_work_items,
+        acceptance_summary=acceptance_summary,
+        regression_visibility=regression_visibility,
+        change_reason=change_reason,
+        dry_run=dry_run,
+    )
+    try:
+        result = add_backlog_item(config, request)
+    except (BacklogAddError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+    action = "Would create" if result["dry_run"] else "Created"
+    click.echo(f"{action} {result['id']}")
+
+
 @backlog.command("list")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.option("--all", "include_verified", is_flag=True, help="Include verified/closed work items.")
