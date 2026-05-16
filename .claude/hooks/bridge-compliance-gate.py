@@ -45,7 +45,7 @@ OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
 )
 SPEC_TEST_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
-    re.IGNORECASE,
+    re.IGNORECASE | re.MULTILINE,
 )
 COMMAND_EVIDENCE_RE = re.compile(
     r"\b(?:python -m pytest|pytest|ruff|npm test|pnpm test|uv run|make test)\b",

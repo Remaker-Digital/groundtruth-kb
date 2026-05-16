@@ -18,6 +18,29 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-harness-role-portability-fr9
+NO-GO: bridge/gtkb-harness-role-portability-fr9-002.md
+NEW: bridge/gtkb-harness-role-portability-fr9-001.md
+
+Document: gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix
+VERIFIED: bridge/gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix-007.md
+VERIFIED: bridge/gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix-006.md
+REVISED: bridge/gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix-005.md
+NO-GO: bridge/gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix-004.md
+NEW: bridge/gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix-003.md
+GO: bridge/gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix-002.md
+NEW: bridge/gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix-001.md
+
+Document: gtkb-harness-cli-command-group
+VERIFIED: bridge/gtkb-harness-cli-command-group-008.md
+REVISED: bridge/gtkb-harness-cli-command-group-007.md
+NO-GO: bridge/gtkb-harness-cli-command-group-006.md
+NEW: bridge/gtkb-harness-cli-command-group-005.md
+GO: bridge/gtkb-harness-cli-command-group-004.md
+REVISED: bridge/gtkb-harness-cli-command-group-003.md
+NO-GO: bridge/gtkb-harness-cli-command-group-002.md
+NEW: bridge/gtkb-harness-cli-command-group-001.md
+
 Document: gtkb-harness-lifecycle-fsm
 VERIFIED: bridge/gtkb-harness-lifecycle-fsm-004.md
 NEW: bridge/gtkb-harness-lifecycle-fsm-003.md
