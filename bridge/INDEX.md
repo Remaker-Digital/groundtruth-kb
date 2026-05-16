@@ -18,16 +18,23 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-project-completion-scanner-wi-auto-regex-fix
+NEW: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-001.md
+
 Document: gtkb-bridge-compliance-gate-index-exemption
+GO: bridge/gtkb-bridge-compliance-gate-index-exemption-002.md
 NEW: bridge/gtkb-bridge-compliance-gate-index-exemption-001.md
 
 Document: gtkb-bridge-compliance-gate-wi-auto-regex-fix
+GO: bridge/gtkb-bridge-compliance-gate-wi-auto-regex-fix-002.md
 NEW: bridge/gtkb-bridge-compliance-gate-wi-auto-regex-fix-001.md
 
 Document: gtkb-impl-auth-parser-false-positive-fix
+NO-GO: bridge/gtkb-impl-auth-parser-false-positive-fix-002.md
 NEW: bridge/gtkb-impl-auth-parser-false-positive-fix-001.md
 
 Document: gtkb-owner-decision-tracker-startup-relay-known-match-suppression
+NO-GO: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-006.md
 NEW: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-005.md
 GO: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-004.md
 REVISED: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-003.md
@@ -102,6 +109,7 @@ NO-GO: bridge/gtkb-hook-import-latency-chromadb-lazy-002.md
 NEW: bridge/gtkb-hook-import-latency-chromadb-lazy-001.md
 
 Document: gtkb-gt-bridge-propose-deterministic-cli
+GO: bridge/gtkb-gt-bridge-propose-deterministic-cli-004.md
 REVISED: bridge/gtkb-gt-bridge-propose-deterministic-cli-003.md
 NO-GO: bridge/gtkb-gt-bridge-propose-deterministic-cli-002.md
 NEW: bridge/gtkb-gt-bridge-propose-deterministic-cli-001.md
@@ -112,11 +120,13 @@ NO-GO: bridge/gtkb-bridge-mode-config-transactions-impl-002.md
 NEW: bridge/gtkb-bridge-mode-config-transactions-impl-001.md
 
 Document: gtkb-agent-red-deployability-preservation-gate
+GO: bridge/gtkb-agent-red-deployability-preservation-gate-004.md
 REVISED: bridge/gtkb-agent-red-deployability-preservation-gate-003.md
 NO-GO: bridge/gtkb-agent-red-deployability-preservation-gate-002.md
 NEW: bridge/gtkb-agent-red-deployability-preservation-gate-001.md
 
 Document: gtkb-por-step-16-d-orphan-test-rationalization
+GO: bridge/gtkb-por-step-16-d-orphan-test-rationalization-004.md
 REVISED: bridge/gtkb-por-step-16-d-orphan-test-rationalization-003.md
 NO-GO: bridge/gtkb-por-step-16-d-orphan-test-rationalization-002.md
 NEW: bridge/gtkb-por-step-16-d-orphan-test-rationalization-001.md
@@ -138,11 +148,13 @@ NO-GO: bridge/gtkb-role-enhancement-review-depth-methodology-002.md
 NEW: bridge/gtkb-role-enhancement-review-depth-methodology-001.md
 
 Document: gtkb-wrapup-enhancements-next-slice
+GO: bridge/gtkb-wrapup-enhancements-next-slice-004.md
 REVISED: bridge/gtkb-wrapup-enhancements-next-slice-003.md
 NO-GO: bridge/gtkb-wrapup-enhancements-next-slice-002.md
 NEW: bridge/gtkb-wrapup-enhancements-next-slice-001.md
 
 Document: gtkb-startup-refractor-glossary-load-surface
+GO: bridge/gtkb-startup-refractor-glossary-load-surface-004.md
 REVISED: bridge/gtkb-startup-refractor-glossary-load-surface-003.md
 NO-GO: bridge/gtkb-startup-refractor-glossary-load-surface-002.md
 NEW: bridge/gtkb-startup-refractor-glossary-load-surface-001.md
@@ -154,6 +166,7 @@ NO-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-002.md
 NEW: bridge/gtkb-startup-enhancements-p2-freshness-contract-001.md
 
 Document: gtkb-in-source-provenance-anchors-001-prop
+NO-GO: bridge/gtkb-in-source-provenance-anchors-001-prop-002.md
 NEW: bridge/gtkb-in-source-provenance-anchors-001-prop.md
 
 Document: gtkb-membase-effective-use-recovery-next-slice
@@ -181,6 +194,8 @@ NO-GO: bridge/gtkb-bridge-propose-helper-non-bypass-redesign-002.md
 NEW: bridge/gtkb-bridge-propose-helper-non-bypass-redesign-001.md
 
 Document: gtkb-cross-harness-trigger-index-edit-race-quiesce
+GO: bridge/gtkb-cross-harness-trigger-index-edit-race-quiesce-006.md
+REVISED: bridge/gtkb-cross-harness-trigger-index-edit-race-quiesce-005.md
 NO-GO: bridge/gtkb-cross-harness-trigger-index-edit-race-quiesce-004.md
 REVISED: bridge/gtkb-cross-harness-trigger-index-edit-race-quiesce-003.md
 NO-GO: bridge/gtkb-cross-harness-trigger-index-edit-race-quiesce-002.md
@@ -193,6 +208,8 @@ NO-GO: bridge/gtkb-bridge-citation-freshness-preflight-002.md
 NEW: bridge/gtkb-bridge-citation-freshness-preflight-001.md
 
 Document: gtkb-bridge-poller-wi-retirement-disposition
+GO: bridge/gtkb-bridge-poller-wi-retirement-disposition-006.md
+REVISED: bridge/gtkb-bridge-poller-wi-retirement-disposition-005.md
 NO-GO: bridge/gtkb-bridge-poller-wi-retirement-disposition-004.md
 REVISED: bridge/gtkb-bridge-poller-wi-retirement-disposition-003.md
 NO-GO: bridge/gtkb-bridge-poller-wi-retirement-disposition-002.md
@@ -225,6 +242,8 @@ NO-GO: bridge/gtkb-tier-a-managed-skill-adoption-apply-002.md
 NEW: bridge/gtkb-tier-a-managed-skill-adoption-apply-001.md
 
 Document: gtkb-core-spec-intake-default
+GO: bridge/gtkb-core-spec-intake-default-006.md
+REVISED: bridge/gtkb-core-spec-intake-default-005.md
 NO-GO: bridge/gtkb-core-spec-intake-default-004.md
 REVISED: bridge/gtkb-core-spec-intake-default-003.md
 NO-GO: bridge/gtkb-core-spec-intake-default-002.md
@@ -279,9 +298,11 @@ NO-GO: bridge/gtkb-codex-feedback-pattern-lints-002.md
 NEW: bridge/gtkb-codex-feedback-pattern-lints-001.md
 
 Document: gtkb-commit-scope-bundling-detection-001-prop
+NO-GO: bridge/gtkb-commit-scope-bundling-detection-001-prop-002.md
 NEW: bridge/gtkb-commit-scope-bundling-detection-001-prop.md
 
 Document: gtkb-auto-push-investigation-001-prop
+NO-GO: bridge/gtkb-auto-push-investigation-001-prop-002.md
 NEW: bridge/gtkb-auto-push-investigation-001-prop.md
 
 Document: gtkb-lo-file-safety-pretooluse-enforcement
@@ -308,6 +329,9 @@ NO-GO: bridge/gtkb-bridge-skill-protected-write-helper-002.md
 NEW: bridge/gtkb-bridge-skill-protected-write-helper-001.md
 
 Document: gtkb-generate-approval-packet-cli
+REVISED: bridge/gtkb-generate-approval-packet-cli-009.md
+NO-GO: bridge/gtkb-generate-approval-packet-cli-008.md
+REVISED: bridge/gtkb-generate-approval-packet-cli-007.md
 NO-GO: bridge/gtkb-generate-approval-packet-cli-006.md
 REVISED: bridge/gtkb-generate-approval-packet-cli-005.md
 NO-GO: bridge/gtkb-generate-approval-packet-cli-004.md
@@ -342,6 +366,9 @@ NO-GO: bridge/gtkb-artifact-recorder-cli-scoping-advance-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-scoping-advance-001.md
 
 Document: gtkb-proposal-standards-wi-id-collision-gate
+REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-007.md
+NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-006.md
+REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-005.md
 NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-004.md
 REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-003.md
 NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
@@ -359,6 +386,9 @@ NO-GO: bridge/gtkb-backlog-approval-state-taxonomy-auq-002.md
 NEW: bridge/gtkb-backlog-approval-state-taxonomy-auq-001.md
 
 Document: gtkb-gt-backlog-add-cli
+WITHDRAWN: bridge/gtkb-gt-backlog-add-cli-007.md
+NO-GO: bridge/gtkb-gt-backlog-add-cli-006.md
+REVISED: bridge/gtkb-gt-backlog-add-cli-005.md
 NO-GO: bridge/gtkb-gt-backlog-add-cli-004.md
 REVISED: bridge/gtkb-gt-backlog-add-cli-003.md
 NO-GO: bridge/gtkb-gt-backlog-add-cli-002.md
