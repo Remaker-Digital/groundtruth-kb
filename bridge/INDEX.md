@@ -18,6 +18,29 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-adr-harness-registry-extension
+GO: bridge/gtkb-adr-harness-registry-extension-004.md
+REVISED: bridge/gtkb-adr-harness-registry-extension-003.md
+NO-GO: bridge/gtkb-adr-harness-registry-extension-002.md
+NEW: bridge/gtkb-adr-harness-registry-extension-001.md
+
+Document: gtkb-harness-registry-reader-migration
+GO: bridge/gtkb-harness-registry-reader-migration-004.md
+REVISED: bridge/gtkb-harness-registry-reader-migration-003.md
+NO-GO: bridge/gtkb-harness-registry-reader-migration-002.md
+NEW: bridge/gtkb-harness-registry-reader-migration-001.md
+
+Document: gtkb-harness-data-driven-dispatch
+GO: bridge/gtkb-harness-data-driven-dispatch-004.md
+REVISED: bridge/gtkb-harness-data-driven-dispatch-003.md
+NO-GO: bridge/gtkb-harness-data-driven-dispatch-002.md
+NEW: bridge/gtkb-harness-data-driven-dispatch-001.md
+
+Document: gtkb-impl-start-gate-finalization-quoting-fix
+REVISED: bridge/gtkb-impl-start-gate-finalization-quoting-fix-003.md
+NO-GO: bridge/gtkb-impl-start-gate-finalization-quoting-fix-002.md
+NEW: bridge/gtkb-impl-start-gate-finalization-quoting-fix-001.md
+
 Document: gtkb-impl-start-gate-comparison-operator-fix
 VERIFIED: bridge/gtkb-impl-start-gate-comparison-operator-fix-006.md
 REVISED: bridge/gtkb-impl-start-gate-comparison-operator-fix-005.md
