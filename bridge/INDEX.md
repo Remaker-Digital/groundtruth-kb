@@ -37,6 +37,8 @@ NO-GO: bridge/gtkb-harness-data-driven-dispatch-002.md
 NEW: bridge/gtkb-harness-data-driven-dispatch-001.md
 
 Document: gtkb-impl-start-gate-finalization-quoting-fix
+REVISED: bridge/gtkb-impl-start-gate-finalization-quoting-fix-005.md
+NO-GO: bridge/gtkb-impl-start-gate-finalization-quoting-fix-004.md
 REVISED: bridge/gtkb-impl-start-gate-finalization-quoting-fix-003.md
 NO-GO: bridge/gtkb-impl-start-gate-finalization-quoting-fix-002.md
 NEW: bridge/gtkb-impl-start-gate-finalization-quoting-fix-001.md
