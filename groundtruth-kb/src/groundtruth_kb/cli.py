@@ -4290,20 +4290,78 @@ def harness_set_precedence(ctx: click.Context, harness_id: str, precedence: int,
 
 
 @harness_group.command("set-role")
-@click.option("--harness", "harness_id", default=None, help="Harness id (eventual interface)")
-@click.option("--role", "role", default=None, help="Role to assign (eventual interface)")
-def harness_set_role(harness_id: str | None, role: str | None) -> None:
-    """Assign an operating role to a harness.
+@click.option(
+    "--harness",
+    "harness_id",
+    required=True,
+    help="Durable harness id to promote to prime-builder",
+)
+@click.option(
+    "--reason",
+    "reason",
+    default="promote to prime-builder via gt harness set-role",
+    help="Change reason",
+)
+@click.pass_context
+def harness_set_role(ctx: click.Context, harness_id: str, reason: str) -> None:
+    """Promote a harness to prime-builder, demoting every other harness.
 
-    Not yet available: DB-backed role assignment is REQ-HARNESS-REGISTRY-001
-    FR9, delivered by WI-3341. Use 'gt mode set-role' for role changes.
+    REQ-HARNESS-REGISTRY-001 FR9. The target must be an 'active' harness in the
+    registry; promoting it atomically demotes every other harness to
+    loyal-opposition, leaving the role map as a full role partition.
     """
-    raise click.ClickException(
-        "gt harness set-role is not yet available. DB-backed role assignment "
-        "(REQ-HARNESS-REGISTRY-001 FR9 - assign prime-builder to an active harness, "
-        "atomic demotion, and the single-prime-builder invariant) is delivered by "
-        "WI-3341 and depends on the harness-registry reader migration (WI-3342). "
-        "Use 'gt mode set-role' for role changes until then."
+    import json as _json
+    from pathlib import Path
+
+    from groundtruth_kb.mode_switch.invariants import (
+        RolePartitionViolation,
+        verify_role_partition,
+    )
+    from groundtruth_kb.mode_switch.transaction import (
+        TransactionValidationError,
+        apply_role_switch,
+    )
+
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    # FR9 active-harness eligibility gate: the target must be an active harness
+    # in the DB-backed registry (seeded by WI-3342 Slice A).
+    record = db.get_harness(harness_id)
+    if record is None:
+        raise click.ClickException(
+            f"unknown harness {harness_id!r}; no such harness in the registry"
+        )
+    status = record.get("status")
+    if status != "active":
+        raise click.ClickException(
+            f"harness {harness_id!r} has status {status!r}; gt harness set-role "
+            f"can promote only an active harness — use 'gt harness activate' or "
+            f"'gt harness resume' to bring it active first"
+        )
+    root = Path(config.project_root)
+    try:
+        result = apply_role_switch(
+            root, harness_id, "prime-builder", change_reason=reason
+        )
+    except TransactionValidationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    try:
+        prime_id = verify_role_partition(root)
+    except RolePartitionViolation as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        _json.dumps(
+            {
+                "harness_id": result.harness_id,
+                "new_role_set": list(result.new_role_set),
+                "previous_role_set": list(result.previous_role_set),
+                "derived_topology": result.derived_topology,
+                "audit_record_path": str(result.audit_record_path),
+                "verified_prime_builder": prime_id,
+            },
+            indent=2,
+            sort_keys=True,
+        )
     )
 
 

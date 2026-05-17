@@ -142,3 +142,29 @@ def test_audit_record_contains_required_fields(project_root: Path) -> None:
     assert "requested_at" in record
     assert "effective_at" in record
     assert record["deferred"] is False
+
+
+def test_apply_role_switch_prime_builder_demotes_all_non_targets(
+    project_root: Path,
+) -> None:
+    """FR9 full role partition: promoting a harness to prime-builder demotes
+    EVERY other harness to loyal-opposition, including a non-target whose prior
+    role set was empty (the -006 F1 regression)."""
+    role_map = {
+        "harnesses": {
+            "A": {"role": ["prime-builder"], "name": "codex"},
+            "B": {"role": ["loyal-opposition"], "name": "claude"},
+            "C": {"role": [], "name": "antigravity"},
+        }
+    }
+    _seed_workspace(project_root, role_map=role_map)
+    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
+    updated = json.loads(
+        (project_root / "harness-state" / "role-assignments.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert updated["harnesses"]["B"]["role"] == ["prime-builder"]
+    assert updated["harnesses"]["A"]["role"] == ["loyal-opposition"]
+    # C's prior role set was [] — without the FR9 fix it would survive as [].
+    assert updated["harnesses"]["C"]["role"] == ["loyal-opposition"]

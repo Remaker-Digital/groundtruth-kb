@@ -166,6 +166,14 @@ def apply_role_switch(
     for other_id, other_record in harnesses.items():
         if other_id == harness_id or not isinstance(other_record, dict):
             continue
+        if role == "prime-builder":
+            # REQ-HARNESS-REGISTRY-001 FR9: promoting a harness to
+            # prime-builder atomically demotes every other recorded harness to
+            # loyal-opposition, so the transaction always yields the full role
+            # partition (one prime-builder, every other loyal-opposition) —
+            # including a non-target whose prior role set was empty.
+            other_record["role"] = ["loyal-opposition"]
+            continue
         other_role = other_record.get("role")
         other_set = []
         if isinstance(other_role, list):
