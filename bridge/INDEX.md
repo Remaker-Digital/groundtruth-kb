@@ -18,6 +18,10 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-bridge-active-session-autodrain
+NO-GO: bridge/gtkb-bridge-active-session-autodrain-002.md
+NEW: bridge/gtkb-bridge-active-session-autodrain-001.md
+
 Document: gtkb-adr-harness-registry-extension
 GO: bridge/gtkb-adr-harness-registry-extension-004.md
 REVISED: bridge/gtkb-adr-harness-registry-extension-003.md
@@ -37,6 +41,8 @@ NO-GO: bridge/gtkb-harness-data-driven-dispatch-002.md
 NEW: bridge/gtkb-harness-data-driven-dispatch-001.md
 
 Document: gtkb-impl-start-gate-finalization-quoting-fix
+REVISED: bridge/gtkb-impl-start-gate-finalization-quoting-fix-007.md
+NO-GO: bridge/gtkb-impl-start-gate-finalization-quoting-fix-006.md
 REVISED: bridge/gtkb-impl-start-gate-finalization-quoting-fix-005.md
 NO-GO: bridge/gtkb-impl-start-gate-finalization-quoting-fix-004.md
 REVISED: bridge/gtkb-impl-start-gate-finalization-quoting-fix-003.md
