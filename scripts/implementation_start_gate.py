@@ -67,7 +67,14 @@ SAFE_COMMAND_PREFIXES = (
     "python scripts/adr_dcl_clause_preflight.py",
 )
 GIT_FINALIZATION_SUBCOMMANDS = {"commit", "push"}
-GIT_FINALIZATION_CONTROL_MARKERS = (";", "&&", "||", "|", "$(", "`")
+# Markers that disqualify the simple git-finalization exemption, split by
+# shell quoting semantics so the scan can be quote-aware (WI-3357):
+#   - chaining markers are literal inside EITHER quote type;
+#   - execution markers still run inside double quotes (literal only inside
+#     single quotes).
+GIT_FINALIZATION_CHAINING_MARKERS = (";", "&&", "||", "|")
+GIT_FINALIZATION_EXECUTION_MARKERS = ("$(", "`")
+GIT_FINALIZATION_CONTROL_MARKERS = GIT_FINALIZATION_CHAINING_MARKERS + GIT_FINALIZATION_EXECUTION_MARKERS
 GIT_FINALIZATION_DENIED_FLAGS = {"-f", "--force", "--force-with-lease"}
 MUTATING_COMMAND_RE = re.compile(
     r"\b("
@@ -98,6 +105,17 @@ PATCH_MOVE_RE = re.compile(r"^\*\*\* Move to: (.+)$", re.MULTILINE)
 POWERSHELL_ENV_ASSIGNMENT_RE = re.compile(
     r"""^(?:\$env:[a-z_][\w_]*\s*=\s*(?:'[^']*'|"[^""]*"|[^\s;]+)\s*;\s*)+""",
     re.IGNORECASE,
+)
+# WI-3357: opener of the documented HEREDOC commit-message pattern
+#   git commit -m "$(cat <<'EOF' ... EOF)"
+# This regex matches ONLY the fixed opener `$(cat <<['"]DELIM['"]` on a single
+# physical line (internal whitespace is [ \t], never a newline). The opener-line
+# tail, the heredoc-terminating delimiter line, and the substitution's closing
+# `)` are validated by an explicit forward scan in
+# _find_heredoc_message_substitution_spans().
+_HEREDOC_OPENER_RE = re.compile(
+    r"\$\([ \t]*cat[ \t]+<<(?P<dash>-?)[ \t]*"
+    r"(?P<q>['\"])(?P<delim>[A-Za-z_][A-Za-z0-9_]*)(?P=q)"
 )
 
 
@@ -180,11 +198,131 @@ def _is_safe_command(command: str) -> bool:
     )
 
 
+def _mask_quoted_spans(command: str, *, mask_double: bool) -> str:
+    """Return ``command`` with quoted-span interiors replaced by spaces.
+
+    Single-quoted span interiors are always blanked: single quotes make every
+    shell metacharacter literal. Double-quoted span interiors are blanked only
+    when ``mask_double`` is True -- double quotes make ``;``, ``|``, ``&&`` and
+    ``||`` literal, but ``$(`` and backtick still execute inside them, so the
+    execution-marker scan must keep double-quoted interiors visible.
+
+    Quote characters are preserved. Backslash escaping is intentionally not
+    modeled: a mis-segmented span can only end early and expose more text to
+    the scan; it can never hide a structural operator (fail-closed). An
+    unbalanced trailing quote blanks to end-of-string; the caller also fails
+    closed because shlex.split raises ValueError on an unbalanced quote.
+    """
+    out: list[str] = []
+    quote: str | None = None
+    for ch in command:
+        if quote is not None:
+            blank = quote == "'" or mask_double
+            out.append(" " if (blank and ch != quote) else ch)
+            if ch == quote:
+                quote = None
+        elif ch in ("'", '"'):
+            quote = ch
+            out.append(ch)
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _has_disqualifying_control_marker(command: str) -> bool:
+    """True iff a control marker disqualifies the git-finalization exemption.
+
+    ``command`` must already have safe HEREDOC substitutions neutralized.
+    Chaining markers (``;``, ``|``, ``&&``, ``||``) count only outside every
+    quote; execution markers (``$(``, backtick) count outside single quotes,
+    including inside double quotes where they still execute.
+    """
+    chaining_view = _mask_quoted_spans(command, mask_double=True)
+    if any(marker in chaining_view for marker in GIT_FINALIZATION_CHAINING_MARKERS):
+        return True
+    execution_view = _mask_quoted_spans(command, mask_double=False)
+    return any(marker in execution_view for marker in GIT_FINALIZATION_EXECUTION_MARKERS)
+
+
+def _find_heredoc_message_substitution_spans(command: str) -> list[tuple[int, int]]:
+    """Return [start, end) spans of provably-safe ``$(cat <<'DELIM' ... DELIM)``
+    command substitutions.
+
+    A span is recognized only when EVERY boundary is validated:
+
+    - the opener is ``$(cat <<['"]DELIM['"]`` -- the only command is read-only
+      ``cat``, and the delimiter is quoted, so the heredoc body is literal;
+    - the opener-line tail (between the quoted delimiter and the body's first
+      newline) is whitespace-only -- a shell can place a redirect, separator,
+      or pipeline there and it would execute;
+    - the heredoc body ends at the FIRST line equal to DELIM (``^DELIM$``, or
+      ``^\\t*DELIM$`` for the ``<<-`` form, which strips leading tabs) --
+      exactly where a POSIX shell terminates the heredoc;
+    - that first delimiter line is followed by optional whitespace and then the
+      closing ``)`` of the substitution.
+
+    Any deviation fails closed: the span is NOT returned and the ``$(`` stays
+    visible to the control-marker scan. A recognized span runs only read-only
+    ``cat`` over a literal (quoted-delimiter) heredoc body.
+    """
+    spans: list[tuple[int, int]] = []
+    search_from = 0
+    while True:
+        opener = _HEREDOC_OPENER_RE.search(command, search_from)
+        if opener is None:
+            break
+        # The heredoc body begins on the line AFTER the opener. The opener-line
+        # tail -- between the quoted delimiter and that line break -- must be
+        # whitespace-only; a redirect / separator / pipeline there executes.
+        body_start = command.find("\n", opener.end())
+        if body_start == -1 or command[opener.end() : body_start].strip():
+            search_from = opener.end()
+            continue
+        body_start += 1
+        prefix = r"\t*" if opener.group("dash") else ""
+        delim_line_re = re.compile(rf"^{prefix}{re.escape(opener.group('delim'))}$", re.MULTILINE)
+        delim_line = delim_line_re.search(command, body_start)
+        if delim_line is None:
+            search_from = opener.end()
+            continue
+        rest = command[delim_line.end() :]
+        after_ws = rest.lstrip()
+        if after_ws.startswith(")"):
+            close = delim_line.end() + (len(rest) - len(after_ws)) + 1
+            spans.append((opener.start(), close))
+            search_from = close
+        else:
+            search_from = opener.end()
+    return spans
+
+
+def _neutralize_heredoc_message_substitutions(command: str) -> str:
+    """Blank each provably-safe ``$(cat <<'DELIM' ... DELIM)`` substitution span.
+
+    A recognized span runs only read-only ``cat`` over a quoted-delimiter
+    heredoc body (literal text), so it is side-effect-free and is removed
+    before the control-marker scan. Text that does not match the recognized
+    shape is left intact and stays subject to the full scan (fail closed).
+    """
+    spans = _find_heredoc_message_substitution_spans(command)
+    if not spans:
+        return command
+    out: list[str] = []
+    cursor = 0
+    for start, end in spans:
+        out.append(command[cursor:start])
+        out.append(" " * (end - start))
+        cursor = end
+    out.append(command[cursor:])
+    return "".join(out)
+
+
 def _is_simple_git_finalization_command(command: str) -> bool:
-    if any(marker in command for marker in GIT_FINALIZATION_CONTROL_MARKERS):
+    scan_command = _neutralize_heredoc_message_substitutions(command)
+    if _has_disqualifying_control_marker(scan_command):
         return False
     try:
-        tokens = [_clean_shell_token(token).lower() for token in shlex.split(command, posix=False)]
+        tokens = [_clean_shell_token(token).lower() for token in shlex.split(scan_command, posix=False)]
     except ValueError:
         return False
     tokens = [token for token in tokens if token]

@@ -200,7 +200,9 @@ def test_requirement_gap_blocks_authorization(tmp_path: Path) -> None:
 
 def test_project_authorization_metadata_is_carried_in_packet(tmp_path: Path) -> None:
     _seed_project_authorization(tmp_path)
-    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
     _write_thread(tmp_path, proposal=proposal)
 
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
@@ -244,7 +246,9 @@ def _write_amendment_packet(tmp_path: Path, filename: str, content: str) -> str:
 
 def test_project_authorization_load_revalidates_current_spec_exclusions(tmp_path: Path) -> None:
     _seed_project_authorization(tmp_path)
-    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
     _write_thread(tmp_path, proposal=proposal)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
@@ -275,7 +279,9 @@ def test_project_authorization_load_revalidates_current_spec_exclusions(tmp_path
 
 def test_project_authorization_does_not_broaden_target_scope(tmp_path: Path) -> None:
     _seed_project_authorization(tmp_path)
-    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
     _write_thread(tmp_path, proposal=proposal)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
@@ -286,7 +292,9 @@ def test_project_authorization_does_not_broaden_target_scope(tmp_path: Path) -> 
 
 def test_project_authorization_requires_work_item_membership_or_inclusion(tmp_path: Path) -> None:
     _seed_project_authorization(tmp_path, link_work_item=False)
-    proposal = _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
     _write_thread(tmp_path, proposal=proposal)
 
     with pytest.raises(auth.AuthorizationError, match="neither included in nor an active member"):
@@ -479,11 +487,7 @@ def test_gate_unchanged_reads_current_json_only(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "apply_patch",
-        "tool_input": {
-            "patch": (
-                "*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n"
-            )
-        },
+        "tool_input": {"patch": ("*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n")},
     }
 
     result = gate.gate_decision(payload)
@@ -621,9 +625,12 @@ def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
     worktree carries its own committed groundtruth.toml. Requires git.
     """
     ident = [
-        "-c", "user.email=test@example.com",
-        "-c", "user.name=test",
-        "-c", "commit.gpgsign=false",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=test",
+        "-c",
+        "commit.gpgsign=false",
     ]
     canonical = tmp_path / "canonical"
     canonical.mkdir()
@@ -662,3 +669,200 @@ def test_start_gate_enforces_canonical_edit_from_worktree(tmp_path: Path) -> Non
         "absolute-path edit from a worktree session, not silently escape"
     )
     assert "authorization packet" in result.get("reason", "")
+
+
+# WI-3357: implementation_start_gate finalization-exemption quote-aware
+# control-marker fix. Cases derive from the Specification-Derived Verification
+# Plan in bridge/gtkb-impl-start-gate-finalization-quoting-fix-007.md, plus the
+# -008 review's non-blocking observations (multi-cat / CRLF / unquoted shapes).
+# In a command string, \n is a literal newline; HEREDOC commands span lines.
+
+
+_WI3357_SIMPLE_CASES = [
+    # (case_id, command, expected_is_simple)
+    ("01-chaining-markers-double-quoted", 'git commit -m "fix X; tidy | done && wrap"', True),
+    ("02-chaining-marker-single-quoted", "git commit -m 'fix X; tidy Y'", True),
+    ("03-heredoc-single-quoted-delim", "git commit -m \"$(cat <<'EOF'\nmsg body\nEOF\n)\"", True),
+    ("04-heredoc-double-quoted-delim", 'git commit -m "$(cat <<"EOF"\nmsg\nEOF\n)"', True),
+    ("05-cmdsub-protected-write", 'git commit -m "$(Set-Content -Path scripts/sample.py -Value z)"', False),
+    ("06-backtick-protected-write", 'git commit -m "`Set-Content -Path scripts/sample.py -Value z`"', False),
+    ("07-cmdsub-non-heredoc", 'git commit -m "$(cat msg.txt)"', False),
+    ("08-heredoc-unquoted-delim", 'git commit -m "$(cat <<EOF\nmsg\nEOF\n)"', False),
+    ("09-heredoc-non-cat-command", "git commit -m \"$(rm scripts/sample.py <<'EOF'\nx\nEOF\n)\"", False),
+    ("10-cmdsub-literal-single-quoted", "git commit -m '$(whoami)'", True),
+    ("11-chained-after-git-finalization", 'git commit -m "x"; rm -rf y', False),
+    (
+        "12-chained-protected-write-punctuated",
+        'git commit -m "fix; tidy"; Set-Content -Path scripts/sample.py -Value "z"',
+        False,
+    ),
+    (
+        "13-chained-after-complete-heredoc",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\" && Set-Content -Path scripts/sample.py -Value z",
+        False,
+    ),
+    ("14-plain-push", "git push origin develop", True),
+    ("15-denied-push-flag", "git push --force origin main", False),
+    (
+        "16-early-delimiter-then-command",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\nSet-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
+        False,
+    ),
+    (
+        "17-early-delimiter-then-separator",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n; Set-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
+        False,
+    ),
+    (
+        "18-opener-redirect-tail",
+        "git commit -m \"$(cat <<'EOF' > scripts/sample.py\nmsg\nEOF\n)\"",
+        False,
+    ),
+    (
+        "19-opener-separator-tail",
+        "git commit -m \"$(cat <<'EOF'; Set-Content -Path scripts/sample.py -Value z\nmsg\nEOF\n)\"",
+        False,
+    ),
+    (
+        "20-opener-pipeline-tail",
+        "git commit -m \"$(cat <<'EOF' | tee scripts/sample.py\nmsg\nEOF\n)\"",
+        False,
+    ),
+    ("21-multi-cat-heredoc", "git commit -m \"$(cat <<'A' <<'B'\nbody\nA\nB\n)\"", False),
+    ("22-crlf-heredoc", "git commit -m \"$(cat <<'EOF'\r\nmsg\r\nEOF\r\n)\"", False),
+    ("23-unquoted-heredoc-substitution", "git commit -m $(cat <<'EOF'\nmsg\nEOF\n)", True),
+]
+
+
+@pytest.mark.parametrize(("case_id", "command", "expected"), _WI3357_SIMPLE_CASES)
+def test_wi3357_simple_git_finalization_classification(case_id: str, command: str, expected: bool) -> None:
+    """WI-3357: _is_simple_git_finalization_command classifies each verification
+    case correctly. Literal punctuation and the documented HEREDOC commit
+    pattern are exempt; executable command substitution, chaining, and any
+    heredoc whose substitution would run a further command are not."""
+    assert gate._is_simple_git_finalization_command(command) is expected, case_id
+
+
+_WI3357_GATE_CASES = [
+    # (case_id, command, expected) -- expected is "exempt" ({}) or "block"
+    ("01-chaining-markers-exempt", 'git commit -m "fix X; tidy | done && wrap"', "exempt"),
+    ("03-heredoc-exempt", "git commit -m \"$(cat <<'EOF'\nmsg body\nEOF\n)\"", "exempt"),
+    (
+        "05-cmdsub-protected-write-blocks",
+        'git commit -m "$(Set-Content -Path scripts/sample.py -Value z)"',
+        "block",
+    ),
+    (
+        "06-backtick-protected-write-blocks",
+        'git commit -m "`Set-Content -Path scripts/sample.py -Value z`"',
+        "block",
+    ),
+    ("07-cmdsub-non-heredoc-blocks", 'git commit -m "$(cat msg.txt)"', "block"),
+    ("08-heredoc-unquoted-delim-blocks", 'git commit -m "$(cat <<EOF\nmsg\nEOF\n)"', "block"),
+    (
+        "09-heredoc-non-cat-blocks",
+        "git commit -m \"$(rm scripts/sample.py <<'EOF'\nx\nEOF\n)\"",
+        "block",
+    ),
+    (
+        "12-chained-protected-write-blocks",
+        'git commit -m "fix; tidy"; Set-Content -Path scripts/sample.py -Value "z"',
+        "block",
+    ),
+    (
+        "13-chained-after-heredoc-blocks",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\" && Set-Content -Path scripts/sample.py -Value z",
+        "block",
+    ),
+    ("14-plain-push-exempt", "git push origin develop", "exempt"),
+    (
+        "16-early-delimiter-blocks",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\nSet-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
+        "block",
+    ),
+    (
+        "17-early-delimiter-separator-blocks",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n; Set-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
+        "block",
+    ),
+    (
+        "18-opener-redirect-tail-blocks",
+        "git commit -m \"$(cat <<'EOF' > scripts/sample.py\nmsg\nEOF\n)\"",
+        "block",
+    ),
+    (
+        "19-opener-separator-tail-blocks",
+        "git commit -m \"$(cat <<'EOF'; Set-Content -Path scripts/sample.py -Value z\nmsg\nEOF\n)\"",
+        "block",
+    ),
+    (
+        "20-opener-pipeline-tail-blocks",
+        "git commit -m \"$(cat <<'EOF' | tee scripts/sample.py\nmsg\nEOF\n)\"",
+        "block",
+    ),
+]
+
+
+@pytest.mark.parametrize(("case_id", "command", "expected"), _WI3357_GATE_CASES)
+def test_wi3357_gate_decision_classification(tmp_path: Path, case_id: str, command: str, expected: str) -> None:
+    """WI-3357: gate_decision exempts a punctuated/HEREDOC git finalization
+    command (returns {}) and blocks a command whose substitution or chaining
+    would run a protected mutation, with no authorization packet seeded."""
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+    }
+    result = gate.gate_decision(payload)
+    if expected == "exempt":
+        assert result == {}, case_id
+    else:
+        assert result.get("decision") == "block", case_id
+        assert "authorization packet" in result.get("reason", ""), case_id
+
+
+_WI3357_PARSER_CASES = [
+    # (case_id, command, expected_span_count)
+    ("documented-single-heredoc", "git commit -m \"$(cat <<'EOF'\nmsg body\nEOF\n)\"", 1),
+    ("unquoted-delimiter", 'git commit -m "$(cat <<EOF\nmsg\nEOF\n)"', 0),
+    ("non-cat-opener", "git commit -m \"$(rm scripts/sample.py <<'EOF'\nx\nEOF\n)\"", 0),
+    (
+        "early-delimiter-then-command",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\nSet-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
+        0,
+    ),
+    (
+        "early-delimiter-then-separator",
+        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n; rm -rf x\nEOF\n)\"",
+        0,
+    ),
+    (
+        "opener-redirect-tail",
+        "git commit -m \"$(cat <<'EOF' > scripts/sample.py\nmsg\nEOF\n)\"",
+        0,
+    ),
+    ("opener-separator-tail", "git commit -m \"$(cat <<'EOF'; rm -rf x\nmsg\nEOF\n)\"", 0),
+    (
+        "opener-pipeline-tail",
+        "git commit -m \"$(cat <<'EOF' | tee scripts/sample.py\nmsg\nEOF\n)\"",
+        0,
+    ),
+    ("no-delimiter-line", "git commit -m \"$(cat <<'EOF'\njust body text\n)\"", 0),
+    ("multi-cat-heredoc", "git commit -m \"$(cat <<'A' <<'B'\nbody\nA\nB\n)\"", 0),
+    ("crlf-heredoc", "git commit -m \"$(cat <<'EOF'\r\nmsg\r\nEOF\r\n)\"", 0),
+    (
+        "two-independent-heredocs",
+        "git commit -m \"$(cat <<'A'\nfirst\nA\n)$(cat <<'B'\nsecond\nB\n)\"",
+        2,
+    ),
+]
+
+
+@pytest.mark.parametrize(("case_id", "command", "expected_spans"), _WI3357_PARSER_CASES)
+def test_wi3357_heredoc_parser_recognizes_only_safe_spans(case_id: str, command: str, expected_spans: int) -> None:
+    """WI-3357: _find_heredoc_message_substitution_spans recognizes a span only
+    when every boundary -- opener, opener-line tail, first delimiter line, and
+    post-delimiter close paren -- is validated; every other shape fails closed
+    (no span), so the $( stays visible to the control-marker scan."""
+    spans = gate._find_heredoc_message_substitution_spans(command)
+    assert len(spans) == expected_spans, case_id
