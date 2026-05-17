@@ -342,6 +342,25 @@ def _is_under(path: Path, root: Path) -> bool:
         return False
 
 
+def _resolve_content_file(raw: Path) -> Path:
+    """Normalize a ``--content-file`` argument to an absolute path.
+
+    ``argparse`` keeps a relative argument relative, but ``render_markdown``
+    calls ``Path.relative_to(PROJECT_ROOT)``, which is purely lexical and
+    raises ``ValueError`` on a relative path. The documented invocation runs
+    from the project root with a project-root-relative ``bridge/...`` path,
+    so resolve a relative argument against ``PROJECT_ROOT`` first and fall
+    back to the current working directory when no project-root candidate
+    exists. Absolute arguments are returned unchanged.
+    """
+    if raw.is_absolute():
+        return raw
+    root_candidate = PROJECT_ROOT / raw
+    if root_candidate.exists():
+        return root_candidate.resolve()
+    return (Path.cwd() / raw).resolve()
+
+
 EXIT_BLOCKING_GAP = 5  # matches scripts/bridge_applicability_preflight.py convention
 EXIT_CANNOT_EVALUATE = EXIT_BLOCKING_GAP
 
@@ -369,6 +388,9 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+
+    if args.content_file is not None:
+        args.content_file = _resolve_content_file(args.content_file)
 
     if not args.clauses_config.is_file():
         print(f"ERROR: clauses config not found: {args.clauses_config}", file=sys.stderr)

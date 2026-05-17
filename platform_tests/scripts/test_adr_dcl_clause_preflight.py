@@ -527,3 +527,77 @@ def test_content_file_mode_reports_blocking_gap_before_index_entry(preflight, tm
     report = out.read_text(encoding="utf-8")
     assert "Blocking Gaps" in report
     assert f"Operative file: `{candidate}" in report or "candidate-gap.md" in report
+
+
+def test_content_file_relative_path_does_not_crash(preflight, tmp_path, monkeypatch):
+    """Regression (WI-3325): a project-root-relative ``--content-file`` argument
+    must not crash ``render_markdown``'s ``relative_to(PROJECT_ROOT)`` call.
+
+    Before the fix a relative ``--content-file`` stayed relative; the
+    ``_is_under`` guard resolved it (CWD-relative) and returned True, then
+    ``relative_to`` ran on the un-resolved relative path and raised
+    ``ValueError``. ``tmp_path`` stands in as the project root so the relative
+    argument resolves in-root and exercises the crashing branch.
+    """
+    monkeypatch.setattr(preflight, "PROJECT_ROOT", tmp_path)
+    monkeypatch.chdir(tmp_path)
+    candidate = tmp_path / "candidate-rel.md"
+    candidate.write_text(
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- ADR-ISOLATION-APPLICATION-PLACEMENT-001 - project root boundary\n\n"
+        "## Files Changed\n\n"
+        "- scripts/foo.py (new, under E:\\GT-KB\\scripts\\)\n"
+        "All outputs reside in-root under E:\\GT-KB.\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "report.md"
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            "test-content-file-relative",
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(tmp_path / "missing-bridge"),
+            "--index",
+            str(tmp_path / "missing-index.md"),
+            "--content-file",
+            "candidate-rel.md",
+            "--out",
+            str(out),
+        ]
+    )
+    assert rc == 0, f"relative --content-file must not crash; got exit {rc}"
+    report = out.read_text(encoding="utf-8")
+    assert "Clause Applicability" in report
+    assert "candidate-rel.md" in report
+
+
+def test_resolve_content_file_normalizes_relative(preflight, tmp_path, monkeypatch):
+    """Unit (WI-3325): ``_resolve_content_file`` normalizes a relative
+    ``--content-file`` argument to an absolute path and leaves an absolute
+    argument unchanged.
+    """
+    proj = tmp_path / "proj"
+    work = tmp_path / "work"
+    proj.mkdir()
+    work.mkdir()
+    monkeypatch.setattr(preflight, "PROJECT_ROOT", proj)
+
+    # Relative argument that exists under PROJECT_ROOT -> project-root-resolved.
+    (proj / "sub").mkdir()
+    (proj / "sub" / "doc.md").write_text("x", encoding="utf-8")
+    root_resolved = preflight._resolve_content_file(Path("sub/doc.md"))
+    assert root_resolved.is_absolute()
+    assert root_resolved == (proj / "sub" / "doc.md").resolve()
+
+    # Relative argument with no project-root candidate -> CWD fallback.
+    monkeypatch.chdir(work)
+    cwd_resolved = preflight._resolve_content_file(Path("ghost.md"))
+    assert cwd_resolved.is_absolute()
+    assert cwd_resolved == (work / "ghost.md").resolve()
+
+    # Absolute argument -> returned unchanged.
+    abs_arg = tmp_path / "abs.md"
+    assert preflight._resolve_content_file(abs_arg) == abs_arg

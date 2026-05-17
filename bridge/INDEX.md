@@ -18,7 +18,35 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-adr-dcl-clause-preflight-content-file-path-fix
+VERIFIED: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-004.md
+NEW: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-003.md
+GO: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-002.md
+NEW: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-001.md
+
+Document: gtkb-governance-hook-worktree-root-resolution
+GO: bridge/gtkb-governance-hook-worktree-root-resolution-006.md
+REVISED: bridge/gtkb-governance-hook-worktree-root-resolution-005.md
+GO: bridge/gtkb-governance-hook-worktree-root-resolution-004.md
+REVISED: bridge/gtkb-governance-hook-worktree-root-resolution-003.md
+NO-GO: bridge/gtkb-governance-hook-worktree-root-resolution-002.md
+NEW: bridge/gtkb-governance-hook-worktree-root-resolution-001.md
+
+Document: gtkb-harness-registry-seed
+VERIFIED: bridge/gtkb-harness-registry-seed-004.md
+NEW: bridge/gtkb-harness-registry-seed-003.md
+GO: bridge/gtkb-harness-registry-seed-002.md
+NEW: bridge/gtkb-harness-registry-seed-001.md
+
 Document: gtkb-harness-role-portability-fr9
+VERIFIED: bridge/gtkb-harness-role-portability-fr9-010.md
+NEW: bridge/gtkb-harness-role-portability-fr9-009.md
+GO: bridge/gtkb-harness-role-portability-fr9-008.md
+REVISED: bridge/gtkb-harness-role-portability-fr9-007.md
+NO-GO: bridge/gtkb-harness-role-portability-fr9-006.md
+REVISED: bridge/gtkb-harness-role-portability-fr9-005.md
+NO-GO: bridge/gtkb-harness-role-portability-fr9-004.md
+REVISED: bridge/gtkb-harness-role-portability-fr9-003.md
 NO-GO: bridge/gtkb-harness-role-portability-fr9-002.md
 NEW: bridge/gtkb-harness-role-portability-fr9-001.md
 
