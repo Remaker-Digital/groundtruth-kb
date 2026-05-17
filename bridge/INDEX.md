@@ -18,6 +18,10 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-impl-start-gate-comparison-operator-fix
+GO: bridge/gtkb-impl-start-gate-comparison-operator-fix-002.md
+NEW: bridge/gtkb-impl-start-gate-comparison-operator-fix-001.md
+
 Document: gtkb-adr-dcl-clause-preflight-content-file-path-fix
 VERIFIED: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-004.md
 NEW: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-003.md
@@ -25,6 +29,8 @@ GO: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-002.md
 NEW: bridge/gtkb-adr-dcl-clause-preflight-content-file-path-fix-001.md
 
 Document: gtkb-governance-hook-worktree-root-resolution
+VERIFIED: bridge/gtkb-governance-hook-worktree-root-resolution-008.md
+NEW: bridge/gtkb-governance-hook-worktree-root-resolution-007.md
 GO: bridge/gtkb-governance-hook-worktree-root-resolution-006.md
 REVISED: bridge/gtkb-governance-hook-worktree-root-resolution-005.md
 GO: bridge/gtkb-governance-hook-worktree-root-resolution-004.md
