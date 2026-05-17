@@ -68,18 +68,67 @@ def _resolve_via_env_var() -> Path | None:
     )
 
 
-def _resolve_via_git_toplevel() -> Path | None:
+_WORKTREE_DIR_SEGMENTS = (".claude", "worktrees")
+
+
+def _is_under_worktrees(path: Path) -> bool:
+    """Return True when ``path`` is at or below a ``.claude/worktrees/`` directory.
+
+    A linked worktree scaffolded under ``.claude/worktrees/<name>/`` carries its
+    own committed copy of ``groundtruth.toml``; a parent walk must not stop on
+    that copy. The canonical root sits above the ``.claude/worktrees/`` segment.
+    """
+    parts = path.parts
+    return any(pair == _WORKTREE_DIR_SEGMENTS for pair in zip(parts, parts[1:], strict=False))
+
+
+def _git_common_dir() -> Path | None:
+    """Return the absolute path of the shared git directory, or None.
+
+    ``git rev-parse --git-common-dir`` reports the *shared* git directory: in a
+    linked worktree that is the main worktree's ``.git``; in the main worktree
+    it is ``.git`` itself. Its parent is the canonical main-worktree root from
+    either location -- unlike ``--show-toplevel``, which reports the current
+    (possibly worktree-local) checkout.
+
+    Prefers ``--path-format=absolute`` (git >= 2.31); for older git, resolves
+    the bare ``--git-common-dir`` output relative to cwd.
+    """
     try:
-        toplevel = subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"],
+        absolute = subprocess.check_output(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        absolute = ""
+    if absolute and Path(absolute).is_absolute():
+        return Path(absolute).resolve()
+
+    try:
+        bare = subprocess.check_output(
+            ["git", "rev-parse", "--git-common-dir"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
-    if not toplevel:
+    if not bare:
         return None
-    candidate = Path(toplevel).resolve()
+    return (Path.cwd() / bare).resolve()
+
+
+def _resolve_via_git_common_dir() -> Path | None:
+    """Resolve the canonical main-worktree root via the shared git directory.
+
+    Worktree-correct: the shared git directory's parent is the canonical root
+    in both the main worktree and a linked worktree, validated by the
+    ``groundtruth.toml`` marker.
+    """
+    common_dir = _git_common_dir()
+    if common_dir is None:
+        return None
+    candidate = common_dir.parent
     if _has_marker(candidate):
         return candidate
     return None
@@ -88,7 +137,7 @@ def _resolve_via_git_toplevel() -> Path | None:
 def _resolve_via_parent_walk() -> Path | None:
     cwd = Path.cwd().resolve()
     for candidate in (cwd, *cwd.parents):
-        if _has_marker(candidate):
+        if _has_marker(candidate) and not _is_under_worktrees(candidate):
             return candidate
     return None
 
@@ -99,8 +148,12 @@ def resolve_project_root() -> Path:
     Resolution order:
 
     1. ``GTKB_PROJECT_ROOT`` env var (must contain ``groundtruth.toml``).
-    2. ``git rev-parse --show-toplevel`` from cwd, validated by ``groundtruth.toml``.
-    3. Walk parents from cwd looking for ``groundtruth.toml``.
+    2. ``git rev-parse --git-common-dir`` from cwd: the shared git directory's
+       parent is the canonical main-worktree root, validated by
+       ``groundtruth.toml``. Worktree-correct -- a linked worktree resolves to
+       the canonical root, not to itself.
+    3. Walk parents from cwd looking for ``groundtruth.toml``, skipping any
+       candidate at or below a ``.claude/worktrees/`` segment.
 
     Raises:
         ProjectRootNotFoundError: when no path yields a validated host root,
@@ -111,7 +164,7 @@ def resolve_project_root() -> Path:
     if env_root is not None:
         return env_root
 
-    git_root = _resolve_via_git_toplevel()
+    git_root = _resolve_via_git_common_dir()
     if git_root is not None:
         return git_root
 

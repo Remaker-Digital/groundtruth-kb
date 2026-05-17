@@ -19,6 +19,10 @@
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 Document: gtkb-impl-start-gate-comparison-operator-fix
+VERIFIED: bridge/gtkb-impl-start-gate-comparison-operator-fix-006.md
+REVISED: bridge/gtkb-impl-start-gate-comparison-operator-fix-005.md
+NO-GO: bridge/gtkb-impl-start-gate-comparison-operator-fix-004.md
+NEW: bridge/gtkb-impl-start-gate-comparison-operator-fix-003.md
 GO: bridge/gtkb-impl-start-gate-comparison-operator-fix-002.md
 NEW: bridge/gtkb-impl-start-gate-comparison-operator-fix-001.md
 

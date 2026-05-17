@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -550,6 +552,27 @@ def test_gate_blocks_no_space_redirect_to_file() -> None:
     assert gate._is_mutating_command("cmd>out.txt") is True
 
 
+# WI-3356: MUTATING_COMMAND_RE comparison-operator false-positive fix.
+# The redirect alternation's trailing lookahead (?![>&=]) must NOT flag a
+# Python `>=` comparison or `>>=` augmented-assignment operator, while still
+# flagging every real shell redirect form.
+
+
+def test_gate_allows_python_ge_comparison() -> None:
+    # `>=` is a Python comparison operator, not a shell redirect.
+    assert gate._is_mutating_command('python -c "print(1 if i>=0 else 2)"') is False
+
+
+def test_gate_allows_python_ge_comparison_with_spaces() -> None:
+    # A spaced `>=` comparison is still not a shell redirect.
+    assert gate._is_mutating_command('python -c "assert x >= 0"') is False
+
+
+def test_gate_allows_python_rshift_augmented_assignment() -> None:
+    # `>>=` is the Python augmented right-shift assignment operator.
+    assert gate._is_mutating_command('python -c "x=8; x>>=2; print(x)"') is False
+
+
 # IP-B/F3: sqlite safe-read tests
 
 
@@ -586,3 +609,56 @@ def test_gate_blocks_python_sqlite_literal_insert() -> None:
 def test_gate_blocks_python_sqlite_commit_after_select() -> None:
     cmd = "python -c \"import sqlite3; c=sqlite3.connect('a.db'); c.execute('SELECT * FROM t'); c.commit()\""
     assert gate._is_mutating_command(cmd) is True
+
+
+# WI-3353 IP-3: worktree-aware canonical-root resolution closes Bug 2 (the
+# silent enforcement escape) for a worktree session editing a canonical file.
+
+
+def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
+    """Build a synthetic GT-KB canonical checkout with a linked worktree under
+    .claude/worktrees/test-wt. Returns (canonical_root, worktree_root). The
+    worktree carries its own committed groundtruth.toml. Requires git.
+    """
+    ident = [
+        "-c", "user.email=test@example.com",
+        "-c", "user.name=test",
+        "-c", "commit.gpgsign=false",
+    ]
+    canonical = tmp_path / "canonical"
+    canonical.mkdir()
+    (canonical / "groundtruth.toml").write_text("# synthetic GT-KB root\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "add", "groundtruth.toml"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "commit", "-m", "init"], cwd=canonical, check=True, capture_output=True)
+    worktree = canonical / ".claude" / "worktrees" / "test-wt"
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", *ident, "worktree", "add", "--detach", str(worktree)],
+        cwd=canonical,
+        check=True,
+        capture_output=True,
+    )
+    return canonical, worktree
+
+
+def test_start_gate_enforces_canonical_edit_from_worktree(tmp_path: Path) -> None:
+    """WI-3353 IP-3 (Bug 2 closure): a worktree session editing a canonical file
+    by absolute path is classified as a protected-path edit and gated. Before
+    the fix the gate trusted payload['cwd'] (the worktree), normalize_relative_path
+    raised 'Path escapes project root', is_protected_path silently returned
+    False, and the gate emitted no decision -- a silent enforcement escape."""
+    if shutil.which("git") is None:
+        pytest.skip("git not available on this system")
+    canonical, worktree = _build_worktree_project(tmp_path)
+    payload = {
+        "cwd": str(worktree),
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(canonical / "scripts" / "sample.py")},
+    }
+    result = gate.gate_decision(payload)
+    assert result.get("decision") == "block", (
+        "the implementation-start gate must enforce against a canonical-by-"
+        "absolute-path edit from a worktree session, not silently escape"
+    )
+    assert "authorization packet" in result.get("reason", "")

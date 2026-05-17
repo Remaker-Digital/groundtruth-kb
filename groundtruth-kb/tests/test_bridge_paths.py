@@ -220,3 +220,83 @@ def test_resolve_project_root_via_env_var_pointing_at_git_repo_without_groundtru
     with pytest.raises(p.ProjectRootNotFoundError) as excinfo:
         p.resolve_project_root()
     assert p.GROUNDTRUTH_MARKER in str(excinfo.value)
+
+
+# WI-3353 IP-1: worktree-aware canonical-root resolution via --git-common-dir.
+
+
+def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
+    """Build a synthetic GT-KB canonical checkout with a linked worktree under
+    .claude/worktrees/test-wt. Returns (canonical_root, worktree_root). The
+    worktree carries its own committed groundtruth.toml. Requires git.
+    """
+    ident = [
+        "-c", "user.email=test@example.com",
+        "-c", "user.name=test",
+        "-c", "commit.gpgsign=false",
+    ]
+    canonical = tmp_path / "canonical"
+    canonical.mkdir()
+    (canonical / "groundtruth.toml").write_text("# synthetic GT-KB root\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "add", "groundtruth.toml"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "commit", "-m", "init"], cwd=canonical, check=True, capture_output=True)
+    worktree = canonical / ".claude" / "worktrees" / "test-wt"
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", *ident, "worktree", "add", "--detach", str(worktree)],
+        cwd=canonical,
+        check=True,
+        capture_output=True,
+    )
+    return canonical, worktree
+
+
+def test_resolve_project_root_worktree_returns_canonical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-3353 IP-1: resolve_project_root() from inside a linked worktree returns
+    the canonical main-worktree root, not the worktree itself.
+
+    ``git rev-parse --git-common-dir`` reports the shared git directory (the main
+    worktree's .git); its parent is the canonical root from either checkout.
+    """
+    p = _paths()
+    if shutil.which("git") is None:
+        pytest.skip("git not available on this system")
+    canonical, worktree = _build_worktree_project(tmp_path)
+    monkeypatch.delenv(p.PROJECT_ROOT_ENV_VAR, raising=False)
+    monkeypatch.chdir(worktree)
+    assert p.resolve_project_root().resolve() == canonical.resolve()
+
+
+def test_resolve_project_root_env_override_and_parent_walk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-3353 IP-1: the GTKB_PROJECT_ROOT override still wins from a worktree
+    cwd, and the no-git parent walk skips a .claude/worktrees/ segment to reach
+    the canonical root rather than stopping on the worktree's marker copy.
+    """
+    p = _paths()
+    canonical = tmp_path / "canonical"
+    worktree = canonical / ".claude" / "worktrees" / "wt"
+    worktree.mkdir(parents=True)
+    (canonical / p.GROUNDTRUTH_MARKER).write_text("# canonical root\n")
+    # The worktree carries its own committed copy of the marker.
+    (worktree / p.GROUNDTRUTH_MARKER).write_text("# worktree marker copy\n")
+
+    # 1. The env-var override wins regardless of cwd.
+    monkeypatch.chdir(worktree)
+    monkeypatch.setenv(p.PROJECT_ROOT_ENV_VAR, str(canonical))
+    assert p.resolve_project_root().resolve() == canonical.resolve()
+
+    # 2. With no env var and no git on PATH, the parent walk skips the
+    #    worktree's marker copy and resolves the canonical root above
+    #    .claude/worktrees/.
+    monkeypatch.delenv(p.PROJECT_ROOT_ENV_VAR, raising=False)
+    no_git = tmp_path / "no-git-dir"
+    no_git.mkdir()
+    monkeypatch.setenv("PATH", str(no_git))
+    if os.name == "nt":
+        monkeypatch.setenv("PATHEXT", "")
+    assert p.resolve_project_root().resolve() == canonical.resolve()

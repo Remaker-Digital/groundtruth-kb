@@ -13,6 +13,7 @@ import hashlib
 import json
 import re
 import sqlite3
+import subprocess
 import tomllib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -24,6 +25,12 @@ BY_BRIDGE_DIRECTORY_RELATIVE_PATH = Path(".gtkb-state/implementation-authorizati
 DEFAULT_EXPIRY_MINUTES = 480
 BOOTSTRAP_BRIDGE_IDS = frozenset({"gtkb-implementation-start-authorization-gate"})
 PLACEHOLDER_RE = re.compile(r"\b(?:TBD|TODO|pending|no relevant|not applicable|n/a)\b", re.IGNORECASE)
+# A concrete artifact-ID citation: an uppercase identifier with at least one
+# hyphen segment (GOV-/SPEC-/ADR-/DCL-/DELIB-/WI- style IDs). A Specification
+# Links bullet that carries such a token (or a backtick span) is a real spec
+# link; the placeholder scan must not flag an ordinary English word in its
+# prose description.
+_SPEC_ID_RE = re.compile(r"\b[A-Z][A-Z0-9]*-[A-Z0-9][A-Z0-9-]*\b")
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 # Heading substrings that mark a section as a spec-derived verification plan.
 # Substring match (not equality) so a heading like "Test Plan (spec-to-test
@@ -91,10 +98,83 @@ def parse_optional_iso(value: str | None) -> datetime | None:
     return parse_iso(value)
 
 
+def _ancestor_or_self(root: Path, cwd_path: Path) -> bool:
+    """Return True when ``root`` is ``cwd_path`` itself or one of its parents.
+
+    The canonical GT-KB root always contains the session cwd: a canonical
+    session runs at the root (or a subdirectory), and a linked worktree lives
+    under ``<canonical>/.claude/worktrees/``. A resolver result that is neither
+    cwd_path nor an ancestor of it does not describe this session and is
+    discarded, so a synthetic cwd passed by a unit test is not silently
+    redirected to the live project root.
+    """
+    try:
+        resolved_root = root.resolve()
+        resolved_cwd = cwd_path.resolve()
+    except OSError:
+        return False
+    return resolved_root == resolved_cwd or resolved_root in resolved_cwd.parents
+
+
+def _git_common_dir_root(cwd_path: Path) -> Path | None:
+    """Resolve the canonical root via ``git rev-parse --git-common-dir``.
+
+    The shared git directory's parent is the canonical main-worktree root,
+    identical from the main worktree and from a linked worktree. Prefers
+    ``--path-format=absolute`` (git >= 2.31) and falls back to the bare form
+    resolved relative to ``cwd_path``. Returns None on any failure or when the
+    resolved parent lacks ``groundtruth.toml``.
+    """
+    for args in (
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        ["git", "rev-parse", "--git-common-dir"],
+    ):
+        try:
+            out = subprocess.check_output(
+                args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if not out:
+            continue
+        common_dir = (cwd_path / out).resolve()
+        candidate = common_dir.parent
+        if (candidate / "groundtruth.toml").is_file():
+            return candidate
+    return None
+
+
+def canonical_project_root(cwd_path: Path, *, fallback: Path | None = None) -> Path:
+    """Resolve the canonical GT-KB project root, independent of session cwd.
+
+    A linked worktree under ``.claude/worktrees/*`` has a cwd that is not the
+    canonical root where ``bridge/INDEX.md`` and the implementation-authorization
+    packets live. Resolution is fail-soft; a candidate is accepted only when it
+    is ``cwd_path`` itself or an ancestor of it (the canonical root always
+    contains the session cwd):
+
+      1. ``groundtruth_kb.bridge.paths.resolve_project_root()`` when importable.
+      2. ``git rev-parse --git-common-dir`` rooted at ``cwd_path``.
+      3. ``fallback`` when supplied, else ``cwd_path``.
+    """
+    try:
+        from groundtruth_kb.bridge.paths import resolve_project_root
+
+        candidate = resolve_project_root()
+    except Exception:  # fail-soft: import failure or resolver error falls through
+        candidate = None
+    if candidate is not None and _ancestor_or_self(candidate, cwd_path):
+        return candidate
+    git_root = _git_common_dir_root(cwd_path)
+    if git_root is not None and _ancestor_or_self(git_root, cwd_path):
+        return git_root
+    return fallback if fallback is not None else cwd_path
+
+
 def project_root_from_arg(value: str | None = None) -> Path:
     if value:
         return Path(value).resolve()
-    return Path(__file__).resolve().parent.parent
+    return canonical_project_root(Path.cwd(), fallback=Path(__file__).resolve().parent.parent)
 
 
 def packet_path(project_root: Path) -> Path:
@@ -205,14 +285,76 @@ def bridge_entry(project_root: Path, bridge_id: str) -> BridgeEntry:
     return entry
 
 
+def _post_go_chain_state(statuses_after_go: list[str]) -> str:
+    """Classify a bridge chain by the version statuses filed after its GO.
+
+    ``statuses_after_go`` is the list of version statuses newer than the
+    authorizing GO, newest-first. A revised *proposal* always precedes its GO
+    in the bridge lifecycle (proposals are revised, then GO'd), so any
+    NEW/REVISED filed *after* a GO is a post-implementation report, never a
+    superseding proposal. The latest status alone therefore determines
+    whether implementation may resume.
+
+    Returns one of:
+
+    - ``"latest_is_go"``    - nothing filed after the GO (the GO is latest);
+    - ``"resumable"``       - latest is a post-GO NO-GO (a post-implementation
+      report was NO-GO'd; the GO still authorizes the revision);
+    - ``"awaiting_review"`` - latest is a post-GO NEW or REVISED report
+      awaiting Loyal Opposition review (mutating now would invalidate the
+      report snapshot under review);
+    - ``"terminal"``        - latest is a post-GO VERIFIED.
+    """
+    if not statuses_after_go:
+        return "latest_is_go"
+    latest = statuses_after_go[0]
+    if latest == "NO-GO":
+        return "resumable"
+    if latest in {"NEW", "REVISED"}:
+        return "awaiting_review"
+    if latest == "VERIFIED":
+        return "terminal"
+    # Defensive: a post-GO GO is handled by callers (newest-GO selection in
+    # approved_files_for_go; the explicit newer-GO check in _validate_packet).
+    return "awaiting_review"
+
+
 def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
-    if entry.latest_status != "GO":
-        raise AuthorizationError(f"Implementation authorization requires latest GO; found {entry.latest_status}")
-    go_file = entry.latest_path
-    for status, path in entry.versions[1:]:
+    """Return ``(approved_proposal_file, go_file)`` for the thread's latest GO.
+
+    The latest GO authorizes implementation. A post-GO NO-GO on a
+    post-implementation report does NOT revoke that authorization: Prime
+    Builder must be able to mint a fresh packet to revise the implementation
+    in response to the report NO-GO. This mirrors ``_validate_packet``, which
+    already treats a post-GO NO-GO as a valid resume state - before this fix
+    ``approved_files_for_go`` rejected it, an asymmetry that blocked every
+    post-impl-report revision once the original packet expired.
+    """
+    go_index = next(
+        (index for index, (status, _) in enumerate(entry.versions) if status == "GO"),
+        None,
+    )
+    if go_index is None:
+        raise AuthorizationError(
+            f"Implementation authorization requires a GO in the bridge chain; found latest status {entry.latest_status}"
+        )
+    state = _post_go_chain_state([status for status, _ in entry.versions[:go_index]])
+    if state == "awaiting_review":
+        raise AuthorizationError(
+            "Post-implementation report is awaiting Loyal Opposition review; "
+            "wait for VERIFIED or NO-GO before requesting authorization."
+        )
+    if state == "terminal":
+        raise AuthorizationError(
+            "Bridge thread is VERIFIED (terminal); the implementation phase "
+            "for this proposal is closed. File a new bridge proposal."
+        )
+    # state is "latest_is_go" or "resumable" - the GO authorizes the work.
+    go_file = entry.versions[go_index][1]
+    for status, path in entry.versions[go_index + 1 :]:
         if status in {"NEW", "REVISED"}:
             return path, go_file
-    raise AuthorizationError(f"No approved proposal file found under latest GO for {entry.bridge_id}")
+    raise AuthorizationError(f"No approved proposal file found under GO for {entry.bridge_id}")
 
 
 def _iter_sections(markdown: str):
@@ -231,17 +373,35 @@ def section_body(markdown: str, heading: str) -> str:
     return ""
 
 
+def _bullet_has_citation(text: str) -> bool:
+    """Return True when a Specification Links bullet carries a concrete citation.
+
+    A concrete citation is a backtick-quoted token or an uppercase artifact-ID
+    token (see ``_SPEC_ID_RE``). A bullet with a concrete citation is a real
+    specification link; ordinary English words in its prose description (e.g.
+    "pending") must not be treated as placeholder text. A bullet with no
+    concrete citation that matches ``PLACEHOLDER_RE`` is a genuine placeholder.
+    """
+    if "`" in text:
+        return True
+    return _SPEC_ID_RE.search(text) is not None
+
+
 def extract_spec_links(markdown: str) -> list[str]:
     body = section_body(markdown, "Specification Links")
     if not body:
         raise AuthorizationError("Approved proposal is missing ## Specification Links")
-    if PLACEHOLDER_RE.search(body):
-        raise AuthorizationError("Approved proposal has placeholder text in Specification Links")
     links: list[str] = []
     for line in body.splitlines():
         stripped = line.strip()
         if not stripped.startswith(("-", "*")):
             continue
+        # Per-bullet placeholder check: a bullet that carries a concrete
+        # citation is a real spec link even when its prose uses an ordinary
+        # word that matches PLACEHOLDER_RE. Only a bullet with NO concrete
+        # citation that matches PLACEHOLDER_RE is a genuine placeholder.
+        if not _bullet_has_citation(stripped) and PLACEHOLDER_RE.search(stripped):
+            raise AuthorizationError("Approved proposal has placeholder text in Specification Links")
         ticks = re.findall(r"`([^`]+)`", stripped)
         links.extend(ticks or [stripped.lstrip("-* ").strip()])
     links = [link for link in links if link]
@@ -262,16 +422,37 @@ def extract_target_paths(markdown: str) -> list[str]:
             raise AuthorizationError("target_paths must be a non-empty JSON list of strings")
         return [item.strip().replace("\\", "/") for item in parsed]
 
+    # Section fallback. `## Files Expected To Change` bullets may carry
+    # multiple backtick spans per line (path plus annotation); all are taken.
     body = section_body(markdown, "Files Expected To Change")
-    targets: list[str] = []
-    for line in body.splitlines():
-        if not line.strip().startswith(("-", "*")):
-            continue
-        targets.extend(re.findall(r"`([^`]+)`", line))
-    targets = [target.strip().replace("\\", "/") for target in targets if target.strip()]
-    if not targets:
-        raise AuthorizationError("Approved proposal is missing concrete target_paths or Files Expected To Change")
-    return targets
+    if body:
+        targets: list[str] = []
+        for line in body.splitlines():
+            if not line.strip().startswith(("-", "*")):
+                continue
+            targets.extend(re.findall(r"`([^`]+)`", line))
+        targets = [target.strip().replace("\\", "/") for target in targets if target.strip()]
+        if targets:
+            return targets
+
+    # `## target_paths` heading form. These bullets place the path FIRST in
+    # backticks and may add parenthetical annotations in further backtick
+    # spans, so only the first span per bullet is the path. The asymmetry
+    # with `## Files Expected To Change` (all spans) is deliberate: each
+    # section name keeps the extraction matched to its observed convention.
+    heading_body = section_body(markdown, "target_paths")
+    if heading_body:
+        heading_targets: list[str] = []
+        for line in heading_body.splitlines():
+            if not line.strip().startswith(("-", "*")):
+                continue
+            spans = re.findall(r"`([^`]+)`", line)
+            if spans and spans[0].strip():
+                heading_targets.append(spans[0].strip().replace("\\", "/"))
+        if heading_targets:
+            return heading_targets
+
+    raise AuthorizationError("Approved proposal is missing concrete target_paths or Files Expected To Change")
 
 
 def _clean_metadata_value(raw: str) -> str:
@@ -617,31 +798,30 @@ def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
     if not found_go:
         raise AuthorizationError(f"Bridge GO file not found in chain: {go_file}")
 
-    if any(status == "REVISED" for status in statuses_after_go):
-        raise AuthorizationError(
-            f"Bridge GO at {go_file} superseded by REVISED proposal in chain; "
-            f"re-issue the implementation-authorization packet from the new GO."
-        )
     if any(status == "GO" for status in statuses_after_go):
         raise AuthorizationError(
             f"Newer GO exists in bridge chain after {go_file}; "
             f"re-issue the implementation-authorization packet from the new GO."
         )
-    if statuses_after_go:
-        latest_status = statuses_after_go[0]
-        if latest_status == "NEW":
-            raise AuthorizationError(
-                f"Post-implementation report at {entry.latest_path} is awaiting "
-                f"Loyal Opposition review; additional mutations during review "
-                f"would invalidate the report snapshot. Wait for VERIFIED or "
-                f"NO-GO before resuming work."
-            )
-        if latest_status == "VERIFIED":
-            raise AuthorizationError(
-                f"Bridge thread is VERIFIED (terminal at {entry.latest_path}); "
-                f"the implementation phase for this proposal is closed. File a "
-                f"new bridge proposal for further work on this surface."
-            )
+    # A post-GO NEW/REVISED is a post-implementation report (not a superseding
+    # proposal); a post-GO NO-GO is a NO-GO'd report and the pinned GO still
+    # authorizes the revision. The latest status determines resume validity -
+    # a REVISED that is not the latest version (a NO-GO'd revised report) is
+    # not a blocker, which the previous any(REVISED) rejection got wrong.
+    state = _post_go_chain_state(statuses_after_go)
+    if state == "awaiting_review":
+        raise AuthorizationError(
+            f"Post-implementation report at {entry.latest_path} is awaiting "
+            f"Loyal Opposition review; additional mutations during review "
+            f"would invalidate the report snapshot. Wait for VERIFIED or "
+            f"NO-GO before resuming work."
+        )
+    if state == "terminal":
+        raise AuthorizationError(
+            f"Bridge thread is VERIFIED (terminal at {entry.latest_path}); "
+            f"the implementation phase for this proposal is closed. File a "
+            f"new bridge proposal for further work on this surface."
+        )
     project_authorization = packet.get("project_authorization")
     if isinstance(project_authorization, dict):
         authorization_id = str(project_authorization.get("id") or "")

@@ -11,9 +11,19 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts.implementation_authorization import AuthorizationError, normalize_relative_path, validate_targets
+    from scripts.implementation_authorization import (
+        AuthorizationError,
+        canonical_project_root,
+        normalize_relative_path,
+        validate_targets,
+    )
 except ImportError:  # pragma: no cover - direct script execution path
-    from implementation_authorization import AuthorizationError, normalize_relative_path, validate_targets
+    from implementation_authorization import (
+        AuthorizationError,
+        canonical_project_root,
+        normalize_relative_path,
+        validate_targets,
+    )
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +74,7 @@ MUTATING_COMMAND_RE = re.compile(
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
     r"apply_patch|git\s+(?:commit|reset|checkout|merge|rebase|tag|push)|"
     r"python\s+.*(?:write_text|open\(.+,\s*['\"]w|sqlite3|insert_|update_|delete_)"
-    r")\b|(?<![:>-])>{1,2}(?![&])",
+    r")\b|(?<![:>-])>{1,2}(?![>&=])",
     re.IGNORECASE,
 )
 NULL_SINK_REDIRECT_STRIP_RE = re.compile(
@@ -92,10 +102,12 @@ POWERSHELL_ENV_ASSIGNMENT_RE = re.compile(
 
 
 def _project_root(payload: dict[str, Any]) -> Path:
-    root = payload.get("project_root") or payload.get("cwd")
-    if isinstance(root, str) and root.strip():
-        return Path(root).resolve()
-    return PROJECT_ROOT
+    explicit = payload.get("project_root")
+    if isinstance(explicit, str) and explicit.strip():
+        return Path(explicit).resolve()
+    cwd = payload.get("cwd")
+    cwd_path = Path(cwd).resolve() if isinstance(cwd, str) and cwd.strip() else PROJECT_ROOT
+    return canonical_project_root(cwd_path)
 
 
 def _tool_name(payload: dict[str, Any]) -> str:

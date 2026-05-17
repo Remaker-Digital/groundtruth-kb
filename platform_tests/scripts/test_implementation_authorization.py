@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -295,8 +297,15 @@ def test_validate_packet_fails_with_pending_new_after_go(auth_module, tmp_path):
         auth_module.activate_packet(tmp_path, slug)
 
 
-def test_validate_packet_fails_with_revised_anywhere_in_chain(auth_module, tmp_path):
-    """IP-C chain walk: any REVISED in post-GO range -> fail with 'superseded by REVISED'."""
+def test_validate_packet_fails_with_newer_go_after_pinned_go(auth_module, tmp_path):
+    """A newer GO after the packet's pinned go_file -> fail with 'Newer GO exists'.
+
+    Repurposed from test_validate_packet_fails_with_revised_anywhere_in_chain:
+    per WI-3333 Bug 3, a post-GO REVISED is a revised post-implementation
+    report, not a superseding proposal, so it is no longer an automatic
+    failure. The chain here additionally carries a genuine newer GO at -004,
+    which is still rejected because the packet pins the -002 go_file.
+    """
     _make_groundtruth_toml(tmp_path)
     slug, _, _ = _setup_simple_go_bridge(tmp_path)
     _begin_packet(auth_module, tmp_path, slug)
@@ -310,7 +319,7 @@ def test_validate_packet_fails_with_revised_anywhere_in_chain(auth_module, tmp_p
         f"NEW: bridge/{slug}.md\n"
     )
     _write_index(tmp_path, [block])
-    with pytest.raises(auth_module.AuthorizationError, match="superseded by REVISED"):
+    with pytest.raises(auth_module.AuthorizationError, match="Newer GO exists"):
         auth_module.activate_packet(tmp_path, slug)
 
 
@@ -490,3 +499,339 @@ def test_create_authorization_packet_accepts_test_plan_spec_to_test_heading(auth
     )
     packet = auth_module.create_authorization_packet(tmp_path, slug)
     assert packet["bridge_id"] == slug
+
+
+# ---------------------------------------------------------------------------
+# WI-3333 Bug 1: `## target_paths` heading recognition in extract_target_paths
+# ---------------------------------------------------------------------------
+
+
+def test_extract_target_paths_accepts_target_paths_heading(auth_module):
+    """T1 -- a `## target_paths` heading section with one backtick path per
+    bullet yields the extracted paths."""
+    md = "# Proposal\n\n## target_paths\n\n- `scripts/a.py`\n- `tests/b.py`\n"
+    assert auth_module.extract_target_paths(md) == ["scripts/a.py", "tests/b.py"]
+
+
+def test_extract_target_paths_target_paths_heading_first_span_only(auth_module):
+    """T2 -- `## target_paths` bullets with a path plus a parenthetical
+    backtick annotation yield only the first span (the path)."""
+    md = "## target_paths\n\n- `scripts/a.py` (new module)\n- `tests/b.py` (`pytest` suite)\n"
+    assert auth_module.extract_target_paths(md) == ["scripts/a.py", "tests/b.py"]
+
+
+def test_extract_target_paths_inline_json_unchanged(auth_module):
+    """T3 -- the inline `target_paths:` JSON metadata line is unchanged."""
+    md = 'target_paths: ["scripts/a.py", "tests/b.py"]\n\n## Summary\n\nx\n'
+    assert auth_module.extract_target_paths(md) == ["scripts/a.py", "tests/b.py"]
+
+
+def test_extract_target_paths_files_expected_to_change_unchanged(auth_module):
+    """T4 -- `## Files Expected To Change` multi-span bullets yield all spans."""
+    md = "## Files Expected To Change\n\n- `scripts/a.py` and `scripts/c.py`\n- `tests/b.py`\n"
+    assert auth_module.extract_target_paths(md) == [
+        "scripts/a.py",
+        "scripts/c.py",
+        "tests/b.py",
+    ]
+
+
+def test_extract_target_paths_raises_when_all_forms_absent(auth_module):
+    """T5 -- none of the three forms present -> AuthorizationError."""
+    md = "# Proposal\n\n## Summary\n\nNo target paths anywhere.\n"
+    with pytest.raises(auth_module.AuthorizationError, match="missing concrete target_paths"):
+        auth_module.extract_target_paths(md)
+
+
+def test_extract_target_paths_inline_json_precedence(auth_module):
+    """T6 -- when both inline JSON and a `## target_paths` heading are present,
+    the inline JSON form wins."""
+    md = 'target_paths: ["scripts/inline.py"]\n\n## target_paths\n\n- `scripts/heading.py`\n'
+    assert auth_module.extract_target_paths(md) == ["scripts/inline.py"]
+
+
+# ---------------------------------------------------------------------------
+# WI-3333 Bug 2: per-bullet Specification Links placeholder check
+# ---------------------------------------------------------------------------
+
+
+def test_extract_spec_links_substantive_word_in_cited_bullet_not_flagged(auth_module):
+    """T7 -- a bullet citing a backticked spec is not flagged as placeholder
+    even when its prose contains an ordinary placeholder-shaped word."""
+    md = (
+        "## Specification Links\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge authority; covers the pending-review state.\n"
+    )
+    assert auth_module.extract_spec_links(md) == ["GOV-FILE-BRIDGE-AUTHORITY-001"]
+
+
+def test_extract_spec_links_placeholder_only_bullet_still_flagged(auth_module):
+    """T8 -- a bullet with no concrete citation that matches PLACEHOLDER_RE
+    still raises."""
+    md = (
+        "## Specification Links\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge authority.\n"
+        "- TODO: add the remaining specs.\n"
+    )
+    with pytest.raises(auth_module.AuthorizationError, match="placeholder text"):
+        auth_module.extract_spec_links(md)
+
+
+def test_extract_spec_links_bare_placeholder_word_bullet_still_flagged(auth_module):
+    """T9 -- a bullet that is a bare placeholder token still raises."""
+    md = "## Specification Links\n\n- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge authority.\n- TBD\n"
+    with pytest.raises(auth_module.AuthorizationError, match="placeholder text"):
+        auth_module.extract_spec_links(md)
+
+
+def test_extract_spec_links_id_token_bullet_with_placeholder_word_not_flagged(auth_module):
+    """T10 -- a bullet citing a bare uppercase artifact-ID token (no backticks)
+    is not flagged even when its prose contains a placeholder-shaped word."""
+    md = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001 - resolves the pending verification gap.\n"
+    assert auth_module.extract_spec_links(md)
+
+
+def test_extract_spec_links_normal_section_returns_links(auth_module):
+    """T11 -- a normal section with real citations returns the links."""
+    md = (
+        "## Specification Links\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge authority.\n"
+        "- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` - testing gate.\n"
+    )
+    assert auth_module.extract_spec_links(md) == [
+        "GOV-FILE-BRIDGE-AUTHORITY-001",
+        "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001",
+    ]
+
+
+def test_create_authorization_packet_accepts_target_paths_heading_proposal(auth_module, tmp_path):
+    """T12 -- end-to-end: a GO'd proposal using the `## target_paths` heading
+    form (not the inline JSON) yields a valid authorization packet."""
+    slug = "fixture-bridge"
+    proposal = tmp_path / "bridge" / f"{slug}.md"
+    proposal.parent.mkdir(parents=True, exist_ok=True)
+    proposal.write_text(
+        f"# Fixture proposal {slug}\n\n"
+        "## target_paths\n\n"
+        "- `scripts/dummy.py`\n"
+        "- `.gtkb-state/**` (state dir)\n\n"
+        "## Specification Links\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge protocol.\n"
+        "- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` - spec linkage.\n\n"
+        "## Requirement Sufficiency\n\nExisting requirements sufficient.\n\n"
+        "## Verification Plan\n\n"
+        "Run `python -m pytest platform_tests/scripts/test_dummy.py -q`.\n",
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    assert packet["bridge_id"] == slug
+    assert packet["target_path_globs"] == ["scripts/dummy.py", ".gtkb-state/**"]
+
+
+# ---------------------------------------------------------------------------
+# WI-3333 Bug 3: post-GO authorization-resume symmetry
+# ---------------------------------------------------------------------------
+
+
+def test_approved_files_for_go_authorizes_post_go_no_go(auth_module):
+    """T13 -- chain NEW/NO-GO/REVISED/GO/NEW/NO-GO (latest is a post-GO NO-GO)
+    -> authorized; returns the proposal under the GO and the GO file."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[
+            ("NO-GO", "bridge/x-006.md"),
+            ("NEW", "bridge/x-005.md"),
+            ("GO", "bridge/x-004.md"),
+            ("REVISED", "bridge/x-003.md"),
+            ("NO-GO", "bridge/x-002.md"),
+            ("NEW", "bridge/x-001.md"),
+        ],
+    )
+    assert auth_module.approved_files_for_go(entry) == ("bridge/x-003.md", "bridge/x-004.md")
+
+
+def test_approved_files_for_go_raises_on_post_go_new_awaiting_review(auth_module):
+    """T14 -- latest is a post-GO NEW report awaiting review -> raises."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[
+            ("NEW", "bridge/x-005.md"),
+            ("GO", "bridge/x-004.md"),
+            ("NEW", "bridge/x-001.md"),
+        ],
+    )
+    with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
+        auth_module.approved_files_for_go(entry)
+
+
+def test_approved_files_for_go_raises_on_post_go_revised_awaiting_review(auth_module):
+    """T15 -- latest is a post-GO REVISED report awaiting review -> raises."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[
+            ("REVISED", "bridge/x-007.md"),
+            ("NO-GO", "bridge/x-006.md"),
+            ("NEW", "bridge/x-005.md"),
+            ("GO", "bridge/x-004.md"),
+            ("NEW", "bridge/x-001.md"),
+        ],
+    )
+    with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
+        auth_module.approved_files_for_go(entry)
+
+
+def test_approved_files_for_go_raises_on_post_go_verified(auth_module):
+    """T16 -- latest is a post-GO VERIFIED (terminal) -> raises."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[
+            ("VERIFIED", "bridge/x-006.md"),
+            ("NEW", "bridge/x-005.md"),
+            ("GO", "bridge/x-004.md"),
+            ("NEW", "bridge/x-001.md"),
+        ],
+    )
+    with pytest.raises(auth_module.AuthorizationError, match="VERIFIED \\(terminal"):
+        auth_module.approved_files_for_go(entry)
+
+
+def test_approved_files_for_go_raises_when_no_go_in_chain(auth_module):
+    """T17 -- a chain with no GO anywhere -> raises."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[("NO-GO", "bridge/x-002.md"), ("NEW", "bridge/x-001.md")],
+    )
+    with pytest.raises(auth_module.AuthorizationError, match="requires a GO in the bridge chain"):
+        auth_module.approved_files_for_go(entry)
+
+
+def test_approved_files_for_go_latest_is_go_unchanged(auth_module):
+    """T18 -- latest IS the GO (today's happy path) -> unchanged behavior."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[("GO", "bridge/x-002.md"), ("NEW", "bridge/x-001.md")],
+    )
+    assert auth_module.approved_files_for_go(entry) == ("bridge/x-001.md", "bridge/x-002.md")
+
+
+def test_validate_packet_accepts_post_go_no_go_after_revised_report(auth_module, tmp_path):
+    """T19 -- chain GO/NEW/NO-GO/REVISED/NO-GO: the latest is a NO-GO'd
+    post-impl report and the pinned GO still authorizes resume; the
+    intervening (non-latest) REVISED report is not a blocker."""
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _begin_packet(auth_module, tmp_path, slug)
+    for version, status in ((3, "NEW"), (4, "NO-GO"), (5, "REVISED"), (6, "NO-GO")):
+        _write_verdict(tmp_path, slug, version=version, verdict=status)
+    block = (
+        f"Document: {slug}\n"
+        f"NO-GO: bridge/{slug}-006.md\n"
+        f"REVISED: bridge/{slug}-005.md\n"
+        f"NO-GO: bridge/{slug}-004.md\n"
+        f"NEW: bridge/{slug}-003.md\n"
+        f"GO: bridge/{slug}-002.md\n"
+        f"NEW: bridge/{slug}.md\n"
+    )
+    _write_index(tmp_path, [block])
+    packet = auth_module.activate_packet(tmp_path, slug)
+    assert packet["bridge_id"] == slug
+
+
+def test_validate_packet_raises_on_post_go_revised_report_awaiting_review(auth_module, tmp_path):
+    """T20 -- the latest version is a post-GO REVISED report awaiting Loyal
+    Opposition review -> _validate_packet raises."""
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _begin_packet(auth_module, tmp_path, slug)
+    for version, status in ((3, "NEW"), (4, "NO-GO"), (5, "REVISED")):
+        _write_verdict(tmp_path, slug, version=version, verdict=status)
+    block = (
+        f"Document: {slug}\n"
+        f"REVISED: bridge/{slug}-005.md\n"
+        f"NO-GO: bridge/{slug}-004.md\n"
+        f"NEW: bridge/{slug}-003.md\n"
+        f"GO: bridge/{slug}-002.md\n"
+        f"NEW: bridge/{slug}.md\n"
+    )
+    _write_index(tmp_path, [block])
+    with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
+        auth_module.activate_packet(tmp_path, slug)
+
+
+def test_begin_creates_packet_for_post_go_no_go_thread(auth_module, tmp_path):
+    """T21 -- end-to-end: create_authorization_packet succeeds for a thread
+    whose latest status is a post-implementation-report NO-GO (the WI-3333
+    Bug 3 keystone case that previously failed at begin)."""
+    slug = "fixture-bridge"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py", ".gtkb-state/**"])
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_verdict(tmp_path, slug, version=3, verdict="NEW")
+    _write_verdict(tmp_path, slug, version=4, verdict="NO-GO")
+    _write_index(
+        tmp_path,
+        [
+            f"Document: {slug}\n"
+            f"NO-GO: bridge/{slug}-004.md\n"
+            f"NEW: bridge/{slug}-003.md\n"
+            f"GO: bridge/{slug}-002.md\n"
+            f"NEW: bridge/{slug}.md\n"
+        ],
+    )
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    assert packet["bridge_id"] == slug
+    assert packet["go_file"] == f"bridge/{slug}-002.md"
+    assert packet["proposal_file"] == f"bridge/{slug}.md"
+
+
+# ---------------------------------------------------------------------------
+# WI-3353 IP-4: worktree-safe project_root_from_arg
+# ---------------------------------------------------------------------------
+
+
+def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
+    """Build a synthetic GT-KB canonical checkout with a linked worktree under
+    .claude/worktrees/test-wt. Returns (canonical_root, worktree_root). The
+    worktree carries its own committed groundtruth.toml. Requires git.
+    """
+    ident = [
+        "-c", "user.email=test@example.com",
+        "-c", "user.name=test",
+        "-c", "commit.gpgsign=false",
+    ]
+    canonical = tmp_path / "canonical"
+    canonical.mkdir()
+    (canonical / "groundtruth.toml").write_text("# synthetic GT-KB root\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "add", "groundtruth.toml"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "commit", "-m", "init"], cwd=canonical, check=True, capture_output=True)
+    worktree = canonical / ".claude" / "worktrees" / "test-wt"
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", *ident, "worktree", "add", "--detach", str(worktree)],
+        cwd=canonical,
+        check=True,
+        capture_output=True,
+    )
+    return canonical, worktree
+
+
+def test_project_root_from_arg_resolves_canonical_from_worktree(
+    auth_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-3353 IP-4: project_root_from_arg() with no --project-root resolves the
+    canonical root when invoked from inside a linked worktree, so the
+    implementation-start authorization packet is not scoped to the worktree's
+    own scripts/ copy. An explicit --project-root still takes precedence."""
+    if shutil.which("git") is None:
+        pytest.skip("git not available on this system")
+    canonical, worktree = _build_worktree_project(tmp_path)
+    monkeypatch.delenv("GTKB_PROJECT_ROOT", raising=False)
+    monkeypatch.chdir(worktree)
+    assert auth_module.project_root_from_arg().resolve() == canonical.resolve()
+    assert auth_module.project_root_from_arg(None).resolve() == canonical.resolve()
+    # An explicit --project-root argument still wins.
+    explicit = tmp_path / "explicit-root"
+    explicit.mkdir()
+    assert auth_module.project_root_from_arg(str(explicit)).resolve() == explicit.resolve()

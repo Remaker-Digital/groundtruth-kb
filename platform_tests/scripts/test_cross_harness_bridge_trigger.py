@@ -17,6 +17,8 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -600,6 +602,56 @@ def test_dispatched_child_env_does_not_inherit_disable_var(
     assert child_env["GTKB_BRIDGE_POLLER_RUN_ID"] == meta["dispatch_id"], (
         "GTKB_BRIDGE_POLLER_RUN_ID must equal the dispatch_id"
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# WI-3353 IP-6/IP-7: worktree-aware canonical-root resolution (transitive)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
+    """Build a synthetic GT-KB canonical checkout with a linked worktree under
+    .claude/worktrees/test-wt. Returns (canonical_root, worktree_root). The
+    worktree carries its own committed groundtruth.toml. Requires git.
+    """
+    ident = [
+        "-c", "user.email=test@example.com",
+        "-c", "user.name=test",
+        "-c", "commit.gpgsign=false",
+    ]
+    canonical = tmp_path / "canonical"
+    canonical.mkdir()
+    (canonical / "groundtruth.toml").write_text("# synthetic GT-KB root\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "add", "groundtruth.toml"], cwd=canonical, check=True, capture_output=True)
+    subprocess.run(["git", *ident, "commit", "-m", "init"], cwd=canonical, check=True, capture_output=True)
+    worktree = canonical / ".claude" / "worktrees" / "test-wt"
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", *ident, "worktree", "add", "--detach", str(worktree)],
+        cwd=canonical,
+        check=True,
+        capture_output=True,
+    )
+    return canonical, worktree
+
+
+def test_cross_harness_trigger_resolves_canonical_from_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-3353 IP-6/IP-7: scripts/cross_harness_bridge_trigger.py needs no code
+    change -- its _resolve_project_root delegates to the now worktree-correct
+    groundtruth_kb.bridge.paths.resolve_project_root(). From inside a linked
+    worktree the trigger therefore resolves the canonical main-worktree root,
+    transitively verifying the IP-1 fix."""
+    if shutil.which("git") is None:
+        pytest.skip("git not available on this system")
+    canonical, worktree = _build_worktree_project(tmp_path)
+    monkeypatch.delenv("GTKB_PROJECT_ROOT", raising=False)
+    monkeypatch.chdir(worktree)
+    trigger = _load_trigger()
+    resolved = trigger._resolve_project_root(None)
+    assert resolved.resolve() == canonical.resolve()
 
 
 def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:

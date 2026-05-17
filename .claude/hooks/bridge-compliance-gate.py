@@ -136,6 +136,86 @@ ADVISORY_REPORT_SECTIONS = (
 AUDIT_OUTPUT_RELATIVE_PATH = Path(".codex") / "gtkb-hooks" / "last-bridge-audit.json"
 
 
+def _ancestor_or_self(root: Path, cwd_path: Path) -> bool:
+    """Return True when ``root`` is ``cwd_path`` itself or one of its parents.
+
+    The canonical GT-KB root always contains the session cwd: a canonical
+    session runs at the root (or a subdirectory), and a linked worktree lives
+    under ``<canonical>/.claude/worktrees/``. A resolver result that is neither
+    cwd_path nor an ancestor of it does not describe this session and is
+    discarded, so a synthetic cwd passed by a unit test is not silently
+    redirected to the live project root.
+    """
+    try:
+        resolved_root = root.resolve()
+        resolved_cwd = cwd_path.resolve()
+    except OSError:
+        return False
+    return resolved_root == resolved_cwd or resolved_root in resolved_cwd.parents
+
+
+def _git_common_dir_root(cwd_path: Path) -> Path | None:
+    """Resolve the canonical root via ``git rev-parse --git-common-dir``.
+
+    The shared git directory's parent is the canonical main-worktree root,
+    identical from the main worktree and from a linked worktree. Prefers
+    ``--path-format=absolute`` (git >= 2.31) and falls back to the bare form
+    resolved relative to ``cwd_path``. Returns None on any failure or when the
+    resolved parent lacks ``groundtruth.toml``.
+    """
+    for args in (
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        ["git", "rev-parse", "--git-common-dir"],
+    ):
+        try:
+            out = subprocess.check_output(
+                args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if not out:
+            continue
+        common_dir = (cwd_path / out).resolve()
+        candidate = common_dir.parent
+        if (candidate / "groundtruth.toml").is_file():
+            return candidate
+    return None
+
+
+def _canonical_project_root(cwd_path: Path) -> Path:
+    """Resolve the canonical GT-KB project root for project-state access.
+
+    Bridge governance state -- ``groundtruth.db``, the live ``bridge/INDEX.md``,
+    and the audit-output tree -- exists only at the canonical main-worktree
+    root. A session running inside a ``.claude/worktrees/*`` linked worktree has
+    a cwd that is NOT that root; trusting it makes the gate read an empty
+    scaffold database and falsely block a valid proposal.
+
+    Resolution is fail-soft. A candidate is accepted only when it is
+    ``cwd_path`` itself or an ancestor of it (the canonical root always contains
+    the session cwd):
+
+      1. ``groundtruth_kb.bridge.paths.resolve_project_root()`` when importable
+         -- the same import-with-ImportError-fallback pattern this hook uses for
+         ``groundtruth_kb.governance.output``.
+      2. A dependency-free ``git rev-parse --git-common-dir`` rooted at
+         ``cwd_path``.
+      3. ``cwd_path`` -- the final fail-soft floor, preserving pre-fix behavior.
+    """
+    try:
+        from groundtruth_kb.bridge.paths import resolve_project_root
+
+        candidate = resolve_project_root()
+    except Exception:  # fail-soft: import failure or resolver error falls through
+        candidate = None
+    if candidate is not None and _ancestor_or_self(candidate, cwd_path):
+        return candidate
+    git_root = _git_common_dir_root(cwd_path)
+    if git_root is not None and _ancestor_or_self(git_root, cwd_path):
+        return git_root
+    return cwd_path
+
+
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
     """
     Returns {document_name: latest_status}.
@@ -322,7 +402,7 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
     authorization_id, project_id, work_item_id = _extract_project_metadata(content)
     if not (authorization_id and project_id and work_item_id):
         return None
-    db_path = cwd_path / "groundtruth.db"
+    db_path = _canonical_project_root(cwd_path) / "groundtruth.db"
     if not db_path.is_file():
         return None
     conn: sqlite3.Connection | None = None
@@ -673,7 +753,7 @@ def _write_audit_result(
         if not output_path.is_absolute():
             output_path = cwd_path / output_path
     else:
-        output_path = cwd_path / AUDIT_OUTPUT_RELATIVE_PATH
+        output_path = _canonical_project_root(cwd_path) / AUDIT_OUTPUT_RELATIVE_PATH
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output = {
         "audit_mode": True,
@@ -800,7 +880,7 @@ def main() -> None:
         emit_deny("PreToolUse", reason)
         sys.exit(0)
 
-    index_path = cwd_path / BRIDGE_INDEX_FILENAME
+    index_path = _canonical_project_root(cwd_path) / BRIDGE_INDEX_FILENAME
     if not index_path.exists():
         emit_pass()
         sys.exit(0)
