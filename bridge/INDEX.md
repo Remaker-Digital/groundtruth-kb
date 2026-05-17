@@ -18,7 +18,36 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-bridge-index-archival-trim
+NO-GO: bridge/gtkb-bridge-index-archival-trim-002.md
+NEW: bridge/gtkb-bridge-index-archival-trim-001.md
+
+Document: gtkb-bridge-stop-drain-deference-repair
+NO-GO: bridge/gtkb-bridge-stop-drain-deference-repair-002.md
+NEW: bridge/gtkb-bridge-stop-drain-deference-repair-001.md
+
+Document: gtkb-gov-project-retirement-spec
+VERIFIED: bridge/gtkb-gov-project-retirement-spec-006.md
+NEW: bridge/gtkb-gov-project-retirement-spec-005.md
+GO: bridge/gtkb-gov-project-retirement-spec-004.md
+REVISED: bridge/gtkb-gov-project-retirement-spec-003.md
+NO-GO: bridge/gtkb-gov-project-retirement-spec-002.md
+NEW: bridge/gtkb-gov-project-retirement-spec-001.md
+
+Document: gtkb-cross-harness-trigger-import-repair
+VERIFIED: bridge/gtkb-cross-harness-trigger-import-repair-006.md
+NEW: bridge/gtkb-cross-harness-trigger-import-repair-005.md
+GO: bridge/gtkb-cross-harness-trigger-import-repair-004.md
+REVISED: bridge/gtkb-cross-harness-trigger-import-repair-003.md
+NO-GO: bridge/gtkb-cross-harness-trigger-import-repair-002.md
+NEW: bridge/gtkb-cross-harness-trigger-import-repair-001.md
+
 Document: gtkb-bridge-active-session-autodrain
+VERIFIED: bridge/gtkb-bridge-active-session-autodrain-008.md
+NEW: bridge/gtkb-bridge-active-session-autodrain-007.md
+GO: bridge/gtkb-bridge-active-session-autodrain-006.md
+REVISED: bridge/gtkb-bridge-active-session-autodrain-005.md
+NO-GO: bridge/gtkb-bridge-active-session-autodrain-004.md
 REVISED: bridge/gtkb-bridge-active-session-autodrain-003.md
 NO-GO: bridge/gtkb-bridge-active-session-autodrain-002.md
 NEW: bridge/gtkb-bridge-active-session-autodrain-001.md
@@ -36,6 +65,8 @@ NO-GO: bridge/gtkb-harness-registry-reader-migration-002.md
 NEW: bridge/gtkb-harness-registry-reader-migration-001.md
 
 Document: gtkb-harness-data-driven-dispatch
+VERIFIED: bridge/gtkb-harness-data-driven-dispatch-006.md
+NEW: bridge/gtkb-harness-data-driven-dispatch-005.md
 GO: bridge/gtkb-harness-data-driven-dispatch-004.md
 REVISED: bridge/gtkb-harness-data-driven-dispatch-003.md
 NO-GO: bridge/gtkb-harness-data-driven-dispatch-002.md
