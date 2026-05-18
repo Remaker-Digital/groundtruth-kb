@@ -27,7 +27,7 @@ poller (retired 2026-05-09) are disabled. The cross-harness event-driven
 trigger is the canonical bridge automation path while it remains healthy.**
 
 The owner directive that halted OS pollers on 2026-04-25 applied to the
-former token-heavy implementation: Windows scheduled tasks
+former blind-polling implementation: Windows scheduled tasks
 `AgentRedFileBridgeIndexScan-Claude`, `AgentRedFileBridgeIndexScan-Codex`,
 `AgentRedBridgeLivenessAlert`, and `AgentRedPollerLivenessWatcher`; the
 `.claude/hooks/poller-freshness.py` `UserPromptSubmit` hook; and the
@@ -66,9 +66,10 @@ Prime then reads `bridge/INDEX.md` and acts on actionable entries. Codex
 bridge scans are similarly owner-triggered in the Codex harness.
 
 The 2026-04-25 OS-poller halt was made after the former OS Claude poller
-(activated ~2026-04-23) drove a ~10x session token-cost regression: 173
-Claude capped-spawns/day at peak, plus 92 Codex spawns/day, each costing
-~50k tokens. The 2026-05-09 smart-poller retirement was made after a
+(activated ~2026-04-23) was found to fire on a fixed interval regardless
+of bridge activity: 173 Claude capped-spawns/day at peak plus 92 Codex
+spawns/day, the great majority doing work without information. The defect
+was blind repetition, not the ~50k tokens each spawn consumed. The 2026-05-09 smart-poller retirement was made after a
 S321 daemon-dispatch-disabled incident exposed ongoing scoping ambiguity
 between interval-driven dispatch and event-driven dispatch (per
 `PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001`); the Slice 4 retirement
@@ -278,13 +279,16 @@ Do NOT, without explicit owner approval:
   it. Fresh clones could not see it. Lesson: if it is essential, it must be
   tracked. The `!`-negation patterns added then remain in force for the rule
   files and PS1 scripts even though the retired hook itself is now removed.
-- **S308 (2026-04-25)**: Former OS Claude poller activation drove a ~10x
-  token-cost regression (~12.5M tokens/day from background spawns alone). Owner
-  directive halted the retired pollers and removed the freshness hook, restoring
-  manual-trigger operation until smart-poller automation is available. The
-  protocol itself was unaffected; INDEX.md remains canonical. Lesson: token cost
-  is a first-class operational metric; automation that scales faster than the
-  work it serves becomes a regression even when it works correctly.
+- **S308 (2026-04-25)**: Former OS Claude poller activation produced ~12.5M
+  tokens/day of background spawns (a ~10× jump), most doing work without
+  information because the poller fired on a fixed interval regardless of
+  bridge activity. Owner directive halted the retired pollers and removed the
+  freshness hook, restoring manual-trigger operation until smart-poller
+  automation is available. The protocol itself was unaffected; INDEX.md
+  remains canonical. Lesson: blind, activity-independent automation — work
+  repeated whether or not there is anything to do — is the defect; automation
+  must be activity-driven and deterministic. The waste was work without
+  information, not token volume.
 - **S339 (2026-05-09)**: Smart-poller retirement (Slice 4). Smart-poller
   scheduled task `GTKB-SmartBridgePoller` halted; runtime artifacts
   archived to `archive/smart-poller-2026-05-09/`; doctor's

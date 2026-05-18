@@ -207,10 +207,10 @@ monitor watchdog startup shortcut, or re-enable the Windows scheduled tasks
 cost/benefit analysis required by `.claude/rules/bridge-essential.md`
 §"Re-Enabling Pollers".
 
-Rationale: the OS Claude poller activation around 2026-04-23 drove a
-~10× session token-cost regression (~12.5M tokens/day from background
-spawns alone). Manual scans recover the cost; the bridge protocol itself
-is unaffected.
+Rationale: the OS Claude poller (activated ~2026-04-23) fired on a
+fixed interval regardless of bridge activity — a ~10× spawn jump
+(~12.5M tokens/day) mostly doing work without information, not token
+volume. The bridge protocol itself is unaffected.
 
 ### Session Start: Active Work List (Mandatory)
 

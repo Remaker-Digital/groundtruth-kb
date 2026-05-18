@@ -1043,7 +1043,7 @@ poller's actionable-signature scheme byte-identically per
 invariants are preserved.
 
 **Not to be confused with:** retired `smart poller` (interval-driven
-substrate; archived); retired `OS poller` (token-heavy scheduled-task
+substrate; archived); retired `OS poller` (blind-polling scheduled-task
 class; halted 2026-04-25); the `file bridge` (the protocol surface; the
 trigger dispatches into it).
 
@@ -1164,8 +1164,9 @@ Failures log: ``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
 `AgentRedPollerLivenessWatcher`; the foreground watchdog; the
 `.claude/hooks/poller-freshness.py` hook; the in-session `CronCreate`
 poller). All members of this class were halted 2026-04-25 per owner
-directive after a 10x session token-cost regression and must not be
-re-enabled as a substitute for the smart poller.
+directive because they polled blindly — waking the harnesses on a fixed
+interval regardless of bridge activity — and must not be re-enabled as a
+substitute for the smart poller.
 
 **Not to be confused with:** retired `smart poller` (Slice 4 archive);
 `cross-harness event-driven trigger` (current canonical automation path).

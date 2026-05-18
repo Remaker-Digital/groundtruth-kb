@@ -18,11 +18,45 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-test-build-contract-orphan-relocation
+GO: bridge/gtkb-test-build-contract-orphan-relocation-004.md
+REVISED: bridge/gtkb-test-build-contract-orphan-relocation-003.md
+NO-GO: bridge/gtkb-test-build-contract-orphan-relocation-002.md
+NEW: bridge/gtkb-test-build-contract-orphan-relocation-001.md
+
+Document: gtkb-s358-w5-token-framing-correction
+VERIFIED: bridge/gtkb-s358-w5-token-framing-correction-006.md
+NEW: bridge/gtkb-s358-w5-token-framing-correction-005.md
+GO: bridge/gtkb-s358-w5-token-framing-correction-004.md
+REVISED: bridge/gtkb-s358-w5-token-framing-correction-003.md
+NO-GO: bridge/gtkb-s358-w5-token-framing-correction-002.md
+NEW: bridge/gtkb-s358-w5-token-framing-correction-001.md
+
+Document: gtkb-s358-w4-enforcement-calibration
+GO: bridge/gtkb-s358-w4-enforcement-calibration-006.md
+REVISED: bridge/gtkb-s358-w4-enforcement-calibration-005.md
+GO: bridge/gtkb-s358-w4-enforcement-calibration-004.md
+REVISED: bridge/gtkb-s358-w4-enforcement-calibration-003.md
+NO-GO: bridge/gtkb-s358-w4-enforcement-calibration-002.md
+NEW: bridge/gtkb-s358-w4-enforcement-calibration-001.md
+
 Document: gtkb-bridge-index-archival-trim
+VERIFIED: bridge/gtkb-bridge-index-archival-trim-010.md
+NEW: bridge/gtkb-bridge-index-archival-trim-009.md
+GO: bridge/gtkb-bridge-index-archival-trim-008.md
+REVISED: bridge/gtkb-bridge-index-archival-trim-007.md
+NO-GO: bridge/gtkb-bridge-index-archival-trim-006.md
+REVISED: bridge/gtkb-bridge-index-archival-trim-005.md
+NO-GO: bridge/gtkb-bridge-index-archival-trim-004.md
+REVISED: bridge/gtkb-bridge-index-archival-trim-003.md
 NO-GO: bridge/gtkb-bridge-index-archival-trim-002.md
 NEW: bridge/gtkb-bridge-index-archival-trim-001.md
 
 Document: gtkb-bridge-stop-drain-deference-repair
+VERIFIED: bridge/gtkb-bridge-stop-drain-deference-repair-006.md
+NEW: bridge/gtkb-bridge-stop-drain-deference-repair-005.md
+GO: bridge/gtkb-bridge-stop-drain-deference-repair-004.md
+REVISED: bridge/gtkb-bridge-stop-drain-deference-repair-003.md
 NO-GO: bridge/gtkb-bridge-stop-drain-deference-repair-002.md
 NEW: bridge/gtkb-bridge-stop-drain-deference-repair-001.md
 
@@ -59,6 +93,8 @@ NO-GO: bridge/gtkb-adr-harness-registry-extension-002.md
 NEW: bridge/gtkb-adr-harness-registry-extension-001.md
 
 Document: gtkb-harness-registry-reader-migration
+GO: bridge/gtkb-harness-registry-reader-migration-006.md
+REVISED: bridge/gtkb-harness-registry-reader-migration-005.md
 GO: bridge/gtkb-harness-registry-reader-migration-004.md
 REVISED: bridge/gtkb-harness-registry-reader-migration-003.md
 NO-GO: bridge/gtkb-harness-registry-reader-migration-002.md
