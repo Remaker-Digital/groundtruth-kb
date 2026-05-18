@@ -8426,6 +8426,55 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-18T16:30:13.555395Z
   answer: "User has answered your questions: \"Filing the bridge-scheduler implementation slices is blocked: a governance gate (DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001) requires every implementation proposal to cite a Project, Work Item, and Project Authorization, and the scheduler program has no MemBase scaffolding. How should I scaffold and authorize it?\"=\"Full program (Slices 2-6)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0696
+  asked_at: 2026-05-18T18:09:07.778099Z
+  question: "Owner decision needed?"
+  detected_via: prose:your_decision_q
+  status: resolved
+  question_hash: aa1f2d3bbfd3daaa
+  resolved_at: 2026-05-18T18:38:16.636162Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0697
+  asked_at: 2026-05-18T20:09:42.277072Z
+  question: "Items 1 and 2 are complete (ADR v2 live; post-impl report at REVISED -007 awaiting Codex VERIFIED). Item 3 (revise the NO-GO'd scheduler Slice 5, then implement GO'd Slices 3/4/6) and item 4 (Antigravity onboarding) remain. You asked me to confirm priority before the scheduler-implementation block — what should I prioritize next?"
+  options:
+    - "Scheduler program (item 3)"
+    - "Antigravity first (item 4)"
+    - "Revise Slice 5, then checkpoint"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e1c71d8d43904db2
+  resolved_at: 2026-05-18T20:09:42.277072Z
+  answer: "User has answered your questions: \"Items 1 and 2 are complete (ADR v2 live; post-impl report at REVISED -007 awaiting Codex VERIFIED). Item 3 (revise the NO-GO'd scheduler Slice 5, then implement GO'd Slices 3/4/6) and item 4 (Antigravity onboarding) remain. You asked me to confirm priority before the scheduler-implementation block — what should I prioritize next?\"=\"Antigravity first (item 4)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0698
+  asked_at: 2026-05-18T20:38:28.717543Z
+  question: "NO-GO `-018` (implementation-gate friction hygiene) — approved IP-D scope was 32 regression tests; current implementation covers 19. Which remediation path?"
+  options:
+    - "Land the missing 13 tests"
+    - "REVISED proposal narrowing IP-D to 19"
+    - "Owner waiver in REVISED report"
+    - "Defer the thread — work on GO `-004` first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0001c61367724549
+  resolved_at: 2026-05-18T20:38:28.717543Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0699
+  asked_at: 2026-05-18T21:59:41.278308Z
+  question: "Bridge thread gtkb-implementation-gate-friction-hygiene-018 NO-GO: Codex requires the approved IP-D 32-test scope from -005 be satisfied, but only 19 IP-D tests landed (52 total passing). Three valid paths to closure — which do you want?"
+  options:
+    - "Land remaining ~13 IP-D tests"
+    - "REVISED proposal: narrow to 19"
+    - "Owner waiver for scope reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 399123b1b1e5ab04
+  resolved_at: 2026-05-18T21:59:41.278308Z
+  answer: "Answer questions?"
+  notes: ""
 
 ## History
 
