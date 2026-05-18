@@ -921,9 +921,11 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
         following hold (per gtkb-decision-tracker-block-prose-ask-2026-04-29
         -003 REVISED-1 §F3 Parent Bridge Contract Revision):
 
-        1. The just-completed turn contained at least one prose-decision-ask
-           matching one of the PROSE_DECISION_PATTERNS (after T14 false-positive
-           guards).
+        1. The just-completed turn contained at least one FRESH prose-decision-
+           ask matching one of the PROSE_DECISION_PATTERNS (after T14 false-
+           positive guards and the WI-3332 known-relay filter -- a match that
+           merely relays an already-recorded owner decision is not block-
+           eligible).
         2. The same turn contained ZERO AskUserQuestion tool_use entries
            (askuserquestion_count is per just-completed turn, not session-
            cumulative — per Codex -004 Q1 answer).
@@ -955,6 +957,24 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
         for e in entries:
             if e.question_hash:
                 existing_hashes.add(e.question_hash)
+
+    # Known-decision identity snapshot for startup-relay suppression (WI-3332).
+    # A prose match that merely relays an already-recorded owner decision
+    # (e.g. a startup disclosure echoing the Pending Owner Decisions section)
+    # must not be treated as a fresh owner-decision-ask. This snapshot is built
+    # once from all sections (Pending / Resolved / History) and is NOT mutated
+    # during the scan, so freshness is judged only against decisions recorded
+    # before this turn. Exact hash identity and exact normalized-text identity
+    # only -- no fuzzy matching (per the -004 GO scope constraint).
+    known_decision_hashes: set[str] = set(existing_hashes)
+    known_decision_norms: set[str] = set()
+    for entries in sections.values():
+        for e in entries:
+            if e.question:
+                known_decision_hashes.add(_question_hash(e.question, []))
+                norm = _normalize_question_text(e.question)
+                if norm:
+                    known_decision_norms.add(norm)
 
     asked_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     session_hint = _session_hint()
@@ -1009,9 +1029,13 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
                 sections["pending"].append(entry)
             mutated = True
 
-    # Scan B -- prose anti-patterns. Track all matches (including
-    # already-known hashes) for block-decision input; the durable-file append
-    # path uses idempotence to avoid duplicates.
+    # Scan B -- prose anti-patterns. ``prose_matches_this_turn`` is the raw
+    # scan result feeding the durable-file append/correlation path (which uses
+    # idempotence to avoid duplicates). ``fresh_prose_matches_this_turn`` is the
+    # block-eligible subset: matches that do NOT relay an already-recorded owner
+    # decision. Only fresh matches drive Stop-block emission (WI-3332) --
+    # relaying a known pending/resolved/history decision during a startup
+    # disclosure or status update must not refuse turn-end.
     #
     # Per DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001: if the same
     # turn contains a correlated AskUserQuestion (two-signal-required:
@@ -1020,9 +1044,20 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     # appending to ## Pending. Correlation is fail-closed (biases toward
     # leaving prose pending; never silently auto-resolves an unrelated decision).
     prose_matches_this_turn: list[tuple[str, str]] = []
+    fresh_prose_matches_this_turn: list[tuple[str, str]] = []
     for name, snippet in _scan_prose_decisions(turn_events):
         prose_matches_this_turn.append((name, snippet))
         prose_hash = _question_hash(snippet, [])
+        # Startup-relay suppression (WI-3332): a prose match whose identity
+        # matches an already-recorded decision is a relay, not a fresh ask. It
+        # is excluded from Stop-block eligibility but still flows through the
+        # durable-append/correlation path below (idempotence dedups it).
+        snippet_norm = _normalize_question_text(snippet)
+        is_known_relay = prose_hash in known_decision_hashes or (
+            bool(snippet_norm) and snippet_norm in known_decision_norms
+        )
+        if not is_known_relay:
+            fresh_prose_matches_this_turn.append((name, snippet))
         if prose_hash in existing_hashes:
             continue
         existing_hashes.add(prose_hash)
@@ -1089,9 +1124,11 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     # F3 bounded exception: emit block JSON when the hard condition holds AND
     # the env-var feature flag is enabled. The flag suppresses ONLY this
     # emission — detection (above) and durable-file appends (above) already
-    # ran regardless.
-    if prose_matches_this_turn and askuserquestion_count == 0 and _block_emission_enabled():
-        return _build_block_decision(prose_matches_this_turn)
+    # ran regardless. Only FRESH prose matches are block-eligible: a turn that
+    # merely relays already-recorded owner decisions (WI-3332) does not refuse
+    # turn-end, even though the relay was still scanned and idempotence-checked.
+    if fresh_prose_matches_this_turn and askuserquestion_count == 0 and _block_emission_enabled():
+        return _build_block_decision(fresh_prose_matches_this_turn)
     return None
 
 

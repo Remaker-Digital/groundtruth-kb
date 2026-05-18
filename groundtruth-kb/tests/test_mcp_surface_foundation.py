@@ -23,7 +23,7 @@ from groundtruth_kb.mcp_surface.boundary import (
     assert_in_root,
     resolve_safe_path,
 )
-from groundtruth_kb.mcp_surface.roles import current_role
+from groundtruth_kb.mcp_surface.roles import CANONICAL_ROLES, current_role
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -101,15 +101,68 @@ def test_t5_resolve_safe_path_resolves_relative_to_root() -> None:
 
 
 # ---------------------------------------------------------------------------
-# T6 - role-assignments.json read correctly
+# T6 - role resolved from the registry projection
 # ---------------------------------------------------------------------------
 
 
-def test_t6_current_role_reads_role_assignments_json() -> None:
-    role_map = PROJECT_ROOT / "harness-state" / "role-assignments.json"
-    data = json.loads(role_map.read_text(encoding="utf-8"))
-    for harness_id, entry in data.get("harnesses", {}).items():
-        assert current_role(harness_id=harness_id, role_map_path=role_map) == entry["role"]
+def test_t6_current_role_reads_role_assignments_json(tmp_path: Path) -> None:
+    """WI-3342 IP-4: ``current_role`` resolves the operating role from the
+    DB-backed registry projection ``harness-state/harness-registry.json``,
+    whose ``harnesses`` field is a LIST of unified records (migrated from the
+    retired ``harness-state/role-assignments.json``). The projection ``role``
+    field is the list-valued role-set wire form; ``current_role`` collapses a
+    singleton role-set to its sole canonical scalar role token (WI-3342 C1).
+    Seeded under an isolated ``tmp_path`` so the test never reads the real
+    harness-state.
+    """
+    registry = tmp_path / "harness-registry.json"
+    harnesses = [
+        {"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]},
+        {"id": "B", "harness_name": "claude", "role": ["prime-builder"]},
+    ]
+    registry.write_text(json.dumps({"harnesses": harnesses}), encoding="utf-8")
+    for entry in harnesses:
+        # current_role collapses the singleton role-set wire form to its sole
+        # scalar token -- a canonical role, not the str() of the list (the
+        # latter was the NO-GO -009 F1 defect, closed by WI-3342 C1).
+        resolved = current_role(harness_id=entry["id"], role_map_path=registry)
+        assert resolved == entry["role"][0]
+        assert resolved in CANONICAL_ROLES
+
+
+# ---------------------------------------------------------------------------
+# T6b - multi-element single-harness role-set normalized to primary role
+# ---------------------------------------------------------------------------
+
+
+def test_t6b_current_role_normalizes_multi_role_single_harness_set(
+    tmp_path: Path,
+) -> None:
+    """WI-3342 C1: in single-harness operating mode (per
+    ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``) a single harness id holds the
+    multi-element role-set ``["prime-builder", "loyal-opposition"]``.
+    ``current_role`` collapses that role-set to the deterministic primary role
+    -- ``prime-builder`` -- so the MCP scalar status surface always reports a
+    canonical role token. Seeded under an isolated ``tmp_path``.
+    """
+    registry = tmp_path / "harness-registry.json"
+    registry.write_text(
+        json.dumps(
+            {
+                "harnesses": [
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "role": ["prime-builder", "loyal-opposition"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    resolved = current_role(harness_id="B", role_map_path=registry)
+    assert resolved == "prime-builder"
+    assert resolved in CANONICAL_ROLES
 
 
 # ---------------------------------------------------------------------------
@@ -118,18 +171,21 @@ def test_t6_current_role_reads_role_assignments_json() -> None:
 
 
 def test_t7_current_role_accepts_acting_prime_builder_on_read(tmp_path: Path) -> None:
-    role_map = tmp_path / "role-assignments.json"
-    role_map.write_text(
+    # WI-3342 IP-4: ``current_role`` reads the registry projection LIST. The
+    # legacy scalar role wire form is still READ-accepted per the Acting-Prime
+    # Compatibility Contract.
+    registry = tmp_path / "harness-registry.json"
+    registry.write_text(
         json.dumps(
             {
-                "harnesses": {
-                    "Z": {"role": "acting-prime-builder", "harness_type": "claude"},
-                }
+                "harnesses": [
+                    {"id": "Z", "harness_name": "claude", "role": "acting-prime-builder"},
+                ]
             }
         ),
         encoding="utf-8",
     )
-    assert current_role(harness_id="Z", role_map_path=role_map) == "acting-prime-builder"
+    assert current_role(harness_id="Z", role_map_path=registry) == "acting-prime-builder"
 
 
 # ---------------------------------------------------------------------------

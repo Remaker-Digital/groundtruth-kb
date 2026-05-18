@@ -89,3 +89,36 @@ def test_codex_userpromptsubmit_includes_workstream_focus(codex_hooks: dict) -> 
     assert "workstream-focus" in raw, (
         "Codex hooks.json must reference workstream-focus (cross-harness parity)"
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Startup-disclosure relay cache parity
+#
+# Authority: bridge/gtkb-startup-relay-truncation-fix-refile-003.md (Codex GO
+# at -004); ADR-CODEX-HOOK-PARITY-FALLBACK-001.
+# ──────────────────────────────────────────────────────────────────────────
+
+_RELAY_DISPATCHERS = {
+    "claude": REPO_ROOT / ".claude" / "hooks" / "session_start_dispatch.py",
+    "codex": REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py",
+}
+
+
+def test_startup_relay_cache_write_is_parity_across_dispatchers() -> None:
+    """T6 -- ADR-CODEX-HOOK-PARITY-FALLBACK-001: both SessionStart dispatchers
+    write the harness-scoped startup-disclosure relay cache.
+
+    The bounded-pointer relay is sound only if BOTH harness dispatchers populate
+    the harness-scoped cache; a one-harness implementation would break the relay
+    for the other harness.
+    """
+    for harness, path in _RELAY_DISPATCHERS.items():
+        text = path.read_text(encoding="utf-8")
+        assert "def _write_startup_relay_cache(" in text, (
+            f"{harness} dispatcher is missing the _write_startup_relay_cache helper"
+        )
+        assert "_write_startup_relay_cache(startup_context)" in text, (
+            f"{harness} dispatcher must call _write_startup_relay_cache on the startup path"
+        )
+        assert "last-user-visible-startup.md" in text
+        assert "last-user-visible-startup.meta.json" in text

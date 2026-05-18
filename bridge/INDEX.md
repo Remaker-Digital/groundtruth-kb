@@ -17,22 +17,43 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-bridge-scheduler-lanes-leases-slice-2
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-003.md
+GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-002.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-001.md
+
 Document: gtkb-bridge-target-paths-kb-mutation-check
+GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-001.md
 
 Document: gtkb-s358-w3-requirements-collection-hook-title-fix
+GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-006.md
+REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-005.md
 NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-004.md
 REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-003.md
 NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-002.md
 NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-001.md
 
 Document: gtkb-s358-w2-agent-red-gov-trio-v2
+GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-008.md
+REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-007.md
+NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-006.md
+REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-005.md
 GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-004.md
 REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-003.md
 NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-002.md
 NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-001.md
 
 Document: gtkb-s358-w1-retirement-machinery-correction
+NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-013.md
+REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-012.md
+NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-011.md
+REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-010.md
+REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-009.md
+NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-008.md
+NEW: bridge/gtkb-s358-w1-retirement-machinery-correction-007.md
+GO: bridge/gtkb-s358-w1-retirement-machinery-correction-006.md
+REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-005.md
 GO: bridge/gtkb-s358-w1-retirement-machinery-correction-004.md
 REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-003.md
 NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-002.md
@@ -63,6 +84,14 @@ NO-GO: bridge/gtkb-adr-harness-registry-extension-002.md
 NEW: bridge/gtkb-adr-harness-registry-extension-001.md
 
 Document: gtkb-harness-registry-reader-migration
+VERIFIED: bridge/gtkb-harness-registry-reader-migration-014.md
+NEW: bridge/gtkb-harness-registry-reader-migration-013.md
+NEW: bridge/gtkb-harness-registry-reader-migration-012.md
+GO: bridge/gtkb-harness-registry-reader-migration-011.md
+REVISED: bridge/gtkb-harness-registry-reader-migration-010.md
+NO-GO: bridge/gtkb-harness-registry-reader-migration-009.md
+NEW: bridge/gtkb-harness-registry-reader-migration-008.md
+NEW: bridge/gtkb-harness-registry-reader-migration-007.md
 GO: bridge/gtkb-harness-registry-reader-migration-006.md
 REVISED: bridge/gtkb-harness-registry-reader-migration-005.md
 GO: bridge/gtkb-harness-registry-reader-migration-004.md

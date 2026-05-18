@@ -625,32 +625,57 @@ def _harness_state_dir(project_root: Path) -> Path:
 
 
 def _read_role_assignments(project_root: Path) -> dict[str, Any]:
-    """Read harness-state/role-assignments.json. Returns the parsed document.
+    """Return the harness role map sourced from the registry projection.
 
-    Raises ValueError on missing file or unreadable JSON, so callers fail
-    closed.
+    WI-3342 IP-4: migrated from a direct read of
+    ``harness-state/role-assignments.json`` to the DB-backed registry
+    projection ``harness-state/harness-registry.json``. The projection stores
+    ``harnesses`` as a LIST; this function returns the legacy document shape
+    ``{"harnesses": {harness_id: record}}`` so every consumer
+    (``_resolve_dispatch_target``, ``_is_single_harness_topology``, the
+    single-harness dispatcher's applicability gate) keeps working unchanged.
+    Each record carries the full projection fields (``role``, ``harness_type``,
+    ``invocation_surfaces``, ...). Raises ValueError on a missing or unreadable
+    projection, so callers fail closed.
     """
-    path = _harness_state_dir(project_root) / "role-assignments.json"
+    path = _harness_state_dir(project_root) / "harness-registry.json"
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        projection = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
-        raise ValueError(f"role-assignments.json not found at {path}") from exc
+        raise ValueError(f"harness-registry.json not found at {path}") from exc
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"role-assignments.json unreadable at {path}: {exc}") from exc
+        raise ValueError(f"harness-registry.json unreadable at {path}: {exc}") from exc
+    harnesses = {
+        str(record["id"]): record
+        for record in projection.get("harnesses", [])
+        if isinstance(record, dict) and record.get("id")
+    }
+    return {"harnesses": harnesses}
 
 
 def _read_harness_identities(project_root: Path) -> dict[str, Any]:
-    """Read harness-state/harness-identities.json. Returns the parsed document.
+    """Return the harness identity map sourced from the registry projection.
 
-    Raises ValueError on missing file or unreadable JSON.
+    WI-3342 IP-4: migrated from a direct read of
+    ``harness-state/harness-identities.json`` to the DB-backed registry
+    projection ``harness-state/harness-registry.json``. Returns the legacy
+    document shape ``{"harnesses": {harness_name: {"id": harness_id}}}`` so
+    ``_invert_identities`` and the single-harness dispatcher keep working
+    unchanged. Raises ValueError on a missing or unreadable projection.
     """
-    path = _harness_state_dir(project_root) / "harness-identities.json"
+    path = _harness_state_dir(project_root) / "harness-registry.json"
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        projection = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
-        raise ValueError(f"harness-identities.json not found at {path}") from exc
+        raise ValueError(f"harness-registry.json not found at {path}") from exc
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"harness-identities.json unreadable at {path}: {exc}") from exc
+        raise ValueError(f"harness-registry.json unreadable at {path}: {exc}") from exc
+    harnesses = {
+        str(record["harness_name"]): {"id": record["id"]}
+        for record in projection.get("harnesses", [])
+        if isinstance(record, dict) and record.get("harness_name") and record.get("id")
+    }
+    return {"harnesses": harnesses}
 
 
 def _invert_identities(identities: dict[str, Any]) -> dict[str, str]:

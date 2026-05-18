@@ -2166,9 +2166,12 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
     """Check role-set wire form, valid tokens, no duplicates, topology consistency.
 
     Per IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md (Codex
-    GO at -014). Validates:
+    GO at -014). WI-3342 IP-4 migrated this check from the legacy
+    ``harness-state/role-assignments.json`` + ``harness-state/harness-identities.json``
+    pair to the DB-backed registry projection
+    (``harness-state/harness-registry.json``). Validates:
 
-    - ``harness-state/role-assignments.json`` exists and parses as JSON.
+    - ``harness-state/harness-registry.json`` exists and parses as JSON.
     - Each harness record's ``role`` field is either a list (canonical wire
       form), a string (legacy scalar; READ-accepted), or absent.
     - Every list element is a token in ``{prime-builder, loyal-opposition,
@@ -2176,57 +2179,56 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
       ``acting-prime-builder`` token is READ-accepted per the
       Compatibility/Provenance Classification).
     - No duplicates within a single record's role-set.
-    - Every harness ID referenced by ``role-assignments.json`` has a
-      corresponding entry in ``harness-state/harness-identities.json`` (topology
-      consistency).
+    - Identity/role topology consistency: in the projection, each harness
+      record carries its ``id`` and ``role`` in a single unified row, so the
+      pre-migration cross-check (every role-map ID must also appear in the
+      identity map) is intrinsically satisfied — a record with a ``role`` and
+      no ``id`` is the only residual drift case, and that is flagged here.
     """
     check_name = "Role-set topology consistency"
-    role_path = target / "harness-state" / "role-assignments.json"
-    identities_path = target / "harness-state" / "harness-identities.json"
+    # WI-3342 IP-4: resolve the registry projection path via the package
+    # generator module. Function-local import keeps the doctor module's
+    # top-level import surface unchanged.
+    from groundtruth_kb.harness_projection import harness_registry_path
 
-    if not role_path.is_file():
+    registry_path = harness_registry_path(target)
+
+    if not registry_path.is_file():
         return ToolCheck(
             name=check_name,
             required=False,
             found=False,
             status="warning",
             message=(
-                "harness-state/role-assignments.json missing; doctor cannot validate "
-                "role-set schema until first harness startup writes the file."
+                "harness-state/harness-registry.json missing; doctor cannot validate "
+                "role-set schema until the harness registry projection is generated."
             ),
         )
 
     try:
-        role_doc = json.loads(role_path.read_text(encoding="utf-8"))
+        registry_doc = json.loads(registry_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
-            message=f"harness-state/role-assignments.json unreadable: {exc}",
+            message=f"harness-state/harness-registry.json unreadable: {exc}",
         )
 
-    identities = {}
-    if identities_path.is_file():
-        try:
-            identities_doc = json.loads(identities_path.read_text(encoding="utf-8"))
-            identities = identities_doc.get("harnesses", {}) or {}
-        except (OSError, json.JSONDecodeError):
-            identities = {}
-
     valid_read_tokens = frozenset({"prime-builder", "loyal-opposition", "acting-prime-builder"})
-    harnesses = role_doc.get("harnesses", {}) or {}
+    harnesses = registry_doc.get("harnesses", []) if isinstance(registry_doc, dict) else []
     issues: list[str] = []
     legacy_scalar_count = 0
     list_form_count = 0
 
-    if isinstance(harnesses, dict):
-        identity_ids = {info.get("id") for info in identities.values() if isinstance(info, dict)}
-        for harness_id, record in harnesses.items():
+    if isinstance(harnesses, list):
+        for record in harnesses:
             if not isinstance(record, dict):
-                issues.append(f"harness {harness_id!r}: record is not a JSON object")
+                issues.append("harness registry record is not a JSON object")
                 continue
+            harness_id = record.get("id")
+            harness_label = harness_id if isinstance(harness_id, str) and harness_id else "<unknown>"
             raw_role = record.get("role")
             if raw_role is None:
                 # Missing role is permitted (bootstrap state); doctor flags via
@@ -2236,7 +2238,7 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
                 legacy_scalar_count += 1
                 if raw_role.strip().lower() not in valid_read_tokens:
                     issues.append(
-                        f"harness {harness_id!r}: legacy scalar role "
+                        f"harness {harness_label!r}: legacy scalar role "
                         f"{raw_role!r} not in valid READ vocabulary"
                     )
             elif isinstance(raw_role, list):
@@ -2245,36 +2247,39 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
                 for token in raw_role:
                     if not isinstance(token, str):
                         issues.append(
-                            f"harness {harness_id!r}: role-set contains non-string token "
+                            f"harness {harness_label!r}: role-set contains non-string token "
                             f"{token!r}"
                         )
                         continue
                     canonical = token.strip().lower()
                     if canonical not in valid_read_tokens:
                         issues.append(
-                            f"harness {harness_id!r}: role-set contains unknown token "
+                            f"harness {harness_label!r}: role-set contains unknown token "
                             f"{token!r} (valid: {sorted(valid_read_tokens)})"
                         )
                     if canonical in seen:
                         issues.append(
-                            f"harness {harness_id!r}: role-set contains duplicate token "
+                            f"harness {harness_label!r}: role-set contains duplicate token "
                             f"{token!r}"
                         )
                     seen.add(canonical)
             else:
                 issues.append(
-                    f"harness {harness_id!r}: role field has unsupported type "
+                    f"harness {harness_label!r}: role field has unsupported type "
                     f"{type(raw_role).__name__} (expected list or string)"
                 )
-            # Topology consistency: harness ID referenced here should exist in
-            # the identity map (when the identity map is present).
-            if identity_ids and harness_id not in identity_ids:
+            # Topology consistency: in the unified registry projection, identity
+            # (``id``/``harness_name``) and role live in the same row, so the
+            # pre-migration "role-map ID also in identity-map" cross-check is
+            # intrinsically satisfied. The only residual drift is a row that
+            # carries a role but no ``id``.
+            if not (isinstance(harness_id, str) and harness_id):
                 issues.append(
-                    f"harness {harness_id!r}: role-assignments references an ID not "
-                    f"present in harness-identities.json (topology drift)"
+                    "harness registry record carries a role but no 'id' "
+                    "(identity/role topology drift)"
                 )
     else:
-        issues.append("role-assignments.json 'harnesses' field is not a JSON object")
+        issues.append("harness-registry.json 'harnesses' field is not a JSON list")
 
     if issues:
         return ToolCheck(
@@ -2315,34 +2320,43 @@ def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
       applicable".
     """
     check_name = "Single-harness dispatcher when required"
-    role_path = target / "harness-state" / "role-assignments.json"
+    # WI-3342 IP-4: single-harness applicability is determined from the
+    # DB-backed registry projection (harness-state/harness-registry.json),
+    # migrated from the legacy harness-state/role-assignments.json.
+    from groundtruth_kb.harness_projection import harness_registry_path
 
-    if not role_path.is_file():
+    registry_path = harness_registry_path(target)
+
+    if not registry_path.is_file():
         return ToolCheck(
             name=check_name,
             required=False,
             found=False,
             status="warning",
-            message="role-assignments.json missing; single-harness dispatcher applicability cannot be determined",
+            message=(
+                "harness-state/harness-registry.json missing; single-harness "
+                "dispatcher applicability cannot be determined"
+            ),
         )
 
     try:
-        role_doc = json.loads(role_path.read_text(encoding="utf-8"))
+        registry_doc = json.loads(registry_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
-            message=f"role-assignments.json unreadable: {exc}",
+            message=f"harness-state/harness-registry.json unreadable: {exc}",
         )
 
     multi_role_harnesses: list[str] = []
-    harnesses = role_doc.get("harnesses", {}) or {}
-    if isinstance(harnesses, dict):
-        for harness_id, record in harnesses.items():
+    harnesses = registry_doc.get("harnesses", []) if isinstance(registry_doc, dict) else []
+    if isinstance(harnesses, list):
+        for record in harnesses:
             if not isinstance(record, dict):
                 continue
+            harness_id = record.get("id")
             raw_role = record.get("role")
             if isinstance(raw_role, list):
                 canonical = {

@@ -17,11 +17,22 @@ regression — write-always-list + legacy-scalar reads), and IP-9b
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
-from scripts.harness_roles import (
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PACKAGE_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
+if str(_PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(_PACKAGE_SRC))
+
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.harness_projection import (  # noqa: E402
+    generate_harness_projection,
+)
+
+from scripts.harness_roles import (  # noqa: E402
     ROLE_ACTING_PRIME_BUILDER,
     ROLE_LOYAL_OPPOSITION,
     ROLE_PRIME_BUILDER,
@@ -36,6 +47,69 @@ from scripts.harness_roles import (
     role_for_harness,
     set_harness_role,
 )
+
+
+# ---------------------------------------------------------------------------
+# WI-3342 IP-6 — registry-backed reader/writer fixtures.
+#
+# scripts/harness_roles.py was migrated off the legacy
+# harness-state/role-assignments.json. load_role_assignments reads the
+# DB-backed registry projection (harness-state/harness-registry.json); the
+# writers mutate the DB ``harnesses`` table and regenerate the projection.
+# _mirror_role_assignments_to_registry skips harnesses with no current DB row,
+# so writer tests must seed a real DB first.
+# ---------------------------------------------------------------------------
+
+
+def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> None:
+    """Seed a groundtruth.db ``harnesses`` table + generated projection.
+
+    ``harnesses`` maps each durable harness id to ``(harness_name, role_set)``.
+    """
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    for harness_id, (harness_name, role_set) in harnesses.items():
+        db.insert_harness(
+            id=harness_id,
+            harness_name=harness_name,
+            harness_type=harness_name,
+            role=list(role_set),
+            changed_by="test",
+            change_reason="WI-3342 IP-6 role_set_schema fixture",
+            status="active",
+        )
+    generate_harness_projection(db, root)
+
+
+def _write_projection_directly(root: Path, harnesses: list[dict]) -> None:
+    """Write the registry projection file directly with the given records.
+
+    Used by the legacy-scalar READ-tolerance tests: the projection reader and
+    ``_normalize_role_field`` must accept a legacy scalar ``role`` wire form in
+    a projection record even though the DB writer always emits list form.
+    """
+    registry = root / "harness-state" / "harness-registry.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": harnesses,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _projection_role(root: Path, harness_id: str) -> object:
+    """Return the raw ``role`` field for ``harness_id`` in the registry projection."""
+    projection = json.loads(
+        (root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8")
+    )
+    for record in projection.get("harnesses", []):
+        if isinstance(record, dict) and record.get("id") == harness_id:
+            return record.get("role")
+    raise KeyError(harness_id)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -131,35 +205,32 @@ def test_primary_role_prime_first() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def _read(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def test_set_harness_role_writes_list_form(tmp_path: Path) -> None:
-    role_path = tmp_path / "harness-state" / "role-assignments.json"
+    # WI-3342 IP-6: the write path persists to the DB ``harnesses`` table and
+    # regenerates the registry projection; the harness must exist in the DB.
+    _seed_registry(tmp_path, {"A": ("codex", [ROLE_LOYAL_OPPOSITION])})
     set_harness_role(
         tmp_path,
         ROLE_PRIME_BUILDER,
         harness_id="A",
         harness_name="codex",
-        assignment_path=role_path,
     )
-    data = _read(role_path)
-    assert isinstance(data["harnesses"]["A"]["role"], list)
-    assert data["harnesses"]["A"]["role"] == [ROLE_PRIME_BUILDER]
+    role = _projection_role(tmp_path, "A")
+    assert isinstance(role, list)
+    assert role == [ROLE_PRIME_BUILDER]
 
 
 def test_role_for_harness_writes_list_form_on_self_correction(tmp_path: Path) -> None:
-    role_path = tmp_path / "harness-state" / "role-assignments.json"
+    # WI-3342 IP-6: self-correction writes to the DB + projection; seed harness
+    # B so the corrective role write lands (the mirror skips DB-less harnesses).
+    _seed_registry(tmp_path, {"B": ("claude", [])})
     role_for_harness(
         tmp_path,
         harness_id="B",
         harness_name="claude",
-        assignment_path=role_path,
         ensure_prime_on_startup=True,
     )
-    data = _read(role_path)
-    assert isinstance(data["harnesses"]["B"]["role"], list)
+    assert isinstance(_projection_role(tmp_path, "B"), list)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -168,42 +239,40 @@ def test_role_for_harness_writes_list_form_on_self_correction(tmp_path: Path) ->
 
 
 def test_legacy_scalar_role_reads_as_singleton_set(tmp_path: Path) -> None:
-    role_path = tmp_path / "harness-state" / "role-assignments.json"
-    role_path.parent.mkdir(parents=True, exist_ok=True)
-    role_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {
-                    "A": {"harness_type": "codex", "role": "loyal-opposition"},
-                    "B": {"harness_type": "claude", "role": "prime-builder"},
-                },
-            }
-        ),
-        encoding="utf-8",
+    # WI-3342 IP-3: load_role_assignments reads the registry projection. The
+    # legacy scalar role wire form is still READ-accepted: a projection record
+    # carrying a scalar ``role`` normalizes to a singleton list via
+    # _normalize_role_field. Seed the projection file directly to exercise
+    # legacy-scalar READ tolerance (the DB writer itself always emits lists).
+    _write_projection_directly(
+        tmp_path,
+        [
+            {"id": "A", "harness_name": "codex", "role": "loyal-opposition"},
+            {"id": "B", "harness_name": "claude", "role": "prime-builder"},
+        ],
     )
 
-    document = load_role_assignments(tmp_path, assignment_path=role_path)
+    document = load_role_assignments(tmp_path)
     # Loader normalizes legacy scalar values into list form.
     assert document["harnesses"]["A"]["role"] == ["loyal-opposition"]
     assert document["harnesses"]["B"]["role"] == ["prime-builder"]
 
 
 def test_legacy_scalar_upgrades_to_list_on_first_write(tmp_path: Path) -> None:
-    """IP-10 backward-compat one-shot smoke test."""
-    role_path = tmp_path / "harness-state" / "role-assignments.json"
-    role_path.parent.mkdir(parents=True, exist_ok=True)
-    role_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {
-                    "A": {"harness_type": "codex", "role": "loyal-opposition"},
-                    "B": {"harness_type": "claude", "role": "prime-builder"},
-                },
-            }
-        ),
-        encoding="utf-8",
+    """IP-10 backward-compat: every WRITE path emits list form, never scalar.
+
+    WI-3342 IP-5/IP-6: the role-map write surface is the DB ``harnesses`` table
+    (which is list-native) + the regenerated registry projection; the retired
+    role-assignments.json file-writer is gone. This test pins the write-path
+    list-emission contract: after a ``set_harness_role`` write, every role
+    record in the regenerated projection is list form (no scalar leaks).
+    """
+    _seed_registry(
+        tmp_path,
+        {
+            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
+            "B": ("claude", [ROLE_PRIME_BUILDER]),
+        },
     )
 
     # Trigger a write via set_harness_role.
@@ -212,14 +281,30 @@ def test_legacy_scalar_upgrades_to_list_on_first_write(tmp_path: Path) -> None:
         ROLE_LOYAL_OPPOSITION,
         harness_id="B",
         harness_name="claude",
-        assignment_path=role_path,
     )
 
-    data = _read(role_path)
-    # B's role set should now be list form.
-    assert data["harnesses"]["B"]["role"] == ["loyal-opposition"]
-    # A's role set was carried through the normalize/write cycle and is also list form now.
-    assert data["harnesses"]["A"]["role"] == ["loyal-opposition"]
+    # B's role set is list form; A is demoted-or-carried as list form too —
+    # the write path normalizes every role record to the list wire form.
+    assert _projection_role(tmp_path, "B") == [ROLE_LOYAL_OPPOSITION]
+    assert isinstance(_projection_role(tmp_path, "A"), list)
+
+
+def test_load_role_assignments_normalizes_legacy_scalar_projection_record(
+    tmp_path: Path,
+) -> None:
+    """IP-10 backward-compat: a legacy scalar role wire form is normalized.
+
+    The role-set-schema migration accepts legacy scalar role values on READ
+    and normalizes them to singleton lists in process. After WI-3342 the role
+    map is the registry projection; this confirms a projection record carrying
+    a legacy scalar ``role`` is normalized by ``load_role_assignments``.
+    """
+    _write_projection_directly(
+        tmp_path,
+        [{"id": "A", "harness_name": "codex", "role": "prime-builder"}],
+    )
+    document = load_role_assignments(tmp_path)
+    assert document["harnesses"]["A"]["role"] == [ROLE_PRIME_BUILDER]
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -228,25 +313,18 @@ def test_legacy_scalar_upgrades_to_list_on_first_write(tmp_path: Path) -> None:
 
 
 def test_multi_element_role_set_persists_through_load(tmp_path: Path) -> None:
-    """Single-harness mode: multi-element role set survives load + normalize."""
-    role_path = tmp_path / "harness-state" / "role-assignments.json"
-    role_path.parent.mkdir(parents=True, exist_ok=True)
-    role_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {
-                    "B": {
-                        "harness_type": "claude",
-                        "role": ["prime-builder", "loyal-opposition"],
-                    },
-                },
-            }
-        ),
-        encoding="utf-8",
+    """Single-harness mode: multi-element role set survives load + normalize.
+
+    WI-3342 IP-3: load_role_assignments reads the registry projection; the
+    multi-element role-set wire form (single-harness topology) must survive the
+    load + normalize round-trip.
+    """
+    _seed_registry(
+        tmp_path,
+        {"B": ("claude", ["prime-builder", "loyal-opposition"])},
     )
 
-    document = load_role_assignments(tmp_path, assignment_path=role_path)
+    document = load_role_assignments(tmp_path)
     assert sorted(document["harnesses"]["B"]["role"]) == [
         "loyal-opposition",
         "prime-builder",

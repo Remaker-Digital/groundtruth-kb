@@ -97,13 +97,28 @@ def test_bridge_proposal_all_three_metadata_lines_passes() -> None:
 
 
 def test_bridge_proposal_metadata_accepts_wi_gtkb_worklist_id_formats() -> None:
-    for wi_value in ("WI-9999", "GTKB-SOME-THING-001", "WORKLIST-A-B-C"):
+    for wi_value in ("WI-9999", "WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001", "GTKB-SOME-THING-001", "WORKLIST-A-B-C"):
         metadata = _META_AUTH + _META_PROJECT + f"Work Item: {wi_value}\n"
         content = _proposal("NEW", metadata=metadata)
         reason = _deny(content)
         assert reason is None or _METADATA_CLAUSE not in reason, (
             f"Work Item id format {wi_value} should be accepted"
         )
+
+
+def test_bridge_proposal_metadata_accepts_wi_auto_id() -> None:
+    # WI-AUTO-<SPEC-ID> ids are minted by groundtruth_kb.intake (spec-intake
+    # confirm). A NEW proposal whose Work Item line carries one must not trip
+    # CLAUSE-PROJECT-METADATA-PRESENT. Regression guard for WI-3322.
+    metadata = (
+        _META_AUTH + _META_PROJECT
+        + "Work Item: WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001\n"
+    )
+    content = _proposal("NEW", metadata=metadata)
+    reason = _deny(content)
+    assert reason is None or _METADATA_CLAUSE not in reason, (
+        "spec-intake WI-AUTO-* Work Item id should be accepted by the presence gate"
+    )
 
 
 # --- CLAUSE-VERDICT-FILES-EXCLUDED ----------------------------------------------

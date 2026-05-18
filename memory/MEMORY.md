@@ -1,6 +1,114 @@
 # Agent Red Memory
 
 ## Current Status
+
+- **2026-05-18: Antigravity Integration completion drive started.**
+  Owner directed prioritized completion of `PROJECT-ANTIGRAVITY-INTEGRATION`
+  (add Google Antigravity as a 3rd AI coding harness; harness-registry refactor).
+  Status reconciled across MemBase + `bridge/INDEX.md` + git: 7 WIs VERIFIED,
+  2 GO (WI-3342 reader-migration, WI-3343 ADR extension), 6 TODO. Durable
+  cross-session tracker created at `memory/antigravity-integration-status.md` --
+  **future sessions tracking this project: start there.** Owner AUQ 2026-05-18
+  authorized a MemBase status truth-up (work_items show `stage=backlogged`
+  despite VERIFIED bridge threads). Open next: truth-up bridge proposal,
+  WI-3342/WI-3343 implementation, WI-3345 spike + WI-3362 proposals.
+
+- **S356 (2026-05-16): bridge-compliance-gate `SPEC_TEST_HEADING_RE` re.MULTILINE fix — VERIFIED + committed.**
+  Branch `develop` @ `6d62ac1a`. Fixed the `SPEC_TEST_HEADING_RE` missing-`re.MULTILINE`
+  defect that hard-blocked every Claude-authored VERIFIED bridge verdict
+  (`_has_spec_derived_verification` never matched the mid-document `## Spec-to-Test Mapping`
+  heading). Bridge thread `gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix`:
+  NEW→GO→NEW→NO-GO→REVISED→VERIFIED→VERIFIED (`-007` supersedes `-006`); `WI-3351`
+  under `PROJECT-GTKB-RELIABILITY-FIXES` (reliability fast-lane). Committed `6d62ac1a` —
+  11 files (re.MULTILINE in both `bridge-compliance-gate.py` copies + new regression test
+  + 7 bridge files + INDEX); new test 10/10, existing bridge-compliance-gate suite 57/57,
+  ruff clean. `develop` is 17 ahead of `origin/develop` — **not pushed** (push deferred to
+  owner). Full handoff: `session_prompts` row S356. Open follow-ups: WI-3351
+  `resolution_status` still `open` (stage→resolved deferred — WI not in a backlog snapshot);
+  spawned task "Harden governance hooks for worktree sessions" awaits owner triage; sibling
+  reliability threads `gtkb-bridge-compliance-gate-fenced-code-parser-fix` (WI-3336) and
+  `gtkb-bridge-compliance-gate-wi-auto-regex-fix` (WI-3322) were GO but not implemented as
+  of S356.
+
+- **Fresh-session handoff (S353 wrap + addendum, 2026-05-15 PDT):**
+  S353 was a Codex Loyal Opposition advisory/review session. Branch is
+  `develop`; HEAD at wrap was `fd7bb43a`. The tree is dirty with active
+  startup-relay implementation files, bridge files, skill adapter/manifest
+  changes, and tests. No commit or push was attempted because the relay thread
+  is latest `NO-GO` and the worktree includes mixed Prime-authored and
+  LO-authored active artifacts.
+
+  Addendum after the owner-decision tracker false-positive advisory: Codex wrote
+  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-15-15-07-owner-decision-tracker-startup-relay-false-positive.md`,
+  recorded `WI-3332` ("Suppress already-known startup relay matches in
+  owner-decision tracker") as an open P1 defect under
+  `PROJECT-GTKB-RELIABILITY-FIXES`, linked the advisory report as project source
+  evidence, and filed
+  `bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-001.md`.
+  Loyal Opposition review immediately returned `NO-GO` at
+  `bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-002.md`.
+  The technical scope was accepted as directionally sound, but the operative
+  bridge packet was authored by Codex while Codex was assigned Loyal Opposition;
+  Prime Builder must refile the same technical scope as
+  `bridge/gtkb-owner-decision-tracker-startup-relay-known-match-suppression-003.md`
+  with status `REVISED` and cite durable owner-routing evidence for `WI-3332`.
+  Treat `WI-3323` only as related startup-relay context, not parent scope.
+
+  Completed advisory #2: `gtkb-lo-opportunity-radar-skill` reached
+  `VERIFIED` at `bridge/gtkb-lo-opportunity-radar-skill-004.md`.
+  `SPEC-LO-OPPORTUNITY-RADAR-001` remains specified; the canonical
+  `.claude/skills/lo-opportunity-radar/SKILL.md`, generated Codex adapter,
+  manifest, registry entry, and `tests/skills/test_lo_opportunity_radar_skill.py`
+  are present in the dirty tree. WI-3324 is resolved; project
+  `PROJECT-GTKB-LO-OPPORTUNITY-RADAR` is active and intentionally kept open for
+  future radar slices. Focused rerun during wrap: 6/6 opportunity-radar skill
+  tests passed, adapter/parity tests 10/10 passed, bridge helper tests 34/34
+  passed, and `scripts/check_harness_parity.py --all --markdown` reported
+  PASS with 64 PASS / no parity issues.
+
+  Advisory #1 remains open for Prime correction: the original
+  `gtkb-startup-disclosure-relay-truncation-fix` thread was withdrawn at
+  `bridge/gtkb-startup-disclosure-relay-truncation-fix-003.md`; the refile
+  thread `gtkb-startup-relay-truncation-fix-refile` received GO at `-004`,
+  Prime filed post-implementation report `-005`, and Codex returned
+  `NO-GO` at `bridge/gtkb-startup-relay-truncation-fix-refile-006.md`.
+  The blockers are: mandatory clause preflight reports a blocking
+  `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` gap on the operative
+  report, and the implementation still allows stale or non-disclosure cache
+  content to satisfy the startup relay gate. WI-3323 remains open under
+  `PROJECT-GTKB-RELIABILITY-FIXES`.
+
+  Additional advisory produced:
+  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-15-14-35-skill-usage-advisory.md`
+  recommends a deterministic `skill_usage_router.py` / `gt skills
+  suggest/check` first slice, followed by `gt bridge propose` hardening and
+  `/verify` verdict-author/spec-to-test tooling. The report is under the
+  gitignored CODEX insight dropbox and was not force-added.
+
+  Live bridge scan after the addendum: `VERIFIED=162`, `NO-GO=65`, `GO=24`, `NEW=3`,
+  `WITHDRAWN=28`, `ADVISORY=1`, `REVISED=0`. LO-actionable latest `NEW`
+  entries are `gtkb-in-source-provenance-anchors-001-prop`,
+  `gtkb-commit-scope-bundling-detection-001-prop`, and
+  `gtkb-auto-push-investigation-001-prop`. Prime-actionable latest `GO` and
+  `NO-GO` entries remain substantial; immediate Prime items include the
+  startup-relay `NO-GO` revision and the owner-decision tracker `REVISED` refile.
+
+  Wrap evidence is under `.groundtruth/session/snapshots/S353/`. Hygiene scan
+  reported 38 ERROR / 2265 WARN, dominated by known
+  `snapshots_non_manifest` historical outputs plus current dirty-tree warnings.
+  Consistency scan reported 2 ERROR / 1903 WARN for the old missing
+  `gtkb-isolation-018-slice-d-non-functional-content-{001,002}.md` INDEX
+  citations and historical orphan bridge-file classes. DA harvest apply for
+  S353 was blocked by `GOV-ARTIFACT-APPROVAL-001` because no native formal
+  approval packet was supplied.
+
+  Next session should start `::init gtkb pb`, re-read live `bridge/INDEX.md`,
+  revise `gtkb-owner-decision-tracker-startup-relay-known-match-suppression`
+  from Prime Builder as `REVISED`, then revise
+  `gtkb-startup-relay-truncation-fix-refile` to close `-006` before committing.
+  Do not assume the dirty tree is wholly owned by one thread; keep relay,
+  opportunity-radar, bridge, memory, and advisory artifacts explicitly scoped.
+
 - **Fresh-session handoff (S352 addendum, 2026-05-15 UTC):**
   Governance-chain mechanical enforcement closed. Live bridge shows the recent
   work threads verified: WI-3312/3313/3314/3315 were already verified and

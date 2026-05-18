@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -365,20 +364,41 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError("Project authorization update did not return a current authorization")
         return authorization
 
-    @staticmethod
-    def _authorization_work_item_ids(authorization: dict[str, Any]) -> list[str]:
-        """Decode an authorization's ``included_work_item_ids`` to a list."""
-        parsed = authorization.get("included_work_item_ids_parsed")
-        if isinstance(parsed, list):
-            return [str(value) for value in parsed]
-        raw = authorization.get("included_work_item_ids")
-        if not raw:
-            return []
-        try:
-            decoded = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            return []
-        return [str(value) for value in decoded] if isinstance(decoded, list) else []
+    def _project_membership_work_item_ids(self, project_id: str) -> list[str]:
+        """Return the work-item ids linked to ``project_id`` via an active
+        project-to-work-item membership link.
+
+        GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 defines the
+        completion-gating set as the project's explicitly-linked work items -
+        the active project-to-work-item membership links - not the
+        authorization envelope's ``included_work_item_ids`` list. The scanner
+        (scripts/project_verified_completion_scanner.py) and this service both
+        source the gating set from the membership link so the two agree.
+        """
+        memberships = self.db.list_project_work_items(_require_nonempty(project_id, "project_id"))
+        return [
+            str(membership["work_item_id"])
+            for membership in memberships
+            if str(membership.get("membership_status") or "").strip().lower() == "active"
+        ]
+
+    def _authorization_completion_ready(
+        self, authorization: dict[str, Any], verified_work_items: set[str]
+    ) -> bool:
+        """True when ``authorization`` is active and every gating work item has
+        a VERIFIED bridge thread.
+
+        The gating set is the project's active membership-linked work items
+        (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2). An authorization
+        whose project has no active membership links is not completion-ready.
+        """
+        if authorization.get("status") != ACTIVE_PROJECT_AUTHORIZATION_STATUS:
+            return False
+        project_id = str(authorization.get("project_id") or "")
+        if not project_id:
+            return False
+        included = self._project_membership_work_item_ids(project_id)
+        return bool(included) and all(work_item in verified_work_items for work_item in included)
 
     @staticmethod
     def _verified_work_items(project_root: Path) -> set[str]:
@@ -411,29 +431,107 @@ class ProjectLifecycleService:
                     verified.add(match.group(1).strip())
         return verified
 
+    def _work_item_in_other_active_project(self, work_item_id: str, exclude_project_id: str) -> bool:
+        """True when ``work_item_id`` has an active membership link in some
+        non-terminal project other than ``exclude_project_id``.
+
+        Used by collective retirement: a work item shared with another
+        still-active project is not retired when one of its projects retires;
+        only the retiring project's own membership link is retired.
+        """
+        for project in self.db.list_projects(include_terminal=False):
+            other_project_id = str(project.get("id") or "")
+            if not other_project_id or other_project_id == exclude_project_id:
+                continue
+            for membership in self.db.list_project_work_items(other_project_id):
+                if str(membership.get("work_item_id") or "") == work_item_id:
+                    return True
+        return False
+
+    def _retire_project_work_items(
+        self,
+        project_id: str,
+        *,
+        completed_authorization_id: str,
+        changed_by: str = PROJECTS_CHANGED_BY,
+    ) -> list[str]:
+        """Collectively retire a retiring project's associated work items.
+
+        GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 makes retirement
+        collective: when a project retires, its active project-to-work-item
+        membership links are retired, and each membership-linked work item is
+        transitioned to ``resolution_status='retired'`` unless that work item
+        is still an active member of another non-terminal project (a shared
+        work item, left active for the other project).
+
+        Only ``resolution_status`` is changed; the work item's ``stage`` is
+        left untouched so the transition does not trip the GOV-15 owner-
+        approval gate in ``_validate_stage_transition``. Collective retirement
+        is automatic and takes no owner AskUserQuestion.
+
+        Returns the ids of the work items transitioned to ``retired``.
+        """
+        change_reason = (
+            f"Collective retirement: project {project_id} retired on completion of "
+            f"authorization {completed_authorization_id} "
+            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v3 collective-retirement clause)."
+        )
+        retired_work_items: list[str] = []
+        for membership in self.db.list_project_work_items(project_id):
+            work_item_id = str(membership.get("work_item_id") or "")
+            if not work_item_id:
+                continue
+            # Retire this project's membership link; "retired" is non-active so
+            # the link drops out of the active project-to-work-item set.
+            self.db.link_project_work_item(
+                project_id,
+                work_item_id,
+                changed_by,
+                change_reason,
+                membership_role=membership.get("membership_role") or "member",
+                membership_order=membership.get("membership_order"),
+                status="retired",
+                source=membership.get("membership_source"),
+            )
+            # A work item shared with another non-terminal project stays active
+            # for that project; only the membership link above is retired here.
+            if self._work_item_in_other_active_project(work_item_id, project_id):
+                continue
+            work_item = self.db.get_work_item(work_item_id)
+            if work_item is None:
+                continue
+            if str(work_item.get("resolution_status") or "") == "retired":
+                continue
+            self.db.update_work_item(
+                work_item_id,
+                changed_by,
+                change_reason,
+                resolution_status="retired",
+            )
+            retired_work_items.append(work_item_id)
+        return retired_work_items
+
     def complete_project_authorization(
         self,
         authorization_id: str,
-        owner_decision_deliberation_id: str,
         *,
         project_root: Path,
         changed_by: str = PROJECTS_CHANGED_BY,
         change_reason: str,
     ) -> dict[str, Any]:
         """Transition an active project authorization to ``completed`` and, when
-        it was the project's sole active authorization, retire the project.
+        it was the project's sole active authorization, retire the project and
+        collectively retire its associated work items and membership links.
 
-        IP-3 of WI-3316 (``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001``).
-        Owner confirmation is mandatory and auto-transition is prohibited:
-        ``owner_decision_deliberation_id`` must resolve to a genuine
-        owner-decision deliberation (``source_type='owner_conversation'`` AND
-        ``outcome='owner_decision'``) whose text records the completion context
-        for THIS project or authorization. An LO-review, informational, or
-        no-go deliberation, or an owner decision recorded for a different
-        project, is rejected.
+        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2: completion and
+        retirement are automatic once every gating work item is VERIFIED. There
+        is no owner-confirmation gate - owner AUQ governs project START
+        (authorization creation and approval), not completion. The gating set
+        is the project's explicitly-linked work items: the active
+        project-to-work-item membership links (v2's "explicitly linked"
+        definition), not the authorization envelope's ``included_work_item_ids``.
         """
         norm_auth_id = _require_nonempty(authorization_id, "authorization_id")
-        norm_delib_id = _require_nonempty(owner_decision_deliberation_id, "owner_decision_deliberation_id")
 
         # Step 1: load the authorization; it must be active.
         authorization = self.db.get_project_authorization(norm_auth_id)
@@ -446,41 +544,13 @@ class ProjectLifecycleService:
             )
         project_id = str(authorization.get("project_id") or "")
 
-        # Step 2: owner-confirmation gate (existence is insufficient).
-        deliberation = self.db.get_deliberation(norm_delib_id)
-        if deliberation is None:
-            raise ProjectLifecycleError(
-                f"Owner-decision deliberation not found: {norm_delib_id}. "
-                "Auto-transition is prohibited; an owner-decision deliberation is required."
-            )
-        if deliberation.get("source_type") != "owner_conversation":
-            raise ProjectLifecycleError(
-                f"Deliberation {norm_delib_id} is not an owner conversation "
-                f"(source_type={deliberation.get('source_type')!r}); completion requires "
-                "a genuine owner decision."
-            )
-        if deliberation.get("outcome") != "owner_decision":
-            raise ProjectLifecycleError(
-                f"Deliberation {norm_delib_id} is not an owner decision "
-                f"(outcome={deliberation.get('outcome')!r}); an LO-review, informational, "
-                "or no-go deliberation cannot confirm completion."
-            )
-        context_text = " ".join(
-            str(deliberation.get(field) or "")
-            for field in ("content", "source_ref", "change_reason", "title", "summary")
-        )
-        if project_id not in context_text and norm_auth_id not in context_text:
-            raise ProjectLifecycleError(
-                f"Deliberation {norm_delib_id} does not record the completion context for "
-                f"project {project_id} / authorization {norm_auth_id}; the owner decision "
-                "must reference this project or authorization."
-            )
-
-        # Step 3: re-run the IP-1 readiness check for this authorization.
-        included = self._authorization_work_item_ids(authorization)
+        # Step 2: readiness check - every gating work item must be VERIFIED.
+        # The gating set is the project's active membership-linked work items
+        # (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 "explicitly linked").
+        included = self._project_membership_work_item_ids(project_id)
         if not included:
             raise ProjectLifecycleError(
-                f"Project authorization {norm_auth_id} lists no work items; "
+                f"Project {project_id} has no active membership-linked work items; "
                 "completion readiness cannot be established."
             )
         verified = self._verified_work_items(project_root)
@@ -491,7 +561,7 @@ class ProjectLifecycleService:
                 f"without a VERIFIED bridge thread: {', '.join(unverified)}."
             )
 
-        # Step 4: transition the authorization to completed (status-only change).
+        # Step 3: transition the authorization to completed (status-only change).
         try:
             completed = self.db.update_project_authorization(
                 norm_auth_id,
@@ -504,22 +574,80 @@ class ProjectLifecycleService:
         if completed is None:
             raise ProjectLifecycleError("Project authorization completion did not return a current authorization")
 
-        # Step 5: retire the project iff no other active authorization remains.
+        # Step 4: retire the project iff no other active authorization remains,
+        # and collectively retire the project's associated work items and
+        # membership links (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001:
+        # retirement is collective - project, authorization, and associated
+        # VERIFIED work items retire together).
         other_active = [
             a
             for a in self.db.list_project_authorizations(project_id, status="active")
             if a.get("id") != norm_auth_id
         ]
         project_retired = False
+        retired_work_items: list[str] = []
         if not other_active:
             self.retire_project(
                 project_id,
                 changed_by=changed_by,
                 change_reason=(
                     f"Auto-retired: sole active authorization {norm_auth_id} completed "
-                    f"per owner decision {norm_delib_id}."
+                    "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v3 automatic collective retirement)."
                 ),
             )
             project_retired = True
+            retired_work_items = self._retire_project_work_items(
+                project_id,
+                completed_authorization_id=norm_auth_id,
+                changed_by=changed_by,
+            )
 
-        return {"authorization": completed, "project_retired": project_retired}
+        return {
+            "authorization": completed,
+            "project_retired": project_retired,
+            "retired_work_items": retired_work_items,
+        }
+
+    def auto_complete_ready_authorizations(
+        self,
+        *,
+        project_root: Path,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str = (
+            "Auto-completed: all membership-linked work items VERIFIED "
+            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 automatic completion)."
+        ),
+    ) -> list[dict[str, Any]]:
+        """Scan every active project authorization and auto-complete each one
+        whose gating work items all have a VERIFIED bridge thread.
+
+        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2: completion and
+        retirement are automatic and require no owner confirmation. Idempotent -
+        a completed authorization is no longer active, so a re-run does not
+        re-process it. Returns one result dict per authorization completed in
+        this pass.
+        """
+        verified = self._verified_work_items(project_root)
+        completed: list[dict[str, Any]] = []
+        for project in self.db.list_projects(include_terminal=False):
+            project_id = str(project.get("id") or "")
+            if not project_id:
+                continue
+            for authorization in self.db.list_project_authorizations(project_id, status="active"):
+                if not self._authorization_completion_ready(authorization, verified):
+                    continue
+                result = self.complete_project_authorization(
+                    str(authorization["id"]),
+                    project_root=project_root,
+                    changed_by=changed_by,
+                    change_reason=change_reason,
+                )
+                completed.append(
+                    {
+                        "authorization_id": str(authorization["id"]),
+                        "project_id": project_id,
+                        "project_retired": result["project_retired"],
+                        "retired_work_items": result.get("retired_work_items", []),
+                    }
+                )
+        return completed

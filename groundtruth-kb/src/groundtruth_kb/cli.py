@@ -1075,6 +1075,49 @@ def projects_revoke_authorization(
     click.echo(f"Revoked project authorization {authorization['id']}.")
 
 
+@projects_cmd.command("complete-authorization")
+@click.argument("authorization_id")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for completion.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_complete_authorization(
+    ctx: click.Context,
+    authorization_id: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Complete a project-scoped implementation authorization.
+
+    ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2: project completion
+    and retirement are automatic once every membership-linked work item is
+    VERIFIED. This subcommand is the explicit-invocation surface; it does not
+    gate on an owner decision. The owner-directed ``retire`` subcommand is the
+    separate path for retirements outside the automatic VERIFIED gate.
+    """
+    config = _resolve_config(ctx)
+    db, service = _project_service(ctx)
+    try:
+        result = service.complete_project_authorization(
+            authorization_id,
+            project_root=config.project_root,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    authorization = result["authorization"]
+    retired = " Project retired." if result["project_retired"] else ""
+    click.echo(f"Completed project authorization {authorization['id']}.{retired}")
+
+
 # ---------------------------------------------------------------------------
 # gt secrets
 # ---------------------------------------------------------------------------

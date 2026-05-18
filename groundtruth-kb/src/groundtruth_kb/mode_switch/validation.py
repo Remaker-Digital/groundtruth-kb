@@ -52,17 +52,21 @@ def _fail(axis: str, *errors: str) -> ValidationResult:
 
 
 def validate_role_artifact(project_root: Path) -> ValidationResult:
-    """Validate ``harness-state/role-assignments.json``.
+    """Validate the harness registry projection (WI-3342 IP-5).
 
-    Confirms the file exists, is readable, parses as JSON, and structurally
-    matches the role-set schema (top-level ``"harnesses"`` dict; each harness
-    record carries a ``"role"`` field as either a list of tokens or a legacy
-    scalar; tokens are from ``{prime-builder, loyal-opposition,
-    acting-prime-builder}`` per ``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` and
-    ``GOV-ACTING-PRIME-BUILDER-001``).
+    Confirms ``harness-state/harness-registry.json`` exists, is readable,
+    parses as JSON, and structurally matches the projection schema (top-level
+    ``"harnesses"`` LIST; each harness record carries a ``"role"`` field as
+    either a list of tokens or a legacy scalar; tokens are from
+    ``{prime-builder, loyal-opposition, acting-prime-builder}`` per
+    ``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` and
+    ``GOV-ACTING-PRIME-BUILDER-001``). Migrated from the retired
+    ``harness-state/role-assignments.json`` role artifact.
     """
     axis = "role"
-    path = project_root / "harness-state" / "role-assignments.json"
+    from groundtruth_kb.harness_projection import harness_registry_path
+
+    path = harness_registry_path(project_root)
     if not path.exists():
         return _fail(axis, f"role artifact missing: {path}")
     try:
@@ -76,12 +80,13 @@ def validate_role_artifact(project_root: Path) -> ValidationResult:
     if not isinstance(data, dict):
         return _fail(axis, "role artifact top-level must be a JSON object")
     harnesses = data.get("harnesses")
-    if not isinstance(harnesses, dict):
-        return _fail(axis, "role artifact missing 'harnesses' dict")
+    if not isinstance(harnesses, list):
+        return _fail(axis, "role artifact missing 'harnesses' list")
     valid_tokens = {"prime-builder", "loyal-opposition", "acting-prime-builder"}
-    for harness_id, record in harnesses.items():
+    for record in harnesses:
         if not isinstance(record, dict):
-            return _fail(axis, f"harness {harness_id!r} record is not a JSON object")
+            return _fail(axis, "harness registry record is not a JSON object")
+        harness_id = record.get("id")
         role = record.get("role")
         if isinstance(role, list):
             tokens = [str(item).strip() for item in role]

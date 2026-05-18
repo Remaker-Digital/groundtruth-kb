@@ -44,32 +44,47 @@ def _load_codex_hook(name_suffix: str) -> ModuleType:
 def _write_harness_state(
     project_root: Path,
     *,
-    claude_role: str = "prime-builder",
-    codex_role: str = "loyal-opposition",
+    claude_role: str | list[str] = "prime-builder",
+    codex_role: str | list[str] = "loyal-opposition",
 ) -> None:
-    """Write durable harness-state fixtures with the requested roles."""
+    """Seed the harness registry projection with the requested role assignments.
+
+    WI-3342 IP-4: the SessionStart dispatcher's ``_resolve_own_role_set``
+    resolves identity + role in a single lookup against the DB-backed registry
+    projection ``harness-state/harness-registry.json`` (migrated from the
+    two-step ``harness-identities.json`` -> ``role-assignments.json`` chain).
+    The projection's ``harnesses`` field is a LIST of unified records; each
+    record carries ``id``, ``harness_name``, and ``role``. ``claude_role`` /
+    ``codex_role`` accept the scalar or list wire form; both are normalized to
+    the role-set list form here.
+    """
+
+    def _role_list(value: str | list[str]) -> list[str]:
+        return list(value) if isinstance(value, list) else [value]
+
     harness_state = project_root / "harness-state"
     harness_state.mkdir(parents=True, exist_ok=True)
-    (harness_state / "harness-identities.json").write_text(
+    (harness_state / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "claude": {"id": "B"},
-                    "codex": {"id": "A"},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    (harness_state / "role-assignments.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {
-                    "B": {"role": claude_role, "harness_type": "claude"},
-                    "A": {"role": codex_role, "harness_type": "codex"},
-                },
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "role": _role_list(codex_role),
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "role": _role_list(claude_role),
+                    },
+                ],
             }
         ),
         encoding="utf-8",
@@ -257,3 +272,58 @@ def test_codex_hook_has_envelope_parity_constants() -> None:
     # Dispatch-failures path is under .gtkb-state/bridge-poller/.
     failures_path = str(hook.DISPATCH_FAILURES_PATH).replace("\\", "/")
     assert ".gtkb-state/bridge-poller/dispatch-failures.jsonl" in failures_path
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Startup-disclosure relay cache tests
+#
+# Authority: bridge/gtkb-startup-relay-truncation-fix-refile-003.md (Codex GO
+# at -004); DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001 Required Behavior 5.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_startup_relay_cache_written_with_consistent_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """T4 -- the dispatcher writes a harness-scoped relay cache + consistent metadata."""
+    import hashlib
+
+    module = _load_codex_hook("relay_cache_write")
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
+    body = "# GroundTruth-KB Fresh Session Startup\n\nrelay body line one\nrelay body line two"
+    module._write_startup_relay_cache(
+        "# GroundTruth-KB Programmatic Startup Payload\n\n## User-Visible Startup Message\n\n" + body
+    )
+
+    cache = tmp_path / "last-user-visible-startup.md"
+    meta_path = tmp_path / "last-user-visible-startup.meta.json"
+    assert cache.is_file() and meta_path.is_file()
+    cached = cache.read_text(encoding="utf-8")
+    assert cached == body, "cache holds the extracted user-visible startup message"
+    assert "Programmatic Startup Payload" not in cached
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    encoded = cached.encode("utf-8")
+    assert meta["sha256"] == hashlib.sha256(encoded).hexdigest()
+    assert meta["byte_length"] == len(encoded)
+    assert meta["harness_name"] == "codex"
+
+
+def test_startup_relay_cache_not_written_by_bridge_dispatch_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """T4 -- bridge auto-dispatch payloads must not populate the interactive relay cache.
+
+    DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001 Required Behavior 5: the
+    interactive startup-disclosure cache is isolated from bridge auto-dispatch
+    SessionStart payloads.
+    """
+    module = _load_codex_hook("relay_cache_isolation")
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(module, "_bridge_auto_dispatch_context", lambda: "bridge auto-dispatch test context")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-relay-isolation")
+    monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
+
+    rc = module.main()
+    capsys.readouterr()
+    assert rc == 0
+    assert not (tmp_path / "last-user-visible-startup.md").exists(), (
+        "bridge auto-dispatch path must not populate the interactive relay cache"
+    )

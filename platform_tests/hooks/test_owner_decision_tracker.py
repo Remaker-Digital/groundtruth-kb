@@ -35,7 +35,12 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
-FIXTURES = REPO_ROOT / "tests" / "hooks" / "fixtures" / "owner_decision_tracker"
+# Fixtures are co-located with this test file. Resolved relative to __file__
+# (not REPO_ROOT) so the path survives a tests/ <-> platform_tests/ relocation
+# -- the prior REPO_ROOT/"tests"/... form broke after the suite moved to
+# platform_tests/, leaving every fixture-backed subprocess test failing
+# (WI-3332; corrected under owner AskUserQuestion approval, S354 2026-05-15).
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "owner_decision_tracker"
 
 DURABLE_TEMPLATE = """\
 # Pending Owner Decisions
@@ -884,3 +889,128 @@ def test_correlation_signal_b_only_keeps_prose_pending() -> None:
         "auto-resolve"
     )
     assert sig is None
+
+
+# ===========================================================================
+# WI-3332 -- startup-relay known-match suppression
+# Authority: bridge/gtkb-owner-decision-tracker-startup-relay-known-match-
+# suppression-003.md (Prime REVISED); Codex GO at -004.
+#
+# A prose match that merely relays an already-recorded owner decision (e.g. a
+# startup disclosure echoing the Pending Owner Decisions section) must not be
+# treated as a fresh owner-decision-ask. Fresh prose asks still block.
+# ===========================================================================
+
+
+# Offering/choice-shaped question matching the ``should_i_or`` prose pattern.
+_WI3332_TRIGGER_QUESTION = "Should I land this slice now, or hold for the next review?"
+
+
+def _wi3332_question_hash(question: str) -> str:
+    """Compute the durable question_hash the hook stores for a prose snippet."""
+    return _import_hook_module()._question_hash(question, [])
+
+
+def _write_relay_transcript(tmp_path: Path, assistant_text: str) -> Path:
+    """Write a minimal user->assistant JSONL transcript relaying assistant_text.
+
+    The assistant event carries ``assistant_text`` as plain prose so the
+    Stop-mode scan exercises the prose-pattern detector on a non-structural
+    line (mimics a startup-disclosure relay of a pending-decision bullet).
+    """
+    transcript = tmp_path / "wi3332_relay_transcript.jsonl"
+    user_event = json.dumps(
+        {
+            "type": "user",
+            "uuid": "u1",
+            "parentUuid": None,
+            "timestamp": "2026-05-15T23:00:00Z",
+            "message": {"role": "user", "content": "init gtkb"},
+        }
+    )
+    assistant_event = json.dumps(
+        {
+            "type": "assistant",
+            "uuid": "a1",
+            "parentUuid": "u1",
+            "timestamp": "2026-05-15T23:00:01Z",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": assistant_text}],
+            },
+        }
+    )
+    transcript.write_text(user_event + "\n" + assistant_event, encoding="utf-8")
+    return transcript
+
+
+def _seed_one_decision(
+    project: Path,
+    section: str,
+    question: str,
+    question_hash: str,
+    decision_id: str = "DECISION-0001",
+) -> None:
+    """Write a durable file with one entry under ``section`` (Pending/Resolved)."""
+    other = "Resolved" if section == "Pending" else "Pending"
+    status = "pending" if section == "Pending" else "resolved"
+    body = f"""\
+# Pending Owner Decisions
+---
+## {section}
+
+- id: {decision_id}
+  asked_at: 2026-05-15T09:00:00Z
+  question: {json.dumps(question)}
+  detected_via: prose:should_i_or
+  status: {status}
+  question_hash: {question_hash}
+  notes: ""
+
+## {other}
+
+(none)
+
+## History
+
+(none)
+"""
+    (project / "memory" / "pending-owner-decisions.md").write_text(body, encoding="utf-8")
+
+
+def test_wi3332_t1_known_pending_relay_does_not_block(tmp_path: Path) -> None:
+    """T1: relaying an already-recorded PENDING decision as prose must not
+    emit a Stop block and must not append a duplicate durable entry."""
+    project = _setup_project(tmp_path)
+    qhash = _wi3332_question_hash(_WI3332_TRIGGER_QUESTION)
+    _seed_one_decision(project, "Pending", _WI3332_TRIGGER_QUESTION, qhash)
+    transcript = _write_relay_transcript(tmp_path, f"- DECISION-0001: {_WI3332_TRIGGER_QUESTION}")
+    result = _run_hook("stop", project, json.dumps({"transcript_path": str(transcript)}))
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert result.stdout == "", f"relaying a known pending decision must not block; got: {result.stdout!r}"
+    # Idempotence preserved: the relay must not append a second entry.
+    pending = _read_pending_file(project).split("## Pending", 1)[1].split("##", 1)[0]
+    assert pending.count("- id: DECISION-") == 1, "relay must not duplicate the entry"
+
+
+def test_wi3332_t2_fresh_prose_ask_still_blocks(tmp_path: Path) -> None:
+    """T2: the same trigger-shaped prose ask, when NOT already recorded, is
+    fresh and still emits the Stop block (the fix does not over-suppress)."""
+    project = _setup_project(tmp_path)
+    transcript = _write_relay_transcript(tmp_path, f"- DECISION-0001: {_WI3332_TRIGGER_QUESTION}")
+    result = _run_hook("stop", project, json.dumps({"transcript_path": str(transcript)}))
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert result.stdout, "a fresh prose decision-ask must still emit a block"
+    assert json.loads(result.stdout)["decision"] == "block"
+
+
+def test_wi3332_t3_known_resolved_relay_does_not_block(tmp_path: Path) -> None:
+    """T3: the known-decision snapshot spans all sections -- relaying a
+    decision recorded under ## Resolved must also not block."""
+    project = _setup_project(tmp_path)
+    qhash = _wi3332_question_hash(_WI3332_TRIGGER_QUESTION)
+    _seed_one_decision(project, "Resolved", _WI3332_TRIGGER_QUESTION, qhash)
+    transcript = _write_relay_transcript(tmp_path, f"- DECISION-0001: {_WI3332_TRIGGER_QUESTION}")
+    result = _run_hook("stop", project, json.dumps({"transcript_path": str(transcript)}))
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert result.stdout == "", f"relaying a known resolved decision must not block; got: {result.stdout!r}"

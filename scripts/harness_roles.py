@@ -43,6 +43,13 @@ except ImportError:  # pragma: no cover - direct script execution path
         resolved_harness_id as _resolved_persistent_harness_id,
     )
 
+try:
+    from scripts.harness_projection_reader import load_harness_projection
+except ImportError:  # pragma: no cover - direct script execution path
+    from harness_projection_reader import (  # type: ignore[no-redef]
+        load_harness_projection,
+    )
+
 ROLE_PRIME_BUILDER = "prime-builder"
 ROLE_LOYAL_OPPOSITION = "loyal-opposition"
 # Compatibility/provenance value (per
@@ -216,12 +223,34 @@ def _normalize_document(raw: Any, project_root: Path) -> dict[str, Any]:
 
 
 def load_role_assignments(project_root: Path, assignment_path: Path | None = None) -> dict[str, Any]:
-    path = role_assignments_path(project_root, assignment_path)
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        raw = {}
-    return _normalize_document(raw, project_root)
+    """Load harness role assignments from the registry projection (WI-3342 IP-3).
+
+    Migrated from reading ``harness-state/role-assignments.json`` directly to
+    reading the DB-backed registry projection
+    (``harness-state/harness-registry.json``) via
+    ``scripts/harness_projection_reader.load_harness_projection``. The
+    ``assignment_path`` parameter is retained for signature compatibility
+    (positional callers such as ``scripts/workstream_focus.py``) and for the
+    writer path (``write_role_assignments``); readers resolve role state from
+    the projection. Fail-soft: a missing or malformed projection yields an
+    empty document, never an exception.
+    """
+    _ = assignment_path  # retained for signature + writer-path compatibility
+    document = _empty_document(project_root)
+    projection = load_harness_projection(project_root)
+    harnesses: dict[str, dict[str, Any]] = {}
+    for record in projection.get("harnesses", []):
+        if not isinstance(record, dict):
+            continue
+        harness_id = normalize_harness_id(str(record.get("id") or ""))
+        if not harness_id:
+            continue
+        role_set = _normalize_role_field(record.get("role"))
+        if not role_set:
+            continue
+        harnesses[harness_id] = {"role": _role_set_to_json(role_set)}
+    document["harnesses"] = harnesses
+    return document
 
 
 def write_role_assignments(project_root: Path, document: dict[str, Any], assignment_path: Path | None = None) -> Path:
@@ -231,6 +260,94 @@ def write_role_assignments(project_root: Path, document: dict[str, Any], assignm
     tmp.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(tmp, path)
     return path
+
+
+def _decode_harness_json_field(raw: Any) -> Any:
+    """Decode a harnesses-table JSON-text column value (role / invocation_surfaces).
+
+    ``KnowledgeDB.get_harness`` returns these columns as raw JSON text (or
+    ``None``); decoding is required before round-tripping through
+    ``insert_harness``, which JSON-encodes its inputs."""
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    return raw
+
+
+def _mirror_role_assignments_to_registry(project_root: Path, document: dict[str, Any]) -> None:
+    """Write the role assignments to the DB ``harnesses`` registry table and
+    regenerate the hot-path projection.
+
+    WI-3342 IP-5: this is the AUTHORITATIVE role write — the transitional
+    ``role-assignments.json`` write was removed, so the DB-backed registry and
+    its projection are the sole authoritative role surface.
+
+    For each harness whose role set differs from its current DB row, an
+    append-only ``insert_harness`` version carries the new role (every other
+    field forwarded from the current row). A harness with no current DB row is
+    skipped — first-version creation belongs to the registry seed / new-harness
+    registration flow, not this update mirror.
+
+    SessionStart-safe: this module is stdlib-only, so the ``groundtruth_kb``
+    import is function-local. A missing ``groundtruth.db`` (e.g. a DB-less test
+    fixture) or an unavailable ``groundtruth_kb`` package is a graceful no-op;
+    any other DB error is raised, so a registry-write failure surfaces rather
+    than silently losing the role write."""
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.harness_projection import generate_harness_projection
+    except Exception:
+        return
+    harnesses = document.get("harnesses")
+    if not isinstance(harnesses, dict):
+        return
+    try:
+        db = KnowledgeDB(db_path=db_path)
+        changed = False
+        for harness_id, record in harnesses.items():
+            if not isinstance(record, dict):
+                continue
+            new_role = sorted(_normalize_role_field(record.get("role")))
+            if not new_role:
+                continue
+            current = db.get_harness(str(harness_id))
+            if current is None:
+                continue
+            current_role = sorted(
+                _normalize_role_field(_decode_harness_json_field(current.get("role")))
+            )
+            if current_role == new_role:
+                continue
+            db.insert_harness(
+                id=str(harness_id),
+                harness_name=str(current.get("harness_name") or harness_id),
+                harness_type=str(current.get("harness_type") or harness_id),
+                role=new_role,
+                changed_by="harness-role-write",
+                change_reason="WI-3342 harness role write",
+                status=str(current.get("status") or "registered"),
+                reviewer_precedence=current.get("reviewer_precedence"),
+                invocation_surfaces=_decode_harness_json_field(
+                    current.get("invocation_surfaces")
+                ),
+                capabilities_ref=current.get("capabilities_ref"),
+            )
+            changed = True
+        if changed:
+            generate_harness_projection(db, project_root)
+    except Exception as exc:
+        # WI-3342 IP-5: the DB-backed registry is the sole authoritative role
+        # surface (the transitional role-assignments.json write was removed),
+        # so a registry-write failure must surface rather than silently lose
+        # the role write.
+        raise RuntimeError(f"harness registry role write failed: {exc}") from exc
 
 
 def _ensure_record(
@@ -305,7 +422,9 @@ def role_for_harness(
     primary = primary_role(record)
     if changed or (ensure_prime_on_startup and not path.is_file()):
         document["updated_at"] = _now_iso()
-        write_role_assignments(project_root, document, assignment_path)
+        # WI-3342 IP-5: the transitional role-assignments.json write is
+        # removed; the registry mirror is the authoritative role write.
+        _mirror_role_assignments_to_registry(project_root, document)
     return primary, document, path
 
 
@@ -354,5 +473,9 @@ def set_harness_role(
             if other_id != resolved_id and isinstance(other_record, dict):
                 other_record["role"] = _role_set_to_json({ROLE_LOYAL_OPPOSITION})
     document["updated_at"] = _now_iso()
-    path = write_role_assignments(project_root, document, assignment_path)
+    # WI-3342 IP-5: the transitional role-assignments.json write is removed;
+    # _mirror_role_assignments_to_registry below is the authoritative role
+    # write. ``path`` is resolved (not written) to preserve the return contract.
+    path = role_assignments_path(project_root, assignment_path)
+    _mirror_role_assignments_to_registry(project_root, document)
     return requested_role, document, path

@@ -22,9 +22,21 @@ from groundtruth_kb.mode_switch.invariants import (
 
 
 def _write_role_map(root: Path, harnesses: dict) -> None:
-    path = root / "harness-state" / "role-assignments.json"
+    """Seed the harness registry projection (WI-3342 IP-5).
+
+    ``verify_role_partition`` reads the DB-backed registry projection
+    ``harness-state/harness-registry.json``, whose ``harnesses`` field is a
+    LIST of unified records (each carrying ``id`` + ``role``), not the retired
+    ``harness-state/role-assignments.json`` ``{harness_id: record}`` dict. This
+    helper accepts the legacy dict-keyed-by-id input and writes the equivalent
+    projection LIST so each test's verification intent is preserved.
+    """
+    path = root / "harness-state" / "harness-registry.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"harnesses": harnesses}), encoding="utf-8")
+    records = [
+        {"id": harness_id, **record} for harness_id, record in harnesses.items()
+    ]
+    path.write_text(json.dumps({"harnesses": records}), encoding="utf-8")
 
 
 def test_prime_builder_ids_single() -> None:

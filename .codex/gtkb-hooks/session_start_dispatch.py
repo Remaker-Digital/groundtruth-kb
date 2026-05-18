@@ -18,6 +18,7 @@ the keyword mode. Mismatch → silent drop with audit log entry to
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -69,6 +70,7 @@ class StartupDecision(Enum):
 
 sys.path.insert(0, str(PROJECT_ROOT))
 from scripts.harness_identity import resolved_harness_id  # noqa: E402
+from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 
 def _now_iso() -> str:
@@ -226,42 +228,46 @@ def _role_modes_from_field(raw_role: object) -> frozenset[str]:
 def _resolve_own_role_set(project_root: Path = PROJECT_ROOT) -> frozenset[str]:
     """Resolve this harness's durable role set as canonical modes.
 
-    Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver
-    clause):
-      1. ``harness-state/harness-identities.json`` — resolve own
-         ``HARNESS_NAME`` -> ``harness_id``.
-      2. ``harness-state/role-assignments.json`` — resolve
-         ``harness_id`` -> ``role_label``.
-      3. Convert ``role_label`` to canonical mode via
-         ``_LABEL_TO_CANONICAL_MODE``.
+    Authority (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause;
+    WI-3342 IP-4): migrated from the two-step
+    ``harness-state/harness-identities.json`` -> ``harness_id`` ->
+    ``harness-state/role-assignments.json`` -> ``role_label`` chain to a single
+    lookup against the DB-backed registry projection
+    (``harness-state/harness-registry.json``). The projection unifies identity
+    and role in one record, so this resolves ``HARNESS_NAME`` to its registry
+    record and reads ``id`` + ``role`` from that one row, then converts the
+    role field to canonical modes via ``_LABEL_TO_CANONICAL_MODE``.
 
-    For the current scalar-role schema the role is treated as a singleton
-    set per IP-5 of the bridge proposal: when a future role-set schema lands,
-    this function returns the native set without changing call sites.
+    The role field is the role-set wire form (a list of role tokens); a legacy
+    scalar is also accepted. ``_role_modes_from_field`` handles both.
 
     Raises:
-        ValueError: on unknown role label, missing identity entry, or
-            missing harness in role map. Callers should treat these as
-            "fail-closed treat-as-misdirected" cases.
+        ValueError: on unknown role label, missing registry record for this
+            harness, or a record with no ``id``/``role``. Callers should treat
+            these as "fail-closed treat-as-misdirected" cases. The raised
+            ValueError preserves the pre-migration fail-closed contract.
     """
-    identities_path = project_root / "harness-state" / "harness-identities.json"
-    role_path = project_root / "harness-state" / "role-assignments.json"
-    identities = json.loads(identities_path.read_text(encoding="utf-8"))
-    own_identity_record = identities.get("harnesses", {}).get(HARNESS_NAME)
-    if not isinstance(own_identity_record, dict) or "id" not in own_identity_record:
+    projection = load_harness_projection(project_root)
+    own_record = None
+    for record in projection.get("harnesses", []):
+        if isinstance(record, dict) and record.get("harness_name") == HARNESS_NAME:
+            own_record = record
+            break
+    if own_record is None:
         raise ValueError(
-            f"harness-identities.json missing entry for {HARNESS_NAME!r}"
+            f"harness-registry.json missing entry for harness {HARNESS_NAME!r}"
         )
-    own_id = own_identity_record["id"]
-    role_map = json.loads(role_path.read_text(encoding="utf-8"))
-    own_role_record = role_map.get("harnesses", {}).get(own_id)
-    if not isinstance(own_role_record, dict) or "role" not in own_role_record:
+    if "id" not in own_record:
         raise ValueError(
-            f"role-assignments.json missing entry for harness ID {own_id!r}"
+            f"harness-registry.json entry for {HARNESS_NAME!r} missing 'id'"
         )
-    role_set = _role_modes_from_field(own_role_record["role"])
+    if "role" not in own_record:
+        raise ValueError(
+            f"harness-registry.json entry for {HARNESS_NAME!r} missing 'role'"
+        )
+    role_set = _role_modes_from_field(own_record["role"])
     if not role_set:
-        raise ValueError(f"unknown role field: {own_role_record['role']!r}")
+        raise ValueError(f"unknown role field: {own_record['role']!r}")
     return role_set
 
 
@@ -284,13 +290,16 @@ def _audit_log_misdirected_dispatch(
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         own_harness_id: str | None
+        # WI-3342 IP-4: own harness id resolves from the registry projection
+        # (harness-state/harness-registry.json), migrated from the legacy
+        # harness-state/harness-identities.json. Fail-soft: any read/parse
+        # problem yields None, preserving the pre-migration contract.
         try:
-            identities = json.loads(
-                (project_root / "harness-state" / "harness-identities.json").read_text(
-                    encoding="utf-8"
-                )
-            )
-            own_harness_id = identities.get("harnesses", {}).get(HARNESS_NAME, {}).get("id")
+            own_harness_id = None
+            for record in load_harness_projection(project_root).get("harnesses", []):
+                if isinstance(record, dict) and record.get("harness_name") == HARNESS_NAME:
+                    own_harness_id = record.get("id")
+                    break
         except (OSError, json.JSONDecodeError, KeyError, TypeError):
             own_harness_id = None
         record = {
@@ -415,6 +424,39 @@ def _valid_session_start_payload(text: str, request_started_at: str) -> bool:
     )
 
 
+def _write_startup_relay_cache(additional_context: str) -> None:
+    """Write the harness-scoped startup-disclosure relay cache and metadata.
+
+    Extracts the owner-visible startup message from a validated NORMAL_STARTUP
+    SessionStart payload and writes it to a harness-scoped cache file plus a
+    metadata sidecar (harness, timestamp, byte length, sha256). Called only on
+    the validated normal-startup path, so bridge auto-dispatch payloads never
+    populate the interactive startup-disclosure relay cache. Fails soft.
+    """
+    marker = "## User-Visible Startup Message"
+    if marker in additional_context:
+        body = additional_context.split(marker, 1)[1].strip()
+    else:
+        body = additional_context.strip()
+    if not body:
+        return
+    encoded = body.encode("utf-8")
+    meta = {
+        "harness_name": HARNESS_NAME,
+        "harness_id": _persistent_harness_id(),
+        "generated_at": _now_iso(),
+        "byte_length": len(encoded),
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+    try:
+        (OUT_DIR / "last-user-visible-startup.md").write_text(body, encoding="utf-8", newline="\n")
+        (OUT_DIR / "last-user-visible-startup.meta.json").write_text(
+            json.dumps(meta, ensure_ascii=True, indent=2), encoding="utf-8", newline="\n"
+        )
+    except OSError:
+        pass
+
+
 def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stdout_path = OUT_DIR / "last-session-start.json"
@@ -489,7 +531,9 @@ def main() -> int:
         stderr_path.write_text(process.stderr, encoding="utf-8")
         if process.returncode == 0 and _valid_session_start_payload(process.stdout, request_started_at):
             payload = json.loads(process.stdout)
-            print(_dump_payload(_session_start_payload(payload["hookSpecificOutput"]["additionalContext"])))
+            startup_context = payload["hookSpecificOutput"]["additionalContext"]
+            _write_startup_relay_cache(startup_context)
+            print(_dump_payload(_session_start_payload(startup_context)))
             return 0
         reason = f"startup service returned exit {process.returncode}"
         if process.stderr.strip():

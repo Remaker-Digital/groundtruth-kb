@@ -1039,28 +1039,25 @@ def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evi
     (tmp_path / "bridge").mkdir(exist_ok=True)
     harness_state = tmp_path / "harness-state"
     harness_state.mkdir(exist_ok=True)
-    (harness_state / "harness-identities.json").write_text(
+    # WI-3342 IP-4: the trigger's topology check (_is_single_harness_topology
+    # via _read_role_assignments) resolves the role map from the DB-backed
+    # registry projection harness-state/harness-registry.json, whose
+    # ``harnesses`` field is a LIST of unified records. Single-harness topology
+    # is one harness ID with a multi-element role-set.
+    (harness_state / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "claude": {"id": "B"},
-                    "codex": {"id": "A"},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    (harness_state / "role-assignments.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {
-                    "B": {
-                        "role": ["prime-builder", "loyal-opposition"],
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": [
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
                         "harness_type": "claude",
+                        "status": "active",
+                        "role": ["prime-builder", "loyal-opposition"],
                     }
-                },
+                ],
             }
         ),
         encoding="utf-8",

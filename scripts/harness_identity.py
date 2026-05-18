@@ -10,6 +10,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.harness_projection_reader import load_harness_projection
+except ImportError:  # pragma: no cover - direct script execution path
+    from harness_projection_reader import (  # type: ignore[no-redef]
+        load_harness_projection,
+    )
+
 HARNESS_IDENTITIES_RELATIVE_PATH = Path("harness-state") / "harness-identities.json"
 DEFAULT_HARNESS_IDS = {
     "codex": "A",
@@ -75,12 +82,31 @@ def _normalize_document(raw: Any) -> dict[str, Any]:
 
 
 def load_harness_identities(project_root: Path, identity_path: Path | None = None) -> dict[str, Any]:
-    path = harness_identities_path(project_root, identity_path)
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        raw = {}
-    return _normalize_document(raw)
+    """Load harness identities from the registry projection (WI-3342 IP-3).
+
+    Migrated from reading ``harness-state/harness-identities.json`` directly to
+    reading the DB-backed registry projection
+    (``harness-state/harness-registry.json``) via
+    ``scripts/harness_projection_reader.load_harness_projection``. The
+    ``identity_path`` parameter is retained for signature compatibility
+    (positional callers) and for the writer path
+    (``write_harness_identities``); readers resolve identity state from the
+    projection. Fail-soft: a missing or malformed projection yields an empty
+    document, never an exception.
+    """
+    _ = identity_path  # retained for signature + writer-path compatibility
+    document = _empty_document()
+    harnesses: dict[str, dict[str, Any]] = {}
+    for record in load_harness_projection(project_root).get("harnesses", []):
+        if not isinstance(record, dict):
+            continue
+        harness_name = normalize_harness_name(str(record.get("harness_name") or ""))
+        harness_id = normalize_harness_id(str(record.get("id") or ""))
+        if not harness_name or not harness_id:
+            continue
+        harnesses[harness_name] = {"id": harness_id}
+    document["harnesses"] = harnesses
+    return document
 
 
 def write_harness_identities(project_root: Path, document: dict[str, Any], identity_path: Path | None = None) -> Path:
@@ -90,6 +116,97 @@ def write_harness_identities(project_root: Path, document: dict[str, Any], ident
     tmp.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(tmp, path)
     return path
+
+
+def _decode_harness_json_field(raw: Any) -> Any:
+    """Decode a harnesses-table JSON-text column value (role / invocation_surfaces).
+
+    ``KnowledgeDB.get_harness`` returns these columns as raw JSON text (or
+    ``None``). Decoding is required before the value is round-tripped back
+    through ``insert_harness``, which JSON-encodes its inputs."""
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    return raw
+
+
+def _mirror_identities_to_registry(project_root: Path, document: dict[str, Any]) -> None:
+    """Write harness identities to the DB ``harnesses`` registry table and
+    regenerate the hot-path projection.
+
+    WI-3342 IP-5: this is the AUTHORITATIVE identity write — the transitional
+    ``harness-identities.json`` write was removed, so the DB-backed registry
+    and its projection are the sole authoritative identity surface.
+
+    For each identity whose ``harness_name`` differs from its current DB row, an
+    append-only ``insert_harness`` version corrects the name (every other field,
+    including the role set, forwarded from the current row). A harness with no
+    current DB row, or whose current row carries no role set, is skipped —
+    first-version creation belongs to the registry seed / new-harness
+    registration flow, not this update mirror.
+
+    SessionStart-safe: this module is stdlib-only, so the ``groundtruth_kb``
+    import is function-local. A missing ``groundtruth.db`` (e.g. a DB-less test
+    fixture) or an unavailable ``groundtruth_kb`` package is a graceful no-op;
+    any other DB error is raised, so a registry-write failure surfaces rather
+    than silently losing the identity write."""
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.harness_projection import generate_harness_projection
+    except Exception:
+        return
+    harnesses = document.get("harnesses")
+    if not isinstance(harnesses, dict):
+        return
+    try:
+        db = KnowledgeDB(db_path=db_path)
+        changed = False
+        for harness_name, record in harnesses.items():
+            if not isinstance(record, dict):
+                continue
+            harness_id = normalize_harness_id(str(record.get("id") or ""))
+            if not harness_id:
+                continue
+            current = db.get_harness(harness_id)
+            if current is None:
+                continue
+            if str(current.get("harness_name") or "") == str(harness_name):
+                continue
+            current_role = _decode_harness_json_field(current.get("role"))
+            if not isinstance(current_role, list) or not current_role:
+                continue
+            db.insert_harness(
+                id=harness_id,
+                harness_name=str(harness_name),
+                harness_type=str(current.get("harness_type") or harness_name),
+                role=[str(r) for r in current_role],
+                changed_by="harness-identity-write",
+                change_reason="WI-3342 harness identity write",
+                status=str(current.get("status") or "registered"),
+                reviewer_precedence=current.get("reviewer_precedence"),
+                invocation_surfaces=_decode_harness_json_field(
+                    current.get("invocation_surfaces")
+                ),
+                capabilities_ref=current.get("capabilities_ref"),
+            )
+            changed = True
+        if changed:
+            generate_harness_projection(db, project_root)
+    except Exception as exc:
+        # WI-3342 IP-5: the DB-backed registry is the sole authoritative
+        # identity surface (the transitional harness-identities.json write was
+        # removed), so a registry-write failure must surface rather than
+        # silently lose the identity write.
+        raise RuntimeError(
+            f"harness registry identity write failed: {exc}"
+        ) from exc
 
 
 def validate_unique_harness_ids(document: dict[str, Any]) -> list[str]:
@@ -196,7 +313,12 @@ def resolve_harness_identity(
         "assigned_by": "initial-installation-bootstrap",
     }
     document["updated_at"] = _now_iso()
-    write_harness_identities(project_root, document, identity_path)
+    # WI-3342 IP-5: the transitional harness-identities.json write is removed;
+    # _mirror_identities_to_registry is the authoritative identity write. It
+    # skips harnesses with no current DB row, so a genuinely-new harness
+    # bootstrapped here is not persisted by this path — new-harness registry
+    # registration is a separate flow.
+    _mirror_identities_to_registry(project_root, document)
     return assigned_id, document, path
 
 
@@ -251,7 +373,11 @@ def set_harness_identity(
     record["assigned_at"] = _now_iso()
     record["assigned_by"] = "explicit-owner-requested-identity-change"
     document["updated_at"] = _now_iso()
-    path = write_harness_identities(project_root, document, identity_path)
+    # WI-3342 IP-5: the transitional harness-identities.json write is removed;
+    # _mirror_identities_to_registry below is the authoritative identity write.
+    # ``path`` is resolved (not written) to preserve the return contract.
+    path = harness_identities_path(project_root, identity_path)
+    _mirror_identities_to_registry(project_root, document)
     return normalized_id, document, path
 
 

@@ -130,6 +130,24 @@ status = "adapter"
 adapter_source = ".claude/skills/code-review-audit/SKILL.md"
 source_sha256 = "318aec13485938431ccb85fea58a4ec3bacab8dab2dfe8ea97c54f8d118bc2d3"
 [[capabilities]]
+id = "skill.lo-opportunity-radar"
+kind = "skill"
+canonical_name = "lo-opportunity-radar"
+canonical_purpose = "Bias Loyal Opposition review toward token-savings and deterministic-service / automation opportunities alongside defects."
+canonical_source = ".claude/skills/lo-opportunity-radar/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/lo-opportunity-radar/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/lo-opportunity-radar/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/lo-opportunity-radar/SKILL.md"
+source_sha256 = "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
+[[capabilities]]
 id = "skill.codex-report"
 kind = "skill"
 canonical_name = "loyal-opposition-report"
@@ -560,3 +578,21 @@ surface = ".codex/skills/grill-me-for-clarification/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/grill-me-for-clarification/SKILL.md"
 source_sha256 = "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
+[[capabilities]]
+id = "skill.verify"
+kind = "skill"
+canonical_name = "gtkb-verify"
+canonical_purpose = "Author a Loyal Opposition post-implementation VERIFIED/NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate."
+canonical_source = ".claude/skills/verify/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/verify/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/verify/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/verify/SKILL.md"
+source_sha256 = "0cb8669690d00770ee94ef1362700c6d0fbbacaddf0ac2f31a69a281d71e716c"

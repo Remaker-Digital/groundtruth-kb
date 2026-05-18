@@ -7,8 +7,8 @@ module is the postcondition check for that property. ``apply_role_switch``
 (``mode_switch/transaction.py``) produces the partition inside the transaction;
 ``verify_role_partition`` confirms it afterward.
 
-It is pure standard-library logic: it reads
-``harness-state/role-assignments.json`` and computes over the role-set wire
+It reads the harness registry projection
+(``harness-state/harness-registry.json``) and computes over the role-set wire
 form — a list of role tokens, or a legacy scalar string per
 ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``.
 
@@ -76,21 +76,36 @@ def prime_builder_ids(role_document: dict[str, Any]) -> list[str]:
 def verify_role_partition(project_root: Path, *, role_path: Path | None = None) -> str:
     """Verify the role map is a valid ``REQ-HARNESS-REGISTRY-001`` FR9 partition.
 
-    Loads ``harness-state/role-assignments.json`` under ``project_root`` (or
-    ``role_path`` when given) and raises ``RolePartitionViolation`` unless
-    exactly one harness holds a prime-builder-class role and every other
+    Loads the harness registry projection under ``project_root`` (or the
+    explicit ``role_path`` override) and raises ``RolePartitionViolation``
+    unless exactly one harness holds a prime-builder-class role and every other
     harness's role set is exactly ``{"loyal-opposition"}``. Returns the single
     ``prime-builder`` harness id on success.
+
+    WI-3342 IP-5: migrated from the retired
+    ``harness-state/role-assignments.json`` to the DB-backed registry
+    projection ``harness-state/harness-registry.json``. The projection stores
+    ``harnesses`` as a LIST of unified records; it is converted here to the
+    ``{harness_id: record}`` document shape that ``prime_builder_ids`` and the
+    partition check consume.
     """
-    path = (
-        role_path
-        if role_path is not None
-        else Path(project_root) / "harness-state" / "role-assignments.json"
+    from groundtruth_kb.harness_projection import harness_registry_path
+
+    path = role_path if role_path is not None else harness_registry_path(project_root)
+    projection = json.loads(Path(path).read_text(encoding="utf-8"))
+    projection_harnesses = (
+        projection.get("harnesses", []) if isinstance(projection, dict) else None
     )
-    role_document = json.loads(Path(path).read_text(encoding="utf-8"))
-    harnesses = role_document.get("harnesses", {})
-    if not isinstance(harnesses, dict):
-        raise RolePartitionViolation(f"role map at {path} has no 'harnesses' object")
+    if not isinstance(projection_harnesses, list):
+        raise RolePartitionViolation(
+            f"harness registry projection at {path} has no 'harnesses' list"
+        )
+    harnesses = {
+        str(rec["id"]): rec
+        for rec in projection_harnesses
+        if isinstance(rec, dict) and rec.get("id")
+    }
+    role_document = {"harnesses": harnesses}
     primes = prime_builder_ids(role_document)
     if len(primes) != 1:
         raise RolePartitionViolation(

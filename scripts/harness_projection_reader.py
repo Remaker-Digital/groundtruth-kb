@@ -90,3 +90,74 @@ def load_harness_projection(
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return _empty_document()
     return _normalize_document(raw)
+
+
+# --- Keyed accessors (WI-3342 Slice B, IP-1) -------------------------------
+#
+# ``load_harness_projection`` returns a ``harnesses`` LIST, while the legacy
+# JSON readers being migrated (``harness-state/role-assignments.json`` keyed by
+# harness id, ``harness-state/harness-identities.json`` keyed by harness name)
+# expect dict-shaped lookups. These accessors provide the list-to-keyed
+# adaptation once, so each migrating reader queries the projection without
+# re-implementing it. All are stdlib-only and fail-soft (never raise).
+
+
+def _harness_records(document: Any) -> list[dict[str, Any]]:
+    """Return the projection's harness records as a list of dicts.
+
+    Tolerant of a non-dict ``document`` or a missing/malformed ``harnesses``
+    value (yields an empty list), so callers cannot raise by passing an
+    unnormalized payload."""
+    if not isinstance(document, dict):
+        return []
+    harnesses = document.get("harnesses")
+    if not isinstance(harnesses, list):
+        return []
+    return [h for h in harnesses if isinstance(h, dict)]
+
+
+def _role_set(value: Any) -> set[str]:
+    """Normalize a record's ``role`` field into a set of role strings.
+
+    Accepts the canonical list wire form (``["prime-builder"]``) and the
+    legacy scalar form (``"prime-builder"``); any other shape yields an empty
+    set. Mirrors the READ-side tolerance of
+    ``scripts/harness_roles.py::_normalize_role_field``."""
+    if isinstance(value, str):
+        return {value} if value else set()
+    if isinstance(value, list):
+        return {r for r in value if isinstance(r, str) and r}
+    return set()
+
+
+def harness_by_id(document: dict[str, Any], harness_id: str) -> dict[str, Any] | None:
+    """Return the harness record whose ``id`` equals ``harness_id``.
+
+    ``document`` is a projection document as returned by
+    ``load_harness_projection``. Yields ``None`` when no record matches."""
+    for record in _harness_records(document):
+        if record.get("id") == harness_id:
+            return record
+    return None
+
+
+def role_set_for_id(document: dict[str, Any], harness_id: str) -> set[str]:
+    """Return the role set recorded for the harness with the given ``id``.
+
+    Yields an empty set when the id is absent or the record carries no
+    recognizable ``role`` field — fail-soft, consistent with the module's
+    never-raise contract."""
+    record = harness_by_id(document, harness_id)
+    if record is None:
+        return set()
+    return _role_set(record.get("role"))
+
+
+def id_for_name(document: dict[str, Any], harness_name: str) -> str | None:
+    """Return the ``id`` of the harness whose ``harness_name`` equals
+    ``harness_name``, or ``None`` when no record matches."""
+    for record in _harness_records(document):
+        if record.get("harness_name") == harness_name:
+            value = record.get("id")
+            return value if isinstance(value, str) else None
+    return None

@@ -64,30 +64,53 @@ def _load_hook() -> ModuleType:
     return module
 
 
-def _make_project(root: Path, *, claude_role: str, codex_role: str) -> Path:
-    """Create a fixture GT-KB project root with harness-state identity + role
-    maps and an empty bridge/ dir. The identity map mirrors the live project
-    (claude=B, codex=A); the role map is parameterised per test."""
+def _make_project(
+    root: Path,
+    *,
+    claude_role: str | list[str],
+    codex_role: str | list[str],
+) -> Path:
+    """Create a fixture GT-KB project root with the harness registry projection
+    and an empty bridge/ dir.
+
+    WI-3342 IP-3/IP-4: ``bridge-stop-drain.py`` resolves the active harness's
+    identity + operating role through ``scripts.harness_roles`` /
+    ``scripts.harness_identity``, both migrated to read the DB-backed registry
+    projection ``harness-state/harness-registry.json`` (whose ``harnesses``
+    field is a LIST of unified records). The fixture therefore seeds the
+    projection — identity and role in one record per harness (claude=B,
+    codex=A) — rather than the retired role-assignments.json /
+    harness-identities.json. ``claude_role`` / ``codex_role`` accept the scalar
+    or list role wire form; both normalize to the role-set list form.
+    """
+
+    def _role_list(value: str | list[str]) -> list[str]:
+        return list(value) if isinstance(value, list) else [value]
+
     (root / "bridge").mkdir(parents=True, exist_ok=True)
     harness_state = root / "harness-state"
     harness_state.mkdir(exist_ok=True)
-    (harness_state / "harness-identities.json").write_text(
+    (harness_state / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}},
-            }
-        ),
-        encoding="utf-8",
-    )
-    (harness_state / "role-assignments.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {
-                    "B": {"role": claude_role, "harness_type": "claude"},
-                    "A": {"role": codex_role, "harness_type": "codex"},
-                },
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "role": _role_list(codex_role),
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "role": _role_list(claude_role),
+                    },
+                ],
             }
         ),
         encoding="utf-8",

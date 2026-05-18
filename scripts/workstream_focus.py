@@ -12,6 +12,7 @@ alongside the pre-existing aliases, classifies candidate write targets as
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -510,9 +511,11 @@ def save_state(
         from groundtruth_kb.mode_switch.derive import topology_from_role_map
 
         root = project_root if project_root is not None else _project_root_from_env()
-        role_map_path = root / "harness-state" / "role-assignments.json"
-        if role_map_path.exists():
-            role_map = json.loads(role_map_path.read_text(encoding="utf-8"))
+        # WI-3342 IP-4: topology resolves from the harness registry projection
+        # via the IP-3 foundational loader (load_role_assignments now reads the
+        # projection); the legacy role-assignments.json is no longer read here.
+        role_map = load_role_assignments(root)
+        if role_map.get("harnesses"):
             state["topology_mode"] = topology_from_role_map(role_map)
     except Exception:  # noqa: BLE001 - fail-soft to canonical default
         pass
@@ -1091,63 +1094,127 @@ def _startup_diagnostic_dir(project_root: Path | None = None) -> Path:
     return root / ".codex" / "gtkb-hooks"
 
 
-def _extract_user_visible_startup(context: str) -> str:
-    marker = "## User-Visible Startup Message"
-    if marker in context:
-        return context.split(marker, 1)[1].strip()
-    return context.strip()
+STARTUP_RELAY_CACHE_NAME = "last-user-visible-startup.md"
+STARTUP_RELAY_META_NAME = "last-user-visible-startup.meta.json"
 
 
-def _cached_startup_disclosure(project_root: Path | None = None) -> str | None:
+def _startup_relay_cache_paths(root: Path) -> tuple[Path, Path]:
+    """Harness-scoped startup-disclosure relay cache file and metadata sidecar.
+
+    The cache is harness-scoped (under the active harness's hooks directory),
+    so a Loyal Opposition session never reads a Prime Builder disclosure and
+    vice versa.
+    """
+    diag = _startup_diagnostic_dir(root)
+    return (diag / STARTUP_RELAY_CACHE_NAME, diag / STARTUP_RELAY_META_NAME)
+
+
+def _startup_relay_pointer(project_root: Path | None = None) -> dict[str, Any] | None:
+    """Read the harness-scoped startup-disclosure relay cache and metadata.
+
+    Returns a bounded pointer dict, or None when the cache file or its
+    metadata sidecar is missing, empty, or malformed. The relay path consults
+    only this harness-scoped cache: bridge auto-dispatch SessionStart payloads
+    never populate it, and the shared dashboard report is not a fallback.
+    """
     root = (project_root or _project_root_from_env()).resolve()
-    candidates = [
-        _startup_diagnostic_dir(root) / "last-session-start.json",
-        root / "docs" / "gtkb-dashboard" / "session-startup-report.md",
-    ]
-    for path in candidates:
-        try:
-            text = path.read_text(encoding="utf-8-sig")
-        except OSError:
-            continue
-        if path.suffix.lower() == ".json":
-            try:
-                payload = json.loads(text)
-            except json.JSONDecodeError:
-                continue
-            hook_output = payload.get("hookSpecificOutput") if isinstance(payload, dict) else None
-            context = hook_output.get("additionalContext") if isinstance(hook_output, dict) else None
-            if isinstance(context, str) and context.strip():
-                return _extract_user_visible_startup(context)
-            continue
-        if text.strip():
-            return text.strip()
-    return None
+    cache_path, meta_path = _startup_relay_cache_paths(root)
+    try:
+        body = cache_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if not body.strip():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(meta, dict):
+        return None
+    actual_bytes = body.encode("utf-8")
+    actual_sha = hashlib.sha256(actual_bytes).hexdigest()
+    harness_ok = meta.get("harness_name") in (None, _resolved_harness_name())
+    consistent = harness_ok and meta.get("sha256") == actual_sha and meta.get("byte_length") == len(actual_bytes)
+    try:
+        rel_path = cache_path.relative_to(root).as_posix()
+    except ValueError:
+        rel_path = cache_path.as_posix()
+    return {
+        "cache_path": rel_path,
+        "byte_length": len(actual_bytes),
+        "sha256": actual_sha,
+        "harness_id": meta.get("harness_id"),
+        "generated_at": meta.get("generated_at"),
+        "consistent": consistent,
+    }
 
 
 def _startup_gate_message() -> str:
-    report_path = STARTUP_REPORT_RELATIVE_PATH.as_posix()
     return (
-        "GTKB STARTUP INPUT GATE (init-keyword match): the prompt matched the init keyword "
-        "(per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 and DCL-SESSION-START-INIT-KEYWORD-MATCHING-001) "
-        "so the startup disclosure relay path is active. "
-        "Render the cached role-appropriate startup disclosure included in this additionalContext when present and wait for the next owner message. "
-        f"If the SessionStart payload is unavailable, read `{report_path}` from the project root and relay that startup disclosure. "
-        "After presenting the disclosure, stop and wait for Mike's next message. "
-        "Do not use tools, change files, or map session focus on this disclosure-relay turn."
+        "GTKB STARTUP INPUT GATE (init-keyword match): the prompt matched the "
+        "GroundTruth-KB init keyword, so the startup-disclosure relay path is active. "
+        "Do not perform ordinary task work, mutate files, map session focus, or run "
+        "broad exploration on this disclosure-relay turn. The owner-visible startup "
+        "disclosure is NOT inlined in this payload; it is held in a harness-scoped "
+        "cache file so this payload stays bounded. If the startup disclosure is not "
+        "already fully present in model context, perform exactly one read-only "
+        "filesystem read of the cache file named below, relay its content verbatim "
+        "as the owner-visible startup disclosure, then stop and wait for the next "
+        "owner message. Do not replace the disclosure with a short acknowledgement."
+    )
+
+
+def _startup_relay_failure_context(reason: str) -> str:
+    return (
+        "GTKB STARTUP RELAY FAILURE (init-keyword match): the startup-disclosure "
+        f"relay path is active but its harness-scoped cache is unusable -- {reason}. "
+        "Do NOT treat startup as satisfied, do NOT mark the startup response "
+        "complete, and do NOT claim the disclosure was presented. Report this "
+        "startup-relay failure to the owner with this diagnostic and ask how to "
+        "proceed. Do not perform ordinary task work on this turn."
     )
 
 
 def _startup_gate_response(project_root: Path | None = None) -> dict[str, Any]:
     message = _startup_gate_message()
-    cached_disclosure = _cached_startup_disclosure(project_root)
-    additional_context = message
-    if cached_disclosure:
-        additional_context = f"{message}\n\n## Cached User-Visible Startup Message\n\n{cached_disclosure}"
+    pointer = _startup_relay_pointer(project_root)
+    if pointer is None:
+        diagnostic = _startup_relay_failure_context(
+            "the cache file or its metadata sidecar is missing, empty, or malformed"
+        )
+        return {
+            "systemMessage": diagnostic,
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": diagnostic,
+            },
+        }
+    if not pointer["consistent"]:
+        diagnostic = _startup_relay_failure_context(
+            f"cache file {pointer['cache_path']} does not match its metadata sidecar "
+            "(sha256 or byte-length mismatch); it may be stale or displaced by a "
+            "non-disclosure payload"
+        )
+        return {
+            "systemMessage": diagnostic,
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": diagnostic,
+            },
+        }
+    pointer_block = (
+        "\n\n## Startup Disclosure Relay Source\n\n"
+        f"- cache file: {pointer['cache_path']}\n"
+        f"- byte length: {pointer['byte_length']}\n"
+        f"- sha256: {pointer['sha256']}\n\n"
+        "Read that cache file once (a single read-only filesystem read), then "
+        "relay its full content verbatim as the owner-visible startup disclosure."
+    )
     return {
         "systemMessage": message,
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
-            "additionalContext": additional_context,
+            "additionalContext": f"{message}{pointer_block}",
         },
     }
 

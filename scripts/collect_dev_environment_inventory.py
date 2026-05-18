@@ -344,27 +344,53 @@ def _toolchain_inventory() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def _harness_inventory(project_root: Path) -> dict[str, Any]:
-    identities = _read_json(project_root / "harness-state" / "harness-identities.json")
-    assignments = _read_json(project_root / "harness-state" / "role-assignments.json")
+    # WI-3342 IP-4: harness identity + role state both resolve from the
+    # DB-backed registry projection (harness-state/harness-registry.json). The
+    # legacy harness-identities.json / role-assignments.json files are no
+    # longer read here. The projection's ``harnesses`` is a LIST of unified
+    # records ({id, harness_name, harness_type, role, status, ...}); this
+    # collector needs ``harness_type``, which the IP-3 foundational loaders
+    # strip, so it reads the projection directly via load_harness_projection
+    # rather than through scripts.harness_roles / scripts.harness_identity.
+    try:
+        from scripts.harness_projection_reader import load_harness_projection
+    except ImportError:  # pragma: no cover - direct script execution path
+        from harness_projection_reader import (  # type: ignore[no-redef]
+            load_harness_projection,
+        )
+
+    projection = load_harness_projection(project_root)
+    identities: dict[str, dict[str, Any]] = {}
+    role_assignments: dict[str, dict[str, Any]] = {}
+    for record in projection.get("harnesses", []):
+        if not isinstance(record, dict):
+            continue
+        harness_name = record.get("harness_name")
+        harness_id = record.get("id")
+        role = record.get("role")
+        status = record.get("status")
+        if isinstance(harness_name, str) and harness_name:
+            identities[harness_name] = {
+                "id": harness_id,
+                "status": "verified" if harness_id else "unknown",
+            }
+        if isinstance(harness_id, str) and harness_id:
+            role_assignments[harness_id] = {
+                "harness_type": record.get("harness_type"),
+                "role": role,
+                "status": "verified" if role else "unknown",
+            }
     codex_config = _read_toml(project_root / ".codex" / "config.toml")
     codex_hooks = _read_json(project_root / ".codex" / "hooks.json")
     claude_settings = _read_json(project_root / ".claude" / "settings.json")
     return {
-        "identity_source": _file_state(project_root, "harness-state/harness-identities.json"),
-        "role_assignment_source": _file_state(project_root, "harness-state/role-assignments.json"),
+        "identity_source": _file_state(project_root, "harness-state/harness-registry.json"),
+        "role_assignment_source": _file_state(project_root, "harness-state/harness-registry.json"),
         "identities": {
-            name: {"id": details.get("id"), "status": "verified" if details.get("id") else "unknown"}
-            for name, details in sorted((identities.get("harnesses") or {}).items())
-            if isinstance(details, dict)
+            name: details for name, details in sorted(identities.items())
         },
         "role_assignments": {
-            harness_id: {
-                "harness_type": details.get("harness_type"),
-                "role": details.get("role"),
-                "status": "verified" if details.get("role") else "unknown",
-            }
-            for harness_id, details in sorted((assignments.get("harnesses") or {}).items())
-            if isinstance(details, dict)
+            harness_id: details for harness_id, details in sorted(role_assignments.items())
         },
         "codex": {
             "config": _file_state(project_root, ".codex/config.toml"),
@@ -523,7 +549,7 @@ def _assignment_status_for(harness: str, role: str, harnesses: dict[str, Any]) -
         "current_role": str(assigned_role or "unknown"),
         "matrix_role": role,
         "status": "verified" if assigned_role == role else "configured",
-        "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
+        "evidence": "harness-state/harness-registry.json",
     }
 
 

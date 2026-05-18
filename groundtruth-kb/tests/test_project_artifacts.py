@@ -159,10 +159,15 @@ def test_projects_cli_show_reports_members_from_current_work_items(project_dir, 
 
 
 # ---------------------------------------------------------------------------
-# IP-3 of WI-3316: ProjectLifecycleService.complete_project_authorization()
-# (bridge thread gtkb-project-verified-completion-auq-trigger).
+# W1 of GTKB-GOVERNANCE-CORRECTION-S358 (WI-3365): ProjectLifecycleService
+# completion + retirement under GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001
+# v2. Completion and retirement are automatic once every membership-linked
+# work item is VERIFIED; there is no owner-confirmation gate. The gating set
+# is the project's active project-to-work-item membership links, not the
+# authorization envelope's included_work_item_ids.
 # ---------------------------------------------------------------------------
 
+import sys  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import pytest  # noqa: E402
@@ -171,6 +176,18 @@ from groundtruth_kb.project.lifecycle import (  # noqa: E402
     ProjectLifecycleError,
     ProjectLifecycleService,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_completion_scanner():
+    """Import scripts/project_verified_completion_scanner.py for direct testing."""
+    scripts_dir = _REPO_ROOT / "scripts"
+    if scripts_dir.is_dir() and str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import project_verified_completion_scanner as scanner
+
+    return scanner
 
 
 def _write_verified_bridge(project_root: Path, wi_verified: dict[str, bool]) -> None:
@@ -194,9 +211,17 @@ def _seed_completion_env(
     wi_verified: dict[str, bool] | None = None,
     auth_status: str = "active",
     second_active_auth: bool = False,
+    linked_work_items: set[str] | None = None,
 ) -> KnowledgeDB:
-    """Seed PROJECT-X with authorization PAUTH-X over the given WIs plus a
-    bridge INDEX recording their VERIFIED state. Returns an open KnowledgeDB."""
+    """Seed PROJECT-X with authorization PAUTH-X over the given work items plus
+    a bridge INDEX recording their VERIFIED state. Returns an open KnowledgeDB.
+
+    GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 gates completion on the
+    project's active project-to-work-item membership links; each work item is
+    linked to PROJECT-X via link_project_work_item() unless ``linked_work_items``
+    restricts the linked set. The authorization's included_work_item_ids is
+    still populated so tests can prove the gating set ignores it.
+    """
     if wi_verified is None:
         wi_verified = {"WI-8001": True}
     _write_verified_bridge(project_root, wi_verified)
@@ -213,6 +238,8 @@ def _seed_completion_env(
     )
     for wi in wi_verified:
         db.insert_work_item(wi, f"Work item {wi}", "new", "backlog", "open", "test", "seed")
+        if linked_work_items is None or wi in linked_work_items:
+            db.link_project_work_item("PROJECT-X", wi, "test", "seed")
     db.insert_project_authorization(
         "PROJECT-X", "Primary authorization", "DELIB-AUTH-SEED",
         "Bounded scope.", "test", "seed", id="PAUTH-X", status=auth_status,
@@ -227,99 +254,29 @@ def _seed_completion_env(
     return db
 
 
-def _insert_owner_decision(db: KnowledgeDB, delib_id: str, content: str) -> None:
-    db.insert_deliberation(
-        delib_id, "owner_conversation", "Owner completion decision",
-        "Owner confirmed an authorization completion.", content, "test",
-        "owner decision", outcome="owner_decision",
-    )
+# --- complete_project_authorization: v2 automatic completion (no owner gate) -
 
 
-def test_complete_rejects_missing_deliberation(tmp_path) -> None:
+def test_complete_succeeds_without_owner_decision(tmp_path) -> None:
+    """v2: completion takes no owner_decision_deliberation_id and no gate."""
     db = _seed_completion_env(tmp_path)
     try:
         service = ProjectLifecycleService(db)
-        with pytest.raises(ProjectLifecycleError, match="not found"):
-            service.complete_project_authorization(
-                "PAUTH-X", "DELIB-DOES-NOT-EXIST",
-                project_root=tmp_path, change_reason="complete",
-            )
-    finally:
-        db.close()
-
-
-def test_complete_rejects_lo_review_deliberation(tmp_path) -> None:
-    db = _seed_completion_env(tmp_path)
-    db.insert_deliberation(
-        "DELIB-LO", "lo_review", "LO review", "An LO review of PROJECT-X.",
-        "PROJECT-X reviewed by Loyal Opposition.", "test", "lo review",
-        outcome="no_go",
-    )
-    try:
-        service = ProjectLifecycleService(db)
-        with pytest.raises(ProjectLifecycleError, match="owner conversation"):
-            service.complete_project_authorization(
-                "PAUTH-X", "DELIB-LO", project_root=tmp_path, change_reason="complete",
-            )
-    finally:
-        db.close()
-
-
-def test_complete_rejects_informational_deliberation(tmp_path) -> None:
-    db = _seed_completion_env(tmp_path)
-    db.insert_deliberation(
-        "DELIB-INFO", "owner_conversation", "Informational note",
-        "An informational note about PROJECT-X.", "PROJECT-X status note.",
-        "test", "note", outcome="informational",
-    )
-    try:
-        service = ProjectLifecycleService(db)
-        with pytest.raises(ProjectLifecycleError, match="owner decision"):
-            service.complete_project_authorization(
-                "PAUTH-X", "DELIB-INFO", project_root=tmp_path, change_reason="complete",
-            )
-    finally:
-        db.close()
-
-
-def test_complete_rejects_no_go_deliberation(tmp_path) -> None:
-    db = _seed_completion_env(tmp_path)
-    db.insert_deliberation(
-        "DELIB-NOGO", "owner_conversation", "No-go note",
-        "Owner conversation that ended no-go for PROJECT-X.", "PROJECT-X no-go.",
-        "test", "no-go", outcome="no_go",
-    )
-    try:
-        service = ProjectLifecycleService(db)
-        with pytest.raises(ProjectLifecycleError, match="owner decision"):
-            service.complete_project_authorization(
-                "PAUTH-X", "DELIB-NOGO", project_root=tmp_path, change_reason="complete",
-            )
-    finally:
-        db.close()
-
-
-def test_complete_rejects_owner_decision_for_other_project(tmp_path) -> None:
-    db = _seed_completion_env(tmp_path)
-    _insert_owner_decision(db, "DELIB-OTHER", "Owner approved completion of PROJECT-OTHER.")
-    try:
-        service = ProjectLifecycleService(db)
-        with pytest.raises(ProjectLifecycleError, match="completion context"):
-            service.complete_project_authorization(
-                "PAUTH-X", "DELIB-OTHER", project_root=tmp_path, change_reason="complete",
-            )
+        result = service.complete_project_authorization(
+            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+        )
+        assert result["authorization"]["status"] == "completed"
     finally:
         db.close()
 
 
 def test_complete_rejects_non_active_authorization(tmp_path) -> None:
     db = _seed_completion_env(tmp_path, auth_status="revoked")
-    _insert_owner_decision(db, "DELIB-OK", "Owner approved completion of PROJECT-X / PAUTH-X.")
     try:
         service = ProjectLifecycleService(db)
         with pytest.raises(ProjectLifecycleError, match="not active"):
             service.complete_project_authorization(
-                "PAUTH-X", "DELIB-OK", project_root=tmp_path, change_reason="complete",
+                "PAUTH-X", project_root=tmp_path, change_reason="complete",
             )
     finally:
         db.close()
@@ -327,24 +284,42 @@ def test_complete_rejects_non_active_authorization(tmp_path) -> None:
 
 def test_complete_rejects_when_a_wi_not_verified(tmp_path) -> None:
     db = _seed_completion_env(tmp_path, wi_verified={"WI-8001": True, "WI-8002": False})
-    _insert_owner_decision(db, "DELIB-OK", "Owner approved completion of PROJECT-X / PAUTH-X.")
     try:
         service = ProjectLifecycleService(db)
         with pytest.raises(ProjectLifecycleError, match="not completion-ready"):
             service.complete_project_authorization(
-                "PAUTH-X", "DELIB-OK", project_root=tmp_path, change_reason="complete",
+                "PAUTH-X", project_root=tmp_path, change_reason="complete",
             )
     finally:
         db.close()
 
 
-def test_complete_accepts_valid_owner_decision_deliberation(tmp_path) -> None:
-    db = _seed_completion_env(tmp_path)
-    _insert_owner_decision(db, "DELIB-OK", "Owner approved completion of PROJECT-X / PAUTH-X.")
+def test_complete_rejects_when_project_has_no_membership_links(tmp_path) -> None:
+    """v2 gates on membership links; a project with none cannot complete."""
+    db = _seed_completion_env(tmp_path, linked_work_items=set())
+    try:
+        service = ProjectLifecycleService(db)
+        with pytest.raises(ProjectLifecycleError, match="no active membership-linked work items"):
+            service.complete_project_authorization(
+                "PAUTH-X", project_root=tmp_path, change_reason="complete",
+            )
+    finally:
+        db.close()
+
+
+def test_complete_gating_set_is_membership_links_not_included_ids(tmp_path) -> None:
+    """The authorization lists an unverified WI in included_work_item_ids, but
+    only a VERIFIED WI is membership-linked. v2 gates on the membership link,
+    so completion succeeds."""
+    db = _seed_completion_env(
+        tmp_path,
+        wi_verified={"WI-8001": True, "WI-8002": False},
+        linked_work_items={"WI-8001"},
+    )
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", "DELIB-OK", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X", project_root=tmp_path, change_reason="complete",
         )
         assert result["authorization"]["status"] == "completed"
     finally:
@@ -353,11 +328,10 @@ def test_complete_accepts_valid_owner_decision_deliberation(tmp_path) -> None:
 
 def test_complete_sole_active_authorization_retires_project(tmp_path) -> None:
     db = _seed_completion_env(tmp_path)
-    _insert_owner_decision(db, "DELIB-OK", "Owner approved completion of PROJECT-X / PAUTH-X.")
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", "DELIB-OK", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X", project_root=tmp_path, change_reason="complete",
         )
         assert result["project_retired"] is True
         assert db.get_project("PROJECT-X")["status"] == "retired"
@@ -367,13 +341,155 @@ def test_complete_sole_active_authorization_retires_project(tmp_path) -> None:
 
 def test_complete_with_other_active_authorization_keeps_project_active(tmp_path) -> None:
     db = _seed_completion_env(tmp_path, second_active_auth=True)
-    _insert_owner_decision(db, "DELIB-OK", "Owner approved completion of PROJECT-X / PAUTH-X.")
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", "DELIB-OK", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X", project_root=tmp_path, change_reason="complete",
         )
         assert result["project_retired"] is False
         assert db.get_project("PROJECT-X")["status"] == "active"
+    finally:
+        db.close()
+
+
+# --- auto_complete_ready_authorizations: idempotent automatic transition -----
+
+
+def test_auto_complete_ready_authorizations_completes_and_retires(tmp_path) -> None:
+    db = _seed_completion_env(tmp_path)
+    try:
+        service = ProjectLifecycleService(db)
+        completed = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert [c["authorization_id"] for c in completed] == ["PAUTH-X"]
+        assert completed[0]["project_retired"] is True
+        assert db.get_project_authorization("PAUTH-X")["status"] == "completed"
+        assert db.get_project("PROJECT-X")["status"] == "retired"
+    finally:
+        db.close()
+
+
+def test_auto_complete_is_idempotent(tmp_path) -> None:
+    db = _seed_completion_env(tmp_path)
+    try:
+        service = ProjectLifecycleService(db)
+        first = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        second = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert len(first) == 1
+        assert second == []
+    finally:
+        db.close()
+
+
+def test_auto_complete_skips_unready_authorization(tmp_path) -> None:
+    db = _seed_completion_env(tmp_path, wi_verified={"WI-8001": True, "WI-8002": False})
+    try:
+        service = ProjectLifecycleService(db)
+        completed = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert completed == []
+        assert db.get_project_authorization("PAUTH-X")["status"] == "active"
+    finally:
+        db.close()
+
+
+# --- scanner gating-set parity with the lifecycle service --------------------
+
+
+def test_scanner_gating_set_uses_membership_links(tmp_path) -> None:
+    """The completion scanner sources its gating set from the project's
+    membership links, agreeing with the lifecycle service."""
+    scanner = _load_completion_scanner()
+    db = _seed_completion_env(
+        tmp_path,
+        wi_verified={"WI-8001": True, "WI-8002": False},
+        linked_work_items={"WI-8001"},
+    )
+    db.close()
+    ready = scanner.completion_ready(tmp_path)
+    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert ready[0].verified_work_item_ids == ["WI-8001"]
+
+
+# --- gt projects complete-authorization CLI subcommand -----------------------
+
+
+def test_projects_complete_authorization_cli(project_dir, runner: CliRunner) -> None:
+    config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+    db = _seed_completion_env(project_dir)
+    db.close()
+
+    result = runner.invoke(
+        main,
+        [
+            *config_flag, "projects", "complete-authorization", "PAUTH-X",
+            "--change-reason", "W1 CLI completion test", "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["authorization"]["status"] == "completed"
+    assert payload["project_retired"] is True
+
+
+# --- v3 collective retirement: associated work items + membership links ------
+
+
+def test_complete_retires_membership_linked_work_items(tmp_path) -> None:
+    """GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 collective retirement:
+    completing the sole active authorization retires the project AND
+    transitions its membership-linked work item to resolution_status='retired'
+    AND retires the membership link."""
+    db = _seed_completion_env(tmp_path)
+    try:
+        service = ProjectLifecycleService(db)
+        result = service.complete_project_authorization(
+            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+        )
+        assert result["project_retired"] is True
+        assert result["retired_work_items"] == ["WI-8001"]
+        assert db.get_work_item("WI-8001")["resolution_status"] == "retired"
+        # The membership link is retired (non-active) -> absent from the active
+        # set, but preserved append-only with status 'retired'.
+        assert db.list_project_work_items("PROJECT-X") == []
+        all_memberships = db.list_project_work_items("PROJECT-X", include_inactive=True)
+        assert [m["membership_status"] for m in all_memberships] == ["retired"]
+    finally:
+        db.close()
+
+
+def test_complete_shared_work_item_is_not_retired(tmp_path) -> None:
+    """Collective retirement, shared-work-item case: a work item that is also
+    an active member of another non-terminal project is left active when one
+    of its projects retires; only the retiring project's membership link is
+    retired."""
+    db = _seed_completion_env(tmp_path)
+    try:
+        db.insert_project("Other Project", "test", "seed", id="PROJECT-OTHER", status="active")
+        db.link_project_work_item("PROJECT-OTHER", "WI-8001", "test", "seed")
+        service = ProjectLifecycleService(db)
+        result = service.complete_project_authorization(
+            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+        )
+        assert result["project_retired"] is True
+        # WI-8001 is shared with the still-active PROJECT-OTHER -> not retired.
+        assert result["retired_work_items"] == []
+        assert db.get_work_item("WI-8001")["resolution_status"] != "retired"
+        # PROJECT-X's membership link is retired; PROJECT-OTHER's stays active.
+        assert db.list_project_work_items("PROJECT-X") == []
+        assert [m["work_item_id"] for m in db.list_project_work_items("PROJECT-OTHER")] == ["WI-8001"]
+    finally:
+        db.close()
+
+
+def test_auto_complete_retires_membership_linked_work_items(tmp_path) -> None:
+    """auto_complete_ready_authorizations applies collective retirement and
+    reports the retired work items in its result."""
+    db = _seed_completion_env(tmp_path)
+    try:
+        service = ProjectLifecycleService(db)
+        completed = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert len(completed) == 1
+        assert completed[0]["retired_work_items"] == ["WI-8001"]
+        assert db.get_work_item("WI-8001")["resolution_status"] == "retired"
     finally:
         db.close()

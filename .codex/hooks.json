@@ -54,7 +54,7 @@
           {
             "type": "command",
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\project-completion-surface.py",
-            "statusMessage": "Checking project completion readiness",
+            "statusMessage": "Auto-completing VERIFIED-ready project authorizations",
             "timeout": 5
           }
         ]
@@ -218,6 +218,12 @@
             "type": "command",
             "command": "python E:\\GT-KB\\.claude\\hooks\\advisory-router-scan.py",
             "statusMessage": "Advisory-to-backlog router scan",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.claude\\hooks\\bridge-stop-drain.py --harness codex",
+            "statusMessage": "Bridge active-session auto-drain (role-aware Stop drain)",
             "timeout": 10
           }
         ]

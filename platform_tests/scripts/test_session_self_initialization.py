@@ -2214,6 +2214,57 @@ def test_render_pending_decisions_block_includes_id_question_options() -> None:
 
 
 # =====================================================================
+# WI-3332 -- Stop-safe pending-decision rendering
+# Authority: bridge/gtkb-owner-decision-tracker-startup-relay-known-
+# match-suppression-003.md (Prime REVISED); Codex GO at -004.
+# =====================================================================
+
+
+def _load_owner_decision_tracker_module():
+    """Import the owner-decision-tracker hook module for cross-module checks."""
+    hook_path = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
+    spec = importlib.util.spec_from_file_location("_odt_xcheck", hook_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["_odt_xcheck"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_wi3332_t4_pending_decisions_block_renders_question_stop_safe() -> None:
+    """T4 (WI-3332): the renderer emits the question as a column-0 blockquote
+    so a verbatim relay is classified as documentation -- not a fresh
+    owner-decision-ask -- by the owner-decision-tracker Stop hook's
+    structural-context check."""
+    module = _load_module()
+    trigger_question = "Should I land this slice now, or hold for the next review?"
+    decisions = [
+        {
+            "id": "DECISION-0001",
+            "question": trigger_question,
+            "options": "Land it; Hold",
+            "asked_at": "2026-05-15T09:00:00Z",
+            "thread_ref": "",
+        }
+    ]
+    block = module._render_pending_decisions_block(decisions)
+    # The question renders on its own column-0 "> " blockquote line.
+    assert f"> {trigger_question}" in block, "the question must render as a column-0 blockquote line"
+    # The decision id and options remain visible to the owner.
+    assert "**DECISION-0001**" in block
+    assert "Land it; Hold" in block
+    # Cross-check the Part A <-> Part B contract: the owner-decision-tracker
+    # Stop hook's structural-context detector treats the rendered question's
+    # position as a relay/documentation context, so a verbatim relay of this
+    # block does not register as a fresh owner-decision-ask.
+    hook = _load_owner_decision_tracker_module()
+    q_offset = block.index(trigger_question)
+    assert hook._is_inside_structural_context(block, q_offset), (
+        "rendered question must fall inside a structural context the Stop hook recognizes (a line starting with '> ')"
+    )
+
+
+# =====================================================================
 # Smart-poller orient section retirement (Slice 4, 2026-05-09)
 # The smart-poller mechanism was retired; _render_smart_poller_section
 # is now a stub returning []. Bridge dispatch is governed by the

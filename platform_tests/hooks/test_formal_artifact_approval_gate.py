@@ -134,6 +134,23 @@ def test_high_level_spec_record_command_is_not_hook_matched() -> None:
     assert response == {}
 
 
+def test_high_level_spec_update_command_is_not_hook_matched() -> None:
+    # T-HG-SU-1: the governed `gt spec update` CLI path writes its own approval
+    # packet, so it must NOT be matched by FORMAL_MUTATION_PATTERNS.
+    response = _run_hook("python -m groundtruth_kb spec update --id GOV-EXAMPLE-001 --content-file content.md")
+
+    assert response == {}
+
+
+def test_raw_update_spec_call_is_still_hook_matched() -> None:
+    # T-HG-SU-2: regression — the raw `update_spec(...)` mutation pattern
+    # remains protected for direct-API callers and blocks without a packet.
+    response = _run_hook("python -c \"db.update_spec('GOV-1', 'me', 'reason', status='verified')\"")
+
+    assert response["decision"] == "block"
+    assert "formal artifact mutation" in response["reason"]
+
+
 def test_hook_and_shared_validator_agree_on_packet_fixtures(tmp_path: Path) -> None:
     valid_path = _packet(tmp_path)
     valid_packet = json.loads(valid_path.read_text(encoding="utf-8"))

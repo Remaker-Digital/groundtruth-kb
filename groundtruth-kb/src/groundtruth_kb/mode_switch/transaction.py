@@ -93,6 +93,103 @@ def _atomic_write_json(path: Path, payload: Any) -> None:
         raise
 
 
+def _decode_harness_json_field(raw: Any) -> Any:
+    """Decode a harnesses-table JSON-text column value (role / invocation_surfaces).
+
+    ``KnowledgeDB.get_harness`` returns these columns as raw JSON text (or
+    ``None``). Decoding is required before the value is round-tripped back
+    through ``insert_harness``, which JSON-encodes its inputs — passing the raw
+    text straight through would double-encode it."""
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    return raw
+
+
+def _mirror_role_map_to_registry(
+    project_root: Path,
+    role_map: dict[str, Any],
+    change_reason: str,
+) -> None:
+    """Write the post-switch role map to the DB ``harnesses`` registry table
+    and regenerate the hot-path projection.
+
+    WI-3342 IP-5: this is now the AUTHORITATIVE role write for the role-switch
+    transaction — the transitional ``role-assignments.json`` write was removed,
+    so the DB-backed registry and its projection are the sole authoritative
+    role surface.
+
+    For each harness in the role map whose role set differs from its current
+    DB row, an append-only ``insert_harness`` version is written carrying the
+    new role and every other field forwarded from the current row. A harness
+    with no current DB row is skipped — the registry seed owns first-version
+    creation. After the inserts the projection is regenerated.
+
+    A missing ``groundtruth.db`` (e.g. a DB-less test fixture) is a graceful
+    no-op. Any other registry/DB failure is raised, failing the transaction —
+    a registry-write failure must not silently lose the role switch."""
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.harness_projection import generate_harness_projection
+    except Exception:
+        return
+    harnesses = role_map.get("harnesses")
+    if not isinstance(harnesses, dict):
+        return
+    try:
+        db = KnowledgeDB(db_path=db_path)
+        changed = False
+        for harness_id, record in harnesses.items():
+            if not isinstance(record, dict):
+                continue
+            raw_role = record.get("role")
+            if isinstance(raw_role, list):
+                new_role = [str(r) for r in raw_role]
+            elif isinstance(raw_role, str) and raw_role.strip():
+                new_role = [raw_role.strip()]
+            else:
+                continue
+            current = db.get_harness(str(harness_id))
+            if current is None:
+                continue
+            current_role = _decode_harness_json_field(current.get("role"))
+            current_role_list = current_role if isinstance(current_role, list) else []
+            if sorted(str(r) for r in current_role_list) == sorted(new_role):
+                continue
+            db.insert_harness(
+                id=str(harness_id),
+                harness_name=str(current.get("harness_name") or harness_id),
+                harness_type=str(current.get("harness_type") or harness_id),
+                role=new_role,
+                changed_by="mode-switch-transaction",
+                change_reason=change_reason,
+                status=str(current.get("status") or "registered"),
+                reviewer_precedence=current.get("reviewer_precedence"),
+                invocation_surfaces=_decode_harness_json_field(
+                    current.get("invocation_surfaces")
+                ),
+                capabilities_ref=current.get("capabilities_ref"),
+            )
+            changed = True
+        if changed:
+            generate_harness_projection(db, project_root)
+    except Exception as exc:
+        # WI-3342 IP-5: the DB-backed registry is now the sole authoritative
+        # role surface (the transitional role-assignments.json write was
+        # removed), so a registry-write failure must fail the transaction
+        # rather than silently lose the role switch.
+        raise RuntimeError(
+            f"harness registry write failed during role-switch transaction: {exc}"
+        ) from exc
+
+
 def apply_role_switch(
     project_root: Path,
     harness_id_or_name: str,
@@ -105,19 +202,24 @@ def apply_role_switch(
 
     Order of operations (fail-closed before any state mutation):
 
-    1. Validate role artifact (``harness-state/role-assignments.json``).
+    1. Validate role artifact (the harness registry projection).
     2. Validate bridge artifact (``bridge/INDEX.md``).
     3. Validate session-state artifact (``.claude/session/work-subject.json``).
     4. Validate role token against ``VALID_ROLES_FOR_WRITE`` (SET-rejects
        ``acting-prime-builder``).
     5. Resolve harness id-or-name to harness id.
-    6. Read role map; compute new role set (singleton list for multi-harness
-       case; multi-element only via separate single-harness path).
+    6. Read the role map from the DB-backed registry projection; compute the
+       new role set (singleton list for the multi-harness case; multi-element
+       only via the separate single-harness path).
     7. Write audit-trail record FIRST (per failure-leaves-no-state-mutation
        invariant).
-    8. Atomically write role-assignments.json with derived topology.
+    8. WI-3342 IP-5: the transitional ``role-assignments.json`` write is
+       removed — the DB registry and projection (Step 10) are the sole
+       authoritative role surface.
     9. Atomically write work-subject.json with derived topology if file
        exists.
+    10. Write the post-switch role map to the DB harnesses registry and
+       regenerate the hot-path projection — the authoritative role write.
 
     Raises ``TransactionValidationError`` on any validation failure;
     no state mutation occurs in that case.
@@ -143,8 +245,25 @@ def apply_role_switch(
         )
 
     # Step 5-6: Resolve harness, compute new role set.
-    role_map_path = project_root / "harness-state" / "role-assignments.json"
-    role_map = json.loads(role_map_path.read_text(encoding="utf-8"))
+    # WI-3342 IP-5: the current role map is read from the DB-backed registry
+    # projection (harness-state/harness-registry.json), not the retired
+    # harness-state/role-assignments.json. The projection stores harnesses as a
+    # LIST; convert to the {harness_id: record} dict shape the role-switch
+    # logic below mutates.
+    from groundtruth_kb.harness_projection import harness_registry_path
+
+    registry_path = harness_registry_path(project_root)
+    projection = json.loads(registry_path.read_text(encoding="utf-8"))
+    projection_harnesses = (
+        projection.get("harnesses", []) if isinstance(projection, dict) else []
+    )
+    role_map: dict[str, Any] = {
+        "harnesses": {
+            str(rec["id"]): rec
+            for rec in projection_harnesses
+            if isinstance(rec, dict) and rec.get("id")
+        }
+    }
     harness_id = _resolve_harness_id(role_map, harness_id_or_name)
     harnesses = role_map["harnesses"]
     record = harnesses[harness_id]
@@ -200,8 +319,10 @@ def apply_role_switch(
         deferred=False,
     )
 
-    # Step 8: Atomic write role-assignments.json.
-    _atomic_write_json(role_map_path, role_map)
+    # Step 8: WI-3342 IP-5 — the transitional legacy-JSON write of
+    # harness-state/role-assignments.json is removed. The DB-backed registry
+    # and its projection (written authoritatively by Step 10) are now the sole
+    # authoritative role surface.
 
     # Step 9: Atomic write work-subject.json with derived topology (if it
     # exists).
@@ -211,6 +332,11 @@ def apply_role_switch(
         if isinstance(session_data, dict):
             session_data["topology_mode"] = derived_topology
             _atomic_write_json(session_path, session_data)
+
+    # Step 10: WI-3342 IP-5 — write the post-switch role map to the DB
+    # harnesses registry and regenerate the hot-path projection. This is the
+    # authoritative role write (the legacy-JSON write was removed at Step 8).
+    _mirror_role_map_to_registry(project_root, role_map, change_reason)
 
     return TransactionResult(
         harness_id=harness_id,

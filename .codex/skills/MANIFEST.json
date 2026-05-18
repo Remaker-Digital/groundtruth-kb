@@ -50,6 +50,13 @@
       "source_sha256": "318aec13485938431ccb85fea58a4ec3bacab8dab2dfe8ea97c54f8d118bc2d3"
     },
     {
+      "adapter_relative_path": ".codex/skills/lo-opportunity-radar/SKILL.md",
+      "canonical_name": "lo-opportunity-radar",
+      "capability_id": "skill.lo-opportunity-radar",
+      "source_relative_path": ".claude/skills/lo-opportunity-radar/SKILL.md",
+      "source_sha256": "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
+    },
+    {
       "adapter_relative_path": ".codex/skills/codex-report/SKILL.md",
       "canonical_name": "loyal-opposition-report",
       "capability_id": "skill.codex-report",
@@ -209,6 +216,13 @@
       "capability_id": "skill.grill-me-for-clarification",
       "source_relative_path": ".claude/skills/grill-me-for-clarification/SKILL.md",
       "source_sha256": "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/verify/SKILL.md",
+      "canonical_name": "gtkb-verify",
+      "capability_id": "skill.verify",
+      "source_relative_path": ".claude/skills/verify/SKILL.md",
+      "source_sha256": "0cb8669690d00770ee94ef1362700c6d0fbbacaddf0ac2f31a69a281d71e716c"
     }
   ],
   "generated_by": "scripts/generate_codex_skill_adapters.py",

@@ -4,17 +4,36 @@ Covers SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001 acceptance criteria #1
 (deterministic component), #2 (validation before write), and #3 (audit
 evidence).
 
+WI-3342 IP-6: ``apply_role_switch`` was migrated to read the harness role map
+from the DB-backed registry projection ``harness-state/harness-registry.json``
+and to persist the post-switch role map through the DB ``harnesses`` table +
+projection regeneration (the transitional ``role-assignments.json`` write was
+removed). The fixtures here therefore seed a real ``groundtruth.db`` with the
+test harnesses and generate the projection from it; post-write assertions read
+the regenerated projection rather than the retired role-assignments.json.
+
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights reserved.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from groundtruth_kb.mode_switch.transaction import (
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PACKAGE_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
+if str(_PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(_PACKAGE_SRC))
+
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.harness_projection import (  # noqa: E402
+    generate_harness_projection,
+)
+from groundtruth_kb.mode_switch.transaction import (  # noqa: E402
     TransactionValidationError,
     apply_role_switch,
 )
@@ -25,27 +44,66 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+# Default harnesses for a seeded workspace: harness A (codex) loyal-opposition,
+# harness B (claude) prime-builder. Each entry is (harness_name, role-set).
+_DEFAULT_HARNESSES: dict[str, tuple[str, list[str]]] = {
+    "A": ("codex", ["loyal-opposition"]),
+    "B": ("claude", ["prime-builder"]),
+}
+
+
 def _seed_workspace(
     root: Path,
     *,
-    role_map: dict | None = None,
+    harnesses: dict[str, tuple[str, list[str]]] | None = None,
     index_text: str | None = None,
 ) -> None:
-    if role_map is None:
-        role_map = {
-            "harnesses": {
-                "A": {"role": ["loyal-opposition"], "name": "codex"},
-                "B": {"role": ["prime-builder"], "name": "claude"},
-            }
-        }
+    """Seed a real ``groundtruth.db`` registry + generated projection + INDEX.
+
+    ``harnesses`` maps each durable harness id to ``(harness_name, role_set)``.
+    A real DB is required because ``apply_role_switch`` persists the post-switch
+    role map through the DB ``harnesses`` table (``_mirror_role_map_to_registry``
+    skips any harness with no current DB row) and then regenerates the
+    projection — the surface every post-write assertion reads.
+    """
+    if harnesses is None:
+        harnesses = _DEFAULT_HARNESSES
     if index_text is None:
         index_text = (
             "Document: foo\n"
             "VERIFIED: bridge/foo-002.md\n"
             "NEW: bridge/foo-001.md\n"
         )
-    _write(root / "harness-state" / "role-assignments.json", json.dumps(role_map))
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    for harness_id, (harness_name, role_set) in harnesses.items():
+        db.insert_harness(
+            id=harness_id,
+            harness_name=harness_name,
+            harness_type=harness_name,
+            role=list(role_set),
+            changed_by="test",
+            change_reason="WI-3342 IP-6 mode-switch transaction fixture",
+            status="active",
+        )
+    generate_harness_projection(db, root)
     _write(root / "bridge" / "INDEX.md", index_text)
+
+
+def _read_role_map(root: Path) -> dict[str, Any]:
+    """Return ``{harness_id: role_set}`` from the regenerated registry projection.
+
+    WI-3342 IP-6: the authoritative post-switch role surface is the DB-backed
+    registry projection (``harness-state/harness-registry.json``), not the
+    retired ``harness-state/role-assignments.json``.
+    """
+    projection = json.loads(
+        (root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8")
+    )
+    return {
+        str(record["id"]): record.get("role")
+        for record in projection.get("harnesses", [])
+        if isinstance(record, dict) and record.get("id")
+    }
 
 
 @pytest.fixture
@@ -55,8 +113,12 @@ def project_root(tmp_path: Path) -> Path:
 
 def test_apply_role_switch_returns_transaction_result(project_root: Path) -> None:
     _seed_workspace(project_root)
+    # WI-3342 IP-6: target the harness by its durable id. apply_role_switch
+    # reads the registry projection, whose records carry ``harness_name`` (not
+    # the legacy ``name`` key), so harness-id targeting is the migration-stable
+    # path; harness B is the claude harness.
     result = apply_role_switch(
-        project_root, "claude", "loyal-opposition", change_reason="test"
+        project_root, "B", "loyal-opposition", change_reason="test"
     )
     assert result.harness_id == "B"
     assert result.new_role_set == ("loyal-opposition",)
@@ -85,22 +147,37 @@ def test_apply_role_switch_rejects_unknown_harness(project_root: Path) -> None:
 
 
 def test_apply_role_switch_refuses_when_bridge_index_missing(project_root: Path) -> None:
-    """F2: validators run BEFORE any state mutation."""
-    _write(
-        project_root / "harness-state" / "role-assignments.json",
-        json.dumps({"harnesses": {"A": {"role": ["prime-builder"]}}}),
+    """F2: validators run BEFORE any state mutation.
+
+    WI-3342 IP-6: a valid registry projection is seeded so the role-artifact
+    validator passes and the bridge-artifact validator (missing INDEX) is the
+    failure under test.
+    """
+    db = KnowledgeDB(db_path=project_root / "groundtruth.db")
+    db.insert_harness(
+        id="A", harness_name="codex", harness_type="codex",
+        role=["prime-builder"], changed_by="test", change_reason="fixture",
+        status="active",
     )
+    generate_harness_projection(db, project_root)
     # No bridge/INDEX.md
     with pytest.raises(TransactionValidationError):
         apply_role_switch(project_root, "A", "loyal-opposition", change_reason="t")
 
 
 def test_apply_role_switch_refuses_when_bridge_index_unparseable(project_root: Path) -> None:
-    """F2: bridge artifact with unknown status token fails closed."""
-    _write(
-        project_root / "harness-state" / "role-assignments.json",
-        json.dumps({"harnesses": {"A": {"role": ["prime-builder"]}}}),
+    """F2: bridge artifact with unknown status token fails closed.
+
+    WI-3342 IP-6: a valid registry projection is seeded so the bridge-artifact
+    validator (unknown status token) is the failure under test.
+    """
+    db = KnowledgeDB(db_path=project_root / "groundtruth.db")
+    db.insert_harness(
+        id="A", harness_name="codex", harness_type="codex",
+        role=["prime-builder"], changed_by="test", change_reason="fixture",
+        status="active",
     )
+    generate_harness_projection(db, project_root)
     _write(
         project_root / "bridge" / "INDEX.md",
         "Document: foo\nFROBNICATED: bridge/foo-001.md\n",
@@ -111,28 +188,25 @@ def test_apply_role_switch_refuses_when_bridge_index_unparseable(project_root: P
 
 def test_apply_role_switch_demotes_other_harness_to_opposite_role(project_root: Path) -> None:
     """When B becomes prime-builder, A must be demoted to loyal-opposition."""
-    role_map = {
-        "harnesses": {
-            "A": {"role": ["prime-builder"], "name": "codex"},
-            "B": {"role": ["loyal-opposition"], "name": "claude"},
-        }
-    }
-    _seed_workspace(project_root, role_map=role_map)
-    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
-    updated = json.loads(
-        (project_root / "harness-state" / "role-assignments.json").read_text(
-            encoding="utf-8"
-        )
+    _seed_workspace(
+        project_root,
+        harnesses={
+            "A": ("codex", ["prime-builder"]),
+            "B": ("claude", ["loyal-opposition"]),
+        },
     )
-    assert updated["harnesses"]["B"]["role"] == ["prime-builder"]
-    assert updated["harnesses"]["A"]["role"] == ["loyal-opposition"]
+    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
+    updated = _read_role_map(project_root)
+    assert updated["B"] == ["prime-builder"]
+    assert updated["A"] == ["loyal-opposition"]
 
 
 def test_audit_record_contains_required_fields(project_root: Path) -> None:
     """Acceptance criterion #3: who/what/when/effective-when evidence."""
     _seed_workspace(project_root)
+    # WI-3342 IP-6: target harness B (claude) by its durable id.
     result = apply_role_switch(
-        project_root, "claude", "loyal-opposition", change_reason="audit fields test"
+        project_root, "B", "loyal-opposition", change_reason="audit fields test"
     )
     record = json.loads(result.audit_record_path.read_text(encoding="utf-8"))
     assert record["harness_id"] == "B"
@@ -150,21 +224,17 @@ def test_apply_role_switch_prime_builder_demotes_all_non_targets(
     """FR9 full role partition: promoting a harness to prime-builder demotes
     EVERY other harness to loyal-opposition, including a non-target whose prior
     role set was empty (the -006 F1 regression)."""
-    role_map = {
-        "harnesses": {
-            "A": {"role": ["prime-builder"], "name": "codex"},
-            "B": {"role": ["loyal-opposition"], "name": "claude"},
-            "C": {"role": [], "name": "antigravity"},
-        }
-    }
-    _seed_workspace(project_root, role_map=role_map)
-    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
-    updated = json.loads(
-        (project_root / "harness-state" / "role-assignments.json").read_text(
-            encoding="utf-8"
-        )
+    _seed_workspace(
+        project_root,
+        harnesses={
+            "A": ("codex", ["prime-builder"]),
+            "B": ("claude", ["loyal-opposition"]),
+            "C": ("antigravity", []),
+        },
     )
-    assert updated["harnesses"]["B"]["role"] == ["prime-builder"]
-    assert updated["harnesses"]["A"]["role"] == ["loyal-opposition"]
+    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
+    updated = _read_role_map(project_root)
+    assert updated["B"] == ["prime-builder"]
+    assert updated["A"] == ["loyal-opposition"]
     # C's prior role set was [] — without the FR9 fix it would survive as [].
-    assert updated["harnesses"]["C"]["role"] == ["loyal-opposition"]
+    assert updated["C"] == ["loyal-opposition"]

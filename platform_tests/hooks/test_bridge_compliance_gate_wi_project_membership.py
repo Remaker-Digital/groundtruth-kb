@@ -38,6 +38,7 @@ _SPEC_LINKS = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
 _AUTH_ID = "PAUTH-TEST-MEMBERSHIP"
 _PROJECT_ID = "PROJECT-TEST-MEMBERSHIP"
 _WI_ID = "WI-7777"
+_WI_AUTO_ID = "WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001"
 
 
 def _make_db(
@@ -217,6 +218,42 @@ def test_cited_project_mismatch_with_membership_project_blocked(tmp_path: Path) 
     )
     reason = _deny(tmp_path, _proposal(project=_PROJECT_ID))
     assert reason is not None and "wi-not-found-in-project" in reason
+
+
+# --- WI-AUTO-* id regression (WI-3322) ------------------------------------------
+
+def test_extract_project_metadata_captures_wi_auto_id() -> None:
+    # WORK_ITEM_VALUE_RE must capture a spec-intake WI-AUTO-* id so the
+    # downstream membership check receives a non-None work_item_id.
+    # Regression guard for WI-3322.
+    content = _proposal(wi=_WI_AUTO_ID)
+    auth_id, project_id, work_item_id = _gate._extract_project_metadata(content)
+    assert work_item_id == _WI_AUTO_ID
+    assert auth_id == _AUTH_ID
+    assert project_id == _PROJECT_ID
+
+
+def test_wi_auto_id_membership_check_engages(tmp_path: Path) -> None:
+    # A WI-AUTO-* proposal whose work item has NO membership row must be
+    # BLOCKED with wi-not-found-in-project. Against the un-widened
+    # WORK_ITEM_VALUE_RE the id fails to capture, _wi_project_membership_gap
+    # short-circuits on its fail-open guard, and no denial is produced -- so
+    # this assertion cannot be satisfied by the silent-skip path.
+    _make_db(tmp_path, membership=None, authorization=_auth())
+    reason = _deny(tmp_path, _proposal(wi=_WI_AUTO_ID))
+    assert reason is not None and "wi-not-found-in-project" in reason
+
+
+def test_wi_auto_id_active_membership_passes(tmp_path: Path) -> None:
+    # A WI-AUTO-* work item with an active membership and an active,
+    # including authorization yields a passing proposal.
+    _make_db(
+        tmp_path,
+        membership=(_WI_AUTO_ID, _PROJECT_ID, "active"),
+        authorization=_auth(included_work_item_ids=f'["{_WI_AUTO_ID}"]'),
+    )
+    reason = _deny(tmp_path, _proposal(wi=_WI_AUTO_ID))
+    assert reason is None, f"compliant WI-AUTO proposal incorrectly denied: {reason}"
 
 
 def test_block_reason_includes_specific_condition_token(tmp_path: Path) -> None:

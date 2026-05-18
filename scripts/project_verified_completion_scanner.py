@@ -4,9 +4,12 @@
 IP-1 of WI-3316 (bridge thread ``gtkb-project-verified-completion-auq-trigger``).
 
 For every ``status='active'`` project authorization, this scanner determines
-whether every work item in ``included_work_item_ids`` is covered by a bridge
-thread whose latest ``bridge/INDEX.md`` status is ``VERIFIED``. An authorization
-is *completion-ready* iff it lists at least one work item and all of them are
+whether every work item linked to the authorization's project via an active
+project-to-work-item membership link is covered by a bridge thread whose
+latest ``bridge/INDEX.md`` status is ``VERIFIED`` (the
+``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2 "explicitly linked"
+gating definition). An authorization is *completion-ready* iff its project has
+at least one active membership-linked work item and all of them are
 VERIFIED-covered.
 
 The scanner is strictly read-only: it issues no DB writes and no bridge-file
@@ -97,18 +100,24 @@ def verified_work_items(project_root: Path) -> set[str]:
     return verified
 
 
-def _included_work_item_ids(authorization: dict[str, Any]) -> list[str]:
-    parsed = authorization.get("included_work_item_ids_parsed")
-    if isinstance(parsed, list):
-        return [str(value) for value in parsed]
-    raw = authorization.get("included_work_item_ids")
-    if not raw:
+def _project_membership_work_item_ids(db: Any, project_id: str) -> list[str]:
+    """Return the work-item ids linked to ``project_id`` via an active
+    project-to-work-item membership link.
+
+    GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 defines the
+    completion-gating set as the project's explicitly-linked work items - the
+    active project-to-work-item membership links - not the authorization
+    envelope's ``included_work_item_ids`` list. ``ProjectLifecycleService``
+    sources the gating set the same way so the scanner and the service agree.
+    """
+    if not project_id:
         return []
-    try:
-        decoded = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return []
-    return [str(value) for value in decoded] if isinstance(decoded, list) else []
+    memberships = db.list_project_work_items(project_id)
+    return [
+        str(membership["work_item_id"])
+        for membership in memberships
+        if str(membership.get("membership_status") or "").strip().lower() == "active"
+    ]
 
 
 def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
@@ -122,20 +131,26 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
     db = KnowledgeDB(project_root / "groundtruth.db")
     try:
         active = db.list_project_authorizations(status="active")
+        gating_by_project: dict[str, list[str]] = {}
+        for authorization in active:
+            project_id = str(authorization.get("project_id") or "")
+            if project_id and project_id not in gating_by_project:
+                gating_by_project[project_id] = _project_membership_work_item_ids(db, project_id)
     finally:
         db.close()
 
     verified = verified_work_items(project_root)
     results: list[AuthorizationReadiness] = []
     for authorization in active:
-        included = _included_work_item_ids(authorization)
+        project_id = str(authorization.get("project_id") or "")
+        included = gating_by_project.get(project_id, [])
         verified_ids = [wi for wi in included if wi in verified]
         unverified_ids = [wi for wi in included if wi not in verified]
         completion_ready = bool(included) and not unverified_ids
         results.append(
             AuthorizationReadiness(
                 authorization_id=str(authorization.get("id") or ""),
-                project_id=str(authorization.get("project_id") or ""),
+                project_id=project_id,
                 authorization_name=str(authorization.get("authorization_name") or ""),
                 included_work_item_ids=included,
                 verified_work_item_ids=verified_ids,

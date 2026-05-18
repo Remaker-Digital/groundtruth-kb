@@ -1,8 +1,11 @@
-"""Tests for scripts/project_verified_completion_scanner.py (IP-1 of WI-3316).
+"""Tests for scripts/project_verified_completion_scanner.py.
 
-Bridge thread gtkb-project-verified-completion-auq-trigger. Uses isolated
-tmp_path project roots; the only dependency on the live repo is the script
-import path.
+W1 of GTKB-GOVERNANCE-CORRECTION-S358 (WI-3365); originally IP-1 of WI-3316.
+Under GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 the scanner gates an
+authorization's completion readiness on the project's active project-to-work-
+item membership links, not on the authorization envelope's
+``included_work_item_ids``. Uses isolated tmp_path project roots; the only
+dependency on the live repo is the script import path.
 """
 
 from __future__ import annotations
@@ -28,9 +31,21 @@ def scanner():
     return module
 
 
-def _seed(project_root: Path, *, wi_statuses: dict[str, bool]) -> None:
+def _seed(
+    project_root: Path,
+    *,
+    wi_statuses: dict[str, bool],
+    linked_work_items: set[str] | None = None,
+) -> None:
     """Seed a project root with one active authorization (PAUTH-X) over the WIs
-    in ``wi_statuses``. Each WI maps to whether its bridge thread is VERIFIED."""
+    in ``wi_statuses``. Each WI maps to whether its bridge thread is VERIFIED.
+
+    GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 gates completion on the
+    project's active project-to-work-item membership links, not on the
+    authorization envelope's ``included_work_item_ids``. Each WI is linked to
+    PROJECT-X via ``link_project_work_item()`` unless ``linked_work_items``
+    restricts the linked set.
+    """
     bridge = project_root / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
     index_lines = ["# Bridge Index", ""]
@@ -58,6 +73,8 @@ def _seed(project_root: Path, *, wi_statuses: dict[str, bool]) -> None:
         db.insert_project("Scanner Project", "test", "seed", id="PROJECT-X", status="active")
         for wi in wi_statuses:
             db.insert_work_item(wi, f"Work item {wi}", "new", "backlog", "open", "test", "seed")
+            if linked_work_items is None or wi in linked_work_items:
+                db.link_project_work_item("PROJECT-X", wi, "test", "seed")
         db.insert_spec(
             id="SPEC-SEED",
             title="Seed spec",
@@ -98,6 +115,22 @@ def test_scanner_skips_authorization_with_one_non_verified_wi(scanner, tmp_path)
     assert auth.completion_ready is False
     assert auth.unverified_work_item_ids == ["WI-8002"]
     assert auth.verified_work_item_ids == ["WI-8001"]
+
+
+def test_scanner_gating_uses_membership_links_not_included_ids(scanner, tmp_path):
+    # WI-8002 is in the authorization's included_work_item_ids and its bridge
+    # thread is not VERIFIED, but it is not membership-linked to PROJECT-X.
+    # GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 gates on the membership
+    # links, so PAUTH-X is completion-ready on the linked WI-8001 alone.
+    _seed(
+        tmp_path,
+        wi_statuses={"WI-8001": True, "WI-8002": False},
+        linked_work_items={"WI-8001"},
+    )
+    ready = scanner.completion_ready(tmp_path)
+    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert ready[0].verified_work_item_ids == ["WI-8001"]
+    assert ready[0].unverified_work_item_ids == []
 
 
 def test_scanner_makes_no_db_writes(scanner, tmp_path):

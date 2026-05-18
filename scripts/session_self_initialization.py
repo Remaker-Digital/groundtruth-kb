@@ -77,6 +77,7 @@ try:
     from scripts.harness_roles import (
         DEFAULT_HARNESS_IDS,
         ROLE_ASSIGNMENTS_RELATIVE_PATH,
+        load_role_assignments,
         role_assignments_path,
         role_for_harness,
     )
@@ -90,6 +91,7 @@ except ImportError:  # pragma: no cover - direct script execution path
     from harness_roles import (  # type: ignore[no-redef]
         DEFAULT_HARNESS_IDS,
         ROLE_ASSIGNMENTS_RELATIVE_PATH,
+        load_role_assignments,
         role_assignments_path,
         role_for_harness,
     )
@@ -4137,12 +4139,12 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
             topology_from_role_map,
         )
 
-        role_map_path = _PROJECT_ROOT_FOR_IMPORTS / "harness-state" / "role-assignments.json"
-        if role_map_path.exists():
-            try:
-                role_map = json.loads(role_map_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                role_map = {}  # malformed/unreadable -> empty -> canonical helper fail-closed
+        # WI-3342 IP-4: role map resolves from the harness registry projection
+        # via the IP-3 foundational loader (load_role_assignments now reads the
+        # projection). load_role_assignments is fail-soft — a missing or
+        # malformed projection yields an empty document, preserving the
+        # canonical-helper fail-closed path below.
+        role_map = load_role_assignments(_PROJECT_ROOT_FOR_IMPORTS)
         topology_mode = topology_from_role_map(role_map)
         active_harness_id = model.get("role", {}).get("harness_id")
         role_slot = role_slot_from_active_harness(role_map, active_harness_id)
@@ -4470,8 +4472,11 @@ def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
     """Format the pending-decisions list for the startup disclosure.
 
     Matches the visual style of other startup sections (markdown bullets
-    with bold IDs). Each entry shows id, question, optional thread_ref
-    and option list.
+    with bold IDs). The decision id and suffix metadata render on the bullet
+    line; the question renders as a column-0 blockquote so a verbatim relay
+    of this section is classified as documentation rather than a fresh
+    owner-decision-ask by the owner-decision-tracker Stop hook (WI-3332). An
+    optional indented option list follows.
     """
     if not decisions:
         return ""
@@ -4495,8 +4500,14 @@ def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
         if thread_ref:
             suffix_parts.append(f"thread: `{thread_ref}`")
         suffix = f" ({'; '.join(suffix_parts)})" if suffix_parts else ""
-        line = f"- **{decision_id}**: {question}{suffix}"
-        lines.append(line)
+        # WI-3332: render the stored question as a column-0 blockquote line so
+        # a verbatim relay of this section is classified as documentation, not
+        # a fresh owner-decision-ask, by the owner-decision-tracker Stop hook's
+        # structural-context check (a line starting with "> " is treated as a
+        # relay). The decision id, question, and options stay fully visible.
+        lines.append(f"- **{decision_id}**{suffix}")
+        if question:
+            lines.append(f"> {question}")
         if opts:
             lines.append(f"  - Options: {opts}")
     return "\n".join(lines)

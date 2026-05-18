@@ -58,30 +58,39 @@ def _invoke(config: Path, *args: str) -> object:
     return CliRunner().invoke(main, ["--config", str(config), "harness", *args])
 
 
-def _register_active(config: Path, harness_id: str, harness_type: str) -> None:
-    """Register a harness and activate it (status 'active' in the registry)."""
-    reg = _invoke(
-        config, "register", "--id", harness_id, "--name", harness_id.lower(),
+def _register_active(
+    config: Path, harness_id: str, harness_type: str, *, role: list[str] | None = None
+) -> None:
+    """Register a harness with an initial role set and activate it.
+
+    WI-3342 IP-6: the harness role map is the DB-backed registry projection
+    (``harness-state/harness-registry.json``), not the retired
+    ``role-assignments.json``. The initial role set is therefore written into
+    the DB at registration via repeatable ``--role`` options so the projection
+    ``apply_role_switch`` reads carries the intended starting roles.
+    """
+    register_args = [
+        "register", "--id", harness_id, "--name", harness_id.lower(),
         "--type", harness_type,
-    )
+    ]
+    for token in role or []:
+        register_args += ["--role", token]
+    reg = _invoke(config, *register_args)
     assert reg.exit_code == 0, reg.output
     act = _invoke(config, "activate", "--harness", harness_id)
     assert act.exit_code == 0, act.output
 
 
-def _seed_role_workspace(root: Path, role_map: dict[str, list[str]]) -> None:
-    """Seed harness-state/role-assignments.json and a minimal bridge/INDEX.md.
+def _seed_role_workspace(root: Path) -> None:
+    """Seed the minimal ``bridge/INDEX.md`` the transaction validator needs.
 
-    ``apply_role_switch`` validates the role artifact, the bridge artifact, and
-    (optionally) the session-state artifact before any write; this seeds the
-    first two so the transaction's validator chain passes.
+    WI-3342 IP-6: ``apply_role_switch`` validates the role artifact (the
+    DB-backed registry projection — already produced by ``gt harness register``
+    / ``activate``), the bridge artifact, and (optionally) the session-state
+    artifact before any write. The starting role map now comes from the DB via
+    ``_register_active(..., role=[...])``, so this helper only seeds the bridge
+    artifact.
     """
-    harnesses = {
-        hid: {"role": roles, "name": hid.lower()} for hid, roles in role_map.items()
-    }
-    role_path = root / "harness-state" / "role-assignments.json"
-    role_path.parent.mkdir(parents=True, exist_ok=True)
-    role_path.write_text(json.dumps({"harnesses": harnesses}), encoding="utf-8")
     index_path = root / "bridge" / "INDEX.md"
     index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text(
@@ -90,11 +99,20 @@ def _seed_role_workspace(root: Path, role_map: dict[str, list[str]]) -> None:
 
 
 def _read_role_map(root: Path) -> dict:
-    """Return the 'harnesses' object of the current role-assignments.json."""
+    """Return ``{harness_id: record}`` from the registry projection (WI-3342 IP-6).
+
+    The post-switch role surface is the DB-backed registry projection
+    ``harness-state/harness-registry.json`` (``harnesses`` is a LIST of unified
+    records), not the retired ``role-assignments.json``.
+    """
     data = json.loads(
-        (root / "harness-state" / "role-assignments.json").read_text(encoding="utf-8")
+        (root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8")
     )
-    return data["harnesses"]
+    return {
+        str(record["id"]): record
+        for record in data.get("harnesses", [])
+        if isinstance(record, dict) and record.get("id")
+    }
 
 
 # --- T-HC-1: register -------------------------------------------------------
@@ -197,9 +215,9 @@ def test_harness_set_role_promotes_and_demotes(tmp_path: Path) -> None:
     """FR9: set-role sets the target to prime-builder and the other harness to
     loyal-opposition; the role map is a valid partition after."""
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli")
-    _register_active(config, "B", "claude-code")
-    _seed_role_workspace(root, {"A": ["prime-builder"], "B": ["loyal-opposition"]})
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _register_active(config, "B", "claude-code", role=["loyal-opposition"])
+    _seed_role_workspace(root)
     result = _invoke(config, "set-role", "--harness", "B")
     assert result.exit_code == 0, result.output
     role_map = _read_role_map(root)
@@ -211,9 +229,9 @@ def test_harness_set_role_reassigns_prime_builder(tmp_path: Path) -> None:
     """GOV-HARNESS-ROLE-PORTABILITY-001: the role moves by durable harness id
     irrespective of harness_type — A and B carry distinct types."""
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli")
-    _register_active(config, "B", "claude-code")
-    _seed_role_workspace(root, {"A": ["prime-builder"], "B": ["loyal-opposition"]})
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _register_active(config, "B", "claude-code", role=["loyal-opposition"])
+    _seed_role_workspace(root)
     # Promote B (currently loyal-opposition) — prime-builder must move to it.
     assert _invoke(config, "set-role", "--harness", "B").exit_code == 0
     role_map = _read_role_map(root)
@@ -231,13 +249,11 @@ def test_harness_set_role_three_harness_demotes_all_non_targets(tmp_path: Path) 
     the sole prime-builder and demotes BOTH others — including a non-target
     whose prior role set was empty — to loyal-opposition."""
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli")
-    _register_active(config, "B", "claude-code")
-    _register_active(config, "C", "antigravity-cli")
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _register_active(config, "B", "claude-code", role=["loyal-opposition"])
     # C starts with an empty role set — the -006 F1 gap.
-    _seed_role_workspace(
-        root, {"A": ["prime-builder"], "B": ["loyal-opposition"], "C": []}
-    )
+    _register_active(config, "C", "antigravity-cli", role=[])
+    _seed_role_workspace(root)
     result = _invoke(config, "set-role", "--harness", "C")
     assert result.exit_code == 0, result.output
     role_map = _read_role_map(root)
@@ -250,30 +266,32 @@ def test_harness_set_role_rejects_non_active_harness(tmp_path: Path) -> None:
     """FR9 active-harness eligibility gate: a registered or suspended harness is
     rejected, and the role map is not mutated (fail closed before any write)."""
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli")
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
     # B is registered but never activated -> status 'registered'.
-    assert _invoke(config, "register", "--id", "B", "--name", "b", "--type", "claude-code").exit_code == 0
+    assert _invoke(
+        config, "register", "--id", "B", "--name", "b", "--type", "claude-code",
+        "--role", "loyal-opposition",
+    ).exit_code == 0
     # D is registered, activated, then suspended -> status 'suspended'.
-    _register_active(config, "D", "other-cli")
+    _register_active(config, "D", "other-cli", role=["loyal-opposition"])
     assert _invoke(config, "suspend", "--harness", "D").exit_code == 0
-    _seed_role_workspace(
-        root,
-        {"A": ["prime-builder"], "B": ["loyal-opposition"], "D": ["loyal-opposition"]},
-    )
-    role_path = root / "harness-state" / "role-assignments.json"
-    before = role_path.read_text(encoding="utf-8")
+    _seed_role_workspace(root)
+    # WI-3342 IP-6: the role map is the DB-backed registry projection; the
+    # eligibility gate failing closed means the projection's role records are
+    # unchanged by the rejected set-role.
+    roles_before = {hid: rec.get("role") for hid, rec in _read_role_map(root).items()}
     for non_active in ("B", "D"):
         result = _invoke(config, "set-role", "--harness", non_active)
         assert result.exit_code != 0, result.output
         assert "status" in result.output
     # The eligibility gate fails closed: no role-map write occurred.
-    assert role_path.read_text(encoding="utf-8") == before
+    assert {hid: rec.get("role") for hid, rec in _read_role_map(root).items()} == roles_before
 
 
 def test_harness_set_role_unknown_harness_rejected(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli")
-    _seed_role_workspace(root, {"A": ["prime-builder"]})
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _seed_role_workspace(root)
     result = _invoke(config, "set-role", "--harness", "ZZ")
     assert result.exit_code != 0
     assert "ZZ" in result.output
@@ -281,9 +299,9 @@ def test_harness_set_role_unknown_harness_rejected(tmp_path: Path) -> None:
 
 def test_harness_set_role_emits_single_prime_builder(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli")
-    _register_active(config, "B", "claude-code")
-    _seed_role_workspace(root, {"A": ["prime-builder"], "B": ["loyal-opposition"]})
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _register_active(config, "B", "claude-code", role=["loyal-opposition"])
+    _seed_role_workspace(root)
     result = _invoke(config, "set-role", "--harness", "B")
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)

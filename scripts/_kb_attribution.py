@@ -32,7 +32,6 @@ where the mutating variant raises. Mutating callers MUST NOT use the
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 
@@ -43,17 +42,30 @@ ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
 
 
 def _load_role_assignments() -> dict[str, dict[str, str]]:
-    """Load harness-state/role-assignments.json; return {} on absence."""
-    if not ROLE_ASSIGNMENTS_PATH.is_file():
-        return {}
-    return json.loads(ROLE_ASSIGNMENTS_PATH.read_text(encoding="utf-8")).get("harnesses", {})
+    """Load harness role assignments from the registry projection (WI-3342 IP-4).
+
+    Migrated from a direct read of ``harness-state/role-assignments.json`` to
+    the DB-backed registry projection via the foundational loader
+    ``scripts.harness_roles.load_role_assignments`` (itself projection-backed
+    since IP-3). Returns the ``{harness_id: {...}}`` mapping; ``{}`` on absence.
+    """
+    from scripts.harness_roles import load_role_assignments  # local: avoid cycle
+
+    return load_role_assignments(PROJECT_ROOT).get("harnesses", {})
 
 
 def _load_harness_identities() -> dict[str, dict[str, str]]:
-    """Load harness-state/harness-identities.json; return {} on absence."""
-    if not HARNESS_IDENTITIES_PATH.is_file():
-        return {}
-    return json.loads(HARNESS_IDENTITIES_PATH.read_text(encoding="utf-8")).get("harnesses", {})
+    """Load harness identities from the registry projection (WI-3342 IP-4).
+
+    Migrated from a direct read of ``harness-state/harness-identities.json`` to
+    the DB-backed registry projection via the foundational loader
+    ``scripts.harness_identity.load_harness_identities`` (itself
+    projection-backed since IP-3). Returns the ``{harness_name: {...}}``
+    mapping; ``{}`` on absence.
+    """
+    from scripts.harness_identity import load_harness_identities  # local: avoid cycle
+
+    return load_harness_identities(PROJECT_ROOT).get("harnesses", {})
 
 
 def _harness_id_for_name(harness_name: str) -> str | None:

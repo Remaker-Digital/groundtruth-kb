@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit hook — Project VERIFIED-completion AUQ surface.
+"""UserPromptSubmit hook - Project VERIFIED-completion automatic-transition trigger.
 
-IP-2 of WI-3316 (bridge thread ``gtkb-project-verified-completion-auq-trigger``).
+W1 of GTKB-GOVERNANCE-CORRECTION-S358 (WI-3365); originally IP-2 of WI-3316.
 
-An Axis-2 (non-dispatchable, interactive notification) surface. On each
-``UserPromptSubmit`` it runs the read-only project-verified-completion scanner;
-when a project authorization has become completion-ready (every included work
-item is covered by a bridge thread whose latest ``bridge/INDEX.md`` status is
-``VERIFIED``), it surfaces ONE such authorization per prompt as
-``additionalContext``, instructing the agent to confirm completion with the
-owner via ``AskUserQuestion``.
+An Axis-2 (interactive notification) surface. On each ``UserPromptSubmit`` it
+invokes ``ProjectLifecycleService.auto_complete_ready_authorizations()``: every
+active project authorization whose gating work items all have a VERIFIED bridge
+thread is transitioned to ``completed`` automatically, and its project is
+retired when it was the sole active authorization. When the pass completes one
+or more authorizations, the hook emits a notification of what was
+auto-completed and retired as ``additionalContext``.
 
-This hook never mutates state. The actual transition is performed only by
-``ProjectLifecycleService.complete_project_authorization()`` after owner
-confirmation; auto-transition is prohibited
-(``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001``).
+``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2: completion and retirement
+are automatic and require no owner ``AskUserQuestion`` confirmation - owner AUQ
+governs project START (authorization creation and approval), not completion.
+This hook is the prompt-time trigger plus owner-visible notification; the
+transition itself is performed by
+``ProjectLifecycleService.complete_project_authorization()``.
 
 This file is kept byte-identical between ``.claude/hooks/`` and
 ``.codex/gtkb-hooks/`` for Claude/Codex hook parity
 (``ADR-CODEX-HOOK-PARITY-FALLBACK-001``); ``parents[2]`` resolves the repo root
 from either location.
 
-Stdin:  JSON hook event payload.
-Stdout: empty (silent no-op) or a markdown additionalContext block.
+Stdin:  JSON hook event payload (consumed, not inspected).
+Stdout: empty (silent no-op) or a markdown additionalContext notification.
 Exit:   always 0 (fire-and-forget; the hook must never crash the agent).
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -33,7 +35,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -46,7 +47,6 @@ PROJECT_ROOT = Path(
     or Path(__file__).resolve().parents[2]
 ).resolve()
 
-STATE_DIR_REL = ".gtkb-state/project-completion-surface"
 ERRORS_LOG_REL = ".gtkb-state/project-completion-surface/errors.jsonl"
 
 
@@ -65,116 +65,84 @@ def _log_error(payload: dict[str, Any]) -> None:
         pass
 
 
-def _completion_ready_authorizations() -> list[Any]:
-    """Return completion-ready authorizations via the IP-1 scanner.
+def _auto_complete_ready_authorizations() -> list[dict[str, Any]]:
+    """Run the automatic project-completion transition via the lifecycle service.
 
-    Degrades to ``[]`` (silent no-op) if the scanner is unavailable or fails,
-    so the hook never blocks or crashes the agent.
+    Degrades to ``[]`` (silent no-op) if the service is unavailable or fails,
+    so the hook never blocks or crashes the agent. The transition is idempotent:
+    a completed authorization is no longer active and is not re-processed.
     """
     try:
-        scripts_dir = PROJECT_ROOT / "scripts"
-        if scripts_dir.is_dir() and str(scripts_dir) not in sys.path:
-            sys.path.insert(0, str(scripts_dir))
-        from project_verified_completion_scanner import completion_ready
+        gt_src = PROJECT_ROOT / "groundtruth-kb" / "src"
+        if gt_src.is_dir() and str(gt_src) not in sys.path:
+            sys.path.insert(0, str(gt_src))
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.project.lifecycle import ProjectLifecycleService
     except Exception as exc:
-        _log_error({"event": "scanner_unavailable", "error": str(exc)})
-        return []
-    try:
-        return completion_ready(PROJECT_ROOT)
-    except Exception as exc:
-        _log_error({"event": "scan_failed", "error": str(exc)})
+        _log_error({"event": "service_unavailable", "error": str(exc)})
         return []
 
-
-def _read_cache(cache_path: Path) -> dict[str, Any]:
+    db = None
     try:
-        return json.loads(cache_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {}
-
-
-def _write_cache(cache_path: Path, payload: dict[str, Any]) -> None:
-    """Atomic write via per-invocation temp + rename."""
-    try:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = cache_path.with_name(f"{cache_path.name}.{uuid.uuid4().hex[:8]}.tmp")
-        tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        tmp.replace(cache_path)
+        db = KnowledgeDB(PROJECT_ROOT / "groundtruth.db")
+        service = ProjectLifecycleService(db)
+        return service.auto_complete_ready_authorizations(project_root=PROJECT_ROOT)
     except Exception as exc:
-        _log_error({"event": "cache_write_failed", "error": str(exc), "path": str(cache_path)})
+        _log_error({"event": "auto_complete_failed", "error": str(exc)})
+        return []
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
-def _resolve_session_id(payload: dict[str, Any]) -> str:
-    """Per-session cache key; sanitized for filesystem safety."""
-    sid = str(payload.get("session_id") or "").strip()
-    if sid:
-        return "".join(c for c in sid if c.isalnum() or c in ("-", "_"))[:64] or "default"
-    return "default"
+def _render_notification(completed: list[dict[str, Any]]) -> str:
+    """Render the additionalContext markdown notification for the
+    auto-completed authorizations."""
+    lines = [
+        "### Project Completion Surface - Authorizations Auto-Completed",
+        "",
+        f"_Detected at {_now_iso()}._",
+        "",
+        f"{len(completed)} project authorization(s) reached VERIFIED-completion readiness and "
+        "were transitioned automatically. Per GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2, "
+        "project completion and retirement are automatic and require no owner confirmation.",
+        "",
+    ]
+    for item in completed:
+        retired = " - project retired (sole active authorization)" if item.get("project_retired") else ""
+        lines.append(
+            f"- Authorization `{item.get('authorization_id')}` "
+            f"(project `{item.get('project_id')}`) -> `completed`{retired}."
+        )
+    lines.append("")
+    lines.append("_Notification only - the transition has already been applied; no action is required._")
+    lines.append("")
+    return "\n".join(lines)
 
 
-def _render_surface(item: Any) -> str:
-    """Render the additionalContext markdown block for one ready authorization."""
-    included = ", ".join(item.included_work_item_ids) or "(none)"
-    return "\n".join(
-        [
-            "### Project Completion Surface — Authorization Ready for Owner Confirmation",
-            "",
-            f"_Detected at {_now_iso()}._",
-            "",
-            f"- Project authorization **{item.authorization_id}** "
-            f"(project `{item.project_id}` — {item.authorization_name}) is "
-            "**completion-ready**: every included work item "
-            f"({included}) is covered by a VERIFIED bridge thread.",
-            "",
-            "**Action:** confirm with the owner via `AskUserQuestion` whether to "
-            f"transition `{item.authorization_id}` to `completed` (and retire "
-            f"`{item.project_id}` if it is the sole active authorization). On owner "
-            "approval, archive the owner-decision deliberation with the project or "
-            "authorization id in its content, then call "
-            "`ProjectLifecycleService.complete_project_authorization()`. "
-            "Do NOT auto-transition without owner confirmation.",
-            "",
-        ]
-    )
+def _user_prompt_handler() -> str:
+    """UserPromptSubmit entry point. Returns markdown to inject (empty = silent).
 
-
-def _user_prompt_handler(stdin_text: str) -> str:
-    """UserPromptSubmit entry point. Returns markdown to inject (empty = silent)."""
+    The auto-completion pass does not depend on the prompt payload.
+    """
     if os.environ.get(ENV_DISABLE) == "1":
         return ""
-    try:
-        payload = json.loads(stdin_text or "{}")
-    except json.JSONDecodeError:
+    completed = _auto_complete_ready_authorizations()
+    if not completed:
         return ""
-
-    session_id = _resolve_session_id(payload)
-    cache_path = PROJECT_ROOT / STATE_DIR_REL / f"{session_id}.json"
-
-    ready = _completion_ready_authorizations()
-    if not ready:
-        return ""
-
-    cache = _read_cache(cache_path)
-    surfaced = set(cache.get("surfaced_authorization_ids") or [])
-    pending = [r for r in ready if r.authorization_id not in surfaced]
-    if not pending:
-        return ""
-
-    item = pending[0]  # one-at-a-time, oldest (project/id-sorted) first
-    cache["surfaced_authorization_ids"] = sorted(surfaced | {item.authorization_id})
-    cache["last_surfaced_at"] = _now_iso()
-    cache["session_id"] = session_id
-    _write_cache(cache_path, cache)
-    return _render_surface(item)
+    return _render_notification(completed)
 
 
 def main() -> int:
     try:
-        stdin_text = sys.stdin.read()
+        sys.stdin.read()  # consume the hook payload; it is not inspected
     except Exception:
-        stdin_text = ""
+        pass
     try:
-        output = _user_prompt_handler(stdin_text)
+        output = _user_prompt_handler()
     except Exception as exc:
         _log_error({"event": "handler_crashed", "error": str(exc)})
         output = ""

@@ -29,9 +29,25 @@ ssi = importlib.import_module("session_self_initialization")
 
 
 def _write_role_map(root: Path, role_map: dict[str, Any]) -> None:
-    role_map_path = root / "harness-state" / "role-assignments.json"
-    role_map_path.parent.mkdir(parents=True, exist_ok=True)
-    role_map_path.write_text(json.dumps(role_map, indent=2) + "\n", encoding="utf-8")
+    """Seed the harness registry projection (WI-3342 IP-3/IP-4).
+
+    ``_render_current_project_state`` resolves the role map through
+    ``load_role_assignments``, migrated to read the DB-backed registry
+    projection ``harness-state/harness-registry.json`` (``harnesses`` is a LIST
+    of unified records each carrying ``id`` + ``role``). This helper accepts
+    the legacy ``{"harnesses": {harness_id: record}}`` dict input and writes
+    the equivalent projection LIST so each test's verification intent — the
+    rendered role-slot / topology line — is preserved.
+    """
+    harnesses_in = role_map.get("harnesses", {})
+    records = [
+        {"id": harness_id, **record} for harness_id, record in harnesses_in.items()
+    ]
+    registry_path = root / "harness-state" / "harness-registry.json"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text(
+        json.dumps({"harnesses": records}, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def _make_model(
@@ -217,8 +233,9 @@ def test_topology_label_canonical_fail_closed_for_missing_role_map_file(project_
     so the canonical helpers' fail-closed semantics (``multi_harness`` /
     ``shared``) survive.
     """
-    # No role-map file is written; the path does not exist.
-    assert not (project_root / "harness-state" / "role-assignments.json").exists()
+    # No role-map file is written; the path does not exist. WI-3342 IP-3/IP-4:
+    # the role-map file the render path reads is the registry projection.
+    assert not (project_root / "harness-state" / "harness-registry.json").exists()
     model = _make_model(role={"harness_id": "B"})
     rendered = ssi._render_current_project_state(model)
     assert "Harness topology: `multi_harness`" in rendered
@@ -235,10 +252,13 @@ def test_topology_label_canonical_fail_closed_for_malformed_role_map_json(
     JSON decode failure must yield an empty role_map dict passed through the
     canonical helper, returning ``multi_harness`` / ``shared`` per the helper's
     fail-closed contract.
+
+    WI-3342 IP-3/IP-4: the role-map file the render path reads is the registry
+    projection ``harness-state/harness-registry.json``.
     """
-    role_map_path = project_root / "harness-state" / "role-assignments.json"
-    role_map_path.parent.mkdir(parents=True, exist_ok=True)
-    role_map_path.write_text("{not valid json,,,", encoding="utf-8")
+    registry_path = project_root / "harness-state" / "harness-registry.json"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("{not valid json,,,", encoding="utf-8")
     model = _make_model(role={"harness_id": "B"})
     rendered = ssi._render_current_project_state(model)
     assert "Harness topology: `multi_harness`" in rendered

@@ -40,18 +40,22 @@ def test_validate_role_artifact_missing_file_fails(project_root: Path) -> None:
 
 
 def test_validate_role_artifact_parseable_passes(project_root: Path) -> None:
+    # WI-3342 IP-5: validate_role_artifact reads the DB-backed registry
+    # projection (harness-state/harness-registry.json), whose ``harnesses`` is a
+    # LIST of unified records, not the retired role-assignments.json dict.
     _write(
-        project_root / "harness-state" / "role-assignments.json",
-        json.dumps({"harnesses": {"A": {"role": ["prime-builder"]}}}),
+        project_root / "harness-state" / "harness-registry.json",
+        json.dumps({"harnesses": [{"id": "A", "role": ["prime-builder"]}]}),
     )
     result = validate_role_artifact(project_root)
     assert result.is_valid
 
 
 def test_validate_role_artifact_unknown_token_fails(project_root: Path) -> None:
+    # WI-3342 IP-5: validate_role_artifact reads the registry projection LIST.
     _write(
-        project_root / "harness-state" / "role-assignments.json",
-        json.dumps({"harnesses": {"A": {"role": ["mystery-role"]}}}),
+        project_root / "harness-state" / "harness-registry.json",
+        json.dumps({"harnesses": [{"id": "A", "role": ["mystery-role"]}]}),
     )
     result = validate_role_artifact(project_root)
     assert not result.is_valid
