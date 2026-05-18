@@ -17,19 +17,45 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-antigravity-related-bridge-threads-backfill
+VERIFIED: bridge/gtkb-antigravity-related-bridge-threads-backfill-006.md
+NEW: bridge/gtkb-antigravity-related-bridge-threads-backfill-005.md
+GO: bridge/gtkb-antigravity-related-bridge-threads-backfill-004.md
+REVISED: bridge/gtkb-antigravity-related-bridge-threads-backfill-003.md
+NO-GO: bridge/gtkb-antigravity-related-bridge-threads-backfill-002.md
+NEW: bridge/gtkb-antigravity-related-bridge-threads-backfill-001.md
+
+Document: gtkb-antigravity-ide-research-spike
+VERIFIED: bridge/gtkb-antigravity-ide-research-spike-004.md
+NEW: bridge/gtkb-antigravity-ide-research-spike-003.md
+GO: bridge/gtkb-antigravity-ide-research-spike-002.md
+NEW: bridge/gtkb-antigravity-ide-research-spike-001.md
+
 Document: gtkb-bridge-scheduler-lanes-leases-slice-6
+VERIFIED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-6-004.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-6-003.md
 GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-6-002.md
 NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-6-001.md
 
 Document: gtkb-bridge-scheduler-lanes-leases-slice-5
+VERIFIED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-006.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-005.md
+GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-004.md
+REVISED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-003.md
 NO-GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-002.md
 NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-001.md
 
 Document: gtkb-bridge-scheduler-lanes-leases-slice-4
+VERIFIED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-4-004.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-4-003.md
 GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-4-002.md
 NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-4-001.md
 
 Document: gtkb-bridge-scheduler-lanes-leases-slice-3
+VERIFIED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-006.md
+REVISED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-005.md
+NO-GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-004.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-003.md
 GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-002.md
 NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-001.md
 
@@ -44,6 +70,10 @@ GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-001.md
 
 Document: gtkb-s358-w3-requirements-collection-hook-title-fix
+GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-010.md
+REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-009.md
+NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-008.md
+NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-007.md
 GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-006.md
 REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-005.md
 NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-004.md
@@ -52,6 +82,11 @@ NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-002.md
 NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-001.md
 
 Document: gtkb-s358-w2-agent-red-gov-trio-v2
+VERIFIED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-014.md
+REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-013.md
+GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-012.md
+REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-011.md
+NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-010.md
 NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-009.md
 GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-008.md
 REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-007.md
@@ -63,6 +98,10 @@ NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-002.md
 NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-001.md
 
 Document: gtkb-s358-w1-retirement-machinery-correction
+NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-017.md
+REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-016.md
+NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-015.md
+REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-014.md
 NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-013.md
 REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-012.md
 NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-011.md
@@ -96,6 +135,10 @@ NO-GO: bridge/gtkb-s358-w4-enforcement-calibration-002.md
 NEW: bridge/gtkb-s358-w4-enforcement-calibration-001.md
 
 Document: gtkb-adr-harness-registry-extension
+VERIFIED: bridge/gtkb-adr-harness-registry-extension-008.md
+REVISED: bridge/gtkb-adr-harness-registry-extension-007.md
+NO-GO: bridge/gtkb-adr-harness-registry-extension-006.md
+NEW: bridge/gtkb-adr-harness-registry-extension-005.md
 GO: bridge/gtkb-adr-harness-registry-extension-004.md
 REVISED: bridge/gtkb-adr-harness-registry-extension-003.md
 NO-GO: bridge/gtkb-adr-harness-registry-extension-002.md
