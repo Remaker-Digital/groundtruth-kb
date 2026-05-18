@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-05-15T17:10:32Z
+Generated: 2026-05-18T00:42:12Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8)
 
 ## Project
@@ -13,7 +13,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986
 ## Redaction
 
 - Status: pass
-- Sensitive local environment entries detected: 2
+- Sensitive local environment entries detected: 1
 - Public output excludes raw credential values, local-only key names, and absolute local paths.
 
 ## Toolchain
@@ -34,8 +34,8 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986
 
 - Harness identity source present: True
 - Role assignment source present: True
-- Skills: 30
-- Claude hooks: 24
+- Skills: 32
+- Claude hooks: 25
 - Codex hooks: 13
 - GitHub workflows: 16
 - MCP config: local_only presence only

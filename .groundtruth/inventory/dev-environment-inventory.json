@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-15T17:10:32Z",
+  "generated_at": "2026-05-18T00:42:12Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -101,19 +101,20 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 2,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 24,
+      "count": 25,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-axis-2-surface.py",
         ".claude/hooks/bridge-compliance-gate.py",
+        ".claude/hooks/bridge-stop-drain.py",
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/delib-preflight-gate.py",
         ".claude/hooks/destructive-gate.py",
@@ -222,7 +223,7 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 30,
+      "count": 32,
       "items": [
         "alternatives-investigation",
         "arch-audit",
@@ -246,6 +247,7 @@
         "kb-session-wrap-scan",
         "kb-spec",
         "kb-work-item",
+        "lo-opportunity-radar",
         "projects",
         "proposal-review",
         "release-candidate-gate",
@@ -253,7 +255,8 @@
         "seed-tenant",
         "send-review",
         "spec-intake",
-        "structural-hygiene-review"
+        "structural-hygiene-review",
+        "verify"
       ]
     }
   },
