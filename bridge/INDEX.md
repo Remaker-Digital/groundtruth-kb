@@ -18,6 +18,7 @@
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 Document: gtkb-bridge-scheduler-lanes-leases-slice-2
+VERIFIED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-004.md
 NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-003.md
 GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-002.md
 NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-001.md
