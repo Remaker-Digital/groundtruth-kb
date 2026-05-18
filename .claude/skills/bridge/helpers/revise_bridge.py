@@ -391,6 +391,16 @@ def file_revision(
             raise
     finally:
         candidate_path.unlink(missing_ok=True)
+    # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
+    try:
+        import sys as _sys
+        _trim_scripts = str(bridge_root.parent / "scripts")
+        if _trim_scripts not in _sys.path:
+            _sys.path.insert(0, _trim_scripts)
+        from bridge_index_archival import maybe_archive_and_prune_index as _trim
+        _trim(bridge_root.parent, current_thread=slug)
+    except Exception:  # noqa: BLE001 - archival must never fail a bridge write
+        pass
     return live_path
 
 

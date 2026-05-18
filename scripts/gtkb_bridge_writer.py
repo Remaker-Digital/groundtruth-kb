@@ -312,3 +312,13 @@ def insert_index_status(
             f"{status}:{version:03d} for {document_name}, got "
             f"{block.latest_status if block else None}:{block.latest_version if block else None}"
         )
+    # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
+    try:
+        import sys as _sys
+        _trim_scripts = str(project_root / "scripts")
+        if _trim_scripts not in _sys.path:
+            _sys.path.insert(0, _trim_scripts)
+        from bridge_index_archival import maybe_archive_and_prune_index as _trim
+        _trim(project_root, current_thread=document_name)
+    except Exception:  # noqa: BLE001 - archival must never fail a bridge write
+        pass

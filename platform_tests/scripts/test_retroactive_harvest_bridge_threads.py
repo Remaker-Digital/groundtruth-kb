@@ -293,6 +293,15 @@ class _StubDB:
 
     def __init__(self) -> None:
         self.rows: list[dict] = []
+        # WI-3364: active project authorizations for the authorization-aware
+        # prune skip. Empty by default so pre-WI-3364 tests are unaffected.
+        self.authorizations: list[dict] = []
+
+    def list_project_authorizations(self, project_id=None, *, status=None, include_terminal=False, **_):
+        out = self.authorizations
+        if status is not None:
+            out = [a for a in out if a.get("status") == status]
+        return list(out)
 
     def list_deliberations(self, *, source_type=None, source_ref=None, **_):
         out = self.rows

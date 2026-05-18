@@ -800,6 +800,16 @@ def propose_bridge(
     for attempt in range(1, max_attempts + 1):
         try:
             _update_bridge_index(index_path, new_entry, topic_slug=topic_slug)
+            # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
+            try:
+                import sys as _sys
+                _trim_scripts = str(bridge_root.parent / "scripts")
+                if _trim_scripts not in _sys.path:
+                    _sys.path.insert(0, _trim_scripts)
+                from bridge_index_archival import maybe_archive_and_prune_index as _trim
+                _trim(bridge_root.parent, current_thread=topic_slug)
+            except Exception:  # noqa: BLE001 - archival must never fail a bridge write
+                pass
             return bridge_file
         except BridgeIndexConflictError as exc:
             last_error = exc

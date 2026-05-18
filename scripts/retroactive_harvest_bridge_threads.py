@@ -61,6 +61,19 @@ _HEADER_COMMENT_KEEPERS = (
 _COMMENT_COMPACTION_THRESHOLD_BYTES = 8_000
 _COMMENT_COMPACTION_THRESHOLD_LINES = 12
 
+# WI-3364: GT-KB bridge threads are GT-KB platform artifacts; archive them with
+# GT-KB origin metadata, not the Agent Red origin previously hard-coded.
+_ARCHIVE_ORIGIN_PROJECT = "groundtruth-kb"
+_ARCHIVE_ORIGIN_REPO = "Remaker-Digital/groundtruth-kb"
+
+# WI-3364: Work Item metadata line in a bridge version file. Mirrors the
+# pattern in scripts/project_verified_completion_scanner.py so the prune's
+# notion of a thread's work items matches the completion scanner's.
+_WORK_ITEM_LINE_RE = re.compile(
+    r"^Work Item:\s*`?(WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
+    re.MULTILINE,
+)
+
 
 # ---------------------------------------------------------------------------
 # Thread identity
@@ -310,17 +323,24 @@ def compute_active_bridge_thread_coverage(
 # ---------------------------------------------------------------------------
 
 
-def _write_pruned_index(index_path: Path, archived_thread_names: set[str]) -> int:
+def _write_pruned_index(index_path: Path, archived_thread_names: set[str]) -> tuple[int, bool]:
     """Remove archived VERIFIED document entries from bridge/INDEX.md.
 
     Bridge files are never deleted. Only the active coordination entry is
     removed after the corresponding compressed thread row exists in the
     Deliberation Archive.
+
+    Returns ``(removed_block_count, skipped_concurrent_index_change)``. WI-3364:
+    bridge/INDEX.md is re-read immediately before the write; if it changed
+    since the snapshot taken at the start of this call, the write is skipped
+    and ``skipped_concurrent_index_change`` is ``True`` so an event-driven
+    prune never overwrites a concurrent bridge status insertion.
     """
     if not archived_thread_names or not index_path.exists():
-        return 0
+        return 0, False
 
-    lines = index_path.read_text(encoding="utf-8").splitlines()
+    snapshot = index_path.read_text(encoding="utf-8")
+    lines = snapshot.splitlines()
     kept: list[str] = []
     removed = 0
     i = 0
@@ -357,8 +377,11 @@ def _write_pruned_index(index_path: Path, archived_thread_names: set[str]) -> in
                 blank_run += 1
                 if blank_run <= 2:
                     compact.append(line)
+        if index_path.read_text(encoding="utf-8") != snapshot:
+            # WI-3364: a concurrent bridge write landed; skip rather than clobber.
+            return 0, True
         index_path.write_text("\n".join(compact).rstrip() + "\n", encoding="utf-8")
-    return removed
+    return removed, False
 
 
 def _comment_marker(block_text: str) -> str:
@@ -477,8 +500,23 @@ def _compact_index_comments(index_path: Path, db) -> dict:
 
     if not removed_lines:
         if compacted_text != original:
+            if index_path.read_text(encoding="utf-8") != original:
+                # WI-3364: a concurrent bridge write landed; skip rather than clobber.
+                return {
+                    "compacted_blocks": 0,
+                    "removed_comment_lines": 0,
+                    "removed_bytes": 0,
+                    "archive_id": None,
+                    "skipped_concurrent_index_change": True,
+                }
             index_path.write_text(compacted_text, encoding="utf-8")
-        return {"compacted_blocks": 0, "removed_comment_lines": 0, "removed_bytes": 0, "archive_id": None}
+        return {
+            "compacted_blocks": 0,
+            "removed_comment_lines": 0,
+            "removed_bytes": 0,
+            "archive_id": None,
+            "skipped_concurrent_index_change": False,
+        }
 
     timestamp = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     archive = db.upsert_deliberation_source(
@@ -491,19 +529,76 @@ def _compact_index_comments(index_path: Path, db) -> dict:
             f"{removed_lines} historical comment line(s) from startup context."
         ),
         outcome="informational",
-        origin_project="agent-red",
-        origin_repo="Remaker-Digital/agent-red-customer-engagement",
+        origin_project=_ARCHIVE_ORIGIN_PROJECT,
+        origin_repo=_ARCHIVE_ORIGIN_REPO,
         changed_by="retroactive_harvest_bridge_threads.py",
         change_reason="Owner-authorized startup pruning of oversized bridge/INDEX.md comment history",
     )
     archive_id = archive.get("id") if isinstance(archive, dict) else None
+    if index_path.read_text(encoding="utf-8") != original:
+        # WI-3364: a concurrent bridge write landed; skip rather than clobber.
+        return {
+            "compacted_blocks": 0,
+            "removed_comment_lines": 0,
+            "removed_bytes": 0,
+            "archive_id": archive_id,
+            "skipped_concurrent_index_change": True,
+        }
     index_path.write_text(compacted_text, encoding="utf-8")
     return {
         "compacted_blocks": compacted_blocks,
         "removed_comment_lines": removed_lines,
         "removed_bytes": removed_bytes,
         "archive_id": archive_id,
+        "skipped_concurrent_index_change": False,
     }
+
+
+def _included_authorization_work_item_ids(authorization: dict) -> list[str]:
+    """Return the work-item ids an authorization includes.
+
+    Mirrors ``scripts/project_verified_completion_scanner.py._included_work_item_ids``:
+    prefers the pre-parsed list, else JSON-decodes the raw field.
+    """
+    parsed = authorization.get("included_work_item_ids_parsed")
+    if isinstance(parsed, list):
+        return [str(value) for value in parsed]
+    raw = authorization.get("included_work_item_ids")
+    if not raw:
+        return []
+    try:
+        decoded = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return [str(value) for value in decoded] if isinstance(decoded, list) else []
+
+
+def _active_authorization_work_items(db) -> set[str]:
+    """Return every work-item id included in an active project authorization.
+
+    WI-3364: a VERIFIED bridge thread covering one of these work items must not
+    be pruned from live ``bridge/INDEX.md`` while the authorization is still
+    active, because project-completion readiness is derived from live-INDEX
+    VERIFIED coverage. Errors propagate so a best-effort caller skips the whole
+    prune rather than pruning with no protection.
+    """
+    work_items: set[str] = set()
+    for authorization in db.list_project_authorizations(status="active"):
+        work_items.update(_included_authorization_work_item_ids(authorization))
+    return work_items
+
+
+def _thread_work_items(record: ThreadRecord) -> set[str]:
+    """Return the Work Item ids cited by any version file of a bridge thread."""
+    work_items: set[str] = set()
+    for version_path in record.versions:
+        try:
+            text = version_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for match in _WORK_ITEM_LINE_RE.finditer(text):
+            work_items.add(match.group(1).strip())
+    return work_items
 
 
 def archive_verified_threads_and_prune_index(
@@ -511,16 +606,46 @@ def archive_verified_threads_and_prune_index(
     index_path: Path = BRIDGE_INDEX,
     bridge_dir: Path = BRIDGE_DIR,
     kb_path: str | None = None,
+    exclude_threads: frozenset[str] = frozenset(),
 ) -> dict:
     """Archive active VERIFIED bridge threads, then remove them from INDEX.
 
     This is intentionally stricter than ``run_sweep(execute=True)``: it only
     touches active INDEX entries whose latest status is VERIFIED. GO, NO-GO,
     NEW, REVISED, and orphan bridge files are left alone.
+
+    WI-3364: two safety filters run before archival/pruning. ``exclude_threads``
+    drops the bridge thread of an in-progress write, so an event-driven prune
+    never archives-and-prunes the thread it just wrote. The authorization-aware
+    filter drops any VERIFIED thread whose ``Work Item:`` metadata is included
+    in an active project authorization, so pruning cannot remove the
+    completion-readiness evidence a not-yet-completed authorization still needs
+    from live ``bridge/INDEX.md``.
     """
     records = collect_compressed_bridge_threads(index_path, bridge_dir)
-    verified_records = [r for r in records if r.active and r.latest_status == "VERIFIED"]
+    verified_records_all = [r for r in records if r.active and r.latest_status == "VERIFIED"]
     db = _load_db(kb_path)
+
+    # WI-3364 IP-1: never archive-and-prune the in-progress write's own thread.
+    excluded_current = sorted(
+        r.thread_name for r in verified_records_all if r.thread_name in exclude_threads
+    )
+    verified_records = [r for r in verified_records_all if r.thread_name not in exclude_threads]
+
+    # WI-3364 IP-2: never archive-and-prune a VERIFIED thread whose work item an
+    # active project authorization still depends on for completion readiness.
+    protected_work_items = _active_authorization_work_items(db)
+    protected_skipped: list[str] = []
+    if protected_work_items:
+        eligible: list[ThreadRecord] = []
+        for rec in verified_records:
+            if _thread_work_items(rec) & protected_work_items:
+                protected_skipped.append(rec.thread_name)
+            else:
+                eligible.append(rec)
+        verified_records = eligible
+    protected_skipped.sort()
+
     existing_rows = db.list_deliberations(source_type="bridge_thread")
 
     archived_thread_names: set[str] = set()
@@ -552,8 +677,8 @@ def archive_verified_threads_and_prune_index(
                 title=title,
                 summary=summary,
                 outcome="go",
-                origin_project="agent-red",
-                origin_repo="Remaker-Digital/agent-red-customer-engagement",
+                origin_project=_ARCHIVE_ORIGIN_PROJECT,
+                origin_repo=_ARCHIVE_ORIGIN_REPO,
                 changed_by="retroactive_harvest_bridge_threads.py",
                 change_reason=(
                     "Owner-authorized startup maintenance: archive VERIFIED "
@@ -570,7 +695,7 @@ def archive_verified_threads_and_prune_index(
         except Exception as exc:  # noqa: BLE001 - keep unarchived entries visible
             failed.append(f"{rec.thread_name}: {exc}")
 
-    pruned = _write_pruned_index(index_path, archived_thread_names)
+    pruned, prune_skipped_concurrent = _write_pruned_index(index_path, archived_thread_names)
     try:
         comment_compaction = _compact_index_comments(index_path, db)
     except Exception as exc:  # noqa: BLE001 - index comments remain if archival/compaction fails
@@ -582,10 +707,15 @@ def archive_verified_threads_and_prune_index(
             "error": str(exc),
         }
     return {
-        "verified_threads_seen": len(verified_records),
+        "verified_threads_seen": len(verified_records_all),
+        "verified_threads_eligible": len(verified_records),
+        "excluded_current_thread": excluded_current,
+        "protected_authorization_skipped": protected_skipped,
         "already_archived": already_archived,
         "inserted": inserted,
         "pruned_from_index": pruned,
+        "concurrent_index_change_skipped": bool(prune_skipped_concurrent)
+        or bool(comment_compaction.get("skipped_concurrent_index_change")),
         "comment_compaction": comment_compaction,
         "failed_count": len(failed),
         "failed": failed,
@@ -678,8 +808,8 @@ def run_sweep(
                     title=title,
                     summary=summary,
                     outcome=outcome,
-                    origin_project="agent-red",
-                    origin_repo="Remaker-Digital/agent-red-customer-engagement",
+                    origin_project=_ARCHIVE_ORIGIN_PROJECT,
+                    origin_repo=_ARCHIVE_ORIGIN_REPO,
                     changed_by="retroactive_harvest_bridge_threads.py",
                     change_reason="Retroactive thread-compressed DA harvest (bridge gtkb-da-harvest-coverage-implementation-005)",
                 )
