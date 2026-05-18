@@ -48,6 +48,21 @@ SEED_CHANGE_REASON = (
     "2026-05-16 (WI-3342 Slice A)."
 )
 
+# WI-3344 IP-3: a fresh install must seed invocation_surfaces so the
+# registry-driven cross-harness trigger can dispatch the seeded harnesses
+# without any code-side fallback. Keyed by resolved harness type; the headless
+# argv template uses the {{PROMPT}} / {{PROJECT_ROOT}} placeholder tokens that
+# cross_harness_bridge_trigger._harness_command substitutes as individual argv
+# elements. Unknown harness types seed with no invocation_surfaces.
+_SEED_INVOCATION_SURFACES: dict[str, dict[str, Any]] = {
+    "codex": {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}},
+    "claude": {
+        "headless": {
+            "argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]
+        }
+    },
+}
+
 
 def _load_json_object(path: Path) -> dict[str, Any]:
     """Load a JSON object from ``path``; return an empty dict on any failure."""
@@ -96,12 +111,14 @@ def read_legacy_harnesses(project_root: Path) -> list[dict[str, Any]]:
                 continue
             harness_type = str(record.get("harness_type") or "").strip()
             harness_name = id_to_name.get(hid) or harness_type or hid
+            resolved_type = harness_type or harness_name
             descriptors.append(
                 {
                     "id": hid,
                     "harness_name": harness_name,
-                    "harness_type": harness_type or harness_name,
+                    "harness_type": resolved_type,
                     "role": _normalize_role(record.get("role")),
+                    "invocation_surfaces": _SEED_INVOCATION_SURFACES.get(resolved_type.strip().lower()),
                 }
             )
     return descriptors
@@ -138,6 +155,7 @@ def seed_harness_registry(
             changed_by=changed_by,
             change_reason=SEED_CHANGE_REASON,
             status=SEED_STATUS,
+            invocation_surfaces=descriptor.get("invocation_surfaces"),
         )
         seeded.append(harness_id)
     projection_path = generate_harness_projection(db, project_root)

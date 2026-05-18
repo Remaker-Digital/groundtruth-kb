@@ -59,6 +59,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+# WI-3344: the function-level ``import harness_projection_reader`` in
+# _resolve_dispatch_target resolves a sibling module under scripts/. A bare
+# ``python scripts/cross_harness_bridge_trigger.py`` hook invocation puts
+# scripts/ on sys.path[0] automatically, but importlib loading (tests) and
+# ``python -m`` do not — so ensure this script's own directory is on sys.path
+# before that import runs.
+_TRIGGER_DIR = str(Path(__file__).resolve().parent)
+if _TRIGGER_DIR not in sys.path:
+    sys.path.insert(0, _TRIGGER_DIR)
+
+# WI-3360: the lazy ``import groundtruth_kb`` calls in the dispatch/detection
+# paths require ``groundtruth-kb/src`` on sys.path. The PostToolUse/Stop hook
+# registrations run ``python scripts/cross_harness_bridge_trigger.py`` without
+# PYTHONPATH set, so those imports raised ``ModuleNotFoundError: No module
+# named 'groundtruth_kb'`` and the trigger could not dispatch. Add the package
+# root alongside the sibling-scripts bootstrap above.
+_PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src")
+if _PACKAGE_SRC not in sys.path:
+    sys.path.insert(0, _PACKAGE_SRC)
+
 # Manual-disable env var. When set to "1", this script no-ops immediately.
 # Used as an OPERATOR opt-out (debugging, emergency stop, test harness),
 # NOT as automatic loop prevention.
@@ -454,29 +474,41 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
 
 
 def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) -> list[str] | None:
-    """Build the recipient harness invocation command.
+    """Build the recipient harness invocation command, data-driven from the
+    harness-registry projection.
 
-    Per IP-3b: switches on ``target.command_handle`` (from durable identity
-    record), not on a hardcoded recipient name. Supports both directions:
-    Claude (any role) or Codex (any role).
+    Per WI-3344 / REQ-HARNESS-REGISTRY-001 FR8 / DELIB-2079 Q9: the command is
+    built solely from ``target.invocation_surfaces``. Its ``headless`` entry
+    carries an ordered ``argv`` template whose elements are literal strings or
+    the placeholder tokens ``{{PROMPT}}`` and ``{{PROJECT_ROOT}}``, each
+    substituted as a single individual argv element. No shell is invoked and no
+    per-harness command branch is hard-coded.
 
-    - ``command_handle == "codex"``  → ``codex exec <prompt> --cd <root>``
-    - ``command_handle == "claude"`` → ``claude -p <prompt> --add-dir <root> --output-format json``
-    - other                         → None (unknown command handle)
+    Fails closed to ``None`` ("unknown_recipient") for EVERY harness — Claude
+    and Codex included — when ``invocation_surfaces`` is missing, has no
+    ``headless`` entry, or carries a malformed ``argv`` (absent, empty, not a
+    list, or containing a non-string element).
     """
-    if target.command_handle == "codex":
-        return ["codex", "exec", prompt, "--cd", str(project_root)]
-    if target.command_handle == "claude":
-        return [
-            "claude",
-            "-p",
-            prompt,
-            "--add-dir",
-            str(project_root),
-            "--output-format",
-            "json",
-        ]
-    return None
+    surfaces = target.invocation_surfaces
+    if not isinstance(surfaces, dict):
+        return None
+    headless = surfaces.get("headless")
+    if not isinstance(headless, dict):
+        return None
+    argv_template = headless.get("argv")
+    if not isinstance(argv_template, list) or not argv_template:
+        return None
+    command: list[str] = []
+    for element in argv_template:
+        if not isinstance(element, str):
+            return None
+        if element == "{{PROMPT}}":
+            command.append(prompt)
+        elif element == "{{PROJECT_ROOT}}":
+            command.append(str(project_root))
+        else:
+            command.append(element)
+    return command
 
 
 # ---------------------------------------------------------------------------
@@ -551,6 +583,7 @@ class DispatchTarget:
     harness_id: str  # "A", "B", etc. — durable identity from harness-identities.json
     command_handle: str  # "claude" / "codex" — from inverted harness-identities.json
     canonical_mode: str  # "pb" / "lo" — the canonical-init-keyword mode
+    invocation_surfaces: dict[str, Any] | None = None  # WI-3344: headless argv template from the harness-registry projection; None when the projection carries no record for this harness
 
     @property
     def active_session_lock_name(self) -> str:
@@ -700,11 +733,27 @@ def _resolve_dispatch_target(needed_role_label: str, project_root: Path) -> Disp
             f"for harness ID {harness_id!r}"
         )
 
+    # WI-3344 (REQ-HARNESS-REGISTRY-001 FR8, DELIB-2079 Q9): attach the
+    # harness record's invocation_surfaces from the registry projection so
+    # _harness_command builds the dispatch argv data-driven, with no
+    # hard-coded per-harness branch.
+    from harness_projection_reader import load_harness_projection
+
+    projection = load_harness_projection(project_root)
+    invocation_surfaces: dict[str, Any] | None = None
+    for record in projection.get("harnesses", []):
+        if record.get("id") == harness_id:
+            surfaces = record.get("invocation_surfaces")
+            if isinstance(surfaces, dict):
+                invocation_surfaces = surfaces
+            break
+
     return DispatchTarget(
         needed_role_label=needed_role_label,
         harness_id=harness_id,
         command_handle=identity_handle,
         canonical_mode=mode,
+        invocation_surfaces=invocation_surfaces,
     )
 
 

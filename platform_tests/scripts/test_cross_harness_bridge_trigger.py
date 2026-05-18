@@ -27,6 +27,18 @@ import pytest
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
 
+# WI-3344: invocation_surfaces headless argv templates. {{PROMPT}} and
+# {{PROJECT_ROOT}} are the placeholder tokens _harness_command substitutes as
+# individual argv elements. Shared by the synthetic fixture and the FR8 tests.
+_CODEX_INVOCATION_SURFACES = {
+    "headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}
+}
+_CLAUDE_INVOCATION_SURFACES = {
+    "headless": {
+        "argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]
+    }
+}
+
 
 def _frozen_pending_signature(items: list[object]) -> str:
     """Frozen byte-identical reference for the retired smart-poller's
@@ -114,6 +126,34 @@ def _make_synthetic_project(root: Path) -> Path:
                     "B": {"role": "prime-builder", "harness_type": "claude"},
                     "A": {"role": "loyal-opposition", "harness_type": "codex"},
                 },
+            }
+        ),
+        encoding="utf-8",
+    )
+    # WI-3344: a multi-harness registry projection so the now-fallback-free
+    # _harness_command can build dispatch argv for A (codex) and B (claude).
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "role": ["loyal-opposition"],
+                        "invocation_surfaces": _CODEX_INVOCATION_SURFACES,
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "role": ["prime-builder"],
+                        "invocation_surfaces": _CLAUDE_INVOCATION_SURFACES,
+                    },
+                ],
             }
         ),
         encoding="utf-8",
@@ -572,6 +612,7 @@ def test_dispatched_child_env_does_not_inherit_disable_var(
         harness_id="A",
         command_handle="codex",
         canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
     )
     meta = trigger._spawn_harness(
         target=lo_target,
@@ -1244,3 +1285,88 @@ def test_dispatch_decision_unchanged_with_instrumentation(tmp_path: Path) -> Non
             assert leaked not in rec, f"diagnostic field {leaked!r} leaked into dispatch-state"
     # The diagnostic log is a separate artifact and was written.
     assert (state_dir / "trigger-diagnostic.jsonl").is_file()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# WI-3344 — data-driven _harness_command() from invocation_surfaces (FR8)
+# Per bridge/gtkb-harness-data-driven-dispatch-003.md (Codex GO at -004).
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_harness_command_builds_argv_from_invocation_surfaces(tmp_path: Path) -> None:
+    """WI-3344 FR8 / DELIB-2079 Q9: _harness_command builds the dispatch argv
+    solely from a harness record's invocation_surfaces.headless template,
+    substituting {{PROMPT}} and {{PROJECT_ROOT}} as individual argv elements —
+    for the codex, claude, and a non-claude/codex harness record alike.
+    """
+    trigger = _load_trigger()
+    prompt = "::init gtkb lo"
+    root = tmp_path
+
+    def _target(handle: str, surfaces: object) -> object:
+        return trigger.DispatchTarget(
+            needed_role_label="loyal-opposition",
+            harness_id="A",
+            command_handle=handle,
+            canonical_mode="lo",
+            invocation_surfaces=surfaces,
+        )
+
+    codex_cmd = trigger._harness_command(_target("codex", _CODEX_INVOCATION_SURFACES), prompt, root)
+    assert codex_cmd == ["codex", "exec", prompt, "--cd", str(root)]
+
+    claude_cmd = trigger._harness_command(_target("claude", _CLAUDE_INVOCATION_SURFACES), prompt, root)
+    assert claude_cmd == ["claude", "-p", prompt, "--add-dir", str(root), "--output-format", "json"]
+
+    third_surfaces = {"headless": {"argv": ["gemini", "-p", "{{PROMPT}}", "--root", "{{PROJECT_ROOT}}"]}}
+    third_cmd = trigger._harness_command(_target("gemini", third_surfaces), prompt, root)
+    assert third_cmd == ["gemini", "-p", prompt, "--root", str(root)]
+
+
+def test_harness_command_fails_closed_for_missing_or_malformed_surfaces(tmp_path: Path) -> None:
+    """WI-3344 FR8 / DELIB-2079 Q9: _harness_command returns None
+    ("unknown_recipient") for NULL, no-headless, or malformed invocation_surfaces
+    — uniformly, INCLUDING for a claude or codex command_handle, proving no
+    hard-coded per-harness fallback survives for the existing harnesses.
+    """
+    trigger = _load_trigger()
+    malformed_cases = [
+        None,                                                  # NULL invocation_surfaces
+        {},                                                    # no headless entry
+        {"headless": {}},                                      # headless without argv
+        {"headless": {"argv": []}},                            # empty argv
+        {"headless": {"argv": "codex exec"}},                  # argv is not a list
+        {"headless": {"argv": ["codex", 123, "{{PROMPT}}"]}},  # non-string argv element
+    ]
+    for handle in ("codex", "claude", "gemini"):
+        for surfaces in malformed_cases:
+            target = trigger.DispatchTarget(
+                needed_role_label="loyal-opposition",
+                harness_id="A",
+                command_handle=handle,
+                canonical_mode="lo",
+                invocation_surfaces=surfaces,
+            )
+            assert trigger._harness_command(target, "p", tmp_path) is None, (
+                f"_harness_command must fail closed to None for handle={handle!r}, surfaces={surfaces!r}"
+            )
+
+
+def test_resolve_dispatch_target_attaches_invocation_surfaces_from_projection(
+    tmp_path: Path,
+) -> None:
+    """WI-3344 FR8: _resolve_dispatch_target reads harness-state/harness-registry.json
+    and attaches the selected harness record's invocation_surfaces onto the
+    returned DispatchTarget — exercising the resolve-then-attach projection
+    wiring, not _harness_command in isolation.
+    """
+    root = _make_synthetic_project(tmp_path)
+    trigger = _load_trigger()
+
+    target = trigger._resolve_dispatch_target("loyal-opposition", root)
+    assert target.harness_id == "A"
+    assert target.invocation_surfaces == _CODEX_INVOCATION_SURFACES
+
+    # End-to-end: the resolved target's surfaces drive _harness_command.
+    cmd = trigger._harness_command(target, "the-prompt", root)
+    assert cmd == ["codex", "exec", "the-prompt", "--cd", str(root)]
