@@ -38,8 +38,11 @@ SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
 RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
 WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b")
+# Anchored to an enumerated repo-directory set so prose "word/word" tokens
+# (e.g. GO/NO-GO, prime-builder/loyal-opposition) are not harvested as
+# repository paths. Kept consistent with scripts/implementation_start_gate.py.
 PATH_TOKEN_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?:^|[\s`('\"])((?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+)(?=$|[\s`)'\",:])"
+    r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
 )
 TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
 

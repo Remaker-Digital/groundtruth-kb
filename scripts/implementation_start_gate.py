@@ -81,9 +81,16 @@ MUTATING_COMMAND_RE = re.compile(
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
     r"apply_patch|git\s+(?:commit|reset|checkout|merge|rebase|tag|push)|"
     r"python\s+.*(?:write_text|open\(.+,\s*['\"]w|sqlite3|insert_|update_|delete_)"
-    r")\b|(?<![:>-])>{1,2}(?![>&=])",
+    r")\b",
     re.IGNORECASE,
 )
+# A shell redirection operator token: `>` / `>>`, or the combined-stream
+# `&>` / `&>>` form. Matched against standalone tokens produced by a
+# punctuation-aware shlex scan (see _shell_redirect_present), never against
+# raw command text -- so a `>` inside a quoted argument or an embedded Python
+# expression is not misread as a redirect. A leading file-descriptor digit
+# (`2>`) tokenizes separately and is not part of the operator token.
+REDIRECT_OPERATOR_TOKEN_RE = re.compile(r"&?>{1,2}")
 NULL_SINK_REDIRECT_STRIP_RE = re.compile(
     r"\s*(?:\d+|&)?>{1,2}(?!&)\s*(?:/dev/null|\$null|NUL)\b",
     re.IGNORECASE,
@@ -335,23 +342,52 @@ def _clean_shell_token(token: str) -> str:
     return token.strip().strip("'\"")
 
 
+def _shell_redirect_present(command: str) -> bool:
+    """True when a shell redirection operator token (`>`, `>>`, `&>`, `&>>`)
+    appears as a standalone token.
+
+    Tokenizes with a punctuation-aware shlex scan so a `>` inside a quoted
+    argument or an embedded Python expression -- a comparison, a `->` return
+    arrow, a `:>` format spec, or a `>>` shift -- is not misread as a redirect:
+    a quoted span tokenizes as a single token and never exposes a bare operator
+    token. A parse failure (unbalanced quotes) falls back conservatively to
+    non-redirect; the named-command alternatives in MUTATING_COMMAND_RE remain
+    the other mutating signal in that case.
+    """
+    if not command:
+        return False
+    lexer = shlex.shlex(command, posix=False, punctuation_chars=True)
+    lexer.whitespace_split = True
+    try:
+        return any(REDIRECT_OPERATOR_TOKEN_RE.fullmatch(token) for token in lexer)
+    except ValueError:
+        return False
+
+
+def _has_mutating_signal(command: str) -> bool:
+    """True when the command carries a mutating signal: a named mutating
+    command (MUTATING_COMMAND_RE) or a standalone shell redirect operator
+    token (_shell_redirect_present)."""
+    return MUTATING_COMMAND_RE.search(command) is not None or _shell_redirect_present(command)
+
+
 def _all_mutating_signal_is_null_sink_redirect(command: str) -> bool:
     """True iff the only mutating signal in the command is one or more null-sink redirects.
 
     Strips null-sink redirect tokens (e.g. ``2>/dev/null``, ``2>$null``, ``2>NUL``,
-    ``&>/dev/null``) from the command and re-tests the residue against
-    MUTATING_COMMAND_RE. If the original command matched MUTATING_COMMAND_RE but
-    the stripped residue does not, the only mutating signal was a null-sink
+    ``&>/dev/null``) from the command and re-tests the residue with
+    _has_mutating_signal. If the original command had a mutating signal but the
+    stripped residue does not, the only mutating signal was a null-sink
     redirect — those are diagnostic suppression, not file mutation, and the
     command is exempt from the gate. Real-file redirects survive the strip and
-    keep MUTATING_COMMAND_RE matching.
+    keep _has_mutating_signal matching.
     """
     if not command:
         return False
-    if not MUTATING_COMMAND_RE.search(command):
+    if not _has_mutating_signal(command):
         return False
     stripped = NULL_SINK_REDIRECT_STRIP_RE.sub("", command)
-    return not bool(MUTATING_COMMAND_RE.search(stripped))
+    return not _has_mutating_signal(stripped)
 
 
 def _is_safe_sqlite_read(command: str) -> bool:
@@ -376,7 +412,7 @@ def _is_safe_sqlite_read(command: str) -> bool:
 
 def _is_mutating_command(command: str) -> bool:
     cmd = command or ""
-    if not MUTATING_COMMAND_RE.search(cmd):
+    if not _has_mutating_signal(cmd):
         return False
     if _all_mutating_signal_is_null_sink_redirect(cmd):
         return False

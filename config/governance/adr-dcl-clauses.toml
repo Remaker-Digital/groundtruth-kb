@@ -113,7 +113,7 @@ description = "Bulk operations against the standing backlog (e.g., bulk work_ite
 applies_when_path = ["scripts/**", "tools/**", "bridge/**"]
 applies_when_doc_name = []
 applies_when_content = [
-    "(?i)\\b(?:standing\\s+backlog|work[- ]item|backlog\\s+cleanup|bulk\\s+(?:transition|update|operation))\\b",
+    "(?i)\\b(?:standing\\s+backlog|backlog\\s+cleanup|bulk\\s+(?:transition|update|operation))\\b",
 ]
 evidence_required = "Bulk-operation work item produces an inventory artifact AND review packet AND a Phase/Path-deferred decision marker, OR carries explicit owner-approval packet for the bulk action."
 evidence_pattern = "(?i)(?:inventory|review[- ]packet|DECISION DEFERRED|formal-artifact-approval)"

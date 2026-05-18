@@ -286,3 +286,40 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert "## Applicability Preflight" in markdown
     assert "packet_hash: `sha256:" in markdown
     assert "missing_required_specs: []" in markdown
+
+
+# W4 IP-1 (gtkb-s358-w4-enforcement-calibration, WI-3368): the content-scan
+# pass of extract_target_paths is anchored to an enumerated repo-directory set
+# so prose word/word tokens are not harvested as repository paths.
+
+
+def test_preflight_prose_slash_not_harvested() -> None:
+    """W4 IP-1 (false-positive removed): prose ``word/word`` tokens (GO/NO-GO,
+    and/or, read/write) are not harvested as repository paths -- the anchored
+    PATH_TOKEN_RE requires an enumerated repo-directory prefix.
+    """
+    content = (
+        "# Proposal\n\n"
+        "This proposal discusses GO/NO-GO discipline, prime-builder/loyal-opposition\n"
+        "roles, read/write semantics, and and/or phrasing.\n"
+    )
+    harvested = preflight.extract_target_paths(content)
+    assert harvested == set(), f"prose word/word tokens were harvested as paths: {sorted(harvested)}"
+
+
+def test_preflight_declared_and_rooted_paths_still_harvested() -> None:
+    """W4 IP-1 (genuine-positive preserved): declared ``target_paths`` entries
+    and repo-rooted path mentions in prose are still harvested, so every
+    genuine path-keyed applicability rule still triggers (relevance closure
+    preserved per DCL-SPEC-RELEVANCE-CLOSURE-001).
+    """
+    content = (
+        "# Proposal\n\n"
+        'target_paths: ["scripts/foo.py"]\n\n'
+        "The change also touches config/governance/sample.toml as described.\n"
+    )
+    harvested = preflight.extract_target_paths(content)
+    assert "scripts/foo.py" in harvested, f"declared target_paths entry not harvested: {sorted(harvested)}"
+    assert "config/governance/sample.toml" in harvested, (
+        f"repo-rooted path mention not harvested: {sorted(harvested)}"
+    )

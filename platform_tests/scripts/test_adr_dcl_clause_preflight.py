@@ -601,3 +601,53 @@ def test_resolve_content_file_normalizes_relative(preflight, tmp_path, monkeypat
     # Absolute argument -> returned unchanged.
     abs_arg = tmp_path / "abs.md"
     assert preflight._resolve_content_file(abs_arg) == abs_arg
+
+
+# W4 IP-2 (gtkb-s358-w4-enforcement-calibration, WI-3368): CLAUSE-VISIBILITY-
+# BULK-OPS no longer carries the bare "work item" content trigger, and a
+# single non-content axis hit yields may_apply rather than must_apply.
+
+
+def test_clause_work_item_phrase_is_advisory(preflight):
+    """W4 IP-2 (false-positive removed): a proposal that merely mentions the
+    phrase "work item" no longer forces CLAUSE-VISIBILITY-BULK-OPS to
+    must_apply -- the bare phrase was removed from the clause's content
+    trigger, so a bridge-path-only hit yields may_apply.
+    """
+    content = (
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- SPEC-EXAMPLE-001\n\n"
+        "This proposal updates exactly one work item and performs no sweeping change.\n"
+    )
+    clauses = preflight.load_clauses(CLAUSES_CONFIG)
+    bulk_ops_clause = next(c for c in clauses if "CLAUSE-VISIBILITY-BULK-OPS" in c.clause_id)
+    applicability, reasons = preflight.evaluate_applicability(
+        bulk_ops_clause, content, "test-work-item-phrase", ["bridge/test-work-item-phrase-001.md"]
+    )
+    assert applicability != "must_apply", (
+        f"the bare phrase 'work item' must not force must_apply; got {applicability}; reasons: {reasons}"
+    )
+
+
+def test_clause_genuine_bulk_op_still_must_apply(preflight):
+    """W4 IP-2 (genuine-positive preserved): a genuine bulk standing-backlog
+    operation still triggers CLAUSE-VISIBILITY-BULK-OPS at must_apply. The
+    calibration removed only the bare "work item" phrase, not the genuine
+    bulk-operation vocabulary.
+    """
+    content = (
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- GOV-STANDING-BACKLOG-001\n\n"
+        "This proposal performs a bulk transition across the standing backlog.\n"
+    )
+    clauses = preflight.load_clauses(CLAUSES_CONFIG)
+    bulk_ops_clause = next(c for c in clauses if "CLAUSE-VISIBILITY-BULK-OPS" in c.clause_id)
+    applicability, reasons = preflight.evaluate_applicability(
+        bulk_ops_clause, content, "test-genuine-bulk-op", ["bridge/test-genuine-bulk-op-001.md"]
+    )
+    assert applicability == "must_apply", (
+        f"a genuine bulk standing-backlog operation must still yield must_apply; "
+        f"got {applicability}; reasons: {reasons}"
+    )

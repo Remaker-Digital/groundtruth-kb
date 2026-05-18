@@ -31,12 +31,23 @@ SPEC_LINK_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,
 )
+# A heading line whose text begins with the Specification Links section name
+# but which SPEC_LINK_HEADING_RE rejects (e.g. a trailing parenthetical). Used
+# to tell a heading-format misdetection (ask) apart from a genuinely absent
+# section (deny). See _specification_links_heading_misdetected.
+SPEC_LINK_HEADING_NEAR_MISS_RE = re.compile(
+    r"(?:relevant\s+|linked\s+|governing\s+)?specification\b",
+    re.IGNORECASE,
+)
 SPEC_LINK_TOKEN_RE = re.compile(
     r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\b"
     r"|(?:^|[`(\s])(?:\.claude/rules|groundtruth-kb/docs|docs|bridge)/[^\s`)]+",
     re.IGNORECASE | re.MULTILINE,
 )
-SPEC_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|none|n/a|not applicable|no relevant)\b", re.IGNORECASE)
+SPEC_PLACEHOLDER_LINE_RE = re.compile(
+    r"^[\s>*`_\-:]*(?:tbd|todo|none|n/a|not applicable|no relevant)[\s.`_\-:]*$",
+    re.IGNORECASE,
+)
 OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
     r"^[\s>*`_\-:]*"
     r"(?:tbd|todo|none|n/a|not applicable|no relevant(?: owner decisions?)?)"
@@ -283,8 +294,73 @@ def _has_concrete_spec_links(content: str) -> bool:
             break
         section.append(line)
     section_text = "\n".join(section).strip()
-    return bool(
-        section_text and not SPEC_PLACEHOLDER_RE.search(section_text) and SPEC_LINK_TOKEN_RE.search(section_text)
+    if not section_text or not SPEC_LINK_TOKEN_RE.search(section_text):
+        return False
+    # Per-line placeholder evaluation: a line carrying a genuine spec-link
+    # citation token is concrete-citation rationale and is exempt from the
+    # placeholder test -- its rationale prose may legitimately contain a word
+    # like "none" or "n/a". The section is placeholder-content only when a
+    # line WITHOUT any spec-link token is itself a placeholder line.
+    for section_line in section:
+        stripped_line = section_line.strip()
+        if not stripped_line or SPEC_LINK_TOKEN_RE.search(stripped_line):
+            continue
+        if SPEC_PLACEHOLDER_LINE_RE.match(stripped_line):
+            return False
+    return True
+
+
+def _specification_links_heading_misdetected(content: str) -> bool:
+    """True when no strict Specification Links heading matched but a near-miss
+    heading line is present.
+
+    The near-miss class is a Markdown heading line whose text begins with the
+    Specification Links section name -- optionally a relevant/linked/governing
+    qualifier -- that SPEC_LINK_HEADING_RE rejects, e.g. a trailing
+    parenthetical such as ``## Specification Links (carried forward)``. A
+    genuinely absent section has no such heading line at all; it is not a
+    misdetection. A misdetection should ask (the author wrote the section); an
+    absent section should still deny.
+    """
+    near_miss = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("#"):
+            continue
+        if SPEC_LINK_HEADING_RE.match(stripped):
+            return False
+        if SPEC_LINK_HEADING_NEAR_MISS_RE.match(stripped.lstrip("#").strip()):
+            near_miss = True
+    return near_miss
+
+
+def _ask_reason_for_content(file_path: str, content: str) -> str | None:
+    """Return an ask-checkpoint reason when an implementation proposal's
+    Specification Links section fails the gate solely because its heading is a
+    near-miss form SPEC_LINK_HEADING_RE does not match.
+
+    A heading-format misdetection is a section-scanner boundary ambiguity, not
+    a genuine missing-section failure -- the author wrote the section. It is
+    surfaced as an ask checkpoint rather than a hard deny so the author can
+    confirm or correct the heading instead of being blocked outright. A
+    genuinely absent or placeholder-only section continues to deny via
+    _deny_reason_for_content.
+    """
+    if not (_is_bridge_markdown_file(file_path) and content):
+        return None
+    first_line = _first_nonblank_line(content)
+    if first_line == "ADVISORY" or first_line.startswith(("GO", "NO-GO", "VERIFIED")):
+        return None
+    if _has_concrete_spec_links(content):
+        return None
+    if not _specification_links_heading_misdetected(content):
+        return None
+    return (
+        "[Governance] The Specification Links heading was not recognized in "
+        "its strict form (expected a heading line such as `## Specification "
+        "Links`). Confirm or correct the heading format before filing. "
+        "(Heading-format ambiguity surfaced as a checkpoint rather than a hard "
+        "block per W4 enforcement calibration.)"
     )
 
 
@@ -678,6 +754,7 @@ def _deny_reason_for_content(
             first_line != "ADVISORY"
             and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
             and not _has_concrete_spec_links(content)
+            and not _specification_links_heading_misdetected(content)
         ):
             return (
                 "[Governance] Implementation proposals must include concrete Specification Links "
@@ -878,6 +955,11 @@ def main() -> None:
     )
     if reason:
         emit_deny("PreToolUse", reason)
+        sys.exit(0)
+
+    heading_ask_reason = _ask_reason_for_content(file_path, content)
+    if heading_ask_reason:
+        emit_ask("PreToolUse", heading_ask_reason)
         sys.exit(0)
 
     index_path = _canonical_project_root(cwd_path) / BRIDGE_INDEX_FILENAME

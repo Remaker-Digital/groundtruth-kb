@@ -866,3 +866,28 @@ def test_wi3357_heredoc_parser_recognizes_only_safe_spans(case_id: str, command:
     (no span), so the $( stays visible to the control-marker scan."""
     spans = gate._find_heredoc_message_substitution_spans(command)
     assert len(spans) == expected_spans, case_id
+
+
+# W4 IP-4 (gtkb-s358-w4-enforcement-calibration, WI-3368): MUTATING_COMMAND_RE
+# redirect detection replaced by a punctuation-aware shlex token scan. A `>`
+# inside a quoted argument or embedded Python expression is no longer misread
+# as a shell redirect, while a standalone redirect operator token and the
+# named-command mutations still flag.
+
+
+def test_impl_start_gate_python_operator_not_mutating() -> None:
+    """W4 IP-4 (false-positive removed): a quoted Python comparison or shift
+    operator is not misread as a shell redirect, so the command is not flagged
+    mutating."""
+    assert gate._is_mutating_command('python -c "print(1 if a>b else 0)"') is False
+    assert gate._is_mutating_command('python -c "x = value >> 2"') is False
+    assert gate._is_mutating_command("python -c 'assert score >= 0'") is False
+
+
+def test_impl_start_gate_genuine_redirect_still_mutating() -> None:
+    """W4 IP-4 (genuine-positive preserved): a standalone shell redirect
+    operator token is still flagged mutating, and named-command mutations are
+    unaffected by the shlex-based redirect detection."""
+    assert gate._is_mutating_command("echo data > out.txt") is True
+    assert gate._is_mutating_command("echo data>>out.txt") is True
+    assert gate._is_mutating_command("Set-Content -Path scripts/sample.py -Value x") is True

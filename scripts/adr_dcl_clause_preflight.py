@@ -172,7 +172,7 @@ def evaluate_applicability(clause: Clause, content: str, doc_name: str, paths: l
 
     if triggers_total == 0:
         return ("not_applicable", ["no applicability axes defined for clause"])
-    if triggers_hit == triggers_total or (content_hit and triggers_hit >= 1):
+    if triggers_hit == triggers_total:
         return ("must_apply", reasons)
     if triggers_hit > 0:
         return ("may_apply", reasons)
