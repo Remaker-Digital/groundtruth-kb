@@ -18,7 +18,22 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-s358-w3-requirements-collection-hook-title-fix
+NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-002.md
+NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-001.md
+
+Document: gtkb-s358-w2-agent-red-gov-trio-v2
+NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-002.md
+NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-001.md
+
+Document: gtkb-s358-w1-retirement-machinery-correction
+REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-003.md
+NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-002.md
+NEW: bridge/gtkb-s358-w1-retirement-machinery-correction-001.md
+
 Document: gtkb-test-build-contract-orphan-relocation
+VERIFIED: bridge/gtkb-test-build-contract-orphan-relocation-006.md
+NEW: bridge/gtkb-test-build-contract-orphan-relocation-005.md
 GO: bridge/gtkb-test-build-contract-orphan-relocation-004.md
 REVISED: bridge/gtkb-test-build-contract-orphan-relocation-003.md
 NO-GO: bridge/gtkb-test-build-contract-orphan-relocation-002.md
