@@ -17,6 +17,22 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-bridge-scheduler-lanes-leases-slice-6
+GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-6-002.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-6-001.md
+
+Document: gtkb-bridge-scheduler-lanes-leases-slice-5
+NO-GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-002.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-5-001.md
+
+Document: gtkb-bridge-scheduler-lanes-leases-slice-4
+GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-4-002.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-4-001.md
+
+Document: gtkb-bridge-scheduler-lanes-leases-slice-3
+GO: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-002.md
+NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-3-001.md
+
 Document: gtkb-bridge-scheduler-lanes-leases-slice-2
 VERIFIED: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-004.md
 NEW: bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-003.md
@@ -36,6 +52,7 @@ NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-002.md
 NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-001.md
 
 Document: gtkb-s358-w2-agent-red-gov-trio-v2
+NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-009.md
 GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-008.md
 REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-007.md
 NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-006.md
