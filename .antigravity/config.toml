@@ -1,0 +1,52 @@
+# GT-KB integration config for the Antigravity AI coding harness.
+#
+# This is GT-KB's in-root harness-integration directory for the Antigravity
+# harness (identity C), the harness-C analogue of .codex/ and .claude/.
+# Created by WI-3346 (bridge thread gtkb-antigravity-integration-directory).
+#
+# Antigravity exposes no hook event surface (WI-3345 research spike,
+# DOC-ANTIGRAVITY-IDE-RESEARCH-001): there is intentionally no hooks.json in
+# this directory. Harness-C bridge dispatch uses the interval-driven fallback
+# substrate (ADR-CODEX-HOOK-PARITY-FALLBACK-001 v3). See README.md.
+#
+# The authoritative harness record is the MemBase harness registry, written by
+# WI-3348 (gt harness register). This file is GT-KB's static integration
+# config; if it and the registry disagree, the registry wins.
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+schema_version = 1
+
+[harness]
+id = "C"
+name = "antigravity"
+type = "antigravity"
+# Intended operating role per DELIB-2079 Q1; the authoritative role-set record
+# is the MemBase harness registry (WI-3348).
+role = "loyal-opposition"
+
+[invocation_surfaces]
+# Interactive surface: the Antigravity IDE (an agent-first VS Code fork).
+interactive = "antigravity"
+# Headless surface: the Gemini CLI in non-interactive mode. {{PROMPT}} is the
+# dispatched bridge init prompt. --approval-mode=yolo auto-approves all tools
+# for unattended dispatch (the structured form; --yolo is the deprecated alias,
+# verified against the installed Gemini CLI v0.42.0 per WI-3346 GO condition 3).
+headless = 'gemini -p "{{PROMPT}}" --approval-mode=yolo'
+
+[dispatch]
+# Antigravity has no SessionStart/PostToolUse/Stop hook events, so harness C
+# cannot host the cross-harness event-driven trigger. Its standing dispatch
+# substrate is the interval-driven single-harness bridge dispatcher /
+# host-scheduled-task model. See ADR-CODEX-HOOK-PARITY-FALLBACK-001 v3,
+# ADR-SINGLE-HARNESS-OPERATING-MODE-001, SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001.
+model = "interval_driven_single_harness_dispatcher"
+event_driven_hooks = false
+
+[surfaces]
+# Antigravity's native agent-automation surfaces, populated by later onboarding
+# slices (not by WI-3346). Rules at .agent/rules/ are auto-loaded as context;
+# skills at .agent/skills/<name>/SKILL.md are agent-triggered capability
+# adapters built by WI-3347.
+rules_dir = ".agent/rules"
+skills_dir = ".agent/skills"

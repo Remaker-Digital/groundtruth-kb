@@ -17,6 +17,12 @@
          carrying fresh narrative-artifact approval packets bound to working-tree sha
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
+Document: gtkb-antigravity-integration-directory
+VERIFIED: bridge/gtkb-antigravity-integration-directory-004.md
+NEW: bridge/gtkb-antigravity-integration-directory-003.md
+GO: bridge/gtkb-antigravity-integration-directory-002.md
+NEW: bridge/gtkb-antigravity-integration-directory-001.md
+
 Document: gtkb-antigravity-related-bridge-threads-backfill
 VERIFIED: bridge/gtkb-antigravity-related-bridge-threads-backfill-006.md
 NEW: bridge/gtkb-antigravity-related-bridge-threads-backfill-005.md
