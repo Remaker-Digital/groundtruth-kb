@@ -93,14 +93,13 @@ WRAPUP_TRIGGER_COMMANDS = (
     "begin fresh",
 )
 
-PROJECT_ROOT = Path(
-    os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]
-).resolve()
+PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]).resolve()
 
 STATE_DIR_REL = ".gtkb-state/bridge-poller/stop-drain"
 ERRORS_LOG_REL = ".gtkb-state/bridge-poller/stop-drain/errors.jsonl"
 PENDING_DECISIONS_REL = "memory/pending-owner-decisions.md"
 HEARTBEAT_STATE_DIR_REL = ".gtkb-state/bridge-poller"
+GOVERNANCE_SUSPENSION_REL = ".gtkb-state/governance-suspension.json"
 
 ROLE_PRIME = "prime-builder"
 ROLE_LO = "loyal-opposition"
@@ -167,6 +166,20 @@ def _resolve_roles(project_root: Path, harness_name: str) -> set[str]:
         return set()
 
 
+def _governance_suspension_active(project_root: Path) -> bool:
+    """True when the owner has activated the local emergency suspension marker."""
+    path = project_root / GOVERNANCE_SUSPENSION_REL
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    status = str(data.get("status") or "").strip().lower()
+    suppress = data.get("suppress_bridge_auto_drain")
+    return status == "active" and suppress is not False
+
+
 def _compute_actionable(project_root: Path, roles: set[str]) -> tuple[str, list[Any]]:
     """Return (signature, role-actionable items) for the given role set.
 
@@ -185,10 +198,9 @@ def _compute_actionable(project_root: Path, roles: set[str]) -> tuple[str, list[
         index_text = index_path.read_text(encoding="utf-8")
         from groundtruth_kb.bridge.detector import parse_index  # type: ignore
         from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
+
         parse_result = parse_index(index_text, project_root=project_root)
-        actionable_prime, actionable_codex = compute_actionable_pending(
-            parse_result, project_root=project_root
-        )
+        actionable_prime, actionable_codex = compute_actionable_pending(parse_result, project_root=project_root)
     except Exception as exc:
         _log_error(project_root, {"event": "actionable_detection_failed", "error": str(exc)})
         return "", []
@@ -198,8 +210,19 @@ def _compute_actionable(project_root: Path, roles: set[str]) -> tuple[str, list[
     role_lists = []
     if ROLE_PRIME in roles:
         role_lists.append(actionable_prime)
-    if ROLE_LO in roles:
+    if ROLE_LO in roles and roles != {ROLE_PRIME, ROLE_LO}:
         role_lists.append(actionable_codex)
+    elif ROLE_LO in roles:
+        _log_error(
+            project_root,
+            {
+                "event": "dual_role_lo_autodrain_suppressed",
+                "reason": (
+                    "dual-role active sessions must not auto-drain LO review "
+                    "work because same-session authorship cannot be excluded"
+                ),
+            },
+        )
     for items in role_lists:
         for item in items:
             key = f"{item.document_name}\x00{item.top_status}\x00{item.top_file}"
@@ -249,9 +272,9 @@ def _owner_decision_pending(project_root: Path) -> bool:
         return False
     boundaries.append(len(text))
     for i in range(len(boundaries) - 1):
-        block = text[boundaries[i]:boundaries[i + 1]]
+        block = text[boundaries[i] : boundaries[i + 1]]
         status_match = _STATUS_RE.search(block)
-        status = (status_match.group(1).strip().lower() if status_match else "")
+        status = status_match.group(1).strip().lower() if status_match else ""
         if status != "resolved":
             # Any unresolved decision suppresses the drain, regardless of age.
             return True
@@ -322,7 +345,7 @@ def _normalize_wrapup_candidate(text: str) -> str:
     wrap-up commands."""
     norm = " ".join(text.strip().lower().split()).rstrip(".!?").strip()
     if norm.startswith("please "):
-        norm = norm[len("please "):]
+        norm = norm[len("please ") :]
     if norm.endswith(" please"):
         norm = norm[: -len(" please")]
     return norm.rstrip(".!?").strip()
@@ -427,6 +450,14 @@ def drain_decision(
     """Core role-aware drain decision. Returns the Stop-hook output dict:
     ``{}`` to allow the stop, or ``{"decision": "block", "reason": ...}`` to
     drain. Pure of stdin parsing so tests can drive it directly."""
+    state_path = project_root / STATE_DIR_REL / f"{session_id}.json"
+    if _governance_suspension_active(project_root):
+        state = _read_state(state_path)
+        state["last_result"] = "deferred_governance_suspension"
+        state["updated_at"] = _now_iso()
+        _write_state(project_root, state_path, state)
+        return {}
+
     roles = _resolve_roles(project_root, harness_name)
     if not roles:
         # Fail closed: an unresolvable role must not block the stop.
@@ -436,7 +467,6 @@ def drain_decision(
     if not signature or not items:
         return {}
 
-    state_path = project_root / STATE_DIR_REL / f"{session_id}.json"
     state = _read_state(state_path)
     consecutive = int(state.get("consecutive_blocks") or 0)
 
@@ -513,9 +543,7 @@ def main(argv: list[str] | None = None) -> int:
             session_id = _resolve_session_id(safe_payload)
             transcript_path = str(safe_payload.get("transcript_path") or "") or None
             _bootstrap_sys_path(PROJECT_ROOT)
-            output = drain_decision(
-                PROJECT_ROOT, args.harness, session_id, transcript_path
-            )
+            output = drain_decision(PROJECT_ROOT, args.harness, session_id, transcript_path)
     except Exception as exc:
         _log_error(PROJECT_ROOT, {"event": "handler_crashed", "error": str(exc)})
         output = {}

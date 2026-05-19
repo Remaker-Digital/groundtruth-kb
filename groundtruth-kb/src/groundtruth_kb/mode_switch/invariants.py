@@ -1,11 +1,10 @@
 """Role-map partition checks for the operating-mode subsystem.
 
 ``REQ-HARNESS-REGISTRY-001`` FR9 requires that ``gt harness set-role`` leave
-the role map as a full role partition: exactly one harness holds
-``prime-builder`` and every other harness holds ``loyal-opposition``. This
-module is the postcondition check for that property. ``apply_role_switch``
-(``mode_switch/transaction.py``) produces the partition inside the transaction;
-``verify_role_partition`` confirms it afterward.
+the active harness set with exactly one ``prime-builder`` assignment and exactly
+one ``loyal-opposition`` assignment. When more than one harness is active, those
+roles must be assigned to different active harnesses. Inactive harnesses remain
+registered but carry no operating role.
 
 It reads the harness registry projection
 (``harness-state/harness-registry.json``) and computes over the role-set wire
@@ -23,6 +22,7 @@ reserved.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -35,12 +35,14 @@ _PRIME_BUILDER_TOKENS = frozenset({"prime-builder", "acting-prime-builder"})
 
 
 class RolePartitionViolation(RuntimeError):
-    """Raised when the role map is not a valid FR9 role partition.
+    """Raised when the active role map is not a valid registrar partition."""
 
-    A valid partition has exactly one harness in a prime-builder-class role and
-    every other harness in exactly ``["loyal-opposition"]``. The message names
-    the offending condition and the harness ids involved.
-    """
+
+@dataclass(frozen=True)
+class RolePartitionSummary:
+    prime_builder_id: str
+    loyal_opposition_id: str
+    active_harness_ids: tuple[str, ...]
 
 
 def _role_tokens(role_field: Any) -> set[str]:
@@ -69,18 +71,34 @@ def prime_builder_ids(role_document: dict[str, Any]) -> list[str]:
         harness_id
         for harness_id, record in harnesses.items()
         if isinstance(record, dict)
+        and record.get("status") == "active"
         and _PRIME_BUILDER_TOKENS & _role_tokens(record.get("role"))
     )
 
 
-def verify_role_partition(project_root: Path, *, role_path: Path | None = None) -> str:
-    """Verify the role map is a valid ``REQ-HARNESS-REGISTRY-001`` FR9 partition.
+def loyal_opposition_ids(role_document: dict[str, Any]) -> list[str]:
+    """Return the sorted active harness ids holding loyal-opposition."""
+    harnesses = role_document.get("harnesses", {})
+    if not isinstance(harnesses, dict):
+        return []
+    return sorted(
+        harness_id
+        for harness_id, record in harnesses.items()
+        if isinstance(record, dict)
+        and record.get("status") == "active"
+        and "loyal-opposition" in _role_tokens(record.get("role"))
+    )
+
+
+def verify_active_role_partition(project_root: Path, *, role_path: Path | None = None) -> RolePartitionSummary:
+    """Verify the role map satisfies the active-harness PB/LO invariant.
 
     Loads the harness registry projection under ``project_root`` (or the
     explicit ``role_path`` override) and raises ``RolePartitionViolation``
-    unless exactly one harness holds a prime-builder-class role and every other
-    harness's role set is exactly ``{"loyal-opposition"}``. Returns the single
-    ``prime-builder`` harness id on success.
+    unless exactly one active harness holds a prime-builder-class role and
+    exactly one active harness holds loyal-opposition. With multiple active
+    harnesses, the two role holders must be different. Registered, suspended,
+    and retired harnesses must carry no operating role.
 
     WI-3342 IP-5: migrated from the retired
     ``harness-state/role-assignments.json`` to the DB-backed registry
@@ -93,36 +111,58 @@ def verify_role_partition(project_root: Path, *, role_path: Path | None = None) 
 
     path = role_path if role_path is not None else harness_registry_path(project_root)
     projection = json.loads(Path(path).read_text(encoding="utf-8"))
-    projection_harnesses = (
-        projection.get("harnesses", []) if isinstance(projection, dict) else None
-    )
+    projection_harnesses = projection.get("harnesses", []) if isinstance(projection, dict) else None
     if not isinstance(projection_harnesses, list):
-        raise RolePartitionViolation(
-            f"harness registry projection at {path} has no 'harnesses' list"
-        )
-    harnesses = {
-        str(rec["id"]): rec
-        for rec in projection_harnesses
-        if isinstance(rec, dict) and rec.get("id")
-    }
+        raise RolePartitionViolation(f"harness registry projection at {path} has no 'harnesses' list")
+    harnesses = {str(rec["id"]): rec for rec in projection_harnesses if isinstance(rec, dict) and rec.get("id")}
     role_document = {"harnesses": harnesses}
+    active_ids = tuple(
+        sorted(
+            harness_id
+            for harness_id, record in harnesses.items()
+            if isinstance(record, dict) and record.get("status") == "active"
+        )
+    )
+    if not active_ids:
+        raise RolePartitionViolation("role map must include at least one active harness")
+
+    inactive_with_roles: list[str] = []
+    for harness_id, record in sorted(harnesses.items()):
+        if not isinstance(record, dict) or record.get("status") == "active":
+            continue
+        tokens = _role_tokens(record.get("role"))
+        if tokens:
+            inactive_with_roles.append(f"{harness_id}={sorted(tokens)}")
+    if inactive_with_roles:
+        raise RolePartitionViolation(
+            "inactive harnesses must not carry operating roles; violations: " + ", ".join(inactive_with_roles)
+        )
+
     primes = prime_builder_ids(role_document)
     if len(primes) != 1:
         raise RolePartitionViolation(
-            f"role map must hold exactly one prime-builder; found "
-            f"{len(primes)}: {primes if primes else '[]'}"
+            f"active role map must hold exactly one prime-builder; found {len(primes)}: {primes if primes else '[]'}"
         )
     prime_id = primes[0]
-    violations: list[str] = []
-    for harness_id, record in sorted(harnesses.items()):
-        if harness_id == prime_id or not isinstance(record, dict):
-            continue
-        tokens = _role_tokens(record.get("role"))
-        if tokens != {"loyal-opposition"}:
-            violations.append(f"{harness_id}={sorted(tokens)}")
-    if violations:
+
+    los = loyal_opposition_ids(role_document)
+    if len(los) != 1:
         raise RolePartitionViolation(
-            "every non-prime-builder harness must hold exactly "
-            "['loyal-opposition']; violations: " + ", ".join(violations)
+            f"active role map must hold exactly one loyal-opposition; found {len(los)}: {los if los else '[]'}"
         )
-    return prime_id
+    lo_id = los[0]
+    if len(active_ids) > 1 and lo_id == prime_id:
+        raise RolePartitionViolation(
+            "prime-builder and loyal-opposition must be assigned to different "
+            "active harnesses when more than one active harness exists"
+        )
+    return RolePartitionSummary(
+        prime_builder_id=prime_id,
+        loyal_opposition_id=lo_id,
+        active_harness_ids=active_ids,
+    )
+
+
+def verify_role_partition(project_root: Path, *, role_path: Path | None = None) -> str:
+    """Backward-compatible wrapper returning the verified Prime Builder id."""
+    return verify_active_role_partition(project_root, role_path=role_path).prime_builder_id

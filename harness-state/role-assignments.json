@@ -2,27 +2,26 @@
   "description": "Maps durable harness installation IDs to operating roles. Harness IDs are defined by harness-state/harness-identities.json.",
   "harnesses": {
     "A": {
-      "assigned_at": "2026-05-13T21:34:35Z",
-      "assigned_by": "owner-current-session-role-switch-request",
-      "assigned_reason": "owner asked Codex to switch to Loyal Opposition",
+      "assigned_at": "2026-05-19T18:02:53.157543Z",
+      "assigned_by": "owner-directed-role-correction",
+      "assigned_reason": "Restore owner-directed current-harness PB+LO assignment after erroneous Antigravity handoff partition restore; Claude and Gemini unavailable",
       "harness_type": "codex",
       "role": [
+        "prime-builder",
         "loyal-opposition"
       ],
-      "source": "owner-current-session-role-switch-request"
+      "source": "owner-directed-role-correction"
     },
     "B": {
-      "assigned_at": "2026-05-13T21:34:35Z",
-      "assigned_by": "owner-current-session-role-switch-request",
-      "assigned_reason": "owner asked Codex to switch to Loyal Opposition; Claude assigned Prime Builder to preserve a Prime Builder slot",
+      "assigned_at": "2026-05-19T18:02:53.157543Z",
+      "assigned_by": "owner-directed-role-correction",
+      "assigned_reason": "Claude unavailable; current harness A carries PB+LO until further owner direction",
       "harness_type": "claude",
-      "role": [
-        "prime-builder"
-      ],
-      "source": "owner-current-session-role-switch-request"
+      "role": [],
+      "source": "owner-directed-role-correction"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness role assignments",
-  "updated_at": "2026-05-13T21:34:35Z"
+  "updated_at": "2026-05-19T18:02:53.157543Z"
 }

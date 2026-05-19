@@ -4058,9 +4058,7 @@ def mode_group() -> None:
     type=click.Choice(["prime-builder", "loyal-opposition"]),
     help="Role to assign",
 )
-@click.option(
-    "--reason", "reason", default="manual role-switch via gt mode set-role"
-)
+@click.option("--reason", "reason", default="manual role-switch via gt mode set-role")
 @click.option(
     "--defer-to-next-session",
     "defer",
@@ -4068,9 +4066,7 @@ def mode_group() -> None:
     help="Queue for SessionStart application instead of mid-session apply",
 )
 @click.pass_context
-def mode_set_role(
-    ctx: click.Context, harness: str, role: str, reason: str, defer: bool
-) -> None:
+def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str, defer: bool) -> None:
     """Apply (or defer) a role-switch transaction."""
     import json as _json
     from pathlib import Path
@@ -4207,7 +4203,13 @@ def _run_harness_transition(
 @click.option("--id", "harness_id", required=True, help="Durable harness id (e.g. A, B, C)")
 @click.option("--name", "harness_name", required=True, help="Harness name")
 @click.option("--type", "harness_type", required=True, help="Harness type (e.g. claude-code, codex-cli)")
-@click.option("--role", "roles", multiple=True, help="Initial role token (repeatable; default: none)")
+@click.option(
+    "--role",
+    "roles",
+    multiple=True,
+    hidden=True,
+    help="Deprecated; registration is separate from role assignment",
+)
 @click.option("--precedence", "precedence", type=int, default=None, help="Reviewer precedence (integer)")
 @click.option("--capabilities-ref", "capabilities_ref", default=None, help="Capabilities registry reference")
 @click.option(
@@ -4270,17 +4272,25 @@ def harness_register(
 @click.option("--reason", "reason", default="activate harness via gt harness activate", help="Change reason")
 @click.pass_context
 def harness_activate(ctx: click.Context, harness_id: str, reason: str) -> None:
-    """Activate a registered harness (registered -> active)."""
-    _run_harness_transition(ctx, harness_id, "active", "registered", reason)
+    """Activate a registered or suspended harness."""
+    _run_harness_transition(ctx, harness_id, "active", None, reason)
 
 
 @harness_group.command("suspend")
 @click.option("--harness", "harness_id", required=True, help="Harness id")
 @click.option("--reason", "reason", default="suspend harness via gt harness suspend", help="Change reason")
+@click.option(
+    "--cause",
+    "cause",
+    type=click.Choice(["owner-declared", "non-operating-detected"]),
+    default="owner-declared",
+    show_default=True,
+    help="Suspension cause",
+)
 @click.pass_context
-def harness_suspend(ctx: click.Context, harness_id: str, reason: str) -> None:
+def harness_suspend(ctx: click.Context, harness_id: str, reason: str, cause: str) -> None:
     """Suspend an active harness (active -> suspended)."""
-    _run_harness_transition(ctx, harness_id, "suspended", "active", reason)
+    _run_harness_transition(ctx, harness_id, "suspended", "active", f"{reason} [cause={cause}]")
 
 
 @harness_group.command("resume")
@@ -4337,28 +4347,36 @@ def harness_set_precedence(ctx: click.Context, harness_id: str, precedence: int,
     "--harness",
     "harness_id",
     required=True,
-    help="Durable harness id to promote to prime-builder",
+    help="Durable active harness id receiving the role",
+)
+@click.option(
+    "--role",
+    "role",
+    required=True,
+    type=click.Choice(["prime-builder", "loyal-opposition"]),
+    help="Operating role to assign to the active harness",
 )
 @click.option(
     "--reason",
     "reason",
-    default="promote to prime-builder via gt harness set-role",
+    default="assign operating role via gt harness set-role",
     help="Change reason",
 )
 @click.pass_context
-def harness_set_role(ctx: click.Context, harness_id: str, reason: str) -> None:
-    """Promote a harness to prime-builder, demoting every other harness.
+def harness_set_role(ctx: click.Context, harness_id: str, role: str, reason: str) -> None:
+    """Assign one operating role to one registered and active harness.
 
     REQ-HARNESS-REGISTRY-001 FR9. The target must be an 'active' harness in the
-    registry; promoting it atomically demotes every other harness to
-    loyal-opposition, leaving the role map as a full role partition.
+    registry. The resulting role map has exactly one active Prime Builder and
+    exactly one active Loyal Opposition; they are distinct when more than one
+    active harness exists.
     """
     import json as _json
     from pathlib import Path
 
     from groundtruth_kb.mode_switch.invariants import (
         RolePartitionViolation,
-        verify_role_partition,
+        verify_active_role_partition,
     )
     from groundtruth_kb.mode_switch.transaction import (
         TransactionValidationError,
@@ -4371,25 +4389,21 @@ def harness_set_role(ctx: click.Context, harness_id: str, reason: str) -> None:
     # in the DB-backed registry (seeded by WI-3342 Slice A).
     record = db.get_harness(harness_id)
     if record is None:
-        raise click.ClickException(
-            f"unknown harness {harness_id!r}; no such harness in the registry"
-        )
+        raise click.ClickException(f"unknown harness {harness_id!r}; no such harness in the registry")
     status = record.get("status")
     if status != "active":
         raise click.ClickException(
             f"harness {harness_id!r} has status {status!r}; gt harness set-role "
-            f"can promote only an active harness — use 'gt harness activate' or "
-            f"'gt harness resume' to bring it active first"
+            f"can assign only an active harness - use 'gt harness activate' to "
+            f"bring it active first"
         )
     root = Path(config.project_root)
     try:
-        result = apply_role_switch(
-            root, harness_id, "prime-builder", change_reason=reason
-        )
+        result = apply_role_switch(root, harness_id, role, change_reason=reason)
     except TransactionValidationError as exc:
         raise click.ClickException(str(exc)) from exc
     try:
-        prime_id = verify_role_partition(root)
+        summary = verify_active_role_partition(root)
     except RolePartitionViolation as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(
@@ -4400,7 +4414,9 @@ def harness_set_role(ctx: click.Context, harness_id: str, reason: str) -> None:
                 "previous_role_set": list(result.previous_role_set),
                 "derived_topology": result.derived_topology,
                 "audit_record_path": str(result.audit_record_path),
-                "verified_prime_builder": prime_id,
+                "verified_prime_builder": summary.prime_builder_id,
+                "verified_loyal_opposition": summary.loyal_opposition_id,
+                "verified_active_harnesses": list(summary.active_harness_ids),
             },
             indent=2,
             sort_keys=True,

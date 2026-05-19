@@ -69,11 +69,7 @@ def _seed_workspace(
     if harnesses is None:
         harnesses = _DEFAULT_HARNESSES
     if index_text is None:
-        index_text = (
-            "Document: foo\n"
-            "VERIFIED: bridge/foo-002.md\n"
-            "NEW: bridge/foo-001.md\n"
-        )
+        index_text = "Document: foo\nVERIFIED: bridge/foo-002.md\nNEW: bridge/foo-001.md\n"
     db = KnowledgeDB(db_path=root / "groundtruth.db")
     for harness_id, (harness_name, role_set) in harnesses.items():
         db.insert_harness(
@@ -96,9 +92,7 @@ def _read_role_map(root: Path) -> dict[str, Any]:
     registry projection (``harness-state/harness-registry.json``), not the
     retired ``harness-state/role-assignments.json``.
     """
-    projection = json.loads(
-        (root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8")
-    )
+    projection = json.loads((root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
     return {
         str(record["id"]): record.get("role")
         for record in projection.get("harnesses", [])
@@ -117,9 +111,7 @@ def test_apply_role_switch_returns_transaction_result(project_root: Path) -> Non
     # reads the registry projection, whose records carry ``harness_name`` (not
     # the legacy ``name`` key), so harness-id targeting is the migration-stable
     # path; harness B is the claude harness.
-    result = apply_role_switch(
-        project_root, "B", "loyal-opposition", change_reason="test"
-    )
+    result = apply_role_switch(project_root, "B", "loyal-opposition", change_reason="test")
     assert result.harness_id == "B"
     assert result.new_role_set == ("loyal-opposition",)
     assert result.audit_record_path.exists()
@@ -135,9 +127,7 @@ def test_apply_role_switch_rejects_acting_prime_builder(project_root: Path) -> N
     """GOV-ACTING-PRIME-BUILDER-001: SET-rejects the legacy compat value."""
     _seed_workspace(project_root)
     with pytest.raises(TransactionValidationError):
-        apply_role_switch(
-            project_root, "claude", "acting-prime-builder", change_reason="test"
-        )
+        apply_role_switch(project_root, "claude", "acting-prime-builder", change_reason="test")
 
 
 def test_apply_role_switch_rejects_unknown_harness(project_root: Path) -> None:
@@ -155,8 +145,12 @@ def test_apply_role_switch_refuses_when_bridge_index_missing(project_root: Path)
     """
     db = KnowledgeDB(db_path=project_root / "groundtruth.db")
     db.insert_harness(
-        id="A", harness_name="codex", harness_type="codex",
-        role=["prime-builder"], changed_by="test", change_reason="fixture",
+        id="A",
+        harness_name="codex",
+        harness_type="codex",
+        role=["prime-builder"],
+        changed_by="test",
+        change_reason="fixture",
         status="active",
     )
     generate_harness_projection(db, project_root)
@@ -173,8 +167,12 @@ def test_apply_role_switch_refuses_when_bridge_index_unparseable(project_root: P
     """
     db = KnowledgeDB(db_path=project_root / "groundtruth.db")
     db.insert_harness(
-        id="A", harness_name="codex", harness_type="codex",
-        role=["prime-builder"], changed_by="test", change_reason="fixture",
+        id="A",
+        harness_name="codex",
+        harness_type="codex",
+        role=["prime-builder"],
+        changed_by="test",
+        change_reason="fixture",
         status="active",
     )
     generate_harness_projection(db, project_root)
@@ -205,9 +203,7 @@ def test_audit_record_contains_required_fields(project_root: Path) -> None:
     """Acceptance criterion #3: who/what/when/effective-when evidence."""
     _seed_workspace(project_root)
     # WI-3342 IP-6: target harness B (claude) by its durable id.
-    result = apply_role_switch(
-        project_root, "B", "loyal-opposition", change_reason="audit fields test"
-    )
+    result = apply_role_switch(project_root, "B", "loyal-opposition", change_reason="audit fields test")
     record = json.loads(result.audit_record_path.read_text(encoding="utf-8"))
     assert record["harness_id"] == "B"
     assert record["requested_role"] == "loyal-opposition"
@@ -221,9 +217,7 @@ def test_audit_record_contains_required_fields(project_root: Path) -> None:
 def test_apply_role_switch_prime_builder_demotes_all_non_targets(
     project_root: Path,
 ) -> None:
-    """FR9 full role partition: promoting a harness to prime-builder demotes
-    EVERY other harness to loyal-opposition, including a non-target whose prior
-    role set was empty (the -006 F1 regression)."""
+    """Assigning PB in a three-active topology leaves exactly one active LO."""
     _seed_workspace(
         project_root,
         harnesses={
@@ -236,5 +230,4 @@ def test_apply_role_switch_prime_builder_demotes_all_non_targets(
     updated = _read_role_map(project_root)
     assert updated["B"] == ["prime-builder"]
     assert updated["A"] == ["loyal-opposition"]
-    # C's prior role set was [] — without the FR9 fix it would survive as [].
-    assert updated["C"] == ["loyal-opposition"]
+    assert updated["C"] == []

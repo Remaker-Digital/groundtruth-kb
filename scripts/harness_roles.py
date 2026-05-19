@@ -59,11 +59,13 @@ ROLE_ACTING_PRIME_BUILDER = "acting-prime-builder"
 
 # READ vocabulary includes the legacy compatibility/provenance value so older
 # role-assignments.json records continue to load without error.
-VALID_ROLES_FOR_READ = frozenset({
-    ROLE_PRIME_BUILDER,
-    ROLE_LOYAL_OPPOSITION,
-    ROLE_ACTING_PRIME_BUILDER,
-})
+VALID_ROLES_FOR_READ = frozenset(
+    {
+        ROLE_PRIME_BUILDER,
+        ROLE_LOYAL_OPPOSITION,
+        ROLE_ACTING_PRIME_BUILDER,
+    }
+)
 
 # WRITE vocabulary excludes the legacy compatibility/provenance value; only
 # ``prime-builder`` and ``loyal-opposition`` are valid SET targets. Per
@@ -242,6 +244,8 @@ def load_role_assignments(project_root: Path, assignment_path: Path | None = Non
     for record in projection.get("harnesses", []):
         if not isinstance(record, dict):
             continue
+        if record.get("status") != "active":
+            continue
         harness_id = normalize_harness_id(str(record.get("id") or ""))
         if not harness_id:
             continue
@@ -315,14 +319,10 @@ def _mirror_role_assignments_to_registry(project_root: Path, document: dict[str,
             if not isinstance(record, dict):
                 continue
             new_role = sorted(_normalize_role_field(record.get("role")))
-            if not new_role:
-                continue
             current = db.get_harness(str(harness_id))
             if current is None:
                 continue
-            current_role = sorted(
-                _normalize_role_field(_decode_harness_json_field(current.get("role")))
-            )
+            current_role = sorted(_normalize_role_field(_decode_harness_json_field(current.get("role"))))
             if current_role == new_role:
                 continue
             db.insert_harness(
@@ -334,9 +334,7 @@ def _mirror_role_assignments_to_registry(project_root: Path, document: dict[str,
                 change_reason="WI-3342 harness role write",
                 status=str(current.get("status") or "registered"),
                 reviewer_precedence=current.get("reviewer_precedence"),
-                invocation_surfaces=_decode_harness_json_field(
-                    current.get("invocation_surfaces")
-                ),
+                invocation_surfaces=_decode_harness_json_field(current.get("invocation_surfaces")),
                 capabilities_ref=current.get("capabilities_ref"),
             )
             changed = True
@@ -459,19 +457,83 @@ def set_harness_role(
     if resolved_id is None:
         raise ValueError("Cannot set harness role without a durable harness ID.")
 
-    document = load_role_assignments(project_root, assignment_path)
-    record = _ensure_record(document, resolved_id, harness_name=harness_name)
-    # Single-role assignment via set_harness_role writes a singleton role-set
-    # for the target harness. Multi-element role sets (single-harness mode)
-    # are set by a different code path; see the single-harness bridge
-    # dispatcher Slice 2 thread for the bootstrap flow.
-    record["role"] = _role_set_to_json({requested_role})
+    projection = load_harness_projection(project_root)
+    projection_records = [
+        record
+        for record in projection.get("harnesses", [])
+        if isinstance(record, dict) and normalize_harness_id(str(record.get("id") or ""))
+    ]
+    active_ids = sorted(
+        normalize_harness_id(str(record.get("id") or ""))
+        for record in projection_records
+        if record.get("status") == "active"
+    )
+    if resolved_id not in active_ids:
+        raise ValueError(
+            f"Cannot assign {requested_role!r} to harness {resolved_id!r}; "
+            "role assignment requires a registered and active harness."
+        )
+
+    document = _empty_document(project_root)
+    document["harnesses"] = {
+        normalize_harness_id(str(record.get("id") or "")): {"role": []} for record in projection_records
+    }
+    if len(active_ids) == 1:
+        prime_id = lo_id = active_ids[0]
+    elif requested_role == ROLE_PRIME_BUILDER:
+        prime_id = resolved_id
+        lo_id = next(
+            (
+                hid
+                for hid in active_ids
+                if hid != prime_id
+                and ROLE_LOYAL_OPPOSITION
+                in _normalize_role_field(
+                    next(
+                        (
+                            rec.get("role")
+                            for rec in projection_records
+                            if normalize_harness_id(str(rec.get("id") or "")) == hid
+                        ),
+                        [],
+                    )
+                )
+            ),
+            next(hid for hid in active_ids if hid != prime_id),
+        )
+    else:
+        lo_id = resolved_id
+        prime_id = next(
+            (
+                hid
+                for hid in active_ids
+                if hid != lo_id
+                and ROLE_PRIME_BUILDER
+                in _normalize_role_field(
+                    next(
+                        (
+                            rec.get("role")
+                            for rec in projection_records
+                            if normalize_harness_id(str(rec.get("id") or "")) == hid
+                        ),
+                        [],
+                    )
+                )
+            ),
+            next(hid for hid in active_ids if hid != lo_id),
+        )
+
+    for hid, record in document["harnesses"].items():
+        roles: set[str] = set()
+        if hid == prime_id:
+            roles.add(ROLE_PRIME_BUILDER)
+        if hid == lo_id:
+            roles.add(ROLE_LOYAL_OPPOSITION)
+        record["role"] = _role_set_to_json(roles)
+
+    record = document["harnesses"][resolved_id]
     record["assigned_at"] = _now_iso()
     record["assigned_by"] = "harness-role-command"
-    if requested_role == ROLE_PRIME_BUILDER:
-        for other_id, other_record in document.get("harnesses", {}).items():
-            if other_id != resolved_id and isinstance(other_record, dict):
-                other_record["role"] = _role_set_to_json({ROLE_LOYAL_OPPOSITION})
     document["updated_at"] = _now_iso()
     # WI-3342 IP-5: the transitional role-assignments.json write is removed;
     # _mirror_role_assignments_to_registry below is the authoritative role

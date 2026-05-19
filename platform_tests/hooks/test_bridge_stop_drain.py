@@ -153,10 +153,7 @@ def _write_pending_decision(root: Path, *, status: str, asked_at: datetime) -> N
     memory.mkdir(parents=True, exist_ok=True)
     asked = asked_at.isoformat().replace("+00:00", "Z")
     (memory / "pending-owner-decisions.md").write_text(
-        "# Pending owner decisions\n\n"
-        "- id: DECISION-9001\n"
-        f"  status: {status}\n"
-        f"  asked_at: {asked}\n",
+        f"# Pending owner decisions\n\n- id: DECISION-9001\n  status: {status}\n  asked_at: {asked}\n",
         encoding="utf-8",
     )
 
@@ -178,9 +175,7 @@ def _install_heartbeat_stub(root: Path) -> Path:
     return root / ".heartbeat-rearm-marker"
 
 
-def _write_transcript(
-    root: Path, *, last_user_text: str, trailing_tool_result: bool = False
-) -> Path:
+def _write_transcript(root: Path, *, last_user_text: str, trailing_tool_result: bool = False) -> Path:
     """Write a minimal Claude Code JSONL transcript whose last real owner
     message is ``last_user_text``. When ``trailing_tool_result`` is set a
     tool-result-only user event (an agent-loop continuation) is appended after
@@ -203,9 +198,7 @@ def _write_transcript(
             }
         )
     transcript = root / "transcript.jsonl"
-    transcript.write_text(
-        "\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8"
-    )
+    transcript.write_text("\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8")
     return transcript
 
 
@@ -251,6 +244,47 @@ def test_codex_as_prime_ignores_new_revised(tmp_path: Path) -> None:
     root = _make_project(tmp_path, claude_role="loyal-opposition", codex_role="prime-builder")
     _write_index(root, [("alpha", "NEW", 1), ("beta", "REVISED", 2)])
     assert hook.drain_decision(root, "codex", "s1") == {}
+
+
+def test_governance_suspension_marker_suppresses_autodrain(tmp_path: Path) -> None:
+    """Emergency owner suspension is a mechanical drain stop, not just prose."""
+    hook = _load_hook()
+    root = _make_project(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
+    _write_index(root, [("alpha", "NEW", 1)])
+    suspension = root / ".gtkb-state" / "governance-suspension.json"
+    suspension.parent.mkdir(parents=True, exist_ok=True)
+    suspension.write_text(
+        json.dumps({"status": "active", "suppress_bridge_auto_drain": True}),
+        encoding="utf-8",
+    )
+    assert hook.drain_decision(root, "codex", "s1") == {}
+    assert _drain_state(root, "s1")["last_result"] == "deferred_governance_suspension"
+
+
+def test_dual_role_session_does_not_autodrain_lo_review_work(tmp_path: Path) -> None:
+    """A PB+LO session must not auto-review NEW/REVISED work it may have authored."""
+    hook = _load_hook()
+    root = _make_project(
+        tmp_path,
+        claude_role=[],
+        codex_role=["prime-builder", "loyal-opposition"],
+    )
+    _write_index(root, [("alpha", "NEW", 1)])
+    assert hook.drain_decision(root, "codex", "s1") == {}
+
+
+def test_dual_role_session_can_still_autodrain_prime_continuation_work(tmp_path: Path) -> None:
+    """The dual-role guard is review-specific; Prime GO/NO-GO continuation remains drainable."""
+    hook = _load_hook()
+    root = _make_project(
+        tmp_path,
+        claude_role=[],
+        codex_role=["prime-builder", "loyal-opposition"],
+    )
+    _write_index(root, [("alpha", "GO", 2)])
+    out = hook.drain_decision(root, "codex", "s1")
+    assert out.get("decision") == "block"
+    assert "GO: alpha" in out["reason"]
 
 
 def test_claude_as_prime_drains_go_no_go(tmp_path: Path) -> None:
@@ -387,9 +421,7 @@ def test_wrapup_command_normalization_tolerance(tmp_path: Path) -> None:
     hook = _load_hook()
     variants = ("Wrap Up.", "please wrap up", "session wrap-up please", "  end this session!  ")
     for i, variant in enumerate(variants):
-        root = _make_project(
-            tmp_path / f"v{i}", claude_role="prime-builder", codex_role="loyal-opposition"
-        )
+        root = _make_project(tmp_path / f"v{i}", claude_role="prime-builder", codex_role="loyal-opposition")
         _write_index(root, [("alpha", "GO", 2)])
         transcript = _write_transcript(root, last_user_text=variant)
         out = hook.drain_decision(root, "claude", "s1", str(transcript))
@@ -403,9 +435,7 @@ def test_wrapup_check_skips_tool_result_continuation(tmp_path: Path) -> None:
     hook = _load_hook()
     root = _make_project(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
     _write_index(root, [("alpha", "GO", 2)])
-    transcript = _write_transcript(
-        root, last_user_text="wrap up this session", trailing_tool_result=True
-    )
+    transcript = _write_transcript(root, last_user_text="wrap up this session", trailing_tool_result=True)
     assert hook.drain_decision(root, "claude", "s1", str(transcript)) == {}
 
 
@@ -457,9 +487,7 @@ def test_both_surfaces_use_shared_compute_actionable_pending() -> None:
     AXIS-2 UserPromptSubmit Prime surface both call
     groundtruth_kb.bridge.notify.compute_actionable_pending, so the two
     surfaces cannot drift apart."""
-    axis2 = (_REPO_ROOT / ".claude" / "hooks" / "bridge-axis-2-surface.py").read_text(
-        encoding="utf-8"
-    )
+    axis2 = (_REPO_ROOT / ".claude" / "hooks" / "bridge-axis-2-surface.py").read_text(encoding="utf-8")
     drain = _HOOK_PATH.read_text(encoding="utf-8")
     assert "compute_actionable_pending" in axis2
     assert "compute_actionable_pending" in drain
@@ -479,9 +507,7 @@ def test_main_cli_surface_emits_block_and_exits_zero(tmp_path: Path) -> None:
     # main() bootstraps PROJECT_ROOT/scripts + PROJECT_ROOT/groundtruth-kb/src;
     # the fixture root has neither, so PYTHONPATH carries the real checkout's
     # code while CLAUDE_PROJECT_DIR points the *data* reads at the fixture.
-    env["PYTHONPATH"] = os.pathsep.join(
-        [str(_REPO_ROOT / "scripts"), str(_REPO_ROOT / "groundtruth-kb" / "src")]
-    )
+    env["PYTHONPATH"] = os.pathsep.join([str(_REPO_ROOT / "scripts"), str(_REPO_ROOT / "groundtruth-kb" / "src")])
     proc = subprocess.run(
         [sys.executable, str(_HOOK_PATH), "--harness", "claude"],
         input=json.dumps({"session_id": "cli-smoke"}),
@@ -503,16 +529,12 @@ def test_bridge_stop_drain_registered_last_in_both_stop_arrays() -> None:
     """bridge-stop-drain.py must be the LAST Stop hook in both .claude/settings.json
     and .codex/hooks.json so it observes every prior Stop hook's INDEX
     side-effects before deciding whether to drain."""
-    claude_cfg = json.loads(
-        (_REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8")
-    )
+    claude_cfg = json.loads((_REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     claude_stop = claude_cfg["hooks"]["Stop"][0]["hooks"]
     assert "bridge-stop-drain.py" in claude_stop[-1]["command"]
     assert "--harness claude" in claude_stop[-1]["command"]
 
-    codex_cfg = json.loads(
-        (_REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8")
-    )
+    codex_cfg = json.loads((_REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
     codex_stop = codex_cfg["hooks"]["Stop"][0]["hooks"]
     assert "bridge-stop-drain.py" in codex_stop[-1]["command"]
     assert "--harness codex" in codex_stop[-1]["command"]

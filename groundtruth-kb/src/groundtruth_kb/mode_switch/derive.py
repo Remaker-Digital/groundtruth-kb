@@ -46,24 +46,30 @@ def _role_set(record: Any) -> frozenset[str]:
     return frozenset(tokens)
 
 
+def _is_active(record: Any) -> bool:
+    return isinstance(record, dict) and record.get("status") == "active"
+
+
 def topology_from_role_map(role_map: dict[str, Any]) -> str:
     """Return ``single_harness`` or ``multi_harness`` for the given role map.
 
-    Single-harness iff exactly one harness ID's role-set contains BOTH
-    ``prime-builder`` AND ``loyal-opposition``. All other shapes return
-    ``multi_harness`` (including empty/malformed maps; the dispatcher's
-    fail-closed semantics for ambiguous input is preserved by returning the
-    multi-harness default, which makes the cross-harness trigger the active
-    substrate).
+    Single-harness iff exactly one ACTIVE harness ID's role-set contains BOTH
+    ``prime-builder`` AND ``loyal-opposition``. Registered, suspended, and
+    retired harnesses are ignored for topology because registration is separate
+    from role assignment. All other shapes return ``multi_harness`` (including
+    empty/malformed maps; the dispatcher's fail-closed semantics for ambiguous
+    input is preserved by returning the multi-harness default, which makes the
+    cross-harness trigger the active substrate).
     """
     if not isinstance(role_map, dict):
         return MULTI_HARNESS
     harnesses = role_map.get("harnesses")
     if not isinstance(harnesses, dict):
         return MULTI_HARNESS
-    if len(harnesses) != 1:
+    active_records = [record for record in harnesses.values() if _is_active(record)]
+    if len(active_records) != 1:
         return MULTI_HARNESS
-    only_record = next(iter(harnesses.values()))
+    only_record = active_records[0]
     roles = _role_set(only_record)
     if _PRIME in roles and _LO in roles:
         return SINGLE_HARNESS
@@ -89,6 +95,8 @@ def role_slot_from_active_harness(
     if not isinstance(harnesses, dict):
         return SHARED
     record = harnesses.get(active_harness_id)
+    if not _is_active(record):
+        return SHARED
     roles = _role_set(record)
     if not roles:
         return SHARED
