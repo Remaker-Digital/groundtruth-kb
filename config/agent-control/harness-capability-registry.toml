@@ -21,6 +21,12 @@ surface = ".codex/skills/alternatives-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/alternatives-investigation/SKILL.md"
 source_sha256 = "a58d3a9ef5fd13aa734c76b8f787404546610201782b3af06a5b8f1bec239572"
+
+[capabilities.antigravity]
+surface = ".agent/skills/alternatives-investigation/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/alternatives-investigation/SKILL.md"
+source_sha256 = "a58d3a9ef5fd13aa734c76b8f787404546610201782b3af06a5b8f1bec239572"
 [[capabilities]]
 id = "skill.arch-audit"
 kind = "skill"
@@ -36,6 +42,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/arch-audit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/arch-audit/SKILL.md"
+source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
+
+[capabilities.antigravity]
+surface = ".agent/skills/arch-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/arch-audit/SKILL.md"
 source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
@@ -75,6 +87,12 @@ surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
 source_sha256 = "561406bf00e2acdd143d48cfa0c1401687d5dcb6c82a0cc37526f87093347d73"
+
+[capabilities.antigravity]
+surface = ".agent/skills/bridge/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/bridge/SKILL.md"
+source_sha256 = "561406bf00e2acdd143d48cfa0c1401687d5dcb6c82a0cc37526f87093347d73"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -111,6 +129,12 @@ surface = ".codex/skills/check-deliberations/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/check-deliberations/SKILL.md"
 source_sha256 = "ea6f9f23c5d36c673e82d120bdab5868203f78ee073530bb72c3e16ac2efb59d"
+
+[capabilities.antigravity]
+surface = ".agent/skills/check-deliberations/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/check-deliberations/SKILL.md"
+source_sha256 = "ea6f9f23c5d36c673e82d120bdab5868203f78ee073530bb72c3e16ac2efb59d"
 [[capabilities]]
 id = "skill.code-review-audit"
 kind = "skill"
@@ -126,6 +150,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/code-review-audit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/code-review-audit/SKILL.md"
+source_sha256 = "318aec13485938431ccb85fea58a4ec3bacab8dab2dfe8ea97c54f8d118bc2d3"
+
+[capabilities.antigravity]
+surface = ".agent/skills/code-review-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/code-review-audit/SKILL.md"
 source_sha256 = "318aec13485938431ccb85fea58a4ec3bacab8dab2dfe8ea97c54f8d118bc2d3"
@@ -147,6 +177,12 @@ surface = ".codex/skills/lo-opportunity-radar/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/lo-opportunity-radar/SKILL.md"
 source_sha256 = "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
+
+[capabilities.antigravity]
+surface = ".agent/skills/lo-opportunity-radar/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/lo-opportunity-radar/SKILL.md"
+source_sha256 = "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
 [[capabilities]]
 id = "skill.codex-report"
 kind = "skill"
@@ -165,6 +201,12 @@ surface = ".codex/skills/codex-report/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/codex-report/SKILL.md"
 source_sha256 = "c930da76aec08dc9a1a092f9e90a0d0fcd43cfb5bc089feb4df4661175961d22"
+
+[capabilities.antigravity]
+surface = ".agent/skills/codex-report/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/codex-report/SKILL.md"
+source_sha256 = "c930da76aec08dc9a1a092f9e90a0d0fcd43cfb5bc089feb4df4661175961d22"
 [[capabilities]]
 id = "skill.decision-capture"
 kind = "skill"
@@ -180,6 +222,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/decision-capture/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/decision-capture/SKILL.md"
+source_sha256 = "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
+
+[capabilities.antigravity]
+surface = ".agent/skills/decision-capture/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/decision-capture/SKILL.md"
 source_sha256 = "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
@@ -219,6 +267,12 @@ surface = ".codex/skills/harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
 source_sha256 = "9868556c7f76998cb5ccfb6613b9170b18ba172a9c3f512e023c4bd36c787c5d"
+
+[capabilities.antigravity]
+surface = ".agent/skills/harness-parity-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
+source_sha256 = "9868556c7f76998cb5ccfb6613b9170b18ba172a9c3f512e023c4bd36c787c5d"
 [[capabilities]]
 id = "skill.kb-adr"
 kind = "skill"
@@ -252,6 +306,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/kb-assert/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-assert/SKILL.md"
+source_sha256 = "41e992629bbc599f80464971f0135cea20870803082f4dab720dce8a642db4e2"
+
+[capabilities.antigravity]
+surface = ".agent/skills/kb-assert/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-assert/SKILL.md"
 source_sha256 = "41e992629bbc599f80464971f0135cea20870803082f4dab720dce8a642db4e2"
@@ -309,6 +369,12 @@ surface = ".codex/skills/kb-query/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-query/SKILL.md"
 source_sha256 = "693cfda872edd966ca5f382b0435df0c8b9c62639b32be22ef56f65c92e84086"
+
+[capabilities.antigravity]
+surface = ".agent/skills/kb-query/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-query/SKILL.md"
+source_sha256 = "693cfda872edd966ca5f382b0435df0c8b9c62639b32be22ef56f65c92e84086"
 [[capabilities]]
 id = "skill.kb-session-wrap"
 kind = "skill"
@@ -327,6 +393,12 @@ surface = ".codex/skills/kb-session-wrap/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-session-wrap/SKILL.md"
 source_sha256 = "46ac37d278c3f4d892816802051437759737b013b75badb7d7886bee892a945b"
+
+[capabilities.antigravity]
+surface = ".agent/skills/kb-session-wrap/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-session-wrap/SKILL.md"
+source_sha256 = "46ac37d278c3f4d892816802051437759737b013b75badb7d7886bee892a945b"
 [[capabilities]]
 id = "skill.kb-session-wrap-scan"
 kind = "skill"
@@ -342,6 +414,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/kb-session-wrap-scan/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-session-wrap-scan/SKILL.md"
+source_sha256 = "203d0492747c6e5011df3ee357287cb6e3d32de9bde7ecdc00878cc8526deb56"
+
+[capabilities.antigravity]
+surface = ".agent/skills/kb-session-wrap-scan/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-session-wrap-scan/SKILL.md"
 source_sha256 = "203d0492747c6e5011df3ee357287cb6e3d32de9bde7ecdc00878cc8526deb56"
@@ -381,6 +459,12 @@ surface = ".codex/skills/kb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-work-item/SKILL.md"
 source_sha256 = "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
+
+[capabilities.antigravity]
+surface = ".agent/skills/kb-work-item/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-work-item/SKILL.md"
+source_sha256 = "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
 [[capabilities]]
 id = "skill.projects"
 kind = "skill"
@@ -396,6 +480,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/projects/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/projects/SKILL.md"
+source_sha256 = "d1b717e8b996e192c6c451c923a333cc460c14bda3925dd221e4f2e26883342d"
+
+[capabilities.antigravity]
+surface = ".agent/skills/projects/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/projects/SKILL.md"
 source_sha256 = "d1b717e8b996e192c6c451c923a333cc460c14bda3925dd221e4f2e26883342d"
@@ -417,6 +507,12 @@ surface = ".codex/skills/proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/proposal-review/SKILL.md"
 source_sha256 = "28b517c4790bb61f96aaabda59cdef1f5aa4872c93e69f078fdeb42698b42dcf"
+
+[capabilities.antigravity]
+surface = ".agent/skills/proposal-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/proposal-review/SKILL.md"
+source_sha256 = "28b517c4790bb61f96aaabda59cdef1f5aa4872c93e69f078fdeb42698b42dcf"
 [[capabilities]]
 id = "skill.release-candidate-gate"
 kind = "skill"
@@ -435,6 +531,12 @@ surface = ".codex/skills/release-candidate-gate/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/release-candidate-gate/SKILL.md"
 source_sha256 = "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
+
+[capabilities.antigravity]
+surface = ".agent/skills/release-candidate-gate/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/release-candidate-gate/SKILL.md"
+source_sha256 = "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
 [[capabilities]]
 id = "skill.run-tests"
 kind = "skill"
@@ -450,6 +552,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/run-tests/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/run-tests/SKILL.md"
+source_sha256 = "eb6c2f2b5c19028f5716fd7cbf4d3e150c73170548d2073041e5056da7b15bb9"
+
+[capabilities.antigravity]
+surface = ".agent/skills/run-tests/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/run-tests/SKILL.md"
 source_sha256 = "eb6c2f2b5c19028f5716fd7cbf4d3e150c73170548d2073041e5056da7b15bb9"
@@ -489,6 +597,12 @@ surface = ".codex/skills/send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/send-review/SKILL.md"
 source_sha256 = "d1e8a85a64f3b8191c0e7495873bfb00154ffc05e35a92e448535f8cc22f5213"
+
+[capabilities.antigravity]
+surface = ".agent/skills/send-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/send-review/SKILL.md"
+source_sha256 = "d1e8a85a64f3b8191c0e7495873bfb00154ffc05e35a92e448535f8cc22f5213"
 [[capabilities]]
 id = "skill.spec-intake"
 kind = "skill"
@@ -522,6 +636,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/structural-hygiene-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/structural-hygiene-review/SKILL.md"
+source_sha256 = "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"
+
+[capabilities.antigravity]
+surface = ".agent/skills/structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/structural-hygiene-review/SKILL.md"
 source_sha256 = "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"
@@ -593,6 +713,12 @@ status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/verify/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/verify/SKILL.md"
+source_sha256 = "0cb8669690d00770ee94ef1362700c6d0fbbacaddf0ac2f31a69a281d71e716c"
+
+[capabilities.antigravity]
+surface = ".agent/skills/verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/verify/SKILL.md"
 source_sha256 = "0cb8669690d00770ee94ef1362700c6d0fbbacaddf0ac2f31a69a281d71e716c"
