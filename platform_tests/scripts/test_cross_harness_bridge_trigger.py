@@ -30,13 +30,9 @@ _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_
 # WI-3344: invocation_surfaces headless argv templates. {{PROMPT}} and
 # {{PROJECT_ROOT}} are the placeholder tokens _harness_command substitutes as
 # individual argv elements. Shared by the synthetic fixture and the FR8 tests.
-_CODEX_INVOCATION_SURFACES = {
-    "headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}
-}
+_CODEX_INVOCATION_SURFACES = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
 _CLAUDE_INVOCATION_SURFACES = {
-    "headless": {
-        "argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]
-    }
+    "headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]}
 }
 
 
@@ -61,9 +57,7 @@ def _frozen_pending_signature(items: list[object]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _frozen_selected_items_for_prompt(
-    items: list[object], max_items: int
-) -> list[object]:
+def _frozen_selected_items_for_prompt(items: list[object], max_items: int) -> list[object]:
     """Frozen byte-identical reference for the retired smart-poller's
     ``_selected_items_for_prompt`` (Slice 4 D7).
 
@@ -180,11 +174,7 @@ def _index_with_one_go(root: Path, doc: str = "example-thread") -> str:
     """Build an INDEX whose top status is GO (Prime-actionable)."""
     _write_bridge_file(root, f"{doc}-001.md", "bridge_kind: implementation_proposal\n")
     _write_bridge_file(root, f"{doc}-002.md", "bridge_kind: implementation_proposal\n")
-    return (
-        f"# bridge index\n\nDocument: {doc}\n"
-        f"GO: bridge/{doc}-002.md\n"
-        f"NEW: bridge/{doc}-001.md\n"
-    )
+    return f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -205,12 +195,8 @@ def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) ->
     state_dir_a = tmp_path / "state-a"
     state_dir_b = tmp_path / "state-b"
 
-    summary_a = trigger.run_trigger(
-        project_root=root, state_dir=state_dir_a, dry_run=True
-    )
-    summary_b = trigger.run_trigger(
-        project_root=root, state_dir=state_dir_b, dry_run=True
-    )
+    summary_a = trigger.run_trigger(project_root=root, state_dir=state_dir_a, dry_run=True)
+    summary_b = trigger.run_trigger(project_root=root, state_dir=state_dir_b, dry_run=True)
 
     sig_a = summary_a["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     sig_b = summary_b["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
@@ -238,16 +224,12 @@ def test_uncommitted_index_edit_triggers_dispatch(tmp_path: Path) -> None:
     # Empty INDEX → no dispatch.
     _write_index(root, "# empty\n")
     trigger = _load_trigger()
-    summary_empty = trigger.run_trigger(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary_empty = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary_empty["results"]["loyal-opposition"]["reason"] == "no_pending"
 
     # Add a NEW entry (uncommitted edit) → dispatch fires.
     _write_index(root, _index_with_one_new(root))
-    summary_new = trigger.run_trigger(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary_new = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     # dry_run=True → "launched" stays False, but reason is "dry_run" not "no_pending"
     # which proves the dispatch path was entered.
     assert summary_new["results"]["loyal-opposition"]["reason"] == "dry_run"
@@ -366,9 +348,7 @@ def test_manual_disable_env_var_no_ops(tmp_path: Path, monkeypatch: pytest.Monke
 
     monkeypatch.setenv("GTKB_NO_CROSS_HARNESS_TRIGGER", "1")
     trigger = _load_trigger()
-    summary = trigger.run_trigger(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary == {"skipped": True, "reason": "loop_prevention_env_var"}
     # And no dispatch-state file was written.
     assert not (state_dir / "dispatch-state.json").exists()
@@ -438,9 +418,7 @@ def test_dispatch_state_schema_matches_smart_poller_signature_scheme(tmp_path: P
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    summary = trigger.run_trigger(
-        project_root=root, state_dir=state_dir, dry_run=True
-    )
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
 
     from groundtruth_kb.bridge.detector import parse_index  # type: ignore
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
@@ -506,9 +484,7 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     _write_index(root, _index_with_three_new(root))
 
     trigger = _load_trigger()
-    summary = trigger.run_trigger(
-        project_root=root, state_dir=state_dir, max_items=2, dry_run=True
-    )
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     from groundtruth_kb.bridge.detector import parse_index  # type: ignore
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
@@ -529,8 +505,7 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
 
     actual_sig = summary["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     assert actual_sig == expected_selected_sig, (
-        "trigger must sign the selected dispatch batch (post-cap, post-reverse), "
-        "not the full filtered list"
+        "trigger must sign the selected dispatch batch (post-cap, post-reverse), not the full filtered list"
     )
     assert actual_sig != expected_full_sig
 
@@ -555,9 +530,7 @@ def test_default_max_items_matches_smart_poller_default_cap(tmp_path: Path) -> N
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_dispatched_child_env_does_not_inherit_disable_var(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Codex F2 on -008: the trigger MUST NOT propagate
     GTKB_NO_CROSS_HARNESS_TRIGGER to the dispatched-harness child env.
 
@@ -656,9 +629,12 @@ def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
     worktree carries its own committed groundtruth.toml. Requires git.
     """
     ident = [
-        "-c", "user.email=test@example.com",
-        "-c", "user.name=test",
-        "-c", "commit.gpgsign=false",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=test",
+        "-c",
+        "commit.gpgsign=false",
     ]
     canonical = tmp_path / "canonical"
     canonical.mkdir()
@@ -746,9 +722,7 @@ def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_stop_hook_emits_exactly_braces_json(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_stop_hook_emits_exactly_braces_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """T-3-stop-hook-output-contract: ``--stop-hook`` mode MUST emit exactly
     ``{}`` (parseable JSON object, no extra text) on stdout and exit 0.
 
@@ -775,17 +749,13 @@ def test_stop_hook_emits_exactly_braces_json(
 
     captured = capsys.readouterr()
     # Stdout MUST be exactly "{}\n" (no extra summary text — Codex contract).
-    assert captured.out == "{}\n", (
-        f"Expected stdout exactly '{{}}\\n' for --stop-hook; got: {captured.out!r}"
-    )
+    assert captured.out == "{}\n", f"Expected stdout exactly '{{}}\\n' for --stop-hook; got: {captured.out!r}"
     # Stdout MUST parse as a JSON object.
     parsed = json.loads(captured.out)
     assert parsed == {}, "Stop-hook stdout must parse to an empty dict"
 
 
-def test_stop_hook_overrides_verbose(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_stop_hook_overrides_verbose(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """T-3-stop-hook-output-contract (verbose interaction): when both
     --stop-hook and --verbose are passed, --stop-hook MUST win to preserve
     the JSON contract.
@@ -835,9 +805,7 @@ def test_stop_hook_runs_reconciliation_bounded_no_dispatch_on_unchanged(
     trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     state_path = state_dir / "dispatch-state.json"
     assert state_path.exists()
-    sig_before = json.loads(state_path.read_text(encoding="utf-8"))[
-        "recipients"
-    ]["loyal-opposition"]["signature"]
+    sig_before = json.loads(state_path.read_text(encoding="utf-8"))["recipients"]["loyal-opposition"]["signature"]
 
     # Now invoke --stop-hook on the SAME index state.
     capsys.readouterr()  # drain
@@ -909,9 +877,7 @@ def test_stop_hook_fail_soft_dispatches_on_changed_signature(
     state_path = state_dir / "dispatch-state.json"
     state = json.loads(state_path.read_text(encoding="utf-8"))
     rec = state["recipients"]["loyal-opposition"]
-    assert rec["last_result"] != "unchanged", (
-        "Stop hook must detect changed signature even when PostToolUse missed it"
-    )
+    assert rec["last_result"] != "unchanged", "Stop hook must detect changed signature even when PostToolUse missed it"
     assert "last_launch" in rec
     assert rec["last_launch"]["reason"] == "dry_run"
 
@@ -1088,14 +1054,12 @@ def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evi
     # (3) Per-role audit-log entries in dispatch-failures.jsonl.
     failures_path = state_dir / "dispatch-failures.jsonl"
     assert failures_path.is_file(), "dispatch-failures.jsonl missing"
-    lines = [
-        line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()
-    ]
+    lines = [line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     records = [json.loads(line) for line in lines]
     assert len(records) == 2, f"expected 2 audit entries, got {len(records)}: {records}"
     by_role = {rec["recipient"]: rec for rec in records}
     assert "prime-builder" in by_role and "loyal-opposition" in by_role
-    for role, rec in by_role.items():
+    for rec in by_role.values():
         assert rec["reason"] == "single_harness_topology_not_applicable"
         assert rec["launched"] is False
         assert "SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001" in rec["error_message"]
@@ -1109,6 +1073,77 @@ def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evi
     assert recipients["loyal-opposition"]["last_result"] == "single_harness_topology_not_applicable"
     assert "updated_at" in recipients["prime-builder"]
     assert "updated_at" in recipients["loyal-opposition"]
+
+
+def test_diagnose_reports_current_role_recipient_keys_and_single_harness_as_inert(tmp_path: Path) -> None:
+    """Diagnose must read current role-label state keys, not legacy prime/codex keys."""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "prime-builder": {
+                "last_result": "single_harness_topology_not_applicable",
+                "pending_count": 0,
+                "selected_count": 0,
+                "updated_at": "2026-05-19T21:00:00+00:00",
+            },
+            "loyal-opposition": {
+                "last_result": "single_harness_topology_not_applicable",
+                "pending_count": 0,
+                "selected_count": 0,
+                "updated_at": "2026-05-19T21:00:00+00:00",
+            },
+        },
+        "schema_version": 1,
+        "updated_at": "2026-05-19T21:00:00+00:00",
+    }
+    (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
+
+    trigger = _load_trigger()
+    output = trigger._emit_diagnose_summary(state_dir)
+
+    assert "- prime-builder: last_result=single_harness_topology_not_applicable" in output
+    assert "- loyal-opposition: last_result=single_harness_topology_not_applicable" in output
+    assert "- prime: (no state recorded)" not in output
+    assert "- codex: (no state recorded)" not in output
+    assert "single-harness topology; cross-harness dispatch not applicable" in output
+    assert "HEALTHY" in output
+    assert "DEGRADED" not in output
+
+
+def test_diagnose_migrates_legacy_recipient_keys_before_liveness(tmp_path: Path) -> None:
+    """Legacy dispatch-state keys are translated before diagnose renders liveness."""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "prime": {
+                "last_result": "no_pending",
+                "pending_count": 0,
+                "selected_count": 0,
+                "updated_at": "2026-05-19T21:00:00+00:00",
+            },
+            "codex": {
+                "last_result": "counterpart_active_session_present",
+                "pending_count": 2,
+                "selected_count": 2,
+                "updated_at": "2026-05-19T21:00:00+00:00",
+            },
+        },
+        "schema_version": 1,
+        "updated_at": "2026-05-19T21:00:00+00:00",
+    }
+    (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
+
+    trigger = _load_trigger()
+    output = trigger._emit_diagnose_summary(state_dir)
+
+    assert "- prime-builder: last_result=no_pending" in output
+    assert "- loyal-opposition: last_result=counterpart_active_session_present" in output
+    assert "- prime: last_result=" not in output
+    assert "- codex: last_result=" not in output
+    assert "HEALTHY" in output
+    assert "DEGRADED" not in output
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1237,11 +1272,21 @@ def test_diagnostic_jsonl_parseable(tmp_path: Path) -> None:
     raw = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     assert raw, "diagnostic log must contain at least one record"
     expected_keys = {
-        "timestamp", "invocation_source", "pid", "session_id",
-        "index_mtime", "index_signature_pre", "index_signature_post",
-        "dispatch_state_mtime_pre", "dispatch_state_mtime_post",
-        "classification", "last_dispatched_signature",
-        "last_suppressed_signature", "elapsed_ms", "recipient", "last_result",
+        "timestamp",
+        "invocation_source",
+        "pid",
+        "session_id",
+        "index_mtime",
+        "index_signature_pre",
+        "index_signature_post",
+        "dispatch_state_mtime_pre",
+        "dispatch_state_mtime_post",
+        "classification",
+        "last_dispatched_signature",
+        "last_suppressed_signature",
+        "elapsed_ms",
+        "recipient",
+        "last_result",
     }
     for ln in raw:
         rec = json.loads(ln)  # raises on malformed JSON -> test fails
@@ -1328,11 +1373,11 @@ def test_harness_command_fails_closed_for_missing_or_malformed_surfaces(tmp_path
     """
     trigger = _load_trigger()
     malformed_cases = [
-        None,                                                  # NULL invocation_surfaces
-        {},                                                    # no headless entry
-        {"headless": {}},                                      # headless without argv
-        {"headless": {"argv": []}},                            # empty argv
-        {"headless": {"argv": "codex exec"}},                  # argv is not a list
+        None,  # NULL invocation_surfaces
+        {},  # no headless entry
+        {"headless": {}},  # headless without argv
+        {"headless": {"argv": []}},  # empty argv
+        {"headless": {"argv": "codex exec"}},  # argv is not a list
         {"headless": {"argv": ["codex", 123, "{{PROMPT}}"]}},  # non-string argv element
     ]
     for handle in ("codex", "claude", "gemini"):

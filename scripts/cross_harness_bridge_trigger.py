@@ -233,6 +233,7 @@ LEGACY_TO_NEW_STATE_KEY = {
     "prime": "prime-builder",
     "codex": "loyal-opposition",
 }
+ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")
 
 
 def _migrate_recipients_state_keys(recipients: dict[str, Any]) -> dict[str, Any]:
@@ -583,7 +584,9 @@ class DispatchTarget:
     harness_id: str  # "A", "B", etc. — durable identity from harness-identities.json
     command_handle: str  # "claude" / "codex" — from inverted harness-identities.json
     canonical_mode: str  # "pb" / "lo" — the canonical-init-keyword mode
-    invocation_surfaces: dict[str, Any] | None = None  # WI-3344: headless argv template from the harness-registry projection; None when the projection carries no record for this harness
+    invocation_surfaces: dict[str, Any] | None = (
+        None  # WI-3344: headless argv template from the harness-registry projection; None when the projection carries no record for this harness
+    )
 
     @property
     def active_session_lock_name(self) -> str:
@@ -1268,9 +1271,7 @@ def run_trigger(
         "session_id": os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID", ""),
         "index_mtime": _diag_index_mtime,
         "index_signature_pre": _diag_index_signature_pre,
-        "index_signature_post": hashlib.sha256(
-            _read_index_live(project_root).encode("utf-8")
-        ).hexdigest(),
+        "index_signature_post": hashlib.sha256(_read_index_live(project_root).encode("utf-8")).hexdigest(),
         "dispatch_state_mtime_pre": _diag_dispatch_state_mtime_pre,
         "dispatch_state_mtime_post": _path_mtime_iso(state_dir / DISPATCH_STATE_FILENAME),
         "elapsed_ms": int((time.monotonic() - _diag_start) * 1000),
@@ -1356,7 +1357,11 @@ def _emit_diagnose_summary(state_dir: Path) -> str:
     # Per-recipient state
     lines.append("== Per-recipient state ==")
     recipients = state.get("recipients", {}) or {}
-    for name in ("codex", "prime"):
+    if isinstance(recipients, dict):
+        recipients = _migrate_recipients_state_keys(recipients)
+    else:
+        recipients = {}
+    for name in ROLE_STATE_KEYS:
         rec = recipients.get(name) or {}
         if not rec:
             lines.append(f"- {name}: (no state recorded)")
@@ -1408,13 +1413,17 @@ def _emit_diagnose_summary(state_dir: Path) -> str:
     # Liveness assessment
     lines.append("== Liveness ==")
     overall_healthy = True
-    for name in ("codex", "prime"):
+    for name in ROLE_STATE_KEYS:
         rec = recipients.get(name) or {}
         sig = rec.get("signature") or ""
         last_dispatched = rec.get("last_dispatched_signature") or ""
         last_result = rec.get("last_result") or ""
         if last_result == "no_pending":
             lines.append(f"- {name}: idle (no actionable work).")
+        elif last_result == "no_pending_after_filter":
+            lines.append(f"- {name}: idle (no dispatchable work after filtering).")
+        elif last_result == "single_harness_topology_not_applicable":
+            lines.append(f"- {name}: inert (single-harness topology; cross-harness dispatch not applicable).")
         elif last_result == "counterpart_active_session_present":
             lines.append(f"- {name}: suppressed (counterpart active session detected; by design).")
         elif sig == last_dispatched and sig:
