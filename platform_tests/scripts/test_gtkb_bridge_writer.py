@@ -25,10 +25,10 @@ from pathlib import Path
 import pytest
 
 from scripts.gtkb_bridge_writer import (
-    BridgeConflictError,
-    BridgeTransitionError,
     LOYAL_OPPOSITION_ROLE_SLOT,
     PRIME_ROLE_SLOT,
+    BridgeConflictError,
+    BridgeTransitionError,
     get_block,
     insert_index_status,
     next_file_number,
@@ -38,7 +38,6 @@ from scripts.gtkb_bridge_writer import (
     write_bridge_file,
 )
 
-
 INDEX_HEADER = (
     "# Bridge Index\n"
     "\n"
@@ -47,6 +46,15 @@ INDEX_HEADER = (
     "<!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->\n"
     "\n"
 )
+
+AUTHOR_METADATA = {
+    "author_identity": "Codex",
+    "author_harness_id": "A",
+    "author_session_context_id": "session-123",
+    "author_model": "GPT-5.5",
+    "author_model_version": "5.5",
+    "author_model_configuration": "Extra High",
+}
 
 
 def _build_project(tmp_path: Path, index_body: str = "") -> Path:
@@ -73,8 +81,7 @@ def _make_bridge_file(project_root: Path, name: str, version: int, body: str = "
 def test_parse_index_extracts_blocks_and_order(tmp_path: Path) -> None:
     project = _build_project(
         tmp_path,
-        _doc_block("foo", [("GO", 2), ("NEW", 1)])
-        + _doc_block("bar", [("VERIFIED", 3), ("NEW", 2), ("GO", 1)]),
+        _doc_block("foo", [("GO", 2), ("NEW", 1)]) + _doc_block("bar", [("VERIFIED", 3), ("NEW", 2), ("GO", 1)]),
     )
     raw, blocks = read_index(project)
     assert len(blocks) == 2
@@ -174,10 +181,33 @@ def test_lo_go_after_new_accepted(tmp_path: Path) -> None:
     validate_transition("pending", "GO", LOYAL_OPPOSITION_ROLE_SLOT, project)
 
 
-def test_lo_go_after_revised_accepted(tmp_path: Path) -> None:
-    project = _build_project(
-        tmp_path, _doc_block("revised", [("REVISED", 3), ("NO-GO", 2), ("NEW", 1)])
+def test_lo_go_rejects_same_session_author_metadata(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("pending", [("NEW", 1)]))
+    _make_bridge_file(project, "pending", 1, "NEW\nsession_context_id: s1\n")
+    with pytest.raises(BridgeTransitionError, match="same-session review"):
+        validate_transition(
+            "pending",
+            "GO",
+            LOYAL_OPPOSITION_ROLE_SLOT,
+            project,
+            session_id="s1",
+        )
+
+
+def test_lo_go_allows_unrelated_session_author_metadata(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("pending", [("NEW", 1)]))
+    _make_bridge_file(project, "pending", 1, "NEW\nauthor_session_id: s1\n")
+    validate_transition(
+        "pending",
+        "GO",
+        LOYAL_OPPOSITION_ROLE_SLOT,
+        project,
+        session_id="s2",
     )
+
+
+def test_lo_go_after_revised_accepted(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("revised", [("REVISED", 3), ("NO-GO", 2), ("NEW", 1)]))
     validate_transition("revised", "GO", LOYAL_OPPOSITION_ROLE_SLOT, project)
 
 
@@ -232,9 +262,7 @@ def test_invalid_status_rejected(tmp_path: Path) -> None:
 
 
 def test_any_transition_after_verified_rejected(tmp_path: Path) -> None:
-    project = _build_project(
-        tmp_path, _doc_block("closed", [("VERIFIED", 2), ("NEW", 1)])
-    )
+    project = _build_project(tmp_path, _doc_block("closed", [("VERIFIED", 2), ("NEW", 1)]))
     for status, role in [
         ("REVISED", PRIME_ROLE_SLOT),
         ("GO", LOYAL_OPPOSITION_ROLE_SLOT),
@@ -250,9 +278,18 @@ def test_any_transition_after_verified_rejected(tmp_path: Path) -> None:
 
 def test_write_bridge_file_creates_and_verifies(tmp_path: Path) -> None:
     project = _build_project(tmp_path)
-    path = write_bridge_file("docthing", 1, "NEW\n\nhello\n", project)
+    path = write_bridge_file("docthing", 1, "NEW\n\nhello\n", project, author_metadata=AUTHOR_METADATA)
     assert path.exists()
-    assert path.read_text(encoding="utf-8") == "NEW\n\nhello\n"
+    assert path.read_text(encoding="utf-8") == (
+        "NEW\n"
+        "author_identity: Codex\n"
+        "author_harness_id: A\n"
+        "author_session_context_id: session-123\n"
+        "author_model: GPT-5.5\n"
+        "author_model_version: 5.5\n"
+        "author_model_configuration: Extra High\n"
+        "\nhello\n"
+    )
 
 
 def test_write_bridge_file_rejects_existing(tmp_path: Path) -> None:
@@ -280,9 +317,7 @@ def test_insert_index_status_prepends_in_document_block(tmp_path: Path) -> None:
 def test_insert_index_status_detects_stale_snapshot(tmp_path: Path) -> None:
     project = _build_project(tmp_path, _doc_block("race", [("NEW", 1)]))
     snapshot, _ = read_index(project)
-    (project / "bridge" / "INDEX.md").write_text(
-        snapshot + _doc_block("intruder", [("NEW", 1)]), encoding="utf-8"
-    )
+    (project / "bridge" / "INDEX.md").write_text(snapshot + _doc_block("intruder", [("NEW", 1)]), encoding="utf-8")
     with pytest.raises(BridgeConflictError, match="stale"):
         insert_index_status("race", 2, "GO", project, expected_index_raw=snapshot)
 

@@ -24,6 +24,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 TEMPLATE_HOOK = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "bridge-compliance-gate.py"
 SETTINGS_JSON = REPO_ROOT / ".claude" / "settings.json"
+AUTHOR_METADATA = (
+    "author_identity: Codex\n"
+    "author_harness_id: A\n"
+    "author_session_context_id: session-123\n"
+    "author_model: GPT-5.5\n"
+    "author_model_version: 5.5\n"
+    "author_model_configuration: Extra High\n"
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -112,7 +120,9 @@ def test_proposal_lacking_spec_links_blocked_with_deny() -> None:
 
 
 def _template_shaped_advisory_content() -> str:
-    return """ADVISORY
+    return f"""ADVISORY
+
+{AUTHOR_METADATA}
 
 bridge_kind: loyal_opposition_advisory
 Document: test-advisory-report
@@ -262,7 +272,7 @@ def test_go_with_clean_applicability_preflight_passes() -> None:
             "tool_input": {
                 "file_path": "bridge/test-fake-go-with-preflight-002.md",
                 "content": (
-                    "GO\n\n"
+                    "GO\n" + AUTHOR_METADATA + "\n"
                     "## Applicability Preflight\n\n"
                     "- packet_hash: `sha256:"
                     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`\n"
@@ -291,7 +301,7 @@ def _pending_preflight_content(*, include_application_spec: bool) -> str:
     if include_application_spec:
         spec_lines.append("- ADR-ISOLATION-APPLICATION-PLACEMENT-001")
     return (
-        "NEW\n\n"
+        "NEW\n" + AUTHOR_METADATA + "\n"
         "# Implementation Proposal\n\n"
         # bridge_kind: spec_intake (WI-3315 IP-3) makes this fixture exempt from
         # BOTH the WI-3314 project-metadata-presence gate AND the WI-3315

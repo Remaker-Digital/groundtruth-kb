@@ -57,21 +57,30 @@ _CLEAN_PACKET_HASH = "packet_hash: sha256:" + "0" * 64
 _SPEC_LINKS = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001 - canonical workflow state.\n"
 _APPLICABILITY = "## Applicability Preflight\n\n" + _CLEAN_PACKET_HASH + "\nmissing_required_specs: []\n"
 _SPEC_TO_TEST = (
-    "## Spec-to-Test Mapping\n\n"
-    "| Spec | Test |\n|------|------|\n"
-    "| GOV-FILE-BRIDGE-AUTHORITY-001 | test_x |\n"
+    "## Spec-to-Test Mapping\n\n| Spec | Test |\n|------|------|\n| GOV-FILE-BRIDGE-AUTHORITY-001 | test_x |\n"
 )
 _COMMAND_EVIDENCE = "Executed: python -m pytest platform_tests/hooks/test_x.py\n"
+_AUTHOR_METADATA = (
+    "author_identity: Codex\n"
+    "author_harness_id: A\n"
+    "author_session_context_id: session-123\n"
+    "author_model: GPT-5.5\n"
+    "author_model_version: 5.5\n"
+    "author_model_configuration: Extra High\n"
+)
 
 
 def _complete_verified_verdict() -> str:
     """A VERIFIED verdict carrying every element the gate requires."""
     return (
-        "VERIFIED\n\n"
+        "VERIFIED\n" + _AUTHOR_METADATA + "\n"
         "# Loyal Opposition Verification - Sample\n\n"
-        + _SPEC_LINKS + "\n"
-        + _APPLICABILITY + "\n"
-        + _SPEC_TO_TEST + "\n"
+        + _SPEC_LINKS
+        + "\n"
+        + _APPLICABILITY
+        + "\n"
+        + _SPEC_TO_TEST
+        + "\n"
         + _COMMAND_EVIDENCE
     )
 

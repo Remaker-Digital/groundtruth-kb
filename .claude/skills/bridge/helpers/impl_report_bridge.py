@@ -30,6 +30,10 @@ BRIDGE_PROPOSE_HELPER = PROJECT_ROOT / ".claude" / "skills" / "bridge-propose" /
 
 if str(PROJECT_ROOT / "groundtruth-kb" / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+ensure_author_metadata = importlib.import_module("scripts.bridge_author_metadata").ensure_author_metadata
 
 
 class BridgeImplReportError(RuntimeError):
@@ -421,6 +425,7 @@ def file_report(
     helper = _load_bridge_propose_helper()
     hits = helper.scan_credential_hits(content)
     helper.handle_hits_abort_or_redact(content, hits, mode="abort")
+    content = ensure_author_metadata(content, project_root=bridge_root.parent)
 
     original_index = index_path.read_text(encoding="utf-8")
     if index_path.read_text(encoding="utf-8") != original_index:
@@ -443,10 +448,12 @@ def file_report(
     # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
     try:
         import sys as _sys
+
         _trim_scripts = str(bridge_root.parent / "scripts")
         if _trim_scripts not in _sys.path:
             _sys.path.insert(0, _trim_scripts)
         from bridge_index_archival import maybe_archive_and_prune_index as _trim
+
         _trim(bridge_root.parent, current_thread=slug)
     except Exception:  # noqa: BLE001 - archival must never fail a bridge write
         pass

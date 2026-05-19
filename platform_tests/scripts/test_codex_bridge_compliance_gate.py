@@ -12,6 +12,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ADAPTER_PATH = REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-gate-bash-adapter.py"
 CANONICAL_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 SKIPPED_PATH = REPO_ROOT / ".codex" / "gtkb-hooks" / "last-bridge-audit-skipped.json"
+AUTHOR_METADATA = (
+    "author_identity: Codex\n"
+    "author_harness_id: A\n"
+    "author_session_context_id: session-123\n"
+    "author_model: GPT-5.5\n"
+    "author_model_version: 5.5\n"
+    "author_model_configuration: Extra High\n"
+)
 
 
 def _load_adapter():
@@ -89,7 +97,12 @@ def test_adapter_allows_compliant_bridge_write() -> None:
     payload = {
         "tool_name": "Bash",
         "tool_input": {
-            "command": ("cat > bridge/test-codex-allow-001.md <<'EOF'\nNO-GO\n\n## Findings\n\nReview finding.\nEOF\n")
+            "command": (
+                "cat > bridge/test-codex-allow-001.md <<'EOF'\n"
+                "NO-GO\n"
+                f"{AUTHOR_METADATA}\n"
+                "## Findings\n\nReview finding.\nEOF\n"
+            )
         },
         "cwd": str(REPO_ROOT),
         "session_id": "test",
@@ -156,7 +169,7 @@ def test_audit_only_accepts_compliant_files_without_blocking(tmp_path) -> None:
     audit_path = tmp_path / "last-bridge-audit.json"
     target = REPO_ROOT / "bridge" / "test-audit-compliant-002.md"
     target.write_text(
-        "GO\n\n"
+        "GO\n" + AUTHOR_METADATA + "\n"
         "## Applicability Preflight\n\n"
         "- packet_hash: `sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`\n"
         "- missing_required_specs: []\n",

@@ -35,6 +35,14 @@ def _load_gate():
 _gate = _load_gate()
 
 _SPEC_LINKS = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+_AUTHOR_METADATA = (
+    "author_identity: Codex\n"
+    "author_harness_id: A\n"
+    "author_session_context_id: session-123\n"
+    "author_model: GPT-5.5\n"
+    "author_model_version: 5.5\n"
+    "author_model_configuration: Extra High\n"
+)
 _AUTH_ID = "PAUTH-TEST-MEMBERSHIP"
 _PROJECT_ID = "PROJECT-TEST-MEMBERSHIP"
 _WI_ID = "WI-7777"
@@ -60,8 +68,7 @@ def _make_db(
     conn = sqlite3.connect(db_path)
     try:
         conn.execute(
-            "CREATE TABLE current_project_work_item_memberships "
-            "(work_item_id TEXT, project_id TEXT, status TEXT)"
+            "CREATE TABLE current_project_work_item_memberships (work_item_id TEXT, project_id TEXT, status TEXT)"
         )
         conn.execute(
             "CREATE TABLE current_project_authorizations "
@@ -105,28 +112,33 @@ def _auth(**overrides) -> dict:
     return base
 
 
-def _proposal(*, wi: str = _WI_ID, project: str = _PROJECT_ID, auth: str = _AUTH_ID,
-              status: str = "NEW") -> str:
+def _proposal(*, wi: str = _WI_ID, project: str = _PROJECT_ID, auth: str = _AUTH_ID, status: str = "NEW") -> str:
     return (
-        f"{status}\n\n"
+        f"{status}\n"
+        f"{_AUTHOR_METADATA}\n"
         "# Test Proposal\n\n"
         f"Project Authorization: {auth}\n"
         f"Project: {project}\n"
-        f"Work Item: {wi}\n\n"
-        + _SPEC_LINKS
+        f"Work Item: {wi}\n\n" + _SPEC_LINKS
     )
 
 
 def _deny(tmp_path: Path, content: str) -> str | None:
-    return _gate._deny_reason_for_content(
-        cwd_path=tmp_path,
-        file_path="bridge/test-wi-membership-001.md",
-        content=content,
-        run_pending_preflight=False,
-    )
+    original_resolver = _gate._canonical_project_root
+    _gate._canonical_project_root = lambda cwd_path: cwd_path
+    try:
+        return _gate._deny_reason_for_content(
+            cwd_path=tmp_path,
+            file_path="bridge/test-wi-membership-001.md",
+            content=content,
+            run_pending_preflight=False,
+        )
+    finally:
+        _gate._canonical_project_root = original_resolver
 
 
 # --- blocked-condition cases ----------------------------------------------------
+
 
 def test_wi_not_in_any_project_blocked(tmp_path: Path) -> None:
     _make_db(tmp_path, membership=None, authorization=_auth())
@@ -189,6 +201,7 @@ def test_wi_not_in_included_list_blocked(tmp_path: Path) -> None:
 
 # --- passing cases --------------------------------------------------------------
 
+
 def test_active_membership_active_auth_passes(tmp_path: Path) -> None:
     # Active membership + active, unexpired, including authorization.
     _make_db(
@@ -201,10 +214,10 @@ def test_active_membership_active_auth_passes(tmp_path: Path) -> None:
 
 
 def test_verdict_file_passes_through(tmp_path: Path) -> None:
-    # A NO-GO verdict file with no metadata: the membership check (which lives
-    # inside the NEW/REVISED metadata branch) must never run.
+    # A NO-GO verdict file with author metadata: the membership check (which
+    # lives inside the NEW/REVISED project-metadata branch) must never run.
     _make_db(tmp_path, membership=None, authorization=None)
-    content = "NO-GO\n\n# Verdict\n\nNo blocking findings.\n"
+    content = "NO-GO\n" + _AUTHOR_METADATA + "\n# Verdict\n\nNo blocking findings.\n"
     reason = _deny(tmp_path, content)
     assert reason is None, f"verdict file incorrectly denied: {reason}"
 
@@ -221,6 +234,7 @@ def test_cited_project_mismatch_with_membership_project_blocked(tmp_path: Path) 
 
 
 # --- WI-AUTO-* id regression (WI-3322) ------------------------------------------
+
 
 def test_extract_project_metadata_captures_wi_auto_id() -> None:
     # WORK_ITEM_VALUE_RE must capture a spec-intake WI-AUTO-* id so the

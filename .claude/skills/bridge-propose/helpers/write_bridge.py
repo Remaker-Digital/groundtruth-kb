@@ -32,17 +32,34 @@ Design contract:
 from __future__ import annotations
 
 import contextlib
+import importlib
 import json
 import os
 import re
-from datetime import datetime, timezone
+import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from groundtruth_kb.governance.credential_patterns import (
-    BASH_EXTRAS,
-    CREDENTIAL_PATTERNS,
-)
+
+def _discover_project_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "scripts" / "bridge_author_metadata.py").is_file():
+            return parent
+    return Path(__file__).resolve().parents[4]
+
+
+PROJECT_ROOT = _discover_project_root()
+_GROUNDTRUTH_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
+if _GROUNDTRUTH_SRC.is_dir() and str(_GROUNDTRUTH_SRC) not in sys.path:
+    sys.path.insert(0, str(_GROUNDTRUTH_SRC))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+_credential_patterns = importlib.import_module("groundtruth_kb.governance.credential_patterns")
+BASH_EXTRAS = _credential_patterns.BASH_EXTRAS
+CREDENTIAL_PATTERNS = _credential_patterns.CREDENTIAL_PATTERNS
+ensure_author_metadata = importlib.import_module("scripts.bridge_author_metadata").ensure_author_metadata
 
 
 class BridgeFileAlreadyExistsError(RuntimeError):
@@ -127,9 +144,7 @@ _SCAN_CATALOG: list[tuple[re.Pattern[str], str, str]] = [
 # ---------------------------------------------------------------------------
 
 _GLOSSARY_HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
-_GLOSSARY_ID_RE = re.compile(
-    r"\b(?:DELIB-[A-Z0-9-]+|(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9-]+)\b"
-)
+_GLOSSARY_ID_RE = re.compile(r"\b(?:DELIB-[A-Z0-9-]+|(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9-]+)\b")
 _PRIOR_DELIBS_HEADING = "## Prior Deliberations"
 
 DEFAULT_GLOSSARY_PATH = Path(".claude/rules/canonical-terminology.md")
@@ -273,11 +288,11 @@ def _insert_prior_deliberations_block(body: str, block_text: str) -> str:
         return body + suffix + "\n## Prior Deliberations\n\n" + block_text
 
     section_start, section_end = range_
-    section_body_text = "".join(body_lines[section_start + 1:section_end]).strip()
+    section_body_text = "".join(body_lines[section_start + 1 : section_end]).strip()
 
     if not section_body_text:
         insertion = "\n" + block_text + "\n"
-        new_lines = body_lines[:section_start + 1] + [insertion] + body_lines[section_end:]
+        new_lines = body_lines[: section_start + 1] + [insertion] + body_lines[section_end:]
         return "".join(new_lines)
 
     insertion = "\n### Helper-suggested candidates\n\n" + block_text + "\n"
@@ -379,14 +394,12 @@ def pre_populate_prior_deliberations(
             log_path.write_text(
                 json.dumps(
                     {
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                         "topic_slug": topic_slug,
                         "query": topic_slug.replace("-", " "),
                         "glossary_path": str(glossary_path),
                         "glossary_seed_ids": seed_ids,
-                        "search_result_ids": [
-                            r.get("id", "") for r in search_records_to_add
-                        ],
+                        "search_result_ids": [r.get("id", "") for r in search_records_to_add],
                         "semantic_search_attempted": active_db is not None,
                         "limit": limit,
                         "threshold": threshold,
@@ -780,6 +793,7 @@ def propose_bridge(
     # Phase 1: Pre-flight scan.
     hits = scan_credential_hits(body)
     body_to_write = handle_hits_abort_or_redact(body, hits, mode=mode)
+    body_to_write = ensure_author_metadata(body_to_write, project_root=bridge_root.parent)
 
     # Phase 2: File-first write (fail-fast on existing file; no silent overwrite).
     if bridge_file.exists():
@@ -803,10 +817,12 @@ def propose_bridge(
             # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
             try:
                 import sys as _sys
+
                 _trim_scripts = str(bridge_root.parent / "scripts")
                 if _trim_scripts not in _sys.path:
                     _sys.path.insert(0, _trim_scripts)
                 from bridge_index_archival import maybe_archive_and_prune_index as _trim
+
                 _trim(bridge_root.parent, current_thread=topic_slug)
             except Exception:  # noqa: BLE001 - archival must never fail a bridge write
                 pass

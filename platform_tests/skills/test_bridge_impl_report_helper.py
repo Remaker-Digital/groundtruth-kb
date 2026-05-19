@@ -27,6 +27,16 @@ def helper():
     return _load_helper_module()
 
 
+@pytest.fixture(autouse=True)
+def author_metadata_env(monkeypatch):
+    monkeypatch.setenv("GTKB_AUTHOR_IDENTITY", "Codex")
+    monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", "A")
+    monkeypatch.setenv("GTKB_AUTHOR_SESSION_CONTEXT_ID", "session-123")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL", "GPT-5.5")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "5.5")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "Extra High")
+
+
 def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "test-impl-report") -> Path:
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()

@@ -15,9 +15,16 @@ Phase 7 planning reference:
 
 from __future__ import annotations
 
+import os
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    from scripts.bridge_author_metadata import ensure_author_metadata
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from bridge_author_metadata import ensure_author_metadata
 
 VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"})
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
@@ -31,6 +38,10 @@ _STATUS_LINE_RE = re.compile(
     r"bridge/(?P<filename>[A-Za-z0-9._\-]+)-(?P<version>\d{3,})\.md\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+(?P<name>[A-Za-z0-9._\-]+)\s*$")
+_SESSION_METADATA_RE = re.compile(
+    r"^(?:author_)?session(?:_context)?_id:\s*(?P<id>\S+)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 class BridgeError(Exception):
@@ -150,20 +161,62 @@ def next_file_number(document_name: str, project_root: Path) -> int:
     return max_version + 1
 
 
+def _current_session_id(session_id: str | None = None) -> str | None:
+    if session_id and session_id.strip():
+        return session_id.strip()
+    for name in ("GTKB_SESSION_ID", "CLAUDE_SESSION_ID", "CODEX_SESSION_ID"):
+        value = os.environ.get(name)
+        if value and value.strip():
+            return value.strip()
+    return None
+
+
+def _bridge_file_session_id(project_root: Path, entry: BridgeEntry | None) -> str | None:
+    if entry is None:
+        return None
+    path = _bridge_dir(project_root) / entry.filename
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return None
+    match = _SESSION_METADATA_RE.search(text)
+    return match.group("id") if match else None
+
+
+def _reject_same_session_review(
+    *,
+    proposed_status: str,
+    latest_entry: BridgeEntry | None,
+    project_root: Path,
+    session_id: str | None,
+) -> None:
+    """Reject LO review writes when author metadata names this same session."""
+    if proposed_status not in LOYAL_OPPOSITION_STATUSES or latest_entry is None:
+        return
+    current_session = _current_session_id(session_id)
+    if not current_session:
+        return
+    author_session = _bridge_file_session_id(project_root, latest_entry)
+    if author_session and author_session == current_session:
+        raise BridgeTransitionError(
+            f"same-session review is forbidden: the latest bridge file was authored by session {author_session!r}"
+        )
+
+
 def validate_transition(
     document_name: str,
     proposed_status: str,
     role_slot: str,
     project_root: Path,
+    *,
+    session_id: str | None = None,
 ) -> None:
     """Enforce writer authority and legal status transitions.
 
     Raises BridgeTransitionError describing which rule was violated.
     """
     if proposed_status not in VALID_STATUSES:
-        raise BridgeTransitionError(
-            f"invalid status {proposed_status!r}; must be one of {sorted(VALID_STATUSES)}"
-        )
+        raise BridgeTransitionError(f"invalid status {proposed_status!r}; must be one of {sorted(VALID_STATUSES)}")
     if role_slot == PRIME_ROLE_SLOT and proposed_status not in PRIME_STATUSES:
         raise BridgeTransitionError(
             f"prime-builder may not write {proposed_status!r}; allowed: {sorted(PRIME_STATUSES)}"
@@ -173,18 +226,21 @@ def validate_transition(
             f"loyal-opposition may not write {proposed_status!r}; allowed: {sorted(LOYAL_OPPOSITION_STATUSES)}"
         )
     if role_slot not in (PRIME_ROLE_SLOT, LOYAL_OPPOSITION_ROLE_SLOT):
-        raise BridgeTransitionError(
-            f"unknown role_slot {role_slot!r}; expected 'prime-builder' or 'loyal-opposition'"
-        )
+        raise BridgeTransitionError(f"unknown role_slot {role_slot!r}; expected 'prime-builder' or 'loyal-opposition'")
 
     _, blocks = read_index(project_root)
     block = get_block(blocks, document_name)
     latest = block.latest_status if block is not None else None
+    latest_entry = block.entries[0] if block is not None and block.entries else None
+    _reject_same_session_review(
+        proposed_status=proposed_status,
+        latest_entry=latest_entry,
+        project_root=project_root,
+        session_id=session_id,
+    )
 
     if latest == "VERIFIED":
-        raise BridgeTransitionError(
-            f"{document_name}: thread is VERIFIED; no further transitions permitted"
-        )
+        raise BridgeTransitionError(f"{document_name}: thread is VERIFIED; no further transitions permitted")
 
     if proposed_status == "NEW":
         if latest is None:
@@ -205,9 +261,7 @@ def validate_transition(
     if proposed_status == "GO":
         if latest in ("NEW", "REVISED"):
             return
-        raise BridgeTransitionError(
-            f"{document_name}: GO only permitted after NEW or REVISED; current latest={latest}"
-        )
+        raise BridgeTransitionError(f"{document_name}: GO only permitted after NEW or REVISED; current latest={latest}")
 
     if proposed_status == "NO-GO":
         if latest in ("NEW", "REVISED"):
@@ -236,6 +290,9 @@ def write_bridge_file(
     version: int,
     content: str,
     project_root: Path,
+    *,
+    author_metadata: Mapping[str, object] | None = None,
+    require_author_metadata: bool = True,
 ) -> Path:
     """Write bridge/<document>-<NNN>.md and re-read to verify.
 
@@ -245,12 +302,15 @@ def write_bridge_file(
     target = _bridge_dir(project_root) / f"{document_name}-{padded}.md"
     if target.exists():
         raise BridgeConflictError(f"{target} already exists; refusing to overwrite")
-    target.write_text(content, encoding="utf-8")
+    content_to_write = (
+        ensure_author_metadata(content, project_root=project_root, explicit=author_metadata)
+        if require_author_metadata
+        else content
+    )
+    target.write_text(content_to_write, encoding="utf-8")
     written = target.read_text(encoding="utf-8")
-    if written != content:
-        raise BridgeConflictError(
-            f"post-write verification failed for {target}: content on disk differs"
-        )
+    if written != content_to_write:
+        raise BridgeConflictError(f"post-write verification failed for {target}: content on disk differs")
     return target
 
 
@@ -267,15 +327,11 @@ def insert_index_status(
     INDEX content, raises BridgeConflictError (snapshot is stale).
     """
     if status not in VALID_STATUSES:
-        raise BridgeTransitionError(
-            f"invalid status {status!r}; must be one of {sorted(VALID_STATUSES)}"
-        )
+        raise BridgeTransitionError(f"invalid status {status!r}; must be one of {sorted(VALID_STATUSES)}")
     index_path = _index_path(project_root)
     raw_current = index_path.read_text(encoding="utf-8")
     if expected_index_raw is not None and expected_index_raw != raw_current:
-        raise BridgeConflictError(
-            "INDEX.md changed between snapshot and write; refusing stale insert"
-        )
+        raise BridgeConflictError("INDEX.md changed between snapshot and write; refusing stale insert")
     new_line = f"{status}: bridge/{document_name}-{version:03d}.md"
     lines = raw_current.splitlines(keepends=True)
     updated: list[str] = []
@@ -296,9 +352,7 @@ def insert_index_status(
         updated.append(line)
         i += 1
     if not inserted:
-        raise BridgeConflictError(
-            f"Document: {document_name} block not found in INDEX.md; cannot insert status"
-        )
+        raise BridgeConflictError(f"Document: {document_name} block not found in INDEX.md; cannot insert status")
     new_content = "".join(updated)
     index_path.write_text(new_content, encoding="utf-8")
     verified = index_path.read_text(encoding="utf-8")
@@ -315,10 +369,12 @@ def insert_index_status(
     # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
     try:
         import sys as _sys
+
         _trim_scripts = str(project_root / "scripts")
         if _trim_scripts not in _sys.path:
             _sys.path.insert(0, _trim_scripts)
         from bridge_index_archival import maybe_archive_and_prune_index as _trim
+
         _trim(project_root, current_thread=document_name)
     except Exception:  # noqa: BLE001 - archival must never fail a bridge write
         pass

@@ -24,6 +24,34 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
+for _parent in Path(__file__).resolve().parents:
+    if (_parent / "scripts" / "bridge_author_metadata.py").is_file():
+        if str(_parent) not in sys.path:
+            sys.path.insert(0, str(_parent))
+        break
+
+try:
+    from scripts.bridge_author_metadata import (
+        BRIDGE_AUTHOR_METADATA_STATUSES,
+        REQUIRED_AUTHOR_METADATA_FIELDS,
+        author_metadata_gaps_for_content,
+    )
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    BRIDGE_AUTHOR_METADATA_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"})
+    REQUIRED_AUTHOR_METADATA_FIELDS = (
+        "author_identity",
+        "author_harness_id",
+        "author_session_context_id",
+        "author_model",
+        "author_model_version",
+        "author_model_configuration",
+    )
+
+    def author_metadata_gaps_for_content(content: str) -> list[str]:
+        values = dict(re.findall(r"^(author_[a-z0-9_]+):\s*(.*?)\s*$", content, re.IGNORECASE | re.MULTILINE))
+        return [field for field in REQUIRED_AUTHOR_METADATA_FIELDS if not values.get(field)]
+
+
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
@@ -105,17 +133,13 @@ OWNER_APPROVAL_MARKER_RES = (
 # is satisfied by the NEW/REVISED-only status gate; CLAUSE-NON-IMPLEMENTATION-EXEMPT
 # is satisfied by the bridge_kind exempt set. CLAUSE-PROJECT-AUTH-LIVE-CHECK
 # (live MemBase authorization lookup) is deferred to WI-3315.
-PROJECT_AUTHORIZATION_LINE_RE = re.compile(
-    r"^Project Authorization:\s*PAUTH-[A-Z0-9-]+\s*$", re.MULTILINE
-)
+PROJECT_AUTHORIZATION_LINE_RE = re.compile(r"^Project Authorization:\s*PAUTH-[A-Z0-9-]+\s*$", re.MULTILINE)
 PROJECT_LINE_RE = re.compile(r"^Project:\s*[A-Z0-9-]+\s*$", re.MULTILINE)
 WORK_ITEM_LINE_RE = re.compile(
     r"^Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
 )
 BRIDGE_KIND_LINE_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
-BRIDGE_KIND_METADATA_EXEMPT = frozenset(
-    {"spec_intake", "governance_review", "loyal_opposition_advisory"}
-)
+BRIDGE_KIND_METADATA_EXEMPT = frozenset({"spec_intake", "governance_review", "loyal_opposition_advisory"})
 PROJECT_METADATA_STATUSES = frozenset({"NEW", "REVISED"})
 
 # WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
@@ -128,12 +152,29 @@ PROJECT_METADATA_STATUSES = frozenset({"NEW", "REVISED"})
 # Item. The check fails open on any DB-access error so the gate never blocks on
 # infrastructure failure. Verdict files (GO/NO-GO/VERIFIED) never reach this
 # check because it lives inside the NEW/REVISED metadata branch.
-PROJECT_AUTHORIZATION_VALUE_RE = re.compile(
-    r"^Project Authorization:\s*(PAUTH-[A-Z0-9-]+)\s*$", re.MULTILINE
-)
+PROJECT_AUTHORIZATION_VALUE_RE = re.compile(r"^Project Authorization:\s*(PAUTH-[A-Z0-9-]+)\s*$", re.MULTILINE)
 PROJECT_VALUE_RE = re.compile(r"^Project:\s*([A-Z0-9-]+)\s*$", re.MULTILINE)
 WORK_ITEM_VALUE_RE = re.compile(
     r"^Work Item:\s*(WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
+)
+TARGET_PATHS_LINE_RE = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE | re.MULTILINE)
+KB_MUTATION_DECLARATION_RE = re.compile(
+    r"\b(?:"
+    r"MemBase\s+mutation|"
+    r"mutat(?:e|es|ing)\s+MemBase|"
+    r"(?:insert|inserts|inserting|inserted|write|writes|writing|create|creates|creating|add|adds|adding)\s+(?:(?:a|an|new)\s+){0,2}"
+    r"(?:GOV|SPEC|ADR|DCL|PB|REQ|Deliberation Archive|project|work item|MemBase)\b[^.\n]{0,160}"
+    r"\b(?:record|version|row|entry)\b|"
+    r"(?:GOV|SPEC|ADR|DCL|PB|REQ)\b[^.\n]{0,120}\b(?:supersession|version\s+\d+|v\d+)\b|"
+    r"\bretir(?:e|es|ing)\b[^.\n]{0,120}\b(?:project|work item|spec|specification)\b|"
+    r"\bgroundtruth\.db\b"
+    r")",
+    re.IGNORECASE,
+)
+KB_MUTATION_NEGATION_RE = re.compile(
+    r"\b(?:no|not|without|does\s+not|do\s+not|performs?\s+no|creates?\s+no|executes?\s+no)\b"
+    r"[^.\n]{0,100}\b(?:MemBase|KB|groundtruth\.db)\b[^.\n]{0,80}\b(?:mutation|write|insert|change|edit)s?\b",
+    re.IGNORECASE,
 )
 
 ADVISORY_REPORT_HEADER_FIELDS = ("bridge_kind", "Document", "Version", "Author", "Date")
@@ -179,9 +220,7 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
         ["git", "rev-parse", "--git-common-dir"],
     ):
         try:
-            out = subprocess.check_output(
-                args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL
-            ).strip()
+            out = subprocess.check_output(args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL).strip()
         except (OSError, subprocess.SubprocessError):
             continue
         if not out:
@@ -277,6 +316,22 @@ def _extract_bridge_id_from_path(file_path: str) -> str | None:
     return match.group("bridge_id") if match else None
 
 
+def _collect_section_lines(lines: list[str], start: int) -> list[str]:
+    """Collect section body lines, ignoring headings inside backtick fences."""
+    section: list[str] = []
+    in_fence = False
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            section.append(line)
+            continue
+        if not in_fence and stripped.startswith("#"):
+            break
+        section.append(line)
+    return section
+
+
 def _has_concrete_spec_links(content: str) -> bool:
     lines = content.splitlines()
     start: int | None = None
@@ -287,12 +342,7 @@ def _has_concrete_spec_links(content: str) -> bool:
     if start is None:
         return False
 
-    section: list[str] = []
-    for line in lines[start:]:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            break
-        section.append(line)
+    section = _collect_section_lines(lines, start)
     section_text = "\n".join(section).strip()
     if not section_text or not SPEC_LINK_TOKEN_RE.search(section_text):
         return False
@@ -351,6 +401,10 @@ def _ask_reason_for_content(file_path: str, content: str) -> str | None:
     first_line = _first_nonblank_line(content)
     if first_line == "ADVISORY" or first_line.startswith(("GO", "NO-GO", "VERIFIED")):
         return None
+    if first_line in PENDING_PREFLIGHT_STATUSES:
+        kb_mutation_reason = _kb_mutation_target_paths_ask_reason(content)
+        if kb_mutation_reason:
+            return kb_mutation_reason
     if _has_concrete_spec_links(content):
         return None
     if not _specification_links_heading_misdetected(content):
@@ -361,6 +415,53 @@ def _ask_reason_for_content(file_path: str, content: str) -> str | None:
         "Links`). Confirm or correct the heading format before filing. "
         "(Heading-format ambiguity surfaced as a checkpoint rather than a hard "
         "block per W4 enforcement calibration.)"
+    )
+
+
+def _target_paths_from_content(content: str) -> list[str]:
+    """Parse a proposal's inline target_paths declaration."""
+    paths: list[str] = []
+    for match in TARGET_PATHS_LINE_RE.finditer(content):
+        raw = match.group(1).strip()
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            for item in re.split(r"[,\s]+", raw):
+                cleaned = item.strip().strip("\"'`")
+                if cleaned:
+                    paths.append(cleaned)
+        else:
+            if isinstance(parsed, list):
+                paths.extend(str(item) for item in parsed)
+            else:
+                paths.append(str(parsed))
+    return paths
+
+
+def _declares_kb_mutation(content: str) -> bool:
+    """Return True when proposal text declares its own KB/MemBase mutation."""
+    if KB_MUTATION_NEGATION_RE.search(content):
+        return False
+    return bool(KB_MUTATION_DECLARATION_RE.search(content))
+
+
+def _kb_mutation_target_paths_ask_reason(content: str) -> str | None:
+    """Checkpoint proposals that declare KB mutation but omit groundtruth.db."""
+    first_line = _first_nonblank_line(content)
+    if first_line not in PENDING_PREFLIGHT_STATUSES:
+        return None
+    if _bridge_kind_is_metadata_exempt(content):
+        return None
+    if not _declares_kb_mutation(content):
+        return None
+    target_paths = {path.replace("\\", "/").lstrip("./") for path in _target_paths_from_content(content)}
+    if "groundtruth.db" in target_paths:
+        return None
+    return (
+        "[Governance] This bridge proposal appears to declare KB/MemBase mutation work, "
+        "but target_paths does not include `groundtruth.db`. Add `groundtruth.db` to "
+        "target_paths, or confirm the proposal performs no KB mutation. "
+        "(Ask checkpoint per bridge target_paths KB-mutation completeness check.)"
     )
 
 
@@ -394,11 +495,7 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
             break
     if start is None:
         return False
-    section: list[str] = []
-    for line in lines[start:]:
-        if line.strip().startswith("#"):
-            break
-        section.append(line)
+    section = _collect_section_lines(lines, start)
     text = "\n".join(section).strip()
     if not text:
         return False
@@ -486,8 +583,7 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
         conn.row_factory = sqlite3.Row
         membership = conn.execute(
-            "SELECT status FROM current_project_work_item_memberships "
-            "WHERE work_item_id = ? AND project_id = ?",
+            "SELECT status FROM current_project_work_item_memberships WHERE work_item_id = ? AND project_id = ?",
             (work_item_id, project_id),
         ).fetchone()
         if membership is None:
@@ -549,12 +645,7 @@ def _has_clean_applicability_preflight(content: str) -> bool:
     if start is None:
         return False
 
-    section: list[str] = []
-    for line in lines[start:]:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            break
-        section.append(line)
+    section = _collect_section_lines(lines, start)
     section_text = "\n".join(section)
     return bool(PREFLIGHT_PACKET_HASH_RE.search(section_text) and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text))
 
@@ -819,6 +910,17 @@ def _deny_reason_for_content(
                         "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
                         "mechanical enforcement.)"
                     )
+        if first_line in BRIDGE_AUTHOR_METADATA_STATUSES:
+            author_metadata_gaps = author_metadata_gaps_for_content(content)
+            if author_metadata_gaps:
+                return (
+                    "[Governance] Bridge artifacts must include authoritative author/model audit "
+                    "metadata lines: missing or invalid "
+                    f"{', '.join(author_metadata_gaps)}. Required lines: "
+                    f"{', '.join(REQUIRED_AUTHOR_METADATA_FIELDS)}. The authoring session must "
+                    "supply accurate model, version, and configuration values; the dispatcher "
+                    "must not guess. (Hard-block per owner emergency audit directive 2026-05-19.)"
+                )
     return None
 
 
