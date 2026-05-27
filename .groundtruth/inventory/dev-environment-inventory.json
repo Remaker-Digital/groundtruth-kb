@@ -5,7 +5,7 @@
     "script_hash": "sha256:f323f36ebb1d4d960dcc9cca9324c9d98c6494d5cf676b0d18e5ba1686ec4255",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-19T21:15:30Z",
+  "generated_at": "2026-05-27T08:35:00Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -62,15 +62,16 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "loyal-opposition",
-          "prime-builder"
+          "loyal-opposition"
         ],
         "status": "verified"
       },
       "B": {
         "harness_type": "claude",
-        "role": [],
-        "status": "unknown"
+        "role": [
+          "prime-builder"
+        ],
+        "status": "verified"
       },
       "C": {
         "harness_type": "antigravity",
@@ -109,20 +110,21 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 25,
+      "count": 27,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-axis-2-surface.py",
         ".claude/hooks/bridge-compliance-gate.py",
-        ".claude/hooks/bridge-stop-drain.py",
+        ".claude/hooks/bridge-proposal-wi-id-collision-gate.py",
+        ".claude/hooks/code-quality-baseline-proposal-check.py",
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/delib-preflight-gate.py",
         ".claude/hooks/destructive-gate.py",
@@ -131,6 +133,7 @@
         ".claude/hooks/gov09-capture.py",
         ".claude/hooks/implementation-start-gate.py",
         ".claude/hooks/intake-classifier.py",
+        ".claude/hooks/lo-file-safety-gate.py",
         ".claude/hooks/narrative-artifact-approval-gate.py",
         ".claude/hooks/owner-decision-capture.py",
         ".claude/hooks/owner-decision-tracker.py",
@@ -146,20 +149,26 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 13,
+      "count": 19,
       "items": [
+        ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
         ".codex/gtkb-hooks/glossary-expansion.py",
+        ".codex/gtkb-hooks/lo-file-safety-gate-bash-adapter.py",
         ".codex/gtkb-hooks/project-completion-surface.py",
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
+        ".codex/gtkb-hooks/wi-id-collision-gate-bash-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-audit.cmd",
+        ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
         ".codex/gtkb-hooks/formal-artifact-approval.cmd",
         ".codex/gtkb-hooks/implementation-start-gate.cmd",
+        ".codex/gtkb-hooks/lo-file-safety-gate.cmd",
         ".codex/gtkb-hooks/session-start.cmd",
         ".codex/gtkb-hooks/session-stop.cmd",
+        ".codex/gtkb-hooks/wi-id-collision-gate.cmd",
         ".codex/gtkb-hooks/workstream-focus.cmd"
       ]
     },
@@ -208,9 +217,10 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 17,
+      "count": 18,
       "items": [
         ".claude/rules/acting-prime-builder.md",
+        ".claude/rules/active-workspace.md",
         ".claude/rules/bridge-essential.md",
         ".claude/rules/bridge-poller-canonical.md",
         ".claude/rules/canonical-terminology.md",
@@ -271,7 +281,7 @@
   "role_by_harness_compatibility": [
     {
       "assignment": {
-        "current_role": "unknown",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "prime-builder",
@@ -348,7 +358,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition', 'prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -425,7 +435,7 @@
     },
     {
       "assignment": {
-        "current_role": "unknown",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "loyal-opposition",
@@ -502,7 +512,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition', 'prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
