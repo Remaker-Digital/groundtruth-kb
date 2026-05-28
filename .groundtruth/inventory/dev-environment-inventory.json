@@ -5,7 +5,7 @@
     "script_hash": "sha256:f323f36ebb1d4d960dcc9cca9324c9d98c6494d5cf676b0d18e5ba1686ec4255",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-27T08:35:00Z",
+  "generated_at": "2026-05-28T17:03:22Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -149,7 +149,7 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 19,
+      "count": 20,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
@@ -163,6 +163,7 @@
         ".codex/gtkb-hooks/bridge-compliance-audit.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
+        ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd",
         ".codex/gtkb-hooks/formal-artifact-approval.cmd",
         ".codex/gtkb-hooks/implementation-start-gate.cmd",
         ".codex/gtkb-hooks/lo-file-safety-gate.cmd",
@@ -217,10 +218,11 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 18,
+      "count": 19,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
+        ".claude/rules/backlog-approval-state.md",
         ".claude/rules/bridge-essential.md",
         ".claude/rules/bridge-poller-canonical.md",
         ".claude/rules/canonical-terminology.md",
@@ -651,7 +653,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -665,7 +667,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.12"
     }
   },
   "verification": {

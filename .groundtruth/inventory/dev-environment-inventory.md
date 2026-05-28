@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-05-27T08:35:00Z
+Generated: 2026-05-28T17:03:22Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:f323f36ebb1d4d960dcc9cca9324c9d98c6494d5cf676b0d18e5ba1686ec4255)
 
 ## Project
@@ -26,9 +26,9 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:f323f36ebb1d4d960dcc9cca932
 | `npm` | verified | `11.6.2` | `npm --version` |
 | `pip` | verified | `25.3` | `python -m pip --version` |
 | `playwright` | unsupported | `unknown` | `playwright --version` |
-| `pytest` | verified | `9.0.2` | `python -m pytest --version` |
+| `pytest` | verified | `9.0.3` | `python -m pytest --version` |
 | `python` | verified | `3.14.0` | `python --version` |
-| `ruff` | verified | `0.15.5` | `python -m ruff --version` |
+| `ruff` | verified | `0.15.12` | `python -m ruff --version` |
 
 ## Harness And Repo Surfaces
 
@@ -36,7 +36,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:f323f36ebb1d4d960dcc9cca932
 - Role assignment source present: True
 - Skills: 32
 - Claude hooks: 27
-- Codex hooks: 19
+- Codex hooks: 20
 - GitHub workflows: 16
 - MCP config: local_only presence only
 
