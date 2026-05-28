@@ -384,7 +384,7 @@ def test_default_ignored_top_level_includes_only_cache_and_transient() -> None:
         ".mypy_cache",
         "htmlcov",
     }
-    assert _inventory._DEFAULT_IGNORED_TOP_LEVEL == expected_cache_dirs
+    assert expected_cache_dirs == _inventory._DEFAULT_IGNORED_TOP_LEVEL
     assert "logs" not in _inventory._DEFAULT_IGNORED_TOP_LEVEL
 
 

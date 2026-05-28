@@ -16,7 +16,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import wrap_scan_hygiene as w1  # noqa: E402
 
-
 OLD_ROOT_TOKEN = "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement\\foo"
 
 

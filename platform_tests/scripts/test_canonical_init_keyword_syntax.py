@@ -23,7 +23,6 @@ indistinguishable from drift in the durable role map.
 from __future__ import annotations
 
 import importlib.util
-import re
 import sys
 from pathlib import Path
 from types import ModuleType

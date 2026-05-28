@@ -67,9 +67,8 @@ def test_rename_does_not_retry_filenotfounderror(tmp_path: Path) -> None:
         call_count["n"] += 1
         raise FileNotFoundError("WinError 2 simulated missing temp")
 
-    with patch.object(Path, "replace", fnf_replace):
-        with pytest.raises(FileNotFoundError):
-            cht._rename_with_retry(src, dst, initial_backoff_s=0.001)
+    with patch.object(Path, "replace", fnf_replace), pytest.raises(FileNotFoundError):
+        cht._rename_with_retry(src, dst, initial_backoff_s=0.001)
 
     assert call_count["n"] == 1, "FileNotFoundError must NOT be retried"
 
@@ -85,9 +84,8 @@ def test_rename_raises_after_total_attempts_exhausted(tmp_path: Path) -> None:
         call_count["n"] += 1
         raise PermissionError("WinError 32 simulated, never recovers")
 
-    with patch.object(Path, "replace", always_perm_error):
-        with pytest.raises(PermissionError):
-            cht._rename_with_retry(src, dst, total_attempts=5, initial_backoff_s=0.001)
+    with patch.object(Path, "replace", always_perm_error), pytest.raises(PermissionError):
+        cht._rename_with_retry(src, dst, total_attempts=5, initial_backoff_s=0.001)
 
     assert call_count["n"] == 5, "Should exhaust exactly 5 total_attempts"
 
@@ -108,9 +106,8 @@ def test_rename_total_attempts_5_sleeps_4_times(tmp_path: Path) -> None:
 
     with patch.object(cht, "time") as mock_time:
         mock_time.sleep = fake_sleep
-        with patch.object(Path, "replace", always_perm_error):
-            with pytest.raises(PermissionError):
-                cht._rename_with_retry(src, dst, total_attempts=5, initial_backoff_s=0.05)
+        with patch.object(Path, "replace", always_perm_error), pytest.raises(PermissionError):
+            cht._rename_with_retry(src, dst, total_attempts=5, initial_backoff_s=0.05)
 
     # 5 attempts, 4 sleeps before the final raise.
     assert len(sleep_calls) == 4, f"Expected 4 sleeps, got {len(sleep_calls)}: {sleep_calls}"

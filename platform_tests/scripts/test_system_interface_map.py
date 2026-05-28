@@ -28,7 +28,7 @@ def test_system_interface_map_is_valid_and_seeded() -> None:
 
     assert module.validate_map(system_map) == []
     row_ids = {row["id"] for row in module.system_rows(system_map)}
-    assert module.REQUIRED_SEED_IDS <= row_ids
+    assert row_ids >= module.REQUIRED_SEED_IDS
 
 
 def test_backlog_row_points_to_unified_work_items_authority() -> None:

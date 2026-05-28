@@ -13,11 +13,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
-from datetime import date
 from pathlib import Path
 
 import pytest
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "advisory_backlog_router.py"

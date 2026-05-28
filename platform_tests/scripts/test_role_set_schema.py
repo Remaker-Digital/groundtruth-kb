@@ -48,7 +48,6 @@ from scripts.harness_roles import (  # noqa: E402
     set_harness_role,
 )
 
-
 # ---------------------------------------------------------------------------
 # WI-3342 IP-6 — registry-backed reader/writer fixtures.
 #
@@ -372,12 +371,12 @@ def test_read_write_vocabulary_separation() -> None:
     READ accepts the legacy compatibility/provenance value
     `acting-prime-builder`; WRITE does not.
     """
-    assert VALID_ROLES_FOR_READ == {
+    assert {
         ROLE_PRIME_BUILDER,
         ROLE_LOYAL_OPPOSITION,
         ROLE_ACTING_PRIME_BUILDER,
-    }
-    assert VALID_ROLES_FOR_WRITE == {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION}
+    } == VALID_ROLES_FOR_READ
+    assert {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION} == VALID_ROLES_FOR_WRITE
     assert VALID_ROLES_FOR_WRITE.issubset(VALID_ROLES_FOR_READ)
     assert ROLE_ACTING_PRIME_BUILDER in VALID_ROLES_FOR_READ
     assert ROLE_ACTING_PRIME_BUILDER not in VALID_ROLES_FOR_WRITE

@@ -27,7 +27,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -226,7 +226,7 @@ def test_t11_reclaim_stale_workers(mod, tmp_path):
         }), encoding="utf-8")
         return path
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     old = "2020-01-01T00:00:00+00:00"
     fresh_pb = write_slot("prime-builder", 0, now, "fresh-pb")
     stale_pb = write_slot("prime-builder", 1, old, "stale-pb")
@@ -289,18 +289,16 @@ def test_t13_worker_slot_context_manager(mod, tmp_path):
     assert not _slot_file(state, "prime-builder", slot_index).exists()
 
     # releases on exception
-    with pytest.raises(ValueError):
-        with mod.worker_slot("prime-builder", state_dir=state):
-            raise ValueError("boom")
+    with pytest.raises(ValueError), mod.worker_slot("prime-builder", state_dir=state):
+        raise ValueError("boom")
     assert mod.in_flight_count("prime-builder", state_dir=state) == 0
 
     # raises DispatchCapacityExhausted when the role is at capacity
     s0 = mod.register_worker("prime-builder", state_dir=state)
     s1 = mod.register_worker("prime-builder", state_dir=state)
     assert s0 is not None and s1 is not None
-    with pytest.raises(mod.DispatchCapacityExhausted):
-        with mod.worker_slot("prime-builder", state_dir=state):
-            pass
+    with pytest.raises(mod.DispatchCapacityExhausted), mod.worker_slot("prime-builder", state_dir=state):
+        pass
 
 
 # --- T14: invalid role labels are rejected by every public entry point -------

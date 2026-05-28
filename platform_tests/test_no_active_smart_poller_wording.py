@@ -189,9 +189,7 @@ def _is_allowlisted(rel_path_posix: str) -> bool:
 def _scannable(path: Path) -> bool:
     if not path.is_file():
         return False
-    if path.suffix.lower() not in _SCAN_SUFFIXES:
-        return False
-    return True
+    return path.suffix.lower() in _SCAN_SUFFIXES
 
 
 def test_no_current_use_smart_poller_wording_in_repo() -> None:

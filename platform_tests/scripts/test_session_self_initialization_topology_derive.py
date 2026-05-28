@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from groundtruth_kb.mode_switch.derive import topology_from_role_map
 
 

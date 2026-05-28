@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_SKILL = PROJECT_ROOT / ".claude" / "skills" / "kb-session-wrap" / "SKILL.md"
 CODEX_SKILL = PROJECT_ROOT / ".codex" / "skills" / "kb-session-wrap" / "SKILL.md"

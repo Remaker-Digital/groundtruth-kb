@@ -19,7 +19,6 @@ from __future__ import annotations
 import re
 
 import pytest
-
 from groundtruth_kb import KnowledgeDB
 
 ADR_ID = "ADR-PEER-SOLUTION-WORKFLOW-CONTRACT-001"

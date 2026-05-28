@@ -20,13 +20,10 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
-import sys
 import tomllib
 from pathlib import Path
 
 import pytest
-
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 PYPROJECT = PROJECT_ROOT / "pyproject.toml"

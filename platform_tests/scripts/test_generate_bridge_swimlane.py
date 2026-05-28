@@ -25,7 +25,6 @@ if str(REPO_ROOT) not in sys.path:
 # can resolve scripts.gtkb_dashboard from REPO_ROOT regardless of CWD.
 from scripts.gtkb_dashboard import generate_bridge_swimlane as gbs  # noqa: E402
 
-
 # ----------------------------- helpers -----------------------------
 
 

@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -29,12 +28,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.gtkb_dashboard.refresh_dashboard_db import (  # noqa: E402
+    _REQUIRED_MIGRATION_COLUMNS,
     _classify_manifest,
     _ingest_canonical_pipeline_manifests,
     _is_deployment_event,
     _migrate_schema,
     _reconcile_against_azure_revisions,
-    _REQUIRED_MIGRATION_COLUMNS,
     initialize_database,
 )
 

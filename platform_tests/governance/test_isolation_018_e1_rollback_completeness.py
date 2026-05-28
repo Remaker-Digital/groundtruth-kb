@@ -42,7 +42,6 @@ from rollback_e1_write_set import (  # noqa: E402
     validate_agent_red_destination,
 )
 
-
 # ---------------------------------------------------------------------------
 # M5 + M6: outside paths rejected before destructive operation
 # ---------------------------------------------------------------------------
@@ -53,9 +52,8 @@ def test_m5_outside_file_destination_rejected_before_unlink(tmp_path: Path) -> N
     AssertionError BEFORE any unlink() call is made."""
     (tmp_path / "applications" / "Agent_Red").mkdir(parents=True)
 
-    with patch("rollback_e1_write_set.Path.unlink") as mock_unlink:
-        with pytest.raises(AssertionError) as exc_info:
-            validate_agent_red_destination("some-platform-file.txt", tmp_path)
+    with patch("rollback_e1_write_set.Path.unlink") as mock_unlink, pytest.raises(AssertionError) as exc_info:
+        validate_agent_red_destination("some-platform-file.txt", tmp_path)
 
     assert "out-of-scope" in str(exc_info.value).lower()
     assert mock_unlink.call_count == 0, (
@@ -70,9 +68,8 @@ def test_m6_outside_directory_destination_rejected_before_rmtree(
     AssertionError BEFORE any shutil.rmtree() call is made."""
     (tmp_path / "applications" / "Agent_Red").mkdir(parents=True)
 
-    with patch("rollback_e1_write_set.shutil.rmtree") as mock_rmtree:
-        with pytest.raises(AssertionError) as exc_info:
-            validate_agent_red_destination("some-platform-dir/", tmp_path)
+    with patch("rollback_e1_write_set.shutil.rmtree") as mock_rmtree, pytest.raises(AssertionError) as exc_info:
+        validate_agent_red_destination("some-platform-dir/", tmp_path)
 
     assert "out-of-scope" in str(exc_info.value).lower()
     assert mock_rmtree.call_count == 0, (

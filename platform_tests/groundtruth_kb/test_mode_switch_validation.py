@@ -15,7 +15,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from groundtruth_kb.mode_switch.validation import (
     validate_bridge_artifact,
     validate_role_artifact,

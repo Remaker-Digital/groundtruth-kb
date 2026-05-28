@@ -412,7 +412,7 @@ def test_formal_artifact_approval_records_are_in_membase() -> None:
         gov = db.get_spec("GOV-ARTIFACT-APPROVAL-001")
         assert "native review format" in gov["description"]
         assert "Auto-approval does not remove" in gov["description"]
-        assert "verified" == gov["status"]
+        assert gov["status"] == "verified"
 
         pb = db.get_spec("PB-ARTIFACT-APPROVAL-001")
         assert "approval or acknowledgement evidence" in pb["description"]

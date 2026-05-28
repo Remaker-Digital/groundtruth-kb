@@ -16,9 +16,10 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import sys
+from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import pytest
 

@@ -124,6 +124,7 @@ class TestContactRequirementInProvisioning:
     def test_provision_tenant_has_customer_phone_param(self):
         """provision_tenant() accepts customer_phone parameter."""
         import inspect
+
         from src.integrations.provisioning import provision_tenant
 
         sig = inspect.signature(provision_tenant)
@@ -134,6 +135,7 @@ class TestContactRequirementInProvisioning:
     def test_provision_tenant_customer_email_param_exists(self):
         """provision_tenant() still accepts customer_email parameter."""
         import inspect
+
         from src.integrations.provisioning import provision_tenant
 
         sig = inspect.signature(provision_tenant)

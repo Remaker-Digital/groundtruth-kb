@@ -32,7 +32,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
 # Fixtures are co-located with this test file. Resolved relative to __file__
@@ -233,6 +232,7 @@ def test_t5a_session_init_renders_pending_decisions_when_present(tmp_path: Path)
         # Re-import with project root pointing at tmp_path. Easiest approach:
         # call _load_pending_owner_decisions(project_root=...) directly.
         import importlib
+
         import session_self_initialization as ssi  # type: ignore
         importlib.reload(ssi)
         decisions = ssi._load_pending_owner_decisions(project)
@@ -253,6 +253,7 @@ def test_t5b_session_init_omits_section_when_no_pending(tmp_path: Path) -> None:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
     try:
         import importlib
+
         import session_self_initialization as ssi  # type: ignore
         importlib.reload(ssi)
         decisions = ssi._load_pending_owner_decisions(project)
@@ -664,8 +665,8 @@ def _import_hook_module():
     Used only for testing pure functions (snippet extraction, correlation).
     Stop-mode integration tests still go through the subprocess CLI surface.
     """
-    import sys
     import importlib.util
+    import sys
 
     spec = importlib.util.spec_from_file_location("_odt_test", str(HOOK))
     mod = importlib.util.module_from_spec(spec)

@@ -28,7 +28,6 @@ from scripts._kb_attribution import (  # noqa: E402
     resolve_changed_by_or_none,
 )
 
-
 # Resolver tests use real role-assignments.json + harness-identities.json.
 # Current state: harness A = codex, harness B = claude.
 # Per harness-state/role-assignments.json: claude = prime-builder, codex = loyal-opposition.
@@ -64,10 +63,12 @@ def test_single_prime_fallback_resolves_to_claude() -> None:
     Current role state: claude = prime-builder, codex = loyal-opposition.
     Sole Prime Builder is claude.
     """
-    with mock.patch.dict("os.environ", {}, clear=False):
-        # Ensure env var is unset for this test
-        with mock.patch.dict("os.environ", {}, clear=True):
-            assert resolve_changed_by() == "prime-builder/claude"
+    # Ensure env var is unset for this test
+    with (
+        mock.patch.dict("os.environ", {}, clear=False),
+        mock.patch.dict("os.environ", {}, clear=True),
+    ):
+        assert resolve_changed_by() == "prime-builder/claude"
 
 
 def test_unresolvable_harness_raises() -> None:

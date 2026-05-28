@@ -9,16 +9,16 @@ all associated API methods.
 
 import json
 import os
+
+# Allow import from tools directory
+import sys
 import tempfile
 
 import pytest
 
-# Allow import from tools directory
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools", "knowledge-db"))
 
 from db import KnowledgeDB
-
 from groundtruth_kb.gates import GateRegistry
 from groundtruth_kb.gates_transport import TransportEvidenceGate
 

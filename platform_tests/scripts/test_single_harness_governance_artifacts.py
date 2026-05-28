@@ -261,7 +261,7 @@ def test_role_portability_preserved_across_topologies(tmp_path: Path) -> None:
     """GOV-HARNESS-ROLE-PORTABILITY-001 preserved: in either topology
     (singleton multi-harness or multi-element single-harness), the role
     record attaches to the harness ID, not to a vendor name."""
-    from scripts.harness_roles import is_prime_builder, is_loyal_opposition
+    from scripts.harness_roles import is_loyal_opposition, is_prime_builder
 
     # Multi-harness fixture.
     multi = {"role": ["prime-builder"], "harness_type": "claude"}

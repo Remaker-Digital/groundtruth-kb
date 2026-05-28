@@ -40,7 +40,6 @@ _spec.loader.exec_module(applier)
 
 from groundtruth_kb.project.upgrade import UpgradeAction  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Helpers — fixture adopter project for the dry-run integration test.
 # ---------------------------------------------------------------------------
@@ -93,7 +92,7 @@ def test_kept_action_kinds_constant_matches_tier_a_scope() -> None:
         IN SCOPE: 12 ADD targets, 3 APPEND-GITIGNORE patterns.
         OUT OF SCOPE: 4 MERGE-EVENT-HOOKS, 13 SKIP, 34 in-flight WARNING.
     """
-    assert applier.KEPT_ACTION_KINDS == frozenset({"add", "append-gitignore"})
+    assert frozenset({"add", "append-gitignore"}) == applier.KEPT_ACTION_KINDS
 
 
 # ---------------------------------------------------------------------------

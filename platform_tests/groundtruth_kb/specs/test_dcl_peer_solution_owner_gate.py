@@ -27,7 +27,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from groundtruth_kb import KnowledgeDB
 
 DCL_ID = "DCL-PEER-SOLUTION-OWNER-GATE-001"

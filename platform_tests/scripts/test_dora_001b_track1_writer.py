@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:

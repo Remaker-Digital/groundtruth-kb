@@ -23,7 +23,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -63,10 +63,12 @@ def test_t1_lock_created_on_enter_removed_on_exit(mod, tmp_path):
 
 def test_t2_held_lock_blocks_then_times_out(mod, tmp_path):
     state = tmp_path / "state"
-    with mod.index_write_lock(state_dir=state):
-        with pytest.raises(mod.IndexWriteLockTimeout):
-            with mod.index_write_lock(state_dir=state, timeout_seconds=0.3):
-                pass
+    with (
+        mod.index_write_lock(state_dir=state),
+        pytest.raises(mod.IndexWriteLockTimeout),
+        mod.index_write_lock(state_dir=state, timeout_seconds=0.3),
+    ):
+        pass
 
 
 # --- T3: atomic_index_update applies the mutation ----------------------------
@@ -118,9 +120,8 @@ def test_t4_concurrent_updates_no_lost_update(mod, tmp_path):
 def test_t5_lock_released_on_exception(mod, tmp_path):
     state = tmp_path / "state"
     lock_path = state / "index-writer.lock"
-    with pytest.raises(ValueError):
-        with mod.index_write_lock(state_dir=state):
-            raise ValueError("boom")
+    with pytest.raises(ValueError), mod.index_write_lock(state_dir=state):
+        raise ValueError("boom")
     assert not lock_path.exists()
     # The lock is reusable after a body exception.
     with mod.index_write_lock(state_dir=state):
@@ -155,12 +156,14 @@ def test_t7_fresh_lock_not_reclaimed(mod, tmp_path):
     state = tmp_path / "state"
     state.mkdir(parents=True, exist_ok=True)
     lock_path = state / "index-writer.lock"
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     fresh = {"lock_token": "fresh-token", "pid": 999999, "acquired_at": now, "heartbeat_at": now}
     lock_path.write_text(json.dumps(fresh), encoding="utf-8")
-    with pytest.raises(mod.IndexWriteLockTimeout):
-        with mod.index_write_lock(state_dir=state, timeout_seconds=0.3, ttl_seconds=30):
-            pass
+    with (
+        pytest.raises(mod.IndexWriteLockTimeout),
+        mod.index_write_lock(state_dir=state, timeout_seconds=0.3, ttl_seconds=30),
+    ):
+        pass
     # The fresh foreign lock is untouched.
     record = json.loads(lock_path.read_text(encoding="utf-8"))
     assert record["lock_token"] == "fresh-token"
@@ -246,9 +249,11 @@ def test_t12_fresh_malformed_lock_not_reclaimed(mod, tmp_path):
     lock_path = state / "index-writer.lock"
     lock_path.write_text("{ truncated", encoding="utf-8")
     # mtime is left at ~now: the malformed file is fresh.
-    with pytest.raises(mod.IndexWriteLockTimeout):
-        with mod.index_write_lock(state_dir=state, timeout_seconds=0.3, ttl_seconds=30):
-            pass
+    with (
+        pytest.raises(mod.IndexWriteLockTimeout),
+        mod.index_write_lock(state_dir=state, timeout_seconds=0.3, ttl_seconds=30),
+    ):
+        pass
     # the fresh malformed lock is untouched
     assert lock_path.exists()
     assert lock_path.read_text(encoding="utf-8") == "{ truncated"

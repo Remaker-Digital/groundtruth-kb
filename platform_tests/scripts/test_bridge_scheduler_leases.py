@@ -17,7 +17,7 @@ import json
 import os
 import sys
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 
@@ -61,7 +61,7 @@ def _backdate(lease_path: Path, *, seconds: int) -> None:
     The ``lease_token`` is left intact."""
     record = json.loads(lease_path.read_text(encoding="utf-8"))
     record["heartbeat_at"] = (
-        datetime.now(timezone.utc) - timedelta(seconds=seconds)
+        datetime.now(UTC) - timedelta(seconds=seconds)
     ).isoformat()
     lease_path.write_text(json.dumps(record), encoding="utf-8")
 
@@ -201,15 +201,16 @@ def test_t10_document_lease_context_manager(tmp_path: Path) -> None:
     # raises LeaseUnavailable when a fresh lease is already held
     blocker = acquire_lease("widget-refactor", action="review", state_dir=tmp_path)
     assert blocker is not None
-    with pytest.raises(LeaseUnavailable):
-        with document_lease("widget-refactor", action="review", state_dir=tmp_path):
-            pass
+    with pytest.raises(LeaseUnavailable), document_lease("widget-refactor", action="review", state_dir=tmp_path):
+        pass
     release_lease(blocker)
 
     # released even when the body raises
-    with pytest.raises(RuntimeError, match="boom"):
-        with document_lease("widget-refactor", action="review", state_dir=tmp_path):
-            raise RuntimeError("boom")
+    with (
+        pytest.raises(RuntimeError, match="boom"),
+        document_lease("widget-refactor", action="review", state_dir=tmp_path),
+    ):
+        raise RuntimeError("boom")
     assert is_lease_held("widget-refactor", state_dir=tmp_path) is False
 
 

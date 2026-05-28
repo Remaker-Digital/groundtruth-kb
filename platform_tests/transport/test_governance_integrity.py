@@ -43,9 +43,9 @@ def test_db():
     Yields a KnowledgeDB instance with the transport evidence gate active,
     backed by a temp copy of the production KB. Cleaned up after test.
     """
+    import db as kb_db
     from groundtruth_kb.gates import GateRegistry
     from groundtruth_kb.gates_transport import TransportEvidenceGate
-    import db as kb_db
 
     src_db = _PROJECT_ROOT / "groundtruth.db"
     tmp_dir = tempfile.mkdtemp(prefix="governance_test_")

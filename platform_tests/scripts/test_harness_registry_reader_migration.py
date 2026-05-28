@@ -40,7 +40,6 @@ import ast
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -71,7 +70,6 @@ from scripts.harness_roles import (  # noqa: E402
     ROLE_PRIME_BUILDER,
     load_role_assignments,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: an isolated groundtruth.db registry + generated projection.
@@ -562,9 +560,7 @@ def _executing_reads_of_legacy_json(tree: ast.AST) -> list[tuple[int, str]]:
             and func.attr in ("load", "loads")
             and isinstance(func.value, ast.Name)
             and func.value.id == "json"
-        ):
-            read_target = node.args[0] if node.args else None
-        elif isinstance(func, ast.Name) and func.id == "open":
+        ) or isinstance(func, ast.Name) and func.id == "open":
             read_target = node.args[0] if node.args else None
         if read_target is None:
             continue

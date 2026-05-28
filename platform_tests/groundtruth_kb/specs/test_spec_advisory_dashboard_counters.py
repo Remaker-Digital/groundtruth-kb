@@ -28,7 +28,6 @@ Tests:
 from __future__ import annotations
 
 import pytest
-
 from groundtruth_kb import KnowledgeDB
 
 SPEC_ID = "SPEC-ADVISORY-DASHBOARD-COUNTERS-001"

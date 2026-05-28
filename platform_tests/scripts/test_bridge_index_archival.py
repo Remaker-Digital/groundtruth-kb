@@ -32,7 +32,6 @@ for _path in (str(SCRIPTS_DIR), str(GT_SRC)):
 import bridge_index_archival as bia  # noqa: E402
 import retroactive_harvest_bridge_threads as rhbt  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Stub DB
 # ---------------------------------------------------------------------------
