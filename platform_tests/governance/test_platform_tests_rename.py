@@ -48,9 +48,7 @@ def test_t_rename_1_governance_tests_pass_at_new_path() -> None:
     new platform_tests/governance/ path.
     """
     governance_dir = PROJECT_ROOT / "platform_tests" / "governance"
-    assert governance_dir.is_dir(), (
-        f"Expected platform_tests/governance/ to exist; got {governance_dir}"
-    )
+    assert governance_dir.is_dir(), f"Expected platform_tests/governance/ to exist; got {governance_dir}"
     expected_test_files = [
         "test_isolation_018_e1_rollback_completeness.py",
         "test_isolation_018_e1_step_order.py",
@@ -94,14 +92,17 @@ def test_t_rename_2_full_collect_error_count_dropped() -> None:
     )
     # Assert no collision-class errors remain (the rename's main job).
     collision_class_patterns = (
-        "tests.governance", "tests.hooks", "tests.scripts",
-        "tests.skills", "tests.secrets", "tests.security",
-        "tests.multi_tenant", "tests.transport", "tests.unit",
+        "tests.governance",
+        "tests.hooks",
+        "tests.scripts",
+        "tests.skills",
+        "tests.secrets",
+        "tests.security",
+        "tests.multi_tenant",
+        "tests.transport",
+        "tests.unit",
     )
-    collision_errors = [
-        c for c in errs
-        if any(p in str(c.get("longrepr", "")) for p in collision_class_patterns)
-    ]
+    collision_errors = [c for c in errs if any(p in str(c.get("longrepr", "")) for p in collision_class_patterns)]
     assert not collision_errors, (
         f"Expected zero remaining collision-class errors (tests.<X> "
         f"ModuleNotFoundError); got {len(collision_errors)}: "
@@ -111,43 +112,31 @@ def test_t_rename_2_full_collect_error_count_dropped() -> None:
 
 def test_t_rename_3_directory_state() -> None:
     """T-rename-3: <root>/tests/ removed; <root>/platform_tests/ exists with all migrated files."""
-    assert not (PROJECT_ROOT / "tests").exists(), (
-        "<root>/tests/ should not exist post-rename"
-    )
+    assert not (PROJECT_ROOT / "tests").exists(), "<root>/tests/ should not exist post-rename"
     platform_tests = PROJECT_ROOT / "platform_tests"
     assert platform_tests.is_dir(), "<root>/platform_tests/ must exist post-rename"
 
     if not PRE_RENAME_SOURCE_LIST.is_file():
         pytest.skip(
-            f"Pre-rename source list not available at {PRE_RENAME_SOURCE_LIST}; "
-            "skipping file-count invariant check"
+            f"Pre-rename source list not available at {PRE_RENAME_SOURCE_LIST}; skipping file-count invariant check"
         )
     pre_rename_files = [
         line.strip().replace("tests/", "platform_tests/", 1)
         for line in PRE_RENAME_SOURCE_LIST.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    missing = [
-        f for f in pre_rename_files
-        if not (PROJECT_ROOT / f).is_file()
-    ]
-    assert not missing, (
-        f"{len(missing)} pre-rename files not found at new path: {missing[:5]}..."
-    )
+    missing = [f for f in pre_rename_files if not (PROJECT_ROOT / f).is_file()]
+    assert not missing, f"{len(missing)} pre-rename files not found at new path: {missing[:5]}..."
 
 
 def test_t_rename_4_pyproject_testpaths(pyproject_pytest_config: dict) -> None:
     """T-rename-4: pyproject.toml testpaths references platform_tests not tests."""
     testpaths = pyproject_pytest_config.get("testpaths", [])
     assert testpaths, "pyproject.toml testpaths must be non-empty"
-    assert "platform_tests" in testpaths, (
-        f"pyproject.toml testpaths must include 'platform_tests'; got {testpaths}"
-    )
+    assert "platform_tests" in testpaths, f"pyproject.toml testpaths must include 'platform_tests'; got {testpaths}"
     # The bare "tests" entry must not be present (the migrated application
     # tests are referenced as "applications/Agent_Red/tests" which IS allowed).
-    assert "tests" not in testpaths, (
-        f"pyproject.toml testpaths must not include bare 'tests'; got {testpaths}"
-    )
+    assert "tests" not in testpaths, f"pyproject.toml testpaths must not include bare 'tests'; got {testpaths}"
 
 
 def test_t_rename_5_no_remaining_workflow_refs() -> None:
@@ -156,21 +145,26 @@ def test_t_rename_5_no_remaining_workflow_refs() -> None:
     assert workflows_dir.is_dir(), "expected .github/workflows/ directory"
 
     staying_subdirs = (
-        "governance", "hooks", "scripts", "skills", "secrets", "security",
-        "multi_tenant", "transport", "unit", "test_host",
+        "governance",
+        "hooks",
+        "scripts",
+        "skills",
+        "secrets",
+        "security",
+        "multi_tenant",
+        "transport",
+        "unit",
+        "test_host",
     )
     # Pattern: `tests/<staying-subdir>` where the preceding context is NOT
     # `Agent_Red/` (migrated app tests dir) and NOT `groundtruth-kb/`
     # (platform package vendored tests dir).
-    pattern = re.compile(
-        r"(?<!Agent_Red/)(?<!groundtruth-kb/)\btests/(" + "|".join(staying_subdirs) + r")\b"
-    )
+    pattern = re.compile(r"(?<!Agent_Red/)(?<!groundtruth-kb/)\btests/(" + "|".join(staying_subdirs) + r")\b")
     offending: list[tuple[Path, int, str]] = []
     for yml in workflows_dir.glob("*.yml"):
         for idx, line in enumerate(yml.read_text(encoding="utf-8").splitlines(), start=1):
             if pattern.search(line):
                 offending.append((yml, idx, line.strip()))
     assert not offending, (
-        f"{len(offending)} remaining workflow refs to old tests/<staying-subdir> "
-        f"paths: {offending[:3]}..."
+        f"{len(offending)} remaining workflow refs to old tests/<staying-subdir> paths: {offending[:3]}..."
     )

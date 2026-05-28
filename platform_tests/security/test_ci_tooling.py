@@ -8,6 +8,7 @@ which are only present in the git working tree, not in Docker containers.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import pathlib
 import re
 
@@ -23,17 +24,20 @@ pytestmark = pytest.mark.skipif(
 
 def _read_workflow(name: str) -> str:
     import pathlib
+
     p = pathlib.Path(".github/workflows") / name
     return p.read_text(encoding="utf-8") if p.exists() else ""
 
 
 def _read_pyproject() -> str:
     import pathlib
+
     return pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
 
 
 def _read_requirements_test() -> str:
     import pathlib
+
     return pathlib.Path("requirements-test.txt").read_text(encoding="utf-8")
 
 
@@ -56,7 +60,7 @@ class TestImportCycleDetection:
         section = yml.split("import-cycles:")[1]
         for sep in ["pip-audit:", "complexity:", "syntax:"]:
             if sep in section:
-                section = section[:section.index(sep)]
+                section = section[: section.index(sep)]
         assert "continue-on-error: true" not in section
 
 
@@ -74,7 +78,7 @@ class TestPipAuditScanning:
         section = yml.split("pip-audit:")[1]
         for sep in ["complexity:", "syntax:", "import-cycles:"]:
             if sep in section:
-                section = section[:section.index(sep)]
+                section = section[: section.index(sep)]
         assert "continue-on-error: true" not in section
 
     def test_pip_audit_installed(self):
@@ -91,7 +95,7 @@ class TestRuffBlocking:
 
     def test_ruff_select_includes_e_f(self):
         toml = _read_pyproject()
-        match = re.search(r'select\s*=\s*\[([^\]]+)\]', toml)
+        match = re.search(r"select\s*=\s*\[([^\]]+)\]", toml)
         assert match
         selected = match.group(1)
         assert '"E"' in selected
@@ -125,8 +129,7 @@ class TestXdistParallel:
 
     def test_xdist_used_in_ci(self):
         yml = _read_workflow("python-tests.yml")
-        assert "-n " in yml or "--numprocesses" in yml, \
-            "python-tests.yml should use pytest-xdist -n flag"
+        assert "-n " in yml or "--numprocesses" in yml, "python-tests.yml should use pytest-xdist -n flag"
 
 
 class TestComplexityAnalysis:
@@ -134,8 +137,7 @@ class TestComplexityAnalysis:
 
     def test_lint_has_complexity_or_deadcode_step(self):
         yml = _read_workflow("lint.yml")
-        assert "radon" in yml or "vulture" in yml, \
-            "lint.yml should include radon or vulture analysis"
+        assert "radon" in yml or "vulture" in yml, "lint.yml should include radon or vulture analysis"
 
     def test_complexity_step_references_src(self):
         yml = _read_workflow("lint.yml")
@@ -144,6 +146,5 @@ class TestComplexityAnalysis:
 
     def test_complexity_analysis_installed(self):
         yml = _read_workflow("lint.yml")
-        has_install = ("radon" in yml and "pip install" in yml) or \
-                      ("vulture" in yml and "pip install" in yml)
+        has_install = ("radon" in yml and "pip install" in yml) or ("vulture" in yml and "pip install" in yml)
         assert has_install, "Complexity tools must be installed"

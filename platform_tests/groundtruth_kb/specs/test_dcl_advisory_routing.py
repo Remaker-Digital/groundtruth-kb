@@ -59,12 +59,10 @@ def test_constraints_enforcement_mode_advisory(dcl_spec: dict) -> None:
     if isinstance(constraints, str):
         constraints = json.loads(constraints)
     assert isinstance(constraints, dict), (
-        f"constraints must be a dict (after JSON parse if needed); "
-        f"got {type(constraints).__name__}"
+        f"constraints must be a dict (after JSON parse if needed); got {type(constraints).__name__}"
     )
     assert constraints.get("enforcement_mode") == "advisory", (
-        f"constraints.enforcement_mode must be 'advisory'; "
-        f"got {constraints.get('enforcement_mode')!r}"
+        f"constraints.enforcement_mode must be 'advisory'; got {constraints.get('enforcement_mode')!r}"
     )
 
 
@@ -75,8 +73,7 @@ def test_constraint_text_references_axis_2_surface(dcl_spec: dict) -> None:
         assert needle in desc, f"description must reference {needle!r}"
     # T3 alternative tokens for the AXIS 2 surface, per the proposal wording
     assert ("UserPromptSubmit" in desc) or ("AXIS 2 surface" in desc), (
-        "description must reference 'UserPromptSubmit' or 'AXIS 2 surface' "
-        "(the in-session AXIS 2 surfacing path)"
+        "description must reference 'UserPromptSubmit' or 'AXIS 2 surface' (the in-session AXIS 2 surfacing path)"
     )
 
 
@@ -90,23 +87,19 @@ def test_should_not_must_wording(dcl_spec: dict) -> None:
     """
     desc = dcl_spec.get("description") or ""
     assert "SHOULD be routed" in desc, (
-        "description must include 'SHOULD be routed' "
-        "(matching sibling protocol-extension VERIFIED wording)"
+        "description must include 'SHOULD be routed' (matching sibling protocol-extension VERIFIED wording)"
     )
     assert "SHOULD exclude" in desc, (
-        "description must include 'SHOULD exclude' "
-        "(matching sibling protocol-extension VERIFIED wording)"
+        "description must include 'SHOULD exclude' (matching sibling protocol-extension VERIFIED wording)"
     )
     # Negative checks: MUST-form must not appear in the normative-constraint
     # phrasing. Deferred to a future bridge slice gated on parallel runtime
     # thread per-parser empirical evidence.
     assert "MUST be routed" not in desc, (
-        "description must not use 'MUST be routed' wording; SHOULD-to-MUST "
-        "promotion is deferred"
+        "description must not use 'MUST be routed' wording; SHOULD-to-MUST promotion is deferred"
     )
     assert "MUST exclude" not in desc, (
-        "description must not use 'MUST exclude' wording; SHOULD-to-MUST "
-        "promotion is deferred"
+        "description must not use 'MUST exclude' wording; SHOULD-to-MUST promotion is deferred"
     )
 
 
@@ -135,6 +128,5 @@ def test_assertions_reference_advisory_precondition(dcl_spec: dict) -> None:
             advisory_predicate_found = True
             break
     assert advisory_predicate_found, (
-        "at least one assertion must reference the 'latest_status == ADVISORY' "
-        "precondition (T5 routing predicate)"
+        "at least one assertion must reference the 'latest_status == ADVISORY' precondition (T5 routing predicate)"
     )

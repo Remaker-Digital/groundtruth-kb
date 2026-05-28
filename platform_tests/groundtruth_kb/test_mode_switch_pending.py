@@ -75,9 +75,7 @@ def _seed_workspace(root: Path) -> None:
 
 def _read_role_map(root: Path) -> dict[str, Any]:
     """Return ``{harness_id: role_set}`` from the regenerated registry projection."""
-    projection = json.loads(
-        (root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8")
-    )
+    projection = json.loads((root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
     return {
         str(record["id"]): record.get("role")
         for record in projection.get("harnesses", [])
@@ -92,9 +90,7 @@ def project_root(tmp_path: Path) -> Path:
 
 def test_defer_role_switch_writes_pending_file(project_root: Path) -> None:
     _seed_workspace(project_root)
-    path = defer_role_switch(
-        project_root, "claude", "loyal-opposition", change_reason="defer test"
-    )
+    path = defer_role_switch(project_root, "claude", "loyal-opposition", change_reason="defer test")
     assert path.exists()
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["harness_id_or_name"] == "claude"
@@ -115,9 +111,7 @@ def test_apply_pending_drains_and_archives(project_root: Path) -> None:
     # WI-3342 IP-6: target harness B (claude) by its durable id — apply_role_switch
     # resolves the registry projection by harness id (records carry harness_name,
     # not the legacy ``name`` key).
-    pending_path = defer_role_switch(
-        project_root, "B", "loyal-opposition", change_reason="drain test"
-    )
+    pending_path = defer_role_switch(project_root, "B", "loyal-opposition", change_reason="drain test")
     results = apply_pending(project_root)
     assert len(results) == 1
     assert results[0].applied is True
@@ -131,9 +125,7 @@ def test_apply_pending_leaves_failed_in_pending_with_logged_error(project_root: 
     """Failed pending entries stay in pending/ with an error captured."""
     _seed_workspace(project_root)
     # Defer with an invalid role; apply will fail validation.
-    pending_path = defer_role_switch(
-        project_root, "claude", "no-such-role", change_reason="fail test"
-    )
+    pending_path = defer_role_switch(project_root, "claude", "no-such-role", change_reason="fail test")
     results = apply_pending(project_root)
     assert len(results) == 1
     assert results[0].applied is False
@@ -147,9 +139,7 @@ def test_next_session_initialization_applies_pending_and_state_matches_deferred_
     """Acceptance criterion #6: deferred request becomes effective at next session start."""
     _seed_workspace(project_root)
     # WI-3342 IP-6: target harness B (claude) by its durable id.
-    defer_role_switch(
-        project_root, "B", "loyal-opposition", change_reason="next-session test"
-    )
+    defer_role_switch(project_root, "B", "loyal-opposition", change_reason="next-session test")
     apply_pending(project_root)
     # WI-3342 IP-6: the post-switch role surface is the regenerated registry
     # projection, not the retired role-assignments.json.

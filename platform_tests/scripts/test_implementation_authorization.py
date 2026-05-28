@@ -47,11 +47,7 @@ def _write_index(project_root: Path, blocks: list[str]) -> Path:
     """Write a bridge/INDEX.md with header comments + the supplied per-document blocks."""
     index_path = project_root / "bridge" / "INDEX.md"
     index_path.parent.mkdir(parents=True, exist_ok=True)
-    header = (
-        "# Bridge Index\n\n"
-        "<!-- header comment -->\n"
-        "\n"
-    )
+    header = "# Bridge Index\n\n<!-- header comment -->\n\n"
     index_path.write_text(header + "\n\n".join(blocks) + "\n", encoding="utf-8")
     return index_path
 
@@ -100,11 +96,7 @@ def _setup_simple_go_bridge(project_root: Path, slug: str = "fixture-bridge") ->
     """Build a project root with a single GO'd bridge: NEW at -001, GO at -002."""
     proposal = _write_proposal(project_root, slug, version=1, target_paths=["scripts/dummy.py", ".gtkb-state/**"])
     verdict = _write_verdict(project_root, slug, version=2, verdict="GO")
-    block = (
-        f"Document: {slug}\n"
-        f"GO: bridge/{slug}-002.md\n"
-        f"NEW: bridge/{slug}.md\n"
-    )
+    block = f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
     _write_index(project_root, [block])
     return slug, proposal, verdict
 
@@ -124,11 +116,7 @@ def test_parse_bridge_index_skips_misattributed_status_line(auth_module, tmp_pat
         "Document: doc-a\n"
         "NEW: bridge/doc-b-001.md\n"  # misattributed: filename is for doc-b
     )
-    good_block = (
-        "Document: real-bridge\n"
-        "GO: bridge/real-bridge-002.md\n"
-        "NEW: bridge/real-bridge.md\n"
-    )
+    good_block = "Document: real-bridge\nGO: bridge/real-bridge-002.md\nNEW: bridge/real-bridge.md\n"
     _write_index(tmp_path, [bad_block, good_block])
 
     entries = auth_module.parse_bridge_index(tmp_path)
@@ -165,7 +153,9 @@ def test_filename_matches_doc_accepts_v1_no_suffix_and_v2_plus_suffix(auth_modul
     assert matches("bridge/foo-022.md", "foo")
     # doc_id ending in -001 (real-world case)
     assert matches("bridge/gtkb-single-harness-bridge-dispatcher-001.md", "gtkb-single-harness-bridge-dispatcher-001")
-    assert matches("bridge/gtkb-single-harness-bridge-dispatcher-001-022.md", "gtkb-single-harness-bridge-dispatcher-001")
+    assert matches(
+        "bridge/gtkb-single-harness-bridge-dispatcher-001-022.md", "gtkb-single-harness-bridge-dispatcher-001"
+    )
     # Mismatch: filename does not start with bridge/<doc_id>
     assert not matches("bridge/bar-001.md", "foo")
     # Mismatch: suffix not matching expected pattern
@@ -187,9 +177,7 @@ def test_bridge_entry_succeeds_for_well_formed_bridge(auth_module, tmp_path):
 
 def _make_groundtruth_toml(tmp_path: Path) -> None:
     """Create a minimal groundtruth.toml so groundtruth_db_path resolves."""
-    (tmp_path / "groundtruth.toml").write_text(
-        "[groundtruth]\ndb_path = \"groundtruth.db\"\n", encoding="utf-8"
-    )
+    (tmp_path / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
 
 
 def _begin_packet(auth_module, tmp_path: Path, slug: str) -> dict[str, Any]:
@@ -226,16 +214,8 @@ def test_activate_restores_named_packet_to_current_json(auth_module, tmp_path):
     # Set up a second bridge
     _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/b.py"])
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
-    block_b = (
-        "Document: bridge-b\n"
-        "GO: bridge/bridge-b-002.md\n"
-        "NEW: bridge/bridge-b.md\n"
-    )
-    block_a = (
-        f"Document: {slug_a}\n"
-        f"GO: bridge/{slug_a}-002.md\n"
-        f"NEW: bridge/{slug_a}.md\n"
-    )
+    block_b = "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b.md\n"
+    block_a = f"Document: {slug_a}\nGO: bridge/{slug_a}-002.md\nNEW: bridge/{slug_a}.md\n"
     _write_index(tmp_path, [block_b, block_a])
     # Overwrite current.json with bridge-b's packet
     _begin_packet(auth_module, tmp_path, "bridge-b")
@@ -268,12 +248,7 @@ def test_activate_fails_when_bridge_status_drifted(auth_module, tmp_path):
 
     # Now drift the INDEX: add NEW: -003.md so latest_status is no longer GO
     _write_proposal(tmp_path, slug, version=3, target_paths=["scripts/dummy.py"])
-    block = (
-        f"Document: {slug}\n"
-        f"NEW: bridge/{slug}-003.md\n"
-        f"GO: bridge/{slug}-002.md\n"
-        f"NEW: bridge/{slug}.md\n"
-    )
+    block = f"Document: {slug}\nNEW: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
     _write_index(tmp_path, [block])
 
     with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
@@ -286,12 +261,7 @@ def test_validate_packet_fails_with_pending_new_after_go(auth_module, tmp_path):
     slug, _, _ = _setup_simple_go_bridge(tmp_path)
     _begin_packet(auth_module, tmp_path, slug)
     _write_proposal(tmp_path, slug, version=3, target_paths=["scripts/dummy.py"])
-    block = (
-        f"Document: {slug}\n"
-        f"NEW: bridge/{slug}-003.md\n"
-        f"GO: bridge/{slug}-002.md\n"
-        f"NEW: bridge/{slug}.md\n"
-    )
+    block = f"Document: {slug}\nNEW: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
     _write_index(tmp_path, [block])
     with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
         auth_module.activate_packet(tmp_path, slug)
@@ -368,10 +338,13 @@ def test_list_enumerates_named_packets(auth_module, tmp_path):
     _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
     _write_proposal(tmp_path, "bridge-b", version=1)
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
-    _write_index(tmp_path, [
-        "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
-        "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b.md\n",
-    ])
+    _write_index(
+        tmp_path,
+        [
+            "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
+            "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b.md\n",
+        ],
+    )
     _begin_packet(auth_module, tmp_path, "bridge-a")
     _begin_packet(auth_module, tmp_path, "bridge-b")
 
@@ -441,8 +414,7 @@ def test_has_spec_derived_verification_accepts_test_plan_spec_to_test_heading(au
     """A 'Test Plan (spec-to-test mapping)' heading with command evidence is
     recognized -- the S351 case the begin gate previously rejected."""
     markdown = (
-        "## Test Plan (spec-to-test mapping)\n\n"
-        "Run `python -m pytest platform_tests/scripts/test_x.py -q` to verify.\n"
+        "## Test Plan (spec-to-test mapping)\n\nRun `python -m pytest platform_tests/scripts/test_x.py -q` to verify.\n"
     )
     assert auth_module.has_spec_derived_verification(markdown)
 
@@ -469,11 +441,7 @@ def test_has_spec_derived_verification_rejects_missing_verification_section(auth
 def test_section_body_exact_match_preserved(auth_module):
     """section_body keeps exact, first-match, case-insensitive heading semantics
     after the _iter_sections refactor."""
-    markdown = (
-        "## Verification Plan\n\nfirst body\n\n"
-        "## Other\n\nother body\n\n"
-        "## Verification Plan\n\nsecond body\n"
-    )
+    markdown = "## Verification Plan\n\nfirst body\n\n## Other\n\nother body\n\n## Verification Plan\n\nsecond body\n"
     assert auth_module.section_body(markdown, "Verification Plan") == "first body"
     assert auth_module.section_body(markdown, "verification plan") == "first body"
     assert auth_module.section_body(markdown, "Test Plan (spec-to-test mapping)") == ""
@@ -796,9 +764,12 @@ def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
     worktree carries its own committed groundtruth.toml. Requires git.
     """
     ident = [
-        "-c", "user.email=test@example.com",
-        "-c", "user.name=test",
-        "-c", "commit.gpgsign=false",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=test",
+        "-c",
+        "commit.gpgsign=false",
     ]
     canonical = tmp_path / "canonical"
     canonical.mkdir()

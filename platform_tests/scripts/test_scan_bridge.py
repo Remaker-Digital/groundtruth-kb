@@ -13,6 +13,7 @@ HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan
 
 def _load_helper():
     import sys
+
     spec = importlib.util.spec_from_file_location("scan_bridge", HELPER_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

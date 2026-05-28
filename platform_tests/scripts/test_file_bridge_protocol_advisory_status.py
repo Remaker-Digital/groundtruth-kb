@@ -33,13 +33,8 @@ def test_advisory_row_in_statuses_table() -> None:
         re.MULTILINE,
     )
     matches = pattern.findall(text)
-    assert matches, (
-        "ADVISORY row missing from Statuses table in "
-        ".claude/rules/file-bridge-protocol.md"
-    )
-    assert len(matches) == 1, (
-        f"expected exactly one ADVISORY row; found {len(matches)}: {matches!r}"
-    )
+    assert matches, "ADVISORY row missing from Statuses table in .claude/rules/file-bridge-protocol.md"
+    assert len(matches) == 1, f"expected exactly one ADVISORY row; found {len(matches)}: {matches!r}"
 
 
 def test_advisory_reports_subsection_exists() -> None:
@@ -48,8 +43,7 @@ def test_advisory_reports_subsection_exists() -> None:
     text = _read_protocol_text()
     pattern = re.compile(r"^#{2,3}\s+Advisory Reports\s*$", re.MULTILINE)
     assert pattern.search(text), (
-        "## Advisory Reports (or ### Advisory Reports) subsection missing from "
-        ".claude/rules/file-bridge-protocol.md"
+        "## Advisory Reports (or ### Advisory Reports) subsection missing from .claude/rules/file-bridge-protocol.md"
     )
 
 
@@ -64,6 +58,4 @@ def test_advisory_reports_subsection_mentions_axis_2_routing() -> None:
     )
     assert section_match, "Advisory Reports section anchor not located"
     body = section_match.group("body")
-    assert re.search(r"axis[- ]?2", body, re.IGNORECASE), (
-        "Advisory Reports subsection does not mention Axis-2 routing"
-    )
+    assert re.search(r"axis[- ]?2", body, re.IGNORECASE), "Advisory Reports subsection does not mention Axis-2 routing"

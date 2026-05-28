@@ -38,9 +38,7 @@ _SCRIPT_PATH = _REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
 @pytest.fixture(scope="module")
 def trigger_module():
     assert _SCRIPT_PATH.is_file(), f"Missing {_SCRIPT_PATH}"
-    spec = importlib.util.spec_from_file_location(
-        "cross_harness_bridge_trigger_for_suppression_tests", _SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("cross_harness_bridge_trigger_for_suppression_tests", _SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["cross_harness_bridge_trigger_for_suppression_tests"] = module
@@ -233,14 +231,10 @@ def test_check_counterpart_active_target_after_role_switch_lock_resolution(trigg
 
 def _run_trigger_dry(trigger_module, project_root: Path, state_dir: Path) -> dict:
     """Run trigger in dry-run mode; return the result dict."""
-    return trigger_module.run_trigger(
-        project_root=project_root, state_dir=state_dir, dry_run=True
-    )
+    return trigger_module.run_trigger(project_root=project_root, state_dir=state_dir, dry_run=True)
 
 
-def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(
-    trigger_module, tmp_path: Path
-) -> None:
+def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-suppressed-signature-stored-not-as-dispatched (F1 fix critical).
 
     When the counterpart is active, the current signature is recorded in
@@ -264,9 +258,7 @@ def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(
         f"expected None, got {prime_state.get('last_dispatched_signature')!r}"
     )
     # Legacy `signature` field should NOT be updated to the suppressed signature.
-    assert prime_state.get("signature") in (None,), (
-        f"expected None or unchanged, got {prime_state.get('signature')!r}"
-    )
+    assert prime_state.get("signature") in (None,), f"expected None or unchanged, got {prime_state.get('signature')!r}"
 
 
 def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Path) -> None:
@@ -300,9 +292,7 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
     assert prime_state_b["last_result"] not in (
         "unchanged",
         "counterpart_active_session_present",
-    ), (
-        f"expected dispatch branch entry, got last_result={prime_state_b['last_result']!r}"
-    )
+    ), f"expected dispatch branch entry, got last_result={prime_state_b['last_result']!r}"
     # last_dispatched_signature is set to the current signature post-dispatch attempt.
     assert prime_state_b["last_dispatched_signature"] == suppressed_sig
     # last_suppressed_signature is cleared.
@@ -352,9 +342,7 @@ def test_run_trigger_suppressed_cleared_after_dispatch(trigger_module, tmp_path:
     assert prime_state["last_suppressed_signature"] is None
 
 
-def test_run_trigger_legacy_signature_field_preserved_during_suppression(
-    trigger_module, tmp_path: Path
-) -> None:
+def test_run_trigger_legacy_signature_field_preserved_during_suppression(trigger_module, tmp_path: Path) -> None:
     """Legacy `signature` field is NOT updated on suppression (back-compat).
 
     Slice 2 readers (e.g., dashboards) key off `signature`; updating it on
@@ -374,8 +362,7 @@ def test_run_trigger_legacy_signature_field_preserved_during_suppression(
     # if the suppression branch wrote to legacy_sig (proving the test).
     bridge_index = project_root / "bridge" / "INDEX.md"
     bridge_index.write_text(
-        bridge_index.read_text()
-        + "\nDocument: another-fixture\nGO: bridge/another-fixture-001.md\n"
+        bridge_index.read_text() + "\nDocument: another-fixture\nGO: bridge/another-fixture-001.md\n"
     )
     (project_root / "bridge" / "another-fixture-001.md").write_text("GO\n")
     _write_lock(state_dir, "claude")
@@ -441,9 +428,7 @@ def test_heartbeat_trigger_shared_lock_dir_claude(tmp_path: Path) -> None:
     all_state_dirs = []
     for event, entries in by_event.items():
         for kind, state_dir in entries:
-            assert state_dir is not None, (
-                f"Claude {event} hook missing --state-dir: kind={kind}"
-            )
+            assert state_dir is not None, f"Claude {event} hook missing --state-dir: kind={kind}"
             all_state_dirs.append((event, kind, state_dir))
 
     # Every (heartbeat or trigger) command must resolve to the same state_dir.
@@ -464,9 +449,7 @@ def test_heartbeat_trigger_shared_lock_dir_codex(tmp_path: Path) -> None:
     all_state_dirs = []
     for event, entries in by_event.items():
         for kind, state_dir in entries:
-            assert state_dir is not None, (
-                f"Codex {event} hook missing --state-dir: kind={kind}"
-            )
+            assert state_dir is not None, f"Codex {event} hook missing --state-dir: kind={kind}"
             all_state_dirs.append((event, kind, state_dir))
 
     state_dir_values = {state_dir for _, _, state_dir in all_state_dirs}

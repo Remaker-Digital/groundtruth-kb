@@ -49,16 +49,13 @@ def test_required_header_fields_enumerated(spec: dict) -> None:
     desc = spec.get("description") or ""
     required = ("bridge_kind", "Document", "Version", "Author", "Date")
     missing = [f for f in required if f not in desc]
-    assert not missing, (
-        f"description must enumerate all required header fields; missing: {missing}"
-    )
+    assert not missing, f"description must enumerate all required header fields; missing: {missing}"
     # Closed-set hint: the spec's required header fields must be exactly five.
     # We do not enforce ordering or uniqueness here (different sections may
     # reference these tokens), but we do anchor on the IP-1 enumeration phrase
     # so future drift requires an explicit spec amendment.
     assert "five header fields" in desc, (
-        "description must declare the closed-set count via the phrase "
-        "'five header fields'"
+        "description must declare the closed-set count via the phrase 'five header fields'"
     )
 
 
@@ -73,12 +70,9 @@ def test_required_body_sections_enumerated(spec: dict) -> None:
         "## Classification Slot",
     )
     missing = [s for s in required if s not in desc]
-    assert not missing, (
-        f"description must enumerate all required body sections; missing: {missing}"
-    )
+    assert not missing, f"description must enumerate all required body sections; missing: {missing}"
     assert "five body sections" in desc, (
-        "description must declare the closed-set count via the phrase "
-        "'five body sections'"
+        "description must declare the closed-set count via the phrase 'five body sections'"
     )
 
 
@@ -92,14 +86,9 @@ def test_classification_vocabulary_closed(spec: dict) -> None:
     desc = spec.get("description") or ""
     vocab = ("adopt", "adapt", "reject", "defer", "monitor")
     missing = [v for v in vocab if v not in desc]
-    assert not missing, (
-        f"description must enumerate all five classification states; missing: {missing}"
-    )
+    assert not missing, f"description must enumerate all five classification states; missing: {missing}"
     # Closed-vocabulary anchor phrase: prevents silent superset/subset drift.
-    assert (
-        "five classification states are: adopt, adapt, reject, defer, monitor"
-        in desc
-    ), (
+    assert "five classification states are: adopt, adapt, reject, defer, monitor" in desc, (
         "description must include the closed-vocabulary enumeration "
         "'five classification states are: adopt, adapt, reject, defer, monitor'"
     )

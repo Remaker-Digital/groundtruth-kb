@@ -46,33 +46,41 @@ def _seed_fixture_db(db_path: Path) -> None:
     )
     rows = [
         # ADR fully populated
-        ("ADR-001", 1, "architecture_decision",
-         '["theme-tag", "design-constraint", "topic-foo"]',
-         '["scripts/foo.py"]',
-         '[{"type": "grep", "pattern": "x"}]'),
+        (
+            "ADR-001",
+            1,
+            "architecture_decision",
+            '["theme-tag", "design-constraint", "topic-foo"]',
+            '["scripts/foo.py"]',
+            '[{"type": "grep", "pattern": "x"}]',
+        ),
         # ADR with tags only
-        ("ADR-002", 1, "architecture_decision",
-         '["theme-tag", "topic-bar"]',
-         "",
-         "[]"),
+        ("ADR-002", 1, "architecture_decision", '["theme-tag", "topic-bar"]', "", "[]"),
         # ADR with no metadata
         ("ADR-003", 1, "architecture_decision", "", "", ""),
         # DCL fully populated
-        ("DCL-001", 1, "design_constraint",
-         '["mechanical-enforcement", "topic-foo"]',
-         '["src/bar.py"]',
-         '[{"type": "grep", "pattern": "y"}]'),
+        (
+            "DCL-001",
+            1,
+            "design_constraint",
+            '["mechanical-enforcement", "topic-foo"]',
+            '["src/bar.py"]',
+            '[{"type": "grep", "pattern": "y"}]',
+        ),
         # DCL with tags + assertions but no source_paths
-        ("DCL-002", 1, "design_constraint",
-         '["theme-tag", "design-constraint"]',
-         "[]",
-         '[{"type": "grep", "pattern": "z"}]'),
+        (
+            "DCL-002",
+            1,
+            "design_constraint",
+            '["theme-tag", "design-constraint"]',
+            "[]",
+            '[{"type": "grep", "pattern": "z"}]',
+        ),
         # DCL with no metadata
         ("DCL-003", 1, "design_constraint", None, None, None),
     ]
     conn.executemany(
-        "INSERT INTO specifications (id, version, type, tags, source_paths, assertions) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO specifications (id, version, type, tags, source_paths, assertions) VALUES (?, ?, ?, ?, ?, ?)",
         rows,
     )
     conn.commit()
@@ -211,8 +219,7 @@ def test_read_only_db_access_rejects_writes(tmp_path: Path) -> None:
         # Attempt to INSERT through the read-only connection -> must raise.
         with pytest.raises(sqlite3.OperationalError):
             conn.execute(
-                "INSERT INTO specifications (id, version, type) "
-                "VALUES ('SHOULD-FAIL', 1, 'architecture_decision')"
+                "INSERT INTO specifications (id, version, type) VALUES ('SHOULD-FAIL', 1, 'architecture_decision')"
             )
 
     # mtime must be unchanged after read-only access.
@@ -226,12 +233,18 @@ def test_output_flag_writes_file(tmp_path: Path) -> None:
     _seed_fixture_db(db)
     out = tmp_path / "report.json"
 
-    rc = module.main([
-        "--db", str(db),
-        "--format", "json",
-        "--output", str(out),
-        "--frozen-timestamp", "2026-05-01T00:00:00+00:00",
-    ])
+    rc = module.main(
+        [
+            "--db",
+            str(db),
+            "--format",
+            "json",
+            "--output",
+            str(out),
+            "--frozen-timestamp",
+            "2026-05-01T00:00:00+00:00",
+        ]
+    )
 
     assert rc == 0
     assert out.is_file()

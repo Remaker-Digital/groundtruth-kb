@@ -136,8 +136,12 @@ def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
 
 
 def test_grafana_provisioning_targets_sqlite_database() -> None:
-    datasource = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "datasources" / "gtkb-dashboard-sqlite.yml"
-    dashboard_provider = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "dashboards" / "gtkb-dashboard.yml"
+    datasource = (
+        REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "datasources" / "gtkb-dashboard-sqlite.yml"
+    )
+    dashboard_provider = (
+        REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "dashboards" / "gtkb-dashboard.yml"
+    )
     dashboard = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
     readme = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "README.md"
     package_integration = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "PACKAGE-INTEGRATION.md"
@@ -183,7 +187,8 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert all(
         panel.get("collapsed") is True
         for panel in dashboard_json["panels"]
-        if panel["title"] in {
+        if panel["title"]
+        in {
             "Setup Details",
             "Action Center Details",
             "Delivery Timeline Details",

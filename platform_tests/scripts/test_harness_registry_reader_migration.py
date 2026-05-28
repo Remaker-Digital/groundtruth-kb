@@ -76,9 +76,7 @@ from scripts.harness_roles import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _seed_registry(
-    root: Path, harnesses: dict[str, tuple[str, list[str]]]
-) -> KnowledgeDB:
+def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> KnowledgeDB:
     """Seed an isolated groundtruth.db ``harnesses`` table + generated projection.
 
     ``harnesses`` maps each durable harness id to ``(harness_name, role_set)``.
@@ -160,9 +158,7 @@ def test_resolved_harness_id_resolves_from_projection(tmp_path: Path) -> None:
     assert resolved_harness_id(tmp_path, harness_name="claude") == "B"
 
 
-def test_kb_attribution_raw_reader_resolves_from_projection(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_kb_attribution_raw_reader_resolves_from_projection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Migrated raw-reader site ``scripts/_kb_attribution.py``: ``_load_role_assignments``
     and ``_load_harness_identities`` resolve from the registry projection via
     the IP-3 foundational loaders (WI-3342 IP-4).
@@ -198,9 +194,7 @@ def test_cross_harness_trigger_raw_readers_resolve_from_projection(
     import importlib.util
 
     trigger_path = _REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
-    spec = importlib.util.spec_from_file_location(
-        "cross_harness_bridge_trigger_readermig", trigger_path
-    )
+    spec = importlib.util.spec_from_file_location("cross_harness_bridge_trigger_readermig", trigger_path)
     assert spec is not None and spec.loader is not None
     trigger = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = trigger
@@ -267,9 +261,7 @@ def test_golden_value_role_resolution_matches_pre_migration(tmp_path: Path) -> N
         },
     )
     document = load_role_assignments(tmp_path)
-    resolved = {
-        hid: record["role"] for hid, record in document["harnesses"].items()
-    }
+    resolved = {hid: record["role"] for hid, record in document["harnesses"].items()}
     assert resolved == golden
 
 
@@ -291,9 +283,7 @@ def _authoritative_role_assignments(root: Path, role_map: dict[str, list[str]]) 
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    hid: {"role": roles} for hid, roles in role_map.items()
-                },
+                "harnesses": {hid: {"role": roles} for hid, roles in role_map.items()},
             }
         ),
         encoding="utf-8",
@@ -301,9 +291,7 @@ def _authoritative_role_assignments(root: Path, role_map: dict[str, list[str]]) 
     return path
 
 
-def _reconcile_registry_to_role_assignments(
-    db: KnowledgeDB, root: Path, role_assignments_path: Path
-) -> None:
+def _reconcile_registry_to_role_assignments(db: KnowledgeDB, root: Path, role_assignments_path: Path) -> None:
     """Reconcile the DB ``harnesses`` registry to the authoritative role file.
 
     Mirrors the IP-RECON step: for each harness, the corrected role is derived
@@ -405,11 +393,7 @@ def test_ip_recon_reconciles_inverted_registry_to_authoritative_role_file(
     assert role_document["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]
 
     # FR9 single-prime-builder partition: exactly one prime-builder harness.
-    primes = [
-        hid
-        for hid in ("A", "B")
-        if ROLE_PRIME_BUILDER in role_set_for_id(document, hid)
-    ]
+    primes = [hid for hid in ("A", "B") if ROLE_PRIME_BUILDER in role_set_for_id(document, hid)]
     assert primes == ["B"]
 
     # IP-RECON does NOT modify the authoritative role-assignments.json.
@@ -439,14 +423,10 @@ def test_ip_recon_audit_trail_distinguishes_corrective_writes(tmp_path: Path) ->
     # The current (corrected) version carries the reconciliation attribution.
     conn = db._get_conn()
     for harness_id in ("A", "B"):
-        row = conn.execute(
-            "SELECT changed_by FROM current_harnesses WHERE id = ?", (harness_id,)
-        ).fetchone()
+        row = conn.execute("SELECT changed_by FROM current_harnesses WHERE id = ?", (harness_id,)).fetchone()
         assert row[0] == "harness-registry-reconciliation"
         # The polluted version is retained in history (>= 2 versions total).
-        count = conn.execute(
-            "SELECT COUNT(*) FROM harnesses WHERE id = ?", (harness_id,)
-        ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM harnesses WHERE id = ?", (harness_id,)).fetchone()[0]
         assert count >= 2
 
 
@@ -556,11 +536,15 @@ def _executing_reads_of_legacy_json(tree: ast.AST) -> list[tuple[int, str]]:
         if isinstance(func, ast.Attribute) and func.attr in _READ_ATTRS:
             read_target = func.value
         elif (
-            isinstance(func, ast.Attribute)
-            and func.attr in ("load", "loads")
-            and isinstance(func.value, ast.Name)
-            and func.value.id == "json"
-        ) or isinstance(func, ast.Name) and func.id == "open":
+            (
+                isinstance(func, ast.Attribute)
+                and func.attr in ("load", "loads")
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "json"
+            )
+            or isinstance(func, ast.Name)
+            and func.id == "open"
+        ):
             read_target = node.args[0] if node.args else None
         if read_target is None:
             continue

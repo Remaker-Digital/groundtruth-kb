@@ -13,9 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-SCRIPT = (
-    Path(__file__).resolve().parents[2] / "scripts" / "session_self_initialization.py"
-)
+SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "session_self_initialization.py"
 
 
 def test_session_self_initialization_imports_apply_pending() -> None:
@@ -32,6 +30,4 @@ def test_session_self_initialization_apply_pending_in_main() -> None:
     apply_pos = text.find("_apply_pending(project_root)", main_pos)
     assert project_root_pos > -1, "project_root assignment not found in main()"
     assert apply_pos > -1, "apply_pending call not found in main()"
-    assert apply_pos > project_root_pos, (
-        "apply_pending must be called after project_root is resolved"
-    )
+    assert apply_pos > project_root_pos, "apply_pending must be called after project_root is resolved"

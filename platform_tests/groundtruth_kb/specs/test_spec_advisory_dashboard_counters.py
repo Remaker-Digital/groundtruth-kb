@@ -67,22 +67,16 @@ def test_no_go_count_excludes_advisory(spec_row: dict) -> None:
     """T3 (F1+F3 closure): description states no_go_count MUST NOT include ADVISORY entries."""
     desc = spec_row.get("description") or ""
     # The exclusion must be explicit. Accept either canonical phrasing.
-    explicit = (
-        "no_go_count" in desc
-        and ("MUST NOT include ADVISORY" in desc)
-    )
+    explicit = "no_go_count" in desc and ("MUST NOT include ADVISORY" in desc)
     assert explicit, (
-        "description must explicitly state 'no_go_count' alongside "
-        "'MUST NOT include ADVISORY' (T3 F1+F3 closure)"
+        "description must explicitly state 'no_go_count' alongside 'MUST NOT include ADVISORY' (T3 F1+F3 closure)"
     )
 
 
 def test_actionable_count_for_prime_excludes_verified(spec_row: dict) -> None:
     """T4 (F1+F3 closure): description states actionable_count_for_prime MUST NOT include latest VERIFIED."""
     desc = spec_row.get("description") or ""
-    assert "actionable_count_for_prime" in desc, (
-        "description must reference 'actionable_count_for_prime'"
-    )
+    assert "actionable_count_for_prime" in desc, "description must reference 'actionable_count_for_prime'"
     assert "MUST NOT include latest VERIFIED" in desc, (
         "description must explicitly state 'MUST NOT include latest VERIFIED' "
         "for actionable_count_for_prime (T4 F1+F3 closure)"
@@ -92,14 +86,9 @@ def test_actionable_count_for_prime_excludes_verified(spec_row: dict) -> None:
 def test_advisory_disposition_count_separate(spec_row: dict) -> None:
     """T5 (F1+F3 closure): description identifies advisory_disposition_count as a separate Prime-disposition metric, distinct from actionable_count_for_prime."""
     desc = spec_row.get("description") or ""
-    assert "advisory_disposition_count" in desc, (
-        "description must reference 'advisory_disposition_count'"
-    )
+    assert "advisory_disposition_count" in desc, "description must reference 'advisory_disposition_count'"
     # The "separate" / "disposition surface" framing must be explicit
-    separate_phrasing = (
-        "separate disposition target" in desc
-        or "disposition surface" in desc
-    )
+    separate_phrasing = "separate disposition target" in desc or "disposition surface" in desc
     assert separate_phrasing, (
         "description must explicitly identify advisory_disposition_count as "
         "Prime's separate disposition surface (T5 F1+F3 closure)"
@@ -113,10 +102,7 @@ def test_advisory_disposition_count_separate(spec_row: dict) -> None:
 def test_description_documents_display_distinction(spec_row: dict) -> None:
     """T6 (display distinction): description states dashboard surfaces MUST visually distinguish ADVISORY from NO-GO."""
     desc = spec_row.get("description") or ""
-    assert "visually distinguish" in desc, (
-        "description must reference the visual-distinction display requirement (T6)"
-    )
+    assert "visually distinguish" in desc, "description must reference the visual-distinction display requirement (T6)"
     assert "ADVISORY" in desc and "NO-GO" in desc, (
-        "description must explicitly reference both ADVISORY and NO-GO in the "
-        "display requirement"
+        "description must explicitly reference both ADVISORY and NO-GO in the display requirement"
     )

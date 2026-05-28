@@ -59,12 +59,10 @@ def test_constraints_enforcement_mode_advisory(dcl_spec: dict) -> None:
     if isinstance(constraints, str):
         constraints = json.loads(constraints)
     assert isinstance(constraints, dict), (
-        f"constraints must be a dict (after JSON parse if needed); "
-        f"got {type(constraints).__name__}"
+        f"constraints must be a dict (after JSON parse if needed); got {type(constraints).__name__}"
     )
     assert constraints.get("enforcement_mode") == "advisory", (
-        f"constraints.enforcement_mode must be 'advisory'; "
-        f"got {constraints.get('enforcement_mode')!r}"
+        f"constraints.enforcement_mode must be 'advisory'; got {constraints.get('enforcement_mode')!r}"
     )
 
 
@@ -72,9 +70,7 @@ def test_description_references_auq_and_in_scope_classes(dcl_spec: dict) -> None
     """T3 (constraint text): description references AskUserQuestion (or AUQ) and the in-scope decision classes (adopt / adapt / reject / defer)."""
     desc = dcl_spec.get("description") or ""
     # AUQ reference (either canonical name or the abbreviation)
-    assert ("AskUserQuestion" in desc) or ("AUQ" in desc), (
-        "description must reference 'AskUserQuestion' or 'AUQ'"
-    )
+    assert ("AskUserQuestion" in desc) or ("AUQ" in desc), "description must reference 'AskUserQuestion' or 'AUQ'"
     # Each in-scope class must appear in the description
     for cls in ("adopt", "adapt", "reject", "defer"):
         assert cls in desc, f"description must reference the in-scope class {cls!r}"
@@ -125,21 +121,16 @@ def test_description_cites_procedure_rule_path_and_phase1_narrowing(dcl_spec: di
     desc = dcl_spec.get("description") or ""
     # Procedure-rule path citation
     assert ".claude/rules/peer-solution-advisory-loop.md" in desc, (
-        "description must cite the procedure-rule path "
-        "'.claude/rules/peer-solution-advisory-loop.md' (F1 closure)"
+        "description must cite the procedure-rule path '.claude/rules/peer-solution-advisory-loop.md' (F1 closure)"
     )
     # In-scope vs out-of-scope narrowing must be explicit
     # Phase-1 in-scope: adopt, adapt, reject_with_spec_impact, defer
     # Phase-1 out-of-scope: monitor, reject-with-no-spec-impact
-    assert "monitor" in desc, (
-        "description must document the 'monitor' classification (Phase-1 out-of-scope narrowing)"
-    )
+    assert "monitor" in desc, "description must document the 'monitor' classification (Phase-1 out-of-scope narrowing)"
     # The "in-scope" / "out-of-scope" framing must be explicit
-    assert ("in-scope" in desc.lower() or "in scope" in desc.lower()), (
-        "description must explicitly identify in-scope decision classes "
-        "(Phase-1 narrowing framing)"
+    assert "in-scope" in desc.lower() or "in scope" in desc.lower(), (
+        "description must explicitly identify in-scope decision classes (Phase-1 narrowing framing)"
     )
-    assert ("out-of-scope" in desc.lower() or "out of scope" in desc.lower()), (
-        "description must explicitly identify out-of-scope decision classes "
-        "(Phase-1 narrowing framing)"
+    assert "out-of-scope" in desc.lower() or "out of scope" in desc.lower(), (
+        "description must explicitly identify out-of-scope decision classes (Phase-1 narrowing framing)"
     )

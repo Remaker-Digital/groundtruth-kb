@@ -28,9 +28,7 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
     """Create a minimal synthetic GT-KB project with the requested topology."""
     (root / "harness-state").mkdir(parents=True, exist_ok=True)
     (root / "harness-state" / "harness-identities.json").write_text(
-        json.dumps(
-            {"schema_version": 1, "harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}}}
-        ),
+        json.dumps({"schema_version": 1, "harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}}}),
         encoding="utf-8",
     )
     if single_harness:
@@ -38,9 +36,7 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
             json.dumps(
                 {
                     "schema_version": 1,
-                    "harnesses": {
-                        "B": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "claude"}
-                    },
+                    "harnesses": {"B": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "claude"}},
                 }
             ),
             encoding="utf-8",
@@ -92,18 +88,14 @@ def test_doctor_warns_when_applicable_and_script_present_but_task_missing(
     """
     from groundtruth_kb.project import doctor as doctor_mod
 
-    _check_single_harness_dispatcher_when_required = (
-        doctor_mod._check_single_harness_dispatcher_when_required
-    )
+    _check_single_harness_dispatcher_when_required = doctor_mod._check_single_harness_dispatcher_when_required
 
     _make_synthetic_project(tmp_path, single_harness=True)
     # Place the dispatcher script at the expected location to satisfy the
     # "script present" precondition.
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
-    (scripts_dir / "single_harness_bridge_dispatcher.py").write_text(
-        "# stub for doctor-check test", encoding="utf-8"
-    )
+    (scripts_dir / "single_harness_bridge_dispatcher.py").write_text("# stub for doctor-check test", encoding="utf-8")
 
     # On Windows, the doctor probes Get-ScheduledTask for the task; if the
     # task is not registered, expect WARN with 'not registered'. Simulate that
@@ -111,10 +103,9 @@ def test_doctor_warns_when_applicable_and_script_present_but_task_missing(
     # production scheduled task is installed.
     # On non-Windows, expect WARN with the platform-extension pointer.
     if sys.platform == "win32":
+
         def _fake_run(*args, **kwargs):
-            return doctor_mod.subprocess.CompletedProcess(
-                args[0], 0, stdout="NOT_REGISTERED\n", stderr=""
-            )
+            return doctor_mod.subprocess.CompletedProcess(args[0], 0, stdout="NOT_REGISTERED\n", stderr="")
 
         monkeypatch.setattr(doctor_mod.subprocess, "run", _fake_run)
 
@@ -149,9 +140,7 @@ def test_doctor_warns_when_applicable_but_script_missing(tmp_path: Path) -> None
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_doctor_warn_when_non_windows_host_applicable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_doctor_warn_when_non_windows_host_applicable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """On non-Windows host with applicable topology + script present -> WARN
     with platform-extension pointer (Slice 2 ships Windows-only)."""
     from groundtruth_kb.project import doctor as doctor_mod
@@ -159,9 +148,7 @@ def test_doctor_warn_when_non_windows_host_applicable(
     _make_synthetic_project(tmp_path, single_harness=True)
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
-    (scripts_dir / "single_harness_bridge_dispatcher.py").write_text(
-        "# stub", encoding="utf-8"
-    )
+    (scripts_dir / "single_harness_bridge_dispatcher.py").write_text("# stub", encoding="utf-8")
 
     monkeypatch.setattr(doctor_mod.sys, "platform", "linux")
 

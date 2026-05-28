@@ -32,11 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = REPO_ROOT / "groundtruth.db"
 INVENTORY_SCRIPT = REPO_ROOT / "scripts" / "generate_codex_backlog_cleanup_inventory.py"
 REVIEW_SCRIPT = REPO_ROOT / "scripts" / "generate_codex_backlog_cleanup_review_packet.py"
-DEFAULT_DROPBOX = (
-    REPO_ROOT
-    / "independent-progress-assessments"
-    / "CODEX-INSIGHT-DROPBOX"
-)
+DEFAULT_DROPBOX = REPO_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
 EXPECTED_ROW_COUNT = 119
 
 
@@ -97,9 +93,7 @@ def test_inventory_in_root_output_path(inventory_module):
     assert out.is_relative_to(REPO_ROOT.resolve()), f"out path escapes project root: {out}"
 
 
-def test_inventory_generator_produces_expected_row_count(
-    inventory_module, db_available, tmp_path
-):
+def test_inventory_generator_produces_expected_row_count(inventory_module, db_available, tmp_path):
     """GOV-STANDING-BACKLOG-001 / row-count check: emit exactly 119 data rows."""
     out = tmp_path / "inventory.md"
     rc = inventory_module.main(["--db", str(db_available), "--out", str(out)])
@@ -115,9 +109,7 @@ def test_inventory_generator_produces_expected_row_count(
         and not line.startswith("|---")
         and "WI ID" not in line
     ]
-    assert len(data_lines) == EXPECTED_ROW_COUNT, (
-        f"expected {EXPECTED_ROW_COUNT} data rows; got {len(data_lines)}"
-    )
+    assert len(data_lines) == EXPECTED_ROW_COUNT, f"expected {EXPECTED_ROW_COUNT} data rows; got {len(data_lines)}"
 
 
 def test_inventory_covers_all_distinct_wi_ids(inventory_module, db_available, tmp_path):
@@ -132,16 +124,12 @@ def test_inventory_covers_all_distinct_wi_ids(inventory_module, db_available, tm
         assert f"`{wi_id}`" in text, f"missing WI id in inventory output: {wi_id}"
 
 
-def test_review_packet_aggregates_transition_types(
-    inventory_module, review_module, db_available, tmp_path
-):
+def test_review_packet_aggregates_transition_types(inventory_module, review_module, db_available, tmp_path):
     """Review packet aggregates by transition type without errors."""
     inv = tmp_path / "inventory.md"
     pkt = tmp_path / "packet.md"
     assert inventory_module.main(["--db", str(db_available), "--out", str(inv)]) == 0
-    rc = review_module.main(
-        ["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)]
-    )
+    rc = review_module.main(["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)])
     assert rc == 0
     text = pkt.read_text(encoding="utf-8")
     assert "Counts By Transition Type" in text
@@ -150,37 +138,23 @@ def test_review_packet_aggregates_transition_types(
     assert rows, "no transition rows rendered"
 
 
-def test_review_packet_contains_phase_2_deferred_marker(
-    inventory_module, review_module, db_available, tmp_path
-):
+def test_review_packet_contains_phase_2_deferred_marker(inventory_module, review_module, db_available, tmp_path):
     """Phase-1 scope marker: review packet must contain DECISION DEFERRED TO PHASE 2."""
     inv = tmp_path / "inventory.md"
     pkt = tmp_path / "packet.md"
     assert inventory_module.main(["--db", str(db_available), "--out", str(inv)]) == 0
-    assert (
-        review_module.main(
-            ["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)]
-        )
-        == 0
-    )
+    assert review_module.main(["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)]) == 0
     assert review_module.DEFERRED_MARKER in pkt.read_text(encoding="utf-8")
 
 
-def test_no_kb_write_during_generation(
-    inventory_module, review_module, db_available, tmp_path
-):
+def test_no_kb_write_during_generation(inventory_module, review_module, db_available, tmp_path):
     """Read-only discipline: DB file mtime + sha256 unchanged across both runs."""
     pre_mtime = db_available.stat().st_mtime_ns
     pre_hash = _file_sha256(db_available)
     inv = tmp_path / "inventory.md"
     pkt = tmp_path / "packet.md"
     assert inventory_module.main(["--db", str(db_available), "--out", str(inv)]) == 0
-    assert (
-        review_module.main(
-            ["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)]
-        )
-        == 0
-    )
+    assert review_module.main(["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)]) == 0
     post_mtime = db_available.stat().st_mtime_ns
     post_hash = _file_sha256(db_available)
     assert pre_mtime == post_mtime, "DB mtime changed — read-only contract violated"

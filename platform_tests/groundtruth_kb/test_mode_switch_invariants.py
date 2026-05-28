@@ -33,9 +33,7 @@ def _write_role_map(root: Path, harnesses: dict) -> None:
     """
     path = root / "harness-state" / "harness-registry.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    records = [
-        {"id": harness_id, **record} for harness_id, record in harnesses.items()
-    ]
+    records = [{"id": harness_id, **record} for harness_id, record in harnesses.items()]
     path.write_text(json.dumps({"harnesses": records}), encoding="utf-8")
 
 

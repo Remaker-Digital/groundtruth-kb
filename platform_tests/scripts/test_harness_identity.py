@@ -95,9 +95,7 @@ def test_identity_ids_must_be_unique(tmp_path: Path) -> None:
             "claude": {"id": "A"},
         }
     }
-    assert validate_unique_harness_ids(document) == [
-        "harness ID A is assigned to both codex and claude"
-    ]
+    assert validate_unique_harness_ids(document) == ["harness ID A is assigned to both codex and claude"]
 
     # A registry projection cannot itself encode the same id twice (id is the
     # record key), so the resolve-path uniqueness assertion is exercised by

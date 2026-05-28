@@ -81,8 +81,14 @@ def _seed_index(project_root: Path, doc_name: str, versions: list[tuple[str, str
     (bridge_dir / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _seed_bridge_file(project_root: Path, filename: str, *, spec_links: list[str] = None,
-                     waivers: list[dict] = None, status_header: str = "NEW") -> None:
+def _seed_bridge_file(
+    project_root: Path,
+    filename: str,
+    *,
+    spec_links: list[str] = None,
+    waivers: list[dict] = None,
+    status_header: str = "NEW",
+) -> None:
     """Write a synthesized bridge file with given Specification Links + waivers."""
     spec_links = spec_links or []
     waivers = waivers or []
@@ -144,10 +150,8 @@ def _seed_db(project_root: Path, delibs: list[dict] = None, delib_specs: list[tu
     )
     for d in delibs:
         conn.execute(
-            "INSERT INTO deliberations (id, version, source_type, outcome, content) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (d["id"], d.get("version", 1), d.get("source_type", ""),
-             d.get("outcome", ""), d.get("content", "")),
+            "INSERT INTO deliberations (id, version, source_type, outcome, content) VALUES (?, ?, ?, ?, ?)",
+            (d["id"], d.get("version", 1), d.get("source_type", ""), d.get("outcome", ""), d.get("content", "")),
         )
     for did, sid in delib_specs:
         conn.execute(
@@ -182,12 +186,16 @@ def test_runner_enumerates_all_versions_regardless_of_status(tmp_path: Path, mon
     """Step 2: All versions of a document are read, not just the latest."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [
-        ("VERIFIED", "thread-004.md"),
-        ("NEW", "thread-003.md"),
-        ("GO", "thread-002.md"),
-        ("NEW", "thread-001.md"),
-    ])
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("VERIFIED", "thread-004.md"),
+            ("NEW", "thread-003.md"),
+            ("GO", "thread-002.md"),
+            ("NEW", "thread-001.md"),
+        ],
+    )
     versions = runner._parse_index_for_document("thread")
     assert len(versions) == 4
     statuses = [v.status for v in versions]
@@ -203,10 +211,14 @@ def test_runner_unions_specs_across_all_versions(tmp_path: Path, monkeypatch: py
     """A1: REVISED versions can ADD specs without disruption; the union is computed."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [
-        ("REVISED", "thread-002.md"),
-        ("NEW", "thread-001.md"),
-    ])
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("REVISED", "thread-002.md"),
+            ("NEW", "thread-001.md"),
+        ],
+    )
     _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
     _seed_bridge_file(tmp_path, "thread-002.md", spec_links=["SPEC-A-001", "SPEC-B-001"], status_header="REVISED")
     _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"])
@@ -225,17 +237,25 @@ def test_runner_rejects_removal_without_waiver(tmp_path: Path, monkeypatch: pyte
     """A2: removed specs without waiver fail closed with ERR_REMOVAL_WITHOUT_WAIVER."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [
-        ("REVISED", "thread-002.md"),
-        ("NEW", "thread-001.md"),
-    ])
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("REVISED", "thread-002.md"),
+            ("NEW", "thread-001.md"),
+        ],
+    )
     _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001", "SPEC-B-001"], status_header="NEW")
-    _seed_bridge_file(tmp_path, "thread-002.md", spec_links=["SPEC-B-001"], status_header="REVISED")  # SPEC-A removed; no waiver
+    _seed_bridge_file(
+        tmp_path, "thread-002.md", spec_links=["SPEC-B-001"], status_header="REVISED"
+    )  # SPEC-A removed; no waiver
     rc = runner.run(bridge_id="thread")
     assert rc == 3  # ERR_REMOVAL_WITHOUT_WAIVER
 
 
-def test_runner_strips_code_fenced_examples_from_waiver_extraction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_strips_code_fenced_examples_from_waiver_extraction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Code-fenced waiver schemas (e.g., proposal §1.5 examples) must NOT be
     parsed as real waivers. Regression for the dogfood bug where -003's
     embedded schema example produced false-positive waiver-validation errors."""
@@ -255,14 +275,14 @@ def test_runner_strips_code_fenced_examples_from_waiver_extraction(tmp_path: Pat
         encoding="utf-8",
     )
     _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    waivers = runner._extract_waivers_section(
-        (tmp_path / "bridge" / "thread-001.md").read_text(encoding="utf-8")
-    )
+    waivers = runner._extract_waivers_section((tmp_path / "bridge" / "thread-001.md").read_text(encoding="utf-8"))
     # Code-fenced waiver entries should NOT be parsed.
     assert "SPEC-EXAMPLE" not in waivers
 
 
-def test_runner_strips_code_fenced_spec_ids_from_link_extraction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_strips_code_fenced_spec_ids_from_link_extraction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Spec IDs in code-fenced blocks (illustrative pseudocode) must NOT be
     counted as cited specs. Otherwise example code referencing 'SPEC-X-001'
     in a snippet would inflate the spec coverage count."""
@@ -291,10 +311,14 @@ def test_runner_a2_treats_carry_forward_revised_as_non_removal(tmp_path: Path, m
     """
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [
-        ("REVISED", "thread-002.md"),
-        ("NEW", "thread-001.md"),
-    ])
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("REVISED", "thread-002.md"),
+            ("NEW", "thread-001.md"),
+        ],
+    )
     _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
     # -002 has a Specification Links section with no enumerated SPEC-* tokens
     # (carry-forward via prose). Empty enumeration → no A2 trigger.
@@ -308,7 +332,9 @@ def test_runner_a2_treats_carry_forward_revised_as_non_removal(tmp_path: Path, m
     assert rc == 0
 
 
-def test_runner_a2_uses_operative_prime_version_not_verdict_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_a2_uses_operative_prime_version_not_verdict_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A2 + operative-Prime-version pattern: when the latest version is a
     Codex verdict file (GO/NO-GO/VERIFIED), A2 enforcement compares against
     the most-recent NEW/REVISED, not the verdict file. Codex verdicts don't
@@ -321,10 +347,14 @@ def test_runner_a2_uses_operative_prime_version_not_verdict_file(tmp_path: Path,
     """
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [
-        ("GO", "thread-002.md"),       # Codex verdict — no spec section
-        ("NEW", "thread-001.md"),      # Prime proposal — cites SPEC-A
-    ])
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("GO", "thread-002.md"),  # Codex verdict — no spec section
+            ("NEW", "thread-001.md"),  # Prime proposal — cites SPEC-A
+        ],
+    )
     # Verdict file (no Specification Links section)
     (tmp_path / "bridge" / "thread-002.md").write_text(
         "GO\n\n# Loyal Opposition Review\n\nApproved.\n", encoding="utf-8"
@@ -341,18 +371,34 @@ def test_runner_accepts_removal_with_owner_waiver(tmp_path: Path, monkeypatch: p
     """A2: removed specs WITH owner-approved waiver are accepted; spec marked waived."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_db(tmp_path,
-             delibs=[{"id": "DELIB-100", "source_type": "owner_conversation",
-                      "outcome": "owner_decision", "content": "Retire SPEC-A-001"}],
-             delib_specs=[("DELIB-100", "SPEC-A-001")])
-    _seed_index(tmp_path, "thread", [
-        ("REVISED", "thread-002.md"),
-        ("NEW", "thread-001.md"),
-    ])
+    _seed_db(
+        tmp_path,
+        delibs=[
+            {
+                "id": "DELIB-100",
+                "source_type": "owner_conversation",
+                "outcome": "owner_decision",
+                "content": "Retire SPEC-A-001",
+            }
+        ],
+        delib_specs=[("DELIB-100", "SPEC-A-001")],
+    )
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("REVISED", "thread-002.md"),
+            ("NEW", "thread-001.md"),
+        ],
+    )
     _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001", "SPEC-B-001"], status_header="NEW")
-    _seed_bridge_file(tmp_path, "thread-002.md", spec_links=["SPEC-B-001"], status_header="REVISED",
-                     waivers=[{"spec_id": "SPEC-A-001", "approved_by": "DELIB-100",
-                              "applies_from_version": 2, "reason": "retired"}])
+    _seed_bridge_file(
+        tmp_path,
+        "thread-002.md",
+        spec_links=["SPEC-B-001"],
+        status_header="REVISED",
+        waivers=[{"spec_id": "SPEC-A-001", "approved_by": "DELIB-100", "applies_from_version": 2, "reason": "retired"}],
+    )
     _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"])
     rc = runner.run(bridge_id="thread", json_output=True, advisory=True)
     assert rc == 0
@@ -375,8 +421,7 @@ def test_waiver_validation_rejects_nonexistent_delib_reference(tmp_path: Path, m
 def test_waiver_validation_rejects_non_owner_decision_delib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_db(tmp_path,
-             delibs=[{"id": "DELIB-200", "source_type": "lo_review", "outcome": "informational"}])
+    _seed_db(tmp_path, delibs=[{"id": "DELIB-200", "source_type": "lo_review", "outcome": "informational"}])
     waiver = runner.Waiver(spec_id="SPEC-X", approved_by="DELIB-200", applies_from_version=1)
     err = runner._validate_waiver_evidence(waiver)
     assert err == "not_owner_decision"
@@ -385,10 +430,18 @@ def test_waiver_validation_rejects_non_owner_decision_delib(tmp_path: Path, monk
 def test_waiver_validation_rejects_waiver_for_wrong_spec(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_db(tmp_path,
-             delibs=[{"id": "DELIB-300", "source_type": "owner_conversation",
-                      "outcome": "owner_decision", "content": "About something else entirely"}],
-             delib_specs=[("DELIB-300", "SPEC-Y-001")])
+    _seed_db(
+        tmp_path,
+        delibs=[
+            {
+                "id": "DELIB-300",
+                "source_type": "owner_conversation",
+                "outcome": "owner_decision",
+                "content": "About something else entirely",
+            }
+        ],
+        delib_specs=[("DELIB-300", "SPEC-Y-001")],
+    )
     waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="DELIB-300", applies_from_version=1)
     err = runner._validate_waiver_evidence(waiver)
     assert err == "wrong_spec"
@@ -402,19 +455,25 @@ def test_waiver_validation_rejects_empty_approved_by(tmp_path: Path, monkeypatch
     assert err == "malformed"
 
 
-def test_waiver_validation_rejects_negative_applies_from_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_waiver_validation_rejects_negative_applies_from_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Codex Q2: applies_from_version must be a non-negative int (0 acceptable as 'before 001')."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_db(tmp_path,
-             delibs=[{"id": "DELIB-400", "source_type": "owner_conversation", "outcome": "owner_decision"}],
-             delib_specs=[("DELIB-400", "SPEC-X-001")])
+    _seed_db(
+        tmp_path,
+        delibs=[{"id": "DELIB-400", "source_type": "owner_conversation", "outcome": "owner_decision"}],
+        delib_specs=[("DELIB-400", "SPEC-X-001")],
+    )
     waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="DELIB-400", applies_from_version=-1)
     err = runner._validate_waiver_evidence(waiver)
     assert err == "version_mismatch"
 
 
-def test_waiver_validation_rejects_missing_applies_from_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_waiver_validation_rejects_missing_applies_from_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
     waiver = runner.Waiver(spec_id="SPEC-X", approved_by="DELIB-500", applies_from_version=None)
@@ -425,10 +484,18 @@ def test_waiver_validation_rejects_missing_applies_from_version(tmp_path: Path, 
 def test_waiver_validation_accepts_valid_owner_approval(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    _seed_db(tmp_path,
-             delibs=[{"id": "DELIB-600", "source_type": "owner_conversation",
-                      "outcome": "owner_decision", "content": "Approving retirement of SPEC-X-001"}],
-             delib_specs=[("DELIB-600", "SPEC-X-001")])
+    _seed_db(
+        tmp_path,
+        delibs=[
+            {
+                "id": "DELIB-600",
+                "source_type": "owner_conversation",
+                "outcome": "owner_decision",
+                "content": "Approving retirement of SPEC-X-001",
+            }
+        ],
+        delib_specs=[("DELIB-600", "SPEC-X-001")],
+    )
     waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="DELIB-600", applies_from_version=2)
     err = runner._validate_waiver_evidence(waiver)
     assert err is None
@@ -443,8 +510,9 @@ def test_waiver_validation_accepts_formal_approval_packet(tmp_path: Path, monkey
         json.dumps({"artifact_id": "SPEC-X-001", "approval_mode": "manual"}),
         encoding="utf-8",
     )
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="approval_packet:spec-x-retirement.json",
-                          applies_from_version=2)
+    waiver = runner.Waiver(
+        spec_id="SPEC-X-001", approved_by="approval_packet:spec-x-retirement.json", applies_from_version=2
+    )
     err = runner._validate_waiver_evidence(waiver)
     assert err is None
 
@@ -452,13 +520,14 @@ def test_waiver_validation_accepts_formal_approval_packet(tmp_path: Path, monkey
 def test_waiver_validation_rejects_nonexistent_approval_packet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="approval_packet:missing.json",
-                          applies_from_version=2)
+    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="approval_packet:missing.json", applies_from_version=2)
     err = runner._validate_waiver_evidence(waiver)
     assert err == "nonexistent_packet"
 
 
-def test_waiver_validation_rejects_packet_with_wrong_artifact_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_waiver_validation_rejects_packet_with_wrong_artifact_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
     approvals_dir = tmp_path / ".groundtruth" / "formal-artifact-approvals"
@@ -467,8 +536,7 @@ def test_waiver_validation_rejects_packet_with_wrong_artifact_id(tmp_path: Path,
         json.dumps({"artifact_id": "SPEC-Y-001", "approval_mode": "manual"}),
         encoding="utf-8",
     )
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="approval_packet:wrong.json",
-                          applies_from_version=2)
+    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="approval_packet:wrong.json", applies_from_version=2)
     err = runner._validate_waiver_evidence(waiver)
     assert err == "wrong_spec"
 
@@ -516,7 +584,9 @@ def test_runner_excludes_function_level_docstrings(tmp_path: Path, monkeypatch: 
 # ---------------------------------------------------------------------------
 
 
-def test_runner_returns_verified_only_when_all_specs_have_passing_tests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_returns_verified_only_when_all_specs_have_passing_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Step 7: coverage gap (no test for spec) returns non-VERIFIED + non-zero exit."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
@@ -546,7 +616,9 @@ def test_runner_default_invocation_fails_closed_on_no_index(tmp_path: Path, monk
     assert rc == 2
 
 
-def test_runner_default_invocation_exits_zero_on_fully_verified_thread(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_default_invocation_exits_zero_on_fully_verified_thread(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """F2 fix: fully-passing thread → exit 0 in default fail-closed mode."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
@@ -562,7 +634,9 @@ def test_runner_default_invocation_exits_zero_on_fully_verified_thread(tmp_path:
 # ---------------------------------------------------------------------------
 
 
-def test_runner_outputs_per_spec_execution_matrix_as_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_runner_outputs_per_spec_execution_matrix_as_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
     _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
@@ -601,7 +675,9 @@ def test_runner_makes_zero_writes_to_bridge_index_md(tmp_path: Path, monkeypatch
     assert sha_before == sha_after
 
 
-def test_runner_default_exit_code_is_failclosed_on_unverified_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_default_exit_code_is_failclosed_on_unverified_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001: exit code IS the enforcement signal."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
@@ -611,7 +687,9 @@ def test_runner_default_exit_code_is_failclosed_on_unverified_state(tmp_path: Pa
     assert rc != 0
 
 
-def test_runner_output_is_deterministic_across_repeated_invocations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_runner_output_is_deterministic_across_repeated_invocations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
     """DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE: identical input → identical output."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
@@ -626,7 +704,9 @@ def test_runner_output_is_deterministic_across_repeated_invocations(tmp_path: Pa
     assert out1 == out2
 
 
-def test_runner_json_output_schema_validates_against_consumer_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_runner_json_output_schema_validates_against_consumer_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
     """ADR-CODEX-HOOK-PARITY-FALLBACK-001 + ``.claude/rules/codex-review-gate.md``:
     JSON output keys match the consumer contract used by the Codex review
     skill. ``codex-review-gate.md`` is the procedural rule that wires the
@@ -640,8 +720,14 @@ def test_runner_json_output_schema_validates_against_consumer_contract(tmp_path:
     _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
     runner.run(bridge_id="thread", json_output=True)
     payload = json.loads(capsys.readouterr().out)
-    required_top_keys = {"bridge_document_name", "cited_specs_count", "matrix",
-                         "verified_overall", "waivers_applied", "waiver_errors"}
+    required_top_keys = {
+        "bridge_document_name",
+        "cited_specs_count",
+        "matrix",
+        "verified_overall",
+        "waivers_applied",
+        "waiver_errors",
+    }
     assert required_top_keys <= set(payload.keys())
     for spec_entry in payload["matrix"].values():
         required_entry_keys = {"tests_found", "tests_passed", "tests_failed", "verified", "reason"}
@@ -754,7 +840,9 @@ def test_runner_extracts_delib_ids_from_spec_links_section(tmp_path: Path, monke
     assert "SPEC-FOO-001" in extracted
 
 
-def test_runner_extracts_rule_file_paths_from_spec_links_section(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_extracts_rule_file_paths_from_spec_links_section(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Codex `-006` F1 closure: `.claude/rules/*.md` paths cited in
     Specification Links must be extracted into the runner matrix."""
     runner = _load_runner()
@@ -793,7 +881,9 @@ def test_runner_discovers_tests_for_rule_file_paths(tmp_path: Path, monkeypatch:
     assert "test_rule_match.py" in matches[0]
 
 
-def test_runner_full_flow_includes_delib_and_rule_paths_in_matrix(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_full_flow_includes_delib_and_rule_paths_in_matrix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Codex `-006` F1 closure: end-to-end — a thread that lists DELIB-*
     and rule-path artifacts in Specification Links plus tests that cite
     those artifacts in their docstrings exits 0 with all five entries
@@ -823,7 +913,9 @@ def test_runner_full_flow_includes_delib_and_rule_paths_in_matrix(tmp_path: Path
 # ---------------------------------------------------------------------------
 
 
-def test_waiver_validation_rejects_future_effective_waiver_when_removal_version_known(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_waiver_validation_rejects_future_effective_waiver_when_removal_version_known(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Codex `-006` F2 closure: a waiver with applies_from_version greater
     than the version where the spec was removed is a future-effective waiver
     that retroactively authorizes a removal before its own effective version.
@@ -835,8 +927,14 @@ def test_waiver_validation_rejects_future_effective_waiver_when_removal_version_
     _patch_paths(monkeypatch, tmp_path)
     _seed_db(
         tmp_path,
-        delibs=[{"id": "DELIB-700", "source_type": "owner_conversation",
-                 "outcome": "owner_decision", "content": "About SPEC-X-001"}],
+        delibs=[
+            {
+                "id": "DELIB-700",
+                "source_type": "owner_conversation",
+                "outcome": "owner_decision",
+                "content": "About SPEC-X-001",
+            }
+        ],
         delib_specs=[("DELIB-700", "SPEC-X-001")],
     )
     waiver = runner.Waiver(
@@ -848,7 +946,9 @@ def test_waiver_validation_rejects_future_effective_waiver_when_removal_version_
     assert err == "version_mismatch"
 
 
-def test_waiver_validation_accepts_waiver_effective_at_or_before_removal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_waiver_validation_accepts_waiver_effective_at_or_before_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Codex `-006` F2 closure: a waiver with
     applies_from_version <= removal_version is accepted (the waiver is
     already effective at the time of removal)."""
@@ -856,8 +956,14 @@ def test_waiver_validation_accepts_waiver_effective_at_or_before_removal(tmp_pat
     _patch_paths(monkeypatch, tmp_path)
     _seed_db(
         tmp_path,
-        delibs=[{"id": "DELIB-800", "source_type": "owner_conversation",
-                 "outcome": "owner_decision", "content": "About SPEC-X-001"}],
+        delibs=[
+            {
+                "id": "DELIB-800",
+                "source_type": "owner_conversation",
+                "outcome": "owner_decision",
+                "content": "About SPEC-X-001",
+            }
+        ],
         delib_specs=[("DELIB-800", "SPEC-X-001")],
     )
     # applies_from_version == removal_version: effective at removal.
@@ -876,7 +982,9 @@ def test_waiver_validation_accepts_waiver_effective_at_or_before_removal(tmp_pat
     assert runner._validate_waiver_evidence(waiver_before, removal_version=2) is None
 
 
-def test_runner_full_flow_rejects_removal_with_future_effective_waiver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_full_flow_rejects_removal_with_future_effective_waiver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Codex `-006` F2 closure: end-to-end — a thread that removes a spec
     in version 002 with a waiver claiming applies_from_version: 999 must
     fail closed at exit code 4 (ERR_WAIVER_VERSION_MISMATCH)."""
@@ -884,14 +992,24 @@ def test_runner_full_flow_rejects_removal_with_future_effective_waiver(tmp_path:
     _patch_paths(monkeypatch, tmp_path)
     _seed_db(
         tmp_path,
-        delibs=[{"id": "DELIB-900", "source_type": "owner_conversation",
-                 "outcome": "owner_decision", "content": "About SPEC-A-001"}],
+        delibs=[
+            {
+                "id": "DELIB-900",
+                "source_type": "owner_conversation",
+                "outcome": "owner_decision",
+                "content": "About SPEC-A-001",
+            }
+        ],
         delib_specs=[("DELIB-900", "SPEC-A-001")],
     )
-    _seed_index(tmp_path, "thread", [
-        ("REVISED", "thread-002.md"),
-        ("NEW", "thread-001.md"),
-    ])
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("REVISED", "thread-002.md"),
+            ("NEW", "thread-001.md"),
+        ],
+    )
     _seed_bridge_file(
         tmp_path,
         "thread-001.md",
@@ -903,19 +1021,23 @@ def test_runner_full_flow_rejects_removal_with_future_effective_waiver(tmp_path:
         "thread-002.md",
         spec_links=["SPEC-B-001"],
         status_header="REVISED",
-        waivers=[{
-            "spec_id": "SPEC-A-001",
-            "approved_by": "DELIB-900",
-            "applies_from_version": 999,
-            "reason": "future-effective; should be rejected",
-        }],
+        waivers=[
+            {
+                "spec_id": "SPEC-A-001",
+                "approved_by": "DELIB-900",
+                "applies_from_version": 999,
+                "reason": "future-effective; should be rejected",
+            }
+        ],
     )
     _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"], passing=True)
     rc = runner.run(bridge_id="thread")
     assert rc == 4  # ERR_WAIVER_VERSION_MISMATCH
 
 
-def test_runner_full_flow_accepts_removal_with_effective_at_removal_waiver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_full_flow_accepts_removal_with_effective_at_removal_waiver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Codex `-006` F2 closure: end-to-end positive — a thread that removes
     a spec in version 002 with a waiver effective from version 002 (or
     earlier) is accepted."""
@@ -923,14 +1045,24 @@ def test_runner_full_flow_accepts_removal_with_effective_at_removal_waiver(tmp_p
     _patch_paths(monkeypatch, tmp_path)
     _seed_db(
         tmp_path,
-        delibs=[{"id": "DELIB-1000", "source_type": "owner_conversation",
-                 "outcome": "owner_decision", "content": "About SPEC-A-001"}],
+        delibs=[
+            {
+                "id": "DELIB-1000",
+                "source_type": "owner_conversation",
+                "outcome": "owner_decision",
+                "content": "About SPEC-A-001",
+            }
+        ],
         delib_specs=[("DELIB-1000", "SPEC-A-001")],
     )
-    _seed_index(tmp_path, "thread", [
-        ("REVISED", "thread-002.md"),
-        ("NEW", "thread-001.md"),
-    ])
+    _seed_index(
+        tmp_path,
+        "thread",
+        [
+            ("REVISED", "thread-002.md"),
+            ("NEW", "thread-001.md"),
+        ],
+    )
     _seed_bridge_file(
         tmp_path,
         "thread-001.md",
@@ -942,12 +1074,14 @@ def test_runner_full_flow_accepts_removal_with_effective_at_removal_waiver(tmp_p
         "thread-002.md",
         spec_links=["SPEC-B-001"],
         status_header="REVISED",
-        waivers=[{
-            "spec_id": "SPEC-A-001",
-            "approved_by": "DELIB-1000",
-            "applies_from_version": 2,
-            "reason": "effective at removal",
-        }],
+        waivers=[
+            {
+                "spec_id": "SPEC-A-001",
+                "approved_by": "DELIB-1000",
+                "applies_from_version": 2,
+                "reason": "effective at removal",
+            }
+        ],
     )
     _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"], passing=True)
     rc = runner.run(bridge_id="thread")

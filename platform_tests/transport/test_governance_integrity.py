@@ -31,9 +31,16 @@ if _TOOLS_DIR not in sys.path:
 # ---------------------------------------------------------------------------
 
 
-_TRANSPORT_GATED_SPEC_IDS = frozenset({
-    "SPEC-1524", "SPEC-1525", "SPEC-1535", "SPEC-1536", "SPEC-1537", "SPEC-1802",
-})
+_TRANSPORT_GATED_SPEC_IDS = frozenset(
+    {
+        "SPEC-1524",
+        "SPEC-1525",
+        "SPEC-1535",
+        "SPEC-1536",
+        "SPEC-1537",
+        "SPEC-1802",
+    }
+)
 
 
 @pytest.fixture
@@ -166,9 +173,7 @@ class TestGovernanceGateAllowsReal:
         # Gate resolves relative to project_root (_PROJECT_ROOT)
         real_file = "tests/transport/test_governance_integrity.py"
         resolved = _PROJECT_ROOT / real_file
-        assert resolved.is_file(), (
-            f"Test file {real_file} must resolve to an existing file (got {resolved})"
-        )
+        assert resolved.is_file(), f"Test file {real_file} must resolve to an existing file (got {resolved})"
 
         # Should NOT raise
         test_db.insert_test(

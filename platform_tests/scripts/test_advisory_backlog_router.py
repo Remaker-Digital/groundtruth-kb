@@ -94,9 +94,7 @@ def _basic_advisory(date_str: str = "2026-05-10", severity: str | None = "P1") -
 def test_router_creates_wi_for_new_advisory(router, fake_project, db_factory):
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-A.md", _basic_advisory())
-    result = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     assert result.scanned == 1
     assert len(result.created) == 1
     assert result.created[0]["id"].startswith("WI-")
@@ -109,12 +107,8 @@ def test_router_creates_wi_for_new_advisory(router, fake_project, db_factory):
 def test_router_idempotent_on_rerun(router, fake_project, db_factory):
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-B.md", _basic_advisory())
-    first = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
-    second = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
+    first = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
+    second = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     assert len(first.created) == 1
     assert len(second.created) == 0
     assert len(second.skipped_existing) == 1
@@ -130,9 +124,7 @@ def test_router_parses_severity_from_header(router, fake_project, db_factory, se
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     filename = f"INSIGHTS-2026-05-10-13-26-{severity}.md"
     _write_insights(dropbox, filename, _basic_advisory(severity=severity))
-    result = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory
-    )
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
     assert result.scanned == 1
     assert result.created[0]["priority"] == expected_priority
 
@@ -145,9 +137,7 @@ def test_router_defaults_priority_when_severity_missing(router, fake_project, db
         "INSIGHTS-2026-05-10-13-26-NO-SEVERITY.md",
         _basic_advisory(severity=None),
     )
-    result = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory
-    )
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
     assert result.scanned == 1
     assert result.created[0]["priority"] == "low"
 
@@ -172,9 +162,7 @@ def test_router_skips_advisories_already_in_bridge_threads(router, fake_project,
         related_deliberation_ids="INSIGHTS-2026-05-10-13-26-SAMPLE-C.md",
     )
 
-    result = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     assert result.scanned == 1
     assert len(result.created) == 0
     assert len(result.skipped_existing) == 1
@@ -185,9 +173,7 @@ def test_router_skips_advisories_already_in_bridge_threads(router, fake_project,
 def test_router_dry_run_does_not_mutate(router, fake_project, db_factory):
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-D.md", _basic_advisory())
-    result = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory
-    )
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
     assert result.scanned == 1
     assert len(result.created) == 1
     assert result.created[0]["id"] == "<dry-run>"
@@ -212,9 +198,7 @@ def test_router_handles_malformed_advisory(router, fake_project, db_factory, mon
 
     monkeypatch.setattr(router, "insert_wi_for_advisory", _boom)
 
-    result = router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     assert result.scanned == 1
     assert len(result.errors) == 1
     assert "simulated insert failure" in result.errors[0]["error"]
@@ -227,9 +211,7 @@ def test_router_handles_malformed_advisory(router, fake_project, db_factory, mon
 def test_router_writes_last_scan_timestamp(router, fake_project, db_factory):
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-E.md", _basic_advisory())
-    router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
+    router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     last_scan = fake_project / ".gtkb-state" / "advisory-router" / "last-scan.json"
     assert last_scan.is_file()
     payload = json.loads(last_scan.read_text(encoding="utf-8"))
@@ -245,14 +227,16 @@ def test_router_writes_last_scan_timestamp(router, fake_project, db_factory):
 def test_router_uses_hygiene_origin(router, fake_project, db_factory):
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-F.md", _basic_advisory())
-    router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
+    router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     db = db_factory()
-    row = db._get_conn().execute(
-        "SELECT origin FROM current_work_items WHERE related_deliberation_ids LIKE ?",
-        ("%INSIGHTS-2026-05-10-13-26-SAMPLE-F.md%",),
-    ).fetchone()
+    row = (
+        db._get_conn()
+        .execute(
+            "SELECT origin FROM current_work_items WHERE related_deliberation_ids LIKE ?",
+            ("%INSIGHTS-2026-05-10-13-26-SAMPLE-F.md%",),
+        )
+        .fetchone()
+    )
     assert row is not None
     assert row[0] == "hygiene"
 
@@ -261,14 +245,16 @@ def test_router_uses_hygiene_origin(router, fake_project, db_factory):
 def test_router_sets_source_spec_id(router, fake_project, db_factory):
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-G.md", _basic_advisory())
-    router.run(
-        project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory
-    )
+    router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     db = db_factory()
-    row = db._get_conn().execute(
-        "SELECT source_spec_id FROM current_work_items WHERE related_deliberation_ids LIKE ?",
-        ("%INSIGHTS-2026-05-10-13-26-SAMPLE-G.md%",),
-    ).fetchone()
+    row = (
+        db._get_conn()
+        .execute(
+            "SELECT source_spec_id FROM current_work_items WHERE related_deliberation_ids LIKE ?",
+            ("%INSIGHTS-2026-05-10-13-26-SAMPLE-G.md%",),
+        )
+        .fetchone()
+    )
     assert row is not None
     assert row[0] == "GOV-STANDING-BACKLOG-001"
 
@@ -289,6 +275,5 @@ def test_canonical_glossary_contains_advisory_router_entry():
         "approval-packet workflow per .claude/hooks/narrative-artifact-approval-gate.py"
     )
     assert "scripts/advisory_backlog_router.py" in body, (
-        "advisory-router glossary entry should include an Implementation pointer to "
-        "scripts/advisory_backlog_router.py"
+        "advisory-router glossary entry should include an Implementation pointer to scripts/advisory_backlog_router.py"
     )

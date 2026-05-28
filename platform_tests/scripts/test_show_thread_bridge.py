@@ -13,6 +13,7 @@ HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "show
 
 def _load_helper():
     import sys
+
     spec = importlib.util.spec_from_file_location("show_thread_bridge", HELPER_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -55,10 +56,7 @@ def test_t2_three_versions_sorted_ascending(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo", 2, "GO", "body2")
     _write_version(fake_bridge, "gtkb-foo", 3, "NEW", "body3")
     (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\n"
-        "NEW: bridge/gtkb-foo-003.md\n"
-        "GO: bridge/gtkb-foo-002.md\n"
-        "NEW: bridge/gtkb-foo-001.md\n",
+        "Document: gtkb-foo\nNEW: bridge/gtkb-foo-003.md\nGO: bridge/gtkb-foo-002.md\nNEW: bridge/gtkb-foo-001.md\n",
         encoding="utf-8",
     )
 
@@ -77,9 +75,7 @@ def test_t3_compound_suffix_slug_handled(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo-001", 1, "NEW")
     _write_version(fake_bridge, "gtkb-foo-001", 2, "GO")
     (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo-001\n"
-        "GO: bridge/gtkb-foo-001-002.md\n"
-        "NEW: bridge/gtkb-foo-001-001.md\n",
+        "Document: gtkb-foo-001\nGO: bridge/gtkb-foo-001-002.md\nNEW: bridge/gtkb-foo-001-001.md\n",
         encoding="utf-8",
     )
 
@@ -93,9 +89,7 @@ def test_t4_drift_detection_missing_files(helper, fake_bridge) -> None:
     """INDEX references files that don't exist on disk → drift warning."""
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
     (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\n"
-        "GO: bridge/gtkb-foo-002.md\n"
-        "NEW: bridge/gtkb-foo-001.md\n",
+        "Document: gtkb-foo\nGO: bridge/gtkb-foo-002.md\nNEW: bridge/gtkb-foo-001.md\n",
         encoding="utf-8",
     )
 
@@ -110,8 +104,7 @@ def test_t4b_drift_detection_orphan_disk_files(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
     _write_version(fake_bridge, "gtkb-foo", 2, "GO")
     (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\n"
-        "NEW: bridge/gtkb-foo-001.md\n",
+        "Document: gtkb-foo\nNEW: bridge/gtkb-foo-001.md\n",
         encoding="utf-8",
     )
 
@@ -142,9 +135,7 @@ def test_index_status_chain_returned(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
     _write_version(fake_bridge, "gtkb-foo", 2, "GO")
     (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\n"
-        "GO: bridge/gtkb-foo-002.md\n"
-        "NEW: bridge/gtkb-foo-001.md\n",
+        "Document: gtkb-foo\nGO: bridge/gtkb-foo-002.md\nNEW: bridge/gtkb-foo-001.md\n",
         encoding="utf-8",
     )
 

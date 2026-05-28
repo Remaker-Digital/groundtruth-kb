@@ -94,80 +94,117 @@ def _write_manifest(tmp_path: Path, env: str, ts: int, body: dict[str, Any]) -> 
 # T1-T6: _classify_manifest() — classification contract per scoping sec 5.5
 # ---------------------------------------------------------------------------
 
+
 def test_t1_dry_run_is_pipeline_dry_run() -> None:
     """T1: dry_run=true maps to canonical_pipeline_dry_run, never canonical_deploy."""
     assert _classify_manifest({"dry_run": True}) == "canonical_pipeline_dry_run"
-    assert _classify_manifest({
-        "dry_run": True,
-        "phases": [{"phase": 9, "status": "PASS"}],
-    }) == "canonical_pipeline_dry_run"
+    assert (
+        _classify_manifest(
+            {
+                "dry_run": True,
+                "phases": [{"phase": 9, "status": "PASS"}],
+            }
+        )
+        == "canonical_pipeline_dry_run"
+    )
 
 
 def test_t2_no_deploy_phase_is_pipeline_run() -> None:
     """T2: manifest with no phase 9 maps to canonical_pipeline_run."""
     assert _classify_manifest({}) == "canonical_pipeline_run"
     assert _classify_manifest({"phases": []}) == "canonical_pipeline_run"
-    assert _classify_manifest({
-        "phases": [{"phase": 0, "status": "FAIL"}],
-    }) == "canonical_pipeline_run"
+    assert (
+        _classify_manifest(
+            {
+                "phases": [{"phase": 0, "status": "FAIL"}],
+            }
+        )
+        == "canonical_pipeline_run"
+    )
 
 
 def test_t3_deploy_phase_fail_is_attempted_failed() -> None:
     """T3: phase 9 status=FAIL maps to canonical_deploy_attempted_failed."""
-    assert _classify_manifest({
-        "phases": [{"phase": 9, "status": "FAIL"}],
-    }) == "canonical_deploy_attempted_failed"
+    assert (
+        _classify_manifest(
+            {
+                "phases": [{"phase": 9, "status": "FAIL"}],
+            }
+        )
+        == "canonical_deploy_attempted_failed"
+    )
 
 
 def test_t4_deploy_phase_pass_pretrack1_is_canonical_deploy() -> None:
     """T4: phase 9 status=PASS without deploy_evidence maps to canonical_deploy
     (pre-Track-1 manifest; will be at _confidence='medium' on ingest)."""
-    assert _classify_manifest({
-        "phases": [{"phase": 9, "status": "PASS"}],
-    }) == "canonical_deploy"
+    assert (
+        _classify_manifest(
+            {
+                "phases": [{"phase": 9, "status": "PASS"}],
+            }
+        )
+        == "canonical_deploy"
+    )
 
 
 def test_t5_deploy_evidence_target_succeeded_is_canonical_deploy() -> None:
     """T5: phase 9 PASS with deploy_evidence(target_update_succeeded=true)
     maps to canonical_deploy."""
-    assert _classify_manifest({
-        "phases": [{"phase": 9, "status": "PASS"}],
-        "deploy_evidence": {
-            "target_update_attempted": True,
-            "target_update_succeeded": True,
-        },
-    }) == "canonical_deploy"
+    assert (
+        _classify_manifest(
+            {
+                "phases": [{"phase": 9, "status": "PASS"}],
+                "deploy_evidence": {
+                    "target_update_attempted": True,
+                    "target_update_succeeded": True,
+                },
+            }
+        )
+        == "canonical_deploy"
+    )
 
 
 def test_t6_deploy_evidence_target_failed_is_attempted_failed() -> None:
     """T6: phase 9 PASS with deploy_evidence(target_update_succeeded=false)
     maps to canonical_deploy_attempted_failed."""
-    assert _classify_manifest({
-        "phases": [{"phase": 9, "status": "PASS"}],
-        "deploy_evidence": {
-            "target_update_attempted": True,
-            "target_update_succeeded": False,
-        },
-    }) == "canonical_deploy_attempted_failed"
+    assert (
+        _classify_manifest(
+            {
+                "phases": [{"phase": 9, "status": "PASS"}],
+                "deploy_evidence": {
+                    "target_update_attempted": True,
+                    "target_update_succeeded": False,
+                },
+            }
+        )
+        == "canonical_deploy_attempted_failed"
+    )
 
 
 # ---------------------------------------------------------------------------
 # T7: query-before-insert idempotence per Codex F1 Option 2
 # ---------------------------------------------------------------------------
 
+
 def test_t7_ingest_is_idempotent_via_source_dedup(tmp_path: Path) -> None:
     """T7: second call to _ingest_canonical_pipeline_manifests skips manifests
     already inserted (dedup via _authority_source + source). Per Codex `-002`
     F1 Option 2 (query-before-insert)."""
-    _write_manifest(tmp_path, "production", 1700000000, {
-        "dry_run": False,
-        "version": "v1.99.0",
-        "environment": "production",
-        "status": "SUCCESS",
-        "repo_commit": "abc12345",
-        "started_at": "2026-04-25T00:00:00Z",
-        "phases": [{"phase": 9, "status": "PASS"}],
-    })
+    _write_manifest(
+        tmp_path,
+        "production",
+        1700000000,
+        {
+            "dry_run": False,
+            "version": "v1.99.0",
+            "environment": "production",
+            "status": "SUCCESS",
+            "repo_commit": "abc12345",
+            "started_at": "2026-04-25T00:00:00Z",
+            "phases": [{"phase": 9, "status": "PASS"}],
+        },
+    )
 
     conn = _make_conn()
     counts1 = _ingest_canonical_pipeline_manifests(conn, tmp_path)
@@ -180,8 +217,7 @@ def test_t7_ingest_is_idempotent_via_source_dedup(tmp_path: Path) -> None:
 
     # Total canonical_manifest rows must remain exactly 1.
     total = conn.execute(
-        "SELECT COUNT(*) FROM delivery_timeline_events "
-        "WHERE _authority_source = 'canonical_manifest'"
+        "SELECT COUNT(*) FROM delivery_timeline_events WHERE _authority_source = 'canonical_manifest'"
     ).fetchone()[0]
     assert total == 1
 
@@ -189,6 +225,7 @@ def test_t7_ingest_is_idempotent_via_source_dedup(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # T8-T9: graceful degradation per scoping sec 6 + Codex condition 4
 # ---------------------------------------------------------------------------
+
 
 def test_t8_reconcile_az_returncode_nonzero_degrades_to_unknown() -> None:
     """T8: az returns nonzero -> affected rows _consistency='unknown',
@@ -200,9 +237,14 @@ def test_t8_reconcile_az_returncode_nonzero_degrades_to_unknown() -> None:
         (source, environment, event_kind, _authority_source, _image_ref, _confidence)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        ("logs/deploy-result-production-1.json", "production",
-         "canonical_deploy", "canonical_manifest",
-         "acragentredeastus.azurecr.io/agent-red:v1.99.0", "medium"),
+        (
+            "logs/deploy-result-production-1.json",
+            "production",
+            "canonical_deploy",
+            "canonical_manifest",
+            "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+            "medium",
+        ),
     )
     conn.commit()
 
@@ -212,9 +254,7 @@ def test_t8_reconcile_az_returncode_nonzero_degrades_to_unknown() -> None:
 
     assert counts["rows_unknown"] == 1
     assert counts["rows_matched"] == 0
-    consistency = conn.execute(
-        "SELECT _consistency FROM delivery_timeline_events"
-    ).fetchone()[0]
+    consistency = conn.execute("SELECT _consistency FROM delivery_timeline_events").fetchone()[0]
     assert consistency == "unknown"
 
 
@@ -227,8 +267,7 @@ def test_t9_reconcile_az_not_installed_degrades_to_unknown() -> None:
         (source, environment, event_kind, _authority_source, _confidence)
         VALUES (?, ?, ?, ?, ?)
         """,
-        ("logs/deploy-result-production-1.json", "production",
-         "canonical_deploy", "canonical_manifest", "medium"),
+        ("logs/deploy-result-production-1.json", "production", "canonical_deploy", "canonical_manifest", "medium"),
     )
     conn.commit()
 
@@ -236,15 +275,14 @@ def test_t9_reconcile_az_not_installed_degrades_to_unknown() -> None:
         counts = _reconcile_against_azure_revisions(conn, ["production"])
 
     assert counts["rows_unknown"] == 1
-    consistency = conn.execute(
-        "SELECT _consistency FROM delivery_timeline_events"
-    ).fetchone()[0]
+    consistency = conn.execute("SELECT _consistency FROM delivery_timeline_events").fetchone()[0]
     assert consistency == "unknown"
 
 
 # ---------------------------------------------------------------------------
 # T10-T11: reconciliation success cases
 # ---------------------------------------------------------------------------
+
 
 def test_t10_reconcile_match_sets_both_match() -> None:
     """T10: matching Azure revision -> _consistency='both_match';
@@ -257,32 +295,39 @@ def test_t10_reconcile_match_sets_both_match() -> None:
          _image_tag, _revision_name, _confidence)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        ("logs/deploy-result-production-1.json", "production",
-         "canonical_deploy", "canonical_manifest",
-         "acragentredeastus.azurecr.io/agent-red:v1.99.0",
-         "v1.99.0", "agent-red-api-gateway--abc12", "medium"),
+        (
+            "logs/deploy-result-production-1.json",
+            "production",
+            "canonical_deploy",
+            "canonical_manifest",
+            "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+            "v1.99.0",
+            "agent-red-api-gateway--abc12",
+            "medium",
+        ),
     )
     conn.commit()
 
     fake_az = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout=json.dumps([{
-            "name": "agent-red-api-gateway--abc12",
-            "properties": {
-                "template": {
-                    "containers": [{"image": "acragentredeastus.azurecr.io/agent-red:v1.99.0"}]
+        args=[],
+        returncode=0,
+        stdout=json.dumps(
+            [
+                {
+                    "name": "agent-red-api-gateway--abc12",
+                    "properties": {
+                        "template": {"containers": [{"image": "acragentredeastus.azurecr.io/agent-red:v1.99.0"}]}
+                    },
                 }
-            }
-        }]),
+            ]
+        ),
         stderr="",
     )
     with patch("subprocess.run", return_value=fake_az):
         counts = _reconcile_against_azure_revisions(conn, ["production"])
 
     assert counts["rows_matched"] == 1
-    row = conn.execute(
-        "SELECT _consistency, _revision_name, _confidence FROM delivery_timeline_events"
-    ).fetchone()
+    row = conn.execute("SELECT _consistency, _revision_name, _confidence FROM delivery_timeline_events").fetchone()
     assert row[0] == "both_match"
     assert row[1] == "agent-red-api-gateway--abc12"
     # Confidence upgrade rule: image_ref AND revision_name present -> high.
@@ -300,38 +345,45 @@ def test_t11_reconcile_drift_sets_manifest_only() -> None:
          _image_tag, _confidence)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        ("logs/deploy-result-production-1.json", "production",
-         "canonical_deploy", "canonical_manifest",
-         "acragentredeastus.azurecr.io/agent-red:v1.99.0",
-         "v1.99.0", "medium"),
+        (
+            "logs/deploy-result-production-1.json",
+            "production",
+            "canonical_deploy",
+            "canonical_manifest",
+            "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+            "v1.99.0",
+            "medium",
+        ),
     )
     conn.commit()
 
     fake_az = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout=json.dumps([{
-            "name": "agent-red-api-gateway--xyz99",
-            "properties": {
-                "template": {
-                    "containers": [{"image": "acragentredeastus.azurecr.io/agent-red:v1.98.0"}]
+        args=[],
+        returncode=0,
+        stdout=json.dumps(
+            [
+                {
+                    "name": "agent-red-api-gateway--xyz99",
+                    "properties": {
+                        "template": {"containers": [{"image": "acragentredeastus.azurecr.io/agent-red:v1.98.0"}]}
+                    },
                 }
-            }
-        }]),
+            ]
+        ),
         stderr="",
     )
     with patch("subprocess.run", return_value=fake_az):
         counts = _reconcile_against_azure_revisions(conn, ["production"])
 
     assert counts["rows_drift"] == 1
-    consistency = conn.execute(
-        "SELECT _consistency FROM delivery_timeline_events"
-    ).fetchone()[0]
+    consistency = conn.execute("SELECT _consistency FROM delivery_timeline_events").fetchone()[0]
     assert consistency == "manifest_only"
 
 
 # ---------------------------------------------------------------------------
 # T12: DORA KPI exclusion contract per Codex condition 2
 # ---------------------------------------------------------------------------
+
 
 def test_t12_only_canonical_deploy_counts_as_deployment_event() -> None:
     """T12: _is_deployment_event helper returns True only for canonical_deploy.
@@ -349,61 +401,64 @@ def test_t12_only_canonical_deploy_counts_as_deployment_event() -> None:
 # T13: confidence-upgrade path (Codex condition 3 cap)
 # ---------------------------------------------------------------------------
 
+
 def test_t13_ingest_emits_medium_then_reconcile_upgrades_to_high(tmp_path: Path) -> None:
     """T13: with full deploy_evidence(target_update_succeeded=true), ingest
     emits _confidence='medium' (per Codex condition 3 cap). Subsequent
     reconciliation with matching Azure revision upgrades to 'high'."""
-    _write_manifest(tmp_path, "production", 1700000001, {
-        "dry_run": False,
-        "version": "v1.99.0",
-        "environment": "production",
-        "status": "SUCCESS",
-        "repo_commit": "abc12345",
-        "started_at": "2026-04-25T00:00:00Z",
-        "phases": [{"phase": 9, "status": "PASS"}],
-        "deploy_evidence": {
-            "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
-            "image_tag": "v1.99.0",
-            "revision_name": "agent-red-api-gateway--abc12",
-            "target_verified_at": "2026-04-25T00:01:00Z",
-            "target_update_attempted": True,
-            "target_update_succeeded": True,
+    _write_manifest(
+        tmp_path,
+        "production",
+        1700000001,
+        {
+            "dry_run": False,
+            "version": "v1.99.0",
+            "environment": "production",
+            "status": "SUCCESS",
+            "repo_commit": "abc12345",
+            "started_at": "2026-04-25T00:00:00Z",
+            "phases": [{"phase": 9, "status": "PASS"}],
+            "deploy_evidence": {
+                "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+                "image_tag": "v1.99.0",
+                "revision_name": "agent-red-api-gateway--abc12",
+                "target_verified_at": "2026-04-25T00:01:00Z",
+                "target_update_attempted": True,
+                "target_update_succeeded": True,
+            },
         },
-    })
+    )
 
     conn = _make_conn()
     _ingest_canonical_pipeline_manifests(conn, tmp_path)
 
-    confidence_after_ingest = conn.execute(
-        "SELECT _confidence FROM delivery_timeline_events"
-    ).fetchone()[0]
+    confidence_after_ingest = conn.execute("SELECT _confidence FROM delivery_timeline_events").fetchone()[0]
     assert confidence_after_ingest == "medium", (
-        "Ingest must cap confidence at medium per Codex condition 3, "
-        "even with full deploy_evidence."
+        "Ingest must cap confidence at medium per Codex condition 3, even with full deploy_evidence."
     )
 
     # Now reconcile with matching Azure revision -> upgrade to high.
     fake_az = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout=json.dumps([{
-            "name": "agent-red-api-gateway--abc12",
-            "properties": {
-                "template": {
-                    "containers": [{"image": "acragentredeastus.azurecr.io/agent-red:v1.99.0"}]
+        args=[],
+        returncode=0,
+        stdout=json.dumps(
+            [
+                {
+                    "name": "agent-red-api-gateway--abc12",
+                    "properties": {
+                        "template": {"containers": [{"image": "acragentredeastus.azurecr.io/agent-red:v1.99.0"}]}
+                    },
                 }
-            }
-        }]),
+            ]
+        ),
         stderr="",
     )
     with patch("subprocess.run", return_value=fake_az):
         _reconcile_against_azure_revisions(conn, ["production"])
 
-    confidence_after_reconcile = conn.execute(
-        "SELECT _confidence FROM delivery_timeline_events"
-    ).fetchone()[0]
+    confidence_after_reconcile = conn.execute("SELECT _confidence FROM delivery_timeline_events").fetchone()[0]
     assert confidence_after_reconcile == "high", (
-        "Reconciliation with matching Azure revision must upgrade "
-        "_confidence from medium to high."
+        "Reconciliation with matching Azure revision must upgrade _confidence from medium to high."
     )
 
 
@@ -411,16 +466,20 @@ def test_t13_ingest_emits_medium_then_reconcile_upgrades_to_high(tmp_path: Path)
 # Schema migration sanity check
 # ---------------------------------------------------------------------------
 
+
 def test_migration_columns_include_track2_seven() -> None:
     """Sanity: the 7 Track 2 columns are present in _REQUIRED_MIGRATION_COLUMNS."""
     column_names = {name for name, _ in _REQUIRED_MIGRATION_COLUMNS}
     track2_columns = {
-        "_authority_source", "_image_ref", "_image_tag",
-        "_revision_name", "_deployed_at", "_consistency", "_confidence",
+        "_authority_source",
+        "_image_ref",
+        "_image_tag",
+        "_revision_name",
+        "_deployed_at",
+        "_consistency",
+        "_confidence",
     }
-    assert track2_columns.issubset(column_names), (
-        f"Missing Track 2 columns: {track2_columns - column_names}"
-    )
+    assert track2_columns.issubset(column_names), f"Missing Track 2 columns: {track2_columns - column_names}"
 
 
 # ---------------------------------------------------------------------------
@@ -431,6 +490,7 @@ def test_migration_columns_include_track2_seven() -> None:
 # matching what Codex `-006` proved was MISSING from production schema.sql +
 # migration. T14 exercises the production initialize+migrate path so a future
 # regression of either path fails here, not silently in production.
+
 
 def test_t14_real_schema_supports_canonical_manifest_ingest_and_reconcile(
     tmp_path: Path,
@@ -455,18 +515,22 @@ def test_t14_real_schema_supports_canonical_manifest_ingest_and_reconcile(
     # plus all Track 2 columns. Probing column metadata catches both fresh-DB
     # and migration regressions in a single assertion.
     with sqlite3.connect(db_path) as probe:
-        cols = {
-            row[1]
-            for row in probe.execute(
-                "PRAGMA table_info('delivery_timeline_events')"
-            ).fetchall()
-        }
+        cols = {row[1] for row in probe.execute("PRAGMA table_info('delivery_timeline_events')").fetchall()}
     required = {
         "environment",
-        "event_kind", "deployable_change_id", "commit_range_start",
-        "commit_range_end", "rollback_of_deploy_id", "hotfix_of_deploy_id",
-        "_authority_source", "_image_ref", "_image_tag", "_revision_name",
-        "_deployed_at", "_consistency", "_confidence",
+        "event_kind",
+        "deployable_change_id",
+        "commit_range_start",
+        "commit_range_end",
+        "rollback_of_deploy_id",
+        "hotfix_of_deploy_id",
+        "_authority_source",
+        "_image_ref",
+        "_image_tag",
+        "_revision_name",
+        "_deployed_at",
+        "_consistency",
+        "_confidence",
     }
     missing = required - cols
     assert not missing, (
@@ -475,23 +539,28 @@ def test_t14_real_schema_supports_canonical_manifest_ingest_and_reconcile(
     )
 
     # Exercise ingest end-to-end against the real DB.
-    _write_manifest(tmp_path, "production", 1700000099, {
-        "dry_run": False,
-        "version": "v1.99.0",
-        "environment": "production",
-        "status": "SUCCESS",
-        "repo_commit": "abc12345",
-        "started_at": "2026-04-25T00:00:00Z",
-        "phases": [{"phase": 9, "status": "PASS"}],
-        "deploy_evidence": {
-            "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
-            "image_tag": "v1.99.0",
-            "revision_name": "agent-red-api-gateway--abc12",
-            "target_verified_at": "2026-04-25T00:01:00Z",
-            "target_update_attempted": True,
-            "target_update_succeeded": True,
+    _write_manifest(
+        tmp_path,
+        "production",
+        1700000099,
+        {
+            "dry_run": False,
+            "version": "v1.99.0",
+            "environment": "production",
+            "status": "SUCCESS",
+            "repo_commit": "abc12345",
+            "started_at": "2026-04-25T00:00:00Z",
+            "phases": [{"phase": 9, "status": "PASS"}],
+            "deploy_evidence": {
+                "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+                "image_tag": "v1.99.0",
+                "revision_name": "agent-red-api-gateway--abc12",
+                "target_verified_at": "2026-04-25T00:01:00Z",
+                "target_update_attempted": True,
+                "target_update_succeeded": True,
+            },
         },
-    })
+    )
 
     with sqlite3.connect(db_path) as conn:
         counts = _ingest_canonical_pipeline_manifests(conn, tmp_path)
@@ -500,30 +569,28 @@ def test_t14_real_schema_supports_canonical_manifest_ingest_and_reconcile(
 
         # Verify the row landed with environment populated from the manifest.
         env_value = conn.execute(
-            "SELECT environment FROM delivery_timeline_events "
-            "WHERE _authority_source = 'canonical_manifest'"
+            "SELECT environment FROM delivery_timeline_events WHERE _authority_source = 'canonical_manifest'"
         ).fetchone()[0]
         assert env_value == "production"
 
         # Reconcile against a matching Azure revision through the real DB.
         fake_az = subprocess.CompletedProcess(
-            args=[], returncode=0,
-            stdout=json.dumps([{
-                "name": "agent-red-api-gateway--abc12",
-                "properties": {
-                    "template": {
-                        "containers": [{
-                            "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0"
-                        }]
+            args=[],
+            returncode=0,
+            stdout=json.dumps(
+                [
+                    {
+                        "name": "agent-red-api-gateway--abc12",
+                        "properties": {
+                            "template": {"containers": [{"image": "acragentredeastus.azurecr.io/agent-red:v1.99.0"}]}
+                        },
                     }
-                }
-            }]),
+                ]
+            ),
             stderr="",
         )
         with patch("subprocess.run", return_value=fake_az):
-            reconcile_counts = _reconcile_against_azure_revisions(
-                conn, ["production"]
-            )
+            reconcile_counts = _reconcile_against_azure_revisions(conn, ["production"])
         assert reconcile_counts["rows_matched"] == 1
         assert reconcile_counts["rows_unknown"] == 0
 
@@ -550,6 +617,7 @@ def test_t15_migration_is_idempotent_against_real_schema(tmp_path: Path) -> None
 # the proposed writer tests and the two ingest regression tests."
 # ---------------------------------------------------------------------------
 
+
 def test_t16_pre_track1_manifest_still_classified_as_canonical_deploy(
     tmp_path: Path,
 ) -> None:
@@ -562,28 +630,36 @@ def test_t16_pre_track1_manifest_still_classified_as_canonical_deploy(
     remain valid canonical_deploy events.
     """
     # Classification side: pre-Track-1 shape (no deploy_evidence) -> canonical_deploy
-    assert _classify_manifest({
-        "phases": [{"phase": 9, "status": "PASS"}],
-    }) == "canonical_deploy"
+    assert (
+        _classify_manifest(
+            {
+                "phases": [{"phase": 9, "status": "PASS"}],
+            }
+        )
+        == "canonical_deploy"
+    )
 
     # Ingest side: pre-Track-1 manifest -> _confidence='medium'
-    _write_manifest(tmp_path, "production", 1700000099, {
-        "dry_run": False,
-        "version": "v1.98.92",
-        "environment": "production",
-        "status": "SUCCESS",
-        "repo_commit": "deadbeef0001",
-        "started_at": "2026-04-20T00:00:00Z",
-        "phases": [{"phase": 9, "status": "PASS"}],
-        # Intentionally NO deploy_evidence block — pre-Track-1 shape.
-    })
+    _write_manifest(
+        tmp_path,
+        "production",
+        1700000099,
+        {
+            "dry_run": False,
+            "version": "v1.98.92",
+            "environment": "production",
+            "status": "SUCCESS",
+            "repo_commit": "deadbeef0001",
+            "started_at": "2026-04-20T00:00:00Z",
+            "phases": [{"phase": 9, "status": "PASS"}],
+            # Intentionally NO deploy_evidence block — pre-Track-1 shape.
+        },
+    )
 
     conn = _make_conn()
     _ingest_canonical_pipeline_manifests(conn, tmp_path)
 
-    confidence = conn.execute(
-        "SELECT _confidence FROM delivery_timeline_events"
-    ).fetchone()[0]
+    confidence = conn.execute("SELECT _confidence FROM delivery_timeline_events").fetchone()[0]
     assert confidence == "medium", (
         "Pre-Track-1 manifest must ingest at _confidence='medium' per "
         "Codex GO -006 condition 3 cap. If this fails, Track 1 may have "
@@ -605,30 +681,33 @@ def test_t17_track1_manifest_with_full_evidence_capped_at_medium_until_reconcile
     Per `bridge/gtkb-dora-001b-authoritative-deployment-source-007.md` §4.2,
     only Source C reconciliation may upgrade to 'high'.
     """
-    _write_manifest(tmp_path, "production", 1700000100, {
-        "dry_run": False,
-        "version": "v1.99.0",
-        "environment": "production",
-        "status": "SUCCESS",
-        "repo_commit": "abc12345",
-        "started_at": "2026-04-28T00:00:00Z",
-        "phases": [{"phase": 9, "status": "PASS"}],
-        "deploy_evidence": {
-            "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
-            "image_tag": "v1.99.0",
-            "revision_name": "agent-red-api-gateway--xyz99",
-            "target_verified_at": "2026-04-28T00:01:00Z",
-            "target_update_attempted": True,
-            "target_update_succeeded": True,
+    _write_manifest(
+        tmp_path,
+        "production",
+        1700000100,
+        {
+            "dry_run": False,
+            "version": "v1.99.0",
+            "environment": "production",
+            "status": "SUCCESS",
+            "repo_commit": "abc12345",
+            "started_at": "2026-04-28T00:00:00Z",
+            "phases": [{"phase": 9, "status": "PASS"}],
+            "deploy_evidence": {
+                "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+                "image_tag": "v1.99.0",
+                "revision_name": "agent-red-api-gateway--xyz99",
+                "target_verified_at": "2026-04-28T00:01:00Z",
+                "target_update_attempted": True,
+                "target_update_succeeded": True,
+            },
         },
-    })
+    )
 
     conn = _make_conn()
     _ingest_canonical_pipeline_manifests(conn, tmp_path)
 
-    confidence = conn.execute(
-        "SELECT _confidence FROM delivery_timeline_events"
-    ).fetchone()[0]
+    confidence = conn.execute("SELECT _confidence FROM delivery_timeline_events").fetchone()[0]
     assert confidence == "medium", (
         "Full-evidence Track 1 manifests must still ingest at medium "
         "per Source A → Source C reconciliation contract; only Azure "

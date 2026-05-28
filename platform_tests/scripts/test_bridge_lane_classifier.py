@@ -234,9 +234,10 @@ def test_t19_governance_profile_is_serialized(mod):
 
 
 def test_t20_every_lane_serializes_verdict_writes(mod):
-    assert frozenset(
-        {mod.LANE_REVIEW, mod.LANE_IMPLEMENTATION, mod.LANE_VERIFICATION, mod.LANE_GOVERNANCE}
-    ) == mod.CANONICAL_LANES
+    assert (
+        frozenset({mod.LANE_REVIEW, mod.LANE_IMPLEMENTATION, mod.LANE_VERIFICATION, mod.LANE_GOVERNANCE})
+        == mod.CANONICAL_LANES
+    )
     for lane in mod.CANONICAL_LANES:
         profile = mod.lane_concurrency_profile(lane)
         assert profile["lane"] == lane

@@ -27,7 +27,8 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "archive_claude_design_handoff.py"
 def _load_archive_module():
     """Load the script as a module without triggering argparse."""
     spec = importlib.util.spec_from_file_location(
-        "archive_claude_design_handoff", SCRIPT_PATH,
+        "archive_claude_design_handoff",
+        SCRIPT_PATH,
     )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -83,13 +84,16 @@ class TestInspectHandoff:
         (tmp_path / "ar-widget" / "README.md").write_text("hi\n", encoding="utf-8")
         (tmp_path / "ar-widget" / "project").mkdir()
         (tmp_path / "ar-widget" / "project" / "index.html").write_text(
-            "<!doctype html>", encoding="utf-8",
+            "<!doctype html>",
+            encoding="utf-8",
         )
         (tmp_path / "ar-widget" / "project" / "styles.css").write_text(
-            ":root {}", encoding="utf-8",
+            ":root {}",
+            encoding="utf-8",
         )
         (tmp_path / "ar-widget" / "project" / "app.jsx").write_text(
-            "export {}", encoding="utf-8",
+            "export {}",
+            encoding="utf-8",
         )
         inspection = mod.inspect_handoff(tmp_path)
         assert inspection.source_kind == "directory"

@@ -29,11 +29,7 @@ def _make_repo(tmp_path: Path) -> Path:
     bridge_dir.mkdir()
     # INDEX cites a missing file
     index = bridge_dir / "INDEX.md"
-    index.write_text(
-        "# Bridge Index\n\n"
-        "Document: phantom-thread\n"
-        "VERIFIED: bridge/phantom-thread-006.md\n"
-    )
+    index.write_text("# Bridge Index\n\nDocument: phantom-thread\nVERIFIED: bridge/phantom-thread-006.md\n")
     return project
 
 
@@ -88,9 +84,7 @@ def test_allowlist_malformed_fails_loudly(tmp_path: Path) -> None:
     project = _make_repo(tmp_path)
     allowlist_dir = project / ".groundtruth" / "wrap-scan"
     allowlist_dir.mkdir(parents=True)
-    (allowlist_dir / "historical-phantoms.toml").write_text(
-        "this is not valid toml = {[}\n"
-    )
+    (allowlist_dir / "historical-phantoms.toml").write_text("this is not valid toml = {[}\n")
     with pytest.raises(RuntimeError, match="malformed"):
         w2.check_index_cites_missing_bridge_file(project)
 
@@ -99,9 +93,7 @@ def test_allowlist_wrong_schema_version_fails_loudly(tmp_path: Path) -> None:
     project = _make_repo(tmp_path)
     allowlist_dir = project / ".groundtruth" / "wrap-scan"
     allowlist_dir.mkdir(parents=True)
-    (allowlist_dir / "historical-phantoms.toml").write_text(
-        "schema_version = 99\nphantoms = []\n"
-    )
+    (allowlist_dir / "historical-phantoms.toml").write_text("schema_version = 99\nphantoms = []\n")
     with pytest.raises(RuntimeError, match="schema_version"):
         w2.check_index_cites_missing_bridge_file(project)
 
@@ -112,9 +104,7 @@ def test_allowlist_empty_phantoms_preserves_error_behavior(tmp_path: Path) -> No
     project = _make_repo(tmp_path)
     allowlist_dir = project / ".groundtruth" / "wrap-scan"
     allowlist_dir.mkdir(parents=True)
-    (allowlist_dir / "historical-phantoms.toml").write_text(
-        "schema_version = 1\nphantoms = []\n"
-    )
+    (allowlist_dir / "historical-phantoms.toml").write_text("schema_version = 1\nphantoms = []\n")
     findings = w2.check_index_cites_missing_bridge_file(project)
     phantom = [f for f in findings if "phantom-thread-006.md" in f["message"]]
     assert len(phantom) == 1

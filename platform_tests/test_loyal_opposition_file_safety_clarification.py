@@ -31,10 +31,9 @@ def rule_text() -> str:
 
 
 def test_clarification_section_header_present(rule_text: str) -> None:
-    assert (
-        "## Reviewer-Evidence-Preparation vs Speculative Source Modification"
-        in rule_text
-    ), "subsection header missing from .claude/rules/loyal-opposition.md"
+    assert "## Reviewer-Evidence-Preparation vs Speculative Source Modification" in rule_text, (
+        "subsection header missing from .claude/rules/loyal-opposition.md"
+    )
 
 
 def test_permitted_read_only_review_prep_subsection(rule_text: str) -> None:
@@ -59,20 +58,12 @@ def test_inspection_only_validation_wording(rule_text: str) -> None:
     # of "inspection of the proposal text + current state" vs "hands-on
     # modification".
     normalized = " ".join(rule_text.split())
-    expected_normalized = (
-        "must be by inspection of the proposal text + current state, not by "
-        "hands-on modification"
-    )
-    assert expected_normalized in normalized, (
-        "validation-by-inspection wording missing"
-    )
+    expected_normalized = "must be by inspection of the proposal text + current state, not by hands-on modification"
+    assert expected_normalized in normalized, "validation-by-inspection wording missing"
 
 
 def test_owner_authorization_exception_subsection(rule_text: str) -> None:
-    assert (
-        "### Permitted: speculative source modification with explicit owner authorization"
-        in rule_text
-    )
+    assert "### Permitted: speculative source modification with explicit owner authorization" in rule_text
 
 
 def test_revert_on_no_go_clause(rule_text: str) -> None:

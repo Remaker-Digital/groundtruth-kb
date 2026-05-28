@@ -40,14 +40,10 @@ def _write_role_map(root: Path, role_map: dict[str, Any]) -> None:
     rendered role-slot / topology line — is preserved.
     """
     harnesses_in = role_map.get("harnesses", {})
-    records = [
-        {"id": harness_id, **record} for harness_id, record in harnesses_in.items()
-    ]
+    records = [{"id": harness_id, **record} for harness_id, record in harnesses_in.items()]
     registry_path = root / "harness-state" / "harness-registry.json"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
-    registry_path.write_text(
-        json.dumps({"harnesses": records}, indent=2) + "\n", encoding="utf-8"
-    )
+    registry_path.write_text(json.dumps({"harnesses": records}, indent=2) + "\n", encoding="utf-8")
 
 
 def _make_model(

@@ -44,9 +44,7 @@ def test_memory_md_under_ceiling() -> None:
     project_root = Path(__file__).resolve().parents[2]
     memory_path = _memory_path(project_root)
     if not memory_path.exists():
-        pytest.skip(
-            f"In-root memory not present at {memory_path}; skip ceiling check."
-        )
+        pytest.skip(f"In-root memory not present at {memory_path}; skip ceiling check.")
     size = memory_path.stat().st_size
     assert size <= MEMORY_MD_CEILING_BYTES, (
         f"MEMORY.md is {size} bytes (~{size / 1024:.1f} KiB), exceeds the "

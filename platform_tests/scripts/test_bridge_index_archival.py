@@ -54,10 +54,7 @@ class StubDB:
 
     def upsert_deliberation_source(self, *, source_type, source_ref, content, **kwargs):
         content_hash = hashlib.sha256(content.encode()).hexdigest()
-        existing = [
-            r for r in self.rows
-            if r.get("source_ref") == source_ref and r.get("content_hash") == content_hash
-        ]
+        existing = [r for r in self.rows if r.get("source_ref") == source_ref and r.get("content_hash") == content_hash]
         if existing:
             return existing[0]
         row = {
@@ -158,8 +155,8 @@ class TestExcludeThreads:
 
         assert report["excluded_current_thread"] == ["alpha"]
         text = index.read_text(encoding="utf-8")
-        assert "Document: alpha" in text          # excluded -> retained
-        assert "Document: beta" not in text       # eligible -> pruned
+        assert "Document: alpha" in text  # excluded -> retained
+        assert "Document: beta" not in text  # eligible -> pruned
 
     def test_default_excludes_nothing(self, tmp_path: Path, monkeypatch) -> None:
         bridge_dir = _make_bridge(tmp_path)
@@ -171,7 +168,9 @@ class TestExcludeThreads:
         monkeypatch.setattr(rhbt, "_load_db", lambda _kb: StubDB())
 
         report = rhbt.archive_verified_threads_and_prune_index(
-            index_path=index, bridge_dir=bridge_dir, kb_path=None,
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
         )
 
         assert report["excluded_current_thread"] == []
@@ -200,34 +199,41 @@ class TestAuthorizationAwareSkip:
             records = rhbt.collect_compressed_bridge_threads(index, bridge_dir)
             gamma_rec = next(r for r in records if r.thread_name == "gamma")
             _, _, content = rhbt.build_thread_summary(gamma_rec)
-            stub.rows.append({
-                "source_type": "bridge_thread",
-                "source_ref": gamma_rec.source_ref,
-                "content_hash": hashlib.sha256(content.encode()).hexdigest(),
-            })
+            stub.rows.append(
+                {
+                    "source_type": "bridge_thread",
+                    "source_ref": gamma_rec.source_ref,
+                    "content_hash": hashlib.sha256(content.encode()).hexdigest(),
+                }
+            )
         monkeypatch.setattr(rhbt, "_load_db", lambda _kb: stub)
         report = rhbt.archive_verified_threads_and_prune_index(
-            index_path=index, bridge_dir=bridge_dir, kb_path=None,
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
         )
         return index, report
 
     def test_active_authorization_thread_is_skipped(self, tmp_path, monkeypatch) -> None:
         index, report = self._run(
-            tmp_path, monkeypatch,
+            tmp_path,
+            monkeypatch,
             authorizations=[{"status": "active", "included_work_item_ids_parsed": ["WI-9999"]}],
         )
         assert report["protected_authorization_skipped"] == ["gamma"]
         text = index.read_text(encoding="utf-8")
-        assert "Document: gamma" in text       # protected -> retained
-        assert "Document: delta" not in text   # unrelated -> pruned
+        assert "Document: gamma" in text  # protected -> retained
+        assert "Document: delta" not in text  # unrelated -> pruned
         # Tie the guard to the live completion scanner: WI-9999 must still be
         # discoverable from live bridge/INDEX.md after the prune.
         import project_verified_completion_scanner as pvcs
+
         assert "WI-9999" in pvcs.verified_work_items(tmp_path)
 
     def test_already_archived_protected_thread_is_skipped(self, tmp_path, monkeypatch) -> None:
         index, report = self._run(
-            tmp_path, monkeypatch,
+            tmp_path,
+            monkeypatch,
             authorizations=[{"status": "active", "included_work_item_ids_parsed": ["WI-9999"]}],
             archived_protected=True,
         )
@@ -236,7 +242,8 @@ class TestAuthorizationAwareSkip:
 
     def test_completed_authorization_does_not_protect(self, tmp_path, monkeypatch) -> None:
         index, report = self._run(
-            tmp_path, monkeypatch,
+            tmp_path,
+            monkeypatch,
             authorizations=[{"status": "completed", "included_work_item_ids_parsed": ["WI-9999"]}],
         )
         # status != active -> not protected -> gamma becomes prunable again.
@@ -264,7 +271,9 @@ class TestArchiveOriginMetadata:
         monkeypatch.setattr(rhbt, "_load_db", lambda _kb: stub)
 
         rhbt.archive_verified_threads_and_prune_index(
-            index_path=index, bridge_dir=bridge_dir, kb_path=None,
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
         )
 
         assert len(stub.rows) == 1
@@ -311,9 +320,7 @@ class TestConflictSafeWriters:
 
     def test_compact_index_comments_skips_on_concurrent_change(self, tmp_path) -> None:
         bridge_dir = _make_bridge(tmp_path)
-        bloat = "\n".join(
-            f"<!--   obsolete dispatcher detail #{i} {'x' * 400} -->" for i in range(30)
-        )
+        bloat = "\n".join(f"<!--   obsolete dispatcher detail #{i} {'x' * 400} -->" for i in range(30))
         original = (
             "# Bridge Index\n\n"
             "<!-- Prime inserts new document entries at the top of the list below. -->\n"
@@ -329,8 +336,8 @@ class TestConflictSafeWriters:
 
         assert result["skipped_concurrent_index_change"] is True
         text = real_index.read_text(encoding="utf-8")
-        assert "Document: beta" in text                       # concurrent line survived
-        assert "obsolete dispatcher detail #29" in text       # compaction did not land
+        assert "Document: beta" in text  # concurrent line survived
+        assert "obsolete dispatcher detail #29" in text  # compaction did not land
 
     def test_report_surfaces_concurrent_skip(self, tmp_path, monkeypatch) -> None:
         bridge_dir = _make_bridge(tmp_path)
@@ -339,7 +346,9 @@ class TestConflictSafeWriters:
         monkeypatch.setattr(rhbt, "_write_pruned_index", lambda *_a, **_k: (0, True))
 
         report = rhbt.archive_verified_threads_and_prune_index(
-            index_path=index, bridge_dir=bridge_dir, kb_path=None,
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
         )
         assert report["concurrent_index_change_skipped"] is True
 
@@ -398,7 +407,9 @@ class TestIdempotence:
         monkeypatch.setattr(rhbt, "_load_db", lambda _kb: stub)
 
         rhbt.archive_verified_threads_and_prune_index(
-            index_path=index, bridge_dir=bridge_dir, kb_path=None,
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
         )
         assert len(stub.rows) == 1
 
@@ -409,10 +420,12 @@ class TestIdempotence:
             encoding="utf-8",
         )
         report = rhbt.archive_verified_threads_and_prune_index(
-            index_path=index, bridge_dir=bridge_dir, kb_path=None,
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
         )
         assert report["already_archived"] == 1
-        assert len(stub.rows) == 1   # idempotent: no duplicate archive row
+        assert len(stub.rows) == 1  # idempotent: no duplicate archive row
 
 
 # ---------------------------------------------------------------------------

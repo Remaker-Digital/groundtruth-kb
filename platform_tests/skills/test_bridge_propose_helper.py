@@ -30,9 +30,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HELPER_PATH = REPO_ROOT / ".claude/skills/bridge-propose/helpers/write_bridge.py"
-TEMPLATE_HELPER_PATH = (
-    REPO_ROOT / "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py"
-)
+TEMPLATE_HELPER_PATH = REPO_ROOT / "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py"
 TEMPLATE_SKILL_PATH = REPO_ROOT / "groundtruth-kb/templates/skills/bridge-propose/SKILL.md"
 GLOSSARY_PATH = REPO_ROOT / ".claude/rules/canonical-terminology.md"
 
@@ -45,9 +43,7 @@ def _load_helper_module():
     of import-system configuration.
     """
     sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb/src"))
-    spec = importlib.util.spec_from_file_location(
-        "bridge_propose_helper_under_test", HELPER_PATH
-    )
+    spec = importlib.util.spec_from_file_location("bridge_propose_helper_under_test", HELPER_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -113,11 +109,7 @@ def test_pre_populate_isolation_with_db_false(helper_module, tmp_path):
     no auto-DB-open is attempted.
     """
     log_path = tmp_path / "audit.json"
-    body = (
-        "## Summary\n\nTest body.\n\n"
-        "## Specification Links\n\n- `GOV-FOO-001`\n\n"
-        "## Prior Deliberations\n\n"
-    )
+    body = "## Summary\n\nTest body.\n\n## Specification Links\n\n- `GOV-FOO-001`\n\n## Prior Deliberations\n\n"
     new_body = helper_module.pre_populate_prior_deliberations(
         "isolation",
         body,
@@ -176,9 +168,7 @@ def test_propose_bridge_pre_populate_opt_out_preserves_body(helper_module, tmp_p
     """
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "# Bridge Index\n\n<!-- comment -->\n\n", encoding="utf-8"
-    )
+    (bridge_dir / "INDEX.md").write_text("# Bridge Index\n\n<!-- comment -->\n\n", encoding="utf-8")
 
     body = (
         "# Test Proposal\n\n"
@@ -198,8 +188,7 @@ def test_propose_bridge_pre_populate_opt_out_preserves_body(helper_module, tmp_p
     # The four anchor IDs must NOT be present (pre-population was skipped).
     for anchor in ISOLATION_ANCHOR_IDS:
         assert f"`{anchor}`" not in written, (
-            f"Opt-out failed: anchor {anchor} was seeded despite "
-            "pre_populate_prior_deliberations=False"
+            f"Opt-out failed: anchor {anchor} was seeded despite pre_populate_prior_deliberations=False"
         )
     # The opt-out justification line should still be present.
     assert "_No prior deliberations: opt-out test._" in written
@@ -226,8 +215,7 @@ def test_s331_replay_regression(helper_module):
     # anti-regression for the S331 failure case.
     for anchor in ISOLATION_ANCHOR_IDS:
         assert anchor in seed_set, (
-            f"S331 anti-regression FAILED: {anchor} not in seeds for 'isolation'. "
-            f"Found seeds: {seeds}"
+            f"S331 anti-regression FAILED: {anchor} not in seeds for 'isolation'. Found seeds: {seeds}"
         )
 
 
@@ -239,10 +227,7 @@ def test_s331_replay_regression(helper_module):
 def test_audit_log_schema(helper_module, tmp_path):
     """The audit log file is written with the expected schema."""
     log_path = tmp_path / "audit-log.json"
-    body = (
-        "## Summary\n\nx\n\n## Specification Links\n\n- `GOV-FOO-001`\n\n"
-        "## Prior Deliberations\n\n"
-    )
+    body = "## Summary\n\nx\n\n## Specification Links\n\n- `GOV-FOO-001`\n\n## Prior Deliberations\n\n"
     helper_module.pre_populate_prior_deliberations(
         "isolation",
         body,
@@ -339,7 +324,11 @@ def test_seeds_and_search_combined_and_deduplicated(helper_module, tmp_path):
     (search results that are already in the seed set don't appear twice)."""
     # Fake DB returns one of the known anchor IDs (would dedupe) and one new ID.
     fake_results = [
-        {"id": "DELIB-S319-LIFECYCLE-INDEPENDENCE-CONTRACT", "source_type": "owner_conversation", "title": "Dup of seed"},
+        {
+            "id": "DELIB-S319-LIFECYCLE-INDEPENDENCE-CONTRACT",
+            "source_type": "owner_conversation",
+            "title": "Dup of seed",
+        },
         {"id": "DELIB-FAKE-300", "source_type": "owner_conversation", "title": "Search-only new"},
     ]
     fake_db = _FakeKnowledgeDB(fake_results)
@@ -353,9 +342,7 @@ def test_seeds_and_search_combined_and_deduplicated(helper_module, tmp_path):
     )
     # The duplicate ID appears only once (from the glossary seed).
     occurrences = new_body.count("`DELIB-S319-LIFECYCLE-INDEPENDENCE-CONTRACT`")
-    assert occurrences == 1, (
-        f"Duplicate seed/search ID should appear once; got {occurrences}"
-    )
+    assert occurrences == 1, f"Duplicate seed/search ID should appear once; got {occurrences}"
     # The new search-only ID is present.
     assert "DELIB-FAKE-300" in new_body
 
@@ -380,9 +367,7 @@ def test_codex_skill_adapter_parity_check():
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, (
-        f"Adapter parity check failed: stdout={result.stdout!r} stderr={result.stderr!r}"
-    )
+    assert result.returncode == 0, f"Adapter parity check failed: stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "PASS" in result.stdout, f"Expected PASS in stdout, got: {result.stdout!r}"
 
 

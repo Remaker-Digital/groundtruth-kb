@@ -93,7 +93,9 @@ class TestCompressedCollector:
         assert len(content) > 0
 
     def test_compressed_content_hash_matches_retroactive_sweep(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ) -> None:
         """Thread summary content (and hash) produced by harvest_session matches retroactive.
 
@@ -127,7 +129,9 @@ class TestCompressedCollector:
         assert hsd_hash == retro_hash, "Content hashes must match for idempotence"
 
     def test_non_verified_active_thread_gets_informational_outcome(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ) -> None:
         """Active non-VERIFIED thread → outcome 'informational'."""
         bridge_dir = tmp_path / "bridge"
@@ -218,7 +222,9 @@ class TestJSONSummary:
 
 class TestFlagToggle:
     def test_thread_level_off_skips_compressed_collection(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ) -> None:
         """Default thread_level=False means compressed threads are NOT included."""
         bridge_dir = tmp_path / "bridge"
@@ -242,14 +248,17 @@ class TestFlagToggle:
         assert compressed == []
 
     def test_thread_level_on_includes_compressed_rows(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ) -> None:
         """thread_level=True adds compressed wildcard rows alongside file-level."""
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
         # File-level harvest requires >= 100 bytes
         (bridge_dir / "epsilon-001.md").write_text(
-            "# Epsilon\n\n" + ("body line\n" * 20), encoding="utf-8",
+            "# Epsilon\n\n" + ("body line\n" * 20),
+            encoding="utf-8",
         )
         index = bridge_dir / "INDEX.md"
         index.write_text(
@@ -270,13 +279,16 @@ class TestFlagToggle:
         assert compressed[0].source_type == "bridge_thread"
 
     def test_file_level_harvest_still_runs_without_thread_level(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ) -> None:
         """Legacy file-level harvest unaffected by thread_level flag."""
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
         (bridge_dir / "zeta-001.md").write_text(
-            "# Zeta\n\n" + ("body line\n" * 20), encoding="utf-8",
+            "# Zeta\n\n" + ("body line\n" * 20),
+            encoding="utf-8",
         )
         index = bridge_dir / "INDEX.md"
         index.write_text(

@@ -71,9 +71,7 @@ def test_claude_userpromptsubmit_workstream_focus_runs_first(claude_settings: di
 
 def test_claude_workstream_focus_adapter_sets_harness_name() -> None:
     """The Python adapter owns Claude harness selection for lifecycle guards."""
-    adapter_text = (REPO_ROOT / ".claude" / "hooks" / "workstream-focus.py").read_text(
-        encoding="utf-8"
-    )
+    adapter_text = (REPO_ROOT / ".claude" / "hooks" / "workstream-focus.py").read_text(encoding="utf-8")
     assert 'os.environ.setdefault("GTKB_HARNESS_NAME", "claude")' in adapter_text
 
 
@@ -86,9 +84,7 @@ def test_codex_userpromptsubmit_includes_workstream_focus(codex_hooks: dict) -> 
     """
     # Walk the codex hooks structure looking for workstream-focus references.
     raw = json.dumps(codex_hooks)
-    assert "workstream-focus" in raw, (
-        "Codex hooks.json must reference workstream-focus (cross-harness parity)"
-    )
+    assert "workstream-focus" in raw, "Codex hooks.json must reference workstream-focus (cross-harness parity)"
 
 
 # ──────────────────────────────────────────────────────────────────────────

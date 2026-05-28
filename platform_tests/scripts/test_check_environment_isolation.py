@@ -14,15 +14,11 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2] / "scripts" / "check_environment_isolation.py"
-)
+SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "check_environment_isolation.py"
 
 
 def _load_checker_module():
-    spec = importlib.util.spec_from_file_location(
-        "check_environment_isolation", SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("check_environment_isolation", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["check_environment_isolation"] = module
@@ -58,7 +54,7 @@ CLEAN_COMPOSE = "\n".join(
         "    volumes:",
         "      - ./src:/app/src:ro",
         "      - nats-data:/data",
-        '    ports:',
+        "    ports:",
         '      - "8080:8000"',
         "volumes:",
         "  nats-data:",
@@ -66,15 +62,9 @@ CLEAN_COMPOSE = "\n".join(
     )
 )
 
-CLEAN_REQUIREMENTS_LOCAL = (
-    "-r requirements-test.txt\n"
-    "groundtruth-kb[web] @ git+https://example.com/g.git@v1\n"
-)
+CLEAN_REQUIREMENTS_LOCAL = "-r requirements-test.txt\ngroundtruth-kb[web] @ git+https://example.com/g.git@v1\n"
 
-CLEAN_REQUIREMENTS_TEST = (
-    "-r requirements.txt\n"
-    "groundtruth-kb[search] @ git+https://example.com/g.git@v1\n"
-)
+CLEAN_REQUIREMENTS_TEST = "-r requirements.txt\ngroundtruth-kb[search] @ git+https://example.com/g.git@v1\n"
 
 
 def _write_clean_tree(root: Path) -> None:
@@ -82,12 +72,8 @@ def _write_clean_tree(root: Path) -> None:
     (root / "Dockerfile").write_text(CLEAN_DOCKERFILE, encoding="utf-8")
     (root / "docker-compose.yml").write_text(CLEAN_COMPOSE, encoding="utf-8")
     (root / "requirements.txt").write_text("", encoding="utf-8")
-    (root / "requirements-test.txt").write_text(
-        CLEAN_REQUIREMENTS_TEST, encoding="utf-8"
-    )
-    (root / "requirements-local.txt").write_text(
-        CLEAN_REQUIREMENTS_LOCAL, encoding="utf-8"
-    )
+    (root / "requirements-test.txt").write_text(CLEAN_REQUIREMENTS_TEST, encoding="utf-8")
+    (root / "requirements-local.txt").write_text(CLEAN_REQUIREMENTS_LOCAL, encoding="utf-8")
 
 
 def test_clean_tree_produces_no_findings(tmp_path):
@@ -137,10 +123,7 @@ def test_missing_dockerignore_file_is_reported(tmp_path):
 def test_forbidden_dockerfile_copy_is_reported(tmp_path):
     mod = _load_checker_module()
     (tmp_path / "Dockerfile").write_text(
-        "FROM python:3.12-slim\n"
-        "COPY src/ ./src/\n"
-        "COPY bridge/ ./bridge/\n"
-        "COPY .codex ./agent-config/\n",
+        "FROM python:3.12-slim\nCOPY src/ ./src/\nCOPY bridge/ ./bridge/\nCOPY .codex ./agent-config/\n",
         encoding="utf-8",
     )
 
@@ -162,10 +145,7 @@ def test_dockerfile_allows_approved_copy_sources(tmp_path):
 def test_compose_rejects_host_bind_escaping_repo(tmp_path):
     mod = _load_checker_module()
     (tmp_path / "docker-compose.yml").write_text(
-        "services:\n"
-        "  api:\n"
-        "    volumes:\n"
-        "      - ../other-repo/src:/app/src:ro\n",
+        "services:\n  api:\n    volumes:\n      - ../other-repo/src:/app/src:ro\n",
         encoding="utf-8",
     )
 
@@ -177,10 +157,7 @@ def test_compose_rejects_host_bind_escaping_repo(tmp_path):
 def test_compose_rejects_absolute_host_bind(tmp_path):
     mod = _load_checker_module()
     (tmp_path / "docker-compose.yml").write_text(
-        "services:\n"
-        "  api:\n"
-        "    volumes:\n"
-        "      - /etc/agentred:/app/etc:ro\n",
+        "services:\n  api:\n    volumes:\n      - /etc/agentred:/app/etc:ro\n",
         encoding="utf-8",
     )
 
@@ -288,9 +265,7 @@ def test_detect_gtkb_mode_released(tmp_path):
 def test_detect_gtkb_mode_editable_sibling_is_reported(tmp_path):
     mod = _load_checker_module()
     _write_clean_tree(tmp_path)
-    (tmp_path / "requirements-local.txt").write_text(
-        "-e ../groundtruth-kb[web]\n", encoding="utf-8"
-    )
+    (tmp_path / "requirements-local.txt").write_text("-e ../groundtruth-kb[web]\n", encoding="utf-8")
 
     mode, findings = mod.detect_gtkb_mode(tmp_path)
 
@@ -311,8 +286,7 @@ def test_detect_gtkb_mode_missing(tmp_path):
 def test_detect_gtkb_mode_ignores_commented_editable_line(tmp_path):
     mod = _load_checker_module()
     (tmp_path / "requirements-local.txt").write_text(
-        "# -e ../groundtruth-kb[web]\n"
-        "groundtruth-kb[web] @ git+https://example.com/g.git@v1\n",
+        "# -e ../groundtruth-kb[web]\ngroundtruth-kb[web] @ git+https://example.com/g.git@v1\n",
         encoding="utf-8",
     )
 
@@ -410,9 +384,8 @@ def test_repository_passes_its_own_checker():
     report = mod.build_report(repo_root)
 
     error_findings = [f for f in report.findings if f.severity == "error"]
-    assert error_findings == [], (
-        "Environment-isolation errors detected in the live repository: "
-        + "; ".join(f"{f.code} {f.path}: {f.message}" for f in error_findings)
+    assert error_findings == [], "Environment-isolation errors detected in the live repository: " + "; ".join(
+        f"{f.code} {f.path}: {f.message}" for f in error_findings
     )
 
 
@@ -443,9 +416,7 @@ def test_repeated_probe_is_deterministic(tmp_path, monkeypatch):
 
 def test_editable_line_without_other_gtkb_still_marks_editable(tmp_path):
     mod = _load_checker_module()
-    (tmp_path / "requirements-local.txt").write_text(
-        "-e ../groundtruth-kb[web]\n", encoding="utf-8"
-    )
+    (tmp_path / "requirements-local.txt").write_text("-e ../groundtruth-kb[web]\n", encoding="utf-8")
 
     mode, findings = mod.detect_gtkb_mode(tmp_path)
 

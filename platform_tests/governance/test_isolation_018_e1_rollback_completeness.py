@@ -56,9 +56,7 @@ def test_m5_outside_file_destination_rejected_before_unlink(tmp_path: Path) -> N
         validate_agent_red_destination("some-platform-file.txt", tmp_path)
 
     assert "out-of-scope" in str(exc_info.value).lower()
-    assert mock_unlink.call_count == 0, (
-        "unlink must NOT be called for out-of-scope FILE destination"
-    )
+    assert mock_unlink.call_count == 0, "unlink must NOT be called for out-of-scope FILE destination"
 
 
 def test_m6_outside_directory_destination_rejected_before_rmtree(
@@ -72,9 +70,7 @@ def test_m6_outside_directory_destination_rejected_before_rmtree(
         validate_agent_red_destination("some-platform-dir/", tmp_path)
 
     assert "out-of-scope" in str(exc_info.value).lower()
-    assert mock_rmtree.call_count == 0, (
-        "rmtree must NOT be called for out-of-scope DIRECTORY destination"
-    )
+    assert mock_rmtree.call_count == 0, "rmtree must NOT be called for out-of-scope DIRECTORY destination"
 
 
 # ---------------------------------------------------------------------------
@@ -88,9 +84,7 @@ def test_m7_valid_inscope_file_destination_accepted(tmp_path: Path) -> None:
     Path behavior (so on Windows, backslash normalization is covered)."""
     (tmp_path / "applications" / "Agent_Red" / "tests").mkdir(parents=True)
 
-    result = validate_agent_red_destination(
-        "applications/Agent_Red/tests/a.txt", tmp_path
-    )
+    result = validate_agent_red_destination("applications/Agent_Red/tests/a.txt", tmp_path)
 
     assert result is not None
     # Resolved path is under the allowed root.
@@ -103,9 +97,7 @@ def test_m8_valid_inscope_directory_destination_accepted(tmp_path: Path) -> None
     accepted by the validator."""
     (tmp_path / "applications" / "Agent_Red" / "src").mkdir(parents=True)
 
-    result = validate_agent_red_destination(
-        "applications/Agent_Red/src", tmp_path
-    )
+    result = validate_agent_red_destination("applications/Agent_Red/src", tmp_path)
 
     assert result is not None
     assert "applications" in result.parts
@@ -124,9 +116,7 @@ def test_m9_parent_traversal_rejected(tmp_path: Path) -> None:
     (tmp_path / "applications" / "Agent_Red").mkdir(parents=True)
 
     with pytest.raises(AssertionError) as exc_info:
-        validate_agent_red_destination(
-            "applications/Agent_Red/../outside.txt", tmp_path
-        )
+        validate_agent_red_destination("applications/Agent_Red/../outside.txt", tmp_path)
 
     assert "parent traversal" in str(exc_info.value).lower()
 
@@ -167,9 +157,7 @@ def test_m10b_windows_absolute_path_rejected(tmp_path: Path) -> None:
 
 def _git(*args: str, cwd: Path) -> str:
     """Run git with given args; return stdout."""
-    result = subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
     return result.stdout
 
 
@@ -213,9 +201,7 @@ def test_m4_end_to_end_rollback_completeness(tmp_path: Path) -> None:
         "cluster_destinations_dir_recursive": [],
         "cluster_destinations_file": [],
         "tests_migrating_source_paths": ["tests/a.txt"],
-        "tests_migrating_destination_paths": [
-            "applications/Agent_Red/tests/a.txt"
-        ],
+        "tests_migrating_destination_paths": ["applications/Agent_Red/tests/a.txt"],
         "tests_staying_platform_paths": [],
         "config_files_in_place_edits": [],
         "workflow_files_in_place_edits": [],
@@ -224,28 +210,20 @@ def test_m4_end_to_end_rollback_completeness(tmp_path: Path) -> None:
     }
     write_set_path = tmp_path / ".tmp" / "e1-drift" / "write-set.json"
     write_set_path.parent.mkdir(parents=True, exist_ok=True)
-    write_set_path.write_text(
-        json.dumps(write_set, indent=2), encoding="utf-8"
-    )
+    write_set_path.write_text(json.dumps(write_set, indent=2), encoding="utf-8")
 
     # Invoke the rollback helper against the temp repo.
     rollback(write_set_path, tmp_path)
 
     # Post-rollback assertion: status should be clean.
     status_after = _git("status", "--porcelain", cwd=tmp_path)
-    assert status_after.strip() == "", (
-        f"Expected clean status after rollback, got:\n{status_after}"
-    )
+    assert status_after.strip() == "", f"Expected clean status after rollback, got:\n{status_after}"
 
     # Verify source is restored at its original location.
-    assert (tmp_path / "tests" / "a.txt").exists(), (
-        "tests/a.txt should be restored after rollback"
-    )
+    assert (tmp_path / "tests" / "a.txt").exists(), "tests/a.txt should be restored after rollback"
 
     # Verify destination is removed.
-    assert not (
-        tmp_path / "applications" / "Agent_Red" / "tests" / "a.txt"
-    ).exists(), (
+    assert not (tmp_path / "applications" / "Agent_Red" / "tests" / "a.txt").exists(), (
         "applications/Agent_Red/tests/a.txt must be removed by Phase 3 cleanup"
     )
 
@@ -260,9 +238,9 @@ def test_m1_write_set_consumed_by_rollback() -> None:
     Mutation: missing write-set causes the helper's main() to exit 1."""
     # We don't actually run main() here (it operates on Path.cwd()); we just
     # verify the constant path the helper references.
-    helper_source = (
-        Path(__file__).resolve().parents[2] / "scripts" / "rollback_e1_write_set.py"
-    ).read_text(encoding="utf-8")
+    helper_source = (Path(__file__).resolve().parents[2] / "scripts" / "rollback_e1_write_set.py").read_text(
+        encoding="utf-8"
+    )
     assert ".tmp/e1-drift/write-set.json" in helper_source, (
         "rollback helper must reference the canonical write-set path"
     )
@@ -273,9 +251,9 @@ def test_m2_write_set_schema_has_required_keys(tmp_path: Path) -> None:
     Mutation: omitting any required key from the iteration would cause the
     helper to miss that category in rollback. This test asserts the helper
     references all required keys."""
-    helper_source = (
-        Path(__file__).resolve().parents[2] / "scripts" / "rollback_e1_write_set.py"
-    ).read_text(encoding="utf-8")
+    helper_source = (Path(__file__).resolve().parents[2] / "scripts" / "rollback_e1_write_set.py").read_text(
+        encoding="utf-8"
+    )
 
     required_keys = [
         "cluster_sources_dir_recursive",
@@ -289,9 +267,7 @@ def test_m2_write_set_schema_has_required_keys(tmp_path: Path) -> None:
         "dockerfile_in_place_edits",
     ]
     for key in required_keys:
-        assert key in helper_source, (
-            f"rollback helper must reference write-set key: {key}"
-        )
+        assert key in helper_source, f"rollback helper must reference write-set key: {key}"
 
 
 def test_m3_source_destination_symmetry_for_per_file_tests(tmp_path: Path) -> None:

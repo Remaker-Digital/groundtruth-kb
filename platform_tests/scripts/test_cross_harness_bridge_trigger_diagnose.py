@@ -10,6 +10,7 @@ Specs:
 - PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 (diagnose makes failures
   visible rather than silently accepted).
 """
+
 from __future__ import annotations
 
 import json
@@ -46,19 +47,37 @@ def _seed_state(state_dir: Path) -> None:
         "schema_version": 1,
         "updated_at": "2026-05-10T12:00:00+00:00",
     }
-    (state_dir / "dispatch-state.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    (state_dir / "dispatch-state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def _seed_failures(state_dir: Path) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     failures = [
-        {"error_message": "[WinError 32] sharing violation", "error_type": "PermissionError", "ts": "2026-05-09T22:20:18+00:00"},
-        {"error_message": "[WinError 32] sharing violation", "error_type": "PermissionError", "ts": "2026-05-09T21:00:00+00:00"},
-        {"error_message": "[WinError 5] access denied", "error_type": "PermissionError", "ts": "2026-05-09T18:05:12+00:00"},
-        {"error_message": "[WinError 2] file not found", "error_type": "FileNotFoundError", "ts": "2026-05-09T21:23:24+00:00"},
-        {"error_message": "Permission denied: 'dispatch-state.json.tmp'", "error_type": "PermissionError", "ts": "2026-05-09T17:32:41+00:00"},
+        {
+            "error_message": "[WinError 32] sharing violation",
+            "error_type": "PermissionError",
+            "ts": "2026-05-09T22:20:18+00:00",
+        },
+        {
+            "error_message": "[WinError 32] sharing violation",
+            "error_type": "PermissionError",
+            "ts": "2026-05-09T21:00:00+00:00",
+        },
+        {
+            "error_message": "[WinError 5] access denied",
+            "error_type": "PermissionError",
+            "ts": "2026-05-09T18:05:12+00:00",
+        },
+        {
+            "error_message": "[WinError 2] file not found",
+            "error_type": "FileNotFoundError",
+            "ts": "2026-05-09T21:23:24+00:00",
+        },
+        {
+            "error_message": "Permission denied: 'dispatch-state.json.tmp'",
+            "error_type": "PermissionError",
+            "ts": "2026-05-09T17:32:41+00:00",
+        },
     ]
     path = state_dir / "dispatch-failures.jsonl"
     path.write_text("\n".join(json.dumps(f) for f in failures) + "\n", encoding="utf-8")

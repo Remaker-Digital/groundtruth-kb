@@ -69,6 +69,7 @@ _METADATA_CLAUSE = "CLAUSE-PROJECT-METADATA-PRESENT"
 
 # --- CLAUSE-PROJECT-METADATA-PRESENT (blocked cases) ----------------------------
 
+
 def test_bridge_proposal_missing_project_authorization_line_blocked() -> None:
     content = _proposal("NEW", metadata=_META_PROJECT + _META_WI)
     reason = _deny(content)
@@ -97,23 +98,23 @@ def test_bridge_proposal_all_three_metadata_lines_passes() -> None:
 
 
 def test_bridge_proposal_metadata_accepts_wi_gtkb_worklist_id_formats() -> None:
-    for wi_value in ("WI-9999", "WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001", "GTKB-SOME-THING-001", "WORKLIST-A-B-C"):
+    for wi_value in (
+        "WI-9999",
+        "WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001",
+        "GTKB-SOME-THING-001",
+        "WORKLIST-A-B-C",
+    ):
         metadata = _META_AUTH + _META_PROJECT + f"Work Item: {wi_value}\n"
         content = _proposal("NEW", metadata=metadata)
         reason = _deny(content)
-        assert reason is None or _METADATA_CLAUSE not in reason, (
-            f"Work Item id format {wi_value} should be accepted"
-        )
+        assert reason is None or _METADATA_CLAUSE not in reason, f"Work Item id format {wi_value} should be accepted"
 
 
 def test_bridge_proposal_metadata_accepts_wi_auto_id() -> None:
     # WI-AUTO-<SPEC-ID> ids are minted by groundtruth_kb.intake (spec-intake
     # confirm). A NEW proposal whose Work Item line carries one must not trip
     # CLAUSE-PROJECT-METADATA-PRESENT. Regression guard for WI-3322.
-    metadata = (
-        _META_AUTH + _META_PROJECT
-        + "Work Item: WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001\n"
-    )
+    metadata = _META_AUTH + _META_PROJECT + "Work Item: WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001\n"
     content = _proposal("NEW", metadata=metadata)
     reason = _deny(content)
     assert reason is None or _METADATA_CLAUSE not in reason, (
@@ -122,6 +123,7 @@ def test_bridge_proposal_metadata_accepts_wi_auto_id() -> None:
 
 
 # --- CLAUSE-VERDICT-FILES-EXCLUDED ----------------------------------------------
+
 
 def test_verdict_file_go_no_metadata_passes() -> None:
     # GO verdict file with no metadata: metadata clause must not fire.
@@ -150,6 +152,7 @@ def test_verdict_file_withdrawn_no_metadata_passes() -> None:
 
 # --- CLAUSE-NON-IMPLEMENTATION-EXEMPT -------------------------------------------
 
+
 def test_bridge_kind_spec_intake_no_metadata_passes() -> None:
     content = _proposal("NEW", metadata="", bridge_kind="spec_intake")
     reason = _deny(content)
@@ -169,6 +172,7 @@ def test_bridge_kind_governance_review_no_metadata_passes() -> None:
 
 
 # --- Regression guard: an implementation-kind proposal is NOT exempt ------------
+
 
 def test_bridge_kind_implementation_proposal_still_gated() -> None:
     # A non-exempt bridge_kind must still require the metadata lines.

@@ -53,6 +53,4 @@ def test_session_start_dispatch_apply_pending_precedes_role_resolution(hook_path
     main_apply_pos = text.find("apply_pending", main_pos)
     main_resolution_pos = text.find("_bridge_dispatch_keyword_check()", main_pos)
     assert main_apply_pos > -1 and main_resolution_pos > -1
-    assert main_apply_pos < main_resolution_pos, (
-        f"{hook_path}: apply_pending must precede role-resolution in main()"
-    )
+    assert main_apply_pos < main_resolution_pos, f"{hook_path}: apply_pending must precede role-resolution in main()"

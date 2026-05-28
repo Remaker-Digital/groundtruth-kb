@@ -73,9 +73,7 @@ def _copy_parity_registry(root: Path) -> None:
 
 def _projection_role(root: Path, harness_id: str) -> object:
     """Return the raw ``role`` field for ``harness_id`` in the registry projection."""
-    projection = json.loads(
-        (root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8")
-    )
+    projection = json.loads((root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
     for record in projection.get("harnesses", []):
         if isinstance(record, dict) and record.get("id") == harness_id:
             return record.get("role")
@@ -140,9 +138,7 @@ def _write_role_map(path: Path, roles: dict[str, tuple[str, str]]) -> Path:
     return path
 
 
-def _write_registry_projection(
-    root: Path, harnesses: dict[str, tuple[str, str | list[str]]]
-) -> None:
+def _write_registry_projection(root: Path, harnesses: dict[str, tuple[str, str | list[str]]]) -> None:
     """Seed the registry projection file directly under ``root``.
 
     ``harnesses`` maps each durable harness id to ``(harness_name, role)``.

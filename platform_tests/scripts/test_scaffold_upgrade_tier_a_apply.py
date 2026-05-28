@@ -157,8 +157,10 @@ def test_dry_run_preserves_manifest_and_skips_execute_upgrade(tmp_path: Path) ->
     _write_minimal_toml(tmp_path, version="0.6.1")
     _setup_git_clean_tree(tmp_path)
 
-    with patch.object(applier, "plan_upgrade", return_value=[]) as mock_plan, \
-         patch.object(applier, "execute_upgrade") as mock_execute:
+    with (
+        patch.object(applier, "plan_upgrade", return_value=[]) as mock_plan,
+        patch.object(applier, "execute_upgrade") as mock_execute,
+    ):
         output = applier.apply_tier_a(tmp_path, dry_run=True)
 
     assert mock_plan.called
@@ -181,8 +183,10 @@ def test_apply_calls_execute_upgrade_with_correct_flags(tmp_path: Path) -> None:
 
     one_add = [UpgradeAction(file=".claude/hooks/a.py", action="add", reason="missing")]
 
-    with patch.object(applier, "plan_upgrade", return_value=one_add), \
-         patch.object(applier, "execute_upgrade", return_value=["ADDED .claude/hooks/a.py"]) as mock_execute:
+    with (
+        patch.object(applier, "plan_upgrade", return_value=one_add),
+        patch.object(applier, "execute_upgrade", return_value=["ADDED .claude/hooks/a.py"]) as mock_execute,
+    ):
         output = applier.apply_tier_a(tmp_path, dry_run=False)
 
     assert mock_execute.called
@@ -207,8 +211,7 @@ def test_main_dry_run_emits_valid_json_and_exits_zero(tmp_path: Path) -> None:
     _setup_git_clean_tree(tmp_path)
 
     buf = io.StringIO()
-    with patch.object(applier, "plan_upgrade", return_value=[]), \
-         patch.object(sys, "stdout", buf):
+    with patch.object(applier, "plan_upgrade", return_value=[]), patch.object(sys, "stdout", buf):
         exit_code = applier.main(["--target", str(tmp_path), "--dry-run"])
 
     assert exit_code == 0

@@ -83,24 +83,18 @@ def _has_set_membership_check(src: str) -> bool:
 def test_claude_session_start_checks_set_membership_against_own_role_set() -> None:
     """DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause (Claude)."""
     src = _read(CLAUDE_HOOK_PATH)
-    assert "_resolve_own_role_set" in src, (
-        "Claude SessionStart hook missing _resolve_own_role_set helper."
-    )
+    assert "_resolve_own_role_set" in src, "Claude SessionStart hook missing _resolve_own_role_set helper."
     assert _has_set_membership_check(src), (
-        "Claude SessionStart hook missing set-membership check "
-        "(`keyword_mode in own_role_set` or equivalent)."
+        "Claude SessionStart hook missing set-membership check (`keyword_mode in own_role_set` or equivalent)."
     )
 
 
 def test_codex_session_start_checks_set_membership_against_own_role_set() -> None:
     """DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause (Codex parity)."""
     src = _read(CODEX_HOOK_PATH)
-    assert "_resolve_own_role_set" in src, (
-        "Codex SessionStart hook missing _resolve_own_role_set helper."
-    )
+    assert "_resolve_own_role_set" in src, "Codex SessionStart hook missing _resolve_own_role_set helper."
     assert _has_set_membership_check(src), (
-        "Codex SessionStart hook missing set-membership check "
-        "(`keyword_mode in own_role_set` or equivalent)."
+        "Codex SessionStart hook missing set-membership check (`keyword_mode in own_role_set` or equivalent)."
     )
 
 
@@ -113,8 +107,7 @@ def test_claude_strict_drop_writes_dispatch_failures_jsonl() -> None:
     """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Claude)."""
     src = _read(CLAUDE_HOOK_PATH)
     assert "dispatch-failures.jsonl" in src, (
-        "Claude SessionStart hook missing audit-log path "
-        "`dispatch-failures.jsonl`; silent drops would run undetected."
+        "Claude SessionStart hook missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
     )
     assert "_audit_log_misdirected_dispatch" in src, (
         "Claude SessionStart hook missing _audit_log_misdirected_dispatch helper."
@@ -126,8 +119,7 @@ def test_codex_strict_drop_writes_dispatch_failures_jsonl() -> None:
     """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Codex parity)."""
     src = _read(CODEX_HOOK_PATH)
     assert "dispatch-failures.jsonl" in src, (
-        "Codex SessionStart hook missing audit-log path "
-        "`dispatch-failures.jsonl`; silent drops would run undetected."
+        "Codex SessionStart hook missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
     )
     assert "_audit_log_misdirected_dispatch" in src, (
         "Codex SessionStart hook missing _audit_log_misdirected_dispatch helper."
@@ -236,12 +228,8 @@ def test_keyword_env_var_name_parity() -> None:
     claude_src = _read(CLAUDE_HOOK_PATH)
     codex_src = _read(CODEX_HOOK_PATH)
     env_name = "GTKB_BRIDGE_DISPATCH_KEYWORD"
-    assert env_name in trigger_src, (
-        f"Trigger does not emit env var {env_name!r}; receiver would see no keyword."
-    )
+    assert env_name in trigger_src, f"Trigger does not emit env var {env_name!r}; receiver would see no keyword."
     assert env_name in claude_src, (
         f"Claude hook does not read env var {env_name!r}; receiver keyword check would no-op."
     )
-    assert env_name in codex_src, (
-        f"Codex hook does not read env var {env_name!r}; receiver keyword check would no-op."
-    )
+    assert env_name in codex_src, f"Codex hook does not read env var {env_name!r}; receiver keyword check would no-op."

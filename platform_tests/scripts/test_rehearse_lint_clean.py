@@ -34,9 +34,7 @@ def test_rehearse_package_passes_ruff_check() -> None:
         text=True,
         check=False,
     )
-    assert result.returncode == 0, (
-        f"ruff check found issues:\n{result.stdout}\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"ruff check found issues:\n{result.stdout}\n{result.stderr}"
 
 
 def test_rehearse_package_passes_ruff_format_check() -> None:
@@ -48,7 +46,4 @@ def test_rehearse_package_passes_ruff_format_check() -> None:
         text=True,
         check=False,
     )
-    assert result.returncode == 0, (
-        f"ruff format --check found unformatted files:\n"
-        f"{result.stdout}\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"ruff format --check found unformatted files:\n{result.stdout}\n{result.stderr}"

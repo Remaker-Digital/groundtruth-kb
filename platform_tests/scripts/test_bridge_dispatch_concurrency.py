@@ -158,8 +158,11 @@ def test_t8_stale_slot_reclaimed(mod, tmp_path):
     slot_path = _slot_file(state, "prime-builder", 0)
     slot_path.parent.mkdir(parents=True, exist_ok=True)
     stale = {
-        "schema_version": 1, "role": "prime-builder", "slot_index": 0,
-        "worker_token": "stale-token", "pid": 999999,
+        "schema_version": 1,
+        "role": "prime-builder",
+        "slot_index": 0,
+        "worker_token": "stale-token",
+        "pid": 999999,
         "acquired_at": "2020-01-01T00:00:00+00:00",
         "heartbeat_at": "2020-01-01T00:00:00+00:00",
         "ttl_seconds": 1800.0,
@@ -218,12 +221,21 @@ def test_t11_reclaim_stale_workers(mod, tmp_path):
     def write_slot(role: str, idx: int, heartbeat: str, token: str) -> Path:
         path = _slot_file(state, role, idx)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "schema_version": 1, "role": role, "slot_index": idx,
-            "worker_token": token, "pid": 1,
-            "acquired_at": heartbeat, "heartbeat_at": heartbeat,
-            "ttl_seconds": 1800.0,
-        }), encoding="utf-8")
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "role": role,
+                    "slot_index": idx,
+                    "worker_token": token,
+                    "pid": 1,
+                    "acquired_at": heartbeat,
+                    "heartbeat_at": heartbeat,
+                    "ttl_seconds": 1800.0,
+                }
+            ),
+            encoding="utf-8",
+        )
         return path
 
     now = datetime.now(UTC).isoformat()
@@ -307,13 +319,13 @@ def test_t13_worker_slot_context_manager(mod, tmp_path):
 def test_t14_invalid_role_rejected(mod, tmp_path):
     state = tmp_path / "state"
     invalid_roles = [
-        "",                        # empty string
-        "prime-builder/extra",     # forward-slash path separator
+        "",  # empty string
+        "prime-builder/extra",  # forward-slash path separator
         "loyal-opposition\\evil",  # backslash path separator
-        "..",                      # dot traversal
-        "prime.builder",           # dot
-        "PRIME-BUILDER",           # wrong case - not a canonical role
-        "reviewer",                # unknown role
+        "..",  # dot traversal
+        "prime.builder",  # dot
+        "PRIME-BUILDER",  # wrong case - not a canonical role
+        "reviewer",  # unknown role
     ]
     for bad in invalid_roles:
         with pytest.raises(ValueError):

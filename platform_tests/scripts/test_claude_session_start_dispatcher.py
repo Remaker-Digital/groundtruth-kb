@@ -47,9 +47,7 @@ CODEX_HOOKS = PROJECT_ROOT / ".codex" / "hooks.json"
 STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 
 
-_BRIDGE_DISPATCH_ENV_VARS = frozenset(
-    {"GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_BRIDGE_DISPATCH_KEYWORD"}
-)
+_BRIDGE_DISPATCH_ENV_VARS = frozenset({"GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_BRIDGE_DISPATCH_KEYWORD"})
 
 
 def _run_dispatcher(env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -67,9 +65,7 @@ def _run_dispatcher(env: dict[str, str] | None = None) -> subprocess.CompletedPr
     a hermeticity defect that Codex's NO-GO at -010 surfaced.
     """
     if env is None:
-        env = {
-            k: v for k, v in os.environ.items() if k not in _BRIDGE_DISPATCH_ENV_VARS
-        }
+        env = {k: v for k, v in os.environ.items() if k not in _BRIDGE_DISPATCH_ENV_VARS}
     return subprocess.run(
         [sys.executable, str(DISPATCHER)],
         cwd=str(PROJECT_ROOT),
@@ -240,7 +236,9 @@ def test_harness_parity_import_repaired() -> None:
     assert "Harness parity: unavailable" not in result.stdout
 
 
-def test_dispatcher_fallback_on_broken_startup_service(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_dispatcher_fallback_on_broken_startup_service(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """If the startup service path is unreachable, dispatcher emits a fallback.
 
     Validates fail-soft behavior — dispatcher must always emit a valid
@@ -365,14 +363,10 @@ def test_startup_decision_enum_has_five_distinct_values() -> None:
         "legacy_fallback",
         "strict_drop",
     }
-    assert values == expected, (
-        f"StartupDecision values drifted: got {values!r}, expected {expected!r}"
-    )
+    assert values == expected, f"StartupDecision values drifted: got {values!r}, expected {expected!r}"
 
 
-def test_normal_startup_when_no_env_no_keyword(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_normal_startup_when_no_env_no_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """No env-var, no keyword -> NORMAL_STARTUP (Claude side)."""
     _write_harness_state(tmp_path)
     hook = _load_claude_hook_isolated("normal_startup")
@@ -382,9 +376,7 @@ def test_normal_startup_when_no_env_no_keyword(
     assert decision == hook.StartupDecision.NORMAL_STARTUP
 
 
-def test_dispatch_authorized_when_env_and_matching_keyword(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dispatch_authorized_when_env_and_matching_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """env-var + keyword + mode-in-role-set -> DISPATCH_AUTHORIZED (Claude side).
 
     Claude hosts prime-builder; mode 'pb' must be authorized.
@@ -413,9 +405,7 @@ def test_dispatch_authorized_when_role_record_is_multi_role_set(
     assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
 
 
-def test_spoof_fallback_when_keyword_without_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_spoof_fallback_when_keyword_without_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """keyword present, env-var absent -> SPOOF_FALLBACK (Claude side).
 
     Defends against an owner-typed keyword without the trigger's
@@ -429,9 +419,7 @@ def test_spoof_fallback_when_keyword_without_env(
     assert decision == hook.StartupDecision.SPOOF_FALLBACK
 
 
-def test_legacy_fallback_when_env_without_keyword(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_legacy_fallback_when_env_without_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """env-var present, keyword absent -> LEGACY_FALLBACK (Claude side).
 
     Preserves backward compat with older trigger versions that did not
@@ -445,9 +433,7 @@ def test_legacy_fallback_when_env_without_keyword(
     assert decision == hook.StartupDecision.LEGACY_FALLBACK
 
 
-def test_strict_drop_when_mode_not_in_own_role_set(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_strict_drop_when_mode_not_in_own_role_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """env-var + keyword + mode-NOT-in-role-set -> STRICT_DROP + audit log
     (Claude side).
 
@@ -459,9 +445,7 @@ def test_strict_drop_when_mode_not_in_own_role_set(
     failures_path = tmp_path / "dispatch-failures.jsonl"
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-misdirect")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
-    decision, _reason = hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert decision == hook.StartupDecision.STRICT_DROP
 
     # Audit log written with structured fields.
@@ -476,9 +460,7 @@ def test_strict_drop_when_mode_not_in_own_role_set(
     assert record["own_harness_id"] == "B"
 
 
-def test_strict_drop_on_unreadable_role_record(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_strict_drop_on_unreadable_role_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """If own durable role is unreadable, treat dispatch as misdirected
     (Claude side).
 
@@ -489,9 +471,7 @@ def test_strict_drop_on_unreadable_role_record(
     failures_path = tmp_path / "dispatch-failures.jsonl"
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-unreadable")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
-    decision, reason = hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    decision, reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert decision == hook.StartupDecision.STRICT_DROP
     assert "could not resolve own role set" in reason
 

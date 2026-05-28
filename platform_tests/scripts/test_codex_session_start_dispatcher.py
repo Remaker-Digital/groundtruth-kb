@@ -107,9 +107,7 @@ def test_startup_decision_enum_has_five_distinct_values() -> None:
         "legacy_fallback",
         "strict_drop",
     }
-    assert values == expected, (
-        f"StartupDecision values drifted: got {values!r}, expected {expected!r}"
-    )
+    assert values == expected, f"StartupDecision values drifted: got {values!r}, expected {expected!r}"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -117,9 +115,7 @@ def test_startup_decision_enum_has_five_distinct_values() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_normal_startup_when_no_env_no_keyword(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_normal_startup_when_no_env_no_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """No env-var, no keyword -> NORMAL_STARTUP."""
     _write_harness_state(tmp_path)
     hook = _load_codex_hook("normal_startup")
@@ -129,9 +125,7 @@ def test_normal_startup_when_no_env_no_keyword(
     assert decision == hook.StartupDecision.NORMAL_STARTUP
 
 
-def test_dispatch_authorized_when_env_and_matching_keyword(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dispatch_authorized_when_env_and_matching_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """env-var + keyword + mode-in-role-set -> DISPATCH_AUTHORIZED."""
     # Codex hosts loyal-opposition; mode 'lo' must be authorized.
     _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
@@ -158,9 +152,7 @@ def test_dispatch_authorized_when_role_record_is_multi_role_set(
     assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
 
 
-def test_spoof_fallback_when_keyword_without_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_spoof_fallback_when_keyword_without_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """keyword present, env-var absent -> SPOOF_FALLBACK.
 
     Defends against an owner-typed keyword without the trigger's
@@ -174,9 +166,7 @@ def test_spoof_fallback_when_keyword_without_env(
     assert decision == hook.StartupDecision.SPOOF_FALLBACK
 
 
-def test_legacy_fallback_when_env_without_keyword(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_legacy_fallback_when_env_without_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """env-var present, keyword absent -> LEGACY_FALLBACK.
 
     Preserves backward compat with older trigger versions that did not
@@ -190,9 +180,7 @@ def test_legacy_fallback_when_env_without_keyword(
     assert decision == hook.StartupDecision.LEGACY_FALLBACK
 
 
-def test_strict_drop_when_mode_not_in_own_role_set(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_strict_drop_when_mode_not_in_own_role_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """env-var + keyword + mode-NOT-in-role-set -> STRICT_DROP + audit log.
 
     Codex has durable role 'loyal-opposition' ({'lo'}); a dispatch with
@@ -203,9 +191,7 @@ def test_strict_drop_when_mode_not_in_own_role_set(
     failures_path = tmp_path / "dispatch-failures.jsonl"
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-codex-misdirect")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
-    decision, _reason = hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert decision == hook.StartupDecision.STRICT_DROP
 
     # Audit log entry written with structured fields.
@@ -225,9 +211,7 @@ def test_strict_drop_when_mode_not_in_own_role_set(
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_strict_drop_on_unreadable_role_record(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_strict_drop_on_unreadable_role_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """If own durable role is unreadable, treat dispatch as misdirected.
 
     Fail-closed semantic: cannot prove the keyword matches our role -> drop.
@@ -238,9 +222,7 @@ def test_strict_drop_on_unreadable_role_record(
     failures_path = tmp_path / "dispatch-failures.jsonl"
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-codex-unreadable")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
-    decision, reason = hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    decision, reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert decision == hook.StartupDecision.STRICT_DROP
     assert "could not resolve own role set" in reason
 

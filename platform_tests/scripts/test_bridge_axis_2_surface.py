@@ -33,6 +33,7 @@ def _load_module():
 def _run_hook(stdin_payload: dict, project_root: Path, env_overrides: dict | None = None) -> tuple[int, str, str]:
     """Invoke the hook as a subprocess (closer to production execution)."""
     import os
+
     env = os.environ.copy()
     env["CLAUDE_PROJECT_DIR"] = str(project_root)
     if env_overrides:
@@ -55,9 +56,7 @@ def _write_index(project_root: Path, content: str) -> None:
 
 def _seed_groundtruth_toml(project_root: Path) -> None:
     """Doctor + canonical parser checks rely on groundtruth.toml at root."""
-    (project_root / "groundtruth.toml").write_text(
-        '[project]\nname = "test"\nroot = "."\n', encoding="utf-8"
-    )
+    (project_root / "groundtruth.toml").write_text('[project]\nname = "test"\nroot = "."\n', encoding="utf-8")
 
 
 def test_t1_empty_bridge_state_no_surface(tmp_path):
@@ -230,6 +229,7 @@ def test_t9_latency_under_5s(tmp_path):
 def test_t10_system_map_row_present():
     """T10: config/agent-control/system-interface-map.toml contains the new row."""
     import tomllib
+
     map_path = PROJECT_ROOT / "config" / "agent-control" / "system-interface-map.toml"
     assert map_path.is_file()
     data = tomllib.loads(map_path.read_text(encoding="utf-8"))
@@ -274,6 +274,6 @@ def test_t12_resolver_finds_new_row():
     if result.returncode == 0 and result.stdout.strip():
         parsed = json.loads(result.stdout)
         # Schema: top-level dict with resolved row info.
-        assert "bridge-automation-claude-axis-2" in (
-            parsed.get("id", "") + " " + json.dumps(parsed)
-        ), f"Expected resolver to surface the new row; got: {parsed}"
+        assert "bridge-automation-claude-axis-2" in (parsed.get("id", "") + " " + json.dumps(parsed)), (
+            f"Expected resolver to surface the new row; got: {parsed}"
+        )

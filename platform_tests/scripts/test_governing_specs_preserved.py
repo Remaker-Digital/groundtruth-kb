@@ -131,8 +131,7 @@ def test_role_portability_preserved(tmp_path: Path) -> None:
     target_lo = trigger._resolve_dispatch_target("loyal-opposition", tmp_path)
     target_pb = trigger._resolve_dispatch_target("prime-builder", tmp_path)
     assert target_lo.command_handle == "claude", (
-        "After role swap, loyal-opposition dispatch must target claude (B), "
-        "not codex. Role portability regressed."
+        "After role swap, loyal-opposition dispatch must target claude (B), not codex. Role portability regressed."
     )
     assert target_lo.canonical_mode == "lo"
     assert target_lo.harness_id == "B"
@@ -183,9 +182,7 @@ def test_either_harness_can_hold_either_role(
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_strict_ignore_applies_to_both_harnesses(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_strict_ignore_applies_to_both_harnesses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """DCL-CROSS-HARNESS-ENFORCEMENT-001 — strict-ignore receiver clause
     applies symmetrically to Claude AND Codex.
 
@@ -205,12 +202,8 @@ def test_strict_ignore_applies_to_both_harnesses(
     # Case A: dispatch mode 'pb' targets prime-builder.
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-cross-pb")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
-    claude_dec, _ = claude_hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
-    codex_dec, _ = codex_hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    claude_dec, _ = claude_hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
+    codex_dec, _ = codex_hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert claude_dec == claude_hook.StartupDecision.DISPATCH_AUTHORIZED, (
         "Claude (prime-builder) MUST authorize a pb-targeted dispatch."
     )
@@ -222,12 +215,8 @@ def test_strict_ignore_applies_to_both_harnesses(
     # Case B: dispatch mode 'lo' targets loyal-opposition.
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-cross-lo")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
-    claude_dec, _ = claude_hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
-    codex_dec, _ = codex_hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    claude_dec, _ = claude_hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
+    codex_dec, _ = codex_hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert codex_dec == codex_hook.StartupDecision.DISPATCH_AUTHORIZED, (
         "Codex (loyal-opposition) MUST authorize an lo-targeted dispatch."
     )
@@ -281,8 +270,7 @@ def test_keyword_emitted_only_on_actionable() -> None:
     lines = prompt.splitlines()
     assert lines, "dispatch prompt was empty"
     assert lines[0] == "::init gtkb lo", (
-        f"First line of dispatch prompt MUST be the canonical keyword, "
-        f"got {lines[0]!r}"
+        f"First line of dispatch prompt MUST be the canonical keyword, got {lines[0]!r}"
     )
 
 
@@ -330,9 +318,7 @@ def test_no_keyword_on_idle_signature(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_receiver_defers_to_durable_record(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_receiver_defers_to_durable_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """DCL-SPAWNED-HARNESS-ROLE-DEFER-DURABLE-RECORD-001 v2 — bridge dispatch
     prompts must defer to the durable role record, not assert role inline.
 
@@ -349,9 +335,7 @@ def test_receiver_defers_to_durable_record(
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-defer")
     # Keyword says lo, but Claude harness B has durable role prime-builder ({'pb'}).
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
-    decision, reason = claude_hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    decision, reason = claude_hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert decision == claude_hook.StartupDecision.STRICT_DROP, (
         f"Claude (durable role prime-builder, {{'pb'}}) MUST silently drop a "
         f"keyword='lo' dispatch; got {decision.value!r} ({reason!r}). "
@@ -365,9 +349,7 @@ def test_receiver_defers_to_durable_record(
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_misdirected_dispatch_writes_audit_log(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_misdirected_dispatch_writes_audit_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — silent-drop must be
     investigable via audit log entry.
 
@@ -383,14 +365,11 @@ def test_misdirected_dispatch_writes_audit_log(
 
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-misdirect-001")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
-    decision, _reason = claude_hook._bridge_dispatch_keyword_check(
-        project_root=tmp_path, failures_path=failures_path
-    )
+    decision, _reason = claude_hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
     assert decision == claude_hook.StartupDecision.STRICT_DROP
 
     assert failures_path.is_file(), (
-        "STRICT_DROP must leave an audit-log entry at the dispatch-failures path; "
-        "no file was created."
+        "STRICT_DROP must leave an audit-log entry at the dispatch-failures path; no file was created."
     )
     lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert lines, "dispatch-failures.jsonl was empty after STRICT_DROP"

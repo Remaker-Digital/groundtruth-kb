@@ -189,12 +189,10 @@ def test_emitter_keyword_matches_receiver_regex() -> None:
         m_claude = claude_hook._CANONICAL_KEYWORD_RE.match(emitted)
         m_codex = codex_hook._CANONICAL_KEYWORD_RE.match(emitted)
         assert m_claude is not None, (
-            f"Claude regex does not accept emitter output for label {label!r} "
-            f"(mode {mode!r}, emitted {emitted!r})"
+            f"Claude regex does not accept emitter output for label {label!r} (mode {mode!r}, emitted {emitted!r})"
         )
         assert m_codex is not None, (
-            f"Codex regex does not accept emitter output for label {label!r} "
-            f"(mode {mode!r}, emitted {emitted!r})"
+            f"Codex regex does not accept emitter output for label {label!r} (mode {mode!r}, emitted {emitted!r})"
         )
         assert m_claude.group(1) == mode
         assert m_codex.group(1) == mode

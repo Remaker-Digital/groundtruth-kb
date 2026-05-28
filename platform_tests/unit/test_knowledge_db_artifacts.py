@@ -51,40 +51,64 @@ def gated_db(tmp_path):
 # Schema existence
 # ------------------------------------------------------------------
 
+
 class TestSchemaExists:
     """Verify all expected tables, views, and indexes exist."""
 
     def test_all_tables_exist(self, db):
         conn = db._get_conn()
         tables = sorted(
-            r[0] for r in conn.execute(
+            r[0]
+            for r in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence'"
             ).fetchall()
         )
-        expected = sorted([
-            "assertion_runs", "backlog_snapshots", "deliberation_specs",
-            "deliberation_work_items", "deliberations", "documents",
-            "environment_config", "operational_procedures", "pipeline_events",
-            "quality_scores", "session_prompts", "session_snapshots",
-            "spec_quality_scores", "specifications", "test_coverage", "test_plan_phases",
-            "test_plans", "test_procedures", "testable_elements", "tests", "work_items",
-        ])
+        expected = sorted(
+            [
+                "assertion_runs",
+                "backlog_snapshots",
+                "deliberation_specs",
+                "deliberation_work_items",
+                "deliberations",
+                "documents",
+                "environment_config",
+                "operational_procedures",
+                "pipeline_events",
+                "quality_scores",
+                "session_prompts",
+                "session_snapshots",
+                "spec_quality_scores",
+                "specifications",
+                "test_coverage",
+                "test_plan_phases",
+                "test_plans",
+                "test_procedures",
+                "testable_elements",
+                "tests",
+                "work_items",
+            ]
+        )
         assert tables == expected
 
     def test_all_views_exist(self, db):
         conn = db._get_conn()
-        views = sorted(
-            r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='view'"
-            ).fetchall()
+        views = sorted(r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='view'").fetchall())
+        expected = sorted(
+            [
+                "current_backlog_snapshots",
+                "current_deliberations",
+                "current_documents",
+                "current_environment_config",
+                "current_operational_procedures",
+                "current_specifications",
+                "current_testable_elements",
+                "current_test_plan_phases",
+                "current_test_plans",
+                "current_test_procedures",
+                "current_tests",
+                "current_work_items",
+            ]
         )
-        expected = sorted([
-            "current_backlog_snapshots", "current_deliberations", "current_documents",
-            "current_environment_config", "current_operational_procedures",
-            "current_specifications", "current_testable_elements",
-            "current_test_plan_phases", "current_test_plans",
-            "current_test_procedures", "current_tests", "current_work_items",
-        ])
         assert views == expected
 
     def test_specifications_has_type_column(self, db):
@@ -97,6 +121,7 @@ class TestSchemaExists:
 # Tests artifact
 # ------------------------------------------------------------------
 
+
 class TestTestsArtifact:
     """Verify the tests table and API methods."""
 
@@ -106,9 +131,13 @@ class TestTestsArtifact:
     def test_insert_test(self, db):
         self._seed_spec(db)
         t = db.insert_test(
-            "TEST-0001", "Verify auth returns 200", "SPEC-T1", "unit",
+            "TEST-0001",
+            "Verify auth returns 200",
+            "SPEC-T1",
+            "unit",
             "API returns HTTP 200 with valid auth token",
-            "test", "initial creation",
+            "test",
+            "initial creation",
             test_file="tests/test_auth.py",
             test_function="test_auth_returns_200",
             description="Sends valid token, expects 200",
@@ -123,8 +152,9 @@ class TestTestsArtifact:
     def test_update_test_creates_new_version(self, db):
         self._seed_spec(db)
         db.insert_test("TEST-0001", "Original", "SPEC-T1", "unit", "Pass condition", "test", "create")
-        updated = db.update_test("TEST-0001", "test", "updated description",
-                                 description="Improved test", last_result="PASS")
+        updated = db.update_test(
+            "TEST-0001", "test", "updated description", description="Improved test", last_result="PASS"
+        )
         assert updated["version"] == 2
         assert updated["description"] == "Improved test"
         assert updated["last_result"] == "PASS"
@@ -168,10 +198,8 @@ class TestTestsArtifact:
 
     def test_list_tests_by_result(self, db):
         self._seed_spec(db)
-        db.insert_test("TEST-0001", "Pass", "SPEC-T1", "unit", "pass", "test", "create",
-                        last_result="PASS")
-        db.insert_test("TEST-0002", "Fail", "SPEC-T1", "unit", "pass", "test", "create",
-                        last_result="FAIL")
+        db.insert_test("TEST-0001", "Pass", "SPEC-T1", "unit", "pass", "test", "create", last_result="PASS")
+        db.insert_test("TEST-0002", "Fail", "SPEC-T1", "unit", "pass", "test", "create", last_result="FAIL")
         tests = db.list_tests(last_result="FAIL")
         assert len(tests) == 1
         assert tests[0]["id"] == "TEST-0002"
@@ -204,12 +232,14 @@ class TestTestsArtifact:
 # Test Plans artifact
 # ------------------------------------------------------------------
 
+
 class TestTestPlansArtifact:
     """Verify the test_plans table and API methods."""
 
     def test_insert_test_plan(self, db):
-        tp = db.insert_test_plan("TP-1.0", "1.0 GA Release", "draft", "test", "create",
-                                  description="16-phase test plan")
+        tp = db.insert_test_plan(
+            "TP-1.0", "1.0 GA Release", "draft", "test", "create", description="16-phase test plan"
+        )
         assert tp["id"] == "TP-1.0"
         assert tp["version"] == 1
         assert tp["status"] == "draft"
@@ -247,6 +277,7 @@ class TestTestPlansArtifact:
 # Test Plan Phases artifact
 # ------------------------------------------------------------------
 
+
 class TestTestPlanPhasesArtifact:
     """Verify the test_plan_phases table and API methods."""
 
@@ -256,8 +287,13 @@ class TestTestPlanPhasesArtifact:
     def test_insert_phase(self, db):
         self._seed_plan(db)
         ph = db.insert_test_plan_phase(
-            "TP-1.0-PH-01", "TP-1.0", 1, "Pre-flight",
-            "All 4 checks pass", "test", "create",
+            "TP-1.0-PH-01",
+            "TP-1.0",
+            1,
+            "Pre-flight",
+            "All 4 checks pass",
+            "test",
+            "create",
             test_ids=["TEST-0001", "TEST-0002"],
             description="Verify environment readiness",
         )
@@ -269,10 +305,8 @@ class TestTestPlanPhasesArtifact:
 
     def test_update_phase(self, db):
         self._seed_plan(db)
-        db.insert_test_plan_phase("TP-1.0-PH-01", "TP-1.0", 1, "Pre-flight",
-                                   "All checks pass", "test", "create")
-        updated = db.update_test_plan_phase("TP-1.0-PH-01", "test", "record result",
-                                             last_result="PASS")
+        db.insert_test_plan_phase("TP-1.0-PH-01", "TP-1.0", 1, "Pre-flight", "All checks pass", "test", "create")
+        updated = db.update_test_plan_phase("TP-1.0-PH-01", "test", "record result", last_result="PASS")
         assert updated["version"] == 2
         assert updated["last_result"] == "PASS"
         assert updated["title"] == "Pre-flight"  # carried forward
@@ -289,8 +323,7 @@ class TestTestPlanPhasesArtifact:
     def test_phase_test_ids_json_roundtrip(self, db):
         self._seed_plan(db)
         ids = ["TEST-0001", "TEST-0002", "TEST-0003"]
-        ph = db.insert_test_plan_phase("TP-1.0-PH-01", "TP-1.0", 1, "Phase", "gate",
-                                        "test", "create", test_ids=ids)
+        ph = db.insert_test_plan_phase("TP-1.0-PH-01", "TP-1.0", 1, "Phase", "gate", "test", "create", test_ids=ids)
         assert ph["test_ids_parsed"] == ids
 
 
@@ -298,15 +331,23 @@ class TestTestPlanPhasesArtifact:
 # Work Items artifact
 # ------------------------------------------------------------------
 
+
 class TestWorkItemsArtifact:
     """Verify the work_items table and API methods."""
 
     def test_insert_work_item_defect(self, db):
         wi = db.insert_work_item(
-            "WI-0001", "Auth returns 401 for valid token", "defect",
-            "tenant_administration", "open", "test", "test failure",
-            source_spec_id="SPEC-0100", source_test_id="TEST-0050",
-            failure_description="Expected 200, got 401", priority="P1",
+            "WI-0001",
+            "Auth returns 401 for valid token",
+            "defect",
+            "tenant_administration",
+            "open",
+            "test",
+            "test failure",
+            source_spec_id="SPEC-0100",
+            source_test_id="TEST-0050",
+            failure_description="Expected 200, got 401",
+            priority="P1",
         )
         assert wi["id"] == "WI-0001"
         assert wi["origin"] == "defect"
@@ -317,17 +358,28 @@ class TestWorkItemsArtifact:
 
     def test_insert_work_item_regression(self, db):
         wi = db.insert_work_item(
-            "WI-0002", "Dashboard chart broke after v1.60", "regression",
-            "tenant_administration", "open", "test", "regression detected",
-            source_spec_id="SPEC-0200", source_test_id="TEST-0100",
+            "WI-0002",
+            "Dashboard chart broke after v1.60",
+            "regression",
+            "tenant_administration",
+            "open",
+            "test",
+            "regression detected",
+            source_spec_id="SPEC-0200",
+            source_test_id="TEST-0100",
             failure_description="Chart renders blank",
         )
         assert wi["origin"] == "regression"
 
     def test_insert_work_item_new(self, db):
         wi = db.insert_work_item(
-            "WI-0003", "Implement Stripe billing", "new",
-            "external_integration", "open", "test", "new feature",
+            "WI-0003",
+            "Implement Stripe billing",
+            "new",
+            "external_integration",
+            "open",
+            "test",
+            "new feature",
             source_spec_id="SPEC-0300",
         )
         assert wi["origin"] == "new"
@@ -336,15 +388,12 @@ class TestWorkItemsArtifact:
 
     def test_update_work_item_resolution(self, db):
         db.insert_work_item("WI-0001", "Bug", "defect", "database", "open", "test", "create")
-        updated = db.update_work_item("WI-0001", "test", "started fix",
-                                       resolution_status="in_progress")
+        updated = db.update_work_item("WI-0001", "test", "started fix", resolution_status="in_progress")
         assert updated["version"] == 2
         assert updated["resolution_status"] == "in_progress"
-        resolved = db.update_work_item("WI-0001", "test", "fix applied",
-                                        resolution_status="resolved")
+        resolved = db.update_work_item("WI-0001", "test", "fix applied", resolution_status="resolved")
         assert resolved["version"] == 3
-        verified = db.update_work_item("WI-0001", "test", "confirmed in test plan",
-                                        resolution_status="verified")
+        verified = db.update_work_item("WI-0001", "test", "confirmed in test plan", resolution_status="verified")
         assert verified["version"] == 4
         assert verified["resolution_status"] == "verified"
 
@@ -393,14 +442,17 @@ class TestWorkItemsArtifact:
 # Backlog Snapshots artifact
 # ------------------------------------------------------------------
 
+
 class TestBacklogSnapshotsArtifact:
     """Verify the backlog_snapshots table and API methods."""
 
     def test_insert_backlog_snapshot(self, db):
         bl = db.insert_backlog_snapshot(
-            "BL-S113-start", "S113 start backlog",
+            "BL-S113-start",
+            "S113 start backlog",
             ["WI-0001", "WI-0002", "WI-0003"],
-            "test", "snapshot",
+            "test",
+            "snapshot",
             summary_by_origin={"defect": 2, "new": 1},
             summary_by_component={"database": 2, "customer_interface": 1},
         )
@@ -410,7 +462,9 @@ class TestBacklogSnapshotsArtifact:
 
     def test_create_backlog_snapshot_from_current(self, db):
         db.insert_work_item("WI-0001", "Bug A", "defect", "database", "open", "test", "create", priority="P1")
-        db.insert_work_item("WI-0002", "Feature B", "new", "customer_interface", "open", "test", "create", priority="P2")
+        db.insert_work_item(
+            "WI-0002", "Feature B", "new", "customer_interface", "open", "test", "create", priority="P2"
+        )
         db.insert_work_item("WI-0003", "Done C", "defect", "database", "verified", "test", "create")
         bl = db.create_backlog_snapshot_from_current("BL-S113", "test", "auto-snapshot")
         ids = bl["work_item_ids_parsed"]
@@ -439,6 +493,7 @@ class TestBacklogSnapshotsArtifact:
 # Specifications type column
 # ------------------------------------------------------------------
 
+
 class TestSpecificationsTypeColumn:
     """Verify the type column on specifications."""
 
@@ -447,13 +502,11 @@ class TestSpecificationsTypeColumn:
         assert s["type"] == "requirement"
 
     def test_explicit_governance_type(self, db):
-        s = db.insert_spec("GOV-99", "A governance rule", "specified", "test", "create",
-                           type="governance")
+        s = db.insert_spec("GOV-99", "A governance rule", "specified", "test", "create", type="governance")
         assert s["type"] == "governance"
 
     def test_explicit_protected_behavior_type(self, db):
-        s = db.insert_spec("PB-099", "A protected behavior", "specified", "test", "create",
-                           type="protected_behavior")
+        s = db.insert_spec("PB-099", "A protected behavior", "specified", "test", "create", type="protected_behavior")
         assert s["type"] == "protected_behavior"
 
     def test_update_preserves_type(self, db):
@@ -466,9 +519,7 @@ class TestSpecificationsTypeColumn:
         db.insert_spec("GOV-T1", "Gov", "specified", "test", "create", type="governance")
         # Direct SQL since list_specs doesn't have type filter yet
         conn = db._get_conn()
-        govs = conn.execute(
-            "SELECT * FROM current_specifications WHERE type = 'governance'"
-        ).fetchall()
+        govs = conn.execute("SELECT * FROM current_specifications WHERE type = 'governance'").fetchall()
         assert len(govs) == 1
         assert govs[0]["id"] == "GOV-T1"
 
@@ -476,6 +527,7 @@ class TestSpecificationsTypeColumn:
 # ------------------------------------------------------------------
 # Summary stats include new artifacts
 # ------------------------------------------------------------------
+
 
 class TestSummaryStats:
     """Verify get_summary() includes new artifact counts."""
@@ -501,6 +553,7 @@ class TestSummaryStats:
 # ------------------------------------------------------------------
 # Global history includes new tables
 # ------------------------------------------------------------------
+
 
 class TestGlobalHistory:
     """Verify get_history() includes changes from new tables."""
@@ -537,6 +590,7 @@ class TestGlobalHistory:
 # Export includes new tables
 # ------------------------------------------------------------------
 
+
 class TestExportJson:
     """Verify export_json() includes new tables."""
 
@@ -565,6 +619,7 @@ class TestExportJson:
 # ------------------------------------------------------------------
 # Append-only invariant
 # ------------------------------------------------------------------
+
 
 class TestAppendOnlyInvariant:
     """Verify that updates create new versions, never modifying existing rows."""
@@ -599,20 +654,34 @@ class TestTransportGovernanceGate:
     def test_insert_test_rejects_pass_without_test_file(self, gated_db):
         """Transport test cannot be inserted with pass and no test_file."""
         from db import TransportEvidenceGateError
+
         gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
             gated_db.insert_test(
-                "TEST-9001", "Phantom test", "SPEC-1524", "e2e", "Should pass",
-                "test", "gate test", last_result="pass",
+                "TEST-9001",
+                "Phantom test",
+                "SPEC-1524",
+                "e2e",
+                "Should pass",
+                "test",
+                "gate test",
+                last_result="pass",
             )
 
     def test_update_test_rejects_pass_without_test_file(self, gated_db):
         """Transport test cannot be updated to pass without test_file."""
         from db import TransportEvidenceGateError
+
         gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         gated_db.insert_test(
-            "TEST-9001", "Test", "SPEC-1524", "e2e", "Should pass",
-            "test", "init", last_result="not_proven",
+            "TEST-9001",
+            "Test",
+            "SPEC-1524",
+            "e2e",
+            "Should pass",
+            "test",
+            "init",
+            last_result="not_proven",
         )
         with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
             gated_db.update_test("TEST-9001", "test", "promote", last_result="pass")
@@ -620,39 +689,61 @@ class TestTransportGovernanceGate:
     def test_insert_test_rejects_pass_with_fake_file(self, gated_db):
         """Transport test cannot be marked pass with a nonexistent file."""
         from db import TransportEvidenceGateError
+
         gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="does not exist on disk"):
             gated_db.insert_test(
-                "TEST-9001", "Fake path test", "SPEC-1524", "e2e", "Should pass",
-                "test", "gate test",
-                test_file="does/not/exist.py", last_result="pass",
+                "TEST-9001",
+                "Fake path test",
+                "SPEC-1524",
+                "e2e",
+                "Should pass",
+                "test",
+                "gate test",
+                test_file="does/not/exist.py",
+                last_result="pass",
             )
 
     def test_update_test_rejects_pass_with_fake_file(self, gated_db):
         """Transport test cannot be updated to pass with a nonexistent file."""
         from db import TransportEvidenceGateError
+
         gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         gated_db.insert_test(
-            "TEST-9001", "Test", "SPEC-1524", "e2e", "Should pass",
-            "test", "init",
+            "TEST-9001",
+            "Test",
+            "SPEC-1524",
+            "e2e",
+            "Should pass",
+            "test",
+            "init",
         )
         with pytest.raises(TransportEvidenceGateError, match="does not exist on disk"):
             gated_db.update_test(
-                "TEST-9001", "test", "promote",
-                test_file="does/not/exist.py", last_result="pass",
+                "TEST-9001",
+                "test",
+                "promote",
+                test_file="does/not/exist.py",
+                last_result="pass",
             )
 
     def test_insert_spec_rejects_verified_without_evidence(self, gated_db):
         """Transport spec cannot be inserted as verified without evidence."""
         from db import TransportEvidenceGateError
+
         with pytest.raises(TransportEvidenceGateError, match="no linked tests"):
             gated_db.insert_spec(
-                "SPEC-1524", "SLIM transport", "verified", "test", "bypass attempt",
+                "SPEC-1524",
+                "SLIM transport",
+                "verified",
+                "test",
+                "bypass attempt",
             )
 
     def test_update_spec_rejects_verified_without_evidence(self, gated_db):
         """Transport spec cannot be promoted to verified without evidence."""
         from db import TransportEvidenceGateError
+
         gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="no linked tests"):
             gated_db.update_spec("SPEC-1524", "test", "promote", status="verified")
@@ -660,16 +751,22 @@ class TestTransportGovernanceGate:
     def test_update_spec_rejects_verified_with_fake_file_test(self, gated_db):
         """Transport spec cannot be verified when linked test has fake file."""
         from db import TransportEvidenceGateError
+
         gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         gated_db.insert_test(
-            "TEST-9001", "Fake test", "SPEC-1524", "e2e", "Should pass",
-            "test", "init", test_file="does/not/exist.py", last_result="not_proven",
+            "TEST-9001",
+            "Fake test",
+            "SPEC-1524",
+            "e2e",
+            "Should pass",
+            "test",
+            "init",
+            test_file="does/not/exist.py",
+            last_result="not_proven",
         )
         # Manually set to pass (bypassing the gate by using non-transport spec first)
         conn = gated_db._get_conn()
-        conn.execute(
-            "UPDATE tests SET last_result='pass' WHERE id='TEST-9001' AND version=1"
-        )
+        conn.execute("UPDATE tests SET last_result='pass' WHERE id='TEST-9001' AND version=1")
         conn.commit()
         with pytest.raises(TransportEvidenceGateError, match="does not exist on disk"):
             gated_db.update_spec("SPEC-1524", "test", "promote", status="verified")
@@ -678,8 +775,14 @@ class TestTransportGovernanceGate:
         """Non-transport specs are not affected by the gate."""
         gated_db.insert_spec("SPEC-0001", "Unrelated spec", "implemented", "test", "init")
         gated_db.insert_test(
-            "TEST-9001", "Test", "SPEC-0001", "unit", "Should pass",
-            "test", "init", last_result="pass",
+            "TEST-9001",
+            "Test",
+            "SPEC-0001",
+            "unit",
+            "Should pass",
+            "test",
+            "init",
+            last_result="pass",
         )
         # Should succeed — no gate
         gated_db.update_spec("SPEC-0001", "test", "promote", status="verified")
@@ -707,18 +810,26 @@ class TestDefaultShimGateEnforcement:
     def test_default_path_blocks_transport_test_pass(self):
         """Default KnowledgeDB() must block pass for transport-gated spec without test_file."""
         from db import TransportEvidenceGateError
+
         database = KnowledgeDB(":memory:")
         database.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
             database.insert_test(
-                "TEST-DEFAULT-001", "Default path test", "SPEC-1524", "e2e",
-                "pass expected", "test", "regression test", last_result="pass",
+                "TEST-DEFAULT-001",
+                "Default path test",
+                "SPEC-1524",
+                "e2e",
+                "pass expected",
+                "test",
+                "regression test",
+                last_result="pass",
             )
         database.close()
 
     def test_default_path_blocks_transport_spec_verified(self):
         """Default KnowledgeDB() must block verified for transport-gated spec without evidence."""
         from db import TransportEvidenceGateError
+
         database = KnowledgeDB(":memory:")
         database.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="no linked tests"):
@@ -730,8 +841,14 @@ class TestDefaultShimGateEnforcement:
         database = KnowledgeDB(":memory:")
         database.insert_spec("SPEC-9999", "Non-transport", "implemented", "test", "init")
         result = database.insert_test(
-            "TEST-DEFAULT-002", "Non-gated test", "SPEC-9999", "unit",
-            "pass expected", "test", "regression test", last_result="pass",
+            "TEST-DEFAULT-002",
+            "Non-gated test",
+            "SPEC-9999",
+            "unit",
+            "pass expected",
+            "test",
+            "regression test",
+            last_result="pass",
         )
         assert result["last_result"] == "pass"
         database.close()

@@ -152,10 +152,7 @@ def test_setting_loyal_can_leave_no_prime_until_next_startup(tmp_path: Path) -> 
     )
     document = load_role_assignments(tmp_path)
     # No harness's role-set contains prime-builder after the set-LO update.
-    assert all(
-        ROLE_PRIME_BUILDER not in record.get("role", [])
-        for record in document["harnesses"].values()
-    )
+    assert all(ROLE_PRIME_BUILDER not in record.get("role", []) for record in document["harnesses"].values())
 
     role, _document, _path = role_for_harness(
         tmp_path,

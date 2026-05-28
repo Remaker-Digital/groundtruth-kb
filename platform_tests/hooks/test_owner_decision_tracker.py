@@ -91,19 +91,22 @@ def _read_pending_file(project_root: Path) -> str:
 
 def _stop_payload(transcript_fixture: str) -> str:
     """Build a Stop hook payload pointing transcript_path at the fixture."""
-    return json.dumps({
-        "session_id": "test-session",
-        "transcript_path": str(FIXTURES / transcript_fixture),
-        "cwd": str(REPO_ROOT),
-        "hook_event_name": "Stop",
-        "stop_hook_active": True,
-        "last_assistant_message": "",
-    })
+    return json.dumps(
+        {
+            "session_id": "test-session",
+            "transcript_path": str(FIXTURES / transcript_fixture),
+            "cwd": str(REPO_ROOT),
+            "hook_event_name": "Stop",
+            "stop_hook_active": True,
+            "last_assistant_message": "",
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Stop mode -- transcript JSONL parsing (T1a, T1b -- F2 fixture coverage)
 # ---------------------------------------------------------------------------
+
 
 def test_t1a_stop_parses_jsonl_fixture_and_finds_turn_boundary(tmp_path: Path) -> None:
     """T1a: Stop reads the answered-fixture transcript, scans tool_use, writes Resolved entry."""
@@ -114,7 +117,7 @@ def test_t1a_stop_parses_jsonl_fixture_and_finds_turn_boundary(tmp_path: Path) -
     # Same-turn answered question lands in Resolved with answer text.
     assert "## Resolved" in body
     assert "Which storage backend?" in body
-    assert "answer: \"SQLite\"" in body
+    assert 'answer: "SQLite"' in body
 
 
 def test_t1b_stop_extracts_questions_from_tool_use(tmp_path: Path) -> None:
@@ -131,6 +134,7 @@ def test_t1b_stop_extracts_questions_from_tool_use(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Stop mode -- core scans (T1, T2, T3, T4)
 # ---------------------------------------------------------------------------
+
 
 def test_t1_stop_same_turn_answer_appends_to_resolved(tmp_path: Path) -> None:
     """T1: AskUserQuestion + same-turn tool_result -> Resolved section."""
@@ -193,6 +197,7 @@ def test_t4_stop_idempotent_on_repeat_invocation(tmp_path: Path) -> None:
 # session_self_initialization integration (T5a, T5b -- F1 fixture coverage)
 # ---------------------------------------------------------------------------
 
+
 def test_t5a_session_init_renders_pending_decisions_when_present(tmp_path: Path) -> None:
     """T5a: render_report includes the Pending Owner Decisions section when entries exist.
 
@@ -234,6 +239,7 @@ def test_t5a_session_init_renders_pending_decisions_when_present(tmp_path: Path)
         import importlib
 
         import session_self_initialization as ssi  # type: ignore
+
         importlib.reload(ssi)
         decisions = ssi._load_pending_owner_decisions(project)
         block = ssi._render_pending_decisions_block(decisions)
@@ -255,6 +261,7 @@ def test_t5b_session_init_omits_section_when_no_pending(tmp_path: Path) -> None:
         import importlib
 
         import session_self_initialization as ssi  # type: ignore
+
         importlib.reload(ssi)
         decisions = ssi._load_pending_owner_decisions(project)
         block = ssi._render_pending_decisions_block(decisions)
@@ -268,12 +275,15 @@ def test_t5b_session_init_omits_section_when_no_pending(tmp_path: Path) -> None:
 # UserPromptSubmit mode (T7, T8, T9, T10)
 # ---------------------------------------------------------------------------
 
+
 def _ups_payload(prompt: str) -> str:
-    return json.dumps({
-        "session_id": "test-session",
-        "hook_event_name": "UserPromptSubmit",
-        "prompt": prompt,
-    })
+    return json.dumps(
+        {
+            "session_id": "test-session",
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": prompt,
+        }
+    )
 
 
 def _seed_one_pending(project: Path, decision_id: str = "DECISION-0001", question: str = "Test pending?") -> None:
@@ -345,12 +355,13 @@ def test_t10_ups_resolve_id_moves_to_resolved(tmp_path: Path) -> None:
     assert "(none)" in body.split("## Pending", 1)[1].split("##", 1)[0]
     resolved = body.split("## Resolved", 1)[1].split("##", 1)[0]
     assert "DECISION-0001" in resolved
-    assert "answer: \"Yes\"" in resolved
+    assert 'answer: "Yes"' in resolved
 
 
 # ---------------------------------------------------------------------------
 # File-format + graceful-degradation (T11, T12, T13, T14)
 # ---------------------------------------------------------------------------
+
 
 def test_t11_malformed_durable_file_preserved_as_corrupted(tmp_path: Path) -> None:
     """T11: parse failure preserves the malformed file as .corrupted-<ts>; fresh template replaces it."""
@@ -422,12 +433,33 @@ def test_t14_prose_false_positive_guard_suppresses_abstract_discussion(tmp_path:
     project = _setup_project(tmp_path)
     fixture_path = tmp_path / "abstract.jsonl"
     fixture_path.write_text(
-        json.dumps({"type": "user", "uuid": "u1", "parentUuid": None, "timestamp": "2026-04-25T17:00:00Z",
-                    "message": {"role": "user", "content": "Tell me about decision-making."}}) + "\n" +
-        json.dumps({"type": "assistant", "uuid": "a1", "parentUuid": "u1", "timestamp": "2026-04-25T17:00:01Z",
-                    "message": {"role": "assistant",
-                                "content": [{"type": "text",
-                                             "text": "Decisions are hard. In general, decisions involve weighing tradeoffs. Should I describe the framework or give an example?"}]}}),
+        json.dumps(
+            {
+                "type": "user",
+                "uuid": "u1",
+                "parentUuid": None,
+                "timestamp": "2026-04-25T17:00:00Z",
+                "message": {"role": "user", "content": "Tell me about decision-making."},
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "type": "assistant",
+                "uuid": "a1",
+                "parentUuid": "u1",
+                "timestamp": "2026-04-25T17:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Decisions are hard. In general, decisions involve weighing tradeoffs. Should I describe the framework or give an example?",
+                        }
+                    ],
+                },
+            }
+        ),
         encoding="utf-8",
     )
     payload = json.dumps({"transcript_path": str(fixture_path)})
@@ -442,6 +474,7 @@ def test_t14_prose_false_positive_guard_suppresses_abstract_discussion(tmp_path:
 # ---------------------------------------------------------------------------
 # T15, T16 -- additional edge cases per Codex F2
 # ---------------------------------------------------------------------------
+
 
 def test_t15_truncated_transcript_returns_zero_no_mutation(tmp_path: Path) -> None:
     """T15: corrupt/truncated transcript -> hook exits 0; durable file unchanged."""
@@ -470,7 +503,7 @@ def test_t16_multiple_askuserquestion_in_one_turn(tmp_path: Path) -> None:
     assert "Notifier default channel?" in pending
     # Feature X question was answered "Yes" -> Resolved.
     assert "Should we enable feature X?" in resolved
-    assert "answer: \"Yes\"" in resolved
+    assert 'answer: "Yes"' in resolved
 
 
 # ===========================================================================
@@ -590,13 +623,15 @@ def test_f3_block_emission_enabled_by_default_when_env_var_unset(tmp_path: Path)
 def test_f3_block_emission_handles_malformed_transcript_gracefully(tmp_path: Path) -> None:
     """Graceful degradation: missing transcript must not crash."""
     project = _setup_project(tmp_path)
-    payload = json.dumps({
-        "session_id": "test-session",
-        "transcript_path": str(FIXTURES / "nonexistent_fixture.jsonl"),
-        "cwd": str(REPO_ROOT),
-        "hook_event_name": "Stop",
-        "stop_hook_active": True,
-    })
+    payload = json.dumps(
+        {
+            "session_id": "test-session",
+            "transcript_path": str(FIXTURES / "nonexistent_fixture.jsonl"),
+            "cwd": str(REPO_ROOT),
+            "hook_event_name": "Stop",
+            "stop_hook_active": True,
+        }
+    )
     result = _run_hook("stop", project, payload)
     assert result.returncode == 0
     assert result.stdout == "", "Malformed transcript should produce no block emission"
@@ -679,6 +714,7 @@ def test_question_snippet_extracts_match_group_only() -> None:
     """T-DT-snippet-match-group-only: snippet captures only the matched group, not surrounding 20-char window."""
     mod = _import_hook_module()
     import re
+
     text = "Earlier: some context. Should I commit now? More text after."
     pattern = re.compile(r"Should I commit now\?")
     m = pattern.search(text)
@@ -692,6 +728,7 @@ def test_question_snippet_extends_to_sentence_boundary() -> None:
     """T-DT-snippet-sentence-extension: when match doesn't end at sentence terminator, extend forward."""
     mod = _import_hook_module()
     import re
+
     # Match doesn't include the final '?', extension should grab it.
     text = "Should we commit or revert"  # no terminator at all in text
     pattern = re.compile(r"Should we commit or revert")
@@ -712,6 +749,7 @@ def test_question_snippet_capped_at_120_chars() -> None:
     """T-DT-snippet-length-cap: snippet truncated with ellipsis at 120 chars."""
     mod = _import_hook_module()
     import re
+
     long_text = "Should I " + "really really " * 20 + "commit?"
     pattern = re.compile(re.escape(long_text))
     m = pattern.search(long_text)
@@ -732,9 +770,7 @@ def test_correlated_two_signal_resolves_prose_entry_substring_path(tmp_path: Pat
     assert "resolved_via: same_turn_auq_formalization" in body
     # And NOT in Pending.
     pending = body.split("## Pending", 1)[1].split("##", 1)[0]
-    assert "detected_via: prose:" not in pending, (
-        "correlated prose match must auto-resolve, not stay pending"
-    )
+    assert "detected_via: prose:" not in pending, "correlated prose match must auto-resolve, not stay pending"
 
 
 def test_uncorrelated_boilerplate_overlap_keeps_prose_pending(tmp_path: Path) -> None:
@@ -822,9 +858,7 @@ def test_decision_entry_resolved_via_round_trips(tmp_path: Path) -> None:
     # Parse side: feed the rendered key:value into _set_entry_field and assert
     # the field survives round-trip back onto a fresh DecisionEntry. This
     # exercises the read/write parser path used by _read_pending_file.
-    parsed_entry = mod.DecisionEntry(
-        id="DECISION-9999", asked_at="2026-05-09T00:00:00Z"
-    )
+    parsed_entry = mod.DecisionEntry(id="DECISION-9999", asked_at="2026-05-09T00:00:00Z")
     mod._set_entry_field(parsed_entry, "resolved_via", "same_turn_auq_formalization")
     assert parsed_entry.resolved_via == "same_turn_auq_formalization", (
         "_set_entry_field must restore resolved_via on parse; otherwise the "
@@ -844,8 +878,7 @@ def test_decision_entry_resolved_via_round_trips(tmp_path: Path) -> None:
     resolved_out = sections_out.get("resolved", [])
     assert resolved_out, "expected at least one resolved entry after round-trip"
     assert resolved_out[0].resolved_via == "same_turn_auq_formalization", (
-        "resolved_via field must survive write -> read round-trip via the "
-        "durable-file parser path"
+        "resolved_via field must survive write -> read round-trip via the durable-file parser path"
     )
 
 
@@ -861,9 +894,7 @@ def test_correlation_signal_a_only_keeps_prose_pending() -> None:
     prose = "should i land slice 4 retirement work or hold for review"
     auq = "should i land slice 4 retirement code or hold for review"
     correlated, sig = mod._correlate_prose_to_auq(prose, auq, [])
-    assert correlated is False, (
-        "Signal A alone (Jaccard pass) without B signal must NOT auto-resolve"
-    )
+    assert correlated is False, "Signal A alone (Jaccard pass) without B signal must NOT auto-resolve"
     assert sig is None
 
 
@@ -885,10 +916,7 @@ def test_correlation_signal_b_only_keeps_prose_pending() -> None:
 
     # Now confirm the orchestrator returns False because Signal A failed.
     correlated, sig = mod._correlate_prose_to_auq(prose, auq_question, options)
-    assert correlated is False, (
-        "Signal B alone (option-label overlap) without Signal A must NOT "
-        "auto-resolve"
-    )
+    assert correlated is False, "Signal B alone (option-label overlap) without Signal A must NOT auto-resolve"
     assert sig is None
 
 

@@ -38,8 +38,7 @@ def test_procedure_has_title() -> None:
     """The file leads with a top-level title matching the bridge thread name."""
     text = _read_procedure()
     assert text.startswith("# Peer Solution Advisory Loop Procedure"), (
-        "Procedure file must lead with '# Peer Solution Advisory Loop Procedure' "
-        "as its top-level heading."
+        "Procedure file must lead with '# Peer Solution Advisory Loop Procedure' as its top-level heading."
     )
 
 
@@ -52,33 +51,25 @@ def test_procedure_has_purpose_section() -> None:
 def test_procedure_has_classification_vocabulary_section() -> None:
     """IP-1 §2: Classification vocabulary section defines the five states."""
     text = _read_procedure()
-    assert "## Classification Vocabulary" in text, (
-        "Procedure file missing '## Classification Vocabulary' section."
-    )
+    assert "## Classification Vocabulary" in text, "Procedure file missing '## Classification Vocabulary' section."
 
 
 def test_procedure_has_owner_dialogue_workflow_section() -> None:
     """IP-1 §3: Owner-dialogue workflow section defines expected Prime responses."""
     text = _read_procedure()
-    assert "## Owner-Dialogue Workflow" in text, (
-        "Procedure file missing '## Owner-Dialogue Workflow' section."
-    )
+    assert "## Owner-Dialogue Workflow" in text, "Procedure file missing '## Owner-Dialogue Workflow' section."
 
 
 def test_procedure_has_bridge_integration_section() -> None:
     """IP-1 §4: Bridge integration section defines how advisories enter the bridge."""
     text = _read_procedure()
-    assert "## Bridge Integration" in text, (
-        "Procedure file missing '## Bridge Integration' section."
-    )
+    assert "## Bridge Integration" in text, "Procedure file missing '## Bridge Integration' section."
 
 
 def test_procedure_has_approval_gate_section() -> None:
     """IP-1 §5: Approval-gate section clarifies per-protected-path packet requirement."""
     text = _read_procedure()
-    assert "## Approval-Gate" in text, (
-        "Procedure file missing '## Approval-Gate' section."
-    )
+    assert "## Approval-Gate" in text, "Procedure file missing '## Approval-Gate' section."
 
 
 def test_classification_vocabulary_enumerates_five_states() -> None:
@@ -109,8 +100,7 @@ def test_procedure_cites_parent_thread() -> None:
     """The procedure cites its parent Slice-0 bridge thread for provenance."""
     text = _read_procedure()
     assert "gtkb-peer-solution-advisory-loop-conversion" in text, (
-        "Procedure file must cite parent thread "
-        "gtkb-peer-solution-advisory-loop-conversion for provenance."
+        "Procedure file must cite parent thread gtkb-peer-solution-advisory-loop-conversion for provenance."
     )
 
 
@@ -134,8 +124,7 @@ def test_procedure_distinguishes_da_from_bridge_followons() -> None:
     )
     # Reject/defer/monitor go to Deliberation Archive
     assert "Deliberation Archive" in text, (
-        "Procedure must specify 'Deliberation Archive' as the follow-on store for "
-        "reject/defer/monitor."
+        "Procedure must specify 'Deliberation Archive' as the follow-on store for reject/defer/monitor."
     )
 
 

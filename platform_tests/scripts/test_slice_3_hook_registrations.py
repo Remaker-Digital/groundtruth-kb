@@ -124,10 +124,7 @@ def test_claude_post_tool_use_write_edit_invokes_trigger(claude_settings: dict) 
     """
     groups = _all_post_tool_use_groups(claude_settings)
     we_groups = [g for g in groups if _matcher_for(g) == "Write|Edit"]
-    assert we_groups, (
-        "Slice 3 requires a PostToolUse Write|Edit matcher (regex form covers "
-        "both Write and Edit tools)"
-    )
+    assert we_groups, "Slice 3 requires a PostToolUse Write|Edit matcher (regex form covers both Write and Edit tools)"
     assert any(
         _has_trigger_invocation(
             g,
@@ -185,9 +182,7 @@ def test_codex_post_tool_use_apply_patch_invokes_trigger(codex_hooks: dict) -> N
     """
     groups = _all_post_tool_use_groups(codex_hooks)
     ap_groups = [g for g in groups if _matcher_for(g) == "apply_patch"]
-    assert ap_groups, (
-        "Slice 3 requires a Codex PostToolUse apply_patch matcher"
-    )
+    assert ap_groups, "Slice 3 requires a Codex PostToolUse apply_patch matcher"
     assert any(
         _has_trigger_invocation(
             g,
@@ -237,9 +232,7 @@ def test_codex_stop_invokes_trigger_with_stop_hook_flag(codex_hooks: dict) -> No
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_both_harnesses_share_dispatch_state_path(
-    claude_settings: dict, codex_hooks: dict
-) -> None:
+def test_both_harnesses_share_dispatch_state_path(claude_settings: dict, codex_hooks: dict) -> None:
     """Option A coordination: BOTH harnesses' trigger invocations MUST
     target the same logical dispatch-state path (the smart-poller's
     existing ``.gtkb-state/bridge-poller/``).
@@ -259,14 +252,10 @@ def test_both_harnesses_share_dispatch_state_path(
         for group in event_groups
         for hook in group.get("hooks", [])
     ]
-    claude_trigger_cmds = [
-        cmd for cmd in claude_commands if TRIGGER_SCRIPT_NAME in cmd
-    ]
+    claude_trigger_cmds = [cmd for cmd in claude_commands if TRIGGER_SCRIPT_NAME in cmd]
     assert claude_trigger_cmds, "expected at least one Claude trigger registration"
     for cmd in claude_trigger_cmds:
-        assert SHARED_STATE_PATH_FRAGMENT_CLAUDE in cmd, (
-            f"Claude trigger registration must use the shared path: {cmd}"
-        )
+        assert SHARED_STATE_PATH_FRAGMENT_CLAUDE in cmd, f"Claude trigger registration must use the shared path: {cmd}"
 
     # Codex side — Windows-style separator due to absolute E:\GT-KB path.
     codex_commands = [
@@ -278,11 +267,7 @@ def test_both_harnesses_share_dispatch_state_path(
         for group in event_groups
         for hook in group.get("hooks", [])
     ]
-    codex_trigger_cmds = [
-        cmd for cmd in codex_commands if TRIGGER_SCRIPT_NAME in cmd
-    ]
+    codex_trigger_cmds = [cmd for cmd in codex_commands if TRIGGER_SCRIPT_NAME in cmd]
     assert codex_trigger_cmds, "expected at least one Codex trigger registration"
     for cmd in codex_trigger_cmds:
-        assert SHARED_STATE_PATH_FRAGMENT_CODEX in cmd, (
-            f"Codex trigger registration must use the shared path: {cmd}"
-        )
+        assert SHARED_STATE_PATH_FRAGMENT_CODEX in cmd, f"Codex trigger registration must use the shared path: {cmd}"

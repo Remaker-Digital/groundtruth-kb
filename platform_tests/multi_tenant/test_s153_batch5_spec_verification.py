@@ -3,6 +3,7 @@
 32 specs verified against production interfaces.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from pathlib import Path
 
 import pytest
@@ -24,14 +25,15 @@ CLAUDE_DIR = Path(__file__).resolve().parents[2] / ".claude"
 #  DARK MODE SPECS
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestSpec0015DarkModeDefault:
     """SPEC-0015: Dark Mode MUST be the default mode."""
 
     def test_default_color_scheme_is_dark(self):
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
-        assert "useComputedColorScheme('dark')" in src or \
-               "useComputedColorScheme(\"dark\")" in src, \
+        assert "useComputedColorScheme('dark')" in src or 'useComputedColorScheme("dark")' in src, (
             "Default color scheme must be 'dark'"
+        )
 
 
 class TestSpec0016DarkModeGreysNotBluePurple:
@@ -56,8 +58,7 @@ class TestSpec0018LightModeNavbarGrey:
         tokens_css = SHARED / "theme" / "tokens.css"
         src = tokens_css.read_text(encoding="utf-8")
         # Light mode chrome should be a light grey (#f5f5f5 or similar)
-        assert "#f5f5f5" in src or "#f0f0" in src or "#fafaf" in src, \
-            "Light mode chrome must be a light grey"
+        assert "#f5f5f5" in src or "#f0f0" in src or "#fafaf" in src, "Light mode chrome must be a light grey"
 
 
 class TestSpec0086DarkModeSupported:
@@ -65,8 +66,7 @@ class TestSpec0086DarkModeSupported:
 
     def test_dark_mode_toggle_exists(self):
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
-        assert "toggleColorScheme" in src or "setColorScheme" in src, \
-            "Dark/light mode toggle must be implemented"
+        assert "toggleColorScheme" in src or "setColorScheme" in src, "Dark/light mode toggle must be implemented"
 
     def test_dark_mode_tokens_defined(self):
         tokens_css = SHARED / "theme" / "tokens.css"
@@ -92,13 +92,15 @@ class TestSpec1547WidgetDarkModeWarmGrays:
 #  ACTIVATION / WIZARD SPECS
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestSpec0060ActivationThreeDispositions:
     """SPEC-0060: Activation control MUST have Red/Deactivate, Green/Activate, Yellow/Activate."""
 
     def test_three_activation_colors(self):
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
-        assert "'red'" in src and "'green'" in src and "'yellow'" in src, \
+        assert "'red'" in src and "'green'" in src and "'yellow'" in src, (
             "Activation control must have red, green, yellow states"
+        )
 
     def test_deactivate_and_activate_labels(self):
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
@@ -142,9 +144,9 @@ class TestSpec0066GreenAfterDeactivation:
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
         # After deactivation, is_active=false but config preserved
         # So can_activate should be true, showing green
-        assert "preserved" in src.lower() or "re-activate" in src.lower() or \
-               "can_activate" in src, \
+        assert "preserved" in src.lower() or "re-activate" in src.lower() or "can_activate" in src, (
             "Deactivation must preserve config for re-activation"
+        )
 
 
 class TestSpec0148CustomAIInstructionsStep:
@@ -153,8 +155,7 @@ class TestSpec0148CustomAIInstructionsStep:
     def test_custom_ai_instructions_step(self):
         wizard = SHARED / "components" / "OnboardingWizard.tsx"
         src = wizard.read_text(encoding="utf-8")
-        assert "Custom AI instructions" in src, \
-            "Wizard must have 'Custom AI instructions' step"
+        assert "Custom AI instructions" in src, "Wizard must have 'Custom AI instructions' step"
 
 
 class TestSpec0227ContactUsButton:
@@ -162,8 +163,7 @@ class TestSpec0227ContactUsButton:
 
     def test_contact_us_in_header(self):
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
-        assert "Contact" in src or "contact" in src, \
-            "Header must have Contact button/icon"
+        assert "Contact" in src or "contact" in src, "Header must have Contact button/icon"
 
 
 class TestSpec0494WizardSessionDismissal:
@@ -183,8 +183,7 @@ class TestSpec0629TestModeFirstStep:
         """Test mode toggle removed from wizard step one (S157)."""
         wizard = SHARED / "components" / "OnboardingWizard.tsx"
         src = wizard.read_text(encoding="utf-8")
-        assert "test_mode_enabled" not in src, \
-            "test_mode_enabled should be removed from wizard (S157)"
+        assert "test_mode_enabled" not in src, "test_mode_enabled should be removed from wizard (S157)"
 
 
 class TestSpec0708ActivationEnablesWidget:
@@ -194,8 +193,7 @@ class TestSpec0708ActivationEnablesWidget:
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
         assert "is_active" in src, "Must check is_active for widget display"
         # Widget should only render when active
-        assert "widget" in src.lower() or "Widget" in src, \
-            "Must reference widget rendering"
+        assert "widget" in src.lower() or "Widget" in src, "Must reference widget rendering"
 
 
 class TestSpec0841WizardArrayHandling:
@@ -214,8 +212,9 @@ class TestSpec0843StorefrontDetectedIndicator:
     def test_storefront_detected_in_wizard(self):
         wizard = SHARED / "components" / "OnboardingWizard.tsx"
         src = wizard.read_text(encoding="utf-8")
-        assert "Storefront detected" in src or "storefront" in src.lower(), \
+        assert "Storefront detected" in src or "storefront" in src.lower(), (
             "Wizard must show storefront detection indicator"
+        )
 
 
 class TestSpec0851WizardAutoPresent:
@@ -224,14 +223,14 @@ class TestSpec0851WizardAutoPresent:
     def test_wizard_auto_shows_on_first_login(self):
         # Auto-presentation logic is in StandaloneLayout, which manages wizard state
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
-        assert "active_version" in src or "showOnboarding" in src, \
-            "Must auto-present wizard based on activation state"
+        assert "active_version" in src or "showOnboarding" in src, "Must auto-present wizard based on activation state"
         assert "setShowOnboarding(true)" in src, "Must show wizard on first login"
 
 
 # ═══════════════════════════════════════════════════════════════════════
 #  INFRASTRUCTURE / POLICY SPECS
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestSpec0471ProtectedBehaviors:
     """SPEC-0471: Protected behaviors prevent uncontrolled regressions."""
@@ -240,10 +239,10 @@ class TestSpec0471ProtectedBehaviors:
         hook = CLAUDE_DIR / "hooks" / "assertion-check.py"
         src = hook.read_text(encoding="utf-8")
         # The hook runs ALL assertions which includes PB-* protected behavior specs
-        assert "run_all_assertions" in src, \
+        assert "run_all_assertions" in src, (
             "Assertion hook must run all assertions (including PB-* protected behaviors)"
-        assert "regression" in src.lower() or "FAIL" in src, \
-            "Hook must report regressions"
+        )
+        assert "regression" in src.lower() or "FAIL" in src, "Hook must report regressions"
 
 
 class TestSpec0472NeverRemoveWithoutApproval:
@@ -252,10 +251,10 @@ class TestSpec0472NeverRemoveWithoutApproval:
     def test_rule_in_claude_md(self):
         claude_md = Path(__file__).resolve().parents[2] / "CLAUDE.md"
         src = claude_md.read_text(encoding="utf-8")
-        assert "Never remove" in src or "never remove" in src, \
-            "CLAUDE.md must enforce never-remove rule"
-        assert "explicit owner approval" in src.lower() or "owner approval" in src.lower(), \
+        assert "Never remove" in src or "never remove" in src, "CLAUDE.md must enforce never-remove rule"
+        assert "explicit owner approval" in src.lower() or "owner approval" in src.lower(), (
             "Must require explicit owner approval"
+        )
 
 
 class TestSpec0474ViteApiUrlEmpty:
@@ -270,16 +269,16 @@ class TestSpec0474ViteApiUrlEmpty:
                 for line in src.splitlines():
                     if line.startswith("VITE_API_URL"):
                         val = line.split("=", 1)[1].strip()
-                        assert val == "" or val == "''" or val == '""', \
+                        assert val == "" or val == "''" or val == '""', (
                             f"{admin_dir}/.env.production VITE_API_URL must be empty, got '{val}'"
+                        )
 
 
 class TestSpec0554NonShopifyTenants:
     """SPEC-0554: Non-Shopify tenants acceptable — not all customers use Shopify."""
 
     def test_standalone_admin_exists(self):
-        assert (STANDALONE / "index.tsx").exists(), \
-            "Standalone admin must exist for non-Shopify tenants"
+        assert (STANDALONE / "index.tsx").exists(), "Standalone admin must exist for non-Shopify tenants"
 
     def test_spa_console_exists(self):
         provider = ADMIN / "provider"
@@ -310,8 +309,10 @@ class TestSpec0704PersistentCustomerMemory:
         found = False
         for f in SRC.rglob("*.py"):
             try:
-                if "persistent" in f.read_text(encoding="utf-8").lower() and \
-                   "memory" in f.read_text(encoding="utf-8").lower():
+                if (
+                    "persistent" in f.read_text(encoding="utf-8").lower()
+                    and "memory" in f.read_text(encoding="utf-8").lower()
+                ):
                     found = True
                     break
             except Exception:
@@ -360,15 +361,15 @@ class TestSpec0797AGNTCYIsolation:
     def test_no_agntcy_source_in_repo(self):
         # AGNTCY source must NOT be committed into this repo
         agntcy_dir = Path(__file__).resolve().parents[2] / "AGNTCY"
-        assert not agntcy_dir.exists() or not any(agntcy_dir.rglob("*.py")), \
+        assert not agntcy_dir.exists() or not any(agntcy_dir.rglob("*.py")), (
             "AGNTCY source code must not be in Agent Red repo"
+        )
 
     def test_agntcy_referenced_as_external(self):
         claude_md = Path(__file__).resolve().parents[2] / "CLAUDE.md"
         src = claude_md.read_text(encoding="utf-8")
         assert "AGNTCY" in src, "CLAUDE.md must reference AGNTCY"
-        assert "public repo" in src.lower() or "github.com" in src, \
-            "AGNTCY must be referenced as external"
+        assert "public repo" in src.lower() or "github.com" in src, "AGNTCY must be referenced as external"
 
 
 class TestSpec0850NeverRemoveRule2:

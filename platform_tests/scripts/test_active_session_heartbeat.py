@@ -37,9 +37,7 @@ def heartbeat_module():
     spawning subprocesses for every test.
     """
     assert _SCRIPT_PATH.is_file(), f"Missing {_SCRIPT_PATH}"
-    spec = importlib.util.spec_from_file_location(
-        "active_session_heartbeat", _SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("active_session_heartbeat", _SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["active_session_heartbeat"] = module

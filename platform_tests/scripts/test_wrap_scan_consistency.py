@@ -56,9 +56,7 @@ def test_check_index_cites_missing_bridge_file_clean_when_all_exist(tmp_path: Pa
     (bridge_dir / "real-001.md").write_text("NEW")
     (bridge_dir / "real-002.md").write_text("GO")
     index = bridge_dir / "INDEX.md"
-    index.write_text(
-        "Document: real\nGO: bridge/real-002.md\nNEW: bridge/real-001.md\n"
-    )
+    index.write_text("Document: real\nGO: bridge/real-002.md\nNEW: bridge/real-001.md\n")
     findings = w2.check_index_cites_missing_bridge_file(tmp_path)
     assert findings == []
 
@@ -82,10 +80,7 @@ def test_check_worklist_cites_missing_bridge_file(tmp_path: Path) -> None:
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "real-001.md").write_text("NEW")
-    (memory_dir / "work_list.md").write_text(
-        "row 1: see `bridge/real-001.md`\n"
-        "row 2: see `bridge/missing-005.md`\n"
-    )
+    (memory_dir / "work_list.md").write_text("row 1: see `bridge/real-001.md`\nrow 2: see `bridge/missing-005.md`\n")
     findings = w2.check_worklist_cites_missing_bridge_file(tmp_path)
     assert any("missing-005.md" in f["message"] for f in findings)
     assert all(f["severity"] == w2.SEVERITY_WARN for f in findings)

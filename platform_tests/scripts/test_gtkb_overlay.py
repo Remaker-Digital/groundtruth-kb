@@ -44,15 +44,9 @@ def fake_project(tmp_path: Path) -> Path:
         json.dumps({"generated_at": "2026-04-23T00:00:00Z"}) + "\n",
         encoding="utf-8",
     )
-    (tmp_path / "docs" / "gtkb-dashboard" / "session-startup-report.md").write_text(
-        "# startup\n", encoding="utf-8"
-    )
-    (tmp_path / "docs" / "gtkb-dashboard" / "session-wrapup-report.md").write_text(
-        "# wrapup\n", encoding="utf-8"
-    )
-    (tmp_path / "memory" / "gtkb-dashboard-history.json").write_text(
-        json.dumps([]) + "\n", encoding="utf-8"
-    )
+    (tmp_path / "docs" / "gtkb-dashboard" / "session-startup-report.md").write_text("# startup\n", encoding="utf-8")
+    (tmp_path / "docs" / "gtkb-dashboard" / "session-wrapup-report.md").write_text("# wrapup\n", encoding="utf-8")
+    (tmp_path / "memory" / "gtkb-dashboard-history.json").write_text(json.dumps([]) + "\n", encoding="utf-8")
     return tmp_path
 
 

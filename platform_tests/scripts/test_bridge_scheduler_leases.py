@@ -23,9 +23,7 @@ from types import ModuleType
 
 import pytest
 
-_MODULE_PATH = (
-    Path(__file__).resolve().parents[2] / "scripts" / "bridge_lease_registry.py"
-)
+_MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "bridge_lease_registry.py"
 
 
 def _load_module() -> ModuleType:
@@ -60,9 +58,7 @@ def _backdate(lease_path: Path, *, seconds: int) -> None:
     test can drive the stale/fresh boundary deterministically without sleeping.
     The ``lease_token`` is left intact."""
     record = json.loads(lease_path.read_text(encoding="utf-8"))
-    record["heartbeat_at"] = (
-        datetime.now(UTC) - timedelta(seconds=seconds)
-    ).isoformat()
+    record["heartbeat_at"] = (datetime.now(UTC) - timedelta(seconds=seconds)).isoformat()
     lease_path.write_text(json.dumps(record), encoding="utf-8")
 
 
@@ -190,9 +186,7 @@ def test_t9_release_is_ownership_guarded(tmp_path: Path) -> None:
 
 
 def test_t10_document_lease_context_manager(tmp_path: Path) -> None:
-    with document_lease(
-        "widget-refactor", action="review", state_dir=tmp_path
-    ) as handle:
+    with document_lease("widget-refactor", action="review", state_dir=tmp_path) as handle:
         assert handle is not None
         assert is_lease_held("widget-refactor", state_dir=tmp_path) is True
     # released on normal exit
@@ -247,9 +241,7 @@ def test_t12_concurrent_acquire_yields_single_winner(tmp_path: Path) -> None:
 
     def _worker() -> None:
         barrier.wait()
-        outcome = acquire_lease(
-            "widget-refactor", action="review", state_dir=tmp_path
-        )
+        outcome = acquire_lease("widget-refactor", action="review", state_dir=tmp_path)
         with results_lock:
             results.append(outcome)
 

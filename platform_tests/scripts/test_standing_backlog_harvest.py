@@ -31,9 +31,7 @@ def _most_recent_dated_snapshot(dropbox_dir: Path) -> Path:
         if match:
             matches.append((match.group(1), path.name, path))
     if not matches:
-        raise FileNotFoundError(
-            f"No STANDING-BACKLOG-HARVEST-YYYY-MM-DD*.md files found in {dropbox_dir}"
-        )
+        raise FileNotFoundError(f"No STANDING-BACKLOG-HARVEST-YYYY-MM-DD*.md files found in {dropbox_dir}")
     matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return matches[0][2]
 
@@ -186,12 +184,10 @@ def test_standing_backlog_audit_treats_withdrawn_as_terminal_not_actionable() ->
         None,
     )
     assert fixture_entry is not None, (
-        "test-thread-withdrawn-fixture must appear in parse output; "
-        f"got entries={entries}"
+        f"test-thread-withdrawn-fixture must appear in parse output; got entries={entries}"
     )
     assert fixture_entry["status"] == "WITHDRAWN", (
-        "Latest status must be WITHDRAWN (parsed correctly); "
-        f"got {fixture_entry['status']}"
+        f"Latest status must be WITHDRAWN (parsed correctly); got {fixture_entry['status']}"
     )
     assert fixture_entry["status"] not in module.ACTIONABLE_BRIDGE_STATUSES, (
         "WITHDRAWN must be terminal (not in ACTIONABLE_BRIDGE_STATUSES) like VERIFIED"

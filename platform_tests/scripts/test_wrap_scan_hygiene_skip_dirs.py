@@ -42,9 +42,7 @@ def test_scan_excludes_test_results_dir(tmp_path: Path) -> None:
     (project / "test-results" / "report.py").write_text(f"# {OLD_ROOT_TOKEN}\n")
     findings = w1.check_hardcoded_old_project_root(project)
     paths = [f["path"] for f in findings]
-    assert not any("test-results" in p for p in paths), (
-        f"test-results/ should be in SKIP_DIRS; got {paths}"
-    )
+    assert not any("test-results" in p for p in paths), f"test-results/ should be in SKIP_DIRS; got {paths}"
 
 
 def test_scan_excludes_bridge_dir(tmp_path: Path) -> None:
@@ -66,9 +64,7 @@ def test_scan_includes_root_governance_files(tmp_path: Path) -> None:
     (project / "CLAUDE.md").write_text(f"# Root governance\n{OLD_ROOT_TOKEN}\n")
     findings = w1.check_hardcoded_old_project_root(project)
     paths = [f["path"] for f in findings]
-    assert any("CLAUDE.md" in p for p in paths), (
-        f"CLAUDE.md should be in SCAN_ROOT_FILES; got {paths}"
-    )
+    assert any("CLAUDE.md" in p for p in paths), f"CLAUDE.md should be in SCAN_ROOT_FILES; got {paths}"
 
 
 def test_scan_includes_claude_skills(tmp_path: Path) -> None:
@@ -79,9 +75,7 @@ def test_scan_includes_claude_skills(tmp_path: Path) -> None:
     (skill_dir / "SKILL.md").write_text(f"# Skill\n{OLD_ROOT_TOKEN}\n")
     findings = w1.check_hardcoded_old_project_root(project)
     paths = [f["path"] for f in findings]
-    assert any("skills" in p for p in paths), (
-        f".claude/skills/ should be in SCAN_ROOTS; got {paths}"
-    )
+    assert any("skills" in p for p in paths), f".claude/skills/ should be in SCAN_ROOTS; got {paths}"
 
 
 def test_scan_clean_when_no_old_root_references(tmp_path: Path) -> None:

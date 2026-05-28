@@ -122,7 +122,7 @@ def test_genuine_drift_detected(tmp_path, categorize_module):
         _make_run(_recent_iso(5), [_make_result("X", True)], spec_status="implemented"),
         _make_run(_recent_iso(1), [_make_result("X", False)], spec_status="implemented"),
     ]
-    _build_fixture_db(tmp_path,{"SPEC-DRIFT-1": runs})
+    _build_fixture_db(tmp_path, {"SPEC-DRIFT-1": runs})
     project_root = tmp_path
 
     result = categorize_module.categorize_all(
@@ -139,10 +139,9 @@ def test_genuine_drift_detected(tmp_path, categorize_module):
 def test_chronic_noise_detected(tmp_path, categorize_module):
     """5 consecutive FAIL for implemented spec -> chronic_noise."""
     runs = [
-        _make_run(_recent_iso(d), [_make_result("X", False)], spec_status="implemented")
-        for d in (20, 15, 10, 5, 1)
+        _make_run(_recent_iso(d), [_make_result("X", False)], spec_status="implemented") for d in (20, 15, 10, 5, 1)
     ]
-    _build_fixture_db(tmp_path,{"SPEC-CHRONIC-1": runs})
+    _build_fixture_db(tmp_path, {"SPEC-CHRONIC-1": runs})
     result = categorize_module.categorize_all(
         project_root=tmp_path,
         output_dir=tmp_path / "out",
@@ -161,7 +160,7 @@ def test_flaky_detected(tmp_path, categorize_module):
         _make_run(_recent_iso(5), [_make_result("X", False)], spec_status="implemented"),
         _make_run(_recent_iso(1), [_make_result("X", False)], spec_status="implemented"),
     ]
-    _build_fixture_db(tmp_path,{"SPEC-FLAKY-1": runs})
+    _build_fixture_db(tmp_path, {"SPEC-FLAKY-1": runs})
     result = categorize_module.categorize_all(
         project_root=tmp_path,
         output_dir=tmp_path / "out",
@@ -176,11 +175,8 @@ def test_flaky_detected(tmp_path, categorize_module):
 
 def test_healthy_stable_pass(tmp_path, categorize_module):
     """5 consecutive PASS -> healthy."""
-    runs = [
-        _make_run(_recent_iso(d), [_make_result("X", True)], spec_status="implemented")
-        for d in (20, 15, 10, 5, 1)
-    ]
-    _build_fixture_db(tmp_path,{"SPEC-HEALTHY-1": runs})
+    runs = [_make_run(_recent_iso(d), [_make_result("X", True)], spec_status="implemented") for d in (20, 15, 10, 5, 1)]
+    _build_fixture_db(tmp_path, {"SPEC-HEALTHY-1": runs})
     result = categorize_module.categorize_all(
         project_root=tmp_path,
         output_dir=tmp_path / "out",
@@ -193,11 +189,8 @@ def test_healthy_stable_pass(tmp_path, categorize_module):
 
 def test_healthy_specified_status_expected_fail(tmp_path, categorize_module):
     """5 consecutive FAIL for specified-status spec -> healthy (expected)."""
-    runs = [
-        _make_run(_recent_iso(d), [_make_result("X", False)], spec_status="specified")
-        for d in (20, 15, 10, 5, 1)
-    ]
-    _build_fixture_db(tmp_path,{"SPEC-EXPECTED-FAIL-1": runs})
+    runs = [_make_run(_recent_iso(d), [_make_result("X", False)], spec_status="specified") for d in (20, 15, 10, 5, 1)]
+    _build_fixture_db(tmp_path, {"SPEC-EXPECTED-FAIL-1": runs})
     result = categorize_module.categorize_all(
         project_root=tmp_path,
         output_dir=tmp_path / "out",
@@ -215,14 +208,10 @@ def test_categorization_deterministic(tmp_path, categorize_module):
         _make_run(_recent_iso(d), [_make_result("X", d % 2 == 0)], spec_status="implemented")
         for d in (20, 15, 10, 5, 1)
     ]
-    _build_fixture_db(tmp_path,{"SPEC-DET-1": runs})
+    _build_fixture_db(tmp_path, {"SPEC-DET-1": runs})
 
-    r1 = categorize_module.categorize_all(
-        project_root=tmp_path, output_dir=tmp_path / "out1", dry_run=True
-    )
-    r2 = categorize_module.categorize_all(
-        project_root=tmp_path, output_dir=tmp_path / "out2", dry_run=True
-    )
+    r1 = categorize_module.categorize_all(project_root=tmp_path, output_dir=tmp_path / "out1", dry_run=True)
+    r2 = categorize_module.categorize_all(project_root=tmp_path, output_dir=tmp_path / "out2", dry_run=True)
 
     # Categories and confidences must match across runs
     assert r1["summary"]["counts_by_category"] == r2["summary"]["counts_by_category"]
@@ -243,7 +232,7 @@ def test_categorization_handles_insufficient_history(tmp_path, categorize_module
         _make_run(_recent_iso(5), [_make_result("X", False)], spec_status="implemented"),
         _make_run(_recent_iso(1), [_make_result("X", False)], spec_status="implemented"),
     ]
-    _build_fixture_db(tmp_path,{"SPEC-SHORT-1": runs})
+    _build_fixture_db(tmp_path, {"SPEC-SHORT-1": runs})
     result = categorize_module.categorize_all(
         project_root=tmp_path,
         output_dir=tmp_path / "out",
@@ -258,10 +247,9 @@ def test_categorization_handles_insufficient_history(tmp_path, categorize_module
 def test_categorization_writes_output(tmp_path, categorize_module):
     """Non-dry-run mode writes JSON and markdown files."""
     runs = [
-        _make_run(_recent_iso(d), [_make_result("X", False)], spec_status="implemented")
-        for d in (20, 15, 10, 5, 1)
+        _make_run(_recent_iso(d), [_make_result("X", False)], spec_status="implemented") for d in (20, 15, 10, 5, 1)
     ]
-    _build_fixture_db(tmp_path,{"SPEC-OUT-1": runs})
+    _build_fixture_db(tmp_path, {"SPEC-OUT-1": runs})
     output_dir = tmp_path / "triage"
 
     result = categorize_module.categorize_all(
@@ -289,7 +277,7 @@ def test_categorization_writes_output(tmp_path, categorize_module):
 def test_dry_run_does_not_mutate(tmp_path, categorize_module):
     """Dry-run mode must not write any files."""
     runs = [_make_run(_recent_iso(1), [_make_result("X", False)], spec_status="implemented")]
-    _build_fixture_db(tmp_path,{"SPEC-DRY-1": runs})
+    _build_fixture_db(tmp_path, {"SPEC-DRY-1": runs})
     output_dir = tmp_path / "triage_dry"
 
     categorize_module.categorize_all(

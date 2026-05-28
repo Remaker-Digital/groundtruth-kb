@@ -10,6 +10,7 @@ Specs:
 - ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001 v2 (state-write reliability under
   concurrency is foundational to dispatch correctness).
 """
+
 from __future__ import annotations
 
 import json

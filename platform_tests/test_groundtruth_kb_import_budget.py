@@ -50,8 +50,7 @@ def test_chromadb_not_eagerly_imported() -> None:
         timeout=60,
     )
     assert result.returncode == 0, (
-        f"importing groundtruth_kb eagerly imported chromadb.\n"
-        f"stdout={result.stdout}\nstderr={result.stderr}"
+        f"importing groundtruth_kb eagerly imported chromadb.\nstdout={result.stdout}\nstderr={result.stderr}"
     )
 
 
@@ -78,9 +77,7 @@ def test_lazy_chromadb_loads_on_demand() -> None:
     assert "chromadb" in sys.modules
 
 
-def test_lazy_chromadb_import_failure_degrades_gracefully(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_lazy_chromadb_import_failure_degrades_gracefully(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A failed lazy import degrades to HAS_CHROMADB=False + SQLite fallback.
 
     Derives from DELIB-0699: ChromaDB is optional/rebuildable and its failures

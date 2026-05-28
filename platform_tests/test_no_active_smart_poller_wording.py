@@ -79,9 +79,7 @@ _PRUNE_DIRNAMES = frozenset(
 )
 
 # Suffixes scanned. Restricting to text/source files keeps the walk fast.
-_SCAN_SUFFIXES = frozenset(
-    {".py", ".md", ".toml", ".yml", ".yaml", ".json", ".txt", ".sh", ".ps1"}
-)
+_SCAN_SUFFIXES = frozenset({".py", ".md", ".toml", ".yml", ".yaml", ".json", ".txt", ".sh", ".ps1"})
 
 # Single compiled regex covering all forbidden patterns. Each pattern is
 # escaped because we want literal substring matching.

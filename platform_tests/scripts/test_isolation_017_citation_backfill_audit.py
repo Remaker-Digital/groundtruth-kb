@@ -40,6 +40,7 @@ def db():
     """Open the GT-KB MemBase for read-only inspection."""
     sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
     from groundtruth_kb.db import KnowledgeDB
+
     return KnowledgeDB()
 
 
@@ -97,7 +98,7 @@ def _latest_status_for_thread(thread_id: str) -> str | None:
     match = block_re.search(text)
     if not match:
         return None
-    after = text[match.end():].lstrip("\n")
+    after = text[match.end() :].lstrip("\n")
     # First non-blank, non-comment line after the Document header
     for line in after.splitlines():
         line = line.strip()

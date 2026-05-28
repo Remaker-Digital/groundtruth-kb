@@ -82,8 +82,7 @@ def _row(spec_id: str) -> dict:
     conn = sqlite3.connect(db_path)
     try:
         cur = conn.execute(
-            "SELECT id, type, status, title FROM specifications "
-            "WHERE id = ? ORDER BY version DESC LIMIT 1",
+            "SELECT id, type, status, title FROM specifications WHERE id = ? ORDER BY version DESC LIMIT 1",
             (spec_id,),
         )
         row = cur.fetchone()

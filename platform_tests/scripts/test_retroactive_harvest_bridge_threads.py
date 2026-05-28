@@ -175,10 +175,12 @@ class TestCoverageFormula:
 
     def test_full_coverage(self) -> None:
         records = [_active_verified("a"), _active_verified("b")]
-        db = FakeDB([
-            {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md"},
-            {"source_type": "bridge_thread", "source_ref": "bridge/b-*.md"},
-        ])
+        db = FakeDB(
+            [
+                {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md"},
+                {"source_type": "bridge_thread", "source_ref": "bridge/b-*.md"},
+            ]
+        )
         result = rhbt.compute_active_bridge_thread_coverage(records, db)
         assert result["coverage_pct"] == 100.0
         assert result["uncovered_thread_names"] == []
@@ -188,11 +190,13 @@ class TestCoverageFormula:
         count as ONE covered thread. This guards against the coverage-math
         bug Codex flagged in Finding 1 of -002."""
         records = [_active_verified("a")]
-        db = FakeDB([
-            {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md", "id": "DELIB-0001"},
-            {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md", "id": "DELIB-0002"},
-            {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md", "id": "DELIB-0003"},
-        ])
+        db = FakeDB(
+            [
+                {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md", "id": "DELIB-0001"},
+                {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md", "id": "DELIB-0002"},
+                {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md", "id": "DELIB-0003"},
+            ]
+        )
         result = rhbt.compute_active_bridge_thread_coverage(records, db)
         assert result["coverage_pct"] == 100.0
         assert result["numerator_threads"] == 1
@@ -200,9 +204,7 @@ class TestCoverageFormula:
 
     def test_coverage_cannot_exceed_100(self) -> None:
         records = [_active_verified("a")]
-        db = FakeDB([
-            {"source_type": "bridge_thread", "source_ref": "bridge/a-*.md"} for _ in range(10)
-        ])
+        db = FakeDB([{"source_type": "bridge_thread", "source_ref": "bridge/a-*.md"} for _ in range(10)])
         result = rhbt.compute_active_bridge_thread_coverage(records, db)
         assert 0.0 <= result["coverage_pct"] <= 100.0
 
@@ -211,27 +213,33 @@ class TestCoverageFormula:
         NOT count as canonical wildcard coverage. Only wildcard source_ref
         rows are visible to the coverage metric."""
         records = [_active_verified("demo-thread")]
-        db = FakeDB([
-            {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-001.md"},
-            {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-002.md"},
-        ])
+        db = FakeDB(
+            [
+                {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-001.md"},
+                {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-002.md"},
+            ]
+        )
         result = rhbt.compute_active_bridge_thread_coverage(records, db)
         assert result["numerator_threads"] == 0
         assert result["coverage_pct"] == 0.0
 
-        db_with_canonical = FakeDB([
-            {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-001.md"},
-            {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-*.md"},
-        ])
+        db_with_canonical = FakeDB(
+            [
+                {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-001.md"},
+                {"source_type": "bridge_thread", "source_ref": "bridge/demo-thread-*.md"},
+            ]
+        )
         result2 = rhbt.compute_active_bridge_thread_coverage(records, db_with_canonical)
         assert result2["numerator_threads"] == 1
         assert result2["coverage_pct"] == 100.0
 
     def test_partial_coverage_identifies_uncovered(self) -> None:
         records = [_active_verified("a"), _active_verified("b"), _active_verified("c")]
-        db = FakeDB([
-            {"source_type": "bridge_thread", "source_ref": "bridge/b-*.md"},
-        ])
+        db = FakeDB(
+            [
+                {"source_type": "bridge_thread", "source_ref": "bridge/b-*.md"},
+            ]
+        )
         result = rhbt.compute_active_bridge_thread_coverage(records, db)
         assert result["numerator_threads"] == 1
         assert result["denominator_threads"] == 3
@@ -322,10 +330,7 @@ class _StubDB:
         import hashlib
 
         content_hash = hashlib.sha256(content.encode()).hexdigest()
-        existing = [
-            r for r in self.rows
-            if r.get("source_ref") == source_ref and r.get("content_hash") == content_hash
-        ]
+        existing = [r for r in self.rows if r.get("source_ref") == source_ref and r.get("content_hash") == content_hash]
         if existing:
             return existing[0]
         row = {
@@ -455,11 +460,13 @@ NEW: bridge/beta-001.md
         content_hash = __import__("hashlib").sha256(content.encode()).hexdigest()
 
         stub = _StubDB()
-        stub.rows.append({
-            "source_type": "bridge_thread",
-            "source_ref": "bridge/alpha-*.md",
-            "content_hash": content_hash,
-        })
+        stub.rows.append(
+            {
+                "source_type": "bridge_thread",
+                "source_ref": "bridge/alpha-*.md",
+                "content_hash": content_hash,
+            }
+        )
         monkeypatch.setattr(rhbt, "_load_db", lambda _kb_path: stub)
 
         report = rhbt.archive_verified_threads_and_prune_index(
@@ -478,8 +485,7 @@ NEW: bridge/beta-001.md
         bridge_dir.mkdir()
         (bridge_dir / "active-001.md").write_text("# Active\n\nBody.\n", encoding="utf-8")
         repeated = "\n".join(
-            f"<!--   - Retirement ack #{i}: verbose obsolete dispatcher fire details {'x' * 500} -->"
-            for i in range(30)
+            f"<!--   - Retirement ack #{i}: verbose obsolete dispatcher fire details {'x' * 500} -->" for i in range(30)
         )
         index = bridge_dir / "INDEX.md"
         index.write_text(

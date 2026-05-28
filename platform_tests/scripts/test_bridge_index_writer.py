@@ -97,9 +97,7 @@ def test_t4_concurrent_updates_no_lost_update(mod, tmp_path):
     def worker(i: int) -> None:
         try:
             barrier.wait(timeout=30)
-            mod.atomic_index_update(
-                index, lambda t: t + f"line-{i}\n", state_dir=state, timeout_seconds=30
-            )
+            mod.atomic_index_update(index, lambda t: t + f"line-{i}\n", state_dir=state, timeout_seconds=30)
         except BaseException as exc:  # noqa: BLE001 - recorded and asserted below
             errors.append(exc)
 

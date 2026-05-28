@@ -46,48 +46,38 @@ class TestProductionProtection:
     def test_blocks_production_fqdn(self, check_destructive):
         """Commands referencing production FQDN are blocked."""
         result = check_destructive(
-            'curl https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/health'
+            "curl https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/health"
         )
         assert result is not None
         assert "Production environment" in result
 
     def test_blocks_production_cosmos_db_name(self, check_destructive):
         """Commands referencing production Cosmos database name are blocked."""
-        result = check_destructive(
-            """python -c "DB = 'agentred'; print(DB)" """
-        )
+        result = check_destructive("""python -c "DB = 'agentred'; print(DB)" """)
         assert result is not None
         assert "Production" in result
 
     def test_allows_staging_cosmos_db_name(self, check_destructive):
         """Commands referencing staging database are NOT blocked."""
-        result = check_destructive(
-            """python -c "DB = 'agentred-staging'; print(DB)" """
-        )
+        result = check_destructive("""python -c "DB = 'agentred-staging'; print(DB)" """)
         # Should NOT be blocked (staging is safe)
         assert result is None or "Production" not in result
 
     def test_blocks_production_deploy(self, check_destructive):
         """deploy.py --env prod is blocked."""
-        result = check_destructive(
-            "python deploy.py --env prod"
-        )
+        result = check_destructive("python deploy.py --env prod")
         assert result is not None
         assert "Production" in result
 
     def test_allows_staging_deploy(self, check_destructive):
         """deploy.py --env staging is NOT blocked."""
-        result = check_destructive(
-            "python deploy.py --env staging"
-        )
+        result = check_destructive("python deploy.py --env staging")
         # deploy.py --env staging should not trigger prod patterns
         assert result is None or "Production" not in result
 
     def test_blocks_production_container_app(self, check_destructive):
         """Commands referencing agent-red-api-gateway are blocked."""
-        result = check_destructive(
-            "az containerapp update --name agent-red-api-gateway"
-        )
+        result = check_destructive("az containerapp update --name agent-red-api-gateway")
         assert result is not None
 
 
@@ -100,16 +90,12 @@ class TestAzureDestructiveBlocking:
     """Cosmos delete_item and other Azure destructive ops are blocked."""
 
     def test_blocks_cosmos_delete_item(self, check_destructive):
-        result = check_destructive(
-            "container.delete_item(item=tid, partition_key=tid)"
-        )
+        result = check_destructive("container.delete_item(item=tid, partition_key=tid)")
         assert result is not None
         assert "Destructive Azure" in result
 
     def test_blocks_keyvault_delete(self, check_destructive):
-        result = check_destructive(
-            "az keyvault secret delete --name my-secret"
-        )
+        result = check_destructive("az keyvault secret delete --name my-secret")
         assert result is not None
 
 
@@ -128,9 +114,7 @@ class TestContactRequirementInProvisioning:
         from src.integrations.provisioning import provision_tenant
 
         sig = inspect.signature(provision_tenant)
-        assert "customer_phone" in sig.parameters, (
-            "provision_tenant must accept customer_phone parameter (SPEC-1882)"
-        )
+        assert "customer_phone" in sig.parameters, "provision_tenant must accept customer_phone parameter (SPEC-1882)"
 
     def test_provision_tenant_customer_email_param_exists(self):
         """provision_tenant() still accepts customer_email parameter."""
@@ -155,31 +139,23 @@ class TestPythonRecursiveDeletionParity:
 
     def test_blocks_python_dash_c_with_shutil_rmtree(self, check_destructive):
         """The exact substitution form Prime used in S317 must be blocked."""
-        result = check_destructive(
-            """python -c "import shutil; shutil.rmtree('GT-KB')" """
-        )
+        result = check_destructive("""python -c "import shutil; shutil.rmtree('GT-KB')" """)
         assert result is not None
         assert "destructive" in result.lower() or "delete" in result.lower()
 
     def test_blocks_shutil_rmtree_with_ignore_errors(self, check_destructive):
         """shutil.rmtree variant with ignore_errors=True must also be blocked."""
-        result = check_destructive(
-            """python -c "import shutil; shutil.rmtree('x', ignore_errors=True)" """
-        )
+        result = check_destructive("""python -c "import shutil; shutil.rmtree('x', ignore_errors=True)" """)
         assert result is not None
 
     def test_blocks_os_removedirs(self, check_destructive):
         """os.removedirs (recursive empty-dir cleanup) must be blocked."""
-        result = check_destructive(
-            """python -c "import os; os.removedirs('a/b/c')" """
-        )
+        result = check_destructive("""python -c "import os; os.removedirs('a/b/c')" """)
         assert result is not None
 
     def test_blocks_subprocess_rm_rf_via_python(self, check_destructive):
         """subprocess invocation of `rm -rf` from Python must be blocked."""
-        result = check_destructive(
-            """python -c "import subprocess; subprocess.run(['rm', '-rf', 'x'])" """
-        )
+        result = check_destructive("""python -c "import subprocess; subprocess.run(['rm', '-rf', 'x'])" """)
         assert result is not None
 
     def test_blocks_subprocess_remove_item_recurse_via_python(self, check_destructive):
@@ -191,9 +167,7 @@ class TestPythonRecursiveDeletionParity:
 
     def test_allows_pathlib_unlink_single_file(self, check_destructive):
         """pathlib.Path.unlink (single-file delete, non-recursive) is NOT blocked."""
-        result = check_destructive(
-            """python -c "from pathlib import Path; Path('tmp.txt').unlink()" """
-        )
+        result = check_destructive("""python -c "from pathlib import Path; Path('tmp.txt').unlink()" """)
         # Single-file deletes are not in the recursive class; should not be blocked
         # by the recursive-deletion patterns. May still be blocked by other
         # patterns (e.g., production targeting), but not by _DELETE_PATTERNS.
@@ -204,9 +178,7 @@ class TestPythonRecursiveDeletionParity:
         Python recursive-deletion must NOT be bypassed by an unrelated safe-path
         substring elsewhere in the command. Critical bypass test #1.
         """
-        result = check_destructive(
-            """python -c "import shutil; print('node_modules'); shutil.rmtree('GT-KB')" """
-        )
+        result = check_destructive("""python -c "import shutil; print('node_modules'); shutil.rmtree('GT-KB')" """)
         assert result is not None, (
             "shutil.rmtree must remain blocked even when an unrelated safe-path "
             "substring (node_modules) appears in a print statement. "
@@ -218,9 +190,7 @@ class TestPythonRecursiveDeletionParity:
         Critical bypass test #2 — safe-path substring in a Python comment must
         not suppress the block.
         """
-        result = check_destructive(
-            """python -c "import shutil; shutil.rmtree('GT-KB') # node_modules" """
-        )
+        result = check_destructive("""python -c "import shutil; shutil.rmtree('GT-KB') # node_modules" """)
         assert result is not None, (
             "shutil.rmtree must remain blocked even when an unrelated safe-path "
             "substring (node_modules) appears in a comment. "

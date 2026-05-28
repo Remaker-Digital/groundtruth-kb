@@ -320,6 +320,4 @@ def test_preflight_declared_and_rooted_paths_still_harvested() -> None:
     )
     harvested = preflight.extract_target_paths(content)
     assert "scripts/foo.py" in harvested, f"declared target_paths entry not harvested: {sorted(harvested)}"
-    assert "config/governance/sample.toml" in harvested, (
-        f"repo-rooted path mention not harvested: {sorted(harvested)}"
-    )
+    assert "config/governance/sample.toml" in harvested, f"repo-rooted path mention not harvested: {sorted(harvested)}"

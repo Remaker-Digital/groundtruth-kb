@@ -50,8 +50,13 @@ def _git(args: list[str], cwd: Path) -> str:
         check=True,
         capture_output=True,
         text=True,
-        env={**os.environ, "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "t@t",
-             "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "t@t"},
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "Test",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "Test",
+            "GIT_COMMITTER_EMAIL": "t@t",
+        },
     )
     return completed.stdout.strip()
 
@@ -99,10 +104,7 @@ def test_generate_swimlane_empty_index(tmp_path: Path) -> None:
 
 
 def test_generate_swimlane_single_thread(tmp_path: Path) -> None:
-    body = (
-        "Document: foo-bar\n"
-        "NEW: bridge/foo-bar-001.md\n"
-    )
+    body = "Document: foo-bar\nNEW: bridge/foo-bar-001.md\n"
     _seed_index(tmp_path, body)
     _seed_bridge_file(tmp_path, "foo-bar-001.md")
     snapshot = gbs.generate_swimlane(tmp_path)
@@ -135,23 +137,28 @@ def test_generate_swimlane_multi_version(tmp_path: Path) -> None:
 
 
 def test_generate_swimlane_terminality(tmp_path: Path) -> None:
-    body = "\n".join([
-        "Document: aa",
-        "VERIFIED: bridge/aa-001.md",
-        "",
-        "Document: bb",
-        "NO-GO: bridge/bb-001.md",
-        "",
-        "Document: cc",
-        "GO: bridge/cc-001.md",
-        "",
-        "Document: dd",
-        "NEW: bridge/dd-001.md",
-        "",
-        "Document: ee",
-        "REVISED: bridge/ee-001.md",
-        "",
-    ]) + "\n"
+    body = (
+        "\n".join(
+            [
+                "Document: aa",
+                "VERIFIED: bridge/aa-001.md",
+                "",
+                "Document: bb",
+                "NO-GO: bridge/bb-001.md",
+                "",
+                "Document: cc",
+                "GO: bridge/cc-001.md",
+                "",
+                "Document: dd",
+                "NEW: bridge/dd-001.md",
+                "",
+                "Document: ee",
+                "REVISED: bridge/ee-001.md",
+                "",
+            ]
+        )
+        + "\n"
+    )
     _seed_index(tmp_path, body)
     for name in ("aa-001.md", "bb-001.md", "cc-001.md", "dd-001.md", "ee-001.md"):
         _seed_bridge_file(tmp_path, name)
@@ -165,8 +172,7 @@ def test_generate_swimlane_terminality(tmp_path: Path) -> None:
 
 
 def test_generate_swimlane_summary_counts(tmp_path: Path) -> None:
-    statuses = ["VERIFIED", "VERIFIED", "VERIFIED", "VERIFIED",
-                "NO-GO", "GO", "NEW", "NEW", "REVISED", "REVISED"]
+    statuses = ["VERIFIED", "VERIFIED", "VERIFIED", "VERIFIED", "NO-GO", "GO", "NEW", "NEW", "REVISED", "REVISED"]
     body_lines: list[str] = []
     for idx, status in enumerate(statuses, start=1):
         body_lines.append(f"Document: thread-{idx:02d}")

@@ -223,8 +223,7 @@ def test_audit_flags_go_bridge_without_specification_links(tmp_path: Path) -> No
     report = run_audit(db_path, index, tmp_path)
 
     assert any(
-        gap["kind"] == "bridge_terminal_without_specification_links_section"
-        and gap["artifact_id"] == "missing-links"
+        gap["kind"] == "bridge_terminal_without_specification_links_section" and gap["artifact_id"] == "missing-links"
         for gap in report["gaps"]
     )
 
@@ -245,10 +244,7 @@ def test_audit_flags_agent_red_specs_for_reclassification_review(tmp_path: Path)
 
     report = run_audit(db_path, index, tmp_path)
 
-    assert any(
-        gap["kind"] == "agent_red_scoped_spec_candidate_for_gtkb_reclassification"
-        for gap in report["gaps"]
-    )
+    assert any(gap["kind"] == "agent_red_scoped_spec_candidate_for_gtkb_reclassification" for gap in report["gaps"])
 
 
 def test_audit_flags_spec_without_owner_deliberation_origin(tmp_path: Path) -> None:
@@ -279,7 +275,6 @@ def test_audit_accepts_owner_deliberation_origin(tmp_path: Path) -> None:
     report = run_audit(db_path, index, tmp_path)
 
     assert not any(
-        gap["kind"] == "spec_without_owner_deliberation_origin"
-        and gap["artifact_id"] == "SPEC-WITH-DELIB"
+        gap["kind"] == "spec_without_owner_deliberation_origin" and gap["artifact_id"] == "SPEC-WITH-DELIB"
         for gap in report["gaps"]
     )

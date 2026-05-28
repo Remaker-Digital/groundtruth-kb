@@ -10,6 +10,7 @@ Specs:
 - ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001 v2 (state-write reliability is
   foundational to the owner-out-of-loop dispatch contract).
 """
+
 from __future__ import annotations
 
 import json
@@ -133,11 +134,10 @@ def test_write_dispatch_state_uses_per_invocation_temp_path(tmp_path: Path, monk
         cht._write_dispatch_state(state_dir, {"a": 3})
 
     # Three different per-invocation temp paths — none shared.
-    assert len({str(p) for p in captured_temps}) == 3, (
-        f"Expected 3 distinct temp paths; got {captured_temps}"
-    )
+    assert len({str(p) for p in captured_temps}) == 3, f"Expected 3 distinct temp paths; got {captured_temps}"
     # Each temp path matches the per-invocation pattern.
     import re
+
     pattern = re.compile(r"dispatch-state\.json\.\d+-[0-9a-f]{8}\.tmp$")
     for p in captured_temps:
         assert pattern.search(str(p)), f"Temp path doesn't match pattern: {p}"

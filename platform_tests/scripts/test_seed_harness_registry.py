@@ -52,12 +52,16 @@ def _project(tmp_path: Path, role_map: dict[str, Any] | None = None) -> Path:
     state = tmp_path / "harness-state"
     state.mkdir()
     identities = {"harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}}}
-    roles = role_map if role_map is not None else {
-        "harnesses": {
-            "A": {"role": ["loyal-opposition"], "harness_type": "codex"},
-            "B": {"role": ["prime-builder"], "harness_type": "claude"},
+    roles = (
+        role_map
+        if role_map is not None
+        else {
+            "harnesses": {
+                "A": {"role": ["loyal-opposition"], "harness_type": "codex"},
+                "B": {"role": ["prime-builder"], "harness_type": "claude"},
+            }
         }
-    }
+    )
     (state / "harness-identities.json").write_text(json.dumps(identities), encoding="utf-8")
     (state / "role-assignments.json").write_text(json.dumps(roles), encoding="utf-8")
     return tmp_path
@@ -110,9 +114,7 @@ def test_seed_is_idempotent(tmp_path: Path) -> None:
     assert second["seeded"] == []
     assert second["skipped"] == ["A", "B"]
     for hid in ("A", "B"):
-        count = db._get_conn().execute(
-            "SELECT COUNT(*) FROM harnesses WHERE id = ?", (hid,)
-        ).fetchone()[0]
+        count = db._get_conn().execute("SELECT COUNT(*) FROM harnesses WHERE id = ?", (hid,)).fetchone()[0]
         assert count == 1
 
 

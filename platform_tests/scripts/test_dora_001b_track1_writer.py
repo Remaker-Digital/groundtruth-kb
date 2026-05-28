@@ -41,8 +41,9 @@ class _Result:
         self.stderr = stderr
 
 
-def _build_args(env: str = "production", version: str = "v1.99.0",
-                dry_run: bool = False, with_evidence: bool = True) -> argparse.Namespace:
+def _build_args(
+    env: str = "production", version: str = "v1.99.0", dry_run: bool = False, with_evidence: bool = True
+) -> argparse.Namespace:
     """Build an args namespace shaped like deploy_pipeline.main() would produce."""
     args = argparse.Namespace(
         env=env,
@@ -59,6 +60,7 @@ def _build_args(env: str = "production", version: str = "v1.99.0",
 # Phase 8 tests (T2-T8)
 # ---------------------------------------------------------------------------
 
+
 def test_phase_8_populates_image_and_tag() -> None:
     """T2: phase_8 sets image, image_tag, target_container_app on entry."""
     args = _build_args()
@@ -74,8 +76,7 @@ def test_phase_8_populates_image_and_tag() -> None:
     assert result.passed
     assert args._deploy_evidence["image"] == f"{deploy_pipeline.ACR_LOGIN_SERVER}/{deploy_pipeline.IMAGE_REPO}:v1.99.0"
     assert args._deploy_evidence["image_tag"] == "v1.99.0"
-    assert args._deploy_evidence["target_container_app"] == \
-        deploy_pipeline.ENVIRONMENTS["production"]["container_app"]
+    assert args._deploy_evidence["target_container_app"] == deploy_pipeline.ENVIRONMENTS["production"]["container_app"]
 
 
 def test_phase_8_populates_target_update_attempted_after_az_update() -> None:
@@ -183,11 +184,11 @@ def test_phase_8_phase_timings_captured() -> None:
 # Phase 10 tests (T9-T10)
 # ---------------------------------------------------------------------------
 
+
 def test_phase_10_records_deployed_at_on_version_match() -> None:
     """T9: phase_10 sets deployed_at + phase timing when version matches."""
     args = _build_args(version="v1.99.0")
-    with patch.object(deploy_pipeline, "api_call") as mock_api, \
-         patch.object(deploy_pipeline, "time") as mock_time:
+    with patch.object(deploy_pipeline, "api_call") as mock_api, patch.object(deploy_pipeline, "time") as mock_time:
         mock_time.time.side_effect = [1000.0, 1000.0, 1001.0]
         mock_time.sleep = lambda _x: None
         mock_api.return_value = (200, {"product_version": "1.99.0"}, "")
@@ -202,10 +203,12 @@ def test_phase_10_does_not_record_deployed_at_on_version_mismatch() -> None:
     """T10: phase_10 does NOT set deployed_at when version never matches."""
     args = _build_args(version="v1.99.0")
     # Use HEALTH_WAIT_SECONDS=0 by stubbing at module level so the loop terminates.
-    with patch.object(deploy_pipeline, "api_call") as mock_api, \
-         patch.object(deploy_pipeline, "HEALTH_WAIT_SECONDS", 0), \
-         patch.object(deploy_pipeline, "HEALTH_POLL_INTERVAL", 1), \
-         patch.object(deploy_pipeline.time, "sleep", lambda _x: None):
+    with (
+        patch.object(deploy_pipeline, "api_call") as mock_api,
+        patch.object(deploy_pipeline, "HEALTH_WAIT_SECONDS", 0),
+        patch.object(deploy_pipeline, "HEALTH_POLL_INTERVAL", 1),
+        patch.object(deploy_pipeline.time, "sleep", lambda _x: None),
+    ):
         # Always return mismatch
         mock_api.return_value = (200, {"product_version": "1.98.92"}, "")
         result = deploy_pipeline.phase_10_startup_and_version(args)
@@ -219,16 +222,20 @@ def test_phase_10_does_not_record_deployed_at_on_version_mismatch() -> None:
 # Phase 15 tests (T11)
 # ---------------------------------------------------------------------------
 
+
 def test_phase_15_records_phase_timing() -> None:
     """T11: phase_15 records phase_timings.phase_15_enforce_scaling on success."""
     args = _build_args()
     fake_results = {"app-a": True, "app-b": True}
 
     # Patch the lazy imports to skip the real scaling-enforcement library.
-    with patch.dict(sys.modules, {
-        "lib.scaling_enforcement": type(sys)("lib.scaling_enforcement"),
-        "lib.scaling_targets": type(sys)("lib.scaling_targets"),
-    }):
+    with patch.dict(
+        sys.modules,
+        {
+            "lib.scaling_enforcement": type(sys)("lib.scaling_enforcement"),
+            "lib.scaling_targets": type(sys)("lib.scaling_targets"),
+        },
+    ):
         sys.modules["lib.scaling_enforcement"].enforce_all_scaling = lambda **_kw: fake_results
         sys.modules["lib.scaling_targets"].get_scaling_targets = lambda _env: []
         sys.modules["lib.scaling_targets"].SCALING_CONFIG = {}
@@ -246,6 +253,7 @@ def test_phase_15_records_phase_timing() -> None:
 # Main() and dry-run tests (T1, T12, T13)
 # ---------------------------------------------------------------------------
 
+
 def test_evidence_dict_initialized_in_main() -> None:
     """T1: main() initializes args._deploy_evidence early with empty phase_timings.
 
@@ -259,12 +267,11 @@ def test_evidence_dict_initialized_in_main() -> None:
         captured["args"] = args
         raise SystemExit(0)
 
-    fake_args = argparse.Namespace(env="staging", version="v1.99.0",
-                                   dry_run=True, approved=False)
-    with patch.object(deploy_pipeline.argparse.ArgumentParser, "parse_args",
-                      return_value=fake_args), \
-         patch.object(deploy_pipeline, "phase_0_validate_environment",
-                      _capture_phase):
+    fake_args = argparse.Namespace(env="staging", version="v1.99.0", dry_run=True, approved=False)
+    with (
+        patch.object(deploy_pipeline.argparse.ArgumentParser, "parse_args", return_value=fake_args),
+        patch.object(deploy_pipeline, "phase_0_validate_environment", _capture_phase),
+    ):
         try:
             deploy_pipeline.main()
         except SystemExit:
@@ -287,43 +294,42 @@ def _patch_main_pipeline_phases(
     Returns the subprocess.run mock so callers can configure return_value.
     """
     other_phases = [
-        "phase_0_validate_environment", "phase_1_protected_behaviors",
-        "phase_2_clear_vite_api_url", "phase_3_build_artifacts",
-        "phase_4_freshness_gate", "phase_5_restore_env_local",
-        "phase_7_acr_build", "phase_10_startup_and_version",
-        "phase_15_enforce_scaling", "phase_10a_pre_deploy_snapshot",
-        "phase_11_production_verification", "phase_13_seed_test_tenant",
+        "phase_0_validate_environment",
+        "phase_1_protected_behaviors",
+        "phase_2_clear_vite_api_url",
+        "phase_3_build_artifacts",
+        "phase_4_freshness_gate",
+        "phase_5_restore_env_local",
+        "phase_7_acr_build",
+        "phase_10_startup_and_version",
+        "phase_15_enforce_scaling",
+        "phase_10a_pre_deploy_snapshot",
+        "phase_11_production_verification",
+        "phase_13_seed_test_tenant",
         "phase_13_upgrade_verification",
-        "phase_14_verify_initialized_state", "phase_14_config_pipeline",
+        "phase_14_verify_initialized_state",
+        "phase_14_config_pipeline",
     ]
 
-    stack.enter_context(patch.object(
-        deploy_pipeline.argparse.ArgumentParser, "parse_args",
-        return_value=fake_args))
+    stack.enter_context(patch.object(deploy_pipeline.argparse.ArgumentParser, "parse_args", return_value=fake_args))
     for name in other_phases:
         stack.enter_context(patch.object(deploy_pipeline, name, other_phase_impl))
     stack.enter_context(patch.object(deploy_pipeline, "phase_8_deploy", phase_8_impl))
-    stack.enter_context(patch.object(
-        deploy_pipeline, "phase_6_create_build_context",
-        lambda _a: (other_phase_impl(_a), "")))
-    stack.enter_context(patch.object(
-        deploy_pipeline, "_print_summary", lambda *_a, **_kw: None))
-    stack.enter_context(patch.object(
-        deploy_pipeline, "_write_log_file", lambda _e: None))
+    stack.enter_context(
+        patch.object(deploy_pipeline, "phase_6_create_build_context", lambda _a: (other_phase_impl(_a), ""))
+    )
+    stack.enter_context(patch.object(deploy_pipeline, "_print_summary", lambda *_a, **_kw: None))
+    stack.enter_context(patch.object(deploy_pipeline, "_write_log_file", lambda _e: None))
     stack.enter_context(patch.object(deploy_pipeline, "PROJECT_ROOT", tmp_path))
     stack.enter_context(patch.object(deploy_pipeline.time, "sleep", lambda _x: None))
-    mock_sp_run = stack.enter_context(
-        patch.object(deploy_pipeline.subprocess, "run"))
-    mock_sp_run.return_value = type("R", (), {
-        "returncode": 0, "stdout": "abc123def456\n", "stderr": ""
-    })()
+    mock_sp_run = stack.enter_context(patch.object(deploy_pipeline.subprocess, "run"))
+    mock_sp_run.return_value = type("R", (), {"returncode": 0, "stdout": "abc123def456\n", "stderr": ""})()
     return mock_sp_run
 
 
 def test_main_emits_manifest_with_deploy_evidence_block(tmp_path: Path) -> None:
     """T12: main() with successful phases produces manifest containing deploy_evidence."""
-    fake_args = argparse.Namespace(env="staging", version="v1.99.0",
-                                   dry_run=False, approved=True)
+    fake_args = argparse.Namespace(env="staging", version="v1.99.0", dry_run=False, approved=True)
 
     def _phase_pass(*args_: Any, **_kw: Any) -> deploy_pipeline.PhaseResult:
         # Synthesize meaningful evidence so the gate passes.
@@ -342,8 +348,7 @@ def test_main_emits_manifest_with_deploy_evidence_block(tmp_path: Path) -> None:
         return deploy_pipeline.PhaseResult(0, "stub", "PASS", 0.0)
 
     with contextlib.ExitStack() as stack:
-        _patch_main_pipeline_phases(stack, fake_args, _phase_pass, _phase_other,
-                                    tmp_path)
+        _patch_main_pipeline_phases(stack, fake_args, _phase_pass, _phase_other, tmp_path)
         deploy_pipeline.main()
 
     manifests = list((tmp_path / "logs").glob("deploy-result-staging-*.json"))
@@ -360,15 +365,13 @@ def test_dry_run_does_not_populate_evidence(tmp_path: Path) -> None:
     Codex GO -006 condition 1: dry runs must not emit meaningful
     deploy_evidence just because `args._deploy_evidence` is truthy.
     """
-    fake_args = argparse.Namespace(env="staging", version="v1.99.0",
-                                   dry_run=True, approved=False)
+    fake_args = argparse.Namespace(env="staging", version="v1.99.0", dry_run=True, approved=False)
 
     def _phase_pass(*_a: Any, **_kw: Any) -> deploy_pipeline.PhaseResult:
         return deploy_pipeline.PhaseResult(0, "stub", "PASS", 0.0)
 
     with contextlib.ExitStack() as stack:
-        _patch_main_pipeline_phases(stack, fake_args, _phase_pass, _phase_pass,
-                                    tmp_path)
+        _patch_main_pipeline_phases(stack, fake_args, _phase_pass, _phase_pass, tmp_path)
         deploy_pipeline.main()
 
     manifests = list((tmp_path / "logs").glob("deploy-result-staging-*.json"))

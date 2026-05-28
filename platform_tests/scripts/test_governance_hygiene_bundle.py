@@ -29,9 +29,7 @@ def test_change_a_stale_duplicates_removed() -> None:
 
 def test_change_b_conventional_commits_discipline_rule_present() -> None:
     """Change B — Conventional Commits type discipline rule added to file-bridge-protocol.md."""
-    rule = (PROJECT_ROOT / ".claude" / "rules" / "file-bridge-protocol.md").read_text(
-        encoding="utf-8"
-    )
+    rule = (PROJECT_ROOT / ".claude" / "rules" / "file-bridge-protocol.md").read_text(encoding="utf-8")
     assert "## Conventional Commits Type Discipline" in rule
     assert "Recommended commit type" in rule or "Recommended Commit Type" in rule
     assert "feat:" in rule
@@ -49,9 +47,7 @@ def test_change_c_lo_kb_write_approval_packet_pathway_present() -> None:
 
 def test_change_d_parked_draft_pattern_documented() -> None:
     """Change D — parked-draft semantics documented in file-bridge-protocol.md."""
-    rule = (PROJECT_ROOT / ".claude" / "rules" / "file-bridge-protocol.md").read_text(
-        encoding="utf-8"
-    )
+    rule = (PROJECT_ROOT / ".claude" / "rules" / "file-bridge-protocol.md").read_text(encoding="utf-8")
     assert "## Parked-Draft Pattern" in rule
     assert "ERR_NO_INDEX_ENTRY" in rule
     assert "FINDING-P4-001" in rule
@@ -59,9 +55,7 @@ def test_change_d_parked_draft_pattern_documented() -> None:
 
 def test_change_e_canonical_terminology_dual_repo_listing() -> None:
     """Change E — Agent Red entry now lists both canonical and migration-target repos."""
-    rule = (PROJECT_ROOT / ".claude" / "rules" / "canonical-terminology.md").read_text(
-        encoding="utf-8"
-    )
+    rule = (PROJECT_ROOT / ".claude" / "rules" / "canonical-terminology.md").read_text(encoding="utf-8")
     # Both repo URLs must be present
     assert "https://github.com/mike-remakerdigital/agent-red" in rule
     assert "https://github.com/Remaker-Digital/agent-red-customer-engagement" in rule

@@ -42,32 +42,45 @@ def _seed(project_root: Path, authorizations: dict[str, dict[str, bool]]) -> Non
     for index, (wi, verified) in enumerate(sorted(wi_verified.items())):
         slug = f"gtkb-thread-{index}"
         top_status = "VERIFIED" if verified else "GO"
-        (bridge / f"{slug}-001.md").write_text(
-            f"# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8"
-        )
+        (bridge / f"{slug}-001.md").write_text(f"# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8")
         index_lines += [f"Document: {slug}", f"{top_status}: bridge/{slug}-001.md", ""]
     (bridge / "INDEX.md").write_text("\n".join(index_lines) + "\n", encoding="utf-8")
 
     db = KnowledgeDB(project_root / "groundtruth.db")
     try:
         db.insert_deliberation(
-            "DELIB-SEED", "owner_conversation", "Owner approved",
-            "Owner approved the seed authorizations.", "{}", "test", "seed",
+            "DELIB-SEED",
+            "owner_conversation",
+            "Owner approved",
+            "Owner approved the seed authorizations.",
+            "{}",
+            "test",
+            "seed",
             outcome="owner_decision",
         )
         db.insert_project("Surface Project", "test", "seed", id="PROJECT-X", status="active")
         db.insert_spec(
-            id="SPEC-SEED", title="Seed spec", status="verified",
-            changed_by="test", change_reason="seed",
+            id="SPEC-SEED",
+            title="Seed spec",
+            status="verified",
+            changed_by="test",
+            change_reason="seed",
         )
         for wi in wi_verified:
             db.insert_work_item(wi, f"Work item {wi}", "new", "backlog", "open", "test", "seed")
             db.link_project_work_item("PROJECT-X", wi, "test", "seed")
         for auth_id, wi_map in authorizations.items():
             db.insert_project_authorization(
-                "PROJECT-X", f"Authorization {auth_id}", "DELIB-SEED",
-                "Bounded scope.", "test", "seed", id=auth_id, status="active",
-                included_work_item_ids=list(wi_map), included_spec_ids=["SPEC-SEED"],
+                "PROJECT-X",
+                f"Authorization {auth_id}",
+                "DELIB-SEED",
+                "Bounded scope.",
+                "test",
+                "seed",
+                id=auth_id,
+                status="active",
+                included_work_item_ids=list(wi_map),
+                included_spec_ids=["SPEC-SEED"],
             )
     finally:
         db.close()

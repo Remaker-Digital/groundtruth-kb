@@ -50,8 +50,7 @@ def mod():
 
 def test_t1_priority_ordering_at_equal_age(mod):
     filed = "2026-05-18T10:00:00+00:00"  # 2h old, identical for every tier
-    scores = [mod.dispatch_score(filed_at=filed, priority=p, now=NOW)
-              for p in ("P0", "P1", "P2", "P3", "P4")]
+    scores = [mod.dispatch_score(filed_at=filed, priority=p, now=NOW) for p in ("P0", "P1", "P2", "P3", "P4")]
     assert scores == sorted(scores, reverse=True)  # P0 > P1 > P2 > P3 > P4
     assert len(set(scores)) == 5  # strictly decreasing - no ties
 
@@ -82,7 +81,7 @@ def test_t4_unknown_priority_defaults(mod):
     default_hs = mod.priority_headstart(mod.DEFAULT_PRIORITY)
     assert mod.priority_headstart(None) == default_hs
     assert mod.priority_headstart("nonsense") == default_hs
-    assert mod.priority_headstart(123) == default_hs   # non-string - no raise
+    assert mod.priority_headstart(123) == default_hs  # non-string - no raise
     assert mod.priority_headstart("") == default_hs
 
 
@@ -106,8 +105,7 @@ def test_t6_sort_descending_score(mod):
         {"id": "mid-p4", "filed_at": "2026-05-18T00:00:00+00:00", "priority": "P4"},
     ]
     ordered = mod.sort_by_dispatch_priority(entries, now=NOW)
-    scores = [mod.dispatch_score(filed_at=e["filed_at"], priority=e["priority"], now=NOW)
-              for e in ordered]
+    scores = [mod.dispatch_score(filed_at=e["filed_at"], priority=e["priority"], now=NOW) for e in ordered]
     assert scores == sorted(scores, reverse=True)
 
 
@@ -131,8 +129,9 @@ def test_t8_equal_score_oldest_first(mod):
     # P0 filed 1h ago scores 96 + 1 = 97; P4 filed 97h ago scores 0 + 97 = 97
     p0 = {"id": "p0-fresh", "filed_at": "2026-05-18T11:00:00+00:00", "priority": "P0"}
     p4 = {"id": "p4-old", "filed_at": "2026-05-14T11:00:00+00:00", "priority": "P4"}
-    assert (mod.dispatch_score(filed_at=p0["filed_at"], priority="P0", now=NOW)
-            == mod.dispatch_score(filed_at=p4["filed_at"], priority="P4", now=NOW))
+    assert mod.dispatch_score(filed_at=p0["filed_at"], priority="P0", now=NOW) == mod.dispatch_score(
+        filed_at=p4["filed_at"], priority="P4", now=NOW
+    )
     ordered = mod.sort_by_dispatch_priority([p0, p4], now=NOW)
     assert [e["id"] for e in ordered] == ["p4-old", "p0-fresh"]
 
@@ -187,10 +186,8 @@ def test_t12_exact_tie_preserves_input_order(mod):
     # identical priority and identical filed_at - identical score and tie-break
     e1 = {"id": "first", "filed_at": "2026-05-18T08:00:00+00:00", "priority": "P2"}
     e2 = {"id": "second", "filed_at": "2026-05-18T08:00:00+00:00", "priority": "P2"}
-    assert [e["id"] for e in mod.sort_by_dispatch_priority([e1, e2], now=NOW)] == \
-        ["first", "second"]
-    assert [e["id"] for e in mod.sort_by_dispatch_priority([e2, e1], now=NOW)] == \
-        ["second", "first"]
+    assert [e["id"] for e in mod.sort_by_dispatch_priority([e1, e2], now=NOW)] == ["first", "second"]
+    assert [e["id"] for e in mod.sort_by_dispatch_priority([e2, e1], now=NOW)] == ["second", "first"]
 
 
 # --- T13: timezone handling - the same instant scores identically -----------
@@ -199,10 +196,9 @@ def test_t12_exact_tie_preserves_input_order(mod):
 def test_t13_timezone_handling(mod):
     # the same instant (2026-05-18T00:00 UTC) expressed four ways
     offset_iso = "2026-05-18T00:00:00+00:00"
-    bare_iso = "2026-05-18T00:00:00"                              # no offset -> UTC
-    aware_other = datetime(2026, 5, 18, 2, 0, 0,
-                           tzinfo=timezone(timedelta(hours=2)))   # 00:00 UTC
-    naive_dt = datetime(2026, 5, 18, 0, 0, 0)                     # naive -> UTC
+    bare_iso = "2026-05-18T00:00:00"  # no offset -> UTC
+    aware_other = datetime(2026, 5, 18, 2, 0, 0, tzinfo=timezone(timedelta(hours=2)))  # 00:00 UTC
+    naive_dt = datetime(2026, 5, 18, 0, 0, 0)  # naive -> UTC
     base = mod.dispatch_score(filed_at=offset_iso, priority="P4", now=NOW)
     assert mod.dispatch_score(filed_at=bare_iso, priority="P4", now=NOW) == base
     assert mod.dispatch_score(filed_at=aware_other, priority="P4", now=NOW) == base
@@ -220,5 +216,8 @@ def test_t14_case_insensitive_priority(mod):
     # 'p2' must NOT silently degrade to the DEFAULT_PRIORITY head-start
     assert mod.priority_headstart("p2") != mod.priority_headstart(mod.DEFAULT_PRIORITY)
     # dispatch_score honors the normalized priority
-    assert (mod.dispatch_score(filed_at=NOW, priority="p0", now=NOW)
-            == mod.dispatch_score(filed_at=NOW, priority="P0", now=NOW) == 96.0)
+    assert (
+        mod.dispatch_score(filed_at=NOW, priority="p0", now=NOW)
+        == mod.dispatch_score(filed_at=NOW, priority="P0", now=NOW)
+        == 96.0
+    )

@@ -57,12 +57,8 @@ def test_canonical_artifacts_exist_in_repo() -> None:
     # These files are gitignored (under .tmp/) but are produced by E.1
     # implementation's Step 0 and Step 0.5. After implementation has run,
     # both should exist.
-    assert manifest_path.exists(), (
-        f"manifest-v3.json missing at {manifest_path} — Step 0 was not run"
-    )
-    assert write_set_path.exists(), (
-        f"write-set.json missing at {write_set_path} — Step 0.5 was not run"
-    )
+    assert manifest_path.exists(), f"manifest-v3.json missing at {manifest_path} — Step 0 was not run"
+    assert write_set_path.exists(), f"write-set.json missing at {write_set_path} — Step 0.5 was not run"
 
 
 def test_manifest_v3_schema_is_complete() -> None:
@@ -118,10 +114,6 @@ def test_write_set_schema_is_complete() -> None:
     # Source-destination symmetry invariant (T-write-set-1 M3).
     sources = write_set["tests_migrating_source_paths"]
     destinations = write_set["tests_migrating_destination_paths"]
-    assert len(sources) == len(destinations), (
-        "tests_migrating_source_paths and _destination_paths must be paired"
-    )
+    assert len(sources) == len(destinations), "tests_migrating_source_paths and _destination_paths must be paired"
     for src, dst in zip(sources, destinations):
-        assert dst == "applications/Agent_Red/" + src, (
-            f"pair mismatch: {src} -> {dst}"
-        )
+        assert dst == "applications/Agent_Red/" + src, f"pair mismatch: {src} -> {dst}"

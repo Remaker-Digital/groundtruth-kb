@@ -150,11 +150,7 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
 def test_project_settings_registers_bridge_visibility_hook() -> None:
     settings = json.loads(_read(".claude/settings.json"))
 
-    pre_tool_commands = [
-        hook["command"]
-        for group in settings["hooks"]["PreToolUse"]
-        for hook in group["hooks"]
-    ]
+    pre_tool_commands = [hook["command"] for group in settings["hooks"]["PreToolUse"] for hook in group["hooks"]]
 
     assert any("formal-artifact-approval-gate.py" in command for command in pre_tool_commands)
 
@@ -163,21 +159,12 @@ def test_project_settings_registers_bridge_visibility_hook() -> None:
     # OR a dispatcher under .claude/hooks/ that delegates to the canonical
     # service via the --emit-startup-service-payload contract. Both shapes
     # preserve governance: the SessionStart hook surface is canonical-service-backed.
-    session_start_hooks = [
-        hook["command"]
-        for group in settings["hooks"]["SessionStart"]
-        for hook in group["hooks"]
-    ]
+    session_start_hooks = [hook["command"] for group in settings["hooks"]["SessionStart"] for hook in group["hooks"]]
     direct_match = any(
-        "session_self_initialization.py" in command
-        and "--emit-report" in command
-        and "--fast-hook" in command
+        "session_self_initialization.py" in command and "--emit-report" in command and "--fast-hook" in command
         for command in session_start_hooks
     )
-    dispatcher_match = any(
-        "session_start_dispatch.py" in command
-        for command in session_start_hooks
-    )
+    dispatcher_match = any("session_start_dispatch.py" in command for command in session_start_hooks)
     assert direct_match or dispatcher_match, (
         "SessionStart must register either the canonical service directly "
         "(--emit-report --fast-hook) or a dispatcher under .claude/hooks/ "
@@ -187,9 +174,7 @@ def test_project_settings_registers_bridge_visibility_hook() -> None:
         # Verify the dispatcher source delegates to the canonical service
         # using the SessionStart-correct startup-service payload contract.
         dispatcher_path = Path(".claude/hooks/session_start_dispatch.py")
-        assert dispatcher_path.is_file(), (
-            f"SessionStart dispatcher path missing: {dispatcher_path}"
-        )
+        assert dispatcher_path.is_file(), f"SessionStart dispatcher path missing: {dispatcher_path}"
         dispatcher_source = dispatcher_path.read_text(encoding="utf-8")
         assert "session_self_initialization.py" in dispatcher_source
         assert "--emit-startup-service-payload" in dispatcher_source
@@ -219,32 +204,27 @@ def test_codex_config_registers_formal_artifact_approval_hook_intent() -> None:
     assert formal_groups
     assert all(group["matcher"] == "Bash" for group in formal_groups)
     assert any(
-        "gtkb-hooks" in hook["command"]
-        and "formal-artifact-approval.cmd" in hook["command"]
+        "gtkb-hooks" in hook["command"] and "formal-artifact-approval.cmd" in hook["command"]
         for group in formal_groups
         for hook in group["hooks"]
     )
     assert any(
-        "gtkb-hooks" in hook["command"]
-        and "session_start_dispatch.py" in hook["command"]
+        "gtkb-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
         for group in hooks["hooks"]["SessionStart"]
         for hook in group["hooks"]
     )
     assert any(
-        "gtkb-hooks" in hook["command"]
-        and "session_wrapup_trigger_dispatch.py" in hook["command"]
+        "gtkb-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
         for group in hooks["hooks"]["UserPromptSubmit"]
         for hook in group["hooks"]
     )
     assert any(
-        "gtkb-hooks" in hook["command"]
-        and "workstream-focus.cmd" in hook["command"]
+        "gtkb-hooks" in hook["command"] and "workstream-focus.cmd" in hook["command"]
         for group in hooks["hooks"]["UserPromptSubmit"]
         for hook in group["hooks"]
     )
     assert any(
-        group.get("matcher") == "Bash"
-        and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
+        group.get("matcher") == "Bash" and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
         for group in pre_tool_groups
     )
     assert "Stop" not in hooks["hooks"]
@@ -469,7 +449,9 @@ def test_session_governance_principles_have_membase_records() -> None:
         assert "well-behaved, fully conformant" in conformance["description"]
 
         codex_fallback = db.get_spec("ADR-CODEX-HOOK-PARITY-FALLBACK-001")
-        assert "not represent .codex/hooks.json as a live Windows interception boundary" in codex_fallback["description"]
+        assert (
+            "not represent .codex/hooks.json as a live Windows interception boundary" in codex_fallback["description"]
+        )
 
         audit = db.get_spec("GOV-SESSION-FORMALIZATION-AUDIT-001")
         assert "audit the session against Deliberation Archive entries" in audit["description"]
@@ -524,9 +506,7 @@ def test_standing_backlog_is_formalized_as_governed_artifact() -> None:
                 assert spec["testability"] == "structural", (
                     f"{spec_id} ({spec_type}) must carry structural testability; got {spec['testability']!r}"
                 )
-                assert "DELIB-0838" in (spec["affected_by"] or ""), (
-                    f"{spec_id} must cite DELIB-0838 in affected_by"
-                )
+                assert "DELIB-0838" in (spec["affected_by"] or ""), f"{spec_id} must cite DELIB-0838 in affected_by"
                 assert "memory/work_list.md" in (spec["source_paths"] or ""), (
                     f"{spec_id} must reference memory/work_list.md in source_paths"
                 )

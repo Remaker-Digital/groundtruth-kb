@@ -15,9 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-TRIGGER = (
-    Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
-)
+TRIGGER = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
 
 
 def test_cross_harness_trigger_imports_apply_pending() -> None:
@@ -34,6 +32,4 @@ def test_cross_harness_trigger_apply_pending_precedes_topology_check() -> None:
     topology_check_pos = text.find("_is_single_harness_topology(project_root)", run_trigger_pos)
     assert apply_pos > -1, "apply_pending call not found in run_trigger()"
     assert topology_check_pos > -1, "topology check not found in run_trigger()"
-    assert apply_pos < topology_check_pos, (
-        "apply_pending must precede topology check in run_trigger()"
-    )
+    assert apply_pos < topology_check_pos, "apply_pending must precede topology check in run_trigger()"

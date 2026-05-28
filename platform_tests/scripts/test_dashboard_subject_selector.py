@@ -124,9 +124,7 @@ def test_model_object_carries_current_work_subject(tmp_path: Path) -> None:
 # --------------------- 4: end-to-end writer integration -------------------
 
 
-def test_dashboard_data_json_carries_work_subject(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dashboard_data_json_carries_work_subject(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``write_dashboard_and_report()`` writes the field at all three locations."""
     monkeypatch.setattr(
         ssi,
@@ -157,9 +155,7 @@ def test_dashboard_data_json_carries_work_subject(
 # ---------- 5: producer boundary (refresh_dashboard_db.py is NOT writer) -
 
 
-def test_refresh_dashboard_db_does_not_write_subject(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_refresh_dashboard_db_does_not_write_subject(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``refresh_database()`` must not write ``dashboard-data.json`` at all."""
     # Force the swimlane out_path away from the real docs/ tree to keep this
     # test hermetic — refresh_database now writes the swimlane, but it is not

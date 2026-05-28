@@ -79,10 +79,7 @@ def test_decision_names_membase_as_authoritative(adr_spec: dict) -> None:
         r"MemBase[^.\n]{0,120}(authoritative|source of truth)",
         decision,
         re.IGNORECASE,
-    ), (
-        "Decision section must tie MemBase to authoritative / source-of-truth "
-        "language"
-    )
+    ), "Decision section must tie MemBase to authoritative / source-of-truth language"
 
 
 def test_decision_names_bridge_as_authoritative(adr_spec: dict) -> None:
@@ -104,7 +101,4 @@ def test_decision_names_deliberation_archive_as_authoritative(adr_spec: dict) ->
         r"Deliberation Archive[^.\n]{0,150}(authoritative|reasoning)",
         decision,
         re.IGNORECASE,
-    ), (
-        "Decision section must tie Deliberation Archive to authoritative / "
-        "reasoning language"
-    )
+    ), "Decision section must tie Deliberation Archive to authoritative / reasoning language"

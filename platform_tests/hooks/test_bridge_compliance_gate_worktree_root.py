@@ -68,9 +68,12 @@ def _build_canonical_and_worktree(tmp_path: Path) -> tuple[Path, Path]:
     the WI-3353 defect surface. Requires git.
     """
     ident = [
-        "-c", "user.email=test@example.com",
-        "-c", "user.name=test",
-        "-c", "commit.gpgsign=false",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=test",
+        "-c",
+        "commit.gpgsign=false",
     ]
     canonical = tmp_path / "canonical"
     canonical.mkdir()
@@ -104,8 +107,7 @@ def _make_db(
     conn = sqlite3.connect(db_path)
     try:
         conn.execute(
-            "CREATE TABLE current_project_work_item_memberships "
-            "(work_item_id TEXT, project_id TEXT, status TEXT)"
+            "CREATE TABLE current_project_work_item_memberships (work_item_id TEXT, project_id TEXT, status TEXT)"
         )
         conn.execute(
             "CREATE TABLE current_project_authorizations "
@@ -153,8 +155,7 @@ def _proposal(*, wi: str = _WI_ID) -> str:
         "# Test Proposal\n\n"
         f"Project Authorization: {_AUTH_ID}\n"
         f"Project: {_PROJECT_ID}\n"
-        f"Work Item: {wi}\n\n"
-        + _SPEC_LINKS
+        f"Work Item: {wi}\n\n" + _SPEC_LINKS
     )
 
 

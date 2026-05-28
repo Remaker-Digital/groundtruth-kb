@@ -28,9 +28,7 @@ REGISTRY_PATH = REPO_ROOT / "scripts" / "gtkb_dashboard" / "control_plane_regist
 
 
 def _load_registry():
-    spec = importlib.util.spec_from_file_location(
-        "control_plane_registry_under_test", REGISTRY_PATH
-    )
+    spec = importlib.util.spec_from_file_location("control_plane_registry_under_test", REGISTRY_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["control_plane_registry_under_test"] = module
@@ -93,9 +91,7 @@ def test_registry_exposes_three_operations_with_required_metadata():
 def test_dashboard_refresh_is_the_only_apply_capable_operation():
     registry = _load_registry()
     assert registry.get_descriptor("dashboard.refresh").supports_dry_run is True
-    assert registry.get_descriptor("dashboard.refresh").required_role_slots == (
-        "dashboard-refresh-token",
-    )
+    assert registry.get_descriptor("dashboard.refresh").required_role_slots == ("dashboard-refresh-token",)
     assert registry.get_descriptor("dashboard.read").supports_dry_run is False
     assert registry.get_descriptor("dashboard.read").required_role_slots == ()
     assert registry.get_descriptor("control_plane.status").supports_dry_run is False
@@ -173,9 +169,7 @@ def test_dashboard_read_returns_typed_envelope_with_required_fields(tmp_path):
 def test_dashboard_refresh_dry_run_does_not_apply(tmp_path):
     registry = _load_registry()
     ctx, calls = _build_context(registry, tmp_path)
-    response = registry.dispatch(
-        {"operation_id": "dashboard.refresh", "dry_run": True}, ctx
-    )
+    response = registry.dispatch({"operation_id": "dashboard.refresh", "dry_run": True}, ctx)
     assert response["status"] == "dry_run"
     assert response["dry_run"] is True
     assert response["details"]["would_refresh"] is True
@@ -194,9 +188,7 @@ def test_dashboard_refresh_apply_invokes_handler_and_wraps_result(tmp_path):
             "record_counts": {"refresh_runs": 2},
         },
     )
-    response = registry.dispatch(
-        {"operation_id": "dashboard.refresh", "dry_run": False}, ctx
-    )
+    response = registry.dispatch({"operation_id": "dashboard.refresh", "dry_run": False}, ctx)
     assert response["status"] == "completed"
     assert response["dry_run"] is False
     assert calls == ["dashboard.refresh"]
@@ -210,9 +202,7 @@ def test_control_plane_status_lists_all_registered_operations(tmp_path):
     operations = response["details"]["operations"]
     reported_ids = {op["operation_id"] for op in operations}
     assert reported_ids == set(registry.list_operation_ids())
-    refresh_entry = next(
-        op for op in operations if op["operation_id"] == "dashboard.refresh"
-    )
+    refresh_entry = next(op for op in operations if op["operation_id"] == "dashboard.refresh")
     assert refresh_entry["supports_dry_run"] is True
     assert refresh_entry["required_role_slots"] == ["dashboard-refresh-token"]
 
@@ -232,9 +222,7 @@ def _make_state(tmp_path, *, token: str = "shared-token"):
 
 def test_refresh_service_read_does_not_require_token(tmp_path):
     service, state = _make_state(tmp_path)
-    status, body = service.handle_control_plane_request(
-        {"operation_id": "dashboard.read"}, state, supplied_token=""
-    )
+    status, body = service.handle_control_plane_request({"operation_id": "dashboard.read"}, state, supplied_token="")
     assert status == HTTPStatus.OK
     assert body["operation_id"] == "dashboard.read"
     assert body["status"] == "ok"
@@ -305,9 +293,7 @@ def test_refresh_service_refresh_apply_calls_refresh_now(tmp_path, monkeypatch):
 
 def test_refresh_service_unknown_operation_returns_404(tmp_path):
     service, state = _make_state(tmp_path)
-    status, body = service.handle_control_plane_request(
-        {"operation_id": "dashboard.write"}, state, supplied_token=""
-    )
+    status, body = service.handle_control_plane_request({"operation_id": "dashboard.write"}, state, supplied_token="")
     assert status == HTTPStatus.NOT_FOUND
     assert body["status"] == "error"
 

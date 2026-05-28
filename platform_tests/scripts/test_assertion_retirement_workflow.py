@@ -145,6 +145,7 @@ def _make_formal_packet(
 ) -> Path:
     """Construct a formal-artifact approval packet file for retire-path tests."""
     import hashlib
+
     content_sha = hashlib.sha256(full_content.encode("utf-8")).hexdigest()
     packet: dict[str, Any] = {
         "artifact_type": artifact_type,
@@ -181,9 +182,11 @@ def _make_kb_with_spec(
     and KnowledgeDB.update_spec internally. Returns the groundtruth.db path.
     """
     import sys as _sys
+
     db_path = tmp_path / "groundtruth.db"
     _sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
     from db import KnowledgeDB
+
     db = KnowledgeDB(str(db_path))
     try:
         db.insert_spec(
@@ -413,8 +416,12 @@ def test_apply_decision_retire_rejects_missing_formal_packet_file(retirement_mod
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-4",
-            decision="retire", packet_path=packet_path, formal_packet_path=nonexistent,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-4",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=nonexistent,
         )
     assert "Formal-approval packet file not found" in str(exc.value)
 
@@ -429,8 +436,12 @@ def test_apply_decision_retire_rejects_invalid_formal_packet_json(retirement_mod
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-5",
-            decision="retire", packet_path=packet_path, formal_packet_path=bad_json,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-5",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=bad_json,
         )
     assert "not valid JSON" in str(exc.value)
 
@@ -445,8 +456,12 @@ def test_apply_decision_retire_rejects_formal_packet_missing_fields(retirement_m
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-6",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-6",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "missing required fields" in str(exc.value)
 
@@ -462,8 +477,12 @@ def test_apply_decision_retire_rejects_wrong_artifact_type(retirement_module, tm
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-7",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-7",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "artifact_type mismatch" in str(exc.value)
 
@@ -478,8 +497,12 @@ def test_apply_decision_retire_rejects_packet_presented_to_user_false(retirement
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-8",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-8",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "presented_to_user" in str(exc.value)
 
@@ -494,8 +517,12 @@ def test_apply_decision_retire_rejects_packet_transcript_captured_false(retireme
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-9",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-9",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "transcript_captured" in str(exc.value)
 
@@ -510,8 +537,12 @@ def test_apply_decision_retire_rejects_packet_invalid_approval_mode(retirement_m
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-10",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-10",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "approval_mode" in str(exc.value)
 
@@ -527,8 +558,12 @@ def test_apply_decision_retire_rejects_formal_packet_wrong_artifact_id(retiremen
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-11",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-11",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "artifact_id mismatch" in str(exc.value)
 
@@ -544,8 +579,12 @@ def test_apply_decision_retire_rejects_formal_packet_wrong_action(retirement_mod
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-12",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-12",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "action mismatch" in str(exc.value)
 
@@ -561,8 +600,12 @@ def test_apply_decision_retire_rejects_formal_packet_wrong_transition_marker(ret
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-13",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-13",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "full_content does not match expected transition marker" in str(exc.value)
 
@@ -578,8 +621,12 @@ def test_apply_decision_retire_refuses_already_retired_spec(retirement_module, t
 
     with pytest.raises(SystemExit) as exc:
         retirement_module.apply_decision(
-            project_root=tmp_path, triage_dir=tmp_path, assertion_id="aid-14",
-            decision="retire", packet_path=packet_path, formal_packet_path=formal_path,
+            project_root=tmp_path,
+            triage_dir=tmp_path,
+            assertion_id="aid-14",
+            decision="retire",
+            packet_path=packet_path,
+            formal_packet_path=formal_path,
         )
     assert "already retired" in str(exc.value)
 

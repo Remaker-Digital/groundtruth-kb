@@ -261,9 +261,5 @@ def test_target_paths_all_within_gtkb_root() -> None:
     """Test #15 — every declared target path resolves under the GT-KB root."""
     for relative in _TARGET_PATHS:
         resolved = (_REPO_ROOT / relative).resolve()
-        assert _REPO_ROOT in resolved.parents or resolved == _REPO_ROOT, (
-            f"target path escapes GT-KB root: {relative}"
-        )
-        assert "applications" not in Path(relative).parts, (
-            f"target path must not be under applications/: {relative}"
-        )
+        assert _REPO_ROOT in resolved.parents or resolved == _REPO_ROOT, f"target path escapes GT-KB root: {relative}"
+        assert "applications" not in Path(relative).parts, f"target path must not be under applications/: {relative}"
