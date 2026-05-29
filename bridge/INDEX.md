@@ -6,6 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-discoverability-cli-slice-2-implementation
+VERIFIED: bridge/gtkb-discoverability-cli-slice-2-implementation-006.md
+NEW: bridge/gtkb-discoverability-cli-slice-2-implementation-005.md
+GO: bridge/gtkb-discoverability-cli-slice-2-implementation-004.md
+REVISED: bridge/gtkb-discoverability-cli-slice-2-implementation-003.md
+NO-GO: bridge/gtkb-discoverability-cli-slice-2-implementation-002.md
+NEW: bridge/gtkb-discoverability-cli-slice-2-implementation-001.md
+
 Document: gtkb-project-id-prefix-idempotent-fix
 VERIFIED: bridge/gtkb-project-id-prefix-idempotent-fix-005.md
 NEW: bridge/gtkb-project-id-prefix-idempotent-fix-004.md

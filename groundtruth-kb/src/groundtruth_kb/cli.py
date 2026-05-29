@@ -555,6 +555,87 @@ def backlog_list(ctx: click.Context, json_output: bool, include_verified: bool) 
         click.echo(f"{order_prefix}\t{item['id']}\t{status}\t{title}")
 
 
+@backlog.command("status")
+@click.option(
+    "--project",
+    "project",
+    default=None,
+    help="Limit the report to a single project id (e.g. PROJECT-GTKB-X).",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--with-orphans",
+    is_flag=True,
+    help="Include work items with no active project membership row.",
+)
+@click.option(
+    "--with-retire-ready",
+    is_flag=True,
+    help="Annotate completion-ready project authorizations via the canonical scanner module.",
+)
+@click.option(
+    "--with-verified-coverage",
+    is_flag=True,
+    help="Annotate per-work-item VERIFIED-bridge coverage via the canonical scanner module.",
+)
+@click.pass_context
+def backlog_status(
+    ctx: click.Context,
+    project: str | None,
+    json_output: bool,
+    with_orphans: bool,
+    with_retire_ready: bool,
+    with_verified_coverage: bool,
+) -> None:
+    """Report unified backlog status: projects, work-item rollups, optional scanner-backed annotations.
+
+    Read-only: no MemBase writes, no bridge/INDEX.md mutation. Base output
+    reports raw resolution_status counts and does not invent a
+    terminal/non-terminal definition. Scanner-backed flags
+    (``--with-retire-ready`` / ``--with-verified-coverage``) attach a
+    ``scanner_caveat`` field naming the canonical in-flight scanner-fix
+    thread.
+    """
+    from groundtruth_kb.cli_backlog_status import (
+        BacklogStatusRequest,
+        build_backlog_status,
+    )
+
+    config = _resolve_config(ctx)
+    request = BacklogStatusRequest(
+        project=project,
+        with_orphans=with_orphans,
+        with_retire_ready=with_retire_ready,
+        with_verified_coverage=with_verified_coverage,
+    )
+    result = build_backlog_status(config, request)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+
+    summary = result["summary"]
+    click.echo(
+        f"Projects: {summary['project_count']} "
+        f"(doubled-prefix: {summary['doubled_prefix_project_count']}) | "
+        f"Active memberships: {summary['total_active_memberships']}"
+    )
+    for project_row in result["projects"]:
+        flag = " [DOUBLED-PREFIX]" if project_row["doubled_prefix_flag"] else ""
+        breakdown = ", ".join(
+            f"{k}={v}" for k, v in project_row["resolution_status_breakdown"].items()
+        )
+        click.echo(
+            f"  {project_row['id']} ({project_row['status']}) "
+            f"wi={project_row['work_item_count']}{flag}"
+            + (f" :: {breakdown}" if breakdown else "")
+        )
+    if with_orphans and "orphan_work_items" in result:
+        click.echo(f"Orphan work items: {len(result['orphan_work_items'])}")
+    if "scanner_caveat" in result:
+        click.echo(f"\n[scanner_caveat] {result['scanner_caveat']}")
+
+
 # ---------------------------------------------------------------------------
 # gt projects
 # ---------------------------------------------------------------------------
