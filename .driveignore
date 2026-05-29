@@ -13,6 +13,17 @@
 #   - the snapshot+upload daemon (future work, see GTKB-DB-BACKUP-001
 #     when filed).
 
+# --- Git internal directory (NEVER cloud-sync a .git/) ---
+# A git repo's durable backup is its remote (origin), not file-level sync of
+# .git/. Drive's per-file sync cadence races git's atomic loose-object writes
+# and can drop/quarantine objects the repo still needs. On 2026-05-29 this
+# produced a missing reachable blob (01448913, a historical lifecycle.py
+# version) that broke `git gc`/repack on every commit -- the same failure
+# class as the S311 SQLite corruption noted above. Excluding .git/ stops Drive
+# from touching the object store. That incident was recovered non-destructively
+# by restoring the object from origin.
+.git/
+
 # --- Live SQLite triples (the corruption trigger) ---
 groundtruth.db
 groundtruth.db-wal
