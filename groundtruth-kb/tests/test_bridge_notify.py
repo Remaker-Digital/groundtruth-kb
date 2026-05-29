@@ -116,6 +116,16 @@ def test_compute_pending_excludes_withdrawn_for_both_recipients(tmp_path: Path) 
     assert len(codex) == 0, f"WITHDRAWN must not be actionable for Codex; got {codex}"
 
 
+def test_deferred_top_status_not_actionable_for_either_role(tmp_path: Path) -> None:
+    """DEFERRED is a deliberate bridge parking state, not role-actionable work."""
+    n = _notify()
+    text, root = _make_index_with_top_file(tmp_path, "foo", "DEFERRED")
+    parsed = n.parse_index(text)
+    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(prime) == 0, f"DEFERRED must not be actionable for Prime; got {prime}"
+    assert len(codex) == 0, f"DEFERRED must not be actionable for Codex; got {codex}"
+
+
 def test_compute_pending_excludes_documents_with_missing_top_file(
     tmp_path: Path,
 ) -> None:
@@ -173,6 +183,93 @@ def test_compute_pending_preserves_index_order(tmp_path: Path) -> None:
     parsed = n.parse_index(text)
     prime, _ = n.compute_actionable_pending(parsed, project_root=tmp_path)
     assert [item.document_name for item in prime] == ["gamma", "alpha", "beta"]
+
+
+# --- WI-3442: scoping-terminal-with-successor classifier fix ----------------
+# Per bridge/gtkb-axis-2-scoping-terminal-classifier-fix-002 (GO).
+
+
+def test_scoping_terminal_with_successor_is_excluded(tmp_path: Path) -> None:
+    """A scoping thread at GO is excluded when its successor (slug without
+    `-scoping` suffix) exists in INDEX, regardless of the successor's status."""
+    n = _notify()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "gtkb-example-scoping-002.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-scoping-001.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-002.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-001.md").write_text("# stub\n", encoding="utf-8")
+    text = (
+        "Document: gtkb-example-scoping\n"
+        "GO: bridge/gtkb-example-scoping-002.md\n"
+        "NEW: bridge/gtkb-example-scoping-001.md\n\n"
+        "Document: gtkb-example\n"
+        "VERIFIED: bridge/gtkb-example-002.md\n"
+        "NEW: bridge/gtkb-example-001.md\n"
+    )
+    parsed = n.parse_index(text)
+    prime, codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    prime_names = {item.document_name for item in prime}
+    codex_names = {item.document_name for item in codex}
+    assert "gtkb-example-scoping" not in prime_names, (
+        f"scoping-terminal must be suppressed from Prime when successor exists; got {prime_names}"
+    )
+    assert "gtkb-example-scoping" not in codex_names, (
+        f"scoping-terminal must be suppressed from Codex when successor exists; got {codex_names}"
+    )
+
+
+def test_scoping_terminal_without_successor_is_included(tmp_path: Path) -> None:
+    """A scoping thread at GO is NOT suppressed when no successor exists; the
+    classifier remains conservative (false-negative) when the bridge protocol's
+    scoping → successor pattern is not yet complete."""
+    n = _notify()
+    text, root = _make_index_with_top_file(
+        tmp_path, "gtkb-example-scoping", "GO"
+    )
+    parsed = n.parse_index(text)
+    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime_names = {item.document_name for item in prime}
+    assert "gtkb-example-scoping" in prime_names, (
+        f"scoping thread without successor must remain Prime-actionable; got {prime_names}"
+    )
+    assert len(codex) == 0
+
+
+def test_scoping_helper_classification_safety(tmp_path: Path) -> None:
+    """Unit test of `_scoping_terminal_with_successor` edge cases.
+
+    Per WI-3442 design: only true scoping-with-successor combinations should
+    be suppressed. Empty-successor slugs (`-scoping` alone) and non-scoping
+    slugs are pass-through.
+    """
+    from groundtruth_kb.bridge.notify import _scoping_terminal_with_successor
+
+    n = _notify()
+
+    def parse_with_docs(*names: str) -> object:
+        bridge_dir = tmp_path / "bridge"
+        if not bridge_dir.exists():
+            bridge_dir.mkdir()
+        parts = []
+        for nm in names:
+            top = bridge_dir / f"{nm}-001.md"
+            if not top.exists():
+                top.write_text("# stub\n", encoding="utf-8")
+            parts.append(f"Document: {nm}\nNEW: bridge/{nm}-001.md\n")
+        return n.parse_index("\n".join(parts))
+
+    pr_with_both = parse_with_docs("foo-scoping", "foo")
+    pr_scoping_only = parse_with_docs("foo-scoping")
+    pr_non_scoping = parse_with_docs("foo")
+    pr_empty_successor = parse_with_docs("-scoping")
+    pr_unrelated = parse_with_docs("foo-scoping", "bar")
+
+    assert _scoping_terminal_with_successor("foo-scoping", pr_with_both) is True
+    assert _scoping_terminal_with_successor("foo-scoping", pr_scoping_only) is False
+    assert _scoping_terminal_with_successor("foo", pr_non_scoping) is False
+    assert _scoping_terminal_with_successor("-scoping", pr_empty_successor) is False
+    assert _scoping_terminal_with_successor("foo-scoping", pr_unrelated) is False
 
 
 # --- Tests for update_notification + read_notification -----------------------

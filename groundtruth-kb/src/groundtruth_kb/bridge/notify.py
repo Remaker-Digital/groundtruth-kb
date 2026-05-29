@@ -47,7 +47,8 @@ Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-
   closure, parking, index_reconciliation, thread_reconciliation,
   operational_state_change, candidate_spec_intake) have no Prime follow-up
   after a GO verdict.
-- ``VERIFIED`` top status → not actionable for either.
+- ``VERIFIED`` / ``ADVISORY`` / ``DEFERRED`` / ``WITHDRAWN`` top status →
+  not actionable for either.
 
 Schema v3 (bumped from v2 per kind-aware-routing slice): ``pending_actions[]``
 entries now carry ``dispatchable`` (bool) + ``classification`` (str:
@@ -72,7 +73,7 @@ NOTIFY_SUBDIR: Final[str] = "notifications"
 NOTIFY_SCHEMA_VERSION: Final[int] = 3
 
 # Per AGENTS.md:153-159 + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION.
-# VERIFIED is closure for both Prime and Codex (not actionable).
+# VERIFIED/ADVISORY/DEFERRED/WITHDRAWN are non-actionable for both Prime and Codex.
 ACTIONABLE_STATUSES_FOR_PRIME: Final[frozenset[str]] = frozenset({BridgeStatus.GO.value, BridgeStatus.NO_GO.value})
 ACTIONABLE_STATUSES_FOR_CODEX: Final[frozenset[str]] = frozenset({BridgeStatus.NEW.value, BridgeStatus.REVISED.value})
 
@@ -86,9 +87,9 @@ KIND_AWARE_ROUTING_ENV_VAR: Final[str] = "GTKB_NOTIFY_KIND_AWARE_ROUTING"
 # before broader matches. Per smart-poller-kind-aware-routing-2026-04-30-009
 # REVISED-4 §1.1.
 _KIND_TERMINAL_TOKENS: Final[tuple[str, ...]] = (
-    "scoping",                  # implementation_scoping, governance_scoping_proposal, scoping_proposal, scoping_addendum
+    "scoping",  # implementation_scoping, governance_scoping_proposal, scoping_proposal, scoping_addendum
     "closure",
-    "parking",                  # parking_acknowledgement
+    "parking",  # parking_acknowledgement
     "index_reconciliation",
     "thread_reconciliation",
     "operational_state_change",
@@ -102,8 +103,8 @@ _KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
     "fix",
     "governance_proposal",
     "architecture_proposal",
-    "post_implementation",      # catches post_implementation_report, post_implementation_report_revision, post-implementation-report (after kebab-norm)
-    "post_impl",                # catches post_impl_report
+    "post_implementation",  # catches post_implementation_report, post_implementation_report_revision, post-implementation-report (after kebab-norm)
+    "post_impl",  # catches post_impl_report
     "implementation_report",
 )
 
@@ -217,7 +218,7 @@ def _derive_dispatchable(top_status: str, classification: str) -> bool:
       approval")
     - GO → ``classification != "terminal"`` (Prime filters terminal kinds,
       keeps everything else)
-    - VERIFIED + others → False (not actionable)
+    - VERIFIED / ADVISORY / DEFERRED / WITHDRAWN + others → False (not actionable)
     """
     if top_status in ACTIONABLE_STATUSES_FOR_CODEX:
         return True
@@ -288,6 +289,28 @@ def _is_actionable_for(status: str, recipient: BridgeAgent) -> bool:
     return False
 
 
+_SCOPING_SUFFIX = "-scoping"
+
+
+def _scoping_terminal_with_successor(doc_name: str, parse_result: ParseResult) -> bool:
+    """Return True if ``doc_name`` is a scoping thread whose successor exists.
+
+    A scoping thread is identified by the ``-scoping`` slug suffix. Its
+    successor is the document at the same slug with the suffix stripped.
+    When the successor exists in ``parse_result.documents`` (at any status:
+    NEW/REVISED/GO/VERIFIED/NO-GO/ADVISORY/WITHDRAWN/DEFERRED), the scoping
+    thread is terminal-for-scoping and no longer actionable for either role.
+
+    Per WI-3442 + bridge/gtkb-axis-2-scoping-terminal-classifier-fix-002 (GO).
+    """
+    if not doc_name.endswith(_SCOPING_SUFFIX):
+        return False
+    successor_name = doc_name[: -len(_SCOPING_SUFFIX)]
+    if not successor_name:
+        return False
+    return any(d.name == successor_name for d in parse_result.documents)
+
+
 def compute_actionable_pending(
     parse_result: ParseResult,
     *,
@@ -301,7 +324,8 @@ def compute_actionable_pending(
 
     - ``GO`` / ``NO-GO`` → Prime list.
     - ``NEW`` / ``REVISED`` → Codex list.
-    - ``VERIFIED`` → excluded (closure for both per AGENTS.md role contract).
+    - ``VERIFIED`` / ``ADVISORY`` / ``DEFERRED`` / ``WITHDRAWN`` → excluded
+      (non-actionable for both per bridge protocol).
     - Documents whose top file is missing on disk are excluded (UNROUTABLE_FILE_MISSING
       semantic from P1 routing).
 
@@ -318,6 +342,13 @@ def compute_actionable_pending(
             continue
         top = doc.versions[0]
         if not (project_root / top.file_path).is_file():
+            continue
+
+        # Suppress scoping-terminal threads whose successor implementation
+        # bridge exists. The scoping conversation's work has moved to the
+        # successor slug; the scoping thread itself is not actionable for
+        # either role (per WI-3442 + classifier-fix GO -002).
+        if _scoping_terminal_with_successor(doc.name, parse_result):
             continue
 
         # Kind-aware classification per smart-poller-kind-aware-routing
@@ -340,7 +371,7 @@ def compute_actionable_pending(
             actionable_for_prime.append(entry)
         elif status_str in ACTIONABLE_STATUSES_FOR_CODEX:
             actionable_for_codex.append(entry)
-        # VERIFIED + anything else: not actionable, skip.
+        # VERIFIED/ADVISORY/DEFERRED/WITHDRAWN + anything else: not actionable, skip.
 
     return actionable_for_prime, actionable_for_codex
 
@@ -381,7 +412,9 @@ def _render_markdown(artifact: NotificationArtifact) -> str:
             # actually suppresses Prime dispatch. NO-GO terminal-kind entries
             # show classification in the column but no prefix because Prime
             # revision is preserved.
-            prefix = "(terminal) " if item.classification == "terminal" and item.top_status == BridgeStatus.GO.value else ""
+            prefix = (
+                "(terminal) " if item.classification == "terminal" and item.top_status == BridgeStatus.GO.value else ""
+            )
             lines.append(
                 f"| {prefix}{item.document_name} | {item.top_status} | {item.top_file} | "
                 f"{item.index_line_number} | {dispatchable_marker} | {item.classification} |"
