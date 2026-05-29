@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
-import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -23,6 +24,12 @@ from groundtruth_kb.project.managed_registry import (
     find_artifact_by_id,
 )
 from groundtruth_kb.project.profiles import get_profile
+
+STANDING_BACKLOG_STALE_NO_GO_DAYS = 14
+_BRIDGE_LATEST_STATUS_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
+)
+_BRIDGE_DATE_RE = re.compile(r"^Date:\s*(\d{4}-\d{2}-\d{2})(?:\s+UTC)?\s*$", re.IGNORECASE)
 
 
 @dataclass
@@ -1859,7 +1866,8 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
             found=False,
             status="warning",
             message=(
-                f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} for cross-harness event-driven trigger setup"
+                f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} "
+                "for cross-harness event-driven trigger setup"
             ),
         )
 
@@ -2162,6 +2170,212 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
     )
 
 
+_HARNESS_EXEC_SCAN_TARGETS = (
+    Path("scripts") / "cross_harness_bridge_trigger.py",
+    Path("scripts") / "verify_antigravity_dispatch.py",
+)
+_HARNESS_EXEC_INROOT_TOOLCHAIN = frozenset({"python", "python3"})
+_HARNESS_EXEC_SUBPROCESS_METHODS = frozenset(
+    {"run", "Popen", "call", "check_output", "check_call"}
+)
+
+
+def _extract_literal_command(node: ast.Call) -> str | None:
+    """Return the literal command name from a subprocess.* or shutil.which() call.
+
+    Detects:
+      - ``shutil.which(<literal>)``
+      - ``subprocess.{run,Popen,call,check_output,check_call}(<literal>, ...)``
+      - ``subprocess.{run,Popen,call,check_output,check_call}([<literal>, ...], ...)``
+
+    Returns ``None`` for parametrized calls (the canonical safe pattern: command
+    list built from the harness registry projection at runtime).
+    """
+    func = node.func
+    if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Name):
+        return None
+    if not node.args:
+        return None
+    module = func.value.id
+    method = func.attr
+    first = node.args[0]
+    if module == "shutil" and method == "which":
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            return first.value
+        return None
+    if module == "subprocess" and method in _HARNESS_EXEC_SUBPROCESS_METHODS:
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            return first.value
+        if isinstance(first, ast.List) and first.elts:
+            head = first.elts[0]
+            if isinstance(head, ast.Constant) and isinstance(head.value, str):
+                return head.value
+        return None
+    return None
+
+
+def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
+    """Bound cross-harness exec resolution to registry-enumerated harness commands.
+
+    Implements the deterministic bound for the External Harness Executable
+    Resolution Exception in ``.claude/rules/project-root-boundary.md`` per
+    ``DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION`` and bridge
+    ``gtkb-root-boundary-external-harness-exec-exception`` (GO at -006).
+
+    Loads ``harness-state/harness-registry.json``; collects the set of
+    ``invocation_surfaces.*.argv[0]`` command names. AST-scans
+    ``scripts/cross_harness_bridge_trigger.py`` and
+    ``scripts/verify_antigravity_dispatch.py`` for literal ``shutil.which`` /
+    ``subprocess.{run,Popen,call,check_output,check_call}`` invocations.
+    Classifies each literal command name against the allowed set, the
+    in-root Python toolchain, and in-root absolute paths.
+
+    Status:
+      - ``pass``: every literal exec resolution targets a registry-enumerated
+        harness command, an in-root Python interpreter, or an in-root absolute
+        path; or no literal resolutions exist (the canonical pattern: parametrized
+        command lists built from the registry projection).
+      - ``warning``: the harness registry is missing or empty (exception is
+        vacuous), or a scan-target surface is missing.
+      - ``fail``: a literal subprocess/shutil.which call routes a non-harness
+        command name out-of-root (violates the bound).
+    """
+    check_name = "External harness exec boundary"
+
+    registry_path = target / "harness-state" / "harness-registry.json"
+    if not registry_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=(
+                "harness-state/harness-registry.json missing; the External Harness "
+                "Executable Resolution Exception cannot be enforced without an "
+                "enumerated harness registry"
+            ),
+        )
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=f"harness-state/harness-registry.json unreadable: {exc}",
+        )
+
+    allowed_commands: set[str] = set()
+    harnesses = registry.get("harnesses", []) if isinstance(registry, dict) else []
+    if isinstance(harnesses, list):
+        for h in harnesses:
+            if not isinstance(h, dict):
+                continue
+            surfaces = h.get("invocation_surfaces", {})
+            if not isinstance(surfaces, dict):
+                continue
+            for surface in surfaces.values():
+                if not isinstance(surface, dict):
+                    continue
+                argv = surface.get("argv")
+                if isinstance(argv, list) and argv and isinstance(argv[0], str):
+                    allowed_commands.add(argv[0])
+
+    if not allowed_commands:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                "harness registry enumerates no invocation_surfaces.*.argv[0] commands; "
+                "the External Harness Executable Resolution Exception is vacuous and "
+                "cross-harness dispatch has no allowed out-of-root targets"
+            ),
+        )
+
+    scan_paths = [target / p for p in _HARNESS_EXEC_SCAN_TARGETS]
+    missing = [p.relative_to(target).as_posix() for p in scan_paths if not p.is_file()]
+    if missing:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"cross-harness exec resolution surface(s) missing: {', '.join(missing)}; "
+                f"the External Harness Executable Resolution Exception bound cannot be "
+                f"fully verified"
+            ),
+        )
+
+    target_resolved = target.resolve()
+    violations: list[str] = []
+    for path in scan_paths:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError) as exc:
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="fail",
+                message=(
+                    f"could not parse {path.relative_to(target).as_posix()}: {exc}"
+                ),
+            )
+        rel = path.relative_to(target).as_posix()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            literal_cmd = _extract_literal_command(node)
+            if literal_cmd is None:
+                continue
+            if literal_cmd in allowed_commands:
+                continue
+            if literal_cmd in _HARNESS_EXEC_INROOT_TOOLCHAIN:
+                continue
+            try:
+                cmd_path = Path(literal_cmd)
+                if cmd_path.is_absolute():
+                    cmd_resolved = cmd_path.resolve()
+                    if str(cmd_resolved).startswith(str(target_resolved)):
+                        continue
+            except (OSError, ValueError):
+                pass
+            violations.append(
+                f"{rel}: literal command {literal_cmd!r} (not a registry-enumerated "
+                f"harness command)"
+            )
+
+    if violations:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                "non-harness out-of-root executable resolution detected in cross-harness "
+                "surface(s); violates the External Harness Executable Resolution Exception "
+                "bound (.claude/rules/project-root-boundary.md): "
+                + "; ".join(violations)
+            ),
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=(
+            f"cross-harness exec resolution bounded to registry-enumerated harness "
+            f"commands ({len(allowed_commands)} enumerated: {sorted(allowed_commands)}); "
+            f"no literal non-harness commands in scanned surface(s)"
+        ),
+    )
+
+
 def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
     """Check role-set wire form, valid tokens, no duplicates, topology consistency.
 
@@ -2238,18 +2452,14 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
                 legacy_scalar_count += 1
                 if raw_role.strip().lower() not in valid_read_tokens:
                     issues.append(
-                        f"harness {harness_label!r}: legacy scalar role "
-                        f"{raw_role!r} not in valid READ vocabulary"
+                        f"harness {harness_label!r}: legacy scalar role {raw_role!r} not in valid READ vocabulary"
                     )
             elif isinstance(raw_role, list):
                 list_form_count += 1
                 seen: set[str] = set()
                 for token in raw_role:
                     if not isinstance(token, str):
-                        issues.append(
-                            f"harness {harness_label!r}: role-set contains non-string token "
-                            f"{token!r}"
-                        )
+                        issues.append(f"harness {harness_label!r}: role-set contains non-string token {token!r}")
                         continue
                     canonical = token.strip().lower()
                     if canonical not in valid_read_tokens:
@@ -2258,10 +2468,7 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
                             f"{token!r} (valid: {sorted(valid_read_tokens)})"
                         )
                     if canonical in seen:
-                        issues.append(
-                            f"harness {harness_label!r}: role-set contains duplicate token "
-                            f"{token!r}"
-                        )
+                        issues.append(f"harness {harness_label!r}: role-set contains duplicate token {token!r}")
                     seen.add(canonical)
             else:
                 issues.append(
@@ -2274,10 +2481,7 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
             # intrinsically satisfied. The only residual drift is a row that
             # carries a role but no ``id``.
             if not (isinstance(harness_id, str) and harness_id):
-                issues.append(
-                    "harness registry record carries a role but no 'id' "
-                    "(identity/role topology drift)"
-                )
+                issues.append("harness registry record carries a role but no 'id' (identity/role topology drift)")
     else:
         issues.append("harness-registry.json 'harnesses' field is not a JSON list")
 
@@ -2359,9 +2563,7 @@ def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
             harness_id = record.get("id")
             raw_role = record.get("role")
             if isinstance(raw_role, list):
-                canonical = {
-                    str(t).strip().lower() for t in raw_role if isinstance(t, str)
-                }
+                canonical = {str(t).strip().lower() for t in raw_role if isinstance(t, str)}
                 if len(canonical) >= 2 and "prime-builder" in canonical and "loyal-opposition" in canonical:
                     multi_role_harnesses.append(str(harness_id))
 
@@ -2430,7 +2632,7 @@ def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
                     f"-ErrorAction SilentlyContinue; "
                     f"$lr = if ($info -and $info.LastRunTime) "
                     f"{{ $info.LastRunTime.ToString('o') }} else {{ '' }}; "
-                    f"Write-Output \"REGISTERED|$lr\" "
+                    f'Write-Output "REGISTERED|$lr" '
                     f"}} else {{ Write-Output 'NOT_REGISTERED' }}"
                 ),
             ],
@@ -2492,12 +2694,10 @@ def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
                 ),
             )
         try:
-            from datetime import datetime, timezone
-
             last_run_dt = datetime.fromisoformat(last_run.replace("Z", "+00:00"))
             if last_run_dt.tzinfo is None:
-                last_run_dt = last_run_dt.replace(tzinfo=timezone.utc)
-            age_seconds = (datetime.now(timezone.utc) - last_run_dt).total_seconds()
+                last_run_dt = last_run_dt.replace(tzinfo=UTC)
+            age_seconds = (datetime.now(UTC) - last_run_dt).total_seconds()
         except (ValueError, OSError):
             age_seconds = stale_threshold_seconds + 1
 
@@ -2627,6 +2827,214 @@ def _check_da_harvest_coverage(target: Path) -> ToolCheck:
 # ── Main entry point ──────────────────────────────────────────────────
 
 
+def _latest_bridge_status_entries(index_text: str) -> list[dict[str, str]]:
+    """Return the top status row for each bridge document in INDEX order."""
+
+    entries: list[dict[str, str]] = []
+    current_document: str | None = None
+    for raw_line in index_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("Document: "):
+            current_document = line.removeprefix("Document: ").strip()
+            continue
+        if current_document is None:
+            continue
+        match = _BRIDGE_LATEST_STATUS_RE.match(line)
+        if not match:
+            continue
+        entries.append(
+            {
+                "document": current_document,
+                "status": match.group(1),
+                "path": match.group(2),
+            }
+        )
+        current_document = None
+    return entries
+
+
+def _bridge_file_date(path: Path) -> datetime | None:
+    if not path.is_file():
+        return None
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()[:80]:
+            match = _BRIDGE_DATE_RE.match(line.strip())
+            if match:
+                return datetime.fromisoformat(match.group(1)).replace(tzinfo=UTC)
+    except OSError:
+        return None
+    return None
+
+
+def _active_authorized_work_item_ids(db: Any) -> set[str]:
+    authorized: set[str] = set()
+    for authorization in db.list_project_authorizations(status="active"):
+        raw_ids = (
+            authorization.get("included_work_item_ids_parsed")
+            or authorization.get("_included_work_item_ids_parsed")
+            or []
+        )
+        if not isinstance(raw_ids, list):
+            continue
+        authorized.update(str(item_id) for item_id in raw_ids if str(item_id).strip())
+    return authorized
+
+
+def check_standing_backlog_health(
+    target: Path,
+    *,
+    stale_no_go_days: int = STANDING_BACKLOG_STALE_NO_GO_DAYS,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Return a machine-readable standing-backlog health payload.
+
+    Findings use the severity taxonomy required by GTKB-GOV-010:
+    orphaned-WI=WARN, stale-NO-GO=WARN, missing-evidence=FAIL.
+    """
+
+    from groundtruth_kb.db import KnowledgeDB
+
+    target = target.resolve()
+    now = now or datetime.now(UTC)
+    findings: list[dict[str, Any]] = []
+
+    db_path = target / "groundtruth.db"
+    if not db_path.is_file():
+        findings.append(
+            {
+                "kind": "missing-evidence",
+                "severity": "FAIL",
+                "message": "groundtruth.db is missing; cannot evaluate open work-item authorization coverage.",
+                "path": "groundtruth.db",
+            }
+        )
+    else:
+        db = KnowledgeDB(db_path)
+        try:
+            authorized_work_item_ids = _active_authorized_work_item_ids(db)
+            for item in db.get_open_work_items():
+                item_id = str(item.get("id") or "")
+                if item_id and item_id not in authorized_work_item_ids:
+                    findings.append(
+                        {
+                            "kind": "orphaned-WI",
+                            "severity": "WARN",
+                            "work_item_id": item_id,
+                            "project_name": item.get("project_name"),
+                            "resolution_status": item.get("resolution_status"),
+                            "message": (
+                                f"Open work item {item_id} is not listed in any active "
+                                "project authorization's included_work_item_ids."
+                            ),
+                        }
+                    )
+        except Exception as exc:  # intentional-catch: doctor payload, error -> FAIL finding
+            findings.append(
+                {
+                    "kind": "missing-evidence",
+                    "severity": "FAIL",
+                    "message": f"Could not evaluate work-item authorization coverage: {exc}",
+                    "path": "groundtruth.db",
+                }
+            )
+        finally:
+            db.close()
+
+    index_path = target / "bridge" / "INDEX.md"
+    if not index_path.is_file():
+        findings.append(
+            {
+                "kind": "missing-evidence",
+                "severity": "FAIL",
+                "message": "bridge/INDEX.md is missing; cannot evaluate stale NO-GO bridge entries.",
+                "path": "bridge/INDEX.md",
+            }
+        )
+    else:
+        try:
+            entries = _latest_bridge_status_entries(index_path.read_text(encoding="utf-8"))
+            for entry in entries:
+                if entry["status"] != "NO-GO":
+                    continue
+                bridge_file = target / entry["path"]
+                decided_at = _bridge_file_date(bridge_file)
+                if decided_at is None:
+                    findings.append(
+                        {
+                            "kind": "missing-evidence",
+                            "severity": "FAIL",
+                            "document": entry["document"],
+                            "path": entry["path"],
+                            "message": f"Latest NO-GO file {entry['path']} has no parseable Date line.",
+                        }
+                    )
+                    continue
+                age_days = (now - decided_at).days
+                if age_days > stale_no_go_days:
+                    findings.append(
+                        {
+                            "kind": "stale-NO-GO",
+                            "severity": "WARN",
+                            "document": entry["document"],
+                            "path": entry["path"],
+                            "age_days": age_days,
+                            "threshold_days": stale_no_go_days,
+                            "message": (
+                                f"Bridge document {entry['document']} is latest NO-GO for "
+                                f"{age_days} days, exceeding threshold {stale_no_go_days}."
+                            ),
+                        }
+                    )
+        except Exception as exc:  # intentional-catch: doctor payload, error -> FAIL finding
+            findings.append(
+                {
+                    "kind": "missing-evidence",
+                    "severity": "FAIL",
+                    "message": f"Could not evaluate bridge stale NO-GO state: {exc}",
+                    "path": "bridge/INDEX.md",
+                }
+            )
+
+    fail_count = sum(1 for finding in findings if finding["severity"] == "FAIL")
+    warn_count = sum(1 for finding in findings if finding["severity"] == "WARN")
+    status = "fail" if fail_count else "warning" if warn_count else "pass"
+    return {
+        "schema_version": 1,
+        "check": "standing_backlog_health",
+        "status": status,
+        "threshold_days": stale_no_go_days,
+        "summary": {
+            "finding_count": len(findings),
+            "fail_count": fail_count,
+            "warn_count": warn_count,
+            "orphaned_wi_count": sum(1 for finding in findings if finding["kind"] == "orphaned-WI"),
+            "stale_no_go_count": sum(1 for finding in findings if finding["kind"] == "stale-NO-GO"),
+            "missing_evidence_count": sum(1 for finding in findings if finding["kind"] == "missing-evidence"),
+        },
+        "findings": findings,
+    }
+
+
+def _check_standing_backlog_health(target: Path) -> ToolCheck:
+    payload = check_standing_backlog_health(target)
+    summary = payload["summary"]
+    if payload["status"] == "pass":
+        message = "Standing backlog health: no findings"
+    else:
+        message = (
+            "Standing backlog health: "
+            f"{summary['fail_count']} fail, {summary['warn_count']} warn "
+            f"({summary['finding_count']} findings)"
+        )
+    return ToolCheck(
+        name="Standing backlog health",
+        required=True,
+        found=True,
+        status="fail" if payload["status"] == "fail" else "warning" if payload["status"] == "warning" else "pass",
+        message=message,
+    )
+
+
 def run_doctor(
     target: Path,
     profile: str,
@@ -2683,12 +3091,14 @@ def run_doctor(
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
         checks.append(_check_cross_harness_trigger(target))
+        checks.append(_check_external_harness_exec_boundary(target))
         # IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
         # (Codex GO at -014): role-set schema validation + single-harness
         # dispatcher applicability check.
         checks.append(_check_role_set_topology_consistency(target))
         checks.append(_check_single_harness_dispatcher_when_required(target))
         checks.append(_check_da_harvest_coverage(target))
+        checks.append(_check_standing_backlog_health(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
     # Local import avoids a circular dependency: doctor_isolation imports

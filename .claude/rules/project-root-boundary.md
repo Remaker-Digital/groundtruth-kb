@@ -54,3 +54,38 @@ Owner approval is per-manifest, not per-run; adding new sandbox paths requires:
 1. A code change to `_OUTPUT_DIR_ALLOWLIST_PATTERNS` in `scripts/rehearse/_common.py` (which extends the executable allowlist).
 2. An owner-approved manifest update through the bridge protocol (which exercises the new pattern under owner review).
 3. Synchronized update of this rule's allowlist citation to keep rule text and source code aligned (verified by tests/scripts/test_rehearse_isolation.py asserting `_OUTPUT_DIR_ALLOWLIST_DESC` equals the rule-text quotation).
+
+## External Harness Executable Resolution Exception
+
+GT-KB cross-harness operations may resolve and invoke external AI coding harness
+executables (e.g., codex, claude, gemini) that are installed outside E:\GT-KB by
+their own toolchains (npm-global, user-install, system package managers) when ALL
+of the following hold:
+
+1. The executable is an AI coding harness enumerated in the harness registry
+   (harness-state/harness-registry.json) via an invocation_surfaces.*.argv entry.
+   Only registry-enumerated harness command names are eligible.
+2. Resolution uses one of: (a) ambient PATH resolution provided by the launching
+   context (the mechanism by which codex/claude are already dispatched), or (b) a
+   location configured in the in-root platform env source-of-truth (.env.local)
+   per GOV-ENV-LOCAL-AUTHORITY-001, which is the SoT for hard path prefixes and
+   CLI configuration choices. No out-of-root absolute path is stored as a literal
+   in source, specs, registry values, or state.
+3. The dependency is limited to INVOKING the external harness executable. It does
+   NOT extend to reading, writing, verifying, or requiring any other out-of-root
+   project artifact (specs, tests, source, state, bridge, dashboard, knowledge
+   base).
+4. The deterministic doctor check _check_external_harness_exec_boundary enforces
+   the bound: it confirms any out-of-root executable dependency in GT-KB
+   cross-harness code resolves to a registry-enumerated harness command, and
+   reports FAIL if non-harness project work is routed to an out-of-root path.
+
+This exception is narrow and harness-specific. External AI coding harnesses are,
+by their nature, installed outside the platform root by their own toolchains, and
+the cross-harness dispatch substrate must invoke them. The exception does NOT
+relax the core directive for project artifacts: all active GT-KB project files and
+artifacts MUST remain within E:\GT-KB, and no GT-KB project artifact may be
+created, read as a live dependency, updated, verified, or required from outside
+that root.
+
+Source: DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION (owner S366 AUQ).
