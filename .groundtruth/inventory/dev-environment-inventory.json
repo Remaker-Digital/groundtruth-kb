@@ -5,7 +5,7 @@
     "script_hash": "sha256:f323f36ebb1d4d960dcc9cca9324c9d98c6494d5cf676b0d18e5ba1686ec4255",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-28T17:03:22Z",
+  "generated_at": "2026-05-29T17:05:48Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -243,7 +243,7 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 32,
+      "count": 34,
       "items": [
         "alternatives-investigation",
         "arch-audit",
@@ -257,6 +257,7 @@
         "deploy",
         "grill-me-for-clarification",
         "gtkb-benchmarks",
+        "gtkb-hygiene-sweep",
         "harness-parity-review",
         "kb-adr",
         "kb-assert",
@@ -268,6 +269,7 @@
         "kb-spec",
         "kb-work-item",
         "lo-opportunity-radar",
+        "loyal-opposition-hygiene-assessment",
         "projects",
         "proposal-review",
         "release-candidate-gate",
@@ -653,7 +655,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -667,7 +669,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {
