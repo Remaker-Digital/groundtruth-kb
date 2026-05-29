@@ -81,14 +81,32 @@ def normalize_inventory(payload: dict[str, Any], volatile_paths: list[str] | tup
 
 
 def _delete_dotted_path(payload: Any, dotted_path: str) -> None:
+    """Delete a dotted volatile path from the inventory payload in place.
+
+    Supports a single-level ``*`` wildcard segment so a registry entry like
+    ``toolchain.*.version`` strips the ``version`` key from every tool sub-dict
+    (durable across future tools) without enumerating each tool. Non-wildcard
+    components retain exact-match behavior, so existing volatile paths such as
+    ``generated_at`` and ``redaction.sensitive_environment_entry_count`` are
+    unaffected.
+    """
     parts = [part for part in dotted_path.split(".") if part]
-    current = payload
-    for part in parts[:-1]:
-        if not isinstance(current, dict) or part not in current:
-            return
-        current = current[part]
-    if isinstance(current, dict) and parts:
-        current.pop(parts[-1], None)
+    if parts:
+        _delete_path_parts(payload, parts)
+
+
+def _delete_path_parts(current: Any, parts: list[str]) -> None:
+    if not isinstance(current, dict):
+        return
+    head, rest = parts[0], parts[1:]
+    keys = list(current.keys()) if head == "*" else [head]
+    for key in keys:
+        if key not in current:
+            continue
+        if rest:
+            _delete_path_parts(current[key], rest)
+        else:
+            current.pop(key, None)
 
 
 def inventory_diff_summary(baseline: dict[str, Any], current: dict[str, Any]) -> list[str]:

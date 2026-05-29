@@ -4,6 +4,16 @@ volatile_inventory_paths = [
   "generated_at",
   "redaction.sensitive_environment_entry_count",
   "redaction.sensitive_environment_categories",
+  # toolchain.*.version: tool version strings (pytest/ruff/pip/...) are read
+  # via the interpreter that runs the drift checker. The pre-commit hook uses
+  # the PATH `python`, which can differ from the canonical groundtruth-kb/.venv
+  # interpreter, producing interpreter-specific phantom drift that froze
+  # commits. Versions remain RECORDED in the inventory; only the version field
+  # is non-blocking for drift. Non-version toolchain fields (status,
+  # classification, presence) and all other inventory keys continue to gate.
+  # Owner decision DELIB-2504 (S369) / WI-3449; the wildcard segment is honored
+  # by _delete_dotted_path in scripts/check_dev_environment_inventory_drift.py.
+  "toolchain.*.version",
 ]
 
 [[protected_artifacts]]
