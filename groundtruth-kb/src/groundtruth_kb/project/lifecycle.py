@@ -14,10 +14,11 @@ PROJECT_TERMINAL_STATUS = "retired"
 COMPLETED_PROJECT_AUTHORIZATION_STATUS = "completed"
 PROJECTS_CHANGED_BY = "gt-projects"
 
-# Bridge proposal/report metadata line: ``Work Item: WI-1234`` (or a GTKB-/
-# WORKLIST- descriptive id), optionally backtick-wrapped.
+# Bridge proposal/report metadata line: ``Work Item: WI-1234`` (including
+# spec-intake ``WI-AUTO-*`` ids, or a GTKB-/WORKLIST- descriptive id),
+# optionally backtick-wrapped.
 _WORK_ITEM_LINE_RE = re.compile(
-    r"^Work Item:\s*`?(WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
+    r"^Work Item:\s*`?(WI-AUTO-[A-Z0-9-]+|WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
     re.MULTILINE,
 )
 
@@ -383,13 +384,22 @@ class ProjectLifecycleService:
         ]
 
     def _authorization_completion_ready(
-        self, authorization: dict[str, Any], verified_work_items: set[str]
+        self, authorization: dict[str, Any], verified_for_project: set[str]
     ) -> bool:
-        """True when ``authorization`` is active and every gating work item has
-        a VERIFIED bridge thread.
+        """True when ``authorization`` is active and every gating work item is in
+        ``verified_for_project``.
+
+        ``verified_for_project`` is the PROJECT-SCOPED verified set for this
+        authorization's project (per ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001``
+        v4): the caller looks it up by ``project_id`` from
+        ``_verified_work_items_by_project()``. Passing a project-scoped set
+        (not a global one) is the NO-GO -012 F1 fix — coverage from one
+        project's implements-linked threads cannot satisfy another project's
+        authorization. (The fail-safe diagnostic deliberately passes the global
+        v3 baseline instead, to compute "what v3 would have completed".)
 
         The gating set is the project's active membership-linked work items
-        (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2). An authorization
+        (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001). An authorization
         whose project has no active membership links is not completion-ready.
         """
         if authorization.get("status") != ACTIVE_PROJECT_AUTHORIZATION_STATUS:
@@ -398,38 +408,100 @@ class ProjectLifecycleService:
         if not project_id:
             return False
         included = self._project_membership_work_item_ids(project_id)
-        return bool(included) and all(work_item in verified_work_items for work_item in included)
+        return bool(included) and all(work_item in verified_for_project for work_item in included)
+
+    def _implements_links_by_project(self) -> dict[str, set[str]]:
+        """Return ``{project_id: {bridge_thread_slug}}`` for active implements links.
+
+        v4 PROJECT-SCOPED 'addressing-thread' discriminator per
+        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v4 clause (a):
+        coverage from a thread T accrues ONLY to the project(s) that themselves
+        hold an active ``project_artifact_links`` row (``artifact_type =
+        'bridge_thread'``, ``relationship = 'implements'``, ``status =
+        'active'``) for T's slug. A link held by a *different* project does not
+        transfer coverage (NO-GO -012 F1 fix). Incidental ``'related'`` /
+        ``'implementation_proposal'`` / ``'source_evidence'`` links do not
+        contribute. Reads ``current_project_artifact_links`` (latest-version
+        view) so superseded rows are excluded.
+        """
+        rows = self.db._get_conn().execute(
+            "SELECT project_id, artifact_ref FROM current_project_artifact_links "
+            "WHERE artifact_type = 'bridge_thread' "
+            "AND relationship = 'implements' "
+            "AND status = 'active'"
+        ).fetchall()
+        by_project: dict[str, set[str]] = {}
+        for project_id, slug in rows:
+            if project_id and slug:
+                by_project.setdefault(str(project_id), set()).add(str(slug))
+        return by_project
 
     @staticmethod
-    def _verified_work_items(project_root: Path) -> set[str]:
-        """Return work-item ids covered by a bridge thread whose latest
-        ``bridge/INDEX.md`` status is ``VERIFIED``.
+    def _verified_thread_work_items(project_root: Path) -> dict[str, set[str]]:
+        """Return ``{bridge_thread_slug: {work_item_id}}`` for VERIFIED-topped threads.
 
-        Mirrors the IP-1 scanner's readiness check using the canonical bridge
-        index parser directly. A cross-layer import of the ``scripts/`` scanner
-        from package code was rejected as fragile; both call sites delegate to
-        the same ``groundtruth_kb.bridge.detector.parse_index`` parser.
+        Scans ALL versions of each VERIFIED-topped thread for ``Work Item:``
+        metadata (D3 corrected scope). Uses the canonical
+        ``groundtruth_kb.bridge.detector.parse_index`` parser directly; a
+        cross-layer import of the ``scripts/`` scanner from package code was
+        rejected as fragile, so both layers delegate to the same parser.
         """
         from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
 
         root = Path(project_root)
         index_path = root / "bridge" / "INDEX.md"
         if not index_path.is_file():
-            return set()
+            return {}
         result = parse_index(index_path.read_text(encoding="utf-8"), project_root=root)
-        verified: set[str] = set()
+        by_thread: dict[str, set[str]] = {}
         for document in result.documents:
             top = document.current_top
             if top is None or top.status != BridgeStatus.VERIFIED:
                 continue
+            wis: set[str] = set()
             for version in document.versions:
                 file_path = root / version.file_path
                 if not file_path.is_file():
                     continue
                 text = file_path.read_text(encoding="utf-8", errors="replace")
                 for match in _WORK_ITEM_LINE_RE.finditer(text):
-                    verified.add(match.group(1).strip())
-        return verified
+                    wis.add(match.group(1).strip())
+            if wis:
+                by_thread[document.name] = wis
+        return by_thread
+
+    def _verified_work_items_by_project(self, project_root: Path) -> dict[str, set[str]]:
+        """Return ``{project_id: {verified work_item_id}}`` (project-scoped; F1 fix).
+
+        WI-X is VERIFIED *for project P* iff P holds an active
+        ``relationship='implements'`` link to a VERIFIED-topped thread citing
+        WI-X. Mirrors the scanner's ``verified_work_items_by_project()``. This
+        is the only completion-authorizing view; there is no global decision set.
+        """
+        links_by_project = self._implements_links_by_project()
+        wis_by_thread = self._verified_thread_work_items(project_root)
+        verified_by_project: dict[str, set[str]] = {}
+        for project_id, slugs in links_by_project.items():
+            verified: set[str] = set()
+            for slug in slugs:
+                verified |= wis_by_thread.get(slug, set())
+            verified_by_project[project_id] = verified
+        return verified_by_project
+
+    def _all_verified_work_items(self, project_root: Path) -> set[str]:
+        """Return the GLOBAL union of WIs cited by any VERIFIED-topped thread.
+
+        This is the v3 (over-broad, project-blind) baseline. It is used ONLY by
+        the ``include_fail_safe_pauses`` diagnostic in
+        ``auto_complete_ready_authorizations()`` to compute "what v3 would have
+        completed" — never for a completion authorization decision (which is
+        always project-scoped via ``_verified_work_items_by_project()``).
+        """
+        wis_by_thread = self._verified_thread_work_items(project_root)
+        out: set[str] = set()
+        for wis in wis_by_thread.values():
+            out |= wis
+        return out
 
     def _work_item_in_other_active_project(self, work_item_id: str, exclude_project_id: str) -> bool:
         """True when ``work_item_id`` has an active membership link in some
@@ -553,7 +625,9 @@ class ProjectLifecycleService:
                 f"Project {project_id} has no active membership-linked work items; "
                 "completion readiness cannot be established."
             )
-        verified = self._verified_work_items(project_root)
+        # Project-scoped verified set (v4 F1 fix): only THIS project's own
+        # implements-linked VERIFIED threads count toward its completion.
+        verified = self._verified_work_items_by_project(project_root).get(project_id, set())
         unverified = [wi for wi in included if wi not in verified]
         if unverified:
             raise ProjectLifecycleError(
@@ -580,9 +654,7 @@ class ProjectLifecycleService:
         # retirement is collective - project, authorization, and associated
         # VERIFIED work items retire together).
         other_active = [
-            a
-            for a in self.db.list_project_authorizations(project_id, status="active")
-            if a.get("id") != norm_auth_id
+            a for a in self.db.list_project_authorizations(project_id, status="active") if a.get("id") != norm_auth_id
         ]
         project_retired = False
         retired_work_items: list[str] = []
@@ -615,39 +687,99 @@ class ProjectLifecycleService:
         changed_by: str = PROJECTS_CHANGED_BY,
         change_reason: str = (
             "Auto-completed: all membership-linked work items VERIFIED "
-            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 automatic completion)."
+            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v4 automatic completion)."
         ),
+        include_fail_safe_pauses: bool = False,
     ) -> list[dict[str, Any]]:
-        """Scan every active project authorization and auto-complete each one
-        whose gating work items all have a VERIFIED bridge thread.
+        """Scan every active project authorization; auto-complete those whose
+        gating work items are all covered by an implements-linked VERIFIED
+        bridge thread; optionally emit fail-safe manual-review records for
+        those that would have completed under v3 but are paused under v4.
 
-        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2: completion and
-        retirement are automatic and require no owner confirmation. Idempotent -
-        a completed authorization is no longer active, so a re-run does not
-        re-process it. Returns one result dict per authorization completed in
-        this pass.
+        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v4: completion and
+        retirement are automatic on the implements-linked all-WI-VERIFIED
+        condition (clause (a)+(b)+(c)). When a project has gating WIs but no
+        implements-linked VERIFIED thread covers them, the auto-completion
+        pass does NOT fire and the condition is surfaced as a manual-review
+        record (clause (d): the fail-safe direction is "auto-completion
+        paused" rather than "spurious retirement").
+
+        The fail-safe surface is opt-in (``include_fail_safe_pauses=True``)
+        so existing callers - notably the byte-identical
+        ``project-completion-surface`` hooks per ADR-CODEX-HOOK-PARITY-FALLBACK-001
+        - receive the historical return shape unchanged. New callers (tests,
+        diagnostic surfaces, future hook upgrades) opt in to receive both
+        kinds of records, distinguished by the ``outcome`` key.
+
+        Return record shape:
+          ``outcome="completed"`` - existing shape + new outcome key:
+              ``authorization_id``, ``project_id``, ``project_retired``,
+              ``retired_work_items``, ``outcome="completed"``.
+          ``outcome="manual_review_required"`` (opt-in only):
+              ``authorization_id``, ``project_id``, ``outcome``, ``reason``,
+              ``gating_work_items``, ``covered_under_v3``, ``missing_under_v4``.
+
+        Idempotent: a completed authorization is no longer active, so a re-run
+        does not re-process it. The fail-safe records are read-only (no
+        mutation); a re-run yields the same set until ``implements`` links are
+        backfilled (Phase-2).
         """
-        verified = self._verified_work_items(project_root)
-        completed: list[dict[str, Any]] = []
+        # Project-scoped decision map (v4 F1 fix): {project_id: {verified WI}}.
+        verified_by_project = self._verified_work_items_by_project(project_root)
+        # Global v3 baseline (over-broad, project-blind) used ONLY for the
+        # fail-safe diagnostic — never for a completion decision.
+        verified_global_v3: set[str] | None = (
+            self._all_verified_work_items(project_root) if include_fail_safe_pauses else None
+        )
+        records: list[dict[str, Any]] = []
         for project in self.db.list_projects(include_terminal=False):
             project_id = str(project.get("id") or "")
             if not project_id:
                 continue
+            project_verified = verified_by_project.get(project_id, set())
             for authorization in self.db.list_project_authorizations(project_id, status="active"):
-                if not self._authorization_completion_ready(authorization, verified):
+                authorization_id = str(authorization["id"])
+                if self._authorization_completion_ready(authorization, project_verified):
+                    result = self.complete_project_authorization(
+                        authorization_id,
+                        project_root=project_root,
+                        changed_by=changed_by,
+                        change_reason=change_reason,
+                    )
+                    records.append(
+                        {
+                            "outcome": "completed",
+                            "authorization_id": authorization_id,
+                            "project_id": project_id,
+                            "project_retired": result["project_retired"],
+                            "retired_work_items": result.get("retired_work_items", []),
+                        }
+                    )
                     continue
-                result = self.complete_project_authorization(
-                    str(authorization["id"]),
-                    project_root=project_root,
-                    changed_by=changed_by,
-                    change_reason=change_reason,
-                )
-                completed.append(
+                if not include_fail_safe_pauses or verified_global_v3 is None:
+                    continue
+                # v4 clause (d) fail-safe: emit manual-review record when the
+                # authorization would have completed under v3 (over-broad,
+                # project-blind, incidental-citation-inclusive) but is correctly
+                # held under v4's project-scoped set. This precisely targets the
+                # transition-window cases that need Phase-2 backfill: the auths
+                # that WOULD have auto-retired under v3 and are now paused for
+                # safety. The v3 baseline is the global verified set; the v4
+                # decision is the project-scoped set.
+                if not self._authorization_completion_ready(authorization, verified_global_v3):
+                    continue
+                gating = self._project_membership_work_item_ids(project_id)
+                missing_under_v4 = [wi for wi in gating if wi not in project_verified]
+                covered_under_v3 = [wi for wi in gating if wi in verified_global_v3]
+                records.append(
                     {
-                        "authorization_id": str(authorization["id"]),
+                        "outcome": "manual_review_required",
+                        "authorization_id": authorization_id,
                         "project_id": project_id,
-                        "project_retired": result["project_retired"],
-                        "retired_work_items": result.get("retired_work_items", []),
+                        "reason": "no_implements_linked_thread_covers_gating_wis",
+                        "gating_work_items": gating,
+                        "covered_under_v3": covered_under_v3,
+                        "missing_under_v4": missing_under_v4,
                     }
                 )
-        return completed
+        return records

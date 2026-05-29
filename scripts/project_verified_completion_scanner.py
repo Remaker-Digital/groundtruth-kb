@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sqlite3
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,10 +32,11 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# A bridge proposal/report metadata line: ``Work Item: WI-1234`` (or a
-# GTKB-/WORKLIST- descriptive id), optionally backtick-wrapped.
+# A bridge proposal/report metadata line: ``Work Item: WI-1234`` (including
+# spec-intake ``WI-AUTO-*`` ids, or a GTKB-/WORKLIST- descriptive id),
+# optionally backtick-wrapped.
 _WORK_ITEM_LINE_RE = re.compile(
-    r"^Work Item:\s*`?(WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
+    r"^Work Item:\s*`?(WI-AUTO-[A-Z0-9-]+|WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
     re.MULTILINE,
 )
 
@@ -69,35 +71,104 @@ def _ensure_groundtruth_importable(project_root: Path) -> None:
         sys.path.insert(0, str(gt_src))
 
 
-def verified_work_items(project_root: Path) -> set[str]:
-    """Return the set of work-item ids cited by a bridge thread whose latest
-    ``bridge/INDEX.md`` status is ``VERIFIED``.
+def _implements_links_by_project(project_root: Path) -> dict[str, set[str]]:
+    """Return ``{project_id: {bridge_thread_slug}}`` for active implements links.
 
-    Uses the canonical ``groundtruth_kb.bridge.detector.parse_index`` parser to
-    find VERIFIED documents, then reads each VERIFIED thread's version files for
-    their ``Work Item:`` metadata lines.
+    v4 PROJECT-SCOPED 'addressing-thread' discriminator per
+    ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v4 clause (a): coverage
+    from a bridge thread T accrues ONLY to the project(s) that themselves hold
+    an active ``project_artifact_links`` row (``artifact_type = 'bridge_thread'``,
+    ``relationship = 'implements'``, ``status = 'active'``) for T's slug. A link
+    held by a *different* project does not transfer coverage — this is the fix
+    for the cross-project false-positive defect (NO-GO -012 F1): the prior
+    global-slug set discarded ``project_id`` and let a PROJECT-A link satisfy a
+    PROJECT-B authorization.
+
+    Incidental ``'related'`` / ``'implementation_proposal'`` / ``'source_evidence'``
+    links do not contribute. The query reads ``current_project_artifact_links``
+    (the latest-version view) so superseded rows do not contribute.
+    """
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return {}
+    con = sqlite3.connect(db_path)
+    try:
+        rows = con.execute(
+            "SELECT project_id, artifact_ref FROM current_project_artifact_links "
+            "WHERE artifact_type = 'bridge_thread' "
+            "AND relationship = 'implements' "
+            "AND status = 'active'"
+        ).fetchall()
+    finally:
+        con.close()
+    by_project: dict[str, set[str]] = {}
+    for project_id, slug in rows:
+        if project_id and slug:
+            by_project.setdefault(str(project_id), set()).add(str(slug))
+    return by_project
+
+
+def _verified_thread_work_items(project_root: Path) -> dict[str, set[str]]:
+    """Return ``{bridge_thread_slug: {work_item_id}}`` for VERIFIED-topped threads.
+
+    Scans ALL versions of each thread whose latest ``bridge/INDEX.md`` status is
+    ``VERIFIED`` for ``Work Item:`` metadata lines (D3 corrected scope: per-thread,
+    all versions — the top version is the Codex verdict, which carries no
+    ``Work Item:`` metadata; the metadata lives in the Prime implementation
+    report one or more versions below). Uses the canonical
+    ``groundtruth_kb.bridge.detector.parse_index`` parser.
     """
     _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
 
     index_path = project_root / "bridge" / "INDEX.md"
     if not index_path.is_file():
-        return set()
+        return {}
     result = parse_index(index_path.read_text(encoding="utf-8"), project_root=project_root)
 
-    verified: set[str] = set()
+    by_thread: dict[str, set[str]] = {}
     for document in result.documents:
         top = document.current_top
         if top is None or top.status != BridgeStatus.VERIFIED:
             continue
+        wis: set[str] = set()
         for version in document.versions:
             file_path = project_root / version.file_path
             if not file_path.is_file():
                 continue
             text = file_path.read_text(encoding="utf-8", errors="replace")
             for match in _WORK_ITEM_LINE_RE.finditer(text):
-                verified.add(match.group(1).strip())
-    return verified
+                wis.add(match.group(1).strip())
+        if wis:
+            by_thread[document.name] = wis
+    return by_thread
+
+
+def verified_work_items_by_project(project_root: Path) -> dict[str, set[str]]:
+    """Return ``{project_id: {verified work_item_id}}`` (project-scoped; closes F1).
+
+    A work item WI-X is VERIFIED *for project P* (per
+    ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v4) iff P holds an active
+    ``relationship='implements'`` link to a VERIFIED-topped bridge thread whose
+    version files cite WI-X. Coverage is attributed to the linking project only:
+    a thread implements-linked to PROJECT-A contributes WI metadata to
+    PROJECT-A's verified set and to no other project, even if a different
+    project's gating WI is cited in that thread.
+
+    This replaces the prior global ``verified_work_items() -> set[str]`` whose
+    project-blind union was the NO-GO -012 F1 cross-project false-positive
+    defect. There is intentionally no global-set decision function: the only
+    completion-authorizing view is project-scoped.
+    """
+    links_by_project = _implements_links_by_project(project_root)
+    wis_by_thread = _verified_thread_work_items(project_root)
+    verified_by_project: dict[str, set[str]] = {}
+    for project_id, slugs in links_by_project.items():
+        verified: set[str] = set()
+        for slug in slugs:
+            verified |= wis_by_thread.get(slug, set())
+        verified_by_project[project_id] = verified
+    return verified_by_project
 
 
 def _project_membership_work_item_ids(db: Any, project_id: str) -> list[str]:
@@ -139,13 +210,16 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
     finally:
         db.close()
 
-    verified = verified_work_items(project_root)
+    verified_by_project = verified_work_items_by_project(project_root)
     results: list[AuthorizationReadiness] = []
     for authorization in active:
         project_id = str(authorization.get("project_id") or "")
         included = gating_by_project.get(project_id, [])
-        verified_ids = [wi for wi in included if wi in verified]
-        unverified_ids = [wi for wi in included if wi not in verified]
+        # Project-scoped (v4 F1 fix): a WI counts as verified for THIS project
+        # only via this project's own implements-linked VERIFIED threads.
+        project_verified = verified_by_project.get(project_id, set())
+        verified_ids = [wi for wi in included if wi in project_verified]
+        unverified_ids = [wi for wi in included if wi not in project_verified]
         completion_ready = bool(included) and not unverified_ids
         results.append(
             AuthorizationReadiness(

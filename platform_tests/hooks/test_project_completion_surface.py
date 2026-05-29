@@ -25,13 +25,22 @@ CLAUDE_HOOK = REPO_ROOT / ".claude" / "hooks" / "project-completion-surface.py"
 CODEX_HOOK = REPO_ROOT / ".codex" / "gtkb-hooks" / "project-completion-surface.py"
 
 
-def _seed(project_root: Path, authorizations: dict[str, dict[str, bool]]) -> None:
+def _seed(
+    project_root: Path,
+    authorizations: dict[str, dict[str, bool]],
+    *,
+    implements_link: bool = True,
+) -> None:
     """Seed a project root. ``authorizations`` maps authorization id ->
     {work_item_id: bridge-thread-is-VERIFIED}.
 
-    GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 gates completion on the
-    project's active project-to-work-item membership links; every seeded work
-    item is linked to PROJECT-X via ``link_project_work_item()``.
+    GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v4 gates auto-completion
+    on ``project_artifact_links`` rows with ``artifact_type='bridge_thread'``,
+    ``relationship='implements'``, ``status='active'``. By default each seeded
+    VERIFIED thread is linked to PROJECT-X via such a row so v4-conformant
+    hook tests need not opt in. Pass ``implements_link=False`` for the
+    transition-window case where the hook should stay silent because no
+    implements link covers the project's gating WIs.
     """
     bridge = project_root / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
@@ -82,6 +91,25 @@ def _seed(project_root: Path, authorizations: dict[str, dict[str, bool]]) -> Non
                 included_work_item_ids=list(wi_map),
                 included_spec_ids=["SPEC-SEED"],
             )
+        if implements_link:
+            # v4 D4 gate: link each seeded VERIFIED thread to PROJECT-X with
+            # relationship='implements' so the v4 gate (per
+            # GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v4 clause (a))
+            # admits the thread's Work Item metadata. Without this, the hook
+            # stays silent (silent-pause fail-safe direction).
+            for wi, verified in wi_verified.items():
+                if not verified:
+                    continue
+                slug_index = sorted(wi_verified).index(wi)
+                slug = f"gtkb-thread-{slug_index}"
+                db.add_project_artifact_link(
+                    "PROJECT-X",
+                    "bridge_thread",
+                    slug,
+                    "test",
+                    "seed implements link",
+                    relationship="implements",
+                )
     finally:
         db.close()
 

@@ -198,9 +198,7 @@ def _write_verified_bridge(project_root: Path, wi_verified: dict[str, bool]) -> 
     for index, (wi, verified) in enumerate(sorted(wi_verified.items())):
         slug = f"gtkb-thread-{index}"
         top = "VERIFIED" if verified else "GO"
-        (bridge / f"{slug}-001.md").write_text(
-            f"# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8"
-        )
+        (bridge / f"{slug}-001.md").write_text(f"# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8")
         lines += [f"Document: {slug}", f"{top}: bridge/{slug}-001.md", ""]
     (bridge / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -212,45 +210,90 @@ def _seed_completion_env(
     auth_status: str = "active",
     second_active_auth: bool = False,
     linked_work_items: set[str] | None = None,
+    implements_link: bool = True,
 ) -> KnowledgeDB:
     """Seed PROJECT-X with authorization PAUTH-X over the given work items plus
     a bridge INDEX recording their VERIFIED state. Returns an open KnowledgeDB.
 
-    GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 gates completion on the
-    project's active project-to-work-item membership links; each work item is
-    linked to PROJECT-X via link_project_work_item() unless ``linked_work_items``
-    restricts the linked set. The authorization's included_work_item_ids is
-    still populated so tests can prove the gating set ignores it.
+    GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v4 gates auto-completion on
+    ``project_artifact_links`` rows with ``artifact_type='bridge_thread'``,
+    ``relationship='implements'``, ``status='active'``. By default each seeded
+    VERIFIED thread is linked to PROJECT-X via such a row so v4-conformant
+    tests need not opt in; pass ``implements_link=False`` for the
+    incidental-citation case the v4 gate explicitly excludes.
+
+    Membership-link gating (``linked_work_items``) and implements-link gating
+    are independent: membership defines the gating WI set; implements defines
+    which threads contribute VERIFIED coverage evidence for that set.
     """
     if wi_verified is None:
         wi_verified = {"WI-8001": True}
     _write_verified_bridge(project_root, wi_verified)
     db = KnowledgeDB(db_path=project_root / "groundtruth.db")
     db.insert_deliberation(
-        "DELIB-AUTH-SEED", "owner_conversation", "Owner approved authorization",
-        "Owner approved PROJECT-X authorizations.", "{}", "test", "seed",
+        "DELIB-AUTH-SEED",
+        "owner_conversation",
+        "Owner approved authorization",
+        "Owner approved PROJECT-X authorizations.",
+        "{}",
+        "test",
+        "seed",
         outcome="owner_decision",
     )
     db.insert_project("Completion Project", "test", "seed", id="PROJECT-X", status="active")
     db.insert_spec(
-        id="SPEC-SEED", title="Seed spec", status="verified",
-        changed_by="test", change_reason="seed",
+        id="SPEC-SEED",
+        title="Seed spec",
+        status="verified",
+        changed_by="test",
+        change_reason="seed",
     )
     for wi in wi_verified:
         db.insert_work_item(wi, f"Work item {wi}", "new", "backlog", "open", "test", "seed")
         if linked_work_items is None or wi in linked_work_items:
             db.link_project_work_item("PROJECT-X", wi, "test", "seed")
     db.insert_project_authorization(
-        "PROJECT-X", "Primary authorization", "DELIB-AUTH-SEED",
-        "Bounded scope.", "test", "seed", id="PAUTH-X", status=auth_status,
-        included_work_item_ids=list(wi_verified), included_spec_ids=["SPEC-SEED"],
+        "PROJECT-X",
+        "Primary authorization",
+        "DELIB-AUTH-SEED",
+        "Bounded scope.",
+        "test",
+        "seed",
+        id="PAUTH-X",
+        status=auth_status,
+        included_work_item_ids=list(wi_verified),
+        included_spec_ids=["SPEC-SEED"],
     )
     if second_active_auth:
         db.insert_project_authorization(
-            "PROJECT-X", "Secondary authorization", "DELIB-AUTH-SEED",
-            "Second bounded scope.", "test", "seed", id="PAUTH-Y", status="active",
-            included_work_item_ids=list(wi_verified), included_spec_ids=["SPEC-SEED"],
+            "PROJECT-X",
+            "Secondary authorization",
+            "DELIB-AUTH-SEED",
+            "Second bounded scope.",
+            "test",
+            "seed",
+            id="PAUTH-Y",
+            status="active",
+            included_work_item_ids=list(wi_verified),
+            included_spec_ids=["SPEC-SEED"],
         )
+    if implements_link:
+        # v4 D4 gate: link each seeded VERIFIED thread to PROJECT-X with
+        # relationship='implements'. The thread slugs match the
+        # _write_verified_bridge() naming convention (sorted by WI).
+        for wi, verified in wi_verified.items():
+            if not verified:
+                continue
+            slug_index = sorted(wi_verified).index(wi)
+            slug = f"gtkb-thread-{slug_index}"
+            db.add_project_artifact_link(
+                "PROJECT-X",
+                "bridge_thread",
+                slug,
+                "test",
+                "seed implements link",
+                relationship="implements",
+            )
     return db
 
 
@@ -263,7 +306,27 @@ def test_complete_succeeds_without_owner_decision(tmp_path) -> None:
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
+        )
+        assert result["authorization"]["status"] == "completed"
+    finally:
+        db.close()
+
+
+def test_complete_recognizes_wi_auto_verified_work_item(tmp_path) -> None:
+    """Spec-intake WI-AUTO ids count as VERIFIED completion evidence."""
+    db = _seed_completion_env(
+        tmp_path,
+        wi_verified={"WI-AUTO-SPEC-INTAKE-ABC123": True, "WI-8001": True},
+    )
+    try:
+        service = ProjectLifecycleService(db)
+        result = service.complete_project_authorization(
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
         )
         assert result["authorization"]["status"] == "completed"
     finally:
@@ -276,7 +339,9 @@ def test_complete_rejects_non_active_authorization(tmp_path) -> None:
         service = ProjectLifecycleService(db)
         with pytest.raises(ProjectLifecycleError, match="not active"):
             service.complete_project_authorization(
-                "PAUTH-X", project_root=tmp_path, change_reason="complete",
+                "PAUTH-X",
+                project_root=tmp_path,
+                change_reason="complete",
             )
     finally:
         db.close()
@@ -288,7 +353,9 @@ def test_complete_rejects_when_a_wi_not_verified(tmp_path) -> None:
         service = ProjectLifecycleService(db)
         with pytest.raises(ProjectLifecycleError, match="not completion-ready"):
             service.complete_project_authorization(
-                "PAUTH-X", project_root=tmp_path, change_reason="complete",
+                "PAUTH-X",
+                project_root=tmp_path,
+                change_reason="complete",
             )
     finally:
         db.close()
@@ -301,7 +368,9 @@ def test_complete_rejects_when_project_has_no_membership_links(tmp_path) -> None
         service = ProjectLifecycleService(db)
         with pytest.raises(ProjectLifecycleError, match="no active membership-linked work items"):
             service.complete_project_authorization(
-                "PAUTH-X", project_root=tmp_path, change_reason="complete",
+                "PAUTH-X",
+                project_root=tmp_path,
+                change_reason="complete",
             )
     finally:
         db.close()
@@ -319,7 +388,9 @@ def test_complete_gating_set_is_membership_links_not_included_ids(tmp_path) -> N
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
         )
         assert result["authorization"]["status"] == "completed"
     finally:
@@ -331,7 +402,9 @@ def test_complete_sole_active_authorization_retires_project(tmp_path) -> None:
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
         )
         assert result["project_retired"] is True
         assert db.get_project("PROJECT-X")["status"] == "retired"
@@ -344,7 +417,9 @@ def test_complete_with_other_active_authorization_keeps_project_active(tmp_path)
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
         )
         assert result["project_retired"] is False
         assert db.get_project("PROJECT-X")["status"] == "active"
@@ -391,6 +466,147 @@ def test_auto_complete_skips_unready_authorization(tmp_path) -> None:
         db.close()
 
 
+# --- v4 D4 implements-gate spec-derived tests (IP-5 cases 5-6) ---------------
+
+
+def test_lifecycle_verified_work_items_implements_gate(tmp_path) -> None:
+    """v4 D4 gate parity at the lifecycle layer (project-scoped, NO-GO -012 F1):
+    ``_verified_work_items_by_project()`` excludes a VERIFIED thread that lacks
+    an active ``relationship='implements'`` link for the project; the global v3
+    baseline ``_all_verified_work_items()`` still includes it (used only by the
+    fail-safe surface to compute the "covered under v3" set).
+    """
+    db = _seed_completion_env(
+        tmp_path,
+        wi_verified={"WI-8001": True},
+        implements_link=False,  # incidental-citation case
+    )
+    try:
+        service = ProjectLifecycleService(db)
+
+        # Project-scoped (the decision view): incidental citation excluded.
+        by_project = service._verified_work_items_by_project(tmp_path)
+        assert by_project.get("PROJECT-X", set()) == set()
+
+        # Global v3 baseline (fail-safe diagnostic only): includes the citation.
+        assert service._all_verified_work_items(tmp_path) == {"WI-8001"}
+
+        # complete_project_authorization() uses the project-scoped path → not ready.
+        with pytest.raises(ProjectLifecycleError, match="not completion-ready"):
+            service.complete_project_authorization(
+                "PAUTH-X",
+                project_root=tmp_path,
+                change_reason="complete",
+            )
+    finally:
+        db.close()
+
+
+def test_auto_complete_fail_safe_emits_manual_review(tmp_path) -> None:
+    """v4 clause (d) fail-safe surface: ``auto_complete_ready_authorizations()``
+    invoked with ``include_fail_safe_pauses=True`` emits a manual-review
+    record for an authorization that WOULD have completed under v3 (over-broad
+    incidental-citation scope) but is paused under v4 (implements-linked
+    only). The default invocation (no opt-in) returns the empty list,
+    preserving the existing hook contract per
+    ``ADR-CODEX-HOOK-PARITY-FALLBACK-001``.
+    """
+    db = _seed_completion_env(
+        tmp_path,
+        wi_verified={"WI-8001": True},
+        implements_link=False,  # the transition-window fail-safe trigger
+    )
+    try:
+        service = ProjectLifecycleService(db)
+
+        # Default invocation: hooks see the empty list (silent pause).
+        default = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert default == []
+        assert db.get_project_authorization("PAUTH-X")["status"] == "active"
+        assert db.get_project("PROJECT-X")["status"] == "active"
+
+        # Opt-in invocation: fail-safe manual-review record emitted.
+        with_pauses = service.auto_complete_ready_authorizations(
+            project_root=tmp_path,
+            include_fail_safe_pauses=True,
+        )
+        assert len(with_pauses) == 1
+        record = with_pauses[0]
+        assert record["outcome"] == "manual_review_required"
+        assert record["authorization_id"] == "PAUTH-X"
+        assert record["project_id"] == "PROJECT-X"
+        assert record["reason"] == "no_implements_linked_thread_covers_gating_wis"
+        assert record["gating_work_items"] == ["WI-8001"]
+        assert record["covered_under_v3"] == ["WI-8001"]
+        assert record["missing_under_v4"] == ["WI-8001"]
+        # No mutation occurred: authorization still active, project still active.
+        assert db.get_project_authorization("PAUTH-X")["status"] == "active"
+        assert db.get_project("PROJECT-X")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_auto_complete_does_not_cross_project_retire(tmp_path) -> None:
+    """v4 F1 regression (NO-GO -012) at the lifecycle layer: an ``implements``
+    link held by PROJECT-A must NOT complete or retire PROJECT-B, even when
+    PROJECT-A's VERIFIED thread cites a WI that gates PROJECT-B.
+
+    The prior global-slug implementation would have auto-completed and retired
+    PROJECT-B because WI-8002 entered the global verified set. The project-scoped
+    map attributes thread-a's coverage to PROJECT-A only.
+    """
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / "thread-a-001.md").write_text(
+        "NEW\n\n# Impl report\n\nWork Item: WI-8002\n", encoding="utf-8"
+    )
+    (bridge / "thread-a-002.md").write_text("VERIFIED\n\n# Codex verdict\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "# Bridge Index\n\nDocument: thread-a\n"
+        "VERIFIED: bridge/thread-a-002.md\nNEW: bridge/thread-a-001.md\n\n",
+        encoding="utf-8",
+    )
+
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    try:
+        db.insert_deliberation(
+            "DELIB-SEED", "owner_conversation", "seed", "seed", "{}", "t", "s",
+            outcome="owner_decision",
+        )
+        db.insert_spec(id="SPEC-SEED", title="Seed", status="verified", changed_by="t", change_reason="s")
+        db.insert_project("Project A", "t", "s", id="PROJECT-A", status="active")
+        db.insert_project("Project B", "t", "s", id="PROJECT-B", status="active")
+        # WI-8002 gates PROJECT-B; only PROJECT-A implements-links thread-a.
+        db.insert_work_item("WI-8002", "shared WI", "new", "backlog", "open", "t", "s")
+        db.link_project_work_item("PROJECT-B", "WI-8002", "t", "s")
+        db.add_project_artifact_link(
+            "PROJECT-A", "bridge_thread", "thread-a", "t", "s", relationship="implements",
+        )
+        db.insert_project_authorization(
+            "PROJECT-B", "Auth B", "DELIB-SEED", "Bounded scope.", "t", "s",
+            id="PAUTH-B", status="active",
+            included_work_item_ids=["WI-8002"], included_spec_ids=["SPEC-SEED"],
+        )
+
+        service = ProjectLifecycleService(db)
+        # PROJECT-B verified set is empty (no implements link) → not completed.
+        assert service._verified_work_items_by_project(tmp_path).get("PROJECT-B", set()) == set()
+        completed = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert all(c["project_id"] != "PROJECT-B" for c in completed), (
+            "F1 regression: PROJECT-A's implements link must not auto-complete PROJECT-B"
+        )
+        # PROJECT-B remains active and un-retired; PAUTH-B still active.
+        assert db.get_project("PROJECT-B")["status"] == "active"
+        assert db.get_project_authorization("PAUTH-B")["status"] == "active"
+        # complete_project_authorization() also refuses PROJECT-B directly.
+        with pytest.raises(ProjectLifecycleError, match="not completion-ready"):
+            service.complete_project_authorization(
+                "PAUTH-B", project_root=tmp_path, change_reason="complete",
+            )
+    finally:
+        db.close()
+
+
 # --- scanner gating-set parity with the lifecycle service --------------------
 
 
@@ -420,8 +636,13 @@ def test_projects_complete_authorization_cli(project_dir, runner: CliRunner) -> 
     result = runner.invoke(
         main,
         [
-            *config_flag, "projects", "complete-authorization", "PAUTH-X",
-            "--change-reason", "W1 CLI completion test", "--json",
+            *config_flag,
+            "projects",
+            "complete-authorization",
+            "PAUTH-X",
+            "--change-reason",
+            "W1 CLI completion test",
+            "--json",
         ],
     )
 
@@ -443,7 +664,9 @@ def test_complete_retires_membership_linked_work_items(tmp_path) -> None:
     try:
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
         )
         assert result["project_retired"] is True
         assert result["retired_work_items"] == ["WI-8001"]
@@ -468,7 +691,9 @@ def test_complete_shared_work_item_is_not_retired(tmp_path) -> None:
         db.link_project_work_item("PROJECT-OTHER", "WI-8001", "test", "seed")
         service = ProjectLifecycleService(db)
         result = service.complete_project_authorization(
-            "PAUTH-X", project_root=tmp_path, change_reason="complete",
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
         )
         assert result["project_retired"] is True
         # WI-8001 is shared with the still-active PROJECT-OTHER -> not retired.
