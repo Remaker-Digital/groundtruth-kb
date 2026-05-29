@@ -2,6 +2,102 @@
 
 ## Current Status
 
+- **S372 (2026-05-29): Bridge-implementation conversation (Claude harness B, Opus 4.8; parallel to S373 same-day). Resumed the S372 in-flight bridge work; took 3 threads to VERIFIED + committed, then originated Phase-2.**
+  Three threads VERIFIED and scoped-committed to `develop` (each via `git commit -- <paths>` partial-commit to isolate from the ~723-path parallel-session-polluted index; never `--no-verify`):
+  - **`gtkb-axis-2-scoping-terminal-classifier-fix`** (WI-3442) — VERIFIED -004; commit **`428c603e`** `fix:` (AXIS-2 actionable-entry inflation; notify.py + test_bridge_notify.py).
+  - **`gtkb-project-completion-scanner-addressing-thread-fix`** (WI-3365) — VERIFIED -017; commit **`af0883b6`** `feat:` (v4 **project-scoped** D4 implements-gate). Arc: NO-GO -012 (P0 cross-project leak: global-slug set let a PROJECT-A implements-link complete PROJECT-B) → REVISED-5 -013 (project-scoped `dict[project_id,set[wi]]`; pre-validated against synthetic 2-project DB) → GO -014 → impl → -016 → VERIFIED -017. Inserted **GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v4** to MemBase (formal packet `.groundtruth/formal-artifact-approvals/2026-05-29-GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001-v4.json`, sha `bf4baac8…`). 39 tests incl. 2 cross-project regressions; ruff clean. **Fail-safe: v4 pauses ALL project auto-completion until implements-links exist (0 platform-wide) — correct, conservative.**
+  - **`gtkb-root-boundary-external-harness-exec-exception`** (WI-3434) — VERIFIED -008; commit **`9d379289`** `feat:` (bounded External Harness Executable Resolution Exception in `.claude/rules/project-root-boundary.md` + `_check_external_harness_exec_boundary` doctor check + test; committed WITH its 8 bridge files as drift-gate review evidence). Narrative packet `.groundtruth/formal-artifact-approvals/2026-05-29-claude-rules-project-root-boundary-md.json`. Owner decision `DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION`.
+  **Phase-2 implements-link backfill** (follow-on to v4): owner AUQ chose Phase-2 then "file scoping proposal". Read-only discovery (captured in **WI-3462**, reliability lane): 8 CLEAN auto-linkable / 3 AMBIGUOUS (all resolvable by "prefer non-scoping, non-superseded thread") / 14 UNADDRESSED; reactive eligible set = 0 (non-urgent). Scoping proposal `bridge/gtkb-implements-link-backfill-phase2-scoping-001.md` filed **NEW, awaiting Codex GO** (both preflights pass; design-only, mirrors orphan-wi-backfill precedent).
+  **Self-improvement WIs captured** (reliability lane, unapproved): **WI-3454** (auth-gate `requirement_sufficiency_state` parser needs magic opener phrase), **WI-3463** (bridge gate detectors require magic content phrases — `CLAUSE-INDEX-IS-CANONICAL` bit -015 + Phase-2 scoping; sibling of WI-3454).
+  Branch `develop` **ahead of origin by 3** (the commits above) — **NOT pushed** (owner did not request). DA harvest **BLOCKED** (GOV-ARTIFACT-APPROVAL-001 requires per-deliberation approval packets); owner decisions preserved in the two formal packets + each bridge thread's Owner Decisions section + `memory/pending-owner-decisions.md`. Wrap evidence: `.groundtruth/session/snapshots/S372/`. Tool-output-corruption restart early in session (cleared on restart). Process lessons: `git commit -- <pathspec>` isolates partial commits from index pollution; protected-rule commits need a `bridge/` file co-staged (drift gate) + the local narrative packet (narrative gate); never edit a filed bridge file in place (supersede with a new version).
+
+- **S373 (2026-05-29): Backlog-triage conversation (Claude harness B; conv `00d6b362`). Parallel S373 conversation (`8c70eac3`) ran the working-tree commit-triage umbrella + scanner-fix; this conversation ran the backlog assessment + implementation-gap triage.**
+  Owner asked for a full backlog status report (each project + all outstanding work items) plus an assessment of the project/WI/CLI/skill implementation against the rule that every WI belongs to a named project, projects auto-retire when all WIs are mechanically VERIFIED, and CRUD is deterministic skill+CLI (not markdown). Deterministic MemBase query (read-only) produced: **155 projects (148 active / 7 retired), 2210 work items (231 open + 1800 resolved + others), 507 active memberships, 92 orphan open WIs** (mostly legacy `wont_fix` Agent Red pipeline-failure rows WI-0826..WI-1320), **53 active projects retire-ready** (all WIs terminal) but only 7 actually retired.
+  Seven implementation gaps surfaced (§6 of the report): (1) auto-retire scanner is read-only + has the live D3+D4 over-broad-citation defect [in flight at `gtkb-project-completion-scanner-addressing-thread-fix` GO -004]; (2) `backlog add` doubled-prefix membership bug; (3) `kb-work-item`/`kb-batch` skills bypass CLI; (4) `gt backlog` missing retire/link verbs; (5) **no deterministic `gt backlog status` report CLI** (the symptom this assessment itself hit); (6) orphan-WI scanner Slice 2 not filed; (7) `work_list.md` narrative drift.
+  DECISION-0758 resolved "start the triage". Owner AUQ chose "Implementation gaps" scope, then "File Gap 5 slice-2 scoping now", then "Pick up Gap 2 (doubled-prefix)".
+  **Bridge threads filed this conversation (all Codex-GO'd by wrap):**
+  - `gtkb-discoverability-cli-slice-2-scoping` → **GO -002** (terminal scoping approval for `gt backlog status`).
+  - `gtkb-discoverability-cli-slice-2-implementation` → **GO -004** (after NO-GO -002 [stale `scanner_caveat` cited the WITHDRAWN `-implementation` dup thread] → REVISED -003 fixed to cite canonical `gtkb-project-completion-scanner-addressing-thread-fix`). Parent WI-3262; PAUTH `...DETERMINISTIC-SERVICES-PARALLEL-BATCH-GT-BRIDGE-PROPOSE-CLI`.
+  - `gtkb-project-id-prefix-idempotent-fix` → **GO -003** (Gap 2 fix; after self-detected clause-preflight bulk-ops false-positive on -001 → REVISED -002 added DECISION DEFERRED marker). Root cause: `_project_id_from_names` (db.py:910) unconditionally prepends `PROJECT-`; fix is idempotent normalization. Parent WI-3411 (reliability fast-lane, `PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING`). Phantom-`PROJECT-PROJECT-*` reconciliation (10 projects) deferred to a follow-on (captured in WI-3355).
+  **No code written** — both implementation proposals are GO'd but await `implementation_authorization.py begin` + implementation in a future session. Next session: implement both GO'd threads (prefix fix = 1 function in db.py + `platform_tests/scripts/test_project_id_from_names_idempotent.py`; `gt backlog status` = new `cli_backlog_status.py` + cli.py registration + `platform_tests/scripts/test_cli_backlog_status.py`).
+  Branch `develop` @ `ec080b6d`; 667 dirty working-tree entries (broad mixed-owner). **Commit deferred to the parallel S373 commit-triage umbrella** (`gtkb-s373-triage-umbrella`); this conversation committed nothing. DA harvest deferred (decisions captured in the bridge files' Owner Decisions sections + `memory/pending-owner-decisions.md`; full S373 harvest best run once by the last-wrapping conversation to avoid double-processing).
+
+- **S366 (2026-05-27): Prime bridge continuation, Antigravity dispatch verification, and document-provenance advisory.**
+  Codex continued from the cleared Loyal Opposition queue as Prime Builder,
+  processing Prime-actionable GO/NO-GO bridge responses from live
+  `bridge/INDEX.md`. Revised proposals were filed for
+  `gtkb-work-item-priority-canonical-p0p3-migration`,
+  `gtkb-chromadb-vector-continuity-v1-cut-scoping`,
+  `gtkb-git-repo-broken-blob-investigation`, and
+  `gtkb-skill-modernization-scoping`; Loyal Opposition auto-dispatch later
+  returned GO for those threads. The git fsck missing-blob issue remains
+  separate follow-up reliability debt, with existing WI-3394 context and no
+  repair attempted in this session. Codex implemented the GO for
+  `gtkb-headless-gemini-lo-dispatch-verification`: added
+  `scripts/verify_antigravity_dispatch.py`, its platform tests, the sentinel
+  fixture, and updated `memory/antigravity-integration-status.md`. Focused
+  verification passed: 5 dispatch-verification tests passed and ruff passed;
+  the live Antigravity/Gemini substrate check failed because Python subprocess
+  could not launch bare `gemini` while `gemini.cmd --version` worked. The
+  implementation report was filed at
+  `bridge/gtkb-headless-gemini-lo-dispatch-verification-005.md`, and later
+  bridge state shows follow-on LO responses through `-007`.
+
+  Owner asked whether new document artifacts include model+harness production
+  details. Codex scanned document surfaces and found partial bridge-only
+  coverage, not repo-wide enforcement. A fresh advisory was written at
+  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-27-13-24-DOCUMENT-ARTIFACT-AUTHOR-PROVENANCE-GAP.md`
+  recommending a dedicated `gtkb-document-artifact-author-provenance` proposal.
+  That report is in the gitignored insight dropbox and intentionally not
+  force-added.
+
+  Wrap evidence is under `.groundtruth/session/snapshots/S366/`. Live bridge
+  scan at wrap: 118 documents; latest counts `ADVISORY=1`, `GO=20`, `NEW=1`,
+  `NO-GO=24`, `VERIFIED=35`, `WITHDRAWN=37`; Prime-actionable latest GO/NO-GO
+  count 44; Loyal Opposition-actionable latest NEW/REVISED count 1
+  (`gtkb-headless-gemini-lo-dispatch-verification` NEW at `-007`). MemBase
+  `current_work_items` counts: `open=200`, `in_progress=1`, `new=1`,
+  `deferred=1`, `resolved=1796`, `verified=45`, `retired=64`,
+  `wont_fix=59`, `not_a_defect=7`. Hygiene scan exited nonzero with
+  49 ERROR / 4307 WARN, dominated by snapshot-manifest and dirty-tree findings;
+  consistency scan reported 3606 WARN, dominated by historical orphan
+  bridge-file inventory. DA harvest apply timed out after about two minutes.
+  No commit/push was attempted because the branch is `develop` ahead 1 and the
+  worktree contains broad mixed-owner tracked/untracked changes.
+
+- **S365 (2026-05-27): Codex Loyal Opposition bridge queue processing pass.**
+  Owner asked Codex LO to process as many actionable bridge items as possible
+  in parallel using sub-agents. Codex used the `gtkb-bridge` workflow, live
+  `bridge/INDEX.md`, mandatory applicability and ADR/DCL clause preflights,
+  and read-only sub-agent reviews. Eleven bridge items were processed and
+  `bridge/INDEX.md` was updated append-only:
+  `GO` for `gtkb-inventory-regen-chore-commit-2026-05-27-002.md` and
+  `gtkb-worker-packet-auth-envelope-slice-2-auto-packet-002.md`;
+  `VERIFIED` for `gtkb-bridge-compliance-gate-fenced-code-parser-fix-004.md`;
+  `NO-GO` for `gtkb-agent-red-reference-adopter-framing-restoration-002.md`,
+  `gtkb-headless-gemini-lo-dispatch-verification-002.md`,
+  `gtkb-skill-modernization-scoping-002.md`,
+  `gtkb-impl-report-bridge-structural-validation-mtime-004.md`,
+  `gtkb-project-completion-scanner-wi-auto-regex-fix-004.md`,
+  `gtkb-lo-hygiene-assessment-skill-build-003.md`,
+  `gtkb-s358-w3-requirements-collection-hook-title-fix-012.md`, and
+  `gtkb-bridge-target-paths-kb-mutation-check-004.md`.
+  A late Prime update added `gtkb-inventory-regen-chore-commit-2026-05-27-003.md`
+  after `-002` was GO'd, so it remains LO-actionable. End-of-session live
+  LO bridge scan: 5 actionable items (`gtkb-inventory-regen-chore-commit-2026-05-27`
+  NEW at `-003`; `gtkb-s358-w1-retirement-machinery-correction` REVISED at
+  `-018`; `gtkb-bridge-compliance-gate-wi-auto-regex-fix` NEW at `-003`;
+  `gtkb-startup-relay-truncation-fix-refile` NEW at `-011`;
+  `gtkb-gt-bridge-propose-deterministic-cli` NEW at `-005`).
+  Wrap evidence is under `.groundtruth/session/snapshots/S365/`. DA harvest
+  apply was blocked by `GOV-ARTIFACT-APPROVAL-001` due missing formal approval
+  packet. Hygiene scan exited nonzero with 45 ERROR / 4079 WARN, dominated by
+  known snapshot-manifest policy and dirty-tree warnings; consistency scan
+  reported 3436 WARN, dominated by historical orphan bridge-file inventory.
+  No commit/push was attempted because the worktree already contained broad
+  mixed-owner changes; only the bridge verdict files and INDEX edits from this
+  pass should be attributed to Codex LO.
+
 - **2026-05-18: Antigravity Integration completion drive started.**
   Owner directed prioritized completion of `PROJECT-ANTIGRAVITY-INTEGRATION`
   (add Google Antigravity as a 3rd AI coding harness; harness-registry refactor).
