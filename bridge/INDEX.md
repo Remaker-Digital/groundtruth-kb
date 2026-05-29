@@ -6,13 +6,40 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
-Document: gtkb-discoverability-cli-slice-2-implementation
-VERIFIED: bridge/gtkb-discoverability-cli-slice-2-implementation-006.md
-NEW: bridge/gtkb-discoverability-cli-slice-2-implementation-005.md
-GO: bridge/gtkb-discoverability-cli-slice-2-implementation-004.md
-REVISED: bridge/gtkb-discoverability-cli-slice-2-implementation-003.md
-NO-GO: bridge/gtkb-discoverability-cli-slice-2-implementation-002.md
-NEW: bridge/gtkb-discoverability-cli-slice-2-implementation-001.md
+Document: gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer
+REVISED: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-003.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-001.md
+
+Document: gtkb-skill-modernization-slice-0-skill-health-checker
+VERIFIED: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-004.md
+NEW: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-003.md
+GO: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-002.md
+NEW: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-001.md
+
+Document: gtkb-orphan-wi-membership-backfill-slice-2-scoping
+GO: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-002.md
+NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-001.md
+
+Document: gtkb-phantom-project-prefix-reconciliation
+GO: bridge/gtkb-phantom-project-prefix-reconciliation-004.md
+REVISED: bridge/gtkb-phantom-project-prefix-reconciliation-003.md
+NO-GO: bridge/gtkb-phantom-project-prefix-reconciliation-002.md
+NEW: bridge/gtkb-phantom-project-prefix-reconciliation-001.md
+
+Document: gtkb-inventory-regen-chore-commit-2026-05-29
+VERIFIED: bridge/gtkb-inventory-regen-chore-commit-2026-05-29-006.md
+REVISED: bridge/gtkb-inventory-regen-chore-commit-2026-05-29-005.md
+NO-GO: bridge/gtkb-inventory-regen-chore-commit-2026-05-29-004.md
+NEW: bridge/gtkb-inventory-regen-chore-commit-2026-05-29-003.md
+GO: bridge/gtkb-inventory-regen-chore-commit-2026-05-29-002.md
+NEW: bridge/gtkb-inventory-regen-chore-commit-2026-05-29-001.md
+
+Document: gtkb-interactive-session-role-override-scoping
+GO: bridge/gtkb-interactive-session-role-override-scoping-004.md
+REVISED: bridge/gtkb-interactive-session-role-override-scoping-003.md
+NO-GO: bridge/gtkb-interactive-session-role-override-scoping-002.md
+NEW: bridge/gtkb-interactive-session-role-override-scoping-001.md
 
 Document: gtkb-project-id-prefix-idempotent-fix
 VERIFIED: bridge/gtkb-project-id-prefix-idempotent-fix-005.md
@@ -21,7 +48,123 @@ GO: bridge/gtkb-project-id-prefix-idempotent-fix-003.md
 REVISED: bridge/gtkb-project-id-prefix-idempotent-fix-002.md
 NEW: bridge/gtkb-project-id-prefix-idempotent-fix-001.md
 
+Document: gtkb-discoverability-cli-slice-2-implementation
+VERIFIED: bridge/gtkb-discoverability-cli-slice-2-implementation-006.md
+NEW: bridge/gtkb-discoverability-cli-slice-2-implementation-005.md
+GO: bridge/gtkb-discoverability-cli-slice-2-implementation-004.md
+REVISED: bridge/gtkb-discoverability-cli-slice-2-implementation-003.md
+NO-GO: bridge/gtkb-discoverability-cli-slice-2-implementation-002.md
+NEW: bridge/gtkb-discoverability-cli-slice-2-implementation-001.md
+
+Document: gtkb-lo-advisory-owner-grilling-gate
+VERIFIED: bridge/gtkb-lo-advisory-owner-grilling-gate-009.md
+NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-008.md
+NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-007.md
+GO: bridge/gtkb-lo-advisory-owner-grilling-gate-006.md
+REVISED: bridge/gtkb-lo-advisory-owner-grilling-gate-005.md
+NO-GO: bridge/gtkb-lo-advisory-owner-grilling-gate-004.md
+REVISED: bridge/gtkb-lo-advisory-owner-grilling-gate-003.md
+NO-GO: bridge/gtkb-lo-advisory-owner-grilling-gate-002.md
+NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-001.md
+
+Document: gtkb-discoverability-cli-slice-2-scoping
+GO: bridge/gtkb-discoverability-cli-slice-2-scoping-002.md
+NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-001.md
+
+Document: gtkb-project-completion-scanner-addressing-thread-fix
+GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-010.md
+REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-009.md
+GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-008.md
+REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-007.md
+NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-006.md
+REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-005.md
+GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-004.md
+REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-003.md
+NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-002.md
+NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-001.md
+
+Document: gtkb-project-completion-scanner-addressing-thread-fix-implementation
+WITHDRAWN: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-004.md
+REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-003.md
+NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-002.md
+NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-001.md
+
+Document: gtkb-axis-2-scoping-terminal-classifier-fix
+VERIFIED: bridge/gtkb-axis-2-scoping-terminal-classifier-fix-004.md
+NEW: bridge/gtkb-axis-2-scoping-terminal-classifier-fix-003.md
+GO: bridge/gtkb-axis-2-scoping-terminal-classifier-fix-002.md
+NEW: bridge/gtkb-axis-2-scoping-terminal-classifier-fix-001.md
+
+Document: gtkb-spec-coherence-cli
+GO: bridge/gtkb-spec-coherence-cli-002.md
+NEW: bridge/gtkb-spec-coherence-cli-001.md
+
+Document: gtkb-project-completion-scanner-addressing-thread-fix-scoping
+GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-002.md
+NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-001.md
+
+Document: gtkb-claude-md-scope-clarification-slice-3-reauthorization
+VERIFIED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-019.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-018.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-017.md
+NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-016.md
+GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-015.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-014.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-013.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-012.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-011.md
+GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-010.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-009.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-008.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-007.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-006.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-005.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-004.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-003.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-002.md
+NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-reauthorization-001.md
+
+Document: gtkb-claude-md-scope-clarification-slice-3-implementation
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-010.md
+VERIFIED: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-009.md
+NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-008.md
+GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-007.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-006.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-005.md
+GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-004.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-003.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-002.md
+NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-001.md
+
+Document: gtkb-claude-md-scope-clarification-slice-2
+GO: bridge/gtkb-claude-md-scope-clarification-slice-2-004.md
+REVISED: bridge/gtkb-claude-md-scope-clarification-slice-2-003.md
+NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-2-002.md
+NEW: bridge/gtkb-claude-md-scope-clarification-slice-2-001.md
+
+Document: gtkb-claude-md-scope-clarification-scoping
+GO: bridge/gtkb-claude-md-scope-clarification-scoping-002.md
+NEW: bridge/gtkb-claude-md-scope-clarification-scoping-001.md
+
+Document: gtkb-root-boundary-external-harness-exec-exception
+VERIFIED: bridge/gtkb-root-boundary-external-harness-exec-exception-008.md
+NEW: bridge/gtkb-root-boundary-external-harness-exec-exception-007.md
+GO: bridge/gtkb-root-boundary-external-harness-exec-exception-006.md
+REVISED: bridge/gtkb-root-boundary-external-harness-exec-exception-005.md
+NO-GO: bridge/gtkb-root-boundary-external-harness-exec-exception-004.md
+REVISED: bridge/gtkb-root-boundary-external-harness-exec-exception-003.md
+NO-GO: bridge/gtkb-root-boundary-external-harness-exec-exception-002.md
+NEW: bridge/gtkb-root-boundary-external-harness-exec-exception-001.md
+
+Document: gtkb-hygiene-sweep-cli-test-rebuild
+VERIFIED: bridge/gtkb-hygiene-sweep-cli-test-rebuild-004.md
+NEW: bridge/gtkb-hygiene-sweep-cli-test-rebuild-003.md
+GO: bridge/gtkb-hygiene-sweep-cli-test-rebuild-002.md
+NEW: bridge/gtkb-hygiene-sweep-cli-test-rebuild-001.md
+
 Document: gtkb-hygiene-sweep-skill
+VERIFIED: bridge/gtkb-hygiene-sweep-skill-008.md
+REVISED: bridge/gtkb-hygiene-sweep-skill-007.md
 NO-GO: bridge/gtkb-hygiene-sweep-skill-006.md
 NEW: bridge/gtkb-hygiene-sweep-skill-005.md
 GO: bridge/gtkb-hygiene-sweep-skill-004.md
@@ -87,6 +230,13 @@ REVISED: bridge/gtkb-hygiene-sweep-cli-scoping-002.md
 NEW: bridge/gtkb-hygiene-sweep-cli-scoping-001.md
 
 Document: gtkb-platform-tests-ruff-cleanup
+VERIFIED: bridge/gtkb-platform-tests-ruff-cleanup-014.md
+REVISED: bridge/gtkb-platform-tests-ruff-cleanup-013.md
+NO-GO: bridge/gtkb-platform-tests-ruff-cleanup-012.md
+REVISED: bridge/gtkb-platform-tests-ruff-cleanup-011.md
+NO-GO: bridge/gtkb-platform-tests-ruff-cleanup-010.md
+REVISED: bridge/gtkb-platform-tests-ruff-cleanup-009.md
+NO-GO: bridge/gtkb-platform-tests-ruff-cleanup-008.md
 NEW: bridge/gtkb-platform-tests-ruff-cleanup-007.md
 GO: bridge/gtkb-platform-tests-ruff-cleanup-006.md
 REVISED: bridge/gtkb-platform-tests-ruff-cleanup-005.md
@@ -100,6 +250,9 @@ NO-GO: bridge/gtkb-push-gate-slice-1-5-debt-audit-002.md
 NEW: bridge/gtkb-push-gate-slice-1-5-debt-audit-001.md
 
 Document: gtkb-rc-gate-membase-seed-resilient-fixture
+WITHDRAWN: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-005.md
+NO-GO: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-004.md
+REVISED: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-003.md
 NO-GO: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-002.md
 NEW: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-001.md
 
@@ -153,6 +306,10 @@ NO-GO: bridge/gtkb-work-subject-aware-testing-integration-probe-002.md
 NEW: bridge/gtkb-work-subject-aware-testing-integration-probe-001.md
 
 Document: gtkb-orphan-wi-membership-discovery-slice-1
+VERIFIED: bridge/gtkb-orphan-wi-membership-discovery-slice-1-012.md
+REVISED: bridge/gtkb-orphan-wi-membership-discovery-slice-1-011.md
+NO-GO: bridge/gtkb-orphan-wi-membership-discovery-slice-1-010.md
+REVISED: bridge/gtkb-orphan-wi-membership-discovery-slice-1-009.md
 NO-GO: bridge/gtkb-orphan-wi-membership-discovery-slice-1-008.md
 REVISED: bridge/gtkb-orphan-wi-membership-discovery-slice-1-007.md
 NO-GO: bridge/gtkb-orphan-wi-membership-discovery-slice-1-006.md
@@ -203,6 +360,8 @@ NO-GO: bridge/gtkb-skill-modernization-scoping-002.md
 NEW: bridge/gtkb-skill-modernization-scoping-001.md
 
 Document: gtkb-headless-gemini-lo-dispatch-verification
+NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-012.md
+REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-011.md
 NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-010.md
 REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-009.md
 NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-008.md
@@ -225,6 +384,11 @@ NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-002.md
 NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-001.md
 
 Document: gtkb-lo-hygiene-assessment-skill-build
+NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-008.md
+VERIFIED: bridge/gtkb-lo-hygiene-assessment-skill-build-007.md
+NEW: bridge/gtkb-lo-hygiene-assessment-skill-build-006.md
+GO: bridge/gtkb-lo-hygiene-assessment-skill-build-005.md
+REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-004.md
 NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-003.md
 REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-002.md
 NEW: bridge/gtkb-lo-hygiene-assessment-skill-build-001.md
@@ -440,6 +604,8 @@ NO-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-002.md
 NEW: bridge/gtkb-startup-enhancements-p2-freshness-contract-001.md
 
 Document: gtkb-in-source-provenance-anchors-001-prop
+GO: bridge/gtkb-in-source-provenance-anchors-001-prop-006.md
+REVISED: bridge/gtkb-in-source-provenance-anchors-001-prop-005.md
 NO-GO: bridge/gtkb-in-source-provenance-anchors-001-prop-004.md
 REVISED: bridge/gtkb-in-source-provenance-anchors-001-prop-003.md
 NO-GO: bridge/gtkb-in-source-provenance-anchors-001-prop-002.md
@@ -454,6 +620,8 @@ NO-GO: bridge/gtkb-membase-effective-use-recovery-next-slice-002.md
 NEW: bridge/gtkb-membase-effective-use-recovery-next-slice-001.md
 
 Document: gtkb-mcp-stable-harness-surface-current-version-views
+NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-008.md
+REVISED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-007.md
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-006.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-current-version-views-005.md
 GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-004.md
@@ -575,6 +743,8 @@ NO-GO: bridge/gtkb-audit-script-withdrawn-regex-fix-002.md
 NEW: bridge/gtkb-audit-script-withdrawn-regex-fix-001.md
 
 Document: gtkb-isolation-019-program-closeout
+GO: bridge/gtkb-isolation-019-program-closeout-006.md
+REVISED: bridge/gtkb-isolation-019-program-closeout-005.md
 NO-GO: bridge/gtkb-isolation-019-program-closeout-004.md
 REVISED: bridge/gtkb-isolation-019-program-closeout-003.md
 NO-GO: bridge/gtkb-isolation-019-program-closeout-002.md
@@ -594,6 +764,8 @@ NO-GO: bridge/gtkb-isolation-015-phase7-root-enforcement-002.md
 NEW: bridge/gtkb-isolation-015-phase7-root-enforcement-001.md
 
 Document: gtkb-legacy-gov-wi-cleanup
+NO-GO: bridge/gtkb-legacy-gov-wi-cleanup-008.md
+REVISED: bridge/gtkb-legacy-gov-wi-cleanup-007.md
 NO-GO: bridge/gtkb-legacy-gov-wi-cleanup-006.md
 NEW: bridge/gtkb-legacy-gov-wi-cleanup-005.md
 GO: bridge/gtkb-legacy-gov-wi-cleanup-004.md
@@ -641,8 +813,6 @@ NO-GO: bridge/gtkb-impl-gate-friction-hygiene-002.md
 NEW: bridge/gtkb-impl-gate-friction-hygiene-001.md
 
 Document: gtkb-bridge-skill-protected-write-helper
-NO-GO: bridge/gtkb-bridge-skill-protected-write-helper-006.md
-NEW: bridge/gtkb-bridge-skill-protected-write-helper-005.md
 GO: bridge/gtkb-bridge-skill-protected-write-helper-004.md
 REVISED: bridge/gtkb-bridge-skill-protected-write-helper-003.md
 NO-GO: bridge/gtkb-bridge-skill-protected-write-helper-002.md
@@ -663,6 +833,10 @@ NO-GO: bridge/gtkb-generate-approval-packet-cli-002.md
 NEW: bridge/gtkb-generate-approval-packet-cli-001.md
 
 Document: gtkb-lo-advisory-intake-batch
+VERIFIED: bridge/gtkb-lo-advisory-intake-batch-008.md
+NEW: bridge/gtkb-lo-advisory-intake-batch-007.md
+GO: bridge/gtkb-lo-advisory-intake-batch-006.md
+REVISED: bridge/gtkb-lo-advisory-intake-batch-005.md
 GO: bridge/gtkb-lo-advisory-intake-batch-004.md
 REVISED: bridge/gtkb-lo-advisory-intake-batch-003.md
 NO-GO: bridge/gtkb-lo-advisory-intake-batch-002.md
@@ -674,6 +848,10 @@ NO-GO: bridge/gtkb-cli-discoverability-doctor-json-backlog-show-002.md
 NEW: bridge/gtkb-cli-discoverability-doctor-json-backlog-show-001.md
 
 Document: gtkb-verify-skill-spec-to-test-mapping
+NO-GO: bridge/gtkb-verify-skill-spec-to-test-mapping-008.md
+NEW: bridge/gtkb-verify-skill-spec-to-test-mapping-007.md
+GO: bridge/gtkb-verify-skill-spec-to-test-mapping-006.md
+REVISED: bridge/gtkb-verify-skill-spec-to-test-mapping-005.md
 GO: bridge/gtkb-verify-skill-spec-to-test-mapping-004.md
 REVISED: bridge/gtkb-verify-skill-spec-to-test-mapping-003.md
 NO-GO: bridge/gtkb-verify-skill-spec-to-test-mapping-002.md
