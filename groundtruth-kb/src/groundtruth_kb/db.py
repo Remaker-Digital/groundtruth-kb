@@ -867,7 +867,13 @@ def _stable_slug(value: str) -> str:
 
 
 def _project_id_from_names(project_name: str, subproject_name: str | None = None) -> str:
-    base = f"PROJECT-{_stable_slug(project_name)}"
+    slug = _stable_slug(project_name)
+    # Idempotent prefix: a caller may pass either a bare project name
+    # ("GTKB-RELIABILITY-FIXES") or an already-qualified project id
+    # ("PROJECT-GTKB-RELIABILITY-FIXES"). Only prepend "PROJECT-" when the
+    # slug does not already carry it, so an already-qualified id is not
+    # doubled into "PROJECT-PROJECT-*".
+    base = slug if slug.startswith("PROJECT-") else f"PROJECT-{slug}"
     if subproject_name and subproject_name.strip():
         return f"{base}-{_stable_slug(subproject_name)}"
     return base

@@ -6,6 +6,13 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-project-id-prefix-idempotent-fix
+VERIFIED: bridge/gtkb-project-id-prefix-idempotent-fix-005.md
+NEW: bridge/gtkb-project-id-prefix-idempotent-fix-004.md
+GO: bridge/gtkb-project-id-prefix-idempotent-fix-003.md
+REVISED: bridge/gtkb-project-id-prefix-idempotent-fix-002.md
+NEW: bridge/gtkb-project-id-prefix-idempotent-fix-001.md
+
 Document: gtkb-hygiene-sweep-skill
 NO-GO: bridge/gtkb-hygiene-sweep-skill-006.md
 NEW: bridge/gtkb-hygiene-sweep-skill-005.md
