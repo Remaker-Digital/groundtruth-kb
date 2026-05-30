@@ -93,10 +93,10 @@ def _role_for_harness_id(harness_id: str) -> str | None:
     Prime-equivalent per the Acting-Prime Compatibility Contract.
     """
     from scripts.harness_roles import (  # local import: avoid top-level cycle
-        _normalize_role_field,
         ROLE_ACTING_PRIME_BUILDER,
         ROLE_LOYAL_OPPOSITION,
         ROLE_PRIME_BUILDER,
+        _normalize_role_field,
     )
 
     assignments = _load_role_assignments()
@@ -134,11 +134,7 @@ def _sole_prime_builder_harness_name() -> str | None:
     from scripts.harness_roles import is_prime_builder  # local import: avoid cycle
 
     assignments = _load_role_assignments()
-    prime_ids = [
-        hid
-        for hid, rec in assignments.items()
-        if isinstance(rec, dict) and is_prime_builder(rec)
-    ]
+    prime_ids = [hid for hid, rec in assignments.items() if isinstance(rec, dict) and is_prime_builder(rec)]
     if len(prime_ids) != 1:
         return None
     return _name_for_harness_id(prime_ids[0])
@@ -152,6 +148,50 @@ def _resolve_harness_name(harness_name: str | None) -> str | None:
     if env_value:
         return env_value
     return _sole_prime_builder_harness_name()
+
+
+def _session_role_override(harness_name: str) -> str | None:
+    """Return a declared interactive session role for the attribution LABEL, or None.
+
+    Slice 6 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE
+    (bridge/gtkb-interactive-session-role-override-slice-6-attribution-role-awareness-001.md,
+    Codex GO at -002). Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 1,
+    a declared interactive session role overrides the durable role for the
+    ``changed_by`` LABEL. This is a LABEL OVERRIDE ONLY: it is layered on top of
+    the fail-closed durable resolution in ``resolve_changed_by`` (the durable
+    role must already have resolved, preserving the
+    ``gtkb-kb-attribution-harness-aware`` mis-attribution invariant).
+
+    Returns the marker role only when a valid interactive marker won the shared
+    resolver's interactive resolution; returns ``None`` for durable sources so
+    the caller keeps its already-resolved (fail-closed) durable role.
+
+    Excluded in headless dispatch context (``GTKB_BRIDGE_POLLER_RUN_ID`` set):
+    durable role remains the attribution authority for dispatched work. (Slice 3
+    already clears the marker at every SessionStart in both dispatchers, so a
+    headless session has no marker; this guard makes the interactive-only intent
+    explicit.)
+
+    ``current_session_id`` is ``None`` in CLI/subprocess attribution context, so
+    the resolver's ``marker_session_id_unverified`` branch applies; Slice 3 keeps
+    the marker fresh-per-session. Fail-soft: any resolver error returns ``None``
+    (keep the durable role); it never masks a durable-attribution failure.
+    """
+    if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
+        return None
+    try:
+        from scripts.session_role_resolution import (  # local: avoid top-level cycle
+            resolve_interactive_session_role,
+        )
+
+        role, source = resolve_interactive_session_role(
+            PROJECT_ROOT, current_session_id=None, harness_name=harness_name
+        )
+    except Exception:
+        return None
+    if source in ("marker", "marker_session_id_unverified"):
+        return role
+    return None
 
 
 def resolve_changed_by(*, harness_name: str | None = None) -> str:
@@ -181,8 +221,7 @@ def resolve_changed_by(*, harness_name: str | None = None) -> str:
     harness_id = _harness_id_for_name(resolved)
     if not harness_id:
         raise RuntimeError(
-            f"resolve_changed_by: harness_name '{resolved}' has no entry in "
-            f"{HARNESS_IDENTITIES_PATH.name}."
+            f"resolve_changed_by: harness_name '{resolved}' has no entry in {HARNESS_IDENTITIES_PATH.name}."
         )
     role = _role_for_harness_id(harness_id)
     if not role:
@@ -190,7 +229,14 @@ def resolve_changed_by(*, harness_name: str | None = None) -> str:
             f"resolve_changed_by: harness_id '{harness_id}' (harness_name "
             f"'{resolved}') has no role assignment in {ROLE_ASSIGNMENTS_PATH.name}."
         )
-    return f"{role}/{resolved}"
+    # Slice 6: a declared interactive session role overrides the durable role for
+    # the attribution LABEL (ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 1).
+    # This is layered AFTER the fail-closed durable resolution above, so the
+    # durable role must still resolve (mis-attribution invariant preserved); the
+    # marker overrides only the label, and falls back to the durable role when no
+    # valid marker is present.
+    effective_role = _session_role_override(resolved) or role
+    return f"{effective_role}/{resolved}"
 
 
 def resolve_changed_by_or_none(*, harness_name: str | None = None) -> str | None:

@@ -2175,9 +2175,7 @@ _HARNESS_EXEC_SCAN_TARGETS = (
     Path("scripts") / "verify_antigravity_dispatch.py",
 )
 _HARNESS_EXEC_INROOT_TOOLCHAIN = frozenset({"python", "python3"})
-_HARNESS_EXEC_SUBPROCESS_METHODS = frozenset(
-    {"run", "Popen", "call", "check_output", "check_call"}
-)
+_HARNESS_EXEC_SUBPROCESS_METHODS = frozenset({"run", "Popen", "call", "check_output", "check_call"})
 
 
 def _extract_literal_command(node: ast.Call) -> str | None:
@@ -2321,9 +2319,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
                 required=False,
                 found=True,
                 status="fail",
-                message=(
-                    f"could not parse {path.relative_to(target).as_posix()}: {exc}"
-                ),
+                message=(f"could not parse {path.relative_to(target).as_posix()}: {exc}"),
             )
         rel = path.relative_to(target).as_posix()
         for node in ast.walk(tree):
@@ -2344,10 +2340,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
                         continue
             except (OSError, ValueError):
                 pass
-            violations.append(
-                f"{rel}: literal command {literal_cmd!r} (not a registry-enumerated "
-                f"harness command)"
-            )
+            violations.append(f"{rel}: literal command {literal_cmd!r} (not a registry-enumerated harness command)")
 
     if violations:
         return ToolCheck(
@@ -2358,8 +2351,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
             message=(
                 "non-harness out-of-root executable resolution detected in cross-harness "
                 "surface(s); violates the External Harness Executable Resolution Exception "
-                "bound (.claude/rules/project-root-boundary.md): "
-                + "; ".join(violations)
+                "bound (.claude/rules/project-root-boundary.md): " + "; ".join(violations)
             ),
         )
 
@@ -2373,6 +2365,165 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
             f"commands ({len(allowed_commands)} enumerated: {sorted(allowed_commands)}); "
             f"no literal non-harness commands in scanned surface(s)"
         ),
+    )
+
+
+# Slice 7 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE
+# (bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-001.md,
+# Codex GO at -002). The ephemeral session-state role marker is written by the
+# UserPromptSubmit init-keyword path (Slice 2) and invalidated at SessionStart
+# (Slice 3). These two read-only checks surface marker problems.
+#
+# The marker path and the session-id env fallback set are DUPLICATED here (with
+# a parity test against scripts.session_role_resolution) rather than imported,
+# to keep the packaged groundtruth_kb doctor's import surface out of the
+# repo-root scripts/ tree (Codex Review Ask 2 confirmed).
+_SESSION_ROLE_MARKER_NAME = "active-session-role.json"
+_SESSION_ROLE_VALID_ROLES = frozenset({"prime-builder", "loyal-opposition"})
+# MUST equal scripts.session_role_resolution._SESSION_ID_ENV_FALLBACKS /
+# scripts.workstream_focus._SESSION_ID_ENV_FALLBACKS (Slice 2/4).
+_SESSION_ID_ENV_FALLBACKS = (
+    "GTKB_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "CLAUDE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
+)
+
+
+def _session_role_marker_path(target: Path) -> Path:
+    return target / ".claude" / "session" / _SESSION_ROLE_MARKER_NAME
+
+
+def _read_session_role_marker(target: Path) -> tuple[dict | None, str | None]:
+    """Return (marker_dict, error). error is set on unreadable/malformed/absent.
+
+    (None, None) -> no marker file (a normal, non-warning state).
+    (None, "<reason>") -> marker present but unreadable or not a JSON object.
+    (dict, None) -> marker parsed.
+    """
+    marker_path = _session_role_marker_path(target)
+    if not marker_path.is_file():
+        return None, None
+    try:
+        body = json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, f"unreadable or malformed JSON: {exc}"
+    if not isinstance(body, dict):
+        return None, "marker is not a JSON object"
+    return body, None
+
+
+def _session_role_marker_structurally_valid(body: dict) -> bool:
+    """True iff a parsed marker satisfies DCL-SESSION-ROLE-RESOLUTION-001
+    assertion 6 (non-empty string ``session_id``) AND assertion 7 (``role`` in
+    the role set). The alignment check consults this so it defers to the
+    validity check for ANY structural invalidity (no double-WARN), including an
+    invalid role paired with a present-but-stale session id.
+    """
+    session_id = body.get("session_id")
+    if not (isinstance(session_id, str) and session_id.strip()):
+        return False
+    return body.get("role") in _SESSION_ROLE_VALID_ROLES
+
+
+def _resolve_env_session_id() -> str | None:
+    """Best-effort current session id from the resolver's env fallback chain."""
+    for env_name in _SESSION_ID_ENV_FALLBACKS:
+        value = os.environ.get(env_name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _check_session_role_marker_validity(target: Path) -> ToolCheck:
+    """Structural validity of the ephemeral session-state role marker.
+
+    DCL-SESSION-ROLE-RESOLUTION-001 assertion 6 (non-null session id) and
+    assertion 7 (role in {prime-builder, loyal-opposition}). Read-only.
+    """
+    check_name = "Session-role marker validity"
+    body, error = _read_session_role_marker(target)
+    if body is None and error is None:
+        return ToolCheck(
+            name=check_name, required=False, found=False, status="pass", message="no active session-role marker"
+        )
+    if error is not None:
+        return ToolCheck(
+            name=check_name, required=False, found=True, status="warning", message=f"session-role marker {error}"
+        )
+    assert body is not None
+    session_id = body.get("session_id")
+    if not (isinstance(session_id, str) and session_id.strip()):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="session-role marker missing or empty 'session_id' (DCL-SESSION-ROLE-RESOLUTION-001 assertion 6)",
+        )
+    role = body.get("role")
+    if role not in _SESSION_ROLE_VALID_ROLES:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"session-role marker 'role' {role!r} not in {{prime-builder, loyal-opposition}} (assertion 7)",
+        )
+    return ToolCheck(
+        name=check_name, required=False, found=True, status="pass", message=f"valid session-role marker: role={role}"
+    )
+
+
+def _check_session_role_marker_session_id_alignment(target: Path) -> ToolCheck:
+    """Best-effort staleness: marker session id vs the current session id.
+
+    The doctor has no UserPromptSubmit payload session id, so 'current' is
+    resolved best-effort from the resolver's env fallback set. INFO when no
+    session-id env var is available (e.g. a manual CLI run outside a session).
+    When the marker is structurally invalid, the validity check owns the
+    warning and this check passes (no double-WARN). Read-only.
+    """
+    check_name = "Session-role marker session alignment"
+    body, error = _read_session_role_marker(target)
+    if body is None:
+        # No marker, or invalid marker (validity check owns that warning).
+        detail = "no marker to align" if error is None else "marker invalid (see validity check)"
+        return ToolCheck(name=check_name, required=False, found=body is not None, status="pass", message=detail)
+    if not _session_role_marker_structurally_valid(body):
+        # Any structural invalidity (missing/empty session_id OR invalid role)
+        # is owned by the validity check; alignment passes to avoid double-WARN.
+        return ToolCheck(
+            name=check_name, required=False, found=True, status="pass", message="marker invalid (see validity check)"
+        )
+    session_id = str(body.get("session_id")).strip()
+    current = _resolve_env_session_id()
+    if current is None:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="info",
+            message="alignment indeterminate; no session-id env var set (run inside a session to check staleness)",
+        )
+    if session_id != current:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"stale session-role marker: session_id {session_id!r} != current {current!r}; "
+                "SessionStart invalidation (Slice 3) may have failed"
+            ),
+        )
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message="marker session id aligns with current session",
     )
 
 
@@ -3096,6 +3247,10 @@ def run_doctor(
         # (Codex GO at -014): role-set schema validation + single-harness
         # dispatcher applicability check.
         checks.append(_check_role_set_topology_consistency(target))
+        # Slice 7 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: read-only
+        # session-state role marker diagnostics (validity + best-effort staleness).
+        checks.append(_check_session_role_marker_validity(target))
+        checks.append(_check_session_role_marker_session_id_alignment(target))
         checks.append(_check_single_harness_dispatcher_when_required(target))
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
