@@ -6,16 +6,41 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-interactive-session-role-override-slice-10-regression-tests
+NEW: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-001.md
+
+Document: gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates
+NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-001.md
+
+Document: gtkb-interactive-session-role-override-hygiene-backfill
+NO-GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-002.md
+NEW: bridge/gtkb-interactive-session-role-override-hygiene-backfill-001.md
+
 Document: gtkb-bridge-dispatch-per-document-lease-substitution
 GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-002.md
 NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-001.md
 
 Document: gtkb-gov-backlog-source-of-truth-2026-05-02
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-016.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-015.md
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-014.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-013.md
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-012.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-011.md
 NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-010.md
 NEW: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-009.md
 VERIFIED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-008.md
 
 Document: gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive
+VERIFIED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-014.md
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-013.md
+NO-GO: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-012.md
+VERIFIED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-011.md
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-010.md
+NO-GO: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-009.md
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-008.md
+NO-GO: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-007.md
+NEW: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-006.md
 GO: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-005.md
 REVISED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-004.md
 REVISED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-003.md
@@ -23,12 +48,25 @@ NO-GO: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-002
 NEW: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-001.md
 
 Document: gtkb-backlog-canonical-pivot-spec-promotion
+VERIFIED: bridge/gtkb-backlog-canonical-pivot-spec-promotion-006.md
+NEW: bridge/gtkb-backlog-canonical-pivot-spec-promotion-005.md
 GO: bridge/gtkb-backlog-canonical-pivot-spec-promotion-004.md
 REVISED: bridge/gtkb-backlog-canonical-pivot-spec-promotion-003.md
 NO-GO: bridge/gtkb-backlog-canonical-pivot-spec-promotion-002.md
 NEW: bridge/gtkb-backlog-canonical-pivot-spec-promotion-001.md
 
 Document: gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-015.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-014.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-013.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-012.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-011.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-010.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-009.md
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-008.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-007.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-006.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-005.md
 GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-004.md
 REVISED: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-003.md
 NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-002.md
@@ -118,6 +156,8 @@ ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-002.md
 ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-001.md
 
 Document: gtkb-skill-modernization-slice-3-kb-work-item-migration
+VERIFIED: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-012.md
+NEW: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-011.md
 GO: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-010.md
 REVISED: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-009.md
 NO-GO: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-008.md

@@ -25,6 +25,9 @@ Two modes:
   emission is per-turn rate-limited to one and gated by env var
   GTKB_BLOCK_ON_PROSE_DECISION_ASK (default 1; =0 disables block emission
   while preserving detection + durable-file writes + graceful degradation).
+  When running inside an auto-dispatched bridge worker
+  (GTKB_BRIDGE_POLLER_RUN_ID is set), prose decision asks are recorded as a
+  dispatch-run artifact instead of emitting the interactive block decision.
 
   This bounded exception revises the original Slice 1 F3 rule "Stop writes
   durable state only" (parent GO at gtkb-gov-owner-decision-surfacing-slice1
@@ -89,12 +92,12 @@ QUESTION_HASH_LENGTH = 16
 
 # Project root resolution: prefer CLAUDE_PROJECT_DIR env var (Claude Code
 # sets this for hooks); fall back to walking up from this file's location.
-PROJECT_ROOT = Path(
-    os.environ.get("CLAUDE_PROJECT_DIR")
-    or Path(__file__).resolve().parents[2]
-).resolve()
+PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]).resolve()
 
 PENDING_FILE_REL = "memory/pending-owner-decisions.md"
+DISPATCH_RUNS_REL = Path(".gtkb-state") / "cross-harness-trigger" / "dispatch-runs"
+WORKER_RUN_ID_ENV_VAR = "GTKB_BRIDGE_POLLER_RUN_ID"
+PROJECT_ROOT_ENV_VAR = "GTKB_PROJECT_ROOT"
 
 # Prose anti-patterns: phrasings that indicate the assistant is asking
 # for an owner decision in prose rather than via AskUserQuestion. Each
@@ -105,37 +108,58 @@ PROSE_DECISION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     # All patterns prefixed with negative lookbehind (?<!["`]) to suppress
     # quoted/backtick-bounded literals (DECISION-0001/0002 FP class, S309).
     # See bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-007.md.
-    ("offering_or_choice", re.compile(
-        r'(?<!["`])\bwant me to\b[^.?!]*\bor\b[^.?!]*\?',
-        re.IGNORECASE,
-    )),
-    ("should_i_or", re.compile(
-        r'(?<!["`])\bshould I\b[^.?!]*\bor\b[^.?!]*\?',
-        re.IGNORECASE,
-    )),
+    (
+        "offering_or_choice",
+        re.compile(
+            r'(?<!["`])\bwant me to\b[^.?!]*\bor\b[^.?!]*\?',
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "should_i_or",
+        re.compile(
+            r'(?<!["`])\bshould I\b[^.?!]*\bor\b[^.?!]*\?',
+            re.IGNORECASE,
+        ),
+    ),
     # Split awaiting_input into _q (interrogative) + _first_person (active wait).
     # Bare "Awaiting your X." status statements no longer match (S328 directive).
-    ("awaiting_input_q", re.compile(
-        r'(?<!["`])\bawaiting (?:your|owner)\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b[^.?!]*\?',
-        re.IGNORECASE,
-    )),
-    ("awaiting_input_first_person", re.compile(
-        r'(?<!["`])\b(?:i am|i\'m|we are|we\'re)\s+awaiting (?:your|owner)\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b',
-        re.IGNORECASE,
-    )),
+    (
+        "awaiting_input_q",
+        re.compile(
+            r'(?<!["`])\bawaiting (?:your|owner)\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b[^.?!]*\?',
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "awaiting_input_first_person",
+        re.compile(
+            r'(?<!["`])\b(?:i am|i\'m|we are|we\'re)\s+awaiting (?:your|owner)\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b',
+            re.IGNORECASE,
+        ),
+    ),
     # Split standing_by_for similarly.
-    ("standing_by_for_q", re.compile(
-        r'(?<!["`])\bstanding by for\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b[^.?!]*\?',
-        re.IGNORECASE,
-    )),
-    ("standing_by_for_first_person", re.compile(
-        r'(?<!["`])\b(?:i am|i\'m|we are|we\'re)\s+standing by for\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b',
-        re.IGNORECASE,
-    )),
-    ("your_decision_q", re.compile(
-        r'(?<!["`])\b(?:your|owner)\s+(?:decision|choice|input)\b[^.?!]{0,80}\?',
-        re.IGNORECASE,
-    )),
+    (
+        "standing_by_for_q",
+        re.compile(
+            r'(?<!["`])\bstanding by for\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b[^.?!]*\?',
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "standing_by_for_first_person",
+        re.compile(
+            r'(?<!["`])\b(?:i am|i\'m|we are|we\'re)\s+standing by for\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b',
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "your_decision_q",
+        re.compile(
+            r'(?<!["`])\b(?:your|owner)\s+(?:decision|choice|input)\b[^.?!]{0,80}\?',
+            re.IGNORECASE,
+        ),
+    ),
 )
 
 # False-positive guard for prose detection (T14): patterns that look like
@@ -178,17 +202,36 @@ GUARD_LOCAL_WINDOW_CHARS = 200
 # PROSE_FALSE_POSITIVE_GUARDS so the latter remain limited to in-window
 # semantic guards (Sub-slice A -007 §F1 invariant preserved).
 _FENCE_LINE_RE = re.compile(r"(?:^|\n)```")
+_PENDING_OWNER_DECISIONS_HEADING_RE = re.compile(
+    r"(?im)^([#]{2,3})[ \t]+Pending Owner Decisions(?:[ \t]*\([^)\n]*\))?[ \t\r]*$"
+)
+_MARKDOWN_HEADING_RE = re.compile(r"(?m)^([#]{1,6})[ \t]+")
+
+
+def _is_inside_pending_owner_decisions_section(text: str, match_start: int) -> bool:
+    """Return True when ``match_start`` is inside a pending-decision section."""
+    prefix = text[:match_start]
+    pending_heading: tuple[int, int] | None = None
+    for heading in _PENDING_OWNER_DECISIONS_HEADING_RE.finditer(prefix):
+        pending_heading = (heading.end(), len(heading.group(1)))
+    if pending_heading is None:
+        return False
+
+    heading_end, pending_level = pending_heading
+    section_prefix = prefix[heading_end:]
+    return all(len(heading.group(1)) > pending_level for heading in _MARKDOWN_HEADING_RE.finditer(section_prefix))
 
 
 def _is_inside_structural_context(text: str, match_start: int) -> bool:
     """Return True if ``match_start`` falls inside a markdown structural
     context where a trigger pattern should be treated as documentation
-    rather than a real owner-decision-ask. Covers four contexts:
+    rather than a real owner-decision-ask. Covers five contexts:
 
     1. Triple-backtick fenced code block (line-anchored).
     2. 4-space indented code block (line-prefix heuristic).
     3. Markdown blockquote (line starts with ``> ``).
     4. HTML comment (between unclosed ``<!--`` and the next ``-->``).
+    5. Cached ``Pending Owner Decisions`` markdown sections.
     """
     prefix = text[:match_start]
 
@@ -206,23 +249,27 @@ def _is_inside_structural_context(text: str, match_start: int) -> bool:
     if last_open != -1 and last_open > last_close:
         return True
 
+    # 3. Cached startup payloads can relay already-recorded pending decisions
+    # as markdown bullets. Text inside this section is historical state, not a
+    # fresh prose owner-decision ask.
+    if _is_inside_pending_owner_decisions_section(text, match_start):
+        return True
+
     # Identify the line containing match_start.
     line_start = prefix.rfind("\n") + 1  # 0 if no preceding newline.
     next_newline = text.find("\n", match_start)
     line_full = text[line_start:] if next_newline == -1 else text[line_start:next_newline]
 
-    # 3. Markdown blockquote.
+    # 4. Markdown blockquote.
     if line_full.startswith("> "):
         return True
 
-    # 4. 4-space indented code block (heuristic: line prefix only; does
+    # 5. 4-space indented code block (heuristic: line prefix only; does
     # not enforce the preceding-blank-line CommonMark requirement, since
     # the false-positive cost of suppressing 4-space-indented prose is
     # low and rare in our bridge corpus).
-    if line_full.startswith("    "):
-        return True
+    return bool(line_full.startswith("    "))
 
-    return False
 
 # Block emission feature flag (Codex -004 GO condition 3).
 # Default '1' (enabled); '=0' suppresses block JSON only — detection,
@@ -263,7 +310,7 @@ def _build_block_decision(matches: list[tuple[str, str]]) -> dict[str, str]:
     - Names the resolution path (call AskUserQuestion).
     - Names the disable path (env var ``GTKB_BLOCK_ON_PROSE_DECISION_ASK=0``).
     """
-    displayed = matches[: BLOCK_REASON_DISPLAYED_MATCHES_CAP]
+    displayed = matches[:BLOCK_REASON_DISPLAYED_MATCHES_CAP]
     extra_count = len(matches) - len(displayed)
 
     header = (
@@ -272,8 +319,7 @@ def _build_block_decision(matches: list[tuple[str, str]]) -> dict[str, str]:
         else "Matched patterns:"
     )
     lines = [
-        "Owner-decision-tracker: prose decision ask(s) detected without "
-        "AskUserQuestion call this turn.",
+        "Owner-decision-tracker: prose decision ask(s) detected without AskUserQuestion call this turn.",
         "",
         header,
     ]
@@ -284,22 +330,73 @@ def _build_block_decision(matches: list[tuple[str, str]]) -> dict[str, str]:
         lines.append(f"  - {name}: '{excerpt}'")
     if extra_count > 0:
         lines.append(f"  ({extra_count} additional matches)")
-    lines.extend([
-        "",
-        "Resolution: call AskUserQuestion with the detected questions "
-        "formalized as structured options. The dialog produces a clickable "
-        "popup the user can respond to inline; prose questions get lost in "
-        "chat scrollback.",
-        "",
-        f"Disable: set env var {BLOCK_EMISSION_ENV_VAR}=0 to suppress block "
-        f"emission while keeping detection + durable-file writes.",
-    ])
+    lines.extend(
+        [
+            "",
+            "Resolution: call AskUserQuestion with the detected questions "
+            "formalized as structured options. The dialog produces a clickable "
+            "popup the user can respond to inline; prose questions get lost in "
+            "chat scrollback.",
+            "",
+            f"Disable: set env var {BLOCK_EMISSION_ENV_VAR}=0 to suppress block "
+            f"emission while keeping detection + durable-file writes.",
+        ]
+    )
     return {"decision": "block", "reason": "\n".join(lines)}
+
+
+def _worker_dispatch_run_id() -> str | None:
+    """Return the active bridge-worker run id, if this Stop hook is worker-scoped."""
+    run_id = os.environ.get(WORKER_RUN_ID_ENV_VAR, "").strip()
+    return run_id or None
+
+
+def _dispatch_artifact_path(run_id: str) -> Path:
+    """Return the worker owner-decision artifact path for a dispatch run id."""
+    project_root_value = os.environ.get(PROJECT_ROOT_ENV_VAR, "").strip()
+    project_root = Path(project_root_value).resolve() if project_root_value else PROJECT_ROOT
+    safe_run_id = re.sub(r"[^A-Za-z0-9_.-]", "_", run_id)
+    return project_root / DISPATCH_RUNS_REL / f"{safe_run_id}.owner-decision-requested.json"
+
+
+def _write_worker_owner_decision_request(
+    *,
+    run_id: str,
+    matches: list[tuple[str, str]],
+    transcript_path: Path,
+    timestamp_utc: str,
+) -> None:
+    """Persist a structured owner-decision request for unattended bridge workers."""
+    path = _dispatch_artifact_path(run_id)
+    payload = {
+        "schema_version": 1,
+        "decision": "requires_owner_decision",
+        "run_id": run_id,
+        "detected_patterns": [[name, snippet] for name, snippet in matches],
+        "transcript_path": str(transcript_path),
+        "timestamp_utc": timestamp_utc,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        tmp_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        tmp_path.replace(path)
+    except OSError as exc:
+        # Hook failures must not crash a harness. The durable pending file has
+        # already preserved the ask; this artifact is worker-dispatch routing.
+        print(
+            f"owner-decision-tracker: failed to write worker decision artifact: {exc}",
+            file=sys.stderr,
+        )
 
 
 # ---------------------------------------------------------------------------
 # Durable-file model + I/O
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DecisionEntry:
@@ -309,6 +406,7 @@ class DecisionEntry:
     ## History sections in memory/pending-owner-decisions.md. The hook is
     the canonical writer; manual edits should add an Edited-by-owner note.
     """
+
     id: str
     asked_at: str
     asked_in_session: str = ""
@@ -353,7 +451,7 @@ class DecisionEntry:
             lines.append(f"  resolved_via: {self.resolved_via}")
         if self.answer:
             lines.append(f"  answer: {_quote_yaml(self.answer)}")
-        lines.append(f"  notes: {_quote_yaml(self.notes) if self.notes else '\"\"'}")
+        lines.append(f"  notes: {_quote_yaml(self.notes) if self.notes else '""'}")
         return "\n".join(lines)
 
 
@@ -366,8 +464,59 @@ def _quote_yaml(value: str) -> str:
     questions are short by convention; multi-paragraph questions belong in
     a thread_ref bridge file, not in the question field itself).
     """
-    s = value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ")
-    return f"\"{s}\""
+    s = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+    return f'"{s}"'
+
+
+_AUTO_ARCHIVE_FAILURE_LOG_REL = Path(".gtkb-state/owner-decision-auto-archive/failures.jsonl")
+
+
+def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> None:
+    """Slice 4: opt-in auto-archive of resolved AUQ to the Deliberation Archive.
+
+    Env-gated via ``GTKB_AUQ_AUTO_ARCHIVE=1``; default-off. Classification is
+    deterministic per ``SPEC-AUQ-NO-LLM-CLASSIFIER-001``. All filesystem and
+    DB writes are anchored to ``PROJECT_ROOT`` (resolved from
+    ``CLAUDE_PROJECT_DIR`` at hook startup), never ``Path.cwd()``. Failures
+    are caught and appended to ``<PROJECT_ROOT>/.gtkb-state/owner-decision-
+    auto-archive/failures.jsonl``; the tracker's notepad-tier write remains
+    load-bearing.
+    """
+    if os.environ.get("GTKB_AUQ_AUTO_ARCHIVE", "0") != "1":
+        return
+    try:
+        from groundtruth_kb.owner_decision.auto_archive import (
+            DecisionForArchive,
+            archive_decision,
+            should_auto_archive,
+        )
+
+        candidate = DecisionForArchive(
+            decision_id=entry.id,
+            question=entry.question,
+            options=tuple(entry.options),
+            answer=entry.answer,
+            resolved_at=entry.resolved_at,
+            session_id=entry.resolved_in_session or session_hint,
+            detected_via=entry.detected_via,
+        )
+        ok, _reason = should_auto_archive(candidate)
+        if ok:
+            archive_decision(candidate, project_root=PROJECT_ROOT)
+    except Exception as exc:  # noqa: BLE001 - hook must never raise
+        try:
+            failure_log = PROJECT_ROOT / _AUTO_ARCHIVE_FAILURE_LOG_REL
+            failure_log.parent.mkdir(parents=True, exist_ok=True)
+            record = {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "decision_id": entry.id,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+            }
+            with failure_log.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record) + "\n")
+        except OSError:
+            pass
 
 
 def _ensure_pending_file(path: Path) -> None:
@@ -461,7 +610,7 @@ def _read_pending_file(path: Path) -> dict[str, list[DecisionEntry]]:
             if stripped.startswith("- id: "):
                 _flush_entry(sections, current_section, current_entry)
                 current_entry = DecisionEntry(
-                    id=stripped[len("- id: "):].strip(),
+                    id=stripped[len("- id: ") :].strip(),
                     asked_at="",
                     status="pending" if current_section == "pending" else "resolved",
                 )
@@ -476,7 +625,7 @@ def _read_pending_file(path: Path) -> dict[str, list[DecisionEntry]]:
                 continue
 
             if in_options and line.startswith("    - "):
-                current_entry.options.append(_unquote_yaml(line[len("    - "):]))
+                current_entry.options.append(_unquote_yaml(line[len("    - ") :]))
                 continue
 
             if line.startswith("  ") and ":" in stripped:
@@ -516,9 +665,9 @@ def _flush_entry(
 
 def _unquote_yaml(value: str) -> str:
     """Strip surrounding double quotes and unescape; pass-through otherwise."""
-    if value.startswith("\"") and value.endswith("\"") and len(value) >= 2:
+    if value.startswith('"') and value.endswith('"') and len(value) >= 2:
         body = value[1:-1]
-        return body.replace("\\\"", "\"").replace("\\\\", "\\")
+        return body.replace('\\"', '"').replace("\\\\", "\\")
     return value
 
 
@@ -585,7 +734,7 @@ def _next_decision_id(sections: dict[str, list[DecisionEntry]]) -> str:
     for entries in sections.values():
         for entry in entries:
             if entry.id.startswith(DECISION_ID_PREFIX):
-                tail = entry.id[len(DECISION_ID_PREFIX):]
+                tail = entry.id[len(DECISION_ID_PREFIX) :]
                 try:
                     highest = max(highest, int(tail))
                 except ValueError:
@@ -606,6 +755,7 @@ def _question_hash(question: str, options: list[str]) -> str:
 # ---------------------------------------------------------------------------
 # Stop mode -- transcript JSONL parsing
 # ---------------------------------------------------------------------------
+
 
 def _parse_stop_payload(stdin_text: str) -> dict[str, Any]:
     """Parse the Stop hook event payload from stdin.
@@ -734,10 +884,10 @@ def _extract_question_snippet(full_text: str, match: re.Match[str]) -> str:
     matched = match.group(0)
     end = match.end()
     if not matched.rstrip().endswith(("?", "!", ".")):
-        forward_window = full_text[end:end + 60]
+        forward_window = full_text[end : end + 60]
         terminator_match = re.search(r"[.?!]", forward_window)
         if terminator_match:
-            matched = matched + forward_window[:terminator_match.end()]
+            matched = matched + forward_window[: terminator_match.end()]
     matched = matched.strip()
     if len(matched) > 120:
         matched = matched[:117] + "..."
@@ -749,13 +899,55 @@ def _extract_question_snippet(full_text: str, match: re.Match[str]) -> str:
 # (biases toward false-negatives so unrelated decisions are not silently
 # auto-resolved). After stoplist removal, the remaining tokens carry the
 # discriminating semantic.
-_CORRELATION_STOPLIST: frozenset[str] = frozenset({
-    "want", "me", "to", "or", "wait", "should", "i", "now", "approve", "the",
-    "defer", "do", "you", "we", "is", "this", "are", "go", "stop", "yes", "no",
-    "any", "of", "in", "on", "at", "for", "with", "and", "but", "as", "be",
-    "have", "has", "had", "did", "does", "can", "could", "will", "would",
-    "shall", "must", "may", "might",
-})
+_CORRELATION_STOPLIST: frozenset[str] = frozenset(
+    {
+        "want",
+        "me",
+        "to",
+        "or",
+        "wait",
+        "should",
+        "i",
+        "now",
+        "approve",
+        "the",
+        "defer",
+        "do",
+        "you",
+        "we",
+        "is",
+        "this",
+        "are",
+        "go",
+        "stop",
+        "yes",
+        "no",
+        "any",
+        "of",
+        "in",
+        "on",
+        "at",
+        "for",
+        "with",
+        "and",
+        "but",
+        "as",
+        "be",
+        "have",
+        "has",
+        "had",
+        "did",
+        "does",
+        "can",
+        "could",
+        "will",
+        "would",
+        "shall",
+        "must",
+        "may",
+        "might",
+    }
+)
 
 
 _CORRELATION_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
@@ -796,9 +988,7 @@ def _discriminating_jaccard(prose_tokens: set[str], auq_tokens: set[str]) -> tup
         return (0.0, False)
     intersection = prose_tokens & auq_tokens
     j_d = len(intersection) / len(union)
-    has_min_length = any(
-        len(tok) >= 4 and not tok.isdigit() for tok in intersection
-    )
+    has_min_length = any(len(tok) >= 4 and not tok.isdigit() for tok in intersection)
     return (j_d, has_min_length)
 
 
@@ -930,6 +1120,10 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
            (askuserquestion_count is per just-completed turn, not session-
            cumulative — per Codex -004 Q1 answer).
         3. The env var ``GTKB_BLOCK_ON_PROSE_DECISION_ASK`` is not '0'.
+        4. The hook is not running inside an auto-dispatched bridge worker
+           (``GTKB_BRIDGE_POLLER_RUN_ID`` is unset). Workers cannot open
+           interactive owner input, so they write a dispatch-run
+           ``*.owner-decision-requested.json`` artifact instead.
 
         The block decision is per-turn rate-limited to one (single return
         value; caller emits exactly one JSON to stdout). Detection +
@@ -995,11 +1189,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
             if not isinstance(q, dict):
                 continue
             question_text = str(q.get("question") or "").strip()
-            options = [
-                str(opt.get("label") or "")
-                for opt in (q.get("options") or [])
-                if isinstance(opt, dict)
-            ]
+            options = [str(opt.get("label") or "") for opt in (q.get("options") or []) if isinstance(opt, dict)]
             if not question_text:
                 continue
             auq_questions_this_turn.append((question_text, options))
@@ -1025,6 +1215,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
                 entry.resolved_in_session = session_hint
                 entry.answer = _extract_answer_text(tr)
                 sections["resolved"].append(entry)
+                _auto_archive_if_enabled(entry, session_hint=session_hint)
             else:
                 sections["pending"].append(entry)
             mutated = True
@@ -1065,9 +1256,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
         # Two-signal correlation against AUQ questions in this turn.
         b_signal: str | None = None
         for auq_question, auq_options in auq_questions_this_turn:
-            correlated, signal_name = _correlate_prose_to_auq(
-                snippet, auq_question, auq_options
-            )
+            correlated, signal_name = _correlate_prose_to_auq(snippet, auq_question, auq_options)
             if correlated:
                 b_signal = signal_name
                 break
@@ -1127,8 +1316,18 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     # ran regardless. Only FRESH prose matches are block-eligible: a turn that
     # merely relays already-recorded owner decisions (WI-3332) does not refuse
     # turn-end, even though the relay was still scanned and idempotence-checked.
-    if fresh_prose_matches_this_turn and askuserquestion_count == 0 and _block_emission_enabled():
-        return _build_block_decision(fresh_prose_matches_this_turn)
+    if fresh_prose_matches_this_turn and askuserquestion_count == 0:
+        worker_run_id = _worker_dispatch_run_id()
+        if worker_run_id:
+            _write_worker_owner_decision_request(
+                run_id=worker_run_id,
+                matches=fresh_prose_matches_this_turn,
+                transcript_path=transcript_path,
+                timestamp_utc=asked_at,
+            )
+            return None
+        if _block_emission_enabled():
+            return _build_block_decision(fresh_prose_matches_this_turn)
     return None
 
 
@@ -1217,6 +1416,7 @@ def _user_prompt_handler(stdin_text: str) -> str:
                 entry.resolved_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
                 entry.answer = answer
                 sections["resolved"].append(entry)
+                _auto_archive_if_enabled(entry)
                 del sections["pending"][idx]
                 _write_pending_file(pending_path, sections)
                 return f"[owner-decision-tracker] resolved {target_id}."
@@ -1306,6 +1506,7 @@ def _format_nudge(pending: list[DecisionEntry]) -> str:
 # ---------------------------------------------------------------------------
 # Main / mode dispatch
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> int:
     """Hook entry point. Always returns 0 (graceful degradation)."""

@@ -1043,3 +1043,115 @@ def test_wi3332_t3_known_resolved_relay_does_not_block(tmp_path: Path) -> None:
     result = _run_hook("stop", project, json.dumps({"transcript_path": str(transcript)}))
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert result.stdout == "", f"relaying a known resolved decision must not block; got: {result.stdout!r}"
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 -- auto-archive env-gate + failure-log path
+# (gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive)
+# ---------------------------------------------------------------------------
+
+
+def test_slice4_auto_archive_disabled_by_default(tmp_path: Path) -> None:
+    """Default behavior: env var unset -> no failure log written, tracker behaves identically."""
+    project = _setup_project(tmp_path)
+    payload = _stop_payload("turn_with_askuserquestion_answered.jsonl")
+    result = _run_hook("stop", project, payload)
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    failure_log = project / ".gtkb-state" / "owner-decision-auto-archive" / "failures.jsonl"
+    assert not failure_log.exists(), "default-off must not create the failure-log file"
+
+
+def _run_hook_isolated(
+    mode: str,
+    project_root: Path,
+    extra_env: dict,
+    stdin_text: str = "",
+) -> subprocess.CompletedProcess:
+    """Run hook with cwd=project_root for Slice 4 isolation (NO-GO -007 F1 fix)."""
+    env = os.environ.copy()
+    env["CLAUDE_PROJECT_DIR"] = str(project_root)
+    env.update(extra_env)
+    return subprocess.run(
+        [sys.executable, str(HOOK), "--mode", mode],
+        input=stdin_text,
+        text=True,
+        capture_output=True,
+        env=env,
+        cwd=str(project_root),
+        check=False,
+        timeout=10,
+    )
+
+
+def test_slice4_auto_archive_enabled_writes_failure_log_when_service_unavailable(
+    tmp_path: Path,
+) -> None:
+    """Env-gate-on + no DB under PROJECT_ROOT -> graceful failure-log write.
+
+    Post NO-GO -007 F1+F2 fix: subprocess runs with cwd=tmp_path AND
+    CLAUDE_PROJECT_DIR=tmp_path. There is no groundtruth.db under tmp_path,
+    so archive_decision raises when trying to write to the absent DB. The
+    tracker catches the exception and writes a JSONL record to
+    <tmp_path>/.gtkb-state/owner-decision-auto-archive/failures.jsonl. The
+    notepad-tier write remains load-bearing (exit 0).
+    """
+    project = _setup_project(tmp_path)
+    payload = _stop_payload("turn_with_askuserquestion_answered.jsonl")
+    result = _run_hook_isolated(
+        "stop",
+        project,
+        {"GTKB_AUQ_AUTO_ARCHIVE": "1"},
+        payload,
+    )
+    assert result.returncode == 0, f"tracker hook must NEVER raise on auto-archive failure; stderr: {result.stderr}"
+    pending = _read_pending_file(project)
+    assert "DECISION-" in pending, "notepad write must remain load-bearing"
+
+    failure_log = project / ".gtkb-state" / "owner-decision-auto-archive" / "failures.jsonl"
+    assert failure_log.exists(), f"failure log must be written when service is unavailable; checked {failure_log}"
+    lines = [ln for ln in failure_log.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert lines, "failure log must contain at least one JSONL record"
+    record = json.loads(lines[0])
+    assert "decision_id" in record, "failure record must cite the decision id"
+    assert record["decision_id"].startswith("DECISION-"), "decision_id format"
+    assert "error_type" in record, "failure record must name the exception type"
+    assert "error_message" in record, "failure record must capture the error message"
+    assert len(record["error_message"]) <= 500, "error_message must be bounded"
+
+
+def test_slice4_hook_does_not_touch_live_repo_state(tmp_path: Path) -> None:
+    """Regression for NO-GO -007 F1: the env-gated hook must never write to
+    the live GT-KB repo (groundtruth.db, .groundtruth/formal-artifact-approvals/,
+    or .gtkb-state/) regardless of process cwd or stray PROJECT_ROOT resolution.
+    """
+    project = _setup_project(tmp_path)
+    payload = _stop_payload("turn_with_askuserquestion_answered.jsonl")
+
+    live_repo = REPO_ROOT
+    approvals_dir = live_repo / ".groundtruth" / "formal-artifact-approvals"
+    state_dir = live_repo / ".gtkb-state" / "owner-decision-auto-archive"
+    db_path = live_repo / "groundtruth.db"
+
+    before_approvals = set(approvals_dir.glob("2026-05-30-DELIB-*.json")) if approvals_dir.exists() else set()
+    before_state = set(state_dir.glob("*")) if state_dir.exists() else set()
+    before_db_mtime = db_path.stat().st_mtime if db_path.exists() else None
+
+    result = _run_hook_isolated(
+        "stop",
+        project,
+        {"GTKB_AUQ_AUTO_ARCHIVE": "1"},
+        payload,
+    )
+    assert result.returncode == 0, f"hook must not raise; stderr: {result.stderr}"
+
+    after_approvals = set(approvals_dir.glob("2026-05-30-DELIB-*.json")) if approvals_dir.exists() else set()
+    after_state = set(state_dir.glob("*")) if state_dir.exists() else set()
+    after_db_mtime = db_path.stat().st_mtime if db_path.exists() else None
+
+    new_approvals = after_approvals - before_approvals
+    new_state = after_state - before_state
+    db_touched = before_db_mtime is not None and after_db_mtime != before_db_mtime
+
+    assert not new_approvals, f"hook leaked approval packets into live repo: {sorted(p.name for p in new_approvals)}"
+    assert not new_state, f"hook leaked state files into live .gtkb-state/: {sorted(p.name for p in new_state)}"
+    assert not db_touched, "hook must not modify the live groundtruth.db"
