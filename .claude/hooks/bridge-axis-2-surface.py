@@ -57,10 +57,22 @@ from typing import Any
 ENV_DISABLE = "GTKB_NO_AXIS_2_SURFACE"
 DISMISS_KEYWORD = "dismiss bridge surface"
 
-PROJECT_ROOT = Path(
-    os.environ.get("CLAUDE_PROJECT_DIR")
-    or Path(__file__).resolve().parents[2]
-).resolve()
+PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]).resolve()
+
+# Slice 4: the shared session-role resolver (scripts/session_role_resolution.py)
+# lives under PROJECT_ROOT/scripts; ensure it is importable from this hook.
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Role-profile constants mirror scripts.session_role_resolution; redefined here
+# so the surface heading and element selection do not depend on the resolver
+# import succeeding (the role default is Prime on resolver failure).
+ROLE_PRIME = "prime-builder"
+ROLE_LO = "loyal-opposition"
+_ROLE_HEADING = {
+    ROLE_PRIME: "Prime",
+    ROLE_LO: "Loyal Opposition",
+}
 
 STATE_DIR_REL = ".gtkb-state/bridge-poller/axis-2-surface"
 DISPATCH_STATE_REL = ".gtkb-state/bridge-poller/dispatch-state.json"
@@ -86,10 +98,19 @@ def _log_error(payload: dict[str, Any]) -> None:
         pass
 
 
-def _compute_prime_actionable() -> tuple[str, list[Any]]:
-    """Return (signature, actionable_items_for_prime).
+def _compute_actionable_for_role(role_profile: str) -> tuple[str, list[Any]]:
+    """Return (signature, actionable_items) for the resolved session role.
 
-    Byte-identical signature to scripts/cross_harness_bridge_trigger.py:_signature.
+    Per Slice 4 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: the AXIS 2
+    surface follows the session-stated role. ``compute_actionable_pending``
+    returns ``(actionable_for_prime, actionable_for_codex)`` (element 0 = Prime
+    GO/NO-GO work; element 1 = Loyal Opposition NEW/REVISED work). This selects
+    the element matching ``role_profile`` and computes the signature over the
+    SELECTED items, so suppression/dismissal keys off the correct role's
+    signature.
+
+    Byte-identical signature scheme to
+    scripts/cross_harness_bridge_trigger.py:_signature for the selected list.
     Falls back to ("", []) if the bridge index is missing or the canonical
     parser is unavailable — hook silently no-ops in those degraded states.
     """
@@ -113,25 +134,29 @@ def _compute_prime_actionable() -> tuple[str, list[Any]]:
 
     try:
         parse_result = parse_index(index_text, project_root=PROJECT_ROOT)
-        actionable_prime, _actionable_codex = compute_actionable_pending(
-            parse_result, project_root=PROJECT_ROOT
-        )
+        actionable_prime, actionable_codex = compute_actionable_pending(parse_result, project_root=PROJECT_ROOT)
     except Exception as exc:
         _log_error({"event": "parse_or_compute_failed", "error": str(exc)})
         return "", []
 
+    # Slice 4: select the element matching the resolved session role. Element 0
+    # is Prime-actionable (GO/NO-GO); element 1 is Loyal-Opposition-actionable
+    # (NEW/REVISED), per compute_actionable_pending's (prime, codex) contract.
+    items = actionable_prime if role_profile == ROLE_PRIME else actionable_codex
+
     import hashlib
+
     normalized = [
         {
             "document_name": item.document_name,
             "top_status": item.top_status,
             "top_file": item.top_file,
         }
-        for item in actionable_prime
+        for item in items
     ]
     raw = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
     signature = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    return signature, actionable_prime
+    return signature, items
 
 
 def _read_cache(cache_path: Path) -> dict[str, Any]:
@@ -146,6 +171,7 @@ def _write_cache(cache_path: Path, payload: dict[str, Any]) -> None:
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         import uuid as _uuid
+
         tmp = cache_path.with_name(f"{cache_path.name}.{_uuid.uuid4().hex[:8]}.tmp")
         tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         tmp.replace(cache_path)
@@ -164,10 +190,15 @@ def _resolve_session_id(payload: dict[str, Any]) -> str:
     return "default"
 
 
-def _render_surface(items: list[Any]) -> str:
-    """Render the additionalContext markdown block for actionable Prime work."""
+def _render_surface(items: list[Any], role_profile: str = ROLE_PRIME) -> str:
+    """Render the additionalContext markdown block for the resolved role's work.
+
+    The heading reflects the session-stated role: "Prime Work" for a Prime
+    Builder session, "Loyal Opposition Work" for a Loyal Opposition session.
+    """
+    role_label = _ROLE_HEADING.get(role_profile, "Prime")
     lines = [
-        "### Bridge AXIS 2 Surface — Newly-Actionable Prime Work",
+        f"### Bridge AXIS 2 Surface — Newly-Actionable {role_label} Work",
         "",
         f"_Detected at {_now_iso()}. {len(items)} actionable entry/entries since last surface in this session._",
         "",
@@ -188,6 +219,28 @@ def _render_surface(items: list[Any]) -> str:
     return "\n".join(lines)
 
 
+def _resolve_session_role_failsoft(payload: dict[str, Any]) -> str:
+    """Resolve the interactive session role via the shared resolver; fail-soft.
+
+    Passes the RAW payload ``session_id`` (Slice 2 stores the raw id). Returns
+    ``ROLE_PRIME`` on any resolver import/lookup failure so the hook never
+    crashes and degrades to today's Prime-default behavior.
+    """
+    raw_session_id = str(payload.get("session_id") or "").strip() or None
+    try:
+        from scripts.session_role_resolution import resolve_interactive_session_role
+
+        role_profile, _source = resolve_interactive_session_role(
+            PROJECT_ROOT,
+            current_session_id=raw_session_id,
+            harness_name="claude",
+        )
+        return role_profile if role_profile in (ROLE_PRIME, ROLE_LO) else ROLE_PRIME
+    except Exception as exc:  # noqa: BLE001 - hook must never crash the agent.
+        _log_error({"event": "session_role_resolve_failed", "error": str(exc)})
+        return ROLE_PRIME
+
+
 def _user_prompt_handler(stdin_text: str) -> str:
     """UserPromptSubmit entry point. Returns markdown to inject (empty = silent)."""
     if os.environ.get(ENV_DISABLE) == "1":
@@ -202,7 +255,14 @@ def _user_prompt_handler(stdin_text: str) -> str:
     session_id = _resolve_session_id(payload)
     cache_path = PROJECT_ROOT / STATE_DIR_REL / f"{session_id}.json"
 
-    signature, items = _compute_prime_actionable()
+    # Slice 4: resolve the session-stated role (marker > durable) and surface
+    # the matching actionable work. The RAW payload session_id (not the
+    # sanitized cache key) is passed so the resolver's session-id comparison is
+    # like-for-like with the Slice 2 writer's stored raw id. Fail-soft to the
+    # Prime profile (today's default) on any resolver failure.
+    role_profile = _resolve_session_role_failsoft(payload)
+
+    signature, items = _compute_actionable_for_role(role_profile)
     if not signature or not items:
         return ""
 
@@ -220,11 +280,11 @@ def _user_prompt_handler(stdin_text: str) -> str:
         return ""
 
     # Suppress re-surface of an already-surfaced or owner-dismissed signature.
-    if signature == last_surfaced or signature == dismissed:
+    if signature in (last_surfaced, dismissed):
         return ""
 
     # New signature with selected_count > 0. Emit + update cache.
-    rendered = _render_surface(items)
+    rendered = _render_surface(items, role_profile)
     cache.update(
         {
             "last_surfaced_signature": signature,

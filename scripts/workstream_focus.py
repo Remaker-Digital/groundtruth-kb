@@ -97,6 +97,8 @@ LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-
 STARTUP_REPORT_RELATIVE_PATH = Path("docs") / "gtkb-dashboard" / "session-startup-report.md"
 DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
 STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
+STARTUP_RELAY_CACHE_MAX_AGE_SECONDS = STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS
+STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS = 5 * 60
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
@@ -1048,7 +1050,7 @@ def system_message_for_state(state: dict[str, Any], *, changed: bool = False) ->
     )
 
 
-_CANONICAL_DISPATCH_INIT_RE = re.compile(r"^::init\s+gtkb\s+(?:pb|lo)\s*$", re.IGNORECASE)
+_CANONICAL_DISPATCH_INIT_RE = re.compile(r"^::init\s+gtkb\s+(?P<role_mode>pb|lo)\s*$", re.IGNORECASE)
 
 
 def _match_startup_init_keyword(prompt: str) -> InitKeywordMatch | None:
@@ -1058,6 +1060,90 @@ def _match_startup_init_keyword(prompt: str) -> InitKeywordMatch | None:
     if _CANONICAL_DISPATCH_INIT_RE.match(prompt.strip()):
         return InitKeywordMatch(app_scope="gtkb", mode="default")
     return None
+
+
+def _startup_role_mode_from_prompt(prompt: str) -> str | None:
+    match = _CANONICAL_DISPATCH_INIT_RE.match(prompt.strip())
+    if match is None:
+        return None
+    return match.group("role_mode").lower()
+
+
+# Slice 2 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE
+# (bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-003.md,
+# Codex GO at -004). Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 4
+# and DCL-SESSION-ROLE-RESOLUTION-001 assertions 2/6/7: when the owner declares
+# a session role via ``::init gtkb (pb|lo)`` in an interactive context, write
+# an ephemeral marker carrying the role and a non-null session id. The marker
+# is invalidated by SessionStart in Slice 3 and read by Slices 4-6.
+_MODE_TO_ROLE_PROFILE = {
+    "pb": "prime-builder",
+    "lo": "loyal-opposition",
+}
+_SESSION_ROLE_MARKER_NAME = "active-session-role.json"
+_SESSION_ID_ENV_FALLBACKS = (
+    "GTKB_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "CLAUDE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
+)
+_BRIDGE_DISPATCH_RUN_ID_ENV = "GTKB_BRIDGE_POLLER_RUN_ID"
+
+
+def _session_role_marker_path(project_root: Path | None = None) -> Path:
+    root = (project_root or _project_root_from_env()).resolve()
+    return root / ".claude" / "session" / _SESSION_ROLE_MARKER_NAME
+
+
+def _resolve_session_id(payload_session_id: Any) -> tuple[str | None, str | None]:
+    """Resolve a non-null session id per the Slice 2 F1 fallback chain.
+
+    Returns ``(session_id, source_label)``. Source label is ``"payload"`` when
+    the id came from the hook payload, ``"env:<NAME>"`` when from an env var, or
+    ``(None, None)`` when no non-null id is available (the fail-soft branch).
+    Per DCL-SESSION-ROLE-RESOLUTION-001 assertion 6, callers MUST NOT persist a
+    marker when this returns ``(None, None)``.
+    """
+    if isinstance(payload_session_id, str) and payload_session_id.strip():
+        return payload_session_id.strip(), "payload"
+    for env_name in _SESSION_ID_ENV_FALLBACKS:
+        value = os.environ.get(env_name)
+        if isinstance(value, str) and value.strip():
+            return value.strip(), f"env:{env_name}"
+    return None, None
+
+
+def _write_session_role_marker(
+    role_profile: str,
+    session_id: str,
+    session_id_source: str,
+    project_root: Path | None = None,
+) -> bool:
+    """Write the ephemeral session-state role marker; fail soft on OSError.
+
+    Returns True on successful write, False if the directory or file could not
+    be written. The caller decides whether to record a fail-soft event in the
+    lifecycle guard.
+    """
+    marker_path = _session_role_marker_path(project_root)
+    body = {
+        "role": role_profile,
+        "session_id": session_id,
+        "session_id_source": session_id_source,
+        "written_at": _now_iso(),
+        "source": "init_keyword",
+    }
+    try:
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        marker_path.write_text(
+            json.dumps(body, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    except OSError:
+        return False
+    return True
 
 
 def _set_work_subject_from_init_match(
@@ -1096,9 +1182,18 @@ def _startup_diagnostic_dir(project_root: Path | None = None) -> Path:
 
 STARTUP_RELAY_CACHE_NAME = "last-user-visible-startup.md"
 STARTUP_RELAY_META_NAME = "last-user-visible-startup.meta.json"
+_STARTUP_CACHE_READ_COMMAND_RE = re.compile(
+    r"^\s*Get-Content\s+"
+    r"(?:(?:-Raw\s+)?-LiteralPath\s+(?P<path_a>'[^']+'|\"[^\"]+\"|[^\s]+)(?:\s+-Raw)?"
+    r"|-LiteralPath\s+(?P<path_b>'[^']+'|\"[^\"]+\"|[^\s]+)\s+-Raw"
+    r"|-Raw\s+(?P<path_c>'[^']+'|\"[^\"]+\"|[^\s]+))"
+    r"\s*$",
+    re.IGNORECASE,
+)
+_STARTUP_CACHE_READ_FORBIDDEN_TOKENS = (";", "|", "&", ">", "<", "`", "$(")
 
 
-def _startup_relay_cache_paths(root: Path) -> tuple[Path, Path]:
+def _startup_relay_cache_paths(root: Path, role_mode: str | None = None) -> tuple[Path, Path]:
     """Harness-scoped startup-disclosure relay cache file and metadata sidecar.
 
     The cache is harness-scoped (under the active harness's hooks directory),
@@ -1106,10 +1201,74 @@ def _startup_relay_cache_paths(root: Path) -> tuple[Path, Path]:
     vice versa.
     """
     diag = _startup_diagnostic_dir(root)
+    if role_mode in {"pb", "lo"}:
+        return (
+            diag / f"last-user-visible-startup-{role_mode}.md",
+            diag / f"last-user-visible-startup-{role_mode}.meta.json",
+        )
     return (diag / STARTUP_RELAY_CACHE_NAME, diag / STARTUP_RELAY_META_NAME)
 
 
-def _startup_relay_pointer(project_root: Path | None = None) -> dict[str, Any] | None:
+def _startup_relay_cache_fresh(meta: dict[str, Any], project_root: Path) -> bool:
+    """Return true when relay cache metadata belongs to the active startup gate."""
+
+    generated_at = _parse_iso8601(meta.get("generated_at"))
+    if generated_at is None:
+        return False
+    state = _read_lifecycle_guard(project_root)
+    reference_at = _parse_iso8601(state.get("startup_prompt_discarded_at") or state.get("armed_at"))
+    if reference_at is None:
+        reference_at = datetime.now(UTC)
+    age_seconds = (reference_at - generated_at).total_seconds()
+    if age_seconds > STARTUP_RELAY_CACHE_MAX_AGE_SECONDS:
+        return False
+    return -age_seconds <= STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS
+
+
+def _allowed_startup_relay_cache_reads(root: Path) -> set[Path]:
+    allowed: set[Path] = set()
+    for role_mode in (None, "pb", "lo"):
+        cache_path, _meta_path = _startup_relay_cache_paths(root, role_mode)
+        allowed.add(cache_path.resolve())
+    return allowed
+
+
+def _candidate_startup_cache_read_path(raw_path: str, root: Path) -> Path | None:
+    path_text = raw_path.strip().strip("'\"")
+    if not path_text:
+        return None
+    candidate = Path(path_text)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    return candidate.resolve()
+
+
+def _is_startup_relay_cache_read(payload: dict[str, Any], project_root: Path | None = None) -> bool:
+    """Allow the one read needed to relay an init-keyword startup disclosure."""
+
+    tool_name = str(payload.get("tool_name") or "")
+    if tool_name not in {"Bash", "shell_command"}:
+        return False
+    tool_input = payload.get("tool_input") or {}
+    if not isinstance(tool_input, dict):
+        return False
+    command = str(tool_input.get("command") or "")
+    if not command.strip():
+        return False
+    if any(token in command for token in _STARTUP_CACHE_READ_FORBIDDEN_TOKENS):
+        return False
+    match = _STARTUP_CACHE_READ_COMMAND_RE.match(command)
+    if match is None:
+        return False
+    raw_path = match.group("path_a") or match.group("path_b") or match.group("path_c")
+    if raw_path is None:
+        return False
+    root = (project_root or _project_root_from_env()).resolve()
+    candidate = _candidate_startup_cache_read_path(raw_path, root)
+    return candidate in _allowed_startup_relay_cache_reads(root)
+
+
+def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str | None = None) -> dict[str, Any] | None:
     """Read the harness-scoped startup-disclosure relay cache and metadata.
 
     Returns a bounded pointer dict, or None when the cache file or its
@@ -1118,7 +1277,7 @@ def _startup_relay_pointer(project_root: Path | None = None) -> dict[str, Any] |
     never populate it, and the shared dashboard report is not a fallback.
     """
     root = (project_root or _project_root_from_env()).resolve()
-    cache_path, meta_path = _startup_relay_cache_paths(root)
+    cache_path, meta_path = _startup_relay_cache_paths(root, role_mode)
     try:
         body = cache_path.read_text(encoding="utf-8")
     except OSError:
@@ -1134,7 +1293,20 @@ def _startup_relay_pointer(project_root: Path | None = None) -> dict[str, Any] |
     actual_bytes = body.encode("utf-8")
     actual_sha = hashlib.sha256(actual_bytes).hexdigest()
     harness_ok = meta.get("harness_name") in (None, _resolved_harness_name())
-    consistent = harness_ok and meta.get("sha256") == actual_sha and meta.get("byte_length") == len(actual_bytes)
+    harness_id = _resolved_harness_id(root)
+    harness_id_ok = meta.get("harness_id") in (None, harness_id)
+    role_ok = role_mode is None or meta.get("role_mode") == role_mode
+    freshness_ok = _startup_relay_cache_fresh(meta, root)
+    disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
+    consistent = (
+        harness_ok
+        and harness_id_ok
+        and role_ok
+        and freshness_ok
+        and disclosure_ok
+        and meta.get("sha256") == actual_sha
+        and meta.get("byte_length") == len(actual_bytes)
+    )
     try:
         rel_path = cache_path.relative_to(root).as_posix()
     except ValueError:
@@ -1144,7 +1316,9 @@ def _startup_relay_pointer(project_root: Path | None = None) -> dict[str, Any] |
         "byte_length": len(actual_bytes),
         "sha256": actual_sha,
         "harness_id": meta.get("harness_id"),
+        "role_mode": meta.get("role_mode"),
         "generated_at": meta.get("generated_at"),
+        "fresh": freshness_ok,
         "consistent": consistent,
     }
 
@@ -1175,9 +1349,9 @@ def _startup_relay_failure_context(reason: str) -> str:
     )
 
 
-def _startup_gate_response(project_root: Path | None = None) -> dict[str, Any]:
+def _startup_gate_response(project_root: Path | None = None, *, role_mode: str | None = None) -> dict[str, Any]:
     message = _startup_gate_message()
-    pointer = _startup_relay_pointer(project_root)
+    pointer = _startup_relay_pointer(project_root, role_mode=role_mode)
     if pointer is None:
         diagnostic = _startup_relay_failure_context(
             "the cache file or its metadata sidecar is missing, empty, or malformed"
@@ -1192,8 +1366,8 @@ def _startup_gate_response(project_root: Path | None = None) -> dict[str, Any]:
     if not pointer["consistent"]:
         diagnostic = _startup_relay_failure_context(
             f"cache file {pointer['cache_path']} does not match its metadata sidecar "
-            "(sha256 or byte-length mismatch); it may be stale or displaced by a "
-            "non-disclosure payload"
+            "(sha256, byte-length, harness id, role, freshness, or startup-disclosure shape mismatch); "
+            "it may be stale, wrong-role, or displaced by a non-disclosure payload"
         )
         return {
             "systemMessage": diagnostic,
@@ -1219,7 +1393,12 @@ def _startup_gate_response(project_root: Path | None = None) -> dict[str, Any]:
     }
 
 
-def _consume_discard_first_prompt_gate(prompt: str, project_root: Path | None = None) -> dict[str, Any] | None:
+def _consume_discard_first_prompt_gate(
+    prompt: str,
+    project_root: Path | None = None,
+    *,
+    session_id: str | None = None,
+) -> dict[str, Any] | None:
     state = _read_lifecycle_guard(project_root)
     if state.get("discard_next_user_prompt") is not True:
         return None
@@ -1267,8 +1446,40 @@ def _consume_discard_first_prompt_gate(prompt: str, project_root: Path | None = 
     )
     if current_subject is not None:
         state["current_subject"] = current_subject
+    # Slice 2: write the ephemeral session-state role marker on the interactive
+    # init-keyword path. Per DCL-SESSION-ROLE-RESOLUTION-001:
+    #   - assertion 2: marker is written on the keyword code path;
+    #   - assertion 6: persisted marker MUST carry a non-null session id (the
+    #     fail-soft branch writes NO marker when no id can be resolved);
+    #   - assertion 7: marker role is in {prime-builder, loyal-opposition}.
+    # The headless dispatch path (GTKB_BRIDGE_POLLER_RUN_ID present) is excluded
+    # so only interactive owner-typed declarations produce a marker, per
+    # DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001's INTERACTIVE_OVERRIDE_AUTHORIZED
+    # receiver decision.
+    role_mode = _startup_role_mode_from_prompt(prompt)
+    role_profile = _MODE_TO_ROLE_PROFILE.get(role_mode or "")
+    headless_dispatch = bool(os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV))
+    if role_profile and not headless_dispatch:
+        resolved_id, source_label = _resolve_session_id(session_id)
+        if resolved_id is None:
+            state["startup_session_role_marker_failsoft_at"] = _now_iso()
+            state["startup_session_role_marker_failsoft_reason"] = "session_id_unresolved"
+        else:
+            wrote = _write_session_role_marker(
+                role_profile,
+                resolved_id,
+                source_label or "",
+                project_root,
+            )
+            if wrote:
+                state["startup_session_role_marker_written_at"] = _now_iso()
+                state["startup_session_role_marker_role"] = role_profile
+                state["startup_session_role_marker_session_id_source"] = source_label
+            else:
+                state["startup_session_role_marker_failsoft_at"] = _now_iso()
+                state["startup_session_role_marker_failsoft_reason"] = "marker_write_oserror"
     _write_lifecycle_guard(state, project_root)
-    return _startup_gate_response(project_root)
+    return _startup_gate_response(project_root, role_mode=role_mode)
 
 
 def _clear_startup_response_pending_for_followup(project_root: Path | None = None) -> None:
@@ -1435,7 +1646,7 @@ def guard_tool_use(
     GT-KB product paths.
     """
 
-    if _startup_response_pending(project_root):
+    if _startup_response_pending(project_root) and not _is_startup_relay_cache_read(payload, project_root):
         return {
             "decision": "block",
             "reason": (
@@ -1475,8 +1686,13 @@ def guard_tool_use(
     return {}
 
 
-def handle_user_prompt(prompt: str, project_root: Path | None = None) -> dict[str, Any]:
-    startup_gate_response = _consume_discard_first_prompt_gate(prompt, project_root)
+def handle_user_prompt(
+    prompt: str,
+    project_root: Path | None = None,
+    *,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    startup_gate_response = _consume_discard_first_prompt_gate(prompt, project_root, session_id=session_id)
     if startup_gate_response is not None:
         return startup_gate_response
 
@@ -1502,5 +1718,15 @@ def handle_hook_payload(payload: dict[str, Any], project_root: Path | None = Non
     if not isinstance(prompt, str):
         prompt = payload.get("prompt")
     if isinstance(prompt, str):
-        return handle_user_prompt(prompt, project_root)
+        # Slice 2: thread the Claude Code UserPromptSubmit ``session_id`` field
+        # (if present) into the prompt-handling path so the init-keyword marker
+        # write can satisfy DCL-SESSION-ROLE-RESOLUTION-001 assertion 6
+        # (non-null session id) without falling through to the env fallback
+        # chain when the canonical payload field is available.
+        payload_session_id = payload.get("session_id")
+        return handle_user_prompt(
+            prompt,
+            project_root,
+            session_id=payload_session_id if isinstance(payload_session_id, str) else None,
+        )
     return guard_tool_use(payload, project_root)

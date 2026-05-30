@@ -53,6 +53,10 @@ _LABEL_TO_CANONICAL_MODE = {
     "acting-prime-builder": "pb",
     "loyal-opposition": "lo",
 }
+_MODE_TO_ROLE_PROFILE = {
+    "pb": "prime-builder",
+    "lo": "loyal-opposition",
+}
 # Audit log for misdirected dispatch silent-drops. Shared with the trigger's
 # dispatch-failures path so investigators see all dispatch-related failures
 # in one location.
@@ -111,6 +115,33 @@ def _purge_previous_diagnostics(*paths: Path) -> None:
             continue
         except OSError:
             pass
+
+
+# Slice 3 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: the ephemeral
+# session-state role marker is written by the UserPromptSubmit init-keyword
+# path (scripts/workstream_focus.py, Slice 2). Per
+# DCL-SESSION-ROLE-RESOLUTION-001 assertion 5, SessionStart must invalidate it
+# so the interactive override does not survive a SessionStart event (new
+# session, compaction, resume). The constant is duplicated from
+# scripts.workstream_focus._SESSION_ROLE_MARKER_NAME rather than imported, to
+# keep the SessionStart hot path stdlib-light; the parity test asserts the two
+# paths stay equal.
+_SESSION_ROLE_MARKER_NAME = "active-session-role.json"
+
+
+def _session_role_marker_path(project_root: Path = PROJECT_ROOT) -> Path:
+    return project_root / ".claude" / "session" / _SESSION_ROLE_MARKER_NAME
+
+
+def _invalidate_session_role_marker(project_root: Path = PROJECT_ROOT) -> None:
+    """Delete any pre-existing session-state role marker before SessionStart
+    renders. Fail-soft: a missing marker or an OSError must not abort startup."""
+    try:
+        _session_role_marker_path(project_root).unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
 
 
 def _persistent_harness_id() -> str:
@@ -260,17 +291,11 @@ def _resolve_own_role_set(project_root: Path = PROJECT_ROOT) -> frozenset[str]:
             own_record = record
             break
     if own_record is None:
-        raise ValueError(
-            f"harness-registry.json missing entry for harness {HARNESS_NAME!r}"
-        )
+        raise ValueError(f"harness-registry.json missing entry for harness {HARNESS_NAME!r}")
     if "id" not in own_record:
-        raise ValueError(
-            f"harness-registry.json entry for {HARNESS_NAME!r} missing 'id'"
-        )
+        raise ValueError(f"harness-registry.json entry for {HARNESS_NAME!r} missing 'id'")
     if "role" not in own_record:
-        raise ValueError(
-            f"harness-registry.json entry for {HARNESS_NAME!r} missing 'role'"
-        )
+        raise ValueError(f"harness-registry.json entry for {HARNESS_NAME!r} missing 'role'")
     role_set = _role_modes_from_field(own_record["role"])
     if not role_set:
         raise ValueError(f"unknown role field: {own_record['role']!r}")
@@ -430,7 +455,44 @@ def _valid_session_start_payload(text: str, request_started_at: str) -> bool:
     )
 
 
-def _write_startup_relay_cache(additional_context: str) -> None:
+def _startup_relay_cache_names(role_mode: str | None = None) -> tuple[str, str]:
+    if role_mode in _MODE_TO_ROLE_PROFILE:
+        return (
+            f"last-user-visible-startup-{role_mode}.md",
+            f"last-user-visible-startup-{role_mode}.meta.json",
+        )
+    return ("last-user-visible-startup.md", "last-user-visible-startup.meta.json")
+
+
+def _startup_body_role_mode(body: str) -> str | None:
+    if "Role being assumed: Loyal Opposition" in body:
+        return "lo"
+    if "Role being assumed: Prime Builder" in body:
+        return "pb"
+    return None
+
+
+def _render_role_startup_report(role_profile: str) -> str | None:
+    try:
+        from scripts import session_self_initialization as startup  # noqa: PLC0415
+
+        model = startup.build_startup_model(
+            PROJECT_ROOT,
+            role_profile=role_profile,
+            harness_name=HARNESS_NAME,
+            harness_id=_persistent_harness_id(),
+            fast_hook=True,
+        )
+        return startup.render_report(
+            model,
+            startup._markdown_url_link(startup.GRAFANA_DASHBOARD_URL),
+            PROJECT_ROOT,
+        )
+    except Exception:
+        return None
+
+
+def _write_startup_relay_cache(additional_context: str, *, role_mode: str | None = None) -> None:
     """Write the harness-scoped startup-disclosure relay cache and metadata.
 
     Extracts the owner-visible startup message from a validated NORMAL_STARTUP
@@ -447,20 +509,46 @@ def _write_startup_relay_cache(additional_context: str) -> None:
     if not body:
         return
     encoded = body.encode("utf-8")
+    effective_role_mode = role_mode or _startup_body_role_mode(body)
     meta = {
         "harness_name": HARNESS_NAME,
         "harness_id": _persistent_harness_id(),
+        "role_mode": effective_role_mode,
+        "role_profile": _MODE_TO_ROLE_PROFILE.get(effective_role_mode or ""),
         "generated_at": _now_iso(),
         "byte_length": len(encoded),
         "sha256": hashlib.sha256(encoded).hexdigest(),
     }
+    cache_name, meta_name = _startup_relay_cache_names(role_mode)
     try:
-        (OUT_DIR / "last-user-visible-startup.md").write_text(body, encoding="utf-8", newline="\n")
-        (OUT_DIR / "last-user-visible-startup.meta.json").write_text(
-            json.dumps(meta, ensure_ascii=True, indent=2), encoding="utf-8", newline="\n"
-        )
+        (OUT_DIR / cache_name).write_text(body, encoding="utf-8", newline="\n")
+        (OUT_DIR / meta_name).write_text(json.dumps(meta, ensure_ascii=True, indent=2), encoding="utf-8", newline="\n")
     except OSError:
         pass
+
+
+def _write_role_scoped_startup_relay_caches(additional_context: str) -> None:
+    marker = "## User-Visible Startup Message"
+    body = (
+        additional_context.split(marker, 1)[1].strip() if marker in additional_context else additional_context.strip()
+    )
+    primary_mode = _startup_body_role_mode(body)
+    if primary_mode:
+        _write_startup_relay_cache(body, role_mode=primary_mode)
+    # Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2 and
+    # DCL-SESSION-ROLE-RESOLUTION-001: both the -pb and -lo startup-disclosure
+    # caches are generated unconditionally, regardless of this harness's durable
+    # role set, so the UserPromptSubmit init-keyword matcher's keyword-keyed
+    # cache lookup succeeds for either role when the owner declares a
+    # session-stated role via ``::init gtkb (pb|lo)``. The durable role set is
+    # NOT consulted here; durable role remains the authority for headless
+    # dispatch routing only.
+    for mode in sorted(_MODE_TO_ROLE_PROFILE):
+        if mode == primary_mode:
+            continue
+        report = _render_role_startup_report(_MODE_TO_ROLE_PROFILE[mode])
+        if report:
+            _write_startup_relay_cache(report, role_mode=mode)
 
 
 def main() -> int:
@@ -469,6 +557,13 @@ def main() -> int:
     stderr_path = OUT_DIR / "last-session-start.err"
     request_started_at = _now_iso()
     _purge_previous_diagnostics(stdout_path, stderr_path)
+    # Slice 3 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: invalidate any
+    # pre-existing session-state role marker before the dispatch fork and before
+    # any role rendering, so the ephemeral interactive override does not survive
+    # this SessionStart event (DCL-SESSION-ROLE-RESOLUTION-001 assertion 5). This
+    # runs on every SessionStart path (normal, bridge auto-dispatch, strict-drop)
+    # and does not disturb the mode-switch-drain -> dispatch ordering below.
+    _invalidate_session_role_marker()
     # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
     # mode-switch transactions BEFORE role resolution, so a next-session-
     # effective mode/role switch takes effect for the dispatch decision
@@ -539,6 +634,7 @@ def main() -> int:
             payload = json.loads(process.stdout)
             startup_context = payload["hookSpecificOutput"]["additionalContext"]
             _write_startup_relay_cache(startup_context)
+            _write_role_scoped_startup_relay_caches(startup_context)
             print(_dump_payload(_session_start_payload(startup_context)))
             return 0
         reason = f"startup service returned exit {process.returncode}"
