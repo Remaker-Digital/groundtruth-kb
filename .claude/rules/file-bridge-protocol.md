@@ -130,6 +130,24 @@ If a linked specification has no executed test coverage, Loyal Opposition must
 issue `NO-GO` unless the owner explicitly approves a documented waiver for that
 specific specification and risk.
 
+### Pre-File Code-Quality Gates (lint AND format are separate)
+
+Before filing a post-implementation report whose changes include Python files,
+Prime Builder MUST run BOTH repo-native code-quality gates on the changed files
+and report the results:
+
+- `ruff check <changed.py>` (lint), and
+- `ruff format --check <changed.py>` (formatting).
+
+These are SEPARATE gates: code that passes `ruff check` can still fail
+`ruff format --check`. Loyal Opposition verification and CI both enforce
+`ruff format --check`, so a report filed without it risks a `NO-GO` solely on
+formatting. The `scripts/check_ruff_format.py` guardrail (active via
+`.githooks/pre-commit`) enforces the format gate at commit time as a backstop;
+the pre-file run above is what prevents the verification-time `NO-GO`. Resolve a
+ruff-capable interpreter deterministically — the project venv has `ruff` even
+when the default `python` does not.
+
 ## Mandatory Applicability Preflight Gate
 
 Before Loyal Opposition issues `GO` or `VERIFIED`, it must run the mechanical

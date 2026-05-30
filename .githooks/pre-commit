@@ -27,6 +27,11 @@ PYTHON_BIN="${PYTHON:-python}"
 # which AI harness produced the staged change.
 "$PYTHON_BIN" scripts/check_narrative_artifact_evidence.py --staged || exit $?
 
+# WI-3473: ruff format --check on staged Python (separate gate from ruff check).
+# Stdlib-only script; resolves a ruff-capable interpreter venv-first so it does
+# not fail open when PYTHON_BIN lacks ruff while the project venv has it.
+"$PYTHON_BIN" scripts/check_ruff_format.py --staged || exit $?
+
 # Only proceed if PowerShell is available
 PWSH=""
 if command -v pwsh &>/dev/null; then
