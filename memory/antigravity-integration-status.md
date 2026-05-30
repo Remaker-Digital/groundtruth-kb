@@ -1,7 +1,7 @@
 # Antigravity Integration - Project Status Tracker
 
 **Project:** `PROJECT-ANTIGRAVITY-INTEGRATION` (MemBase, status `active`, rank 1)
-**Last updated:** 2026-05-18 by Prime Builder (Claude Code, harness B)
+**Last updated:** 2026-05-27 by Prime Builder (Codex, harness A)
 **Purpose:** operational cross-session tracker so any session can resume Antigravity
 Integration work cold.
 
@@ -23,8 +23,8 @@ DB-backed registry.
   registry and role-assignment mechanism* (status: `specified`).
 - Owner decisions: `DELIB-2079` (project design -- 3-harness model, DB-backed
   registry, `gt harness` CLI FSM), `DELIB-2080` (amendment -- full role
-  portability + single-prime-builder invariant), `DELIB-2081` (WI-3359 auto-drain
-  authorized under this project, S358).
+  portability + single-prime-builder invariant), `DELIB-2081` (historical WI-3359
+  auto-drain authorization; superseded by the 2026-05-19 owner removal directive).
 - Authorizations (both `active`):
   - `PAUTH-PROJECT-ANTIGRAVITY-INTEGRATION-...` v2 -- covers `REQ-HARNESS-REGISTRY-001`
     + `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001` (WI-3359).
@@ -62,21 +62,23 @@ exists to backfill it canonically).
 
 | WI | Title | Bridge thread | State |
 |----|-------|---------------|-------|
-| WI-3345 | Research spike: Antigravity IDE hook/skill/config format | -- | TODO -- gates WI-3346..WI-3349 |
-| WI-3346 | `.antigravity/` harness integration directory | -- | TODO -- blocked on WI-3345 |
-| WI-3347 | LO-role-scoped Antigravity capability adapters | -- | TODO -- blocked on WI-3345 |
-| WI-3348 | Register the Antigravity harness (identity C) | -- | TODO -- blocked on WI-3345 + Lane A |
-| WI-3349 | End-to-end Gemini CLI headless LO-review dispatch verification | -- | TODO -- blocked on WI-3346..WI-3348 |
+| WI-3345 | Research spike: Antigravity IDE hook/skill/config format | gtkb-antigravity-ide-research-spike-004 | VERIFIED |
+| WI-3346 | `.antigravity/` harness integration directory | gtkb-antigravity-integration-directory-004 | VERIFIED |
+| WI-3347 | LO-role-scoped Antigravity capability adapters | gtkb-antigravity-capability-adapters-004 | VERIFIED |
+| WI-3348 | Register the Antigravity harness (identity C) | gtkb-antigravity-harness-registration-004 | VERIFIED |
+| WI-3349 | End-to-end Gemini CLI headless LO-review dispatch verification | gtkb-headless-gemini-lo-dispatch-verification-004 | GO -004; substrate verification implementation in progress |
 
 ### Umbrella-direct
 
 | WI | Title | Bridge thread | State |
 |----|-------|---------------|-------|
-| WI-3359 | Bridge-notifier active-session auto-drain | gtkb-bridge-active-session-autodrain-008 + gtkb-bridge-stop-drain-deference-repair-006 | VERIFIED (committed 89720684) |
-| WI-3362 | Backfill `related_bridge_threads` linkage for WI-3337..WI-3349 | -- | TODO |
+| WI-3359 | Bridge-notifier active-session auto-drain | gtkb-bridge-active-session-autodrain-008 + gtkb-bridge-stop-drain-deference-repair-006 | REMOVED by owner directive 2026-05-19 |
+| WI-3362 | Backfill `related_bridge_threads` linkage for WI-3337..WI-3349 | gtkb-antigravity-related-bridge-threads-backfill-006 | VERIFIED partial linkage backfill; WI-3346..WI-3349 remained unlinked until their threads existed |
 
-**Rollup:** 7 VERIFIED · 2 GO · 6 TODO. Live registry `harness-state/harness-registry.json`
-registers harness A=codex, B=claude only -- no harness C yet.
+**Rollup:** 10 VERIFIED · 4 GO/active · 0 TODO · 1 REMOVED. Live registry
+`harness-state/harness-registry.json` registers harness A=codex, B=claude, and
+C=antigravity; C is `status = registered`, `role = []`, with no live role
+assignment or activation in this slice.
 
 ## 4. Completion roadmap
 
@@ -88,23 +90,27 @@ multiple threads in review at once).
   IP-RECON step first per the GO's Implementation Conditions; ~18 target files),
   then WI-3343 (GO -004; owner AUQ for ADR v2 before `gt spec update`). Each ->
   post-impl report -> Codex VERIFIED.
-- **Lane B -- Antigravity Onboarding:** file WI-3345 spike proposal first (gate).
-  After it lands, propose WI-3346/3347 (parallelizable), WI-3348 (also needs
-  Lane A VERIFIED), then WI-3349.
-- **Lane C -- umbrella + hygiene:** file WI-3362 proposal (independent); MemBase
-  status truth-up; resolve duplicate sub-project records; promote
+- **Lane B -- Antigravity Onboarding:** WI-3345, WI-3346, and WI-3347 are
+  VERIFIED. WI-3348 is GO and has registered harness C; file the
+  post-implementation report for LO verification, then proceed to WI-3349
+  end-to-end Gemini CLI headless dispatch verification.
+- **Lane C -- umbrella + hygiene:** WI-3362 has a VERIFIED partial linkage
+  backfill. Complete follow-on linkage/status truth-up once WI-3348 and WI-3349
+  have their bridge threads, resolve duplicate sub-project records, and promote
   `REQ-HARNESS-REGISTRY-001` past `specified` once coverage warrants.
 
 ## 5. Open next actions (priority order)
 
-1. MemBase status truth-up bridge proposal (owner-authorized AUQ 2026-05-18).
-2. Implement WI-3342 -- re-run `python scripts/implementation_authorization.py
+1. File the WI-3348 post-implementation report for
+   `gtkb-antigravity-harness-registration` and drive it to LO VERIFIED.
+2. After WI-3348 VERIFIED, propose and execute WI-3349 end-to-end Gemini CLI
+   headless LO-review dispatch verification.
+3. MemBase status truth-up bridge proposal (owner-authorized AUQ 2026-05-18).
+4. Implement WI-3342 -- re-run `python scripts/implementation_authorization.py
    begin --bridge-id gtkb-harness-registry-reader-migration` (the prior packet
    expired 2026-05-18T06:04Z and points at stale GO -004; re-begin against GO -006).
-3. Implement WI-3343 -- begin packet against GO -004; owner AUQ for
+5. Implement WI-3343 -- begin packet against GO -004; owner AUQ for
    ADR-SINGLE-HARNESS-OPERATING-MODE-001 v2 text before `gt spec update`.
-4. File WI-3345 Antigravity research-spike proposal.
-5. File WI-3362 linkage-backfill proposal.
 
 ## 6. Known data-hygiene issues
 
@@ -121,6 +127,16 @@ multiple threads in review at once).
 - **Empty `related_bridge_threads`** on all WIs -- this is WI-3362's purpose.
 
 ## 7. Change log
+
+- 2026-05-27 -- Antigravity harness-C registration reached VERIFIED earlier in
+  the bridge chain. WI-3349 substrate verification is now tracked by
+  `gtkb-headless-gemini-lo-dispatch-verification`; Loyal Opposition returned
+  GO at `bridge/gtkb-headless-gemini-lo-dispatch-verification-004.md`.
+  Implementation is substrate-only: no harness C activation, role assignment,
+  role-topology change, dispatcher source change, or production routing change.
+  Deferred decisions remain: harness C activation, harness C role assignment,
+  multi-LO versus replacement topology, and disposition of the prior Codex A
+  proxy-attribution precedent.
 
 - 2026-05-18 -- File created by Prime Builder. Initial status reconciliation
   across MemBase, `bridge/INDEX.md`, on-disk bridge files, and git history.
