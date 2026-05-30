@@ -6,7 +6,134 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-bridge-dispatch-per-document-lease-substitution
+GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-002.md
+NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-001.md
+
+Document: gtkb-gov-backlog-source-of-truth-2026-05-02
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-010.md
+NEW: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-009.md
+VERIFIED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-008.md
+
+Document: gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive
+GO: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-005.md
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-004.md
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-003.md
+NO-GO: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-002.md
+NEW: bridge/gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive-001.md
+
+Document: gtkb-backlog-canonical-pivot-spec-promotion
+GO: bridge/gtkb-backlog-canonical-pivot-spec-promotion-004.md
+REVISED: bridge/gtkb-backlog-canonical-pivot-spec-promotion-003.md
+NO-GO: bridge/gtkb-backlog-canonical-pivot-spec-promotion-002.md
+NEW: bridge/gtkb-backlog-canonical-pivot-spec-promotion-001.md
+
+Document: gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table
+GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-004.md
+REVISED: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-003.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-001.md
+
+Document: gtkb-interactive-session-role-override-slice-7-doctor-marker-checks
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-006.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-005.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-004.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-003.md
+GO: bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-001.md
+
+Document: gtkb-antigravity-insight-stale-owner-action-advisory
+ADVISORY: bridge/gtkb-antigravity-insight-stale-owner-action-advisory-001.md
+
+Document: gtkb-interactive-session-role-override-slice-6-attribution-role-awareness
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-6-attribution-role-awareness-004.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-6-attribution-role-awareness-003.md
+GO: bridge/gtkb-interactive-session-role-override-slice-6-attribution-role-awareness-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-6-attribution-role-awareness-001.md
+
+Document: gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness-004.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness-003.md
+GO: bridge/gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness-001.md
+
+Document: gtkb-ruff-format-pre-file-gate
+VERIFIED: bridge/gtkb-ruff-format-pre-file-gate-010.md
+NEW: bridge/gtkb-ruff-format-pre-file-gate-009.md
+GO: bridge/gtkb-ruff-format-pre-file-gate-008.md
+REVISED: bridge/gtkb-ruff-format-pre-file-gate-007.md
+NO-GO: bridge/gtkb-ruff-format-pre-file-gate-006.md
+REVISED: bridge/gtkb-ruff-format-pre-file-gate-005.md
+NO-GO: bridge/gtkb-ruff-format-pre-file-gate-004.md
+REVISED: bridge/gtkb-ruff-format-pre-file-gate-003.md
+NO-GO: bridge/gtkb-ruff-format-pre-file-gate-002.md
+NEW: bridge/gtkb-ruff-format-pre-file-gate-001.md
+
+Document: gtkb-interactive-session-role-override-slice-4-axis2-role-awareness
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-4-axis2-role-awareness-004.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-4-axis2-role-awareness-003.md
+GO: bridge/gtkb-interactive-session-role-override-slice-4-axis2-role-awareness-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-4-axis2-role-awareness-001.md
+
+Document: gtkb-interactive-session-role-override-slice-3-sessionstart-marker-invalidation
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-3-sessionstart-marker-invalidation-004.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-3-sessionstart-marker-invalidation-003.md
+GO: bridge/gtkb-interactive-session-role-override-slice-3-sessionstart-marker-invalidation-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-3-sessionstart-marker-invalidation-001.md
+
+Document: gtkb-implements-link-backfill-phase2-implementation
+VERIFIED: bridge/gtkb-implements-link-backfill-phase2-implementation-006.md
+REVISED: bridge/gtkb-implements-link-backfill-phase2-implementation-005.md
+NO-GO: bridge/gtkb-implements-link-backfill-phase2-implementation-004.md
+NEW: bridge/gtkb-implements-link-backfill-phase2-implementation-003.md
+GO: bridge/gtkb-implements-link-backfill-phase2-implementation-002.md
+NEW: bridge/gtkb-implements-link-backfill-phase2-implementation-001.md
+
+Document: gtkb-implements-link-backfill-phase2-scoping
+GO: bridge/gtkb-implements-link-backfill-phase2-scoping-002.md
+NEW: bridge/gtkb-implements-link-backfill-phase2-scoping-001.md
+
+Document: gtkb-orphan-wi-membership-backfill-slice-2-implementation
+VERIFIED: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-008.md
+REVISED: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-007.md
+NO-GO: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-006.md
+NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-005.md
+GO: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-004.md
+REVISED: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-003.md
+NO-GO: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-002.md
+NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-implementation-001.md
+
+Document: gtkb-interactive-session-role-override-slice-2-session-role-marker
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-008.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-007.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-006.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-005.md
+GO: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-004.md
+REVISED: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-003.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-002.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-001.md
+
+Document: gtkb-lo-hourly-quality-scout-advisory
+ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-002.md
+ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-001.md
+
+Document: gtkb-skill-modernization-slice-3-kb-work-item-migration
+GO: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-010.md
+REVISED: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-009.md
+NO-GO: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-008.md
+NEW: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-007.md
+GO: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-006.md
+REVISED: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-005.md
+NO-GO: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-004.md
+REVISED: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-003.md
+NO-GO: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-002.md
+NEW: bridge/gtkb-skill-modernization-slice-3-kb-work-item-migration-001.md
+
 Document: gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-007.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-006.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-005.md
+GO: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-004.md
 REVISED: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-003.md
 NO-GO: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-002.md
 NEW: bridge/gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer-001.md
@@ -22,6 +149,10 @@ GO: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-002.md
 NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-001.md
 
 Document: gtkb-phantom-project-prefix-reconciliation
+VERIFIED: bridge/gtkb-phantom-project-prefix-reconciliation-008.md
+REVISED: bridge/gtkb-phantom-project-prefix-reconciliation-007.md
+NO-GO: bridge/gtkb-phantom-project-prefix-reconciliation-006.md
+NEW: bridge/gtkb-phantom-project-prefix-reconciliation-005.md
 GO: bridge/gtkb-phantom-project-prefix-reconciliation-004.md
 REVISED: bridge/gtkb-phantom-project-prefix-reconciliation-003.md
 NO-GO: bridge/gtkb-phantom-project-prefix-reconciliation-002.md
@@ -72,6 +203,13 @@ GO: bridge/gtkb-discoverability-cli-slice-2-scoping-002.md
 NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-001.md
 
 Document: gtkb-project-completion-scanner-addressing-thread-fix
+VERIFIED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-017.md
+NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-016.md
+NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-015.md
+GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-014.md
+REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-013.md
+NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-012.md
+NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-011.md
 GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-010.md
 REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-009.md
 GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-008.md
@@ -592,6 +730,9 @@ NO-GO: bridge/gtkb-startup-refractor-glossary-load-surface-002.md
 NEW: bridge/gtkb-startup-refractor-glossary-load-surface-001.md
 
 Document: gtkb-startup-enhancements-p2-freshness-contract
+GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-013.md
+REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-012.md
+REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-011.md
 GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-010.md
 REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-009.md
 NO-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-008.md
@@ -905,6 +1046,10 @@ NO-GO: bridge/gtkb-gt-backlog-add-cli-002.md
 NEW: bridge/gtkb-gt-backlog-add-cli-001.md
 
 Document: gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory
+VERIFIED: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-008.md
+NEW: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-007.md
+GO: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-006.md
+REVISED: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-005.md
 GO: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-004.md
 REVISED: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-003.md
 NO-GO: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-002.md
