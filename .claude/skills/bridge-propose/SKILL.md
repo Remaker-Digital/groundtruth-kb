@@ -68,6 +68,43 @@ Do NOT use for:
 
 ## How it works
 
+### Harness-explicit non-bypass model
+
+The bridge-propose helper has two governed authoring paths:
+
+- **Claude path:** helper composer functions may return proposal and INDEX
+  content for the harness to persist through Claude ``Write`` / ``Edit`` tool
+  calls. Those calls flow through the live Claude PreToolUse governance hooks.
+- **Codex path:** Codex must use the helper-mediated path that runs
+  ``.claude/hooks/bridge-compliance-gate.py --audit-only`` against the composed
+  proposal content before any proposal file is written. Codex must not treat
+  ``apply_patch`` as equivalent to Claude ``Write`` / ``Edit`` for bridge
+  compliance unless a future hook-parity change explicitly adds that coverage.
+
+The pure composer functions are ``compose_proposal(...)`` and
+``compose_index_update(...)``. They perform no file I/O. The Codex writer entry
+point is ``propose_bridge_codex_non_bypass(...)``; it preserves credential
+scanning, author metadata insertion, bridge-compliance validation, file-first
+write ordering, and atomic ``bridge/INDEX.md`` update behavior.
+
+### Optional deterministic draft scaffold
+
+For implementation-targeting proposal drafts, the author MAY start with the
+deterministic CLI scaffold:
+
+```text
+gt bridge propose --kind <implementation|defect-fix|scoping|advisory-disposition|retirement|umbrella> --wi <WI-ID> --slug <topic-slug> --target-path <path>
+```
+
+The command writes a NON-DISPATCHABLE draft under
+``.gtkb-state/bridge-propose-drafts/<topic-slug>-001.md``. That draft is
+runtime state only; it is not a filed bridge proposal and does not mutate
+``bridge/`` or ``bridge/INDEX.md``. Review and fill the AI-judgment
+placeholders, then use the helper-mediated write path below to file the final
+proposal. The helper remains the canonical bridge write path because it performs
+credential scanning, file-existence checks, and atomic ``bridge/INDEX.md``
+insertion.
+
 Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
 caller-supplied ``topic_slug``, ``body``, and optional metadata.
 

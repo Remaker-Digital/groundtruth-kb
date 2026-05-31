@@ -1,48 +1,24 @@
-# Security Policy
+# Security Policy — GroundTruth-KB Platform
+
+This is the platform-level security policy entry point for GroundTruth-KB.
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Agent Red, please report it responsibly.
+To report a vulnerability in the GroundTruth-KB platform itself (governance contract, role enforcement, approval-packet evidence layer, secrets scanning, doctor checks, CLI surfaces), email **security@remakerdigital.com**.
 
-**Email:** security@remakerdigital.com
+To report a vulnerability in a specific application managed by GT-KB, see the per-application security policy:
 
-Please include:
-- Description of the vulnerability
-- Steps to reproduce
-- Impact assessment
-- Any suggested fixes
+- **Agent Red Customer Experience:** [`applications/Agent_Red/SECURITY.md`](applications/Agent_Red/SECURITY.md)
 
-## Response Timeline
+## Platform Security Practices
 
-- **Acknowledgment:** Within 48 hours
-- **Initial assessment:** Within 5 business days
-- **Resolution target:** Based on severity (P0: 24h, P1: 72h, P2: 2 weeks, P3: next release)
-
-## Scope
-
-This policy covers the Agent Red platform including:
-- API Gateway and backend services
-- Chat widget (embedded on merchant sites)
-- Admin dashboards (Shopify, standalone, provider)
-- Azure infrastructure configuration
-
-## Out of Scope
-
-- Third-party services (Azure, Shopify, Stripe) — report to those vendors directly
-- Social engineering attacks against team members
-- Denial of service attacks
-
-## Security Practices
-
-Agent Red implements:
-- Per-tenant AES-256-GCM envelope encryption with Azure Key Vault HSM-backed keys
-- Managed identities for all service-to-service authentication
-- Pre-authentication rate limiting
-- Input and output sanitization
-- Append-only audit logging
-- Dependency vulnerability scanning in CI (pip-audit)
-- No hardcoded secrets policy with automated guardrail enforcement
+The GroundTruth-KB platform enforces:
+- Pre-commit secrets scanning via `gt secrets scan --staged --fail-on verified-provider`.
+- Narrative-artifact approval-packet evidence layer via `scripts/check_narrative_artifact_evidence.py` (universal `.githooks/pre-commit` floor).
+- Append-only versioning of canonical artifacts in MemBase.
+- Role-based authority via `harness-state/role-assignments.json` durable role map.
+- Bridge-protocol GO/NO-GO/VERIFIED audit trail for governance-sensitive changes.
 
 ---
 
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

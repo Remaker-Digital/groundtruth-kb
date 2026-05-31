@@ -6,5 +6,9 @@
 # through UserPromptSubmit so normal assistant completions do not look like
 # session boundaries.
 
+approval_policy = "never"
 [features]
 codex_hooks = true
+
+[sandbox_workspace_write]
+network_access = true

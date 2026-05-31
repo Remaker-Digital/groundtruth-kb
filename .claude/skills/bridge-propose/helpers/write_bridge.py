@@ -36,7 +36,9 @@ import importlib
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -101,6 +103,16 @@ class CredentialHitsFoundError(RuntimeError):
 
     The body contained credential-shaped text and the caller chose
     to abort rather than redact.
+    """
+
+
+class BridgeComplianceError(RuntimeError):
+    """Raised when the Codex helper path fails bridge-compliance validation.
+
+    Codex does not currently have a Write/Edit tool hook route equivalent to
+    Claude's bridge-compliance PreToolUse path. The Codex path therefore runs
+    the bridge-compliance gate in audit mode before any proposal file write and
+    raises this error on a deny decision.
     """
 
 
@@ -627,6 +639,131 @@ def _compute_new_index_content(existing_lines: list[str], new_entry: str) -> str
     return head + entry + tail
 
 
+def compose_proposal(
+    slug: str,
+    version: int,
+    content: str,
+    *,
+    bridge_dir: Path | None = None,
+) -> tuple[Path, str]:
+    """Return the proposal target path and content without writing files."""
+    bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
+    return bridge_root / f"{slug}-{version:03d}.md", content
+
+
+def compose_index_update(
+    slug: str,
+    version: int,
+    status: str,
+    current_index_text: str,
+) -> str:
+    """Return full ``bridge/INDEX.md`` text with the status line inserted.
+
+    This is a pure string transformation. It creates a new ``Document`` block
+    for new slugs and prepends a status line to an existing exact ``Document``
+    entry when the slug is already present.
+    """
+    status_token = status.strip().upper()
+    status_line = f"{status_token}: bridge/{slug}-{version:03d}.md"
+    lines = current_index_text.splitlines(keepends=True)
+
+    for line in lines:
+        if line.strip() == status_line:
+            raise BridgeIndexConflictError(f"INDEX.md already contains status line {status_line!r}")
+
+    document_line = f"Document: {slug}"
+    for index, line in enumerate(lines):
+        if line.strip() != document_line:
+            continue
+        insertion = status_line + "\n"
+        return "".join(lines[: index + 1] + [insertion] + lines[index + 1 :])
+
+    new_entry = f"{document_line}\n{status_line}\n"
+    return _compute_new_index_content(lines, new_entry)
+
+
+def _relative_to_project(path: Path, project_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _run_bridge_compliance_audit(
+    *,
+    file_path: Path,
+    content: str,
+    project_root: Path,
+) -> dict[str, Any]:
+    """Run bridge-compliance-gate.py in audit mode for in-memory content."""
+    gate_path = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
+    payload = {
+        "cwd": str(project_root.resolve()),
+        "tool_input": {
+            "file_path": _relative_to_project(file_path, project_root),
+            "content": content,
+        },
+    }
+    with tempfile.TemporaryDirectory(prefix="gtkb-bridge-compliance-") as tmp:
+        audit_output = Path(tmp) / "audit.json"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(gate_path),
+                "--audit-only",
+                "--audit-output",
+                str(audit_output),
+            ],
+            cwd=project_root,
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise BridgeComplianceError(
+                "bridge-compliance audit failed to execute: "
+                f"returncode={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}"
+            )
+        try:
+            audit = json.loads(audit_output.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise BridgeComplianceError("bridge-compliance audit did not produce readable JSON") from exc
+    if audit.get("decision") != "pass":
+        reason = audit.get("reason") or "bridge-compliance audit denied the composed proposal"
+        raise BridgeComplianceError(str(reason))
+    return audit
+
+
+def _update_bridge_index_with_composed_content(
+    index_path: Path,
+    *,
+    topic_slug: str,
+    version: int,
+    status: str,
+) -> None:
+    """Atomically update INDEX using ``compose_index_update``."""
+    original_bytes = index_path.read_bytes()
+    original_text = original_bytes.decode("utf-8")
+    new_content = compose_index_update(topic_slug, version, status, original_text)
+    temp_path = index_path.with_name(f"{index_path.name}.tmp.{os.getpid()}")
+    temp_path.write_bytes(new_content.encode("utf-8"))
+    try:
+        if index_path.read_bytes() != original_bytes:
+            temp_path.unlink()
+            raise BridgeIndexConflictError(
+                "INDEX.md changed during update - concurrent modification detected. Retry required."
+            )
+        os.replace(temp_path, index_path)
+    except BridgeIndexConflictError:
+        raise
+    except Exception:
+        if temp_path.exists():
+            with contextlib.suppress(OSError):
+                temp_path.unlink()
+        raise
+
+
 def _update_bridge_index(
     index_path: Path,
     new_entry: str,
@@ -841,17 +978,106 @@ def propose_bridge(
     )
 
 
+def propose_bridge_codex_non_bypass(
+    topic_slug: str,
+    body: str,
+    *,
+    version: int = 1,
+    status: str = "NEW",
+    mode: Literal["abort", "redact"] = "abort",
+    bridge_dir: Path | None = None,
+    pre_populate_prior_deliberations: bool = True,
+    db: Any | None = None,
+    glossary_path: Path | None = None,
+    pre_populate_log_path: Path | bool | None = None,
+    author_metadata: dict[str, Any] | None = None,
+) -> Path:
+    """Create a bridge proposal through the Codex inline-compliance path.
+
+    This path is for Codex harnesses where ``apply_patch`` is not covered by
+    the bridge-compliance PreToolUse hook. It composes the proposal body,
+    ensures author metadata, runs ``bridge-compliance-gate.py --audit-only`` on
+    the in-memory proposal content, and only then writes the proposal file and
+    atomically updates ``bridge/INDEX.md``.
+    """
+    bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
+    project_root = bridge_root.parent.resolve()
+    bridge_file, _ = compose_proposal(topic_slug, version, body, bridge_dir=bridge_root)
+    index_path = bridge_root / "INDEX.md"
+
+    if pre_populate_prior_deliberations:
+        body = globals()["pre_populate_prior_deliberations"](
+            topic_slug,
+            body,
+            db=db,
+            glossary_path=glossary_path,
+            log_path=pre_populate_log_path,
+        )
+
+    hits = scan_credential_hits(body)
+    body_to_write = handle_hits_abort_or_redact(body, hits, mode=mode)
+    body_to_write = ensure_author_metadata(
+        body_to_write,
+        project_root=project_root,
+        explicit=author_metadata,
+    )
+    bridge_file, body_to_write = compose_proposal(
+        topic_slug,
+        version,
+        body_to_write,
+        bridge_dir=bridge_root,
+    )
+
+    _run_bridge_compliance_audit(
+        file_path=bridge_file,
+        content=body_to_write,
+        project_root=project_root,
+    )
+
+    if bridge_file.exists():
+        raise BridgeFileAlreadyExistsError(
+            f"{bridge_file} already exists - pick a fresh slug or version. The skill never silently overwrites."
+        )
+    bridge_file.parent.mkdir(parents=True, exist_ok=True)
+    bridge_file.write_bytes(body_to_write.encode("utf-8"))
+
+    last_error: BridgeIndexConflictError | None = None
+    max_attempts = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            _update_bridge_index_with_composed_content(
+                index_path,
+                topic_slug=topic_slug,
+                version=version,
+                status=status,
+            )
+            return bridge_file
+        except BridgeIndexConflictError as exc:
+            last_error = exc
+            if attempt >= max_attempts:
+                break
+    raise BridgeIndexConflictError(
+        f"Bridge file {bridge_file} was written but INDEX.md could not be "
+        f"updated after 2 total attempts. The file exists on disk; manually "
+        f"add an entry to bridge/INDEX.md or retry the skill. Last error: {last_error}"
+    )
+
+
 __all__ = [
     "BridgeFileAlreadyExistsError",
+    "BridgeComplianceError",
     "BridgeIndexConflictError",
     "CredentialHitsFoundError",
     "DEFAULT_GLOSSARY_PATH",
     "DEFAULT_PREPOPULATION_LOG",
     "DEFAULT_PRE_POPULATION_LIMIT",
     "RedactionResidualError",
+    "compose_index_update",
+    "compose_proposal",
     "handle_hits_abort_or_redact",
     "pre_populate_prior_deliberations",
     "propose_bridge",
+    "propose_bridge_codex_non_bypass",
     "redact_credential_hits",
     "scan_credential_hits",
 ]
