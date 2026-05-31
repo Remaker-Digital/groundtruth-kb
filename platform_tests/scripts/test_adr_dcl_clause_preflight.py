@@ -651,3 +651,58 @@ def test_clause_genuine_bulk_op_still_must_apply(preflight):
         f"a genuine bulk standing-backlog operation must still yield must_apply; "
         f"got {applicability}; reasons: {reasons}"
     )
+
+
+# WI-3508 (S378): CLAUSE-IN-ROOT failure_pattern path-token-boundary tightening.
+# The failure_pattern now carries a negative lookbehind ``(?<![\w./\\-])`` so the
+# out-of-root prefixes (Unix temp, Windows user-profile, Windows shared-temp) only
+# refute evidence at a path-token boundary. Before the anchor, the Unix temp token
+# matched as a bare substring anywhere, so an in-root scratch path whose tail is
+# the temp sub-segment (e.g. ``.gtkb-state/tmp/...``) was wrongly flagged
+# out-of-root (the S377 false positive). These paired tests follow the W4
+# calibration shape above: one proves the false positive is gone, one proves the
+# genuine positive is preserved.
+
+
+def test_clause_in_root_ignores_in_root_tmp_scratch_path(preflight):
+    """WI-3508 false-positive removed: an in-root scratch path whose tail is the
+    Unix temp sub-segment (``.gtkb-state/tmp/...``) must NOT refute CLAUSE-IN-ROOT
+    evidence. The temp token is preceded by a word character, which the new
+    boundary lookbehind excludes, so the failure_pattern no longer matches and the
+    in-root evidence stands.
+    """
+    content = (
+        "## Files Changed\n\n"
+        "- The deterministic-writer scratch output lands in-root at "
+        "E:\\GT-KB\\.gtkb-state/tmp/writer-output.md.\n"
+        "All outputs reside in-root under E:\\GT-KB per ADR-ISOLATION-APPLICATION-PLACEMENT-001.\n"
+    )
+    clauses = preflight.load_clauses(CLAUSES_CONFIG)
+    in_root_clause = next(c for c in clauses if "CLAUSE-IN-ROOT" in c.clause_id)
+    found, reasons, gap = preflight.evaluate_evidence(in_root_clause, content)
+    assert found is True, (
+        f"in-root .gtkb-state/tmp scratch path must not refute CLAUSE-IN-ROOT evidence; "
+        f"got found={found}; reasons={reasons}; gap={gap}"
+    )
+    assert gap is None
+
+
+def test_clause_in_root_still_flags_out_of_root_path(preflight):
+    """WI-3508 genuine-positive preserved: a standalone out-of-root Unix temp path
+    at a token boundary must STILL refute CLAUSE-IN-ROOT evidence. The boundary
+    anchor narrows only in-root sub-segment matches, not genuine out-of-root
+    references, so the failure_pattern still fires here.
+    """
+    content = (
+        "## Files Changed\n\n"
+        "- Implementation will write cache output to /tmp/evil-cache/out (out-of-root).\n"
+        "Specification Links cite E:\\GT-KB but the output path escapes the root.\n"
+    )
+    clauses = preflight.load_clauses(CLAUSES_CONFIG)
+    in_root_clause = next(c for c in clauses if "CLAUSE-IN-ROOT" in c.clause_id)
+    found, reasons, gap = preflight.evaluate_evidence(in_root_clause, content)
+    assert found is False, (
+        f"standalone out-of-root /tmp/ path must still refute CLAUSE-IN-ROOT evidence; "
+        f"got found={found}; reasons={reasons}"
+    )
+    assert gap is not None and len(gap) > 0, f"expected non-empty gap_summary; got {gap}"

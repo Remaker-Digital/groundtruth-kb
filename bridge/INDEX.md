@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 Document: gtkb-clause-in-root-failure-pattern-tightening
+VERIFIED: bridge/gtkb-clause-in-root-failure-pattern-tightening-004.md
+NEW: bridge/gtkb-clause-in-root-failure-pattern-tightening-003.md
+GO: bridge/gtkb-clause-in-root-failure-pattern-tightening-002.md
 NEW: bridge/gtkb-clause-in-root-failure-pattern-tightening-001.md
 
 Document: antigravity-inspection-results-053026-options-for-implementation
