@@ -7,6 +7,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 Document: gtkb-inventory-regen-chore-commit-2026-05-31
+NEW: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-007.md
 GO: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-006.md
 REVISED: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-005.md
 NO-GO: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-004.md
