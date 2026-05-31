@@ -9,7 +9,7 @@
 ## Project Structure
 
 ```
-E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
+E:\GT-KB\applications\Agent_Red\
 │
 ├── CLAUDE.md                       # AI assistant guidance (core, loaded every session)
 ├── CLAUDE-REFERENCE.md             # Static reference: legal, pricing, infra, AGNTCY rules
