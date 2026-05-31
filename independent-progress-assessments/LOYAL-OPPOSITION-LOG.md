@@ -175,6 +175,31 @@
 
 ---
 
+### 2026-05-27 - Harness Capability and Role Suitability Advisory
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Antigravity (Gemini) is ready to serve as Loyal Opposition once registration and dispatch verification are verified, but is structurally blocked from Prime Builder role due to a lack of event hooks. | `memory/antigravity-integration-status.md`; `bridge/gtkb-antigravity-harness-registration-003.md`; `DOC-ANTIGRAVITY-IDE-RESEARCH-001` | Verify harness registration and complete headless dispatch verification, then activate and assign Gemini as LO. | Open |
+| Process | Claude Code is currently incapable of serving as Prime Builder due to severe background execution/auth hangs and silent no-ops discovered during headless runs. | `independent-progress-assessments/bridge-automation/claude-file-bridge-scan.ps1` | Maintain Claude Code's suspended status in registry until headless CLI execution fixes are proposed and verified. Owner AUQ 2026-05-27 (S364): defer until WI-3349 VERIFIED — the suggested topology reshuffle (suspend B; flip A to PB; activate C as LO) presumes Antigravity's LO suitability, which WI-3349 substrate verification is the precondition for. Re-surface for owner disposition once WI-3349 reaches VERIFIED. | Deferred |
+
+---
+
+### 2026-05-27 - Efficacy KPI Suite Proposal
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Traditional engineering metrics fail to capture agentic software factory performance. We proposed a three-tiered KPI suite (Owner Burden, Dual-Agent Velocity & Rigor, and System Integrity) to measure GroundTruth KB efficacy and prevent regression. | `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-27-13-40.md`; owner request to propose a suite of KPIs to measure efficacy and regression. | Prime Builder should review the proposed KPI metrics, draft SQLite views for STMR and DPD, and present a dashboard visualization plan. | Open |
+
+---
+
+### 2026-05-29 - Session and Work Envelope UI Convention
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | DELIB-2500 establishes session and work envelope UI convention at MEDIUM commitment, but contains concurrency write races, validation gaps, parser compatibility risks, role assertion mismatches, Agent Red coupling risk, and an unsettled UX value-vs-ceremony question. | `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-29-06-50-delib-2500-review.md`; `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-29-07-12-delib-2500-envelope-convention-advisory.md`; database record lookup of DELIB-2500. | Prime Builder should run a structured owner-grilling pass before any implementation proposal, then file a scoping/specification proposal covering per-harness envelope state, parser compatibility matrix, application binding, strict role assertion behavior, service-level work-envelope instrumentation, and glossary/spec amendments. | Open |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).

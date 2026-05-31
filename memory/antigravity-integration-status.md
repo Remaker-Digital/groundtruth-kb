@@ -128,6 +128,8 @@ multiple threads in review at once).
 
 ## 7. Change log
 
+- 2026-05-30 -- Owner directed Antigravity integration to be suspended to minimize token consumption while maintaining specialized LO capability parity. Modified generate_antigravity_skill_adapters.py to compile the complete set of 32 system skill adapters (duplicating Codex's capabilities payload). Updated role-assignments.json and harness-registry.json to set Harness C's status to 'suspended' and empty its role mapping to ensure it does not receive bridge notifications. Headless dispatch verification passed. Amended AGENTS.md File Safety Contract to restrict Harness C's standing write permission solely to creating and updating ADVISORY bridge documents, requiring explicit per-file approval for all other modifications.
+
 - 2026-05-27 -- Antigravity harness-C registration reached VERIFIED earlier in
   the bridge chain. WI-3349 substrate verification is now tracked by
   `gtkb-headless-gemini-lo-dispatch-verification`; Loyal Opposition returned

@@ -33,7 +33,7 @@
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
-      "source_sha256": "f0438c6479fb2e1e625ebf12fbe04e64f13c864528cc7e1d62b4dde4e45bc901"
+      "source_sha256": "5189b0b9b27922ed104e74e87ecc7f745bae629a5d659d5d67b6acb74a5e876b"
     },
     {
       "adapter_relative_path": ".codex/skills/check-deliberations/SKILL.md",
