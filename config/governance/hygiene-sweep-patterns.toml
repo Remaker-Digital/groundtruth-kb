@@ -1,0 +1,60 @@
+# GroundTruth-KB hygiene sweep pattern-set registry
+#
+# Drives the `gt hygiene sweep` deterministic CLI (WI-3420; bridge thread
+# `gtkb-hygiene-sweep-cli` GO at -002).
+#
+# Per `GOV-ARTIFACT-APPROVAL-001`: this configuration artifact's initial
+# content is approved via the bridge GO at -002. Future revisions go through
+# standard formal-artifact-approval-packet workflow.
+#
+# Per `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE`: this pattern set captures
+# the three S363 Agent-Red-inherited drift instances (WI-3409, WI-3417,
+# WI-3418) into one deterministic discovery surface, replacing per-instance
+# manual investigation.
+#
+# Pattern entry schema:
+#   id                  - kebab-case stable identifier
+#   class               - drift class (config_drift, workflow_drift, etc.)
+#   description         - human-readable explanation
+#   file_globs          - paths to scan (fnmatch syntax, forward-slash normalized)
+#   content_patterns    - regex patterns (Python `re` syntax) to match
+#   exclusion_globs     - paths to skip
+#   classification      - finding classification tag
+#   remediation_hint    - suggested next-step guidance
+#
+# Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
+# All rights reserved.
+
+version = 1
+
+[[patterns]]
+id = "agent-red-config-drift"
+class = "config_drift"
+description = "Agent-Red-inherited config carried in GT-KB repo-root files (sonar key, GitHub Actions repo references, source-tree assumptions)."
+file_globs = [
+    "*.properties",
+    ".github/workflows/*.yml",
+    ".github/workflows/*.yaml",
+    "pyproject.toml",
+    "scripts/**/*.py",
+    "sonar-project.properties",
+]
+content_patterns = [
+    "Remaker-Digital_agent-red-customer-engagement",
+    "AGENT_RED_GITHUB_REPO",
+    "applications/Agent_Red/",
+    "sonar\\.sources=src/",
+]
+exclusion_globs = [
+    "applications/**",
+    "bridge/**",
+    "memory/**",
+    "independent-progress-assessments/**",
+    ".gtkb-state/**",
+    "archive/**",
+    ".claude/**",
+    ".codex/**",
+    "config/governance/hygiene-sweep-patterns.toml",
+]
+classification = "agent_red_inherited"
+remediation_hint = "Verify path/key is in canonical GT-KB scope; relink if not. See bridge thread gtkb-sonarcloud-config-relink-gt-kb for the relink pattern."
