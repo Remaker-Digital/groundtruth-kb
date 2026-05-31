@@ -46,5 +46,13 @@ groundtruth.db.corrupt-*
 bridge.db
 prime_bridge.db
 
+# --- GT-KB runtime / ephemeral state (locks, dispatch-state, benchmarks) ---
+# Drive's per-file sync cadence races the bridge-poller heartbeat/lock writes
+# and produced "(N)" conflict-copy clutter (e.g. active-codex-session (3).lock).
+# This tree is local runtime state, not durable project content -- the durable
+# records live in MemBase and bridge/. Same failure class as the .git/ and
+# live-SQLite exclusions above.
+.gtkb-state/
+
 # --- Drive's own staging directory (Drive normally hides this; redundant) ---
 .tmp.driveupload/
