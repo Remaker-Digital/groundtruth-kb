@@ -1,0 +1,5 @@
+{
+  "command": "python -c \"from pathlib import Path; from scripts.implementation_authorization import extract_target_paths; p=Path('bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-001.md'); print(extract_target_paths(p.read_text(encoding='utf-8-sig')))\"",
+  "reason": "bridge file write content extraction failed",
+  "skipped": true
+}

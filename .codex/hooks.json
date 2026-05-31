@@ -99,6 +99,28 @@
         "hooks": [
           {
             "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\code-quality-baseline-proposal-check.cmd",
+            "statusMessage": "Checking Code Quality Baseline proposal shape",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\wi-id-collision-gate.cmd",
+            "statusMessage": "Checking bridge WI-ID collisions",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
             "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\implementation-start-gate.cmd",
             "statusMessage": "Checking implementation-start authorization",
             "timeout": 5
@@ -112,6 +134,50 @@
             "type": "command",
             "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\implementation-start-gate.cmd",
             "statusMessage": "Checking implementation-start authorization",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\bridge-compliance-gate-apply-patch-adapter.cmd",
+            "statusMessage": "Checking bridge compliance for apply_patch",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\code-quality-baseline-proposal-check.cmd",
+            "statusMessage": "Checking Code Quality Baseline proposal shape",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\lo-file-safety-gate.cmd",
+            "statusMessage": "Checking LO file safety",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\lo-file-safety-gate.cmd",
+            "statusMessage": "Checking LO file safety",
             "timeout": 5
           }
         ]
@@ -218,12 +284,6 @@
             "type": "command",
             "command": "python E:\\GT-KB\\.claude\\hooks\\advisory-router-scan.py",
             "statusMessage": "Advisory-to-backlog router scan",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "python E:\\GT-KB\\.claude\\hooks\\bridge-stop-drain.py --harness codex",
-            "statusMessage": "Bridge active-session auto-drain (role-aware Stop drain)",
             "timeout": 10
           }
         ]

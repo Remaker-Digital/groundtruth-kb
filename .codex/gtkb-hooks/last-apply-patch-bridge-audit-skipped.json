@@ -1,0 +1,5 @@
+{
+  "patch": "{\"cwd\": \"E:\\\\GT-KB\", \"session_id\": \"session-malformed\", \"tool_input\": {\"patch\": \"not an apply_patch envelope\"}, \"tool_name\": \"apply_patch\"}",
+  "reason": "no apply_patch envelope found",
+  "skipped": true
+}

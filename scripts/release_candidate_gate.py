@@ -278,10 +278,47 @@ def _check_project_resource_registry() -> None:
     )
 
 
+def _standing_backlog_health_helpers():
+    package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    from groundtruth_kb.project.doctor import check_standing_backlog_health  # noqa: PLC0415
+
+    return check_standing_backlog_health
+
+
+def _check_standing_backlog_health() -> None:
+    check_standing_backlog_health = _standing_backlog_health_helpers()
+    payload = check_standing_backlog_health(PROJECT_ROOT)
+    findings = payload.get("findings", [])
+    fail_findings = [finding for finding in findings if finding.get("severity") == "FAIL"]
+    if fail_findings:
+        reasons = [str(finding.get("message") or finding.get("kind")) for finding in fail_findings]
+        raise GateFailure("Standing backlog health: " + "; ".join(reasons))
+    warn_count = sum(1 for finding in findings if finding.get("severity") == "WARN")
+    print(f"PASS standing backlog health ({warn_count} warning findings)")
+
+
 def _python_gates() -> None:
-    _run([sys.executable, "-m", "ruff", "check", "applications/Agent_Red/src/", "applications/Agent_Red/tests/", "platform_tests/", "--select", "E,F"], timeout=120)
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "ruff",
+            "check",
+            "applications/Agent_Red/src/",
+            "applications/Agent_Red/tests/",
+            "platform_tests/",
+            "--select",
+            "E,F",
+        ],
+        timeout=120,
+    )
     _run([sys.executable, "scripts/detect_import_cycles.py", "applications/Agent_Red/src"], timeout=120)
-    _run([sys.executable, "-m", "bandit", "-r", "applications/Agent_Red/src/", "-ll", "-c", "pyproject.toml"], timeout=180)
+    _run(
+        [sys.executable, "-m", "bandit", "-r", "applications/Agent_Red/src/", "-ll", "-c", "pyproject.toml"],
+        timeout=180,
+    )
     _run([sys.executable, "-m", "pip_audit", "-r", "requirements.txt"], timeout=180)
     _run([sys.executable, "scripts/check_codex_hook_parity.py"], timeout=60)
     _run([sys.executable, "scripts/generate_codex_skill_adapters.py", "--update-registry", "--check"], timeout=30)
@@ -425,6 +462,7 @@ def main() -> int:
         _check_secret_gate_present()
         _check_secret_ci_workflow_present()
         _check_project_resource_registry()
+        _check_standing_backlog_health()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
         # Narrative-artifact evidence rollup runs BEFORE the inventory-drift check

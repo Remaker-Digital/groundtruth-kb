@@ -69,6 +69,7 @@ SCRIPT_MUTATION_POLICIES = {
     "backfill_lo_reports.py": "invocation",
 }
 SCRIPT_HELP_FLAGS = {"-h", "--help"}
+READ_ONLY_FLAGS = {"--help", "-h", "--dry-run", "--validate-only", "--version", "-V"}
 COMMAND_SEPARATORS = {";", "&&", "||", "|"}
 PYTHON_RUNNERS = {"python", "python.exe", "python3", "python3.exe", "py", "py.exe"}
 
@@ -126,9 +127,10 @@ def _extract_packet_path(command: str) -> str | None:
 
 
 def _is_formal_mutation(command: str) -> bool:
-    return any(pattern.search(command) for pattern in FORMAL_MUTATION_PATTERNS) or _has_mutating_script_invocation(
-        command
-    )
+    for segment in _command_segments(_command_tokens(command)):
+        if _is_formal_mutation_segment(segment) and not _segment_has_read_only_flag(segment):
+            return True
+    return False
 
 
 def _command_tokens(command: str) -> list[str]:
@@ -151,6 +153,39 @@ def _token_basename(token: str) -> str:
 def _is_command_separator(token: str) -> bool:
     cleaned = _clean_token(token)
     return cleaned in COMMAND_SEPARATORS or cleaned.endswith(";")
+
+
+def _command_segments(tokens: list[str]) -> list[list[str]]:
+    segments: list[list[str]] = []
+    current: list[str] = []
+    for token in tokens:
+        cleaned = _clean_token(token)
+        if cleaned in COMMAND_SEPARATORS:
+            if current:
+                segments.append(current)
+                current = []
+            continue
+        if cleaned.endswith(";") and cleaned != ";":
+            current.append(token.rstrip(";"))
+            if current:
+                segments.append(current)
+                current = []
+            continue
+        current.append(token)
+    if current:
+        segments.append(current)
+    return segments
+
+
+def _segment_has_read_only_flag(segment: list[str]) -> bool:
+    return any(_clean_token(token) in READ_ONLY_FLAGS for token in segment)
+
+
+def _is_formal_mutation_segment(segment: list[str]) -> bool:
+    segment_text = " ".join(segment)
+    return any(pattern.search(segment_text) for pattern in FORMAL_MUTATION_PATTERNS) or _has_mutating_script_invocation(
+        segment_text
+    )
 
 
 def _is_script_invocation(tokens: list[str], index: int) -> bool:

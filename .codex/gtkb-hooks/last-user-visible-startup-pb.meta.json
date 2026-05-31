@@ -1,0 +1,9 @@
+{
+  "harness_name": "codex",
+  "harness_id": "A",
+  "role_mode": "pb",
+  "role_profile": "prime-builder",
+  "generated_at": "2026-05-31T21:18:08Z",
+  "byte_length": 12046,
+  "sha256": "e7b40611f73e6f37f81c0cdefc3e5867d04499db3359cefde78247af88187bbe"
+}
