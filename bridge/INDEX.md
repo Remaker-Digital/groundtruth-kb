@@ -6,6 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-inventory-regen-chore-commit-2026-05-31
+GO: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-006.md
+REVISED: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-005.md
+NO-GO: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-004.md
+REVISED: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-003.md
+NO-GO: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-002.md
+NEW: bridge/gtkb-inventory-regen-chore-commit-2026-05-31-001.md
+
 Document: gtkb-clause-in-root-failure-pattern-tightening
 VERIFIED: bridge/gtkb-clause-in-root-failure-pattern-tightening-004.md
 NEW: bridge/gtkb-clause-in-root-failure-pattern-tightening-003.md
@@ -41,6 +49,10 @@ NO-GO: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-002.md
 NEW: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-001.md
 
 Document: gtkb-interactive-session-role-override-slice-10-regression-tests
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-010.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-009.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-008.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-007.md
 GO: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-006.md
 REVISED: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-005.md
 NO-GO: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-004.md

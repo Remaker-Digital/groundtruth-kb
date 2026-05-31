@@ -161,6 +161,14 @@ def _extract_version(output: str, fallback: str = "unknown") -> str:
     version_match = re.search(r"(\d+(?:\.\d+)+(?:[A-Za-z0-9.+_-]*)?)", first_line)
     if version_match:
         return version_match.group(1)
+    # Path-safe fallback (DELIB-2522 / Codex NO-GO -004 P1-002 fix): if the
+    # unstructured first line contains an absolute local path the public
+    # validator would later reject, return the sentinel rather than leaking
+    # it through the public ``version`` field. This addresses tools whose
+    # failure stderr embeds path-shaped diagnostic text (e.g., ``gh`` when
+    # its config file is unreadable: ``open C:\Users\...``).
+    if ABSOLUTE_PATH_RE.search(first_line):
+        return fallback
     return first_line[:80]
 
 
@@ -368,7 +376,7 @@ def _harness_inventory(project_root: Path) -> dict[str, Any]:
         harness_name = record.get("harness_name")
         harness_id = record.get("id")
         role = record.get("role")
-        status = record.get("status")
+        status = record.get("status")  # noqa: F841 - retained for future schema parity; pre-existing
         if isinstance(harness_name, str) and harness_name:
             identities[harness_name] = {
                 "id": harness_id,
@@ -386,12 +394,8 @@ def _harness_inventory(project_root: Path) -> dict[str, Any]:
     return {
         "identity_source": _file_state(project_root, "harness-state/harness-registry.json"),
         "role_assignment_source": _file_state(project_root, "harness-state/harness-registry.json"),
-        "identities": {
-            name: details for name, details in sorted(identities.items())
-        },
-        "role_assignments": {
-            harness_id: details for harness_id, details in sorted(role_assignments.items())
-        },
+        "identities": {name: details for name, details in sorted(identities.items())},
+        "role_assignments": {harness_id: details for harness_id, details in sorted(role_assignments.items())},
         "codex": {
             "config": _file_state(project_root, ".codex/config.toml"),
             "hooks": _file_state(project_root, ".codex/hooks.json"),

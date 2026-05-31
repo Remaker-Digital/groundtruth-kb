@@ -10,9 +10,14 @@
       "assigned_at": "2026-05-05T00:00:00Z",
       "assigned_by": "owner-directed-initial-identity",
       "id": "A"
+    },
+    "antigravity": {
+      "assigned_at": "2026-05-31T14:25:00Z",
+      "assigned_by": "owner-directed-identity-registration",
+      "id": "C"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness installation identities",
-  "updated_at": "2026-05-05T00:00:00Z"
+  "updated_at": "2026-05-31T14:25:00Z"
 }

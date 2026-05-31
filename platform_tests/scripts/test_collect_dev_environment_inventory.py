@@ -178,3 +178,44 @@ def test_public_validator_rejects_sensitive_values_absolute_paths_and_stale_inve
     assert any("credential-shaped" in error for error in errors)
     assert any("absolute local path" in error for error in errors)
     assert any("stale" in error for error in errors)
+
+
+def test_extract_version_path_safe_fallback_for_unstructured_output() -> None:
+    """DELIB-2522 / Codex NO-GO -004 P1-002 path-safe fallback.
+
+    When a tool's version probe fails (e.g., ``gh`` cannot read its config
+    file) the captured first line is unstructured error text. If that text
+    contains an absolute local path (Windows ``C:\\Users\\...`` or POSIX
+    ``/Users/...``, ``/home/...``, ``/root/...``), the prior implementation
+    truncated it to 80 chars and stored it in the public ``version`` field,
+    which then tripped ``_validate_public_inventory``'s ``ABSOLUTE_PATH_RE``
+    check and aborted the entire inventory write.
+
+    The fix returns the ``fallback`` sentinel ("unknown" by default) for
+    path-shaped fallbacks so the public payload remains writable. Failed
+    tool diagnostic detail still reaches the private payload via
+    ``raw_output``.
+    """
+
+    module = _load_module()
+
+    # Windows-style path inside gh failure stderr.
+    gh_failure = "failed to create root command: failed to read configuration: open C:\\Users\\micha\\AppData\\Roaming\\gh\\config.yml"
+    assert module._extract_version(gh_failure) == "unknown"
+
+    # POSIX-style path that the validator also rejects.
+    posix_failure = "could not open /Users/example/.config/tool/config.yml"
+    assert module._extract_version(posix_failure) == "unknown"
+
+    # Non-version /home/ path failure (the validator rejects /home/ too).
+    home_failure = "permission denied: /home/example/.config"
+    assert module._extract_version(home_failure) == "unknown"
+
+    # Sanity check: well-formed version strings still pass through untouched.
+    assert module._extract_version("gh version 2.83.2 (2025-12-10)") == "2.83.2"
+    assert module._extract_version("Python 3.14.0") == "3.14.0"
+
+    # Sanity check: a non-version first line WITHOUT a path-shape still
+    # returns the truncated first line (existing behavior preserved for
+    # unstructured-but-path-safe outputs).
+    assert module._extract_version("custom-tool: some diagnostic text") == "custom-tool: some diagnostic text"

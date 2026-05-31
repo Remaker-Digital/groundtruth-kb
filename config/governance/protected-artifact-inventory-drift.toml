@@ -14,6 +14,23 @@ volatile_inventory_paths = [
   # Owner decision DELIB-2504 (S369) / WI-3449; the wildcard segment is honored
   # by _delete_dotted_path in scripts/check_dev_environment_inventory_drift.py.
   "toolchain.*.version",
+  # toolchain.*.status and toolchain.*.classification: tool-availability fields
+  # are workstation-specific. A workstation where ``gh --version`` (or any other
+  # inventoried tool) fails records ``status: "unknown"`` and
+  # ``classification: "unknown"``; a workstation where the tool succeeds records
+  # ``"verified"``. Without volatility on these fields, env-specific tool
+  # availability differences cause cross-workstation drift that gates every
+  # cross-harness commit attempt (observed during Codex review at
+  # bridge/gtkb-inventory-regen-chore-commit-2026-05-31-004.md P1-001).
+  # Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING covers this
+  # source/config drift-policy change under GOV-RELIABILITY-FAST-LANE-001;
+  # DELIB-2504 is the closest prior owner-decision precedent (toolchain.*.version
+  # volatility, 2026-05-29 chore). The bundled state/baseline commit that
+  # carried this change is separately authorized by DELIB-2522. Tool-presence
+  # regressions (catalog adds/removes) continue to gate via the toolchain
+  # top-level key set.
+  "toolchain.*.status",
+  "toolchain.*.classification",
 ]
 
 [[protected_artifacts]]

@@ -2,26 +2,37 @@
   "description": "Maps durable harness installation IDs to operating roles. Harness IDs are defined by harness-state/harness-identities.json.",
   "harnesses": {
     "A": {
-      "assigned_at": "2026-05-19T18:02:53.157543Z",
-      "assigned_by": "owner-directed-role-correction",
-      "assigned_reason": "Restore owner-directed current-harness PB+LO assignment after erroneous Antigravity handoff partition restore; Claude and Gemini unavailable",
+      "assigned_at": "2026-05-27T08:11:58.790133Z",
+      "assigned_by": "mode-switch-transaction",
+      "assigned_reason": "Owner requested Claude Code as Prime Builder and Codex as Loyal Opposition",
       "harness_type": "codex",
       "role": [
-        "prime-builder",
         "loyal-opposition"
       ],
-      "source": "owner-directed-role-correction"
+      "source": "compatibility-mirror"
     },
     "B": {
-      "assigned_at": "2026-05-19T18:02:53.157543Z",
-      "assigned_by": "owner-directed-role-correction",
-      "assigned_reason": "Claude unavailable; current harness A carries PB+LO until further owner direction",
+      "assigned_at": "2026-05-27T08:11:58.790133Z",
+      "assigned_by": "mode-switch-transaction",
+      "assigned_reason": "Owner requested Claude Code as Prime Builder and Codex as Loyal Opposition",
       "harness_type": "claude",
-      "role": [],
-      "source": "owner-directed-role-correction"
+      "role": [
+        "prime-builder"
+      ],
+      "source": "compatibility-mirror"
+    },
+    "C": {
+      "assigned_at": "2026-05-31T14:25:00Z",
+      "assigned_by": "owner-directed-role-assignment",
+      "assigned_reason": "Owner assigned Prime Builder to Antigravity while Claude Code is offline; obsolete Antigravity restrictions lifted",
+      "harness_type": "antigravity",
+      "role": [
+        "prime-builder"
+      ],
+      "source": "owner-directive"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness role assignments",
-  "updated_at": "2026-05-19T18:02:53.157543Z"
+  "updated_at": "2026-05-31T14:25:00Z"
 }
