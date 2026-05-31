@@ -33,15 +33,20 @@ def _write_role_map(root: Path, harnesses: dict) -> None:
     """
     path = root / "harness-state" / "harness-registry.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    records = [{"id": harness_id, **record} for harness_id, record in harnesses.items()]
+    records = []
+    for harness_id, record in harnesses.items():
+        rec = {"id": harness_id, **record}
+        if "status" not in rec:
+            rec["status"] = "active"
+        records.append(rec)
     path.write_text(json.dumps({"harnesses": records}), encoding="utf-8")
 
 
 def test_prime_builder_ids_single() -> None:
     doc = {
         "harnesses": {
-            "A": {"role": ["loyal-opposition"]},
-            "B": {"role": ["prime-builder"]},
+            "A": {"role": ["loyal-opposition"], "status": "active"},
+            "B": {"role": ["prime-builder"], "status": "active"},
         }
     }
     assert prime_builder_ids(doc) == ["B"]
@@ -51,8 +56,8 @@ def test_prime_builder_ids_handles_legacy_scalar_role() -> None:
     """A legacy scalar role wire form (``"role": "prime-builder"``) is counted."""
     doc = {
         "harnesses": {
-            "A": {"role": "prime-builder"},
-            "B": {"role": "loyal-opposition"},
+            "A": {"role": "prime-builder", "status": "active"},
+            "B": {"role": "loyal-opposition", "status": "active"},
         }
     }
     assert prime_builder_ids(doc) == ["A"]
@@ -62,9 +67,9 @@ def test_verify_role_partition_accepts_valid_partition(tmp_path: Path) -> None:
     _write_role_map(
         tmp_path,
         {
-            "A": {"role": ["prime-builder"]},
-            "B": {"role": ["loyal-opposition"]},
-            "C": {"role": ["loyal-opposition"]},
+            "A": {"role": ["prime-builder"], "status": "active"},
+            "B": {"role": ["loyal-opposition"], "status": "active"},
+            "C": {"role": [], "status": "suspended"},
         },
     )
     assert verify_role_partition(tmp_path) == "A"

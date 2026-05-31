@@ -126,6 +126,17 @@ def verify_active_role_partition(project_root: Path, *, role_path: Path | None =
     if not active_ids:
         raise RolePartitionViolation("role map must include at least one active harness")
 
+    active_roleless: list[str] = []
+    for harness_id in active_ids:
+        record = harnesses[harness_id]
+        tokens = _role_tokens(record.get("role"))
+        if not tokens:
+            active_roleless.append(harness_id)
+    if active_roleless:
+        raise RolePartitionViolation(
+            "active harnesses must carry operating roles; violations: " + ", ".join(sorted(active_roleless))
+        )
+
     inactive_with_roles: list[str] = []
     for harness_id, record in sorted(harnesses.items()):
         if not isinstance(record, dict) or record.get("status") == "active":

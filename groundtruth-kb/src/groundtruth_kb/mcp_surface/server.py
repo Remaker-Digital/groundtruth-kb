@@ -19,8 +19,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from mcp.server.lowlevel import Server
 from mcp import types
+from mcp.server.lowlevel import Server
 
 from groundtruth_kb.mcp_surface.authority import AuthorityLabel, build_envelope
 from groundtruth_kb.mcp_surface.boundary import resolve_safe_path

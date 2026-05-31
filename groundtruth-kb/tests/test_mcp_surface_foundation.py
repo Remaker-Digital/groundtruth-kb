@@ -259,12 +259,8 @@ def test_t11_membase_row_counts_use_current_views_not_base_tables() -> None:
 
     connection = sqlite3.connect(db_path)
     try:
-        base_count_row = connection.execute(
-            "SELECT count(*) FROM work_items"
-        ).fetchone()
-        current_count_row = connection.execute(
-            "SELECT count(*) FROM current_work_items"
-        ).fetchone()
+        base_count_row = connection.execute("SELECT count(*) FROM work_items").fetchone()
+        current_count_row = connection.execute("SELECT count(*) FROM current_work_items").fetchone()
     finally:
         connection.close()
 
@@ -305,11 +301,9 @@ def test_t12_default_harness_id_does_not_hardcode_claude(monkeypatch: pytest.Mon
     ``current_role`` returns ``"unknown"`` rather than silently
     mis-attributing the role to whichever harness was hardcoded.
     """
-    from groundtruth_kb.mcp_surface.roles import _default_harness_id, current_role
+    from groundtruth_kb.mcp_surface.roles import _default_harness_id
 
     # Clear all env vars that would trigger harness detection.
-    for var in list(monkeypatch._setitem):  # type: ignore[attr-defined]
-        pass
     for name in [
         "GTKB_HARNESS_ID",
         "CLAUDE_PROJECT_DIR",

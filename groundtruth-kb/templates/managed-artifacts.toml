@@ -2,7 +2,7 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 56 records = 20 hooks + 10 rules + 6 skills + 16 settings-hook-registrations + 4 gitignore-patterns.
+# 66 records = 21 hooks + 11 rules + 11 skills + 3 files + 16 settings-hook-registrations + 4 gitignore-patterns.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -20,7 +20,7 @@
 #   none    = []
 
 # =========================================================================
-# HOOKS (19 records — 14 original + 5 governance hooks per
+# HOOKS (21 records — 14 original + governance and follow-on policy hooks per
 # gtkb-da-governance-completeness-implementation-016)
 # =========================================================================
 
@@ -227,6 +227,19 @@ adopter_divergence_policy = "warn"
 # settings-hook-registration). The other four are event hooks with matching
 # settings-hook-registration entries below.
 notes = "PreToolUse GOV-01 spec-first enforcement gate; product-managed framework governance policy."
+
+[[artifacts]]
+class = "hook"
+id = "hook.code-quality-baseline-proposal-check"
+template_path = "hooks/code-quality-baseline-proposal-check.py"
+target_path = ".claude/hooks/code-quality-baseline-proposal-check.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "PreToolUse proposal-time Code Quality Baseline table contract; product-managed governance policy."
 
 [[artifacts]]
 class = "hook"
@@ -450,7 +463,7 @@ adopter_divergence_policy = "warn"
 notes = "Canonical-terminology disambiguation policy; product-managed because the per-term Tier A/B/C policy is framework-defined."
 
 # =========================================================================
-# SKILLS (6 records)
+# SKILLS (11 records)
 # =========================================================================
 
 [[artifacts]]
@@ -529,12 +542,77 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "spec-intake helper module; product-managed because spec-intake contract is framework-defined."
+
+[[artifacts]]
+class = "skill"
+id = "skill.bridge.skill-md"
+template_path = "skills/bridge/SKILL.md"
+target_path = ".claude/skills/bridge/SKILL.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "bridge SKILL.md manifest; product-managed because bridge protocol operations are framework-defined."
+
+[[artifacts]]
+class = "skill"
+id = "skill.bridge.scan-helper"
+template_path = "skills/bridge/helpers/scan_bridge.py"
+target_path = ".claude/skills/bridge/helpers/scan_bridge.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "bridge scan helper; product-managed because bridge queue classification is framework-defined."
+
+[[artifacts]]
+class = "skill"
+id = "skill.bridge.revise-helper"
+template_path = "skills/bridge/helpers/revise_bridge.py"
+target_path = ".claude/skills/bridge/helpers/revise_bridge.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "bridge revision helper; product-managed because NO-GO revision workflow is framework-defined."
+
+[[artifacts]]
+class = "skill"
+id = "skill.bridge.impl-report-helper"
+template_path = "skills/bridge/helpers/impl_report_bridge.py"
+target_path = ".claude/skills/bridge/helpers/impl_report_bridge.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "bridge implementation-report helper; product-managed because verification handoff workflow is framework-defined."
+
+[[artifacts]]
+class = "skill"
+id = "skill.bridge.show-thread-helper"
+template_path = "skills/bridge/helpers/show_thread_bridge.py"
+target_path = ".claude/skills/bridge/helpers/show_thread_bridge.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "bridge show-thread helper; product-managed because bridge thread status inspection is framework-defined."
 
 # =========================================================================
-# SETTINGS-HOOK-REGISTRATION (15 records — 11 original + 4 governance hook
+# SETTINGS-HOOK-REGISTRATION (16 records — 11 original + governance and recovery hook
 # registrations per gtkb-da-governance-completeness-implementation-016)
 # =========================================================================
-notes = "spec-intake helper module; product-managed because spec-intake contract is framework-defined."
 
 [[artifacts]]
 class = "settings-hook-registration"

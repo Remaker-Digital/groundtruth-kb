@@ -53,8 +53,8 @@ def _registry_records() -> list[ManagedArtifact]:
 # ---------------------------------------------------------------------------
 
 
-def test_registry_total_is_fifty_six_records() -> None:
-    """56 total = 20 hooks + 10 rules + 6 skills + 16 settings + 4 gitignore.
+def test_registry_total_matches_current_manifest() -> None:
+    """66 total = 21 hooks + 11 rules + 11 skills + 3 files + 16 settings + 4 gitignore.
 
     Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
     bridge -006 GO): hook count 19→20 (+spec-event-surfacer.py), settings
@@ -86,7 +86,8 @@ def test_registry_total_is_fifty_six_records() -> None:
     # (canonical-terminology-policy). Total: 58 + 1 = 59.
     # GTKB-ISOLATION-017 Slice 4 (S328): 1 new file-class record
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
-    assert len(records) == 60, f"expected 60 total registry records; got {len(records)}"
+    # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
+    assert len(records) == 66, f"expected 66 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
@@ -100,13 +101,34 @@ def test_registry_class_counts_match_proposal() -> None:
     for r in records:
         counts[r.class_] = counts.get(r.class_, 0) + 1
     assert counts == {
-        "hook": 20,
+        "hook": 21,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
-        "skill": 6,
+        "skill": 11,
         "file": 3,  # GTKB-ISOLATION-017 Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
         "settings-hook-registration": 16,
         "gitignore-pattern": 4,
     }
+
+
+def test_bridge_skill_records_are_managed_for_dual_agent_profiles() -> None:
+    """The bridge skill template is scaffolded and upgrade-managed as Tier A."""
+    expected_targets = {
+        ".claude/skills/bridge/SKILL.md",
+        ".claude/skills/bridge/helpers/scan_bridge.py",
+        ".claude/skills/bridge/helpers/revise_bridge.py",
+        ".claude/skills/bridge/helpers/impl_report_bridge.py",
+        ".claude/skills/bridge/helpers/show_thread_bridge.py",
+    }
+
+    scaffold_targets = {
+        r.target_path for r in artifacts_for_scaffold("dual-agent", class_="skill") if isinstance(r, FileArtifact)
+    }
+    upgrade_targets = {
+        r.target_path for r in artifacts_for_upgrade("dual-agent", class_="skill") if isinstance(r, FileArtifact)
+    }
+
+    assert expected_targets <= scaffold_targets
+    assert expected_targets <= upgrade_targets
 
 
 def test_registry_ids_are_unique() -> None:
@@ -250,7 +272,7 @@ def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
 
 
 def test_scaffold_dual_agent_copies_everything() -> None:
-    """dual-agent scaffold copies 19 hooks + 10 rules + 6 skills + 15 settings + 4 gitignore.
+    """dual-agent scaffold copies the full dual-agent managed artifact set.
 
     Post-C4 (gtkb-settings-merge): gitignore-pattern scaffold count 1→4
     (3 adopter-critical patterns added: groundtruth.db, .groundtruth/,
@@ -264,9 +286,9 @@ def test_scaffold_dual_agent_copies_everything() -> None:
     for r in scaffolded:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
-        "hook": 20,
+        "hook": 21,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
-        "skill": 6,
+        "skill": 11,
         "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
         "settings-hook-registration": 16,
         "gitignore-pattern": 4,
@@ -516,7 +538,8 @@ def test_managed_registry_settings_registration_managed_profiles_match_hook_arti
     records = _load_all_artifacts()
     hook = next(r for r in records if isinstance(r, FileArtifact) and r.id == "hook.spec-event-surfacer")
     reg = next(
-        r for r in records
+        r
+        for r in records
         if isinstance(r, SettingsHookRegistration) and r.id == "settings.hook.spec-event-surfacer.posttooluse"
     )
     # The registration must point to the hook the artifact installs.
@@ -578,9 +601,9 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 60 records (post-Slice-3+4 file class + Slice-1 policy):
-    # 20 hooks + 11 rules + 6 skills + 3 files + 16 settings + 4 gitignore.
-    assert len(dual_agent) == 60
+    # dual-agent sees all 66 records:
+    # 21 hooks + 11 rules + 11 skills + 3 files + 16 settings + 4 gitignore.
+    assert len(dual_agent) == 66
 
     local_only = load_managed_artifacts("local-only")
     # local-only sees all 14 ORIGINAL hooks + rule.prime-builder + 2

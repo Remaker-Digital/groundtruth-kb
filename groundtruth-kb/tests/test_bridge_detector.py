@@ -17,6 +17,13 @@ def _detector() -> SimpleNamespace:
     return SimpleNamespace(BridgeStatus=BridgeStatus, parse_index=parse_index)
 
 
+def _status_driver() -> SimpleNamespace:
+    """Lazy-import bridge.status_driver per test_bridge_import_hygiene rule."""
+    from groundtruth_kb.bridge.status_driver import NON_ACTIONABLE_STATUSES
+
+    return SimpleNamespace(NON_ACTIONABLE_STATUSES=NON_ACTIONABLE_STATUSES)
+
+
 def test_parser_handles_canonical_index_layout() -> None:
     d = _detector()
     text = "# Bridge Index\n\nDocument: foo\nGO: bridge/foo-002.md\nNEW: bridge/foo-001.md\n"
@@ -60,6 +67,26 @@ def test_parser_handles_advisory_status() -> None:
     result = d.parse_index(text)
     assert result.errors == ()
     assert result.documents[0].versions[0].status == d.BridgeStatus.ADVISORY
+
+
+def test_bridge_status_enum_includes_deferred() -> None:
+    d = _detector()
+    assert d.BridgeStatus("DEFERRED") == d.BridgeStatus.DEFERRED
+
+
+def test_parser_recognizes_deferred_status() -> None:
+    d = _detector()
+    text = "Document: deferred-thread\nDEFERRED: bridge/deferred-thread-002.md\nNO-GO: bridge/deferred-thread-001.md\n"
+    result = d.parse_index(text)
+    assert result.errors == ()
+    assert result.documents[0].current_top is not None
+    assert result.documents[0].current_top.status == d.BridgeStatus.DEFERRED
+
+
+def test_status_driver_classifies_deferred_non_actionable() -> None:
+    d = _detector()
+    s = _status_driver()
+    assert d.BridgeStatus.DEFERRED.value in s.NON_ACTIONABLE_STATUSES
 
 
 def test_parser_handles_multiline_html_comment_blocks() -> None:

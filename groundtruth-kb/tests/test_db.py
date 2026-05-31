@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
+from pathlib import Path
+
 import pytest
 
 from groundtruth_kb.db import KnowledgeDB, get_depth, get_parent_id, spec_sort_key
@@ -1050,8 +1054,11 @@ class TestProjectAuthorizationSpecLinkage:
     def test_authorize_active_with_retired_spec_raises(self, db) -> None:
         self._prepare(db)
         db.insert_spec(
-            id="SPEC-RETIRED-1", title="Retired spec", status="retired",
-            changed_by="test", change_reason="test",
+            id="SPEC-RETIRED-1",
+            title="Retired spec",
+            status="retired",
+            changed_by="test",
+            change_reason="test",
         )
         with pytest.raises(ValueError, match="status=retired-not-approved"):
             self._authorize(db, included_spec_ids=["SPEC-RETIRED-1"])
@@ -1061,8 +1068,12 @@ class TestProjectAuthorizationSpecLinkage:
     def test_authorize_active_with_specification_type_spec_succeeds(self, db) -> None:
         self._prepare(db)
         db.insert_spec(
-            id="SPEC-LINKAGE-1", title="A specification-type spec", status="verified",
-            changed_by="test", change_reason="test", type="specification",
+            id="SPEC-LINKAGE-1",
+            title="A specification-type spec",
+            status="verified",
+            changed_by="test",
+            change_reason="test",
+            type="specification",
         )
         result = self._authorize(db, included_spec_ids=["SPEC-LINKAGE-1"])
         assert result is not None and result["status"] == "active"
@@ -1070,8 +1081,12 @@ class TestProjectAuthorizationSpecLinkage:
     def test_authorize_active_with_requirement_type_spec_succeeds(self, db) -> None:
         self._prepare(db)
         db.insert_spec(
-            id="REQ-LINKAGE-1", title="A requirement-type spec", status="implemented",
-            changed_by="test", change_reason="test", type="requirement",
+            id="REQ-LINKAGE-1",
+            title="A requirement-type spec",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
+            type="requirement",
         )
         result = self._authorize(db, included_spec_ids=["REQ-LINKAGE-1"])
         assert result is not None and result["status"] == "active"
@@ -1079,8 +1094,12 @@ class TestProjectAuthorizationSpecLinkage:
     def test_authorize_active_with_governance_type_spec_succeeds(self, db) -> None:
         self._prepare(db)
         db.insert_spec(
-            id="GOV-LINKAGE-1", title="A governance-type spec", status="specified",
-            changed_by="test", change_reason="test", type="governance",
+            id="GOV-LINKAGE-1",
+            title="A governance-type spec",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
+            type="governance",
         )
         result = self._authorize(db, included_spec_ids=["GOV-LINKAGE-1"])
         assert result is not None and result["status"] == "active"
@@ -1089,8 +1108,11 @@ class TestProjectAuthorizationSpecLinkage:
         # One resolvable approved spec is sufficient even alongside invalid ids.
         self._prepare(db)
         db.insert_spec(
-            id="SPEC-LINKAGE-2", title="Valid spec", status="verified",
-            changed_by="test", change_reason="test",
+            id="SPEC-LINKAGE-2",
+            title="Valid spec",
+            status="verified",
+            changed_by="test",
+            change_reason="test",
         )
         result = self._authorize(db, included_spec_ids=["SPEC-MISSING", "SPEC-LINKAGE-2"])
         assert result is not None and result["status"] == "active"
@@ -1109,12 +1131,17 @@ class TestProjectAuthorizationSpecLinkage:
         # (a spec change would engage the WI-3313 amendment gate instead).
         self._prepare(db)
         db.insert_spec(
-            id="SPEC-LINKAGE-3", title="Valid spec", status="verified",
-            changed_by="test", change_reason="test",
+            id="SPEC-LINKAGE-3",
+            title="Valid spec",
+            status="verified",
+            changed_by="test",
+            change_reason="test",
         )
         self._authorize(db, included_spec_ids=["SPEC-LINKAGE-3"])
         revoked = self._authorize(
-            db, included_spec_ids=["SPEC-LINKAGE-3"], status="revoked",
+            db,
+            included_spec_ids=["SPEC-LINKAGE-3"],
+            status="revoked",
             change_reason="revoke",
         )
         assert revoked is not None and revoked["status"] == "revoked"
@@ -1164,23 +1191,42 @@ class TestProjectAuthorizationSpecAmendment:
         )
         for spec_id in ("SPEC-AMEND-1", "SPEC-AMEND-2", "SPEC-AMEND-3"):
             db.insert_spec(
-                id=spec_id, title=f"Spec {spec_id}", status="verified",
-                changed_by="test", change_reason="setup",
+                id=spec_id,
+                title=f"Spec {spec_id}",
+                status="verified",
+                changed_by="test",
+                change_reason="setup",
             )
 
     def _v1(self, db, change_reason="initial authorization"):
         return db.insert_project_authorization(
-            self.PROJECT_ID, self.AUTH_NAME, self.DELIB_ID, "bounded scope",
-            "test", change_reason, status="active",
+            self.PROJECT_ID,
+            self.AUTH_NAME,
+            self.DELIB_ID,
+            "bounded scope",
+            "test",
+            change_reason,
+            status="active",
             included_spec_ids=["SPEC-AMEND-1"],
         )
 
-    def _amend(self, db, change_reason, *,
-               included_spec_ids=("SPEC-AMEND-1", "SPEC-AMEND-2"),
-               excluded_spec_ids=None, status="active"):
+    def _amend(
+        self,
+        db,
+        change_reason,
+        *,
+        included_spec_ids=("SPEC-AMEND-1", "SPEC-AMEND-2"),
+        excluded_spec_ids=None,
+        status="active",
+    ):
         return db.insert_project_authorization(
-            self.PROJECT_ID, self.AUTH_NAME, self.DELIB_ID, "bounded scope",
-            "test", change_reason, status=status,
+            self.PROJECT_ID,
+            self.AUTH_NAME,
+            self.DELIB_ID,
+            "bounded scope",
+            "test",
+            change_reason,
+            status=status,
             included_spec_ids=list(included_spec_ids) if included_spec_ids is not None else None,
             excluded_spec_ids=list(excluded_spec_ids) if excluded_spec_ids is not None else None,
         )
@@ -1190,8 +1236,7 @@ class TestProjectAuthorizationSpecAmendment:
         directory.mkdir(parents=True, exist_ok=True)
         return directory
 
-    def _write_packet(self, db, filename, *, full_content, approved_by="owner",
-                      drop_field=None, raw=None):
+    def _write_packet(self, db, filename, *, full_content, approved_by="owner", drop_field=None, raw=None):
         import json as _json
 
         from groundtruth_kb.governance.approval_packet import content_hash
@@ -1259,7 +1304,8 @@ class TestProjectAuthorizationSpecAmendment:
         self._write_packet(db, "malformed.json", full_content="", raw="{not valid json")
         with pytest.raises(ValueError, match="not readable JSON"):
             self._amend(
-                db, "amend per .groundtruth/formal-artifact-approvals/malformed.json",
+                db,
+                "amend per .groundtruth/formal-artifact-approvals/malformed.json",
             )
 
     def test_amend_specs_with_schema_invalid_packet_raises(self, db) -> None:
@@ -1268,18 +1314,23 @@ class TestProjectAuthorizationSpecAmendment:
         self._write_packet(db, "schema-bad.json", full_content=self._COVERING, drop_field="action")
         with pytest.raises(ValueError, match="fails schema validation"):
             self._amend(
-                db, "amend per .groundtruth/formal-artifact-approvals/schema-bad.json",
+                db,
+                "amend per .groundtruth/formal-artifact-approvals/schema-bad.json",
             )
 
     def test_amend_specs_with_non_owner_approved_packet_raises(self, db) -> None:
         self._prepare(db)
         self._v1(db)
         self._write_packet(
-            db, "non-owner.json", full_content=self._COVERING, approved_by="some-agent",
+            db,
+            "non-owner.json",
+            full_content=self._COVERING,
+            approved_by="some-agent",
         )
         with pytest.raises(ValueError, match="not owner-approved"):
             self._amend(
-                db, "amend per .groundtruth/formal-artifact-approvals/non-owner.json",
+                db,
+                "amend per .groundtruth/formal-artifact-approvals/non-owner.json",
             )
 
     def test_amend_specs_packet_does_not_cover_project_raises(self, db) -> None:
@@ -1287,12 +1338,14 @@ class TestProjectAuthorizationSpecAmendment:
         self._v1(db)
         # full_content omits the project id (and no authorization id appears).
         self._write_packet(
-            db, "no-project.json",
+            db,
+            "no-project.json",
             full_content="Owner-approved amendment adding SPEC-AMEND-2.",
         )
         with pytest.raises(ValueError, match="does not cover the amendment"):
             self._amend(
-                db, "amend per .groundtruth/formal-artifact-approvals/no-project.json",
+                db,
+                "amend per .groundtruth/formal-artifact-approvals/no-project.json",
             )
 
     def test_amend_specs_packet_does_not_cover_added_spec_raises(self, db) -> None:
@@ -1300,12 +1353,14 @@ class TestProjectAuthorizationSpecAmendment:
         self._v1(db)
         # full_content mentions the project but omits the added spec SPEC-AMEND-2.
         self._write_packet(
-            db, "no-spec.json",
+            db,
+            "no-spec.json",
             full_content="Owner-approved amendment of project PROJECT-AMEND-TEST.",
         )
         with pytest.raises(ValueError, match="does not cover the amendment"):
             self._amend(
-                db, "amend per .groundtruth/formal-artifact-approvals/no-spec.json",
+                db,
+                "amend per .groundtruth/formal-artifact-approvals/no-spec.json",
             )
 
     # --- passing cases ----------------------------------------------------------
@@ -1315,7 +1370,8 @@ class TestProjectAuthorizationSpecAmendment:
         self._v1(db)
         self._write_packet(db, "covering.json", full_content=self._COVERING)
         result = self._amend(
-            db, "amend per .groundtruth/formal-artifact-approvals/covering.json",
+            db,
+            "amend per .groundtruth/formal-artifact-approvals/covering.json",
         )
         assert result is not None and result["status"] == "active" and result["version"] == 2
 
@@ -1330,7 +1386,8 @@ class TestProjectAuthorizationSpecAmendment:
         )
         self._write_packet(db, "batch.json", full_content=batch_content)
         result = self._amend(
-            db, "amend per .groundtruth/formal-artifact-approvals/batch.json",
+            db,
+            "amend per .groundtruth/formal-artifact-approvals/batch.json",
         )
         assert result is not None and result["version"] == 2
 
@@ -1345,7 +1402,9 @@ class TestProjectAuthorizationSpecAmendment:
         self._prepare(db)
         self._v1(db)
         result = self._amend(
-            db, "revoke the authorization", included_spec_ids=("SPEC-AMEND-1",),
+            db,
+            "revoke the authorization",
+            included_spec_ids=("SPEC-AMEND-1",),
             status="revoked",
         )
         assert result is not None and result["status"] == "revoked"
@@ -1356,7 +1415,8 @@ class TestProjectAuthorizationSpecAmendment:
         self._v1(db)
         with pytest.raises(ValueError, match="No packet path detected"):
             self._amend(
-                db, "exclude a spec with no packet",
+                db,
+                "exclude a spec with no packet",
                 included_spec_ids=("SPEC-AMEND-1",),
                 excluded_spec_ids=("SPEC-AMEND-3",),
             )
@@ -1368,13 +1428,15 @@ class TestProjectAuthorizationSpecAmendment:
             parse_packet_path_from_change_reason,
         )
 
-        assert parse_packet_path_from_change_reason(
-            "see .groundtruth/formal-artifact-approvals/p.json for detail"
-        ) == ".groundtruth/formal-artifact-approvals/p.json"
+        assert (
+            parse_packet_path_from_change_reason("see .groundtruth/formal-artifact-approvals/p.json for detail")
+            == ".groundtruth/formal-artifact-approvals/p.json"
+        )
         # Backslash separators are normalized to forward slashes.
-        assert parse_packet_path_from_change_reason(
-            "see .groundtruth\\formal-artifact-approvals\\p.json"
-        ) == ".groundtruth/formal-artifact-approvals/p.json"
+        assert (
+            parse_packet_path_from_change_reason("see .groundtruth\\formal-artifact-approvals\\p.json")
+            == ".groundtruth/formal-artifact-approvals/p.json"
+        )
         assert parse_packet_path_from_change_reason("no packet path in this reason") is None
 
     def test_packet_covers_amendment_helper(self) -> None:
@@ -1389,7 +1451,11 @@ class TestProjectAuthorizationSpecAmendment:
         covers, _ = packet_covers_amendment(packet, "PROJECT-X", "PAUTH-X", {"SPEC-1"}, {"SPEC-2"})
         assert covers is True
         covers_no_project, reason = packet_covers_amendment(
-            packet, "PROJECT-MISSING", "PAUTH-MISSING", {"SPEC-1"}, set(),
+            packet,
+            "PROJECT-MISSING",
+            "PAUTH-MISSING",
+            {"SPEC-1"},
+            set(),
         )
         assert covers_no_project is False and "PROJECT-MISSING" in reason
 
@@ -1428,12 +1494,20 @@ class TestHarnesses:
 
     def test_insert_harness_version_bumps(self, db):
         v1 = db.insert_harness(
-            id="A", harness_name="codex", harness_type="codex",
-            role=["loyal-opposition"], changed_by="test", change_reason="v1",
+            id="A",
+            harness_name="codex",
+            harness_type="codex",
+            role=["loyal-opposition"],
+            changed_by="test",
+            change_reason="v1",
         )
         v2 = db.insert_harness(
-            id="A", harness_name="codex", harness_type="codex",
-            role=["loyal-opposition"], changed_by="test", change_reason="v2",
+            id="A",
+            harness_name="codex",
+            harness_type="codex",
+            role=["loyal-opposition"],
+            changed_by="test",
+            change_reason="v2",
             status="suspended",
         )
         assert v1["version"] == 1
@@ -1442,12 +1516,20 @@ class TestHarnesses:
 
     def test_get_harness_returns_latest(self, db):
         db.insert_harness(
-            id="C", harness_name="antigravity", harness_type="antigravity",
-            role=["loyal-opposition"], changed_by="test", change_reason="v1",
+            id="C",
+            harness_name="antigravity",
+            harness_type="antigravity",
+            role=["loyal-opposition"],
+            changed_by="test",
+            change_reason="v1",
         )
         db.insert_harness(
-            id="C", harness_name="antigravity", harness_type="antigravity",
-            role=["loyal-opposition"], changed_by="test", change_reason="v2",
+            id="C",
+            harness_name="antigravity",
+            harness_type="antigravity",
+            role=["loyal-opposition"],
+            changed_by="test",
+            change_reason="v2",
             status="active",
         )
         result = db.get_harness("C")
@@ -1458,16 +1540,28 @@ class TestHarnesses:
 
     def test_list_harnesses_returns_current_set(self, db):
         db.insert_harness(
-            id="A", harness_name="codex", harness_type="codex",
-            role=["loyal-opposition"], changed_by="test", change_reason="v1",
+            id="A",
+            harness_name="codex",
+            harness_type="codex",
+            role=["loyal-opposition"],
+            changed_by="test",
+            change_reason="v1",
         )
         db.insert_harness(
-            id="B", harness_name="claude", harness_type="claude",
-            role=["prime-builder"], changed_by="test", change_reason="v1",
+            id="B",
+            harness_name="claude",
+            harness_type="claude",
+            role=["prime-builder"],
+            changed_by="test",
+            change_reason="v1",
         )
         db.insert_harness(
-            id="B", harness_name="claude", harness_type="claude",
-            role=["prime-builder"], changed_by="test", change_reason="v2",
+            id="B",
+            harness_name="claude",
+            harness_type="claude",
+            role=["prime-builder"],
+            changed_by="test",
+            change_reason="v2",
             status="active",
         )
         harnesses = db.list_harnesses()
@@ -1476,3 +1570,194 @@ class TestHarnesses:
         assert by_id["A"]["version"] == 1
         assert by_id["B"]["version"] == 2
         assert by_id["B"]["status"] == "active"
+
+
+class TestSpecLifecycleSchemaSlice1:
+    def test_specifications_table_has_new_lifecycle_columns(self, db):
+        cols = {row[1] for row in db._get_conn().execute("PRAGMA table_info(specifications)").fetchall()}
+        assert {"implementation_verified_at", "retired_at", "parent"}.issubset(cols)
+
+    def test_specifications_alter_table_migration_idempotent(self, tmp_path):
+        db_path = tmp_path / "legacy.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """CREATE TABLE specifications (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id, version)
+            )"""
+        )
+        conn.execute(
+            """INSERT INTO specifications
+               (id, version, title, status, changed_by, changed_at, change_reason)
+               VALUES ('SPEC-LEGACY', 1, 'Legacy', 'specified', 'test', '2026-05-19T00:00:00Z', 'seed')"""
+        )
+        conn.commit()
+        conn.close()
+
+        db = KnowledgeDB(db_path=db_path)
+        db.close()
+        db2 = KnowledgeDB(db_path=db_path)
+        row = db2._get_conn().execute("SELECT * FROM specifications WHERE id = 'SPEC-LEGACY'").fetchone()
+        assert row["implementation_verified_at"] is None
+        assert row["retired_at"] is None
+        assert row["parent"] is None
+
+    def test_specification_deliberation_sources_table_exists(self, db):
+        conn = db._get_conn()
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(specification_deliberation_sources)").fetchall()]
+        assert cols == [
+            "rowid",
+            "spec_id",
+            "spec_version",
+            "deliberation_id",
+            "source_role",
+            "added_at",
+            "added_by",
+        ]
+        unique_indexes = [
+            row[1] for row in conn.execute("PRAGMA index_list(specification_deliberation_sources)").fetchall() if row[2]
+        ]
+        indexed_columns = {
+            tuple(col[2] for col in conn.execute(f'PRAGMA index_info("{index_name}")').fetchall())
+            for index_name in unique_indexes
+        }
+        assert ("spec_id", "spec_version", "deliberation_id") in indexed_columns
+
+    def test_link_spec_deliberation_source_inserts_row(self, db):
+        row = db.link_spec_deliberation_source(
+            "SPEC-001",
+            1,
+            "DELIB-0707",
+            "test",
+            source_role="source",
+            added_at="2026-05-19T00:00:00Z",
+        )
+        assert row["spec_id"] == "SPEC-001"
+        assert row["spec_version"] == 1
+        assert row["deliberation_id"] == "DELIB-0707"
+        assert row["source_role"] == "source"
+        assert row["added_at"] == "2026-05-19T00:00:00Z"
+        assert row["added_by"] == "test"
+        with pytest.raises(ValueError, match="added_by is required"):
+            db.link_spec_deliberation_source("SPEC-001", 1, "DELIB-0707", "")
+
+    def test_link_spec_deliberation_source_idempotent_re_link(self, db):
+        first = db.link_spec_deliberation_source("SPEC-001", 1, "DELIB-0707", "test", source_role="source")
+        second = db.link_spec_deliberation_source("SPEC-001", 1, "DELIB-0707", "test-2", source_role="context")
+        count = db._get_conn().execute("SELECT COUNT(*) FROM specification_deliberation_sources").fetchone()[0]
+        assert first["rowid"] == second["rowid"]
+        assert second["added_by"] == "test"
+        assert second["source_role"] == "source"
+        assert count == 1
+
+    def test_populated_fixture_migration_zero_data_loss(self, tmp_path):
+        fixture_path = Path(__file__).parent / "fixtures" / "spec_lifecycle_slice1_populated_fixture.json"
+        fixture_data = json.loads(fixture_path.read_text(encoding="utf-8"))
+        fixture_rows = fixture_data["rows"] if isinstance(fixture_data, dict) else fixture_data
+        db_path = tmp_path / "fixture.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """CREATE TABLE specifications (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id, version)
+            )"""
+        )
+        trimmed_rows = [
+            {
+                "id": row["id"],
+                "version": row["version"],
+                "title": row["title"],
+                "status": row["status"],
+                "changed_by": row["changed_by"],
+                "changed_at": row["changed_at"],
+                "change_reason": row["change_reason"],
+            }
+            for row in fixture_rows[:50]
+        ]
+        conn.executemany(
+            """INSERT INTO specifications
+               (id, version, title, status, changed_by, changed_at, change_reason)
+               VALUES (:id, :version, :title, :status, :changed_by, :changed_at, :change_reason)""",
+            trimmed_rows,
+        )
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        before = [dict(row) for row in conn.execute("SELECT * FROM specifications ORDER BY id, version").fetchall()]
+        conn.close()
+
+        db = KnowledgeDB(db_path=db_path)
+        after_rows = db._get_conn().execute("SELECT * FROM specifications ORDER BY id, version").fetchall()
+        assert len(after_rows) == 50
+        for before_row, after_row in zip(before, after_rows, strict=True):
+            for field in ("id", "version", "title", "status", "changed_by", "changed_at", "change_reason"):
+                assert before_row[field] == after_row[field]
+            assert after_row["implementation_verified_at"] is None
+            assert after_row["retired_at"] is None
+            assert after_row["parent"] is None
+
+    def test_tracking_work_item_inserted_with_expected_fields(self, db):
+        db.insert_work_item(
+            "WI-SPEC-LIFECYCLE-SCHEMA-SLICE-1",
+            "Spec lifecycle schema additions (Slice 1)",
+            "new",
+            "spec-lifecycle",
+            "in_progress",
+            "claude-prime-builder",
+            "Track Slice 1 implementation of additive lifecycle schema per parent GO "
+            "bridge/gtkb-spec-lifecycle-schema-2026-04-29-003.md (REVISED-1 of slice-1)",
+            stage="implementing",
+            source_spec_id=None,
+            related_bridge_threads="gtkb-spec-lifecycle-schema-slice-1",
+            related_deliberation_ids="DELIB-0707,DELIB-1852",
+        )
+        row = db.get_work_item("WI-SPEC-LIFECYCLE-SCHEMA-SLICE-1")
+        assert row["title"] == "Spec lifecycle schema additions (Slice 1)"
+        assert row["origin"] == "new"
+        assert row["component"] == "spec-lifecycle"
+        assert row["resolution_status"] == "in_progress"
+        assert row["stage"] == "implementing"
+        assert row["source_spec_id"] is None
+        assert row["changed_by"] == "claude-prime-builder"
+        assert row["related_bridge_threads"] == "gtkb-spec-lifecycle-schema-slice-1"
+        assert row["related_deliberation_ids"] == "DELIB-0707,DELIB-1852"
+
+
+class TestKPIViewsAndQueryMethods:
+    """Tests for the Phase 1 DB instrumentation KPI views and KnowledgeDB helper methods."""
+
+    def test_get_kpi_spec_test_mapping(self, db) -> None:
+        result = db.get_kpi_spec_test_mapping()
+        assert result is not None
+        assert "total_specifications" in result
+        assert "mapped_specifications" in result
+        assert "unmapped_specifications" in result
+        assert "spec_test_mapping_percentage" in result
+
+    def test_get_kpi_deliberation_provenance(self, db) -> None:
+        result = db.get_kpi_deliberation_provenance()
+        assert result is not None
+        assert "deliberation_linkage_percentage" in result
+        assert "total_work_items" in result
+        assert "unmapped_work_items" in result
+
+    def test_get_kpi_backlog_churn(self, db) -> None:
+        result = db.get_kpi_backlog_churn()
+        assert result is not None
+        assert "active_churn_ratio" in result
+        assert "total_work_items" in result
+        assert "active_unresolved_items" in result
+        assert "completed_items" in result

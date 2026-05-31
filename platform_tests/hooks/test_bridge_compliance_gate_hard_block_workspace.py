@@ -35,7 +35,9 @@ AUTHOR_METADATA = (
 
 
 def _file_sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Read as text and normalize CRLF to LF to prevent OS-specific hashing failures.
+    content = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def _run_hook(payload: str) -> subprocess.CompletedProcess:

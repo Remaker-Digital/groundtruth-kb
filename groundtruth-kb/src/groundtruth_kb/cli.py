@@ -24,6 +24,13 @@ from groundtruth_kb.bootstrap import (
     bootstrap_desktop_project,
     bootstrap_summary,
 )
+from groundtruth_kb.cli_approval_packet import (
+    GenerateApprovalPacketError,
+    GenerateApprovalPacketRequest,
+    format_result,
+    run_generate_approval_packet,
+)
+from groundtruth_kb.cli_bridge_propose import bridge_group
 from groundtruth_kb.cli_deliberations_record import (
     DeliberationRecordError,
     DeliberationRecordRequest,
@@ -35,6 +42,7 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
+from groundtruth_kb.hygiene import PatternSetError, emit_json, emit_markdown, run_sweep
 from groundtruth_kb.project.lifecycle import (
     PROJECTS_CHANGED_BY,
     ProjectAuthorizationSpecLinkageError,
@@ -100,6 +108,165 @@ def main(ctx: click.Context, config_path: str | None) -> None:
     configure_cli_logging()
     ctx.ensure_object(dict)
     ctx.obj["config"] = Path(config_path) if config_path else None
+
+
+main.add_command(bridge_group)
+
+
+# ---------------------------------------------------------------------------
+# gt hygiene — deterministic repository hygiene services (WI-3420)
+# ---------------------------------------------------------------------------
+
+
+@main.group("hygiene")
+def hygiene_group() -> None:
+    """Repository hygiene services (drift discovery, sweeps)."""
+
+
+@hygiene_group.command("sweep")
+@click.option(
+    "--root",
+    type=click.Path(file_okay=False),
+    default=".",
+    show_default=True,
+    help="Repository root to scan.",
+)
+@click.option(
+    "--patterns-path",
+    type=click.Path(dir_okay=False),
+    default="config/governance/hygiene-sweep-patterns.toml",
+    show_default=True,
+    help="Pattern-set TOML registry path (resolved relative to --root if not absolute).",
+)
+@click.option("--pattern-set", default=None, help="Limit to a single pattern by id; default scans all.")
+@click.option(
+    "--output",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Output directory; default: .gtkb-state/hygiene-sweep/<run-id>/.",
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["json", "md", "both"]),
+    default="both",
+    show_default=True,
+    help="Output formats to emit.",
+)
+@click.option(
+    "--report-only/--fail-on-findings",
+    default=True,
+    show_default=True,
+    help="Exit-code policy: --report-only always exits 0; --fail-on-findings exits 2 when any findings emitted.",
+)
+def hygiene_sweep(
+    root: str,
+    patterns_path: str,
+    pattern_set: str | None,
+    output: str | None,
+    fmt: str,
+    report_only: bool,
+) -> None:
+    """Run a deterministic hygiene sweep against the repository.
+
+    Walks ``--root`` against the pattern-set TOML registry and emits findings
+    as JSON + markdown to ``--output``. Read-only against the repo; mutates
+    only its own output directory. No MemBase, bridge, or governance artifact
+    creation.
+    """
+    root_path = Path(root).resolve()
+    patterns_full = Path(patterns_path)
+    if not patterns_full.is_absolute():
+        patterns_full = root_path / patterns_full
+    try:
+        result = run_sweep(root_path, patterns_full, pattern_set)
+    except PatternSetError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    out_dir = Path(output) if output else root_path / ".gtkb-state" / "hygiene-sweep" / result.run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if fmt in ("json", "both"):
+        emit_json(result, out_dir / "findings.json")
+    if fmt in ("md", "both"):
+        emit_markdown(result, out_dir / "summary.md")
+    click.echo(f"hygiene sweep: {result.finding_count} finding(s); output: {out_dir}")
+    if not report_only and result.finding_count > 0:
+        raise SystemExit(2)
+
+
+# ---------------------------------------------------------------------------
+# gt generate-approval-packet
+# ---------------------------------------------------------------------------
+
+
+@main.command("generate-approval-packet")
+@click.option("--kind", type=click.Choice(["narrative", "formal"]), required=True, help="Packet kind to generate.")
+@click.option("--target", type=click.Path(), default=None, help="Narrative target path to read.")
+@click.option("--artifact-id", required=True, help="Approval packet artifact id.")
+@click.option("--action", type=click.Choice(["create", "update", "delete"]), required=True, help="Artifact action.")
+@click.option("--source-ref", required=True, help="Bridge id or deliberation reference authorizing the change.")
+@click.option("--explicit-change-request", required=True, help="Owner-visible change request text.")
+@click.option("--change-reason", required=True, help="Short rationale for the packet.")
+@click.option(
+    "--approval-mode",
+    type=click.Choice(["approve", "acknowledge", "edit-and-approve", "auto"]),
+    required=True,
+    help="Approval mode recorded in the packet.",
+)
+@click.option("--changed-by", required=True, help="Harness or actor id recording the packet.")
+@click.option("--out", type=click.Path(), default=None, help="Packet output path.")
+@click.option("--stage/--no-stage", default=False, show_default=True, help="Stage the packet and narrative target.")
+@click.option(
+    "--validate-after/--no-validate-after",
+    default=True,
+    show_default=True,
+    help="Read back and validate the written packet.",
+)
+@click.option("--artifact-type", default=None, help="Formal artifact type, required for --kind formal.")
+@click.option("--content-file", type=click.Path(), default=None, help="Formal artifact content file.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def generate_approval_packet(
+    ctx: click.Context,
+    kind: str,
+    target: str | None,
+    artifact_id: str,
+    action: str,
+    source_ref: str,
+    explicit_change_request: str,
+    change_reason: str,
+    approval_mode: str,
+    changed_by: str,
+    out: str | None,
+    stage: bool,
+    validate_after: bool,
+    artifact_type: str | None,
+    content_file: str | None,
+    json_output: bool,
+) -> None:
+    """Generate formal or narrative-artifact approval packets."""
+    config = _resolve_config(ctx)
+    request = GenerateApprovalPacketRequest(
+        kind=kind,
+        target=Path(target) if target else None,
+        artifact_id=artifact_id,
+        action=action,
+        source_ref=source_ref,
+        explicit_change_request=explicit_change_request,
+        change_reason=change_reason,
+        approval_mode=approval_mode,
+        changed_by=changed_by,
+        out=Path(out) if out else None,
+        stage=stage,
+        validate_after=validate_after,
+        artifact_type=artifact_type,
+        content_file=Path(content_file) if content_file else None,
+    )
+    try:
+        result = run_generate_approval_packet(config, request)
+    except GenerateApprovalPacketError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(format_result(result, json_output=json_output))
 
 
 # ---------------------------------------------------------------------------
@@ -362,77 +529,6 @@ def backlog() -> None:
     """Unified backlog commands backed by MemBase work_items."""
 
 
-@backlog.command("migrate-work-list")
-@click.option(
-    "--work-list",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    default=None,
-    help="Legacy memory/work_list.md path. Defaults to <project_root>/memory/work_list.md.",
-)
-@click.option("--dry-run", is_flag=True, help="Parse and report rows without inserting MemBase records.")
-@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
-@click.option("--changed-by", default="gt-backlog-migration", show_default=True, help="History author for inserts.")
-@click.option(
-    "--change-reason",
-    default="Migrate legacy markdown work_list rows into unified MemBase work_items backlog.",
-    show_default=True,
-    help="History reason for inserts.",
-)
-@click.pass_context
-def backlog_migrate_work_list(
-    ctx: click.Context,
-    work_list: Path | None,
-    dry_run: bool,
-    json_output: bool,
-    changed_by: str,
-    change_reason: str,
-) -> None:
-    """Migrate legacy markdown work-list rows into the unified backlog."""
-    from groundtruth_kb.backlog import migrate_work_list_items, parse_work_list_file
-
-    config = _resolve_config(ctx)
-    work_list_path = work_list or config.project_root / "memory" / "work_list.md"
-    if not work_list_path.exists():
-        raise click.ClickException(f"Work-list file not found: {work_list_path}")
-
-    db = _open_db(config)
-    try:
-        items = parse_work_list_file(work_list_path)
-        result = migrate_work_list_items(
-            db,
-            items,
-            changed_by=changed_by,
-            change_reason=change_reason,
-            dry_run=dry_run,
-        )
-    finally:
-        db.close()
-
-    if json_output:
-        click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
-        return
-    action = "would insert" if dry_run else "inserted"
-    update_action = "would enrich" if dry_run else "enriched"
-    click.echo(
-        "Backlog work-list migration: "
-        f"parsed {result.parsed}, {action} {len(result.inserted)}, "
-        f"{update_action} {len(result.updated_existing)}, "
-        f"skipped existing {len(result.skipped_existing)}."
-    )
-    if result.inserted:
-        click.echo("Inserted:")
-        for item_id in result.inserted:
-            click.echo(f"  - {item_id}")
-    if result.updated_existing:
-        click.echo("Enriched existing:")
-        for item_id in result.updated_existing:
-            click.echo(f"  - {item_id}")
-    if result.skipped_existing:
-        click.echo("Skipped existing:")
-        for item_id in result.skipped_existing:
-            click.echo(f"  - {item_id}")
-
-
 @backlog.command("add")
 @click.option("--title", required=True, help="Work item title.")
 @click.option(
@@ -491,7 +587,7 @@ def backlog_add(
 
     Capture is not implementation approval — the new row records a candidate
     for future consideration. The command writes only to MemBase work_items;
-    it never mutates memory/MEMORY.md or memory/work_list.md.
+    it never mutates memory/MEMORY.md.
     """
     from groundtruth_kb.cli_backlog_add import BacklogAddError, BacklogAddRequest, add_backlog_item
 
@@ -528,6 +624,109 @@ def backlog_add(
     click.echo(f"{action} {result['id']}")
 
 
+@backlog.command("add-work-item")
+@click.option("--title", required=True, help="Work item title.")
+@click.option(
+    "--origin",
+    required=True,
+    type=click.Choice(["new", "hygiene", "improvement", "defect", "regression"]),
+    help="Work item origin classification.",
+)
+@click.option("--component", required=True, help="Component taxonomy value.")
+@click.option(
+    "--priority",
+    type=click.Choice(["P0", "P1", "P2", "P3"]),
+    default="P3",
+    show_default=True,
+    help="Candidate priority.",
+)
+@click.option("--project-name", default=None, help="Project grouping for the work item.")
+@click.option("--subproject-name", default=None, help="Sub-project grouping for the work item.")
+@click.option("--description", default=None, help="Longer description of the work.")
+@click.option("--source-owner-directive", default=None, help="Owner directive that motivated this work.")
+@click.option("--source-spec-id", default=None, help="Specification this work item relates to.")
+@click.option("--test-title", required=True, help="GOV-12 linked test title.")
+@click.option(
+    "--test-type",
+    required=True,
+    type=click.Choice(["assertion", "e2e", "integration", "unit", "manual"]),
+    help="GOV-12 linked test type.",
+)
+@click.option("--test-expected-outcome", required=True, help="GOV-03 unambiguous expected outcome for the test.")
+@click.option("--test-spec-id", default=None, help="Spec the test links to (defaults to --source-spec-id).")
+@click.option(
+    "--test-plan-phase",
+    default=None,
+    help="GOV-13 test-plan phase id to assign the test to (REQUIRED for non-dry-run creation).",
+)
+@click.option("--change-reason", required=True, help="History reason for the inserts.")
+@click.option("--dry-run", is_flag=True, help="Report allocated ids + validate the phase without writing.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_add_work_item(
+    ctx: click.Context,
+    title: str,
+    origin: str,
+    component: str,
+    priority: str,
+    project_name: str | None,
+    subproject_name: str | None,
+    description: str | None,
+    source_owner_directive: str | None,
+    source_spec_id: str | None,
+    test_title: str,
+    test_type: str,
+    test_expected_outcome: str,
+    test_spec_id: str | None,
+    test_plan_phase: str | None,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Create a work item + linked test (GOV-12) + test-plan phase assignment (GOV-13).
+
+    Deterministic single-invocation replacement for the kb-work-item skill's
+    inline ``db.insert_*`` snippets. ``--test-plan-phase`` is REQUIRED for
+    non-dry-run creation (GOV-13 fail-closed); a missing or unresolvable phase
+    exits non-zero before any work-item/test/phase mutation.
+    """
+    from groundtruth_kb.cli_backlog_add_work_item import (
+        AddWorkItemError,
+        AddWorkItemRequest,
+        add_work_item_with_test,
+    )
+
+    config = _resolve_config(ctx)
+    request = AddWorkItemRequest(
+        title=title,
+        origin=origin,
+        component=component,
+        priority=priority,
+        project_name=project_name,
+        subproject_name=subproject_name,
+        description=description,
+        source_owner_directive=source_owner_directive,
+        source_spec_id=source_spec_id,
+        change_reason=change_reason,
+        test_title=test_title,
+        test_type=test_type,
+        test_expected_outcome=test_expected_outcome,
+        test_spec_id=test_spec_id,
+        test_plan_phase=test_plan_phase,
+        dry_run=dry_run,
+    )
+    try:
+        result = add_work_item_with_test(config, request)
+    except (AddWorkItemError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+    action = "Would create" if result["dry_run"] else "Created"
+    click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
+
+
 @backlog.command("list")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.option("--all", "include_verified", is_flag=True, help="Include verified/closed work items.")
@@ -553,6 +752,78 @@ def backlog_list(ctx: click.Context, json_output: bool, include_verified: bool) 
         status = item.get("status_detail") or item.get("resolution_status")
         title = item.get("title") or item["id"]
         click.echo(f"{order_prefix}\t{item['id']}\t{status}\t{title}")
+
+
+def _format_work_item_detail(item: dict[str, object], history: list[dict[str, object]] | None = None) -> str:
+    """Render a current work item row for human CLI output."""
+    fields = [
+        ("ID", "id"),
+        ("Version", "version"),
+        ("Title", "title"),
+        ("Priority", "priority"),
+        ("Project", "project_name"),
+        ("Subproject", "subproject_name"),
+        ("Stage", "stage"),
+        ("Resolution Status", "resolution_status"),
+        ("Status Detail", "status_detail"),
+        ("Origin", "origin"),
+        ("Component", "component"),
+        ("Implementation Order", "implementation_order"),
+    ]
+    lines: list[str] = []
+    for label, key in fields:
+        value = item.get(key)
+        if value is not None and value != "":
+            lines.append(f"{label}: {value}")
+
+    for label, key in (("Description", "description"), ("Acceptance Summary", "acceptance_summary")):
+        value = str(item.get(key) or "").strip()
+        lines.append("")
+        lines.append(f"{label}:")
+        if value:
+            lines.extend(f"  {line}" for line in value.splitlines())
+        else:
+            lines.append("  (none)")
+
+    if history is not None:
+        lines.append("")
+        lines.append("Version History:")
+        if not history:
+            lines.append("  (none)")
+        for row in history:
+            version = row.get("version")
+            changed_at = row.get("changed_at") or ""
+            changed_by = row.get("changed_by") or ""
+            reason = row.get("change_reason") or ""
+            lines.append(f"  - v{version} {changed_at} {changed_by}: {reason}")
+
+    return "\n".join(lines)
+
+
+@backlog.command("show")
+@click.argument("work_item_id")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--history", is_flag=True, help="Include the full work-item version chain.")
+@click.pass_context
+def backlog_show(ctx: click.Context, work_item_id: str, json_output: bool, history: bool) -> None:
+    """Show one unified backlog item from MemBase work_items."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        item = db.get_work_item(work_item_id)
+        if item is None:
+            raise click.ClickException(f"Work item not found: {work_item_id}")
+        history_rows = db.get_work_item_history(work_item_id) if history else None
+    finally:
+        db.close()
+
+    if json_output:
+        payload: dict[str, object] | list[dict[str, object]] | object
+        payload = {"current": item, "history": history_rows or []} if history else item
+        click.echo(json.dumps(payload, indent=2, sort_keys=True, default=str))
+        return
+
+    click.echo(_format_work_item_detail(item, history_rows))
 
 
 @backlog.command("status")
@@ -622,13 +893,10 @@ def backlog_status(
     )
     for project_row in result["projects"]:
         flag = " [DOUBLED-PREFIX]" if project_row["doubled_prefix_flag"] else ""
-        breakdown = ", ".join(
-            f"{k}={v}" for k, v in project_row["resolution_status_breakdown"].items()
-        )
+        breakdown = ", ".join(f"{k}={v}" for k, v in project_row["resolution_status_breakdown"].items())
         click.echo(
             f"  {project_row['id']} ({project_row['status']}) "
-            f"wi={project_row['work_item_count']}{flag}"
-            + (f" :: {breakdown}" if breakdown else "")
+            f"wi={project_row['work_item_count']}{flag}" + (f" :: {breakdown}" if breakdown else "")
         )
     if with_orphans and "orphan_work_items" in result:
         click.echo(f"Orphan work items: {len(result['orphan_work_items'])}")
@@ -985,6 +1253,67 @@ def projects_retire(
         click.echo(json.dumps(project, indent=2, sort_keys=True))
         return
     click.echo(f"Retired project {project['id']}: {project['name']}")
+
+
+@projects_cmd.command("reconcile-doubled-prefix")
+@click.option(
+    "--apply",
+    "apply_flag",
+    is_flag=True,
+    default=False,
+    help="Execute the reconciliation. Without this flag the command is dry-run only.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_reconcile_doubled_prefix(
+    ctx: click.Context,
+    apply_flag: bool,
+    json_output: bool,
+) -> None:
+    """Reconcile phantom ``PROJECT-PROJECT-*`` projects (WI-3355).
+
+    The phantoms are historical artifacts of the pre-fix
+    ``_project_id_from_names`` doubling defect (fixed in commit
+    ``281fa28f``). This one-shot CLI reconciles them: re-links each affected
+    work item to its canonical project (if needed), supersedes each phantom
+    membership row, and retires each phantom project. Idempotent on rerun.
+
+    Default mode (no ``--apply``) is dry-run: builds the per-phantom plan
+    and prints/emits it without mutating MemBase.
+    """
+    # Lazy import keeps the reconciliation module out of the click command
+    # registration import path; matches the pattern in ``cli_backlog_status``.
+    from groundtruth_kb.cli_projects_reconcile import (  # noqa: PLC0415
+        ReconcileRequest,
+        build_reconcile_plan,
+    )
+
+    # Resolve the GTConfig the same way every other projects_cmd does;
+    # ctx.obj["config"] holds the raw Path, not a config object.
+    config = _resolve_config(ctx)
+    request = ReconcileRequest(apply=apply_flag)
+    report = build_reconcile_plan(config, request)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        return
+
+    totals = report["totals"]
+    mode = "APPLY" if report["apply"] else "DRY-RUN"
+    click.echo(f"Phantom reconciliation [{mode}]")
+    click.echo(f"  phantoms found: {totals['phantom_count']} (skipped: {totals['skipped_count']})")
+    if report["apply"]:
+        click.echo(f"  canonical links created: {totals['canonical_links_created']}")
+        click.echo(f"  phantom memberships superseded: {totals['phantom_memberships_superseded']}")
+        click.echo(f"  phantom projects retired: {totals['phantom_projects_retired']}")
+    else:
+        planned_links = sum(len(e["plan"]["canonical_links_to_create"]) for e in report["phantoms"])
+        planned_supers = sum(len(e["plan"]["phantom_memberships_to_supersede"]) for e in report["phantoms"])
+        planned_retires = sum(1 for e in report["phantoms"] if e["plan"]["retire_phantom"])
+        click.echo(f"  planned canonical links: {planned_links}")
+        click.echo(f"  planned phantom-membership supersessions: {planned_supers}")
+        click.echo(f"  planned phantom retirements: {planned_retires}")
+        click.echo("  (re-run with --apply to execute)")
 
 
 @projects_cmd.command("link-bridge")
@@ -2127,6 +2456,12 @@ def project() -> None:
     help="Python version for generated CI workflows.",
 )
 @click.option(
+    "--opt-out-core-spec-intake",
+    is_flag=True,
+    default=False,
+    help="Skip default core-spec intake enrollment for this project (automation/unusual cases).",
+)
+@click.option(
     "--gt-kb-root",
     "gt_kb_root_arg",
     default=None,
@@ -2152,6 +2487,7 @@ def project_init(
     lo_provider: str,
     integrations: bool,
     python_version: str,
+    opt_out_core_spec_intake: bool,
     gt_kb_root_arg: str | None,
 ) -> None:
     """Scaffold a new GroundTruth project with the selected profile."""
@@ -2210,6 +2546,7 @@ def project_init(
         lo_provider_id=lo_provider,
         integrations=integrations,
         python_version=python_version,
+        opt_out_core_spec_intake=opt_out_core_spec_intake,
         gt_kb_root=host_root,
     )
     try:
@@ -2260,9 +2597,10 @@ def project_chroma_regenerate(target_dir: str, dry_run: bool, json_output: bool)
 @click.option("--auto-install", is_flag=True, default=False, help="Auto-install safe tools.")
 @click.option("--profile", default=None, help="Profile to check against (auto-detected if omitted).")
 @click.option("--dir", "target_dir", default=".", help="Project directory (default: cwd).")
-def project_doctor(auto_install: bool, profile: str | None, target_dir: str) -> None:
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def project_doctor(auto_install: bool, profile: str | None, target_dir: str, json_output: bool) -> None:
     """Check workstation readiness and optionally install missing tools."""
-    from groundtruth_kb.project.doctor import format_doctor_report, run_doctor
+    from groundtruth_kb.project.doctor import format_doctor_report, format_doctor_report_json, run_doctor
 
     target = Path(target_dir).resolve()
 
@@ -2274,7 +2612,10 @@ def project_doctor(auto_install: bool, profile: str | None, target_dir: str) -> 
         profile = manifest.profile if manifest else "local-only"
 
     report = run_doctor(target, profile, auto_install=auto_install)
-    click.echo(format_doctor_report(report))
+    if json_output:
+        click.echo(json.dumps(format_doctor_report_json(report), indent=2, sort_keys=True))
+    else:
+        click.echo(format_doctor_report(report))
 
     if report.overall == "fail":
         raise SystemExit(1)
@@ -2305,7 +2646,7 @@ a payload branch. A rollback receipt is written; `gt project rollback`
 reverses any failed migration.
 
 Needs-adopter-input checks (no-writable-product-paths,
-hooks-point-to-wrappers, work-list-no-product-entries, chroma-regeneratable)
+hooks-point-to-wrappers, chroma-regeneratable)
 require manual inspection — upgrade refuses these even with
 --accept-migration. For hooks-point-to-wrappers: inspect
 .claude/settings.json for hook commands that aren't wrapper-shaped (i.e.,

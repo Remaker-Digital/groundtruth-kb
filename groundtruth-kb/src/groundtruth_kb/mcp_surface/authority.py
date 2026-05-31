@@ -23,11 +23,11 @@ tools that emit other authority classes.
 from __future__ import annotations
 
 import datetime as dt
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class AuthorityLabel(str, Enum):
+class AuthorityLabel(StrEnum):
     """Authority class of an MCP response payload.
 
     Subclassing ``str`` keeps JSON serialization trivial (``json.dumps``
@@ -79,9 +79,7 @@ def build_envelope(
     """
 
     if not isinstance(authority, AuthorityLabel):
-        raise TypeError(
-            f"authority must be an AuthorityLabel, got {type(authority).__name__}"
-        )
+        raise TypeError(f"authority must be an AuthorityLabel, got {type(authority).__name__}")
     if generated_at is None:
         generated_at = dt.datetime.now(dt.UTC)
     return {

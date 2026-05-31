@@ -24,6 +24,7 @@ NON_ACTIONABLE_STATUSES = {
     BridgeStatus.VERIFIED.value,
     BridgeStatus.WITHDRAWN.value,
     BridgeStatus.ADVISORY.value,
+    BridgeStatus.DEFERRED.value,
 }
 
 

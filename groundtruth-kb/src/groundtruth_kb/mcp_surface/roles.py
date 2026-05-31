@@ -38,9 +38,7 @@ def _detect_active_harness_name() -> str | None:
     recognised harness can be detected (callers handle as fail-closed).
     """
 
-    if os.environ.get("CLAUDE_PROJECT_DIR") or any(
-        name.startswith("CLAUDE_CODE") for name in os.environ
-    ):
+    if os.environ.get("CLAUDE_PROJECT_DIR") or any(name.startswith("CLAUDE_CODE") for name in os.environ):
         return "claude"
     if any(name.startswith("CODEX_") for name in os.environ):
         return "codex"
@@ -157,10 +155,7 @@ def current_role(
 
     if harness_id is None:
         harness_id = _default_harness_id()
-    if role_map_path is None:
-        role_map_path = resolve_safe_path(_HARNESS_REGISTRY_REL)
-    else:
-        role_map_path = Path(role_map_path)
+    role_map_path = resolve_safe_path(_HARNESS_REGISTRY_REL) if role_map_path is None else Path(role_map_path)
     data = json.loads(role_map_path.read_text(encoding="utf-8"))
     for record in data.get("harnesses", []):
         if isinstance(record, dict) and record.get("id") == harness_id:

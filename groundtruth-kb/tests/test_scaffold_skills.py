@@ -91,3 +91,25 @@ def test_spec_intake_skill_recursively_copied(tmp_path: Path) -> None:
     assert "def capture_candidate" in content
     assert "def confirm_candidate" in content
     assert "def reject_candidate" in content
+
+
+def test_dual_agent_project_has_bridge_skill(tmp_path: Path) -> None:
+    """dual-agent scaffold copies bridge SKILL.md + all bridge helpers."""
+    scaffold_project(_make_options("dual-agent", tmp_path))
+    target = tmp_path / "project"
+    skill_md = target / ".claude" / "skills" / "bridge" / "SKILL.md"
+    helpers_dir = target / ".claude" / "skills" / "bridge" / "helpers"
+    helper_names = {
+        "scan_bridge.py",
+        "revise_bridge.py",
+        "impl_report_bridge.py",
+        "show_thread_bridge.py",
+    }
+
+    assert skill_md.exists(), f"bridge SKILL.md missing at {skill_md}"
+    assert skill_md.read_text(encoding="utf-8").strip(), "bridge SKILL.md is empty"
+    assert helpers_dir.is_dir(), f"helpers/ subdir missing at {helpers_dir}"
+    for helper_name in helper_names:
+        helper_path = helpers_dir / helper_name
+        assert helper_path.exists(), f"{helper_name} missing at {helper_path}"
+        assert helper_path.read_text(encoding="utf-8").strip(), f"{helper_name} is empty"

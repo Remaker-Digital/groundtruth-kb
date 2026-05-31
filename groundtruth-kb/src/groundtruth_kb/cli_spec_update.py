@@ -280,6 +280,8 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
 
     if packet_path.exists():
         raise SpecUpdateError(f"approval packet already exists: {packet_path}")
+    packet_path.parent.mkdir(parents=True, exist_ok=True)
+    packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     try:
         row = db.update_spec(
@@ -292,9 +294,6 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
         raise SpecUpdateError(str(exc)) from exc
     if row is None:
         raise SpecUpdateError(f"Unexpected error: updated spec {request.spec_id} not found on readback.")
-
-    packet_path.parent.mkdir(parents=True, exist_ok=True)
-    packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     return {
         "updated": True,

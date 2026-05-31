@@ -277,7 +277,11 @@ def ensure_backlog_for_confirmed_spec(
         )
         attachment = {"action": "attached", "project_id": project_ids[0], "membership": membership}
     elif len(project_ids) > 1:
-        attachment = {"action": "unassigned", "reason": "ambiguous deterministic project fit", "project_ids": project_ids}
+        attachment = {
+            "action": "unassigned",
+            "reason": "ambiguous deterministic project fit",
+            "project_ids": project_ids,
+        }
 
     return {
         "action": action,

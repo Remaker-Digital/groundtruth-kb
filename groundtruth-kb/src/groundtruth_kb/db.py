@@ -68,6 +68,7 @@ def _load_chromadb() -> Any | None:
         chromadb = _chromadb
     return chromadb
 
+
 # Semantic search constants
 SEMANTIC_MAX_DISTANCE = 1.5  # L2 distance threshold for relevance filtering
 CHUNK_MAX_TOKENS = 230  # Safe margin below all-MiniLM-L6-v2's 256 wordpiece limit
@@ -76,6 +77,7 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _CHROMA_COLLECTION_NAME = "deliberations"
 
 WORK_ITEM_BACKLOG_COLUMNS = {
+    "approval_state": "TEXT",
     "project_name": "TEXT",
     "subproject_name": "TEXT",
     "implementation_order": "INTEGER",
@@ -125,10 +127,24 @@ CREATE TABLE IF NOT EXISTS specifications (
     tags TEXT,
     status TEXT NOT NULL,
     assertions TEXT,
+    implementation_verified_at TEXT,
+    retired_at TEXT,
+    parent TEXT,
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
     UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS specification_deliberation_sources (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    spec_id TEXT NOT NULL,
+    spec_version INTEGER NOT NULL,
+    deliberation_id TEXT NOT NULL,
+    source_role TEXT,
+    added_at TEXT NOT NULL,
+    added_by TEXT NOT NULL,
+    UNIQUE(spec_id, spec_version, deliberation_id)
 );
 
 CREATE TABLE IF NOT EXISTS test_procedures (
@@ -293,6 +309,7 @@ CREATE TABLE IF NOT EXISTS work_items (
     resolution_status TEXT NOT NULL,
     priority TEXT,
     stage TEXT NOT NULL DEFAULT 'created',
+    approval_state TEXT,
     project_name TEXT,
     subproject_name TEXT,
     implementation_order INTEGER,
@@ -742,6 +759,31 @@ CREATE VIEW IF NOT EXISTS current_harnesses AS
 SELECT h.* FROM harnesses h
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM harnesses GROUP BY id) m
 ON h.id = m.id AND h.version = m.max_v;
+
+-- Phase 1 DB Instrumentation: KPI Suite Views
+CREATE VIEW IF NOT EXISTS kpi_spec_test_mapping AS
+SELECT
+    COUNT(DISTINCT s.id) AS total_specifications,
+    SUM(CASE WHEN t.spec_id IS NOT NULL THEN 1 ELSE 0 END) AS mapped_specifications,
+    SUM(CASE WHEN t.spec_id IS NULL THEN 1 ELSE 0 END) AS unmapped_specifications,
+    (SUM(CASE WHEN t.spec_id IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT s.id)) AS spec_test_mapping_percentage
+FROM current_specifications s
+LEFT JOIN (SELECT DISTINCT spec_id FROM current_tests) t ON s.id = t.spec_id;
+
+CREATE VIEW IF NOT EXISTS kpi_deliberation_provenance AS
+SELECT
+    (SUM(CASE WHEN related_deliberation_ids IS NOT NULL OR source_owner_directive IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS deliberation_linkage_percentage,
+    COUNT(*) AS total_work_items,
+    SUM(CASE WHEN related_deliberation_ids IS NULL AND source_owner_directive IS NULL THEN 1 ELSE 0 END) AS unmapped_work_items
+FROM current_work_items;
+
+CREATE VIEW IF NOT EXISTS kpi_backlog_churn AS
+SELECT
+    (SUM(CASE WHEN resolution_status IN ('open', 'new', 'unresolved', 'in_progress') THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS active_churn_ratio,
+    COUNT(*) AS total_work_items,
+    SUM(CASE WHEN resolution_status IN ('open', 'new', 'unresolved', 'in_progress') THEN 1 ELSE 0 END) AS active_unresolved_items,
+    SUM(CASE WHEN resolution_status IN ('completed', 'done', 'resolved', 'verified', 'fixed') THEN 1 ELSE 0 END) AS completed_items
+FROM current_work_items;
 """
 
 
@@ -964,7 +1006,23 @@ class KnowledgeDB:
             conn.commit()
             _log.info("Applied migration: add source_paths column")
 
-        # Migration 5: unify backlog metadata onto work_items.
+        # Migration 5: lifecycle schema additions.
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
+        lifecycle_columns = {
+            "implementation_verified_at": "TEXT",
+            "retired_at": "TEXT",
+            "parent": "TEXT",
+        }
+        added_lifecycle_cols = []
+        for col_name, col_type in lifecycle_columns.items():
+            if col_name not in cols:
+                conn.execute(f"ALTER TABLE specifications ADD COLUMN {col_name} {col_type}")
+                added_lifecycle_cols.append(col_name)
+        conn.commit()
+        if added_lifecycle_cols:
+            _log.info("Applied migration: lifecycle schema columns %s", added_lifecycle_cols)
+
+        # Migration 6: unify backlog metadata onto work_items.
         cols = {row[1] for row in conn.execute("PRAGMA table_info(work_items)").fetchall()}
         added_work_item_cols = []
         for col_name, col_type in WORK_ITEM_BACKLOG_COLUMNS.items():
@@ -977,7 +1035,7 @@ class KnowledgeDB:
         if added_work_item_cols:
             _log.info("Applied migration: unified backlog work item columns %s", added_work_item_cols)
 
-        # Migration 6: first-class project layer over canonical work_items.
+        # Migration 7: first-class project layer over canonical work_items.
         self._backfill_project_artifacts_from_work_items()
 
     def _backfill_project_artifacts_from_work_items(self) -> None:
@@ -1487,6 +1545,43 @@ class KnowledgeDB:
             .fetchall()
         )
         return [_row_to_dict(r) for r in rows]
+
+    def link_spec_deliberation_source(
+        self,
+        spec_id: str,
+        spec_version: int,
+        deliberation_id: str,
+        added_by: str,
+        source_role: str | None = None,
+        added_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Create or return an idempotent specification-deliberation source link."""
+        if not spec_id or not spec_id.strip():
+            raise ValueError("spec_id is required")
+        if not isinstance(spec_version, int) or spec_version < 1:
+            raise ValueError("spec_version must be a positive integer")
+        if not deliberation_id or not deliberation_id.strip():
+            raise ValueError("deliberation_id is required")
+        if not added_by or not added_by.strip():
+            raise ValueError("added_by is required")
+
+        conn = self._get_conn()
+        timestamp = added_at or _now()
+        conn.execute(
+            """INSERT OR IGNORE INTO specification_deliberation_sources
+               (spec_id, spec_version, deliberation_id, source_role, added_at, added_by)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (spec_id, spec_version, deliberation_id, source_role, timestamp, added_by),
+        )
+        conn.commit()
+        row = conn.execute(
+            """SELECT * FROM specification_deliberation_sources
+               WHERE spec_id = ? AND spec_version = ? AND deliberation_id = ?""",
+            (spec_id, spec_version, deliberation_id),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError("specification deliberation source link was not persisted")
+        return _row_to_dict(row)
 
     def list_specs(
         self,
@@ -3319,6 +3414,7 @@ class KnowledgeDB:
         failure_description: str | None = None,
         priority: str | None = None,
         stage: str = "created",
+        approval_state: str = "unapproved",
         project_name: str | None = None,
         subproject_name: str | None = None,
         implementation_order: int | None = None,
@@ -3350,6 +3446,7 @@ class KnowledgeDB:
         """
         version = self._next_work_item_version(id)
         backlog_values = {
+            "approval_state": approval_state,
             "project_name": project_name,
             "subproject_name": subproject_name,
             "implementation_order": implementation_order,
@@ -4057,10 +4154,7 @@ class KnowledgeDB:
         if prior_inc == new_inc and prior_exc == new_exc:
             return  # no spec amendment -- nothing to gate
 
-        clause = (
-            "DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001/"
-            "CLAUSE-AMENDMENT-APPROVAL-REQUIRED"
-        )
+        clause = "DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001/CLAUSE-AMENDMENT-APPROVAL-REQUIRED"
         added = (new_inc - prior_inc) | (new_exc - prior_exc)
         removed = (prior_inc - new_inc) | (prior_exc - new_exc)
 
@@ -4076,34 +4170,24 @@ class KnowledgeDB:
         try:
             packet_path.relative_to(project_root)
         except ValueError as exc:
-            raise ValueError(
-                f"Approval-packet path resolves outside the project root ({clause}): {rel_path}"
-            ) from exc
+            raise ValueError(f"Approval-packet path resolves outside the project root ({clause}): {rel_path}") from exc
         if not packet_path.is_file():
             raise ValueError(f"Cited approval packet not found ({clause}): {rel_path}")
         try:
             packet = json.loads(packet_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
-            raise ValueError(
-                f"Cited approval packet is not readable JSON ({clause}): {rel_path}: {exc}"
-            ) from exc
+            raise ValueError(f"Cited approval packet is not readable JSON ({clause}): {rel_path}: {exc}") from exc
         if not isinstance(packet, dict):
             raise ValueError(f"Cited approval packet is not a JSON object ({clause}): {rel_path}")
         result = validate_packet(packet)
         if not result.is_valid:
             detail = result.errors[0] if result.errors else "invalid packet"
-            raise ValueError(
-                f"Cited approval packet fails schema validation ({clause}): {rel_path}: {detail}"
-            )
+            raise ValueError(f"Cited approval packet fails schema validation ({clause}): {rel_path}: {detail}")
         if packet.get("approved_by") != "owner":
-            raise ValueError(
-                f"Cited approval packet is not owner-approved ({clause}): {rel_path}"
-            )
+            raise ValueError(f"Cited approval packet is not owner-approved ({clause}): {rel_path}")
         covers, reason = packet_covers_amendment(packet, project_id, authorization_id, added, removed)
         if not covers:
-            raise ValueError(
-                f"Cited approval packet does not cover the amendment ({clause}): {rel_path}: {reason}"
-            )
+            raise ValueError(f"Cited approval packet does not cover the amendment ({clause}): {rel_path}: {reason}")
 
     def insert_project_authorization(
         self,
@@ -4281,20 +4365,12 @@ class KnowledgeDB:
 
     def get_harness(self, harness_id: str) -> dict[str, Any] | None:
         """Return the current (latest-version) harness row, or None."""
-        row = (
-            self._get_conn()
-            .execute("SELECT * FROM current_harnesses WHERE id = ?", (harness_id,))
-            .fetchone()
-        )
+        row = self._get_conn().execute("SELECT * FROM current_harnesses WHERE id = ?", (harness_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def list_harnesses(self) -> list[dict[str, Any]]:
         """Return all current-version harness rows ordered by harness id."""
-        rows = (
-            self._get_conn()
-            .execute("SELECT * FROM current_harnesses ORDER BY id")
-            .fetchall()
-        )
+        rows = self._get_conn().execute("SELECT * FROM current_harnesses ORDER BY id").fetchall()
         return [_row_to_dict(r) for r in rows]
 
     def update_project_authorization(
@@ -4813,6 +4889,21 @@ class KnowledgeDB:
             .fetchall()
         )
         return [_row_to_dict(r) for r in rows]
+
+    def get_kpi_spec_test_mapping(self) -> dict[str, Any] | None:
+        """Get the current Specification Test-Mapping Rate (STMR) KPI metrics."""
+        row = self._get_conn().execute("SELECT * FROM kpi_spec_test_mapping").fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_kpi_deliberation_provenance(self) -> dict[str, Any] | None:
+        """Get the current Deliberation Provenance Depth (DPD) KPI metrics."""
+        row = self._get_conn().execute("SELECT * FROM kpi_deliberation_provenance").fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_kpi_backlog_churn(self) -> dict[str, Any] | None:
+        """Get the current Backlog Churn and Drift Rate (BCDR) KPI metrics."""
+        row = self._get_conn().execute("SELECT * FROM kpi_backlog_churn").fetchone()
+        return _row_to_dict(row) if row else None
 
     # ------------------------------------------------------------------
     # Global History

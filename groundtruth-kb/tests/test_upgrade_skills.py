@@ -260,3 +260,46 @@ def test_execute_creates_missing_spec_intake_files_at_same_version(tmp_path: Pat
     assert "def capture_candidate" in helper_content
     assert "def confirm_candidate" in helper_content
     assert "def reject_candidate" in helper_content
+
+
+# ---------------------------------------------------------------------------
+# Bridge skill — unconditional missing-file repair at current version.
+# ---------------------------------------------------------------------------
+
+_BRIDGE_SKILL_FILES = {
+    ".claude/skills/bridge/SKILL.md",
+    ".claude/skills/bridge/helpers/scan_bridge.py",
+    ".claude/skills/bridge/helpers/revise_bridge.py",
+    ".claude/skills/bridge/helpers/impl_report_bridge.py",
+    ".claude/skills/bridge/helpers/show_thread_bridge.py",
+}
+
+
+def test_plan_upgrade_adds_missing_bridge_skill_files_at_same_version(tmp_path: Path) -> None:
+    """dual-agent project at current version with bridge skill missing → add actions."""
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    actions = plan_upgrade(tmp_path)
+    action_files = {a.file for a in actions if a.action == "add"}
+    missing = _BRIDGE_SKILL_FILES - action_files
+    assert not missing, f"expected add actions for bridge skill files {sorted(missing)}; got {sorted(action_files)}"
+
+
+def test_execute_creates_missing_bridge_skill_files_at_same_version(tmp_path: Path) -> None:
+    """End-to-end: plan at same version → execute → bridge skill files land on disk."""
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    actions = plan_upgrade(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
+    execute_upgrade(tmp_path, actions, force=False)
+
+    for rel_path in _BRIDGE_SKILL_FILES:
+        path = tmp_path / rel_path
+        assert path.exists(), f"{rel_path} should be copied by execute_upgrade"
+        assert path.read_text(encoding="utf-8").strip(), f"{rel_path} is empty"
+    assert "def scan" in (tmp_path / ".claude/skills/bridge/helpers/scan_bridge.py").read_text(encoding="utf-8")
+    assert "def file_revision" in (tmp_path / ".claude/skills/bridge/helpers/revise_bridge.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def file_report" in (tmp_path / ".claude/skills/bridge/helpers/impl_report_bridge.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def show" in (tmp_path / ".claude/skills/bridge/helpers/show_thread_bridge.py").read_text(encoding="utf-8")
