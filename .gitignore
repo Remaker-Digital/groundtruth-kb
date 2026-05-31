@@ -74,6 +74,10 @@ MANIFEST
 scripts/lib/__pycache__/
 scripts/lib/**/*.py[cod]
 .pytest_cache/
+# Pytest sandbox/basetemp directories produced by --basetemp= flag.
+# Codex + Prime sessions generate these under per-thread names.
+.pytest-*/
+GT-KB.pytest-*/
 .coverage
 htmlcov/
 .tox/
