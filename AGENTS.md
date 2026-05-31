@@ -43,6 +43,7 @@ behavior. Current host-local identities:
 
 - Codex: `A`
 - Claude Code: `B`
+- Antigravity: `C`
 
 Startup resolves the harness ID from `harness-state/harness-identities.json`,
 then resolves the role by reading that harness ID entry in
@@ -69,9 +70,9 @@ role between Prime Builder and Loyal Opposition by updating
 session` and `loyal opposition mode next session` set the current harness's
 next-session role directly.
 
-While Claude Code is unavailable, Codex may be assigned either Prime Builder or
-Loyal Opposition so the normal Prime Builder / Loyal Opposition development
-process can continue instead of being suspended.
+When any harness is unavailable, any other registered harness (Codex, Claude
+Code, or Antigravity) may be assigned either Prime Builder or Loyal Opposition
+so the normal development process can continue instead of being suspended.
 
 Permissions and restrictions attach to the assigned operating role for the
 harness ID, not to any specific model, vendor, or transient session. When the
@@ -288,7 +289,7 @@ item, and release blockers or release-target constraints when present.
   all other downstream bridge-dependent artifacts without additional approval
   when the purpose is sustaining the bridge and ensuring it remains properly and
   fully utilized.
-- **Antigravity Standing Exception Retraction & Scoped Authority**: Notwithstanding the general bridge exception above, the Antigravity harness (ID C) has standing permission *only* to create and update `ADVISORY` bridge documents (files under `bridge/` matching `*-advisory-*.md` and their single-line status insertion entries at the top of the corresponding block in `bridge/INDEX.md`). These advisory documents represent the *sole* case where the Antigravity harness has standing permission to alter or create files. The Antigravity harness may not alter or create any other files (including bridge configurations, automation scripts, or active status surfaces) without explicit, separate per-file approval from Mike.
+- **Antigravity harness (ID C)**: As of 2026-05-31, the former Antigravity Standing Exception Retraction & Scoped Authority restrictions are obsolete per owner directive. Antigravity follows the same role-based file authority as any other harness: when assigned Prime Builder, Prime Builder file authority applies; when assigned Loyal Opposition, Loyal Opposition file-safety applies.
 - New files should be created under:
   - `independent-progress-assessments/`
   - `.claude/rules/`
