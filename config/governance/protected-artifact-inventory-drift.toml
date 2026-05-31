@@ -9,8 +9,12 @@ volatile_inventory_paths = [
   # the PATH `python`, which can differ from the canonical groundtruth-kb/.venv
   # interpreter, producing interpreter-specific phantom drift that froze
   # commits. Versions remain RECORDED in the inventory; only the version field
-  # is non-blocking for drift. Non-version toolchain fields (status,
-  # classification, presence) and all other inventory keys continue to gate.
+  # is non-blocking for drift. See the toolchain.*.status / .classification
+  # block below for the parallel cross-workstation availability volatility;
+  # together with this entry they cover the toolchain availability surface.
+  # Tool-presence regressions (catalog adds/removes of an entire toolchain
+  # entry) continue to gate via the toolchain top-level key set, and all
+  # non-toolchain inventory keys continue to gate.
   # Owner decision DELIB-2504 (S369) / WI-3449; the wildcard segment is honored
   # by _delete_dotted_path in scripts/check_dev_environment_inventory_drift.py.
   "toolchain.*.version",
