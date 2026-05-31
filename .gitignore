@@ -78,6 +78,9 @@ scripts/lib/**/*.py[cod]
 # Codex + Prime sessions generate these under per-thread names.
 .pytest-*/
 GT-KB.pytest-*/
+# Session-ephemeral one-off scripts (per-session backfill / migration helpers
+# that get created and used within a single session; not source-of-truth).
+scripts/session-tmp/
 .coverage
 htmlcov/
 .tox/

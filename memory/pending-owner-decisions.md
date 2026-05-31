@@ -323,61 +323,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S327
   answer: "S327 clear pending: real prose decision-ask from a prior session ('Want me to action those next, or pick something else?'). Resolved by autonomous progression on the work_list-pre-approved ISOLATION-017 Slice 3 track, which reached VERIFIED at bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-014.md. Cleared via 'clear pending' instruction."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0221
-  asked_at: 2026-05-01T20:50:22.375614Z
-  question: "Scoping GO landed. Continue with Slice 1 (Isolation doctor checks) in this session, or wrap?"
-  options:
-    - "Wrap session here (Recommended)"
-    - "File Slice 1 implementation bridge now"
-    - "Other"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 954a40fccf77723b
-  resolved_at: 2026-05-01T20:50:22.375614Z
-  answer: "User has answered your questions: \"Scoping GO landed. Continue with Slice 1 (Isolation doctor checks) in this session, or wrap?\"=\"File Slice 1 implementation bridge now\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0222
-  asked_at: 2026-05-01T20:57:32.317397Z
-  question: "Two dispatched GO entries are plan-level only (no code authorization). Meanwhile, ISOLATION-017 Slice 1 doctor checks just received a NO-GO at the top of INDEX and is your TOP-priority program per work_list row 2. Which path should I take next?"
-  options:
-    - "Revise ISOLATION-017 NO-GO (Recommended)"
-    - "File CS-2 dispatcher slice"
-    - "File CS-1 `gt` CLI slice"
-    - "Acknowledge dispatches; stand down"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 1192c3638bdb9456
-  resolved_at: 2026-05-01T20:57:32.317397Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0223
-  asked_at: 2026-05-01T20:59:33.008014Z
-  question: "Smart poller dispatched two GO entries that are explicitly plan-level (not implementation authorization): gtkb-command-surface-004 (architecture approved; future work in CS-1, CS-1.5, CS-2, CS-3, CS-6, CS-7 slice proposals) and gtkb-incident-response-006 (IR-0 blocked on ADR-ISOLATION-APPLICATION-PLACEMENT-001 + Phase 9 annotation). How should Prime Builder respond?"
-  options:
-    - "Defer — focus on isolation-017"
-    - "File closure VERIFIED reports"
-    - "Start the next implementation slice"
-    - "Show me INDEX summary first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 248afc20d202db3b
-  resolved_at: 2026-05-01T20:59:33.008014Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0226
-  asked_at: 2026-05-01T21:06:03.463668Z
-  question: "Both auto-dispatched GOs are plan-level only (not implementation gates) and the incident-response IR-0.1 child slice is already VERIFIED. Which should I advance next?"
-  options:
-    - "Resume isolation-017 Slice 1 (Recommended)"
-    - "File CS-1.5 sub-bridge"
-    - "File IR-1.1 sub-bridge"
-    - "No action; archive both"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: da6113170c350bc8
-  resolved_at: 2026-05-01T21:06:03.463668Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0227
   asked_at: 2026-05-01T22:35:26.474937Z
   question: "Both dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level approvals — no code action required, and IR-0 is explicitly blocked on missing ADR + Phase 9 prerequisites. The actionable next step under gtkb-command-surface is filing the first concrete implementation slice. Which slice should I file as the next NEW bridge proposal?"
@@ -8337,6 +8282,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-31T19:59:10.958472Z
   answer: "Your questions have been answered: \"Another agent's uncommitted INDEX changes (-226 lines + new dispatch-scoping thread entry) got bundled into the staging. How should I commit?\"=\"Restore INDEX to HEAD + add only my 2 lines (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-0872
+  asked_at: 2026-05-31T21:17:51.433043Z
+  question: "What status taxonomy should the new ADR codify for harness dispatch eligibility? (Background: your S378 directive named active/inactive/suspended. The existing WI-3339 four-state FSM at `groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py:36-43` uses registered/active/suspended/retired.)"
+  options:
+    - "4-state owner-aligned (Recommended)"
+    - "3-state minimal (S378 verbatim)"
+    - "4-state FSM as-is"
+    - "5-state superset"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 188a4f90a37967f1
+  resolved_at: 2026-05-31T21:17:51.433043Z
+  answer: "Your questions have been answered: \"What status taxonomy should the new ADR codify for harness dispatch eligibility? (Background: your S378 directive named active/inactive/suspended. The existing WI-3339 four-state FSM at `groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py:36-43` uses registered/active/suspended/retired.)\"=\"4-state owner-aligned (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0873
+  asked_at: 2026-05-31T21:17:51.433043Z
+  question: "What ADR shape should Slice 1 use to codify the role/status orthogonality model? (Background: `ADR-SINGLE-HARNESS-OPERATING-MODE-001` is the existing ADR that established the role-set wire form and the single-PB invariant. Your S378 directive supersedes the single-PB clause but preserves the single-harness mode capability.)"
+  options:
+    - "New successor ADR + amend old (Recommended)"
+    - "v2 of existing ADR"
+    - "Two new ADRs + retire old entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: af7ef552c709a931
+  resolved_at: 2026-05-31T21:17:51.433043Z
+  answer: "Your questions have been answered: \"What ADR shape should Slice 1 use to codify the role/status orthogonality model? (Background: `ADR-SINGLE-HARNESS-OPERATING-MODE-001` is the existing ADR that established the role-set wire form and the single-PB invariant. Your S378 directive supersedes the single-PB clause but preserves the single-harness mode capability.)\"=\"New successor ADR + amend old (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
@@ -10814,5 +10786,60 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: resolved
   question_hash: a75b0fb0e297983b
   resolved_at: 2026-05-01T16:48:46.417120Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0221
+  asked_at: 2026-05-01T20:50:22.375614Z
+  question: "Scoping GO landed. Continue with Slice 1 (Isolation doctor checks) in this session, or wrap?"
+  options:
+    - "Wrap session here (Recommended)"
+    - "File Slice 1 implementation bridge now"
+    - "Other"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 954a40fccf77723b
+  resolved_at: 2026-05-01T20:50:22.375614Z
+  answer: "User has answered your questions: \"Scoping GO landed. Continue with Slice 1 (Isolation doctor checks) in this session, or wrap?\"=\"File Slice 1 implementation bridge now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0222
+  asked_at: 2026-05-01T20:57:32.317397Z
+  question: "Two dispatched GO entries are plan-level only (no code authorization). Meanwhile, ISOLATION-017 Slice 1 doctor checks just received a NO-GO at the top of INDEX and is your TOP-priority program per work_list row 2. Which path should I take next?"
+  options:
+    - "Revise ISOLATION-017 NO-GO (Recommended)"
+    - "File CS-2 dispatcher slice"
+    - "File CS-1 `gt` CLI slice"
+    - "Acknowledge dispatches; stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1192c3638bdb9456
+  resolved_at: 2026-05-01T20:57:32.317397Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0223
+  asked_at: 2026-05-01T20:59:33.008014Z
+  question: "Smart poller dispatched two GO entries that are explicitly plan-level (not implementation authorization): gtkb-command-surface-004 (architecture approved; future work in CS-1, CS-1.5, CS-2, CS-3, CS-6, CS-7 slice proposals) and gtkb-incident-response-006 (IR-0 blocked on ADR-ISOLATION-APPLICATION-PLACEMENT-001 + Phase 9 annotation). How should Prime Builder respond?"
+  options:
+    - "Defer — focus on isolation-017"
+    - "File closure VERIFIED reports"
+    - "Start the next implementation slice"
+    - "Show me INDEX summary first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 248afc20d202db3b
+  resolved_at: 2026-05-01T20:59:33.008014Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0226
+  asked_at: 2026-05-01T21:06:03.463668Z
+  question: "Both auto-dispatched GOs are plan-level only (not implementation gates) and the incident-response IR-0.1 child slice is already VERIFIED. Which should I advance next?"
+  options:
+    - "Resume isolation-017 Slice 1 (Recommended)"
+    - "File CS-1.5 sub-bridge"
+    - "File IR-1.1 sub-bridge"
+    - "No action; archive both"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: da6113170c350bc8
+  resolved_at: 2026-05-01T21:06:03.463668Z
   answer: "Answer questions?"
   notes: ""
