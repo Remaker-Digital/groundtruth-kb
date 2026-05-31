@@ -851,6 +851,8 @@ NO-GO: bridge/gtkb-startup-refractor-glossary-load-surface-002.md
 NEW: bridge/gtkb-startup-refractor-glossary-load-surface-001.md
 
 Document: gtkb-startup-enhancements-p2-freshness-contract
+VERIFIED: bridge/gtkb-startup-enhancements-p2-freshness-contract-015.md
+NEW: bridge/gtkb-startup-enhancements-p2-freshness-contract-014.md
 GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-013.md
 REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-012.md
 REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-011.md

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -2717,4 +2718,122 @@ def test_t_compat_4_role_profiles_enumeration_retains_acting_prime_builder() -> 
         "acting-prime-builder profile must continue to reference its rule file "
         "for narrative continuity (the rule file is the historical authority "
         "record; the durable role record is harness-state/role-assignments.json)."
+    )
+
+
+def _invoke_emit_startup_service_payload(
+    *,
+    dashboard_dir: Path,
+    request_started_at: str,
+) -> subprocess.CompletedProcess[str]:
+    """Run session_self_initialization.py --emit-startup-service-payload with
+    a fresh GTKB_STARTUP_REQUESTED_AT env var, isolated dashboard_dir, and
+    --fast-hook (skips PDF + historical backfill + bridge maintenance).
+    """
+    env = os.environ.copy()
+    env["GTKB_STARTUP_REQUESTED_AT"] = request_started_at
+    return subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--emit-startup-service-payload",
+            "--fast-hook",
+            "--dashboard-dir",
+            str(dashboard_dir),
+            "--project-root",
+            str(REPO_ROOT),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+
+
+def test_emit_ignores_pre_populated_stale_payload_file(tmp_path) -> None:
+    """IP-5 from gtkb-startup-enhancements-p2-freshness-contract-012: when a
+    pre-populated startup-service payload cache file exists in dashboard_dir
+    with stale request-started content, the emit path must regenerate fresh
+    output rather than serve the cached bytes.
+
+    Linked specs:
+      - GOV-SESSION-SELF-INITIALIZATION-001 (fresh self-initialization payload).
+      - GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001 (no degraded fallback /
+        no stale-cache reuse).
+
+    The prior F1 finding established that cache-based reuse produced
+    stale-request-id payloads; removing the cache implements the contract
+    that the service regenerates every call.
+    """
+    dashboard_dir = tmp_path / "dashboard"
+    dashboard_dir.mkdir()
+    cache_path = dashboard_dir / "startup-service-payload.json"
+    stale_payload_text = json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": "STALE-PRE-POPULATED-MARKER-DO-NOT-REUSE",
+                "startupFreshness": {
+                    "request_started_at": "2020-01-01T00:00:00Z",
+                    "validation": {"startup_payload_fresh": True},
+                },
+            }
+        },
+        ensure_ascii=False,
+    )
+    cache_path.write_text(stale_payload_text + "\n", encoding="utf-8")
+
+    fresh_request_started_at = "2026-05-31T20:00:00Z"
+    completed = _invoke_emit_startup_service_payload(
+        dashboard_dir=dashboard_dir,
+        request_started_at=fresh_request_started_at,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    output = completed.stdout.strip()
+    assert output, "emit path produced no stdout"
+    assert "STALE-PRE-POPULATED-MARKER-DO-NOT-REUSE" not in output, (
+        "emit path must not reuse pre-populated cache bytes (cache-ignore contract)"
+    )
+    assert output != stale_payload_text, "emit path bytes must not be byte-equal to the pre-populated cache file"
+
+    printed_payload = json.loads(output)
+    actual_request_started = printed_payload["hookSpecificOutput"]["startupFreshness"]["request_started_at"]
+    assert actual_request_started == fresh_request_started_at, (
+        f"printed request_started_at {actual_request_started!r} must equal "
+        f"GTKB_STARTUP_REQUESTED_AT {fresh_request_started_at!r}, not the stale "
+        "pre-populated value"
+    )
+
+
+def test_emit_request_started_matches_env_var(tmp_path) -> None:
+    """IP-6 from gtkb-startup-enhancements-p2-freshness-contract-012: the
+    emit path's printed payload's request_started_at value must exactly
+    equal the GTKB_STARTUP_REQUESTED_AT env var, satisfying the
+    cross-harness dispatcher's exact-equality freshness check.
+
+    Linked specs:
+      - GOV-SESSION-SELF-INITIALIZATION-001 (fresh self-initialization payload).
+      - GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001 (proactive disclosure
+        without degraded fallback).
+    """
+    dashboard_dir = tmp_path / "dashboard"
+    dashboard_dir.mkdir()
+    fresh_request_started_at = "2026-05-31T20:15:00Z"
+
+    completed = _invoke_emit_startup_service_payload(
+        dashboard_dir=dashboard_dir,
+        request_started_at=fresh_request_started_at,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    output = completed.stdout.strip()
+    assert output, "emit path produced no stdout"
+
+    printed_payload = json.loads(output)
+    actual_request_started = printed_payload["hookSpecificOutput"]["startupFreshness"]["request_started_at"]
+    assert actual_request_started == fresh_request_started_at, (
+        f"printed request_started_at {actual_request_started!r} must exactly "
+        f"equal GTKB_STARTUP_REQUESTED_AT {fresh_request_started_at!r} "
+        "(dispatcher freshness check is exact-equality)"
     )

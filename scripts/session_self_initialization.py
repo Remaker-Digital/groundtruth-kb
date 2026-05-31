@@ -6294,90 +6294,6 @@ def _startup_freshness_input_signatures(project_root: Path) -> dict[str, Any]:
     }
 
 
-def _startup_freshness_from_payload(payload_path: Path) -> dict[str, Any] | None:
-    try:
-        payload = json.loads(payload_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(payload, dict):
-        return None
-    hook_output = payload.get("hookSpecificOutput")
-    if isinstance(hook_output, dict) and isinstance(hook_output.get("startupFreshness"), dict):
-        return hook_output["startupFreshness"]
-    freshness = payload.get("startupFreshness")
-    if isinstance(freshness, dict):
-        return freshness
-    if payload.get("contract_version") == STARTUP_FRESHNESS_CONTRACT_VERSION:
-        return payload
-    return None
-
-
-def _payload_staleness_reasons(
-    payload_path: Path,
-    project_root: Path,
-    *,
-    max_age_seconds: int = 900,
-    now: datetime | None = None,
-) -> list[str]:
-    if not payload_path.is_file():
-        return ["payload_missing"]
-    try:
-        payload_stat = payload_path.stat()
-    except OSError:
-        return ["payload_unreadable"]
-
-    reasons: list[str] = []
-    current_time = now or datetime.now(UTC)
-    if current_time.tzinfo is None:
-        current_time = current_time.replace(tzinfo=UTC)
-    payload_age = current_time.timestamp() - payload_stat.st_mtime
-    if payload_age > max_age_seconds:
-        reasons.append("payload_age_exceeds_max")
-
-    freshness = _startup_freshness_from_payload(payload_path)
-    if freshness is None:
-        reasons.append("startup_freshness_metadata_missing")
-        return reasons
-    if freshness.get("contract_version") != STARTUP_FRESHNESS_CONTRACT_VERSION:
-        reasons.append("startup_freshness_contract_version_mismatch")
-    validation = freshness.get("validation") if isinstance(freshness.get("validation"), dict) else {}
-    if validation.get("startup_payload_fresh") is not True:
-        reasons.append("startup_freshness_validation_not_fresh")
-
-    recorded_inputs = freshness.get("freshness_inputs") if isinstance(freshness.get("freshness_inputs"), dict) else {}
-    current_inputs = _startup_freshness_input_signatures(project_root)
-    for key in ("role_assignments", "bridge_index"):
-        current = current_inputs.get(key) or {}
-        recorded = recorded_inputs.get(key) if isinstance(recorded_inputs.get(key), dict) else {}
-        if current.get("required") and current.get("status") != "present":
-            reasons.append(f"{key}_missing")
-            continue
-        current_mtime_ns = current.get("modified_ns")
-        if isinstance(current_mtime_ns, int) and current_mtime_ns > payload_stat.st_mtime_ns:
-            reasons.append(f"{key}_newer_than_payload")
-        if key == "role_assignments":
-            if not recorded.get("sha256"):
-                reasons.append("role_assignments_signature_missing")
-            elif current.get("sha256") != recorded.get("sha256"):
-                reasons.append("role_assignments_signature_changed")
-    return reasons
-
-
-def _is_payload_fresh(
-    payload_path: Path,
-    project_root: Path,
-    *,
-    max_age_seconds: int = 900,
-    now: datetime | None = None,
-) -> bool:
-    return not _payload_staleness_reasons(
-        payload_path,
-        project_root,
-        max_age_seconds=max_age_seconds,
-        now=now,
-    )
-
-
 def _workflow_inventory_observation(project_root: Path, *, required: bool = True) -> dict[str, Any]:
     workflows_dir = project_root / ".github" / "workflows"
     workflow_files = (
@@ -6595,7 +6511,6 @@ def _emit_startup_service_payload(
     result: dict[str, Any],
     *,
     request_started_at: str,
-    payload_cache_path: Path | None = None,
 ) -> None:
     payload_emitted_at = _utc_now_iso()
     startup_freshness = _startup_freshness_metadata(
@@ -6622,8 +6537,6 @@ def _emit_startup_service_payload(
         }
     }
     payload_text = json.dumps(payload, ensure_ascii=False)
-    if payload_cache_path is not None:
-        _atomic_write_text(payload_cache_path, payload_text + "\n")
     print(payload_text)
 
 
@@ -6948,11 +6861,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.history_path is not None
         else project_root / "memory" / "gtkb-dashboard-history.json"
     )
-    startup_payload_cache_path = dashboard_dir / "startup-service-payload.json"
-    if args.emit_startup_service_payload and _is_payload_fresh(startup_payload_cache_path, project_root):
-        print(startup_payload_cache_path.read_text(encoding="utf-8").strip())
-        return 0
-
     bridge_maintenance = None
     if startup_emit_requested and not args.skip_bridge_maintenance and not args.fast_hook:
         bridge_maintenance = _run_verified_bridge_startup_maintenance(project_root)
@@ -7001,7 +6909,6 @@ def main(argv: list[str] | None = None) -> int:
         _emit_startup_service_payload(
             result,
             request_started_at=startup_requested_at,
-            payload_cache_path=startup_payload_cache_path,
         )
     elif args.emit_report:
         _emit_hook_context(str(result["report_text"]))
