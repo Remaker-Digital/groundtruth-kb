@@ -6,10 +6,47 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: antigravity-inspection-results-053026-options-for-implementation
+ADVISORY: bridge/antigravity-inspection-results-053026-options-for-implementation-001.md
+
+Document: gtkb-source-of-truth-freshness-governance
+GO: bridge/gtkb-source-of-truth-freshness-governance-008.md
+REVISED: bridge/gtkb-source-of-truth-freshness-governance-007.md
+GO: bridge/gtkb-source-of-truth-freshness-governance-006.md
+REVISED: bridge/gtkb-source-of-truth-freshness-governance-005.md
+NO-GO: bridge/gtkb-source-of-truth-freshness-governance-004.md
+REVISED: bridge/gtkb-source-of-truth-freshness-governance-003.md
+NO-GO: bridge/gtkb-source-of-truth-freshness-governance-002.md
+NEW: bridge/gtkb-source-of-truth-freshness-governance-001.md
+
+Document: gtkb-antigravity-implements-link-ambiguity-advisory
+ADVISORY: bridge/gtkb-antigravity-implements-link-ambiguity-advisory-001.md
+
+Document: gtkb-s374-polluted-delib-2514-2520-governed-retraction
+VERIFIED: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-007.md
+NEW: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-006.md
+GO: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-004.md
+REVISED: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-003.md
+NO-GO: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-002.md
+NEW: bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-001.md
+
 Document: gtkb-interactive-session-role-override-slice-10-regression-tests
+GO: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-006.md
+REVISED: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-005.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-004.md
+REVISED: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-003.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-002.md
 NEW: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-001.md
 
 Document: gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates
+NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-009.md
+GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-008.md
+REVISED: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-007.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-006.md
+REVISED: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-005.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-004.md
+REVISED: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-003.md
+NO-GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-002.md
 NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-001.md
 
 Document: gtkb-interactive-session-role-override-hygiene-backfill
@@ -21,6 +58,14 @@ GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-002.md
 NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-001.md
 
 Document: gtkb-gov-backlog-source-of-truth-2026-05-02
+GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-024.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-023.md
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-022.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-021.md
+GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-020.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-019.md
+GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-018.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-017.md
 NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-016.md
 REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-015.md
 NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-014.md
@@ -56,6 +101,8 @@ NO-GO: bridge/gtkb-backlog-canonical-pivot-spec-promotion-002.md
 NEW: bridge/gtkb-backlog-canonical-pivot-spec-promotion-001.md
 
 Document: gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-017.md
+NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-016.md
 NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-015.md
 NEW: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-014.md
 NO-GO: bridge/gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-013.md
@@ -152,6 +199,8 @@ NO-GO: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker
 NEW: bridge/gtkb-interactive-session-role-override-slice-2-session-role-marker-001.md
 
 Document: gtkb-lo-hourly-quality-scout-advisory
+ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-004.md
+ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-003.md
 ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-002.md
 ADVISORY: bridge/gtkb-lo-hourly-quality-scout-advisory-001.md
 
