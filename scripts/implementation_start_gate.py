@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import shlex
@@ -104,6 +105,7 @@ SQLITE_WRITE_DISQUALIFIERS_RE = re.compile(
     r"\b(?:INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|TRUNCATE|PRAGMA)\b",
     re.IGNORECASE,
 )
+BLOCKING_CLAUSE_ID = "PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001"
 PATH_TOKEN_RE = re.compile(
     r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
 )
@@ -170,6 +172,18 @@ def is_protected_path(relative_path: str) -> bool:
     if rel.startswith(ALLOWED_WRITE_PREFIXES):
         return False
     return any(rel.startswith(prefix) for prefix in PROTECTED_PREFIXES)
+
+
+def _protected_path_classification(relative_path: str) -> str:
+    rel = relative_path.replace("\\", "/").lstrip("./")
+    if rel == "<unknown-mutating-target>":
+        return rel
+    if rel in PROTECTED_EXACT:
+        return rel
+    for prefix in PROTECTED_PREFIXES:
+        if rel.startswith(prefix):
+            return prefix
+    return rel
 
 
 def _paths_from_apply_patch(root: Path, text: str) -> list[str]:
@@ -405,9 +419,110 @@ def _is_safe_sqlite_read(command: str) -> bool:
     SAFE_SQLITE_READ_RE because their argument is not a literal string starting
     with a read keyword.
     """
+    ast_result = _classify_python_sqlite_read_ast(command)
+    if ast_result is not None:
+        return ast_result
     if not SAFE_SQLITE_READ_RE.search(command):
         return False
     return not SQLITE_WRITE_DISQUALIFIERS_RE.search(command)
+
+
+def _python_c_source(command: str) -> str | None:
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError:
+        return None
+    for index, token in enumerate(tokens):
+        if token == "-c" and index + 1 < len(tokens):
+            exe = Path(tokens[0]).name.lower() if tokens else ""
+            if exe.startswith("python") or exe in {"py", "python.exe"}:
+                return tokens[index + 1]
+    return None
+
+
+def _sql_literal_is_read_only(sql: str) -> bool:
+    text = sql.strip()
+    if not re.match(r"(?is)^(?:SELECT|WITH|EXPLAIN)\b", text):
+        return False
+    return SQLITE_WRITE_DISQUALIFIERS_RE.search(text) is None
+
+
+def _is_sqlite_connect_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "connect"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "sqlite3"
+    )
+
+
+def _is_uri_ro_connect(node: ast.Call) -> bool:
+    if not node.args or not isinstance(node.args[0], ast.Constant) or not isinstance(node.args[0].value, str):
+        return False
+    if not re.search(r"^file:.+?\bmode=ro\b", node.args[0].value, re.IGNORECASE):
+        return False
+    return any(
+        keyword.arg == "uri" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True
+        for keyword in node.keywords
+    )
+
+
+class _SQLiteReadClassifier(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.connections: dict[str, str] = {}
+        self.saw_sqlite_operation = False
+        self.unsafe = False
+
+    def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802 - ast visitor name
+        if _is_sqlite_connect_call(node.value):
+            assert isinstance(node.value, ast.Call)
+            kind = "sqlite_conn_uri_ro" if _is_uri_ro_connect(node.value) else "sqlite_conn"
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    self.connections[target.id] = kind
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802 - ast visitor name
+        if isinstance(node.func, ast.Attribute):
+            receiver = node.func.value
+            method = node.func.attr
+            conn_kind: str | None = None
+            if isinstance(receiver, ast.Name) and receiver.id in self.connections:
+                conn_kind = self.connections[receiver.id]
+            elif _is_sqlite_connect_call(receiver):
+                assert isinstance(receiver, ast.Call)
+                conn_kind = "sqlite_conn_uri_ro" if _is_uri_ro_connect(receiver) else "sqlite_conn"
+
+            if conn_kind is not None and method in {"execute", "executemany", "executescript", "commit"}:
+                self.saw_sqlite_operation = True
+                if method != "execute" or not node.args:
+                    self.unsafe = True
+                else:
+                    sql_arg = node.args[0]
+                    if isinstance(sql_arg, ast.Constant) and isinstance(sql_arg.value, str):
+                        if not _sql_literal_is_read_only(sql_arg.value):
+                            self.unsafe = True
+                    elif conn_kind != "sqlite_conn_uri_ro":
+                        self.unsafe = True
+        self.generic_visit(node)
+
+
+def _classify_python_sqlite_read_ast(command: str) -> bool | None:
+    if "sqlite3" not in command.lower():
+        return None
+    source = _python_c_source(command)
+    if source is None:
+        return None
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    classifier = _SQLiteReadClassifier()
+    classifier.visit(tree)
+    if not classifier.saw_sqlite_operation:
+        return None
+    return not classifier.unsafe
 
 
 def _is_mutating_command(command: str) -> bool:
@@ -492,25 +607,47 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         validate_targets(root, protected)
     except AuthorizationError as exc:
+        classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
         return {
             "decision": "block",
             "reason": (
-                "BLOCKED (GTKB-IMPLEMENTATION-START-GATE): protected implementation mutation requires "
-                f"a live bridge GO authorization packet. {exc}"
+                f"BLOCKED (GTKB-IMPLEMENTATION-START-GATE): {BLOCKING_CLAUSE_ID}\n"
+                f"Reason: protected implementation mutation matched {classifications} and requires "
+                f"a live bridge GO authorization packet. {exc}\n"
+                "Suggested fix: acquire or activate an authorization packet with "
+                "`python scripts/implementation_authorization.py begin --bridge-id <id>` before mutating "
+                "protected targets."
             ),
         }
     return {}
 
 
-def main() -> int:
+def _read_payload() -> dict[str, Any]:
     try:
         raw = sys.stdin.read()
         payload = json.loads(raw) if raw.strip() else {}
-        if not isinstance(payload, dict):
-            payload = {}
+        return payload if isinstance(payload, dict) else {}
     except json.JSONDecodeError:
-        payload = {}
+        return {}
+
+
+def main() -> int:
+    diagnostic = "--diagnostic" in sys.argv[1:]
+    payload = _read_payload()
     result = gate_decision(payload)
+    if diagnostic:
+        print(
+            json.dumps(
+                {
+                    "decision": result.get("decision", "allow"),
+                    "diagnostic": True,
+                    "reason": result.get("reason", ""),
+                    "would_block": result.get("decision") == "block",
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
     if result.get("decision") == "block":
         reason = result.get("reason") or "BLOCKED (GTKB-IMPLEMENTATION-START-GATE)"
         print(

@@ -45,6 +45,10 @@ PATH_TOKEN_RE: Final[re.Pattern[str]] = re.compile(
     r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
 )
 TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
+FILES_CHANGED_HEADING_RE: Final[re.Pattern[str]] = re.compile(
+    r"^#{1,6}\s+Files\s+(?:Changed|Expected\s+To\s+Change)\s*$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -155,20 +159,87 @@ def extract_target_paths(content: str) -> set[str]:
     for line in content.splitlines():
         target_match = TARGET_PATH_RE.match(line)
         if target_match:
-            raw = target_match.group(1).strip()
-            try:
-                parsed = json.loads(raw)
-            except json.JSONDecodeError:
-                parsed = [p.strip("\"' ") for p in re.split(r"[,\s]+", raw) if p.strip("\"' ")]
-            if isinstance(parsed, list):
-                paths.update(str(p).replace("\\", "/").strip("/") for p in parsed if str(p).strip())
-            else:
-                paths.add(str(parsed).replace("\\", "/").strip("/"))
+            paths.update(_parse_declared_path_values(target_match.group(1)))
     for match in PATH_TOKEN_RE.finditer(content):
         token = match.group(1).replace("\\", "/").strip("/")
         if token and not token.startswith(("http:/", "https:/")):
             paths.add(token)
     return paths
+
+
+def _normalize_path_token(value: str) -> str:
+    token = value.replace("\\", "/").strip().strip("`'\"")
+    token = token.rstrip(".,;:)")
+    if "::" in token:
+        token = token.split("::", 1)[0]
+    return token.strip("/")
+
+
+def _parse_declared_path_values(raw: str) -> set[str]:
+    raw = raw.strip()
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = [p.strip("\"' ") for p in re.split(r"[,\s]+", raw) if p.strip("\"' ")]
+    if isinstance(parsed, list):
+        return {_normalize_path_token(str(p)) for p in parsed if _normalize_path_token(str(p))}
+    parsed_token = _normalize_path_token(str(parsed))
+    return {parsed_token} if parsed_token else set()
+
+
+def _files_changed_section_lines(content: str) -> list[str]:
+    lines = content.splitlines()
+    collected: list[str] = []
+    in_section = False
+    for line in lines:
+        if FILES_CHANGED_HEADING_RE.match(line.strip()):
+            in_section = True
+            continue
+        if in_section and line.strip().startswith("#"):
+            break
+        if in_section:
+            stripped = line.strip()
+            if stripped.startswith(("-", "*", "|")):
+                collected.append(line)
+    return collected
+
+
+def collect_cited_implementation_paths(content: str) -> set[str]:
+    """Collect paths for missing-parent warnings from deliberate path fields.
+
+    This deliberately does not reuse the broad document-wide PATH_TOKEN_RE scan
+    from extract_target_paths(); incidental prose path mentions should not
+    create warning noise.
+    """
+    paths: set[str] = set()
+    for line in content.splitlines():
+        target_match = TARGET_PATH_RE.match(line)
+        if target_match:
+            paths.update(_parse_declared_path_values(target_match.group(1)))
+    for line in _files_changed_section_lines(content):
+        for match in PATH_TOKEN_RE.finditer(line):
+            token = _normalize_path_token(match.group(1))
+            if token and not token.startswith(("http:/", "https:/")):
+                paths.add(token)
+    return paths
+
+
+def compute_missing_parent_dir_warnings(project_root: Path, paths: set[str]) -> list[str]:
+    warnings: list[str] = []
+    root = project_root.resolve()
+    for rel_path in sorted(paths):
+        candidate = Path(rel_path)
+        target = candidate if candidate.is_absolute() else root / candidate
+        try:
+            resolved = target.resolve(strict=False)
+            resolved.relative_to(root)
+        except ValueError:
+            continue
+        if resolved.exists():
+            continue
+        if not resolved.parent.exists():
+            warnings.append(rel_path)
+    return warnings
 
 
 def load_rules(config_path: Path) -> list[ApplicabilityRule]:
@@ -276,6 +347,8 @@ def build_packet(
         raise SystemExit(f"ERR_NO_INDEX_ENTRY: no entry for bridge_id={bridge_id!r} in {index_path}")
     cited_specs = extract_spec_links(content)
     target_paths = extract_target_paths(content)
+    cited_implementation_paths = collect_cited_implementation_paths(content)
+    project_root = index_path.parent.parent
     work_items = sorted(set(WORK_ITEM_RE.findall(content)))
     applicable = compute_applicable_specs(
         bridge_id=bridge_id,
@@ -303,6 +376,9 @@ def build_packet(
         ),
         "cited_specs": sorted(cited_specs),
         "target_paths": sorted(target_paths),
+        "warnings": {
+            "missing_parent_dirs": compute_missing_parent_dir_warnings(project_root, cited_implementation_paths),
+        },
         "work_items": work_items,
         "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
         "missing_required_specs": missing_required,
@@ -335,6 +411,7 @@ def format_markdown(packet: dict[str, Any]) -> str:
         f"- content_file: `{content_source.get('path', operative_path)}`",
         f"- operative_file: `{operative_path}`",
         f"- preflight_passed: `{str(packet['preflight_passed']).lower()}`",
+        f"- warnings.missing_parent_dirs: {json.dumps(packet.get('warnings', {}).get('missing_parent_dirs', []))}",
         f"- missing_required_specs: {json.dumps(packet['missing_required_specs'])}",
         f"- missing_advisory_specs: {json.dumps(packet['missing_advisory_specs'])}",
         "",
@@ -374,6 +451,13 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(json.dumps(packet, indent=2, sort_keys=True) + "\n")
     else:
         sys.stdout.write(format_markdown(packet))
+    missing_parent_dirs = packet.get("warnings", {}).get("missing_parent_dirs", [])
+    if missing_parent_dirs:
+        sys.stderr.write(
+            "warning: bridge preflight missing parent directories: "
+            + ", ".join(str(path) for path in missing_parent_dirs)
+            + "\n"
+        )
     return 0 if packet["preflight_passed"] else 5
 
 

@@ -101,15 +101,22 @@ LOOP_PREVENTION_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
 # Canonical default state path. Slice 4 may decide to reuse the smart-poller
 # state path instead; path is parameterized so tests don't encode it.
 DEFAULT_STATE_SUBDIR = (".gtkb-state", "cross-harness-trigger")
+BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
 DISPATCH_STATE_FILENAME = "dispatch-state.json"
+QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
+DISPATCH_FAILURES_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_FAILURES_MAX_BYTES"
+DEFAULT_DISPATCH_FAILURES_MAX_BYTES = 1024 * 1024
 
 # Selected-batch cap mirrors the smart-poller's default per
 # ``groundtruth-kb/scripts/bridge_poller_runner.py:670-673``. Bumping this
 # requires a separate bridge proposal — Codex F1 on
 # ``-008`` flagged unilateral cap changes as scope creep.
 DEFAULT_MAX_ITEMS = 2
+QUIESCE_WINDOW_SECONDS = 5.0
+QUIESCE_WINDOW_ENV_VAR = "GTKB_TRIGGER_QUIESCE_SECONDS"
+CLAUDE_WORKER_ALLOWED_TOOLS = "Read Edit Write Glob Grep Bash TodoWrite NotebookEdit"
 
 # WI-3265 (bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md, Codex
 # GO at -004): per-invocation diagnostic instrumentation. Observational only —
@@ -215,6 +222,15 @@ def _load_dispatch_state(state_dir: Path) -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
+def _load_quiesce_state(state_dir: Path) -> dict[str, Any]:
+    target = state_dir / QUIESCE_STATE_FILENAME
+    try:
+        raw = json.loads(target.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
 # IP-3c: dispatch-state-key migration.
 #
 # Legacy keys in dispatch-state.json's recipients map are ``"prime"`` and
@@ -261,6 +277,20 @@ def _migrate_recipients_state_keys(recipients: dict[str, Any]) -> dict[str, Any]
         else:
             migrated[new_key] = value
     return migrated
+
+
+def _diagnose_recipient_state(
+    recipients: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Return diagnose recipients plus display annotations for legacy-only state."""
+
+    has_new_keys = any(key in recipients for key in ROLE_STATE_KEYS)
+    legacy_annotations: dict[str, str] = {}
+    if not has_new_keys:
+        for legacy_key, new_key in LEGACY_TO_NEW_STATE_KEY.items():
+            if legacy_key in recipients:
+                legacy_annotations[new_key] = " (legacy key)"
+    return _migrate_recipients_state_keys(recipients), legacy_annotations
 
 
 def _rename_with_retry(
@@ -337,15 +367,74 @@ def _write_dispatch_state(state_dir: Path, payload: dict[str, Any]) -> None:
             pass
 
 
+def _write_quiesce_state(state_dir: Path, payload: dict[str, Any]) -> None:
+    """Atomically write quiesce state under a per-invocation temp path."""
+    state_dir.mkdir(parents=True, exist_ok=True)
+    target = state_dir / QUIESCE_STATE_FILENAME
+    unique = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    tmp = target.with_suffix(target.suffix + f".{unique}.tmp")
+    try:
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        _rename_with_retry(tmp, target)
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
+
+
+def _quiesce_window_seconds() -> float:
+    raw = os.environ.get(QUIESCE_WINDOW_ENV_VAR)
+    if raw is None or raw.strip() == "":
+        return QUIESCE_WINDOW_SECONDS
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return QUIESCE_WINDOW_SECONDS
+    return max(0.0, parsed)
+
+
+def _hook_context_value(hook_context: dict[str, str] | None, key: str) -> str:
+    if not hook_context:
+        return ""
+    value = hook_context.get(key)
+    return value if isinstance(value, str) else ""
+
+
 def _record_dispatch_failure(state_dir: Path, payload: dict[str, Any]) -> None:
     """Append a fire-and-forget failure record to the JSONL diagnosis log."""
     try:
         state_dir.mkdir(parents=True, exist_ok=True)
         target = state_dir / DISPATCH_FAILURES_FILENAME
+        _rotate_dispatch_failures_if_needed(target)
         with target.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
     except OSError:
         pass
+
+
+def _dispatch_failures_max_bytes() -> int:
+    raw = os.environ.get(DISPATCH_FAILURES_MAX_BYTES_ENV_VAR)
+    if raw is None or raw.strip() == "":
+        return DEFAULT_DISPATCH_FAILURES_MAX_BYTES
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return DEFAULT_DISPATCH_FAILURES_MAX_BYTES
+    return parsed if parsed > 0 else DEFAULT_DISPATCH_FAILURES_MAX_BYTES
+
+
+def _rotate_dispatch_failures_if_needed(target: Path) -> None:
+    """Rotate dispatch-failures.jsonl to .1 when the current segment is oversized."""
+    try:
+        size = target.stat().st_size
+    except FileNotFoundError:
+        return
+    if size <= _dispatch_failures_max_bytes():
+        return
+    rollover = target.with_name(target.name + ".1")
+    _rename_with_retry(target, rollover)
 
 
 def _path_mtime_iso(path: Path) -> str | None:
@@ -358,6 +447,29 @@ def _path_mtime_iso(path: Path) -> str | None:
     except OSError:
         return None
     return dt.datetime.fromtimestamp(mtime, dt.UTC).isoformat(timespec="seconds")
+
+
+def _dispatch_state_mtime(state_dir: Path) -> float | None:
+    try:
+        return (state_dir / DISPATCH_STATE_FILENAME).stat().st_mtime
+    except FileNotFoundError:
+        return None
+
+
+def _resolve_diagnose_state_dir(project_root: Path) -> Path:
+    """Prefer the newest live dispatch-state directory for no-flag diagnose."""
+
+    default_state_dir = project_root.joinpath(*DEFAULT_STATE_SUBDIR)
+    candidates = [
+        project_root.joinpath(*BRIDGE_POLLER_STATE_SUBDIR),
+        default_state_dir,
+    ]
+    existing = [
+        (mtime, state_dir) for state_dir in candidates if (mtime := _dispatch_state_mtime(state_dir)) is not None
+    ]
+    if not existing:
+        return default_state_dir
+    return max(existing, key=lambda item: item[0])[1]
 
 
 def _classify_invocation_outcome(last_result: str) -> str:
@@ -451,6 +563,12 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
         "Latest VERIFIED entries are bridge closure for both roles and are not "
         "queue work; do not process them as actionable."
     )
+    worker_context_line = (
+        "Worker context: this auto-dispatched harness cannot interactively ask "
+        "the owner for input. If a required owner decision blocks the selected "
+        "work, record the blocker in the bridge artifact and stop instead of "
+        "asking in prose."
+    )
     canonical_keyword = f"::init gtkb {target.canonical_mode}"
     return "\n".join(
         [
@@ -464,6 +582,7 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
             ),
             "",
             role_line,
+            worker_context_line,
             "Read bridge/INDEX.md directly before acting. Treat the live latest status as authoritative.",
             "If any listed entry is no longer actionable for your role, do not act on that stale entry.",
             "Keep work scoped to the selected bridge entries and preserve the bridge protocol audit trail.",
@@ -479,11 +598,19 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
     harness-registry projection.
 
     Per WI-3344 / REQ-HARNESS-REGISTRY-001 FR8 / DELIB-2079 Q9: the command is
-    built solely from ``target.invocation_surfaces``. Its ``headless`` entry
-    carries an ordered ``argv`` template whose elements are literal strings or
-    the placeholder tokens ``{{PROMPT}}`` and ``{{PROJECT_ROOT}}``, each
-    substituted as a single individual argv element. No shell is invoked and no
-    per-harness command branch is hard-coded.
+    built from ``target.invocation_surfaces``. Its ``headless`` entry carries
+    an ordered ``argv`` template whose elements are literal strings or the
+    placeholder tokens ``{{PROMPT}}`` and ``{{PROJECT_ROOT}}``, each substituted
+    as a single individual argv element. No shell is invoked and no per-harness
+    command fallback is hard-coded.
+
+    The only role-specific overlay is the approved Prime-worker Claude
+    permission profile from ``gtkb-prime-worker-permission-profile-slice-1``:
+    Claude headless workers get ``acceptEdits`` plus an explicit authoring-tool
+    allow-list so Edit/Write calls do not hang on interactive permission
+    prompts. PreToolUse governance hooks remain the safety floor, and the
+    allow-list intentionally excludes ``AskUserQuestion``, web tools, and MCP
+    tools.
 
     Fails closed to ``None`` ("unknown_recipient") for EVERY harness — Claude
     and Codex included — when ``invocation_surfaces`` is missing, has no
@@ -509,6 +636,11 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
             command.append(str(project_root))
         else:
             command.append(element)
+    if target.command_handle == "claude":
+        if "--permission-mode" not in command:
+            command.extend(["--permission-mode", "acceptEdits"])
+        if "--allowed-tools" not in command and "--allowedTools" not in command:
+            command.extend(["--allowed-tools", CLAUDE_WORKER_ALLOWED_TOOLS])
     return command
 
 
@@ -693,6 +825,96 @@ def _invert_identities(identities: dict[str, Any]) -> dict[str, str]:
         {"B": "claude", "A": "codex"}
     """
     return {info["id"]: name for name, info in identities["harnesses"].items()}
+
+
+def _role_label_for_record(record: dict[str, Any]) -> str:
+    raw = record.get("role")
+    if isinstance(raw, str):
+        return raw.strip().lower()
+    if isinstance(raw, (list, tuple, set, frozenset)):
+        normalized = sorted(str(role).strip().lower() for role in raw if str(role).strip())
+        return "+".join(normalized)
+    return ""
+
+
+def _resolve_origin_identity(project_root: Path) -> tuple[str, str]:
+    """Best-effort origin harness identity for quiesce scoping.
+
+    Hook registrations do not pass an explicit harness argument. Prefer the
+    durable harness env vars when present, fall back to common harness process
+    indicators, then fail soft to ``unknown`` components. The quiesce key still
+    includes session/event, so unknown origin does not affect dispatch safety.
+    """
+    env_harness_id = (
+        os.environ.get("GTKB_HARNESS_ID") or os.environ.get("CODEX_HARNESS_ID") or os.environ.get("CLAUDE_HARNESS_ID")
+    )
+    env_harness_name = os.environ.get("GTKB_HARNESS_NAME")
+    if not env_harness_name:
+        if os.environ.get("CLAUDE_PROJECT_DIR"):
+            env_harness_name = "claude"
+        elif os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_HOME"):
+            env_harness_name = "codex"
+
+    try:
+        identities = _read_harness_identities(project_root)
+        name_to_id = {
+            str(name): str(info.get("id"))
+            for name, info in identities.get("harnesses", {}).items()
+            if isinstance(info, dict) and info.get("id")
+        }
+    except ValueError:
+        name_to_id = {}
+
+    harness_id = str(env_harness_id or name_to_id.get(str(env_harness_name or ""), "") or "")
+    role_label = ""
+    if harness_id:
+        try:
+            role_map = _read_role_assignments(project_root)
+            record = role_map.get("harnesses", {}).get(harness_id)
+            if isinstance(record, dict):
+                role_label = _role_label_for_record(record)
+        except ValueError:
+            role_label = ""
+
+    return harness_id or "unknown", role_label or "unknown"
+
+
+def _quiesce_key(
+    *,
+    project_root: Path,
+    invocation_source: str,
+    hook_context: dict[str, str] | None,
+) -> str:
+    session_id = _hook_context_value(hook_context, "session_id") or os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID", "")
+    hook_event_name = _hook_context_value(hook_context, "hook_event_name") or invocation_source
+    harness_id, role_label = _resolve_origin_identity(project_root)
+    return f"{hook_event_name}:{session_id}:{harness_id}:{role_label}"
+
+
+def _quiesce_marker(
+    actionable_for_prime: list[Any],
+    actionable_for_codex: list[Any],
+    *,
+    max_items: int,
+) -> dict[str, Any]:
+    prime_selected = _selected_oldest_first(
+        [item for item in actionable_for_prime if getattr(item, "dispatchable", True)],
+        max_items,
+    )
+    codex_selected = _selected_oldest_first(
+        [item for item in actionable_for_codex if getattr(item, "dispatchable", True)],
+        max_items,
+    )
+    return {
+        "prime-builder": {
+            "selected_count": len(prime_selected),
+            "signature": _signature(prime_selected),
+        },
+        "loyal-opposition": {
+            "selected_count": len(codex_selected),
+            "signature": _signature(codex_selected),
+        },
+    }
 
 
 def _resolve_dispatch_target(needed_role_label: str, project_root: Path) -> DispatchTarget:
@@ -1056,6 +1278,7 @@ def run_trigger(
     max_items: int = DEFAULT_MAX_ITEMS,
     dry_run: bool = False,
     invocation_source: str = "manual",
+    hook_context: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run one detection + dispatch cycle.
 
@@ -1063,11 +1286,10 @@ def run_trigger(
     dispatch are surfaced via the per-recipient ``last_result`` field but the
     function returns normally.
 
-    ``invocation_source`` (``"PostToolUse"`` / ``"Stop"`` / ``"manual"``) is
-    recorded in the WI-3265 diagnostic instrumentation only; it does not
-    influence dispatch. Defaults to ``"manual"`` for direct/programmatic calls;
-    ``main()`` passes ``"Stop"`` under ``--stop-hook`` and ``"PostToolUse"``
-    otherwise.
+    ``invocation_source`` (``"PostToolUse"`` / ``"Stop"`` / ``"manual"``)
+    controls the quiesce gate. Only PostToolUse invocations are quiesced;
+    Stop and manual reconciliation bypass quiesce and use the normal signature
+    dedup path. ``hook_context`` is the fail-soft parsed hook stdin payload.
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
@@ -1103,6 +1325,45 @@ def run_trigger(
     index_text = _read_index_live(project_root)
     _diag_index_signature_pre = hashlib.sha256(index_text.encode("utf-8")).hexdigest()
     actionable_for_prime, actionable_for_codex = _compute_actionable(index_text, project_root)
+
+    quiesce_key = _quiesce_key(
+        project_root=project_root,
+        invocation_source=invocation_source,
+        hook_context=hook_context,
+    )
+    if invocation_source == "PostToolUse":
+        now_epoch = time.time()
+        window_seconds = _quiesce_window_seconds()
+        quiesce_state = _load_quiesce_state(state_dir)
+        records = quiesce_state.get("records") if isinstance(quiesce_state, dict) else {}
+        if not isinstance(records, dict):
+            records = {}
+        record = records.get(quiesce_key)
+        marker = _quiesce_marker(
+            actionable_for_prime,
+            actionable_for_codex,
+            max_items=max_items,
+        )
+        if isinstance(record, dict) and now_epoch < float(record.get("quiesce_until") or 0):
+            records[quiesce_key] = {
+                "last_postooluse_seen_at": now_epoch,
+                "quiesce_until": now_epoch + window_seconds,
+                "pending_quiesce_marker": marker,
+            }
+            _write_quiesce_state(
+                state_dir,
+                {
+                    "schema_version": 1,
+                    "updated_at": _now_iso(),
+                    "records": records,
+                },
+            )
+            return {
+                "skipped": True,
+                "reason": "quiesce_window_active",
+                "quiesce_key": quiesce_key,
+                "pending_quiesce_marker": marker,
+            }
 
     state = _load_dispatch_state(state_dir)
     recipients_state = state.get("recipients") if isinstance(state, dict) else {}
@@ -1257,6 +1518,26 @@ def run_trigger(
     }
     _write_dispatch_state(state_dir, payload)
 
+    if invocation_source == "PostToolUse":
+        now_epoch = time.time()
+        quiesce_state = _load_quiesce_state(state_dir)
+        records = quiesce_state.get("records") if isinstance(quiesce_state, dict) else {}
+        if not isinstance(records, dict):
+            records = {}
+        records[quiesce_key] = {
+            "last_postooluse_seen_at": now_epoch,
+            "quiesce_until": now_epoch + _quiesce_window_seconds(),
+            "pending_quiesce_marker": None,
+        }
+        _write_quiesce_state(
+            state_dir,
+            {
+                "schema_version": 1,
+                "updated_at": _now_iso(),
+                "records": records,
+            },
+        )
+
     # WI-3265 diagnostic instrumentation: emit one observational record per
     # recipient processed this invocation. The cross-harness trigger handles
     # two recipients per invocation with independent outcomes, so the GO'd
@@ -1268,7 +1549,9 @@ def run_trigger(
         "timestamp": _now_iso(),
         "invocation_source": invocation_source,
         "pid": os.getpid(),
-        "session_id": os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID", ""),
+        "session_id": _hook_context_value(hook_context, "session_id")
+        or os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID", ""),
+        "hook_event_name": _hook_context_value(hook_context, "hook_event_name"),
         "index_mtime": _diag_index_mtime,
         "index_signature_pre": _diag_index_signature_pre,
         "index_signature_post": hashlib.sha256(_read_index_live(project_root).encode("utf-8")).hexdigest(),
@@ -1313,7 +1596,30 @@ def _classify_failure_record(record: dict[str, Any]) -> str:
     return f"other ({record.get('error_type') or 'unknown'})"
 
 
-def _emit_diagnose_summary(state_dir: Path) -> str:
+def _read_dispatch_failure_records(state_dir: Path, *, include_rotated_failures: bool = False) -> list[dict[str, Any]]:
+    paths = [state_dir / DISPATCH_FAILURES_FILENAME]
+    if include_rotated_failures:
+        paths.append(state_dir / f"{DISPATCH_FAILURES_FILENAME}.1")
+
+    records: list[dict[str, Any]] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        try:
+            raw = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in raw:
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(rec, dict):
+                records.append(rec)
+    return records
+
+
+def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = False) -> str:
     """Render a structured liveness summary; read-only.
 
     Sections:
@@ -1358,20 +1664,22 @@ def _emit_diagnose_summary(state_dir: Path) -> str:
     lines.append("== Per-recipient state ==")
     recipients = state.get("recipients", {}) or {}
     if isinstance(recipients, dict):
-        recipients = _migrate_recipients_state_keys(recipients)
+        recipients, recipient_annotations = _diagnose_recipient_state(recipients)
     else:
         recipients = {}
+        recipient_annotations = {}
     for name in ROLE_STATE_KEYS:
+        annotation = recipient_annotations.get(name, "")
         rec = recipients.get(name) or {}
         if not rec:
-            lines.append(f"- {name}: (no state recorded)")
+            lines.append(f"- {name}: (no state recorded){annotation}")
             continue
         sig = (rec.get("signature") or "")[:8]
         last_dispatched = (rec.get("last_dispatched_signature") or "")[:8] or "(none)"
         lines.append(
             f"- {name}: last_result={rec.get('last_result', '?')}, "
             f"pending={rec.get('pending_count', '?')}, "
-            f"selected={rec.get('selected_count', '?')}"
+            f"selected={rec.get('selected_count', '?')}{annotation}"
         )
         lines.append(f"  signature {sig}... last_dispatched={last_dispatched}...")
     lines.append("")
@@ -1382,20 +1690,15 @@ def _emit_diagnose_summary(state_dir: Path) -> str:
     if not failures_path.is_file():
         lines.append("- dispatch-failures.jsonl absent (no failures recorded).")
     else:
-        try:
-            raw = failures_path.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            raw = []
-        records: list[dict[str, Any]] = []
-        for line in raw:
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(rec, dict):
-                records.append(rec)
+        records = _read_dispatch_failure_records(
+            state_dir,
+            include_rotated_failures=include_rotated_failures,
+        )
         total = len(records)
-        lines.append(f"- Total in dispatch-failures.jsonl: {total}")
+        if include_rotated_failures:
+            lines.append(f"- Total in dispatch-failures.jsonl (current + rotated): {total}")
+        else:
+            lines.append(f"- Total in dispatch-failures.jsonl: {total}")
         # Distribution by error class — NOT collapsed.
         class_counts: dict[str, int] = {}
         last_ts_by_class: dict[str, str] = {}
@@ -1414,24 +1717,27 @@ def _emit_diagnose_summary(state_dir: Path) -> str:
     lines.append("== Liveness ==")
     overall_healthy = True
     for name in ROLE_STATE_KEYS:
+        annotation = recipient_annotations.get(name, "")
         rec = recipients.get(name) or {}
         sig = rec.get("signature") or ""
         last_dispatched = rec.get("last_dispatched_signature") or ""
         last_result = rec.get("last_result") or ""
         if last_result == "no_pending":
-            lines.append(f"- {name}: idle (no actionable work).")
+            lines.append(f"- {name}: idle (no actionable work).{annotation}")
         elif last_result == "no_pending_after_filter":
-            lines.append(f"- {name}: idle (no dispatchable work after filtering).")
+            lines.append(f"- {name}: idle (no dispatchable work after filtering).{annotation}")
         elif last_result == "single_harness_topology_not_applicable":
-            lines.append(f"- {name}: inert (single-harness topology; cross-harness dispatch not applicable).")
+            lines.append(
+                f"- {name}: inert (single-harness topology; cross-harness dispatch not applicable).{annotation}"
+            )
         elif last_result == "counterpart_active_session_present":
-            lines.append(f"- {name}: suppressed (counterpart active session detected; by design).")
+            lines.append(f"- {name}: suppressed (counterpart active session detected; by design).{annotation}")
         elif sig == last_dispatched and sig:
-            lines.append(f"- {name}: dispatched (signature matches last_dispatched).")
+            lines.append(f"- {name}: dispatched (signature matches last_dispatched).{annotation}")
         elif last_result == "unchanged":
-            lines.append(f"- {name}: idempotent (signature unchanged from last successful dispatch).")
+            lines.append(f"- {name}: idempotent (signature unchanged from last successful dispatch).{annotation}")
         else:
-            lines.append(f"- {name}: state={last_result or '?'} (no liveness rule matched).")
+            lines.append(f"- {name}: state={last_result or '?'} (no liveness rule matched).{annotation}")
             overall_healthy = False
     lines.append("")
 
@@ -1504,7 +1810,39 @@ def _build_argparser() -> argparse.ArgumentParser:
             "bridge/gtkb-cross-harness-trigger-windows-rename-race-001 GO at -004."
         ),
     )
+    parser.add_argument(
+        "--include-rotated-failures",
+        action="store_true",
+        help=(
+            "In --diagnose mode, include dispatch-failures.jsonl.1 in the failure "
+            "distribution. Default diagnose reads only the current segment."
+        ),
+    )
     return parser
+
+
+def _read_hook_context_from_stdin() -> dict[str, str] | None:
+    """Read hook JSON payload from stdin without blocking manual invocations."""
+    try:
+        if sys.stdin.isatty():
+            return None
+        raw = sys.stdin.read()
+    except Exception:  # noqa: BLE001 - hook payload parsing is fail-soft
+        return None
+    if not raw.strip():
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    session_id = payload.get("session_id")
+    hook_event_name = payload.get("hook_event_name")
+    return {
+        "session_id": session_id if isinstance(session_id, str) else "",
+        "hook_event_name": hook_event_name if isinstance(hook_event_name, str) else "",
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1520,14 +1858,18 @@ def main(argv: list[str] | None = None) -> int:
         avoid violating the JSON contract.
     """
     args = _build_argparser().parse_args(argv)
+    hook_context = _read_hook_context_from_stdin()
     try:
         project_root = _resolve_project_root(args.project_root)
-        state_dir = (
-            args.state_dir.resolve() if args.state_dir is not None else project_root.joinpath(*DEFAULT_STATE_SUBDIR)
-        )
+        if args.state_dir is not None:
+            state_dir = args.state_dir.resolve()
+        elif args.diagnose:
+            state_dir = _resolve_diagnose_state_dir(project_root)
+        else:
+            state_dir = project_root.joinpath(*DEFAULT_STATE_SUBDIR)
         if args.diagnose:
             # Diagnose mode: read-only liveness summary; no dispatch, no state mutation.
-            print(_emit_diagnose_summary(state_dir))
+            print(_emit_diagnose_summary(state_dir, include_rotated_failures=args.include_rotated_failures))
             return 0
         summary = run_trigger(
             project_root=project_root,
@@ -1535,6 +1877,7 @@ def main(argv: list[str] | None = None) -> int:
             max_items=args.max_items,
             dry_run=args.dry_run,
             invocation_source=("Stop" if args.stop_hook else "PostToolUse"),
+            hook_context=hook_context,
         )
         if args.stop_hook:
             # Codex Stop contract: exactly one parseable JSON object on stdout,

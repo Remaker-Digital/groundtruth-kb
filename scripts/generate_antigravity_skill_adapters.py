@@ -67,7 +67,7 @@ class SkillAdapter:
 
 
 def _lo_skill_capabilities(registry: dict) -> list[dict]:
-    """Skill capabilities whose required_for_roles includes loyal-opposition."""
+    """Skill capabilities in the registry."""
 
     raw = registry.get("capabilities")
     if not isinstance(raw, list):
@@ -80,11 +80,7 @@ def _lo_skill_capabilities(registry: dict) -> list[dict]:
             continue
         if not str(capability.get("canonical_source") or "").endswith("/SKILL.md"):
             continue
-        roles = capability.get("required_for_roles")
-        if not isinstance(roles, list):
-            continue
-        if ANTIGRAVITY_ROLE in [str(role).strip().lower() for role in roles]:
-            selected.append(capability)
+        selected.append(capability)
     return selected
 
 
@@ -119,7 +115,7 @@ def render_adapter(source_text: str, adapter: SkillAdapter, *, generated_at: str
 
     body = _strip_generated_block(source_text)
     if body.startswith(BOM):
-        body = body[len(BOM):]
+        body = body[len(BOM) :]
     body = body.rstrip() + "\n"
     block = _generated_block(adapter, generated_at)
     lines = body.splitlines(keepends=True)

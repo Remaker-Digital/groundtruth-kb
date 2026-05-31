@@ -130,9 +130,7 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
         ["git", "rev-parse", "--git-common-dir"],
     ):
         try:
-            out = subprocess.check_output(
-                args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL
-            ).strip()
+            out = subprocess.check_output(args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL).strip()
         except (OSError, subprocess.SubprocessError):
             continue
         if not out:
@@ -141,6 +139,38 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
         candidate = common_dir.parent
         if (candidate / "groundtruth.toml").is_file():
             return candidate
+    return None
+
+
+def _nearest_index_project_root(cwd_path: Path) -> Path | None:
+    """Return the nearest ancestor with an explicit bridge index.
+
+    Unit tests often build synthetic bridge roots under the live checkout's
+    temp directory. Prefer that explicit bridge marker over global resolver
+    state so fixture packets are loaded from the intended root.
+    """
+    try:
+        resolved = cwd_path.resolve()
+    except OSError:
+        resolved = cwd_path
+    for candidate in (resolved, *resolved.parents):
+        if (candidate / "bridge" / "INDEX.md").is_file():
+            return candidate
+    return None
+
+
+def _containing_worktree_canonical_root(cwd_path: Path) -> Path | None:
+    """Return the canonical root for paths under ``.claude/worktrees/*``."""
+    try:
+        resolved = cwd_path.resolve()
+    except OSError:
+        resolved = cwd_path
+    parts = resolved.parts
+    for index in range(len(parts) - 2):
+        if parts[index] == ".claude" and parts[index + 1] == "worktrees":
+            candidate = Path(*parts[:index])
+            if (candidate / "groundtruth.toml").is_file():
+                return candidate
     return None
 
 
@@ -153,10 +183,21 @@ def canonical_project_root(cwd_path: Path, *, fallback: Path | None = None) -> P
     is ``cwd_path`` itself or an ancestor of it (the canonical root always
     contains the session cwd):
 
-      1. ``groundtruth_kb.bridge.paths.resolve_project_root()`` when importable.
-      2. ``git rev-parse --git-common-dir`` rooted at ``cwd_path``.
-      3. ``fallback`` when supplied, else ``cwd_path``.
+      1. The containing canonical root for ``.claude/worktrees/*`` sessions.
+      2. The nearest ancestor of ``cwd_path`` with an explicit bridge index.
+      3. ``git rev-parse --git-common-dir`` rooted at ``cwd_path``.
+      4. ``groundtruth_kb.bridge.paths.resolve_project_root()`` when importable.
+      5. ``fallback`` when supplied, else ``cwd_path``.
     """
+    worktree_root = _containing_worktree_canonical_root(cwd_path)
+    if worktree_root is not None:
+        return worktree_root
+    index_root = _nearest_index_project_root(cwd_path)
+    if index_root is not None:
+        return index_root
+    git_root = _git_common_dir_root(cwd_path)
+    if git_root is not None and _ancestor_or_self(git_root, cwd_path):
+        return git_root
     try:
         from groundtruth_kb.bridge.paths import resolve_project_root
 
@@ -165,9 +206,6 @@ def canonical_project_root(cwd_path: Path, *, fallback: Path | None = None) -> P
         candidate = None
     if candidate is not None and _ancestor_or_self(candidate, cwd_path):
         return candidate
-    git_root = _git_common_dir_root(cwd_path)
-    if git_root is not None and _ancestor_or_self(git_root, cwd_path):
-        return git_root
     return fallback if fallback is not None else cwd_path
 
 
@@ -215,7 +253,7 @@ def _filename_matches_doc(path: str, doc_id: str) -> bool:
     prefix = f"bridge/{doc_id}"
     if not path.startswith(prefix):
         return False
-    suffix = path[len(prefix):]
+    suffix = path[len(prefix) :]
     return suffix == ".md" or re.match(r"^-\d{3,}\.md$", suffix) is not None
 
 
@@ -336,7 +374,9 @@ def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
     )
     if go_index is None:
         raise AuthorizationError(
-            f"Implementation authorization requires a GO in the bridge chain; found latest status {entry.latest_status}"
+            "Implementation authorization requires a GO in the bridge chain; "
+            "latest GO or resumable post-GO NO-GO is required; "
+            f"found latest status {entry.latest_status}"
         )
     state = _post_go_chain_state([status for status, _ in entry.versions[:go_index]])
     if state == "awaiting_review":
@@ -577,7 +617,9 @@ def validate_project_authorization_row(
     excluded_items = set(_json_list(row, "excluded_work_item_ids"))
     if work_item_id:
         if work_item_id in excluded_items:
-            raise AuthorizationError(f"Work item {work_item_id} is excluded by project authorization {authorization_id}")
+            raise AuthorizationError(
+                f"Work item {work_item_id} is excluded by project authorization {authorization_id}"
+            )
         if work_item_id not in included_items and not _work_item_in_project(project_root, project_id, work_item_id):
             raise AuthorizationError(
                 f"Work item {work_item_id} is neither included in nor an active member of project {project_id}"
@@ -707,9 +749,7 @@ def create_authorization_packet(
         errors.append(str(exc))
 
     try:
-        project_authorization = extract_and_validate_project_authorization(
-            project_root, proposal, spec_links
-        )
+        project_authorization = extract_and_validate_project_authorization(project_root, proposal, spec_links)
     except AuthorizationError as exc:
         errors.append(str(exc))
 
@@ -718,9 +758,7 @@ def create_authorization_packet(
 
     sufficiency = requirement_sufficiency_state(proposal)
     if sufficiency == "gap":
-        errors.append(
-            "Approved proposal says new or revised requirements are required before implementation"
-        )
+        errors.append("Approved proposal says new or revised requirements are required before implementation")
     elif sufficiency == "missing" and bridge_id not in BOOTSTRAP_BRIDGE_IDS:
         errors.append("Approved proposal is missing ## Requirement Sufficiency")
 
@@ -790,9 +828,7 @@ def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
             if status == "GO":
                 found_go = True
                 break
-            raise AuthorizationError(
-                f"Bridge GO file status changed: {go_file} is now {status}"
-            )
+            raise AuthorizationError(f"Bridge GO file status changed: {go_file} is now {status}")
         statuses_after_go.append(status)
 
     if not found_go:
@@ -867,9 +903,7 @@ def load_named_packet(project_root: Path, bridge_id: str) -> dict[str, Any]:
     try:
         packet = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise AuthorizationError(
-            f"Named packet for bridge {bridge_id!r} is corrupt JSON"
-        ) from exc
+        raise AuthorizationError(f"Named packet for bridge {bridge_id!r} is corrupt JSON") from exc
     _validate_packet(project_root, packet)
     return packet
 
@@ -903,14 +937,16 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
         try:
             packet = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            rows.append({
-                "path": rel,
-                "bridge_id": None,
-                "expires_at": None,
-                "target_path_globs": [],
-                "valid": False,
-                "error": f"corrupt or unreadable: {exc}",
-            })
+            rows.append(
+                {
+                    "path": rel,
+                    "bridge_id": None,
+                    "expires_at": None,
+                    "target_path_globs": [],
+                    "valid": False,
+                    "error": f"corrupt or unreadable: {exc}",
+                }
+            )
             continue
         bridge_id = packet.get("bridge_id")
         try:
@@ -920,14 +956,16 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
         except AuthorizationError as exc:
             valid = False
             error = str(exc)
-        rows.append({
-            "path": rel,
-            "bridge_id": bridge_id,
-            "expires_at": packet.get("expires_at"),
-            "target_path_globs": packet.get("target_path_globs", []),
-            "valid": valid,
-            "error": error,
-        })
+        rows.append(
+            {
+                "path": rel,
+                "bridge_id": bridge_id,
+                "expires_at": packet.get("expires_at"),
+                "target_path_globs": packet.get("target_path_globs", []),
+                "valid": valid,
+                "error": error,
+            }
+        )
     return rows
 
 
@@ -959,7 +997,9 @@ def main(argv: list[str] | None = None) -> int:
     begin = subparsers.add_parser("begin")
     begin.add_argument("--bridge-id", required=True)
     begin.add_argument("--expires-minutes", type=int, default=DEFAULT_EXPIRY_MINUTES)
-    begin.add_argument("--no-write", action="store_true", help="Print packet without writing current.json or the named-cache packet")
+    begin.add_argument(
+        "--no-write", action="store_true", help="Print packet without writing current.json or the named-cache packet"
+    )
 
     validate = subparsers.add_parser("validate")
     validate.add_argument("--target", action="append", required=True)

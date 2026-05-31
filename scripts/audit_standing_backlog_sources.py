@@ -65,44 +65,64 @@ def work_item_summary(project_root: Path) -> dict[str, Any]:
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     try:
+        active_authorized_work_item_ids: set[str] = set()
+        for row in connection.execute(
+            "SELECT included_work_item_ids FROM current_project_authorizations WHERE status = 'active'"
+        ):
+            raw_ids = row["included_work_item_ids"]
+            if not raw_ids:
+                continue
+            try:
+                parsed_ids = json.loads(raw_ids)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed_ids, list):
+                active_authorized_work_item_ids.update(str(item_id) for item_id in parsed_ids)
+
         status_counts = {
             row["resolution_status"]: row["count"]
             for row in connection.execute(
                 "SELECT resolution_status, count(*) AS count "
-                "FROM work_items GROUP BY resolution_status ORDER BY resolution_status"
+                "FROM current_work_items GROUP BY resolution_status ORDER BY resolution_status"
             )
         }
-        priority_counts = {
-            f"{row['priority'] or 'none'}:{row['resolution_status']}": row["count"]
+        non_terminal_rows = [
+            dict(row)
             for row in connection.execute(
-                "SELECT priority, resolution_status, count(*) AS count "
-                "FROM work_items "
+                "SELECT id, resolution_status, priority, component, project_name, source_spec_id, title "
+                "FROM current_work_items "
                 "WHERE resolution_status IN ({}) "
-                "GROUP BY priority, resolution_status "
-                "ORDER BY priority, resolution_status".format(
+                "ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 ELSE 9 END, id".format(
                     ",".join("?" for _ in NON_TERMINAL_WORK_ITEM_STATUSES)
                 ),
                 sorted(NON_TERMINAL_WORK_ITEM_STATUSES),
             )
-        }
-        top_non_terminal = [
-            dict(row)
+        ]
+        authorization_status_counts = Counter(
+            "covered_by_active_authorization"
+            if row["id"] in active_authorized_work_item_ids
+            else "not_in_active_authorization"
+            for row in non_terminal_rows
+        )
+        priority_counts = {
+            f"{row['priority'] or 'none'}:{row['resolution_status']}": row["count"]
             for row in connection.execute(
-                "SELECT id, resolution_status, priority, component, source_spec_id, title "
-                "FROM work_items "
+                "SELECT priority, resolution_status, count(*) AS count "
+                "FROM current_work_items "
                 "WHERE resolution_status IN ({}) "
-                "ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 ELSE 9 END, id "
-                "LIMIT 25".format(",".join("?" for _ in NON_TERMINAL_WORK_ITEM_STATUSES)),
+                "GROUP BY priority, resolution_status "
+                "ORDER BY priority, resolution_status".format(",".join("?" for _ in NON_TERMINAL_WORK_ITEM_STATUSES)),
                 sorted(NON_TERMINAL_WORK_ITEM_STATUSES),
             )
-        ]
+        }
     finally:
         connection.close()
 
     return {
         "status_counts": status_counts,
+        "authorization_status_counts": dict(sorted(authorization_status_counts.items())),
         "priority_status_counts": priority_counts,
-        "top_non_terminal": top_non_terminal,
+        "top_non_terminal": non_terminal_rows[:25],
     }
 
 
@@ -162,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
     for entry in bridge["actionable"]:
         print(f"- {entry['status']}: {entry['document']} ({entry['path']})")
     print(f"Work item status counts: {work_items['status_counts']}")
+    print(f"Work item authorization coverage: {work_items['authorization_status_counts']}")
     print("Release blockers:")
     for blocker in audit["release_blockers"]:
         print(f"- {blocker}")
