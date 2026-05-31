@@ -6,7 +6,27 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-0860
+  asked_at: 2026-05-31T07:32:41.916810Z
+  question: "Want me to triage that broader 55-entry queue (most are other-stream GOs awaiting implementation), or hold here until..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 9f2c440ad2831146
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0861
+  asked_at: 2026-05-31T07:52:24.177485Z
+  question: "want me to triage that queue, push this commit, or stop here?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 9c86f49773c6f438
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0870
+  asked_at: 2026-05-31T17:48:18.550796Z
+  question: "Want me to (a) continue the diagnostic of the cache/sidecar mismatch I started, (b) propose unifying the startup/fres..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 79be051178c54113
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -303,1446 +323,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S327
   answer: "S327 clear pending: real prose decision-ask from a prior session ('Want me to action those next, or pick something else?'). Resolved by autonomous progression on the work_list-pre-approved ISOLATION-017 Slice 3 track, which reached VERIFIED at bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-014.md. Cleared via 'clear pending' instruction."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0189
-  asked_at: 2026-05-01T05:28:09.181538Z
-  question: "s its own session.  Want me to begin #1 (dashboard-link parent close-out) now, or hold for explicit direction?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 3aa6e3014809c813
-  resolved_at: 2026-05-01T05:35:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (offering_or_choice). The same prose ask was formalized via AskUserQuestion in the same turn; detector caught the prose form anyway. Owner answered \"Yes, begin #1 now\" via the structured dialog. Not a missed decision. Same false-positive class as DECISION-0164 etc. Resolved inline."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0182
-  asked_at: 2026-05-01T05:16:37.566781Z
-  question: "idge files written. Awaiting owner direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 5905132ffcd99c98
-  resolved_at: 2026-05-01T05:25:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169/0175/0177. Truncated prose-detector capture. Resolved inline per Full triage authorization."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0184
-  asked_at: 2026-05-01T05:18:32.505373Z
-  question: "idge files written. Awaiting owner direction.\") — auto-detected"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 85257539e70d75d8
-  resolved_at: 2026-05-01T05:25:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (awaiting_input meta-discussion). Detector caught Claude's own description of DECISION-0182's false-positive class. Same recursive-meta pattern as DECISION-0080/0090/0092/0114/0160. Resolved inline."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0186
-  asked_at: 2026-05-01T05:20:20.224132Z
-  question: "idge files written. Awaiting owner direction.\"). Not real owner"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 8891b782903e6515
-  resolved_at: 2026-05-01T05:25:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (awaiting_input recursive-meta). Same class as DECISION-0184. Detector caught Claude's discussion of the discussion of the false-positive pattern. Resolved inline."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0188
-  asked_at: 2026-05-01T05:20:51.597297Z
-  question: "ode mutations made. Awaiting your direction on next move."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: d5ad3acea9790ec0
-  resolved_at: 2026-05-01T05:25:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (awaiting_input). Truncated prose fragment from a status report. Same class as DECISION-0182. Resolved inline."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0177
-  asked_at: 2026-05-01T05:04:50.340526Z
-  question: "reserved unchanged. Awaiting owner direction on whether to surfa"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: b9252b35f96bac2a
-  resolved_at: 2026-05-01T05:15:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169/0175. Truncated prose-detector capture from a status report. Resolved inline per Full triage authorization."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0175
-  asked_at: 2026-05-01T04:54:11.171778Z
-  question: "sory-only feedback. Awaiting owner direction on whether to: - (a"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 1993ed8371b77b88
-  resolved_at: 2026-05-01T05:00:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169. Detector caught Claude's prose fragment from a status report. Resolved inline per Full triage authorization."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0165
-  asked_at: 2026-05-01T02:17:46.535439Z
-  question: "g-or-choice prose (\"Want me to wait or do you want to trigger Codex manually?\") — same false-posi"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 0272f03b5d22c089
-  resolved_at: 2026-05-01T04:30:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (offering_or_choice meta-discussion). The detector caught Claude's own description of DECISION-0164's false-positive class — quoting the prior false-positive prose to discuss it. Same recursive-meta pattern as DECISION-0080, 0090, 0092, 0114, 0160. Not a real owner question. Resolved inline per Full triage authorization."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0166
-  asked_at: 2026-05-01T02:18:26.151555Z
-  question: "wrap`, `::bridge`). Want me to file that proposal, or do you have a different next priority?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 47c664d8cda0e80d
-  resolved_at: 2026-05-01T04:30:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (offering_or_choice). Detector caught Claude's prose offering paths-from-here at end of status report. Same class as DECISION-0164. Owner answered subsequently via AskUserQuestion (Full triage / Implement dashboard-link / etc.); the prose-ask was rhetorical-closing, not a real decision request. Resolved inline."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0169
-  asked_at: 2026-05-01T03:54:14.743710Z
-  question: "dispatcher logic.  Want me to draft the option-2 closure proposals, the option-3 dispatcher backlog entry, both, or neither?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: d714cda96b4b142e
-  resolved_at: 2026-05-01T04:30:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (offering_or_choice). Same class as DECISION-0165, 0166, 0164. Detector caught Claude's status-report prose. Resolved inline."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0164
-  asked_at: 2026-05-01T00:57:21.983194Z
-  question: "operational state. Want me to wait or do you want to trigger Codex manually?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 750ff2e1bdfd58d8
-  resolved_at: 2026-05-01T01:05:00.000000Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive (offering_or_choice). Same class as the 5 false_positive_meta entries from earlier this session. Detector caught Claude's own closing prose at the end of a status report; owner gave direction in the next turn (manual bridge scan + relay of Codex NO-GO -004 findings) which made the prose-ask irrelevant. Resolved inline as part of the same Full triage authorization."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0078
-  asked_at: 2026-04-29T18:14:32.418962Z
-  question: "rrent latest status awaiting your input."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: cc189cee7a45fc45
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0079
-  asked_at: 2026-04-29T18:20:40.875069Z
-  question: "rrent latest status awaiting your input\"`). I'll wait for y"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: f225e9dd77617892
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0080
-  asked_at: 2026-04-29T18:31:01.168043Z
-  question: "ositives detecting \"awaiting your input\" in my own text. Re"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 6339ac11d703eefa
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0081
-  asked_at: 2026-04-29T18:38:22.768539Z
-  question: "ing-backlog item. **Should I (a) draft the Slice 2 upstream proposal now, (b) wait for your GOV-17 ack on DORA Track 1, or (c) advance whichever standing-backlog item you prioritize?**"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 3e326649019a3ecb
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0082
-  asked_at: 2026-04-29T18:53:30.651276Z
-  question: "ion picks them up.  Awaiting owner direction. No further action"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 9fedce014a91ac7f
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0083
-  asked_at: 2026-04-29T18:56:12.804524Z
-  question: "trail is preserved. Awaiting owner direction before filing any n"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 65a128ee76925b61
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0084
-  asked_at: 2026-04-29T19:04:22.711734Z
-  question: "───────────────`  **Awaiting your direction on next concrete st"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 3e50c72e86229ec4
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0085
-  asked_at: 2026-04-29T19:14:14.228092Z
-  question: "its on `develop`  **Awaiting your direction on next concrete st"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 280bbb2602c502f8
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0086
-  asked_at: 2026-04-29T19:43:59.907389Z
-  question: "ven session scope)  Awaiting your direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: ec8b749b83ff24db
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0087
-  asked_at: 2026-04-29T23:01:28.809266Z
-  question: "rectly remain at GO awaiting your direction on the next-step pr"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 785464f15c6de597
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0088
-  asked_at: 2026-04-29T23:14:09.337671Z
-  question: "uality Slice 2:** - Should I draft the Slice 2 implementation proposal now, or defer? It is substantial d"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: b992e452fdd0e770
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0089
-  asked_at: 2026-04-29T23:14:09.337671Z
-  question: "their audit trail. Awaiting owner direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: c0030a1977bb112f
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0090
-  asked_at: 2026-04-29T23:14:17.725451Z
-  question: "ose anti-patterns (\"awaiting your input\", etc.) from the ow"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 7e898284f06ee356
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0091
-  asked_at: 2026-04-29T23:16:55.765092Z
-  question: "W following a GO).  Awaiting owner direction on items 1–3."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 78d3b4edf6e529f9
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0092
-  asked_at: 2026-04-29T23:16:59.982350Z
-  question: "discussion *about* \"awaiting your input\" prose as an instance of \"awaiting your input\" prose. This is the"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 4ba3a6d491d45e1b
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0093
-  asked_at: 2026-04-29T23:16:59.982350Z
-  question: "lla; high impact).  Want me to (a) recover the NO-GO immediately, (b) draft the spec-lifecycle REVISED-1 addressing F1-F3, or (c) something else?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: c71860b45bd7fb67
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0094
-  asked_at: 2026-04-29T23:32:04.175320Z
-  question: "— another dimension awaiting owner direction. - Acting now would"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: a495fa4d63b10703
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0095
-  asked_at: 2026-04-29T23:36:01.193872Z
-  question: "──────────────`  ## Your decision  How would you like me to handle row 7?  1. **Approve the e"
-  detected_via: prose:your_decision_q
-  status: resolved
-  question_hash: afbc90239b6f3e9e
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0096
-  asked_at: 2026-04-30T00:22:57.160878Z
-  question: "says \"awaits GO\"). Awaiting your approval to apply.  **No bri"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 5fbe22f9484ee92d
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0102
-  asked_at: 2026-04-30T02:09:58.752306Z
-  question: "written.) - **Or** should I instead defer one or both — for example, the dora `-008` GO is purely a confirmation of an already-GO'd contract, so an alternative is to mark this thread closed without a `-009` report and rely on the existing audit trail?  Please confirm how"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 4f21ef356e77d170
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0103
-  asked_at: 2026-04-30T03:21:24.898715Z
-  question: "pending) records: *\"Should I (a) draft the Slice 2 upstream proposal now, (b) wait for your GOV-17 ack on DORA Track 1, or (c) advance whichever standing-backlog item you prioritize?\"*  GOV-17 for DORA-"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: e070f3ddd1dbf13f
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0104
-  asked_at: 2026-04-30T03:21:24.898715Z
-  question: "dit trail intact. - Awaiting owner choice on DECISION-0081 (Track 1 vs. S"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 797760def434b877
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0105
-  asked_at: 2026-04-30T03:34:41.657186Z
-  question: "e any code change.  Want me to pick one autonomously per the standing pre-approval, or hold for your direction?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 3d6f78992db59303
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0106
-  asked_at: 2026-04-30T03:42:05.375231Z
-  question: "less you redirect.  Want me to keep watching for Codex's verdict, or address something else while waiting?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: f60d0ca5320c8d75
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0107
-  asked_at: 2026-04-30T03:42:57.404940Z
-  question: "utations performed. Awaiting your direction on items 1–3."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 08c0f755897d88f8
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0108
-  asked_at: 2026-04-30T03:51:48.959041Z
-  question: "INDEX.md untouched. Awaiting your direction on (A)/(B)/(C)."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 94aaf77bfee5c038
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0109
-  asked_at: 2026-04-30T03:53:05.074876Z
-  question: "o audit-trail gaps. Awaiting your direction before opening eith"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 835c10f9897697b5
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0110
-  asked_at: 2026-04-30T05:16:57.742153Z
-  question: "h in-root routing.\" Want me to draft that Slice 2 proposal now, or defer it (it has no deadline pressure and trades focus against ISOLATION-016 Phase 8 / MEMBASE-EFFECTIVE-USE-RECOVERY Slice A which are higher-priority on row 19 and row 2)?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: f6435363bf07b581
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0111
-  asked_at: 2026-04-30T05:57:32.324453Z
-  question: "nsumed parent GOs.  Awaiting your direction. No bridge-modifyin"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: e5d975b4cf44a588
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0112
-  asked_at: 2026-04-30T05:58:50.516680Z
-  question: "ction of their own. Awaiting owner direction on (1) vs (2). No b"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 25ff2dc2960b8fa3
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0113
-  asked_at: 2026-04-30T05:59:08.094056Z
-  question: "eady-VERIFIED work. Should I treat acknowledgement as sufficient (no new bridge entry, no commit), or do you want a formal Prime ack version filed? 2. **Slice 2 of cod"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 797ba9a652b4917e
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0114
-  asked_at: 2026-04-30T13:20:59.954720Z
-  question: "te prose-asks like \"should I do A or B?\" without calling As"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 8aecd2322bee3154
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0121
-  asked_at: 2026-04-30T16:43:51.105853Z
-  question: "ge-swimlane.json`.  Want me to take up the candidate-spec-intake NO-GO next, or pause for Codex to review `-007`?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 1ccfcbaa8dd4b456
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0122
-  asked_at: 2026-04-30T16:47:19.099540Z
-  question: ".  Which way do you want me to go — stand down, write closure acknowledgements, or file the dispatcher-refinement backlog item?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 554d97bd502f0498
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0126
-  asked_at: 2026-04-30T17:01:33.376347Z
-  question: "ment ADR for IR-0). Want me to pick one and propose, or should I move to a different priority?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: f0a5ea21d8c502b6
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0128
-  asked_at: 2026-04-30T17:38:10.779982Z
-  question: "overnance ceremony. Want me to file Option 2, or accept Option 1 and update the smart poller's kind-aware routing instead?  `★ Insight ───────"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 3582211e16491da9
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0130
-  asked_at: 2026-04-30T17:46:19.502879Z
-  question: "it trail preserved. Awaiting your decision on disposition."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 456b4c626d8c4506
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0133
-  asked_at: 2026-04-30T18:19:13.710794Z
-  question: "onfirm direction:** Should I draft the CS-2 dispatcher bridge proposal now (option 1), or is there a different priority you want me to pick up first?  I have **not** mod"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 97d5bd095f33023f
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0135
-  asked_at: 2026-04-30T18:19:45.956417Z
-  question: "alog was dismissed. Awaiting your direction on which thread to"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 34f172c168664f7c
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0137
-  asked_at: 2026-04-30T18:26:25.333888Z
-  question: "04-29-006.md` (GO)  Want me to pivot to the Slice 0 inventory (today's GO) or one of the others? Per the one-decisio"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: cf19ea44de1b2985
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0140
-  asked_at: 2026-04-30T18:28:49.589162Z
-  question: "actionable queue.  Want me to file the CS-2 slice bridge, the membase Slice A bridge, or a different work item?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 135f1fc995da2999
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0146
-  asked_at: 2026-04-30T19:19:54.614551Z
-  question: "for this dispatch.  Standing by for next owner direction or `Bridge` scan."
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 6f19f0d496039d2c
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0150
-  asked_at: 2026-04-30T19:32:57.647885Z
-  question: "ace beyond CS-1.5.  Should I draft either of these as a NEW bridge proposal, or stand down and wait for explicit direction on which (if either) is the next priority? I would not start e"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 6fe18c134f778a54
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0152
-  asked_at: 2026-04-30T19:33:25.870870Z
-  question: "ithout a selection. Standing by for explicit direction — no implementation"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 296eb601df7e7be2
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0153
-  asked_at: 2026-04-30T19:35:31.167005Z
-  question: "for owner review.  Awaiting your direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 9bc4977d8e200b33
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0157
-  asked_at: 2026-05-01T00:10:02.827410Z
-  question: "matter). Otherwise, awaiting your next direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 1009b183ef5e37b6
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0159
-  asked_at: 2026-05-01T00:10:24.471794Z
-  question: "Question canceled. Awaiting your direction on the next move."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: c6446374385ca835
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0160
-  asked_at: 2026-05-01T00:26:58.594263Z
-  question: "ositives detecting 'awaiting your input' in my own text\"* — the hook caught a sentence describing the false-positive problem itself; DECISION-0092 is even more m"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: e0a6a1f8e850ae91
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0161
-  asked_at: 2026-05-01T00:37:57.113964Z
-  question: "a REVISED proposal. Want me to proceed with that, or do you want a fresh CS-2 / CS-3 / IR follow-up slice proposal drafted instead?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 31a99acfe2bfe5d7
-  resolved_at: 2026-05-01T00:50:25.116555Z
-  resolved_in_session: S324
-  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0123
-  asked_at: 2026-04-30T16:47:34.088219Z
-  question: "How should I handle the two stale plan-level GO entries dispatched by the smart poller?"
-  options:
-    - "Stand down"
-    - "Write closure acks"
-    - "File dispatcher fix"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 21ecef4638ca6096
-  resolved_at: 2026-04-30T16:47:34.088219Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0124
-  asked_at: 2026-04-30T17:00:12.770886Z
-  question: "What's next now that the verified-runner REVISED-2 is filed and waiting on Codex?"
-  options:
-    - "Take up candidate-spec-intake NO-GO"
-    - "Pause for Codex on -007"
-    - "Pick a different work-list item"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 258285ca90091442
-  resolved_at: 2026-04-30T17:00:12.770886Z
-  answer: "User has answered your questions: \"What's next now that the verified-runner REVISED-2 is filed and waiting on Codex?\"=\"Take up candidate-spec-intake NO-GO\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0125
-  asked_at: 2026-04-30T17:00:12.770886Z
-  question: "Codex `-006` requirement #3 offers two paths. Which should I take?"
-  options:
-    - "Revise workflow (Recommended)"
-    - "Actually file all 5 follow-ons"
-    - "Defer this NO-GO again"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: dfec1957f6a6fcce
-  resolved_at: 2026-04-30T17:00:12.770886Z
-  answer: "User has answered your questions: \"Codex `-006` requirement #3 offers two paths. Which should I take?\"=\"Revise workflow (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0127
-  asked_at: 2026-04-30T17:01:56.968040Z
-  question: "How should I follow up on the stale GO bridge dispatch?"
-  options:
-    - "Propose CS-2 hook slice"
-    - "Propose IR-0 inventory slice"
-    - "Switch to other priority"
-    - "Stop and await direction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: cae7f07e6e9c0e59
-  resolved_at: 2026-04-30T17:01:56.968040Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0129
-  asked_at: 2026-04-30T17:38:30.156185Z
-  question: "How should the stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006) be handled so the smart poller stops re-flagging them?"
-  options:
-    - "Update poller routing (Recommended)"
-    - "Append acknowledgement files"
-    - "Leave as-is"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 8e11c3c9b55041cb
-  resolved_at: 2026-04-30T17:38:30.156185Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0131
-  asked_at: 2026-04-30T17:46:43.218072Z
-  question: "How should the two stale architectural-GO bridge entries (gtkb-command-surface-004, gtkb-incident-response-006) be dispositioned?"
-  options:
-    - "Leave as-is (Recommended)"
-    - "File closing post-impl reports"
-    - "Tune smart poller routing"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 187526eb4246e3a9
-  resolved_at: 2026-04-30T17:46:43.218072Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0132
-  asked_at: 2026-04-30T18:15:27.572640Z
-  question: "How should I respond to the OPERATING-MODEL-ALIGNMENT-REMEDIATION advisory?"
-  options:
-    - "Scoped Slice 0 (Recommended)"
-    - "Slice 1 as Codex recommends"
-    - "Add to backlog and defer"
-    - "Decline / counter-propose"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e582567cfcaebdf6
-  resolved_at: 2026-04-30T18:15:27.572640Z
-  answer: "User has answered your questions: \"How should I respond to the OPERATING-MODEL-ALIGNMENT-REMEDIATION advisory?\"=\"Scoped Slice 0 (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0134
-  asked_at: 2026-04-30T18:19:45.956417Z
-  question: "Both auto-dispatched bridge entries are plan-level GOs (architecture authorizations, not implementation authorizations). Which direction should I take next?"
-  options:
-    - "Draft CS-2 dispatcher bridge (Recommended)"
-    - "Advance ADR-isolation-application-placement to implementation"
-    - "Pick a different work_list item instead"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: cbd77895e2d8a9dd
-  resolved_at: 2026-04-30T18:19:45.956417Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0136
-  asked_at: 2026-04-30T18:24:07.804359Z
-  question: "How should I close the docs/gtkb-idp-concept.md audit gap that's blocking the smart-poller-src-docstring REVISED-2?"
-  options:
-    - "Document an owner waiver (Recommended)"
-    - "File a separate closure bridge"
-    - "Revert gtkb-idp-concept.md"
-    - "Take up operating-model REVISED-1 first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6c850926e82a571e
-  resolved_at: 2026-04-30T18:24:07.804359Z
-  answer: "User has answered your questions: \"How should I close the docs/gtkb-idp-concept.md audit gap that's blocking the smart-poller-src-docstring REVISED-2?\"=\"Document an owner waiver (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0138
-  asked_at: 2026-04-30T18:26:50.041449Z
-  question: "Which live bridge GO should I pick up next, since the dispatched umbrella entries are non-actionable?"
-  options:
-    - "Slice 0 inventory (Recommended)"
-    - "Spec lifecycle schema"
-    - "Active workspace declaration"
-    - "Stop / different choice"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 4fdc631b845871cd
-  resolved_at: 2026-04-30T18:26:50.041449Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0139
-  asked_at: 2026-04-30T18:26:51.438091Z
-  question: "The two dispatched parent GOs (gtkb-command-surface-004, gtkb-incident-response-006) need no parent-level Prime action — they are planning-tier GOs whose implementation flows through child slice bridges, and the work_list/INDEX state is already canonical. The smart poller over-flagged them. How do you want me to proceed?"
-  options:
-    - "Stop here, no action (Recommended)"
-    - "Tune notify.py to skip planning GOs"
-    - "File CS-2 implementation bridge"
-    - "File IR-0 implementation bridge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: df4393719ee853b2
-  resolved_at: 2026-04-30T18:26:51.438091Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0141
-  asked_at: 2026-04-30T18:29:23.207509Z
-  question: "Both dispatched GO entries are plan-level (no implementation owed). What should I take on next?"
-  options:
-    - "CS-2 slice bridge (Recommended)"
-    - "Membase Slice A bridge"
-    - "Stop and review backlog"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 217faaa0494d2007
-  resolved_at: 2026-04-30T18:29:23.207509Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0142
-  asked_at: 2026-04-30T19:17:12.280451Z
-  question: "The operating-model Slice 0 GO is the only Prime-actionable bridge item. Context is ~12% remaining. How should I proceed?"
-  options:
-    - "Start the DRAFT artifact only (Recommended)"
-    - "Start nothing this turn"
-    - "Try to complete all four deliverables now"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 160547912b41c8a3
-  resolved_at: 2026-04-30T19:17:12.280451Z
-  answer: "User has answered your questions: \"The operating-model Slice 0 GO is the only Prime-actionable bridge item. Context is ~12% remaining. How should I proceed?\"=\"Start the DRAFT artifact only (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0143
-  asked_at: 2026-04-30T19:17:12.280451Z
-  question: "Given ~54% context remaining, how should I sequence the remaining Slice 0 deliverables?"
-  options:
-    - "Delta annotations (§3.5) next (Recommended)"
-    - "Terminology table (§3.2) next"
-    - "Drift inventory (§3.3) next"
-    - "Stop here"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 29fdf92cf55a0c00
-  resolved_at: 2026-04-30T19:17:12.280451Z
-  answer: "User has answered your questions: \"Given ~54% context remaining, how should I sequence the remaining Slice 0 deliverables?\"=\"Delta annotations (§3.5) next (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0144
-  asked_at: 2026-04-30T19:17:12.280451Z
-  question: "Continue Slice 0 implementation this turn?"
-  options:
-    - "Terminology table (§3.2) next (Recommended)"
-    - "Drift inventory (§3.3) next"
-    - "Stop here"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d13943d629cca034
-  resolved_at: 2026-04-30T19:17:12.280451Z
-  answer: "User has answered your questions: \"Continue Slice 0 implementation this turn?\"=\"Terminology table (§3.2) next (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0145
-  asked_at: 2026-04-30T19:17:12.280451Z
-  question: "Continue to §3.3 drift inventory + §3.4 post-impl, or stop with 3 of 4 done?"
-  options:
-    - "Continue with §3.3 + §3.4 this turn"
-    - "Just §3.3 this turn"
-    - "Stop with 3 of 4"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f6362d91048d9bb5
-  resolved_at: 2026-04-30T19:17:12.280451Z
-  answer: "User has answered your questions: \"Continue to §3.3 drift inventory + §3.4 post-impl, or stop with 3 of 4 done?\"=\"Continue with §3.3 + §3.4 this turn\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0147
-  asked_at: 2026-04-30T19:20:16.539135Z
-  question: "Auto-dispatch landed on two stale plan-level GO entries (no PB action authorized by either GO body). What should Prime Builder do next?"
-  options:
-    - "Pull from work_list.md"
-    - "Propose CS-2 slice"
-    - "Refine smart-poller routing"
-    - "Idle until owner direction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b0ed8ccae6c053c4
-  resolved_at: 2026-04-30T19:20:16.539135Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0148
-  asked_at: 2026-04-30T19:32:06.628543Z
-  question: "F1 closure: drift inventory path. Codex offers two paths."
-  options:
-    - "Move + gitignore exception (Recommended)"
-    - "Revised proposal for docs/ path"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a03e390046dfe8cf
-  resolved_at: 2026-04-30T19:32:06.628543Z
-  answer: "User has answered your questions: \"F1 closure: drift inventory path. Codex offers two paths.\"=\"Move + gitignore exception (Recommended)\", \"F2 closure: corpus-coverage stop criterion. Codex offers two paths.\"=\"Complete the one-pass read (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0149
-  asked_at: 2026-04-30T19:32:06.628543Z
-  question: "F2 closure: corpus-coverage stop criterion. Codex offers two paths."
-  options:
-    - "Complete the one-pass read (Recommended)"
-    - "Revised proposal changing stop criterion"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 8749c05fc6dfd4d0
-  resolved_at: 2026-04-30T19:32:06.628543Z
-  answer: "User has answered your questions: \"F1 closure: drift inventory path. Codex offers two paths.\"=\"Move + gitignore exception (Recommended)\", \"F2 closure: corpus-coverage stop criterion. Codex offers two paths.\"=\"Complete the one-pass read (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0151
-  asked_at: 2026-04-30T19:33:25.870870Z
-  question: "Both auto-dispatched GO entries are plan-level only; neither authorizes implementation. What should I do next?"
-  options:
-    - "Stand down, no action"
-    - "Draft revised ADR proposal"
-    - "Draft CS-2 slice proposal"
-    - "Draft both follow-ups"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d6020b6a824845eb
-  resolved_at: 2026-04-30T19:33:25.870870Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0154
-  asked_at: 2026-04-30T19:35:53.326190Z
-  question: "Both auto-dispatched bridge entries are stale plan-level GOs (already implemented via slice sub-threads). What should I do next?"
-  options:
-    - "Revise slice-0 inventory (Recommended)"
-    - "File routing-defect backlog item"
-    - "Both — revise then file backlog"
-    - "Stop and wait for further direction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 9fa23dde09f6515d
-  resolved_at: 2026-04-30T19:35:53.326190Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0155
-  asked_at: 2026-04-30T22:57:43.823794Z
-  question: "Should I record the Prime parent/plan-level GO false-positive class as actionable follow-on?"
-  options:
-    - "Record as work_list row only"
-    - "File as a NEW bridge proposal now"
-    - "Note in this turn only; no record"
-    - "Stand down"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 57055d2699a23347
-  resolved_at: 2026-04-30T22:57:43.823794Z
-  answer: "User has answered your questions: \"Should I record the Prime parent/plan-level GO false-positive class as actionable follow-on?\"=\"Record as work_list row only\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0156
-  asked_at: 2026-04-30T23:03:37.051045Z
-  question: "Should I record the 'refactor bridge + smart-poller for simplicity' intent in the backlog now?"
-  options:
-    - "Add a work_list row now (Recommended)"
-    - "Note in this turn only"
-    - "Stand down"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d17424f143ecd464
-  resolved_at: 2026-04-30T23:03:37.051045Z
-  answer: "User has answered your questions: \"Should I record the 'refactor bridge + smart-poller for simplicity' intent in the backlog now?\"=\"Add a work_list row now (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0158
-  asked_at: 2026-05-01T00:10:24.471794Z
-  question: "How should I handle the recurring smart-poller over-flagging of plan-level GOs as implementation triggers?"
-  options:
-    - "File backlog entry (Recommended)"
-    - "File as deliberation only"
-    - "Defer — no action"
-    - "Different scope (specify)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c41e7e52685f1af1
-  resolved_at: 2026-05-01T00:10:24.471794Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0162
-  asked_at: 2026-05-01T00:38:15.970499Z
-  question: "Both auto-dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are stale plan-level GOs that don't authorize implementation. Which Prime action should I take next?"
-  options:
-    - "Revise dashboard NO-GO (Recommended)"
-    - "Draft CS-2 slice proposal"
-    - "Draft IR follow-up slice proposal"
-    - "Pull from work_list.md backlog"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e96e801984284dba
-  resolved_at: 2026-05-01T00:38:15.970499Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0163
-  asked_at: 2026-05-01T00:57:21.983194Z
-  question: "How should the 47 entries in memory/pending-owner-decisions.md be disposed?"
-  options:
-    - "clear pending (bulk dismiss)"
-    - "defer all (acknowledge, keep)"
-    - "Sample 10 entries, then decide"
-    - "Full triage (resolve each)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 9adb3f19306b2efb
-  resolved_at: 2026-05-01T00:57:21.983194Z
-  answer: "User has answered your questions: \"How should the 47 entries in memory/pending-owner-decisions.md be disposed?\"=\"Full triage (resolve each)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0167
-  asked_at: 2026-05-01T02:18:42.220342Z
-  question: "How should we proceed with Codex review of -005?"
-  options:
-    - "Wait — smart-poller"
-    - "You'll trigger Codex"
-    - "Pivot to other work"
-    - "Wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d2bda4802ae4483c
-  resolved_at: 2026-05-01T02:18:42.220342Z
-  answer: "User has answered your questions: \"How should we proceed with Codex review of -005?\"=\"Wait — smart-poller\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0168
-  asked_at: 2026-05-01T02:18:53.242829Z
-  question: "Both dispatched bridge GOs are stale plan-level entries with downstream slices already VERIFIED. What's next?"
-  options:
-    - "File CS-2 (Recommended)"
-    - "File CS-1 instead"
-    - "File CS-1 and CS-2 in parallel"
-    - "Stand down — pick from elsewhere"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c9b66346d008115f
-  resolved_at: 2026-05-01T02:18:53.242829Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0170
-  asked_at: 2026-05-01T03:54:39.922159Z
-  question: "Both dispatched bridge GOs are stale (plan-level GOs that explicitly forbid implementation in the parent thread; downstream slices already VERIFIED). What should Prime Builder do?"
-  options:
-    - "Draft both: closure + dispatcher fix (Recommended)"
-    - "Draft closure proposals only"
-    - "Draft dispatcher backlog item only"
-    - "Take no action"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 96e1aaaf86fbd771
-  resolved_at: 2026-05-01T03:54:39.922159Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0171
-  asked_at: 2026-05-01T04:44:03.698046Z
-  question: "How should the F2 (failing-test waiver) finding be addressed?"
-  options:
-    - "Grant explicit waiver"
-    - "Narrow verification scope"
-    - "Fix the failing test"
-    - "File separate hotfix bridge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 5f73761aa9ea65cf
-  resolved_at: 2026-05-01T04:44:03.698046Z
-  answer: "User has answered your questions: \"How should the F2 (failing-test waiver) finding be addressed?\"=\"Fix the failing test\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0172
-  asked_at: 2026-05-01T04:44:03.698046Z
-  question: "The release-gate fails on 3 unrelated pre-existing ruff errors in tests/scripts/test_run_spec_derived_tests.py (workstream gtkb-platform-spec-coverage-verified-runner, currently VERIFIED). How do I proceed?"
-  options:
-    - "Fix the 3 ruff errors in this thread"
-    - "Document as out-of-scope; cite drift in REVISED post-impl"
-    - "File separate hotfix bridge for ruff drift first"
-    - "Skip release-gate in this thread"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: dfa5183b024ce913
-  resolved_at: 2026-05-01T04:44:03.698046Z
-  answer: "User has answered your questions: \"The release-gate fails on 3 unrelated pre-existing ruff errors in tests/scripts/test_run_spec_derived_tests.py (workstream gtkb-platform-spec-coverage-verified-runner, currently VERIFIED). How do I proceed?\"=\"Fix the 3 ruff errors in this thread\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0173
-  asked_at: 2026-05-01T04:44:03.698046Z
-  question: "How do I proceed with the release-gate's broken hardcoded test reference?"
-  options:
-    - "Stop scope expansion; narrow verification surface"
-    - "Fix the gate's hardcoded list too"
-    - "File separate hotfix bridge for the gate"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 4adc545ec657d101
-  resolved_at: 2026-05-01T04:44:03.698046Z
-  answer: "User has answered your questions: \"How do I proceed with the release-gate's broken hardcoded test reference?\"=\"Fix the gate's hardcoded list too\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0174
-  asked_at: 2026-05-01T04:44:03.698046Z
-  question: "The release-gate has at least 2 more pre-existing problems blocking a clean run (internal test failure + 180s timeout vs. >180s suite). How do I proceed?"
-  options:
-    - "STOP cascade. Narrow verification surface."
-    - "Keep going"
-    - "Park dashboard-link, file release-gate hotfix bridge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 846f3ab0d62f7438
-  resolved_at: 2026-05-01T04:44:03.698046Z
-  answer: "User has answered your questions: \"The release-gate has at least 2 more pre-existing problems blocking a clean run (internal test failure + 180s timeout vs. >180s suite). How do I proceed?\"=\"STOP cascade. Narrow verification surface.\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0176
-  asked_at: 2026-05-01T04:54:32.154553Z
-  question: "Both auto-dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are stale plan-level GOs whose follow-on slices are already VERIFIED. What should Prime Builder pick up next?"
-  options:
-    - "Revise dashboard-link NO-GO -010"
-    - "Revise ADR-eval-enforcement NO-GO -002"
-    - "Propose next CS slice"
-    - "Advance work_list.md item"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 10da0e5a56c14ab6
-  resolved_at: 2026-05-01T04:54:32.154553Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0178
-  asked_at: 2026-05-01T05:05:07.547262Z
-  question: "Both umbrella GOs are acknowledged with their first sub-slices VERIFIED. What next?"
-  options:
-    - "Stand down"
-    - "Surface CS shortlist"
-    - "Surface IR shortlist"
-    - "Surface both shortlists"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6375e76f8f4ba228
-  resolved_at: 2026-05-01T05:05:07.547262Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0179
-  asked_at: 2026-05-01T05:06:46.274366Z
-  question: "How should I close the dashboard-link F1 (cascade scope outside -006 GO)?"
-  options:
-    - "Supplemental REVISED in same thread"
-    - "Separate cascade bridge"
-    - "Formal bridge-protocol waiver"
-    - "Revert the cascade entirely"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2e50ef97aa1c286c
-  resolved_at: 2026-05-01T05:06:46.274366Z
-  answer: "User has answered your questions: \"How should I close the dashboard-link F1 (cascade scope outside -006 GO)?\"=\"Separate cascade bridge\", \"For ADR-eval REVISED-2, how should S1's originating DA record be sourced?\"=\"Archive S324 directive as owner_conversation DA\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0180
-  asked_at: 2026-05-01T05:06:46.274366Z
-  question: "For ADR-eval REVISED-2, how should S1's originating DA record be sourced?"
-  options:
-    - "Archive S324 directive as owner_conversation DA"
-    - "Generate a fresh owner statement"
-    - "Defer DA archival to S1 bridge time"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 1de07ad96e7d135f
-  resolved_at: 2026-05-01T05:06:46.274366Z
-  answer: "User has answered your questions: \"How should I close the dashboard-link F1 (cascade scope outside -006 GO)?\"=\"Separate cascade bridge\", \"For ADR-eval REVISED-2, how should S1's originating DA record be sourced?\"=\"Archive S324 directive as owner_conversation DA\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0181
-  asked_at: 2026-05-01T05:09:08.761676Z
-  question: "DECISION-0177 in pending-owner-decisions.md is a truncated prose-detector capture ('reserved unchanged. Awaiting owner direction on whether to surfa') with no real recoverable question. How should I dispose of it?"
-  options:
-    - "Clear pending (dismiss)"
-    - "Defer all"
-    - "Investigate source"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f370a00999261c2f
-  resolved_at: 2026-05-01T05:09:08.761676Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0183
-  asked_at: 2026-05-01T05:16:58.025039Z
-  question: "How should I dispose of the two dispatched plan-level GO entries (gtkb-command-surface-004, gtkb-incident-response-006)?"
-  options:
-    - "Leave as-is (Recommended)"
-    - "File closure markers"
-    - "Backlog: smart-poller plan-GO filter"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2917a72719cf1b7c
-  resolved_at: 2026-05-01T05:16:58.025039Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0185
-  asked_at: 2026-05-01T05:18:52.451156Z
-  question: "How should the two stale umbrella GO bridge threads (gtkb-command-surface-004 and gtkb-incident-response-006) be handled? Both are architecture/plan-level GOs whose downstream slices (CS-1.5, IR-0.1) are already VERIFIED."
-  options:
-    - "File close-out post-impls"
-    - "Leave both open"
-    - "Add poller filter proposal"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b7e57e373b7fb448
-  resolved_at: 2026-05-01T05:18:52.451156Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0187
-  asked_at: 2026-05-01T05:20:51.597297Z
-  question: "Both dispatched GOs are stale (umbrella plans whose sub-threads already VERIFIED). What should Prime Builder do next?"
-  options:
-    - "Address live NO-GO"
-    - "File CS-2 sub-proposal"
-    - "Triage DECISION-0182/0184"
-    - "Stand down + standing backlog"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d7f7cff763870a4c
-  resolved_at: 2026-05-01T05:20:51.597297Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0190
-  asked_at: 2026-05-01T05:31:48.388130Z
-  question: "Should I begin #1 (dashboard-link parent close-out) now?"
-  options:
-    - "Yes, begin #1 now"
-    - "Hold; pick a different item"
-    - "Hold; await Codex on S0"
-    - "Wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 18f78c903f9d56e5
-  resolved_at: 2026-05-01T05:31:48.388130Z
-  answer: "User has answered your questions: \"Should I begin #1 (dashboard-link parent close-out) now?\"=\"Yes, begin #1 now\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0191
-  asked_at: 2026-05-01T05:31:48.388130Z
-  question: "Should I author S0 REVISED-1 -003 now to address the two blocking findings?"
-  options:
-    - "Yes, author REVISED-1 now"
-    - "Hold; wait for dashboard-link VERIFIED first"
-    - "Wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f56c27bc14d6ff1a
-  resolved_at: 2026-05-01T05:31:48.388130Z
-  answer: "User has answered your questions: \"Should I author S0 REVISED-1 -003 now to address the two blocking findings?\"=\"Hold; wait for dashboard-link VERIFIED first\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0193
-  asked_at: 2026-05-01T05:43:28.784250Z
-  question: "What's the next move now that dashboard-link is VERIFIED-terminal?"
-  options:
-    - "File S0 REVISED-1 -003 now"
-    - "Pivot to a different top-10 item"
-    - "Wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 032e6ab9135b5d5b
-  resolved_at: 2026-05-01T05:43:28.784250Z
-  answer: "User has answered your questions: \"What's the next move now that dashboard-link is VERIFIED-terminal?\"=\"File S0 REVISED-1 -003 now\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0194
-  asked_at: 2026-05-01T05:44:09.138702Z
-  question: "Both auto-dispatch GO entries (gtkb-command-surface, gtkb-incident-response) are plan-level approvals that don't authorize code directly. Which next move would you like Prime Builder to take? (DECISION-0192)"
-  options:
-    - "Draft CS-1.5 slice proposal (Recommended)"
-    - "Advance ADR-isolation post-impl"
-    - "Pick a different work_list item"
-    - "Hold; brief me first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 3f96b23b326a4b3d
-  resolved_at: 2026-05-01T05:44:09.138702Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0195
-  asked_at: 2026-05-01T05:50:19.026378Z
-  question: "Should I file S0 REVISED-2 -005 now to close the -004 NO-GO?"
-  options:
-    - "Yes, file REVISED-2 now"
-    - "Hold; pivot to row 24 hygiene first"
-    - "Wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6c4cb4b460d035f0
-  resolved_at: 2026-05-01T05:50:19.026378Z
-  answer: "User has answered your questions: \"Should I file S0 REVISED-2 -005 now to close the -004 NO-GO?\"=\"Hold; pivot to row 24 hygiene first\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0197
-  asked_at: 2026-05-01T05:52:09.826829Z
-  question: "Both auto-dispatched GOs are stale (plan-level, already actioned via slice sub-bridges). What should Prime Builder do next?"
-  options:
-    - "Revise s0-audit NO-GO"
-    - "Propose next CS slice"
-    - "Propose IR-1 phase"
-    - "Pick from work_list.md"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 152680b2ee6616aa
-  resolved_at: 2026-05-01T05:52:09.826829Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0198
-  asked_at: 2026-05-01T06:01:24.052446Z
-  question: "The wrap-scan exit code 2 says mutating wrap shouldn't proceed without explicit owner override. All 22 errors are pre-existing prior-session debt, not S324-caused. How do you want to handle this?"
-  options:
-    - "Override and proceed with mutating wrap"
-    - "Stop wrap; address phantom-INDEX errors first"
-    - "Stop wrap; just proceed manually"
-    - "Review reports first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b6c6b25740d3ee55
-  resolved_at: 2026-05-01T06:01:24.052446Z
-  answer: "User has answered your questions: \"The wrap-scan exit code 2 says mutating wrap shouldn't proceed without explicit owner override. All 22 errors are pre-existing prior-session debt, not S324-caused. How do you want to handle this?\"=\"Stop wrap; address phantom-INDEX errors first\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0200
-  asked_at: 2026-05-01T14:04:56.476808Z
-  question: "Both bridge GOs (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level only and do not authorize implementation. Which next step should Prime advance?"
-  options:
-    - "File CS-1.5 NEW proposal (Recommended)"
-    - "File CS-1 NEW proposal"
-    - "Verify ADR-supersession landing"
-    - "Defer / different priority"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e4b091b4241025bd
-  resolved_at: 2026-05-01T14:04:56.476808Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0203
-  asked_at: 2026-05-01T14:17:58.843600Z
-  question: "How should I handle the gtkb-command-surface-004 GO (architecture-only; needs per-slice proposals before any implementation)?"
-  options:
-    - "Park"
-    - "Draft CS-1.5 proposal"
-    - "Draft CS-2 proposal"
-    - "Pick a different slice"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2460b4f0952df596
-  resolved_at: 2026-05-01T14:17:58.843600Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0205
-  asked_at: 2026-05-01T14:19:51.344868Z
-  question: "Both auto-dispatched GOs are plan-level and don't authorize implementation. Which next step would you like me to take?"
-  options:
-    - "Stand down — no action"
-    - "Draft CS-2 slice proposal"
-    - "Draft CS-1 slice proposal"
-    - "Log dispatch as row-22 evidence"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f349028451162ac9
-  resolved_at: 2026-05-01T14:19:51.344868Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0207
-  asked_at: 2026-05-01T14:22:19.949659Z
-  question: "How do you want me to apply the ISOLATION priority elevation given current S324 state?"
-  options:
-    - "Finalize S324: update work_list priority + run wrap; start ISOLATION-016 next session"
-    - "Update work_list priority now, continue S324 work but prioritize ISOLATION-016 prep"
-    - "Pivot immediately to ISOLATION-016 (abandon wrap close-out and other in-flight)"
-    - "Just update the priority in work_list (treat as deferred re-ordering)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 952470b1b4a81f76
-  resolved_at: 2026-05-01T14:22:19.949659Z
-  answer: "User has answered your questions: \"How do you want me to apply the ISOLATION priority elevation given current S324 state?\"=\"Finalize S324: update work_list priority + run wrap; start ISOLATION-016 next session\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0196
-  asked_at: 2026-05-01T05:51:39.702417Z
-  question: "(not Prime's turn)  Awaiting owner direction on whether to (a) r"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 08fb30c7f58c7285
-  resolved_at: 2026-05-01T14:31:48.135471Z
-  resolved_in_session: S324
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0199
-  asked_at: 2026-05-01T14:04:33.278107Z
-  question: "the auto-tracker — awaiting owner direction. No action from me"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 47439deba4564083
-  resolved_at: 2026-05-01T14:31:48.135501Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0201
-  asked_at: 2026-05-01T14:04:56.476808Z
-  question: "Acknowledged — awaiting your direction. No bridge files wr"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 98ec195ea72760c1
-  resolved_at: 2026-05-01T14:31:48.135507Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0202
-  asked_at: 2026-05-01T14:17:36.319570Z
-  question: "it trail preserved. Awaiting owner direction on (a)/(b)/(c) for"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 9a53fce1198cc5a6
-  resolved_at: 2026-05-01T14:31:48.135510Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0204
-  asked_at: 2026-05-01T14:19:17.248539Z
-  question: "0199 / 0196) remain awaiting your direction; I did not auto-res"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: b1a1cb2783113320
-  resolved_at: 2026-05-01T14:31:48.135514Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0206
-  asked_at: 2026-05-01T14:19:51.344868Z
-  question: "r dispatched entry. Awaiting your direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 59b8222c267f65a4
-  resolved_at: 2026-05-01T14:31:48.135517Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0209
-  asked_at: 2026-05-01T14:56:32.933101Z
-  question: "Both auto-dispatched GOs are stale plan-level approvals (no implementation authorization). Which next move should I take?"
-  options:
-    - "Revise Wave 3 NO-GO"
-    - "File CS-2 sub-bridge"
-    - "Check ADR landing for IR-0"
-    - "Stand down; end turn"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b09d30da60811845
-  resolved_at: 2026-05-01T14:56:32.933101Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0211
-  asked_at: 2026-05-01T15:11:03.094682Z
-  question: "Both auto-dispatched GOs are plan-level (non-implementing). What should I do next?"
-  options:
-    - "ISOLATION-016 Wave 3 REVISED-2"
-    - "File CS-2 slice bridge"
-    - "Resolve DECISION-0208"
-    - "Stand down — end turn"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 77934f3dd42a9baf
-  resolved_at: 2026-05-01T15:11:03.094682Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0213
-  asked_at: 2026-05-01T15:49:09.006572Z
-  question: "Codex NO-GO at -004 with two Prime-fixable findings (F1 amendment-text precision, F2 GOV-20 IPR/CVR scope). Proceed with REVISED-2?"
-  options:
-    - "Proceed with REVISED-2 (Recommended)"
-    - "Pause and review -004 first"
-    - "Different direction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c30487f3266ad179
-  resolved_at: 2026-05-01T15:49:09.006572Z
-  answer: "User has answered your questions: \"Codex NO-GO at -004 with two Prime-fixable findings (F1 amendment-text precision, F2 GOV-20 IPR/CVR scope). Proceed with REVISED-2?\"=\"Proceed with REVISED-2 (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0215
-  asked_at: 2026-05-01T15:50:55.696792Z
-  question: "Both bridge GOs (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level only — neither authorizes implementation. Wave 3 REVISED-2 is already in Codex's queue, and three owner decisions remain unresolved. What should Prime do next?"
-  options:
-    - "Resolve DECISION-0212 (Wave 3) (Recommended)"
-    - "File CS-1 slice as NEW"
-    - "File IR-0.1 as NEW"
-    - "Resolve DECISION-0208 or 0210"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 1798aa0b216f2ae9
-  resolved_at: 2026-05-01T15:50:55.696792Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0217
-  asked_at: 2026-05-01T15:55:54.138018Z
-  question: "Which lane should I advance next? (Resolves pending DECISION-0210/0212/0214.)"
-  options:
-    - "Wave 3 REVISED-3 (Recommended)"
-    - "File CS-2 slice as NEW"
-    - "Address DECISION-0208"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 360cb57ef4726e8c
-  resolved_at: 2026-05-01T15:55:54.138018Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0219
-  asked_at: 2026-05-01T16:48:46.417120Z
-  question: "Both dispatched GOs are stale plan-level approvals from S310 with no Prime action owed. Which work should I take up next?"
-  options:
-    - "Wave3 -008/-009 first (Recommended)"
-    - "Begin command-surface slice CS-1"
-    - "Pull next item from work_list.md"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a75b0fb0e297983b
-  resolved_at: 2026-05-01T16:48:46.417120Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0221
   asked_at: 2026-05-01T20:50:22.375614Z
   question: "Scoping GO landed. Continue with Slice 1 (Isolation doctor checks) in this session, or wrap?"
@@ -9224,6 +7804,539 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-30T16:41:18.948759Z
   answer: "Your questions have been answered: \"Working tree is 779 files across many workstreams, with parallel Codex sessions actively writing. What scope should I commit?\"=\"Scoped bridge-state checkpoint (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-0829
+  asked_at: 2026-05-30T16:49:32.167193Z
+  question: "The collision file can't be cleanly committed: it's an inconsistent partial assembly of 4 VERIFIED threads (permission-profile's code is present but its test update is missing → red test), and a parallel session is mid-git-surgery (active stash). How should I proceed?"
+  options:
+    - "Stand down; let parallel sessions settle"
+    - "I repair the tree, then commit + implement"
+    - "Worktree off clean HEAD"
+    - "Stand down entirely for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 941530ab5428d23d
+  resolved_at: 2026-05-30T16:49:32.167193Z
+  answer: "Your questions have been answered: \"The collision file can't be cleanly committed: it's an inconsistent partial assembly of 4 VERIFIED threads (permission-profile's code is present but its test update is missing → red test), and a parallel session is mid-git-surgery (active stash). How should I proceed?\"=\"Stand down; let parallel sessions settle\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0830
+  asked_at: 2026-05-30T16:50:11.702162Z
+  question: "Bridge updates reported (4 new parallel-owned GO threads; de-index gap steady; freshness -013 deferred). What next?"
+  options:
+    - "Stand by (Recommended)"
+    - "Inspect a newly-GO thread"
+    - "Pick up implementable work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b80835203878fae4
+  resolved_at: 2026-05-30T16:50:11.702162Z
+  answer: "Your questions have been answered: \"Bridge updates reported (4 new parallel-owned GO threads; de-index gap steady; freshness -013 deferred). What next?\"=\"Stand by (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0828
+  asked_at: 2026-05-30T16:45:02.177448Z
+  question: "Want me to dig into any specific thread, or stand by?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f09c43e5a23a7fd6
+  resolved_at: 2026-05-30T16:53:23.970033Z
+  answer: "File Slice 7-prime REVISED -011"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0832
+  asked_at: 2026-05-30T16:56:16.087290Z
+  question: "The continuation prompt is ready. Do you want me to also run session wrap-up procedures, given the working tree is mid-surgery by parallel sessions?"
+  options:
+    - "Leave wrap here"
+    - "Deliberation harvest only"
+    - "Full /kb-session-wrap S373"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 789d9fe87860655b
+  resolved_at: 2026-05-30T16:56:16.087290Z
+  answer: "Your questions have been answered: \"The continuation prompt is ready. Do you want me to also run session wrap-up procedures, given the working tree is mid-surgery by parallel sessions?\"=\"Leave wrap here\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0833
+  asked_at: 2026-05-30T17:04:21.882851Z
+  question: "DECISION-0831: How should I handle session wrap-up given Slice 4 is at NEW-006 awaiting Codex verdict?"
+  options:
+    - "Hold until Slice 4 VERIFIED, then wrap (Recommended)"
+    - "Run wrap-up now (don't wait for verdict)"
+    - "Partial wrap now (memory only, defer DA harvest)"
+    - "Skip wrap-up entirely for this session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6eac724af1bd072f
+  resolved_at: 2026-05-30T17:04:21.882851Z
+  answer: "Your questions have been answered: \"DECISION-0831: How should I handle session wrap-up given Slice 4 is at NEW-006 awaiting Codex verdict?\"=\"Hold until Slice 4 VERIFIED, then wrap (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0831
+  asked_at: 2026-05-30T16:55:08.573559Z
+  question: "Want me to also run the full `/kb-session-wrap S373` (MemBase session record, deliberation harvest), or leave wrap-up..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f353dfb2c1bbf5ef
+  resolved_at: 2026-05-30T17:07:39.745805Z
+  answer: "run wrap-up"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0834
+  asked_at: 2026-05-30T17:38:41.608868Z
+  question: "How should I handle the live contamination of 10 fixture DELIB records (DELIB-2511..DELIB-2520) + 10 approval packet files caused by Slice 4 tests?"
+  options:
+    - "Governed retraction: new DELIB versions + per-record approval packets (Recommended)"
+    - "Single-deliberation remediation entry + bulk reference"
+    - "Owner-approved ad-hoc deletion (governance waiver)"
+    - "Defer remediation; fix the bug first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c8a0e680c2ceaed
+  resolved_at: 2026-05-30T17:38:41.608868Z
+  answer: "Your questions have been answered: \"How should I handle the live contamination of 10 fixture DELIB records (DELIB-2511..DELIB-2520) + 10 approval packet files caused by Slice 4 tests?\"=\"Governed retraction: new DELIB versions + per-record approval packets (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0835
+  asked_at: 2026-05-30T18:40:07.674952Z
+  question: "REVISED-2 (-013) is filed and awaiting Codex's -014 verdict. What should I focus on next?"
+  options:
+    - "Stand by for Codex"
+    - "cli.py coord commit"
+    - "Commit bridge trail now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 630aa79de49e2a9e
+  resolved_at: 2026-05-30T18:40:07.674952Z
+  answer: "Your questions have been answered: \"REVISED-2 (-013) is filed and awaiting Codex's -014 verdict. What should I focus on next?\"=\"Stand by for Codex\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0836
+  asked_at: 2026-05-30T18:45:09.233190Z
+  question: "Hygiene NO-GO F1 is a real authorization-model question: PAUTH-001 v3's allowed_mutation_classes is [source_code, tests, rule_files, doctor_checks, parity_checks, hook_scripts] and explicitly excludes backlog_bulk_ops. Which authorization path do you want me to take for the WI-3474..3477 hygiene backfill?"
+  options:
+    - "Amend PAUTH-001 to add backlog_metadata_hygiene class"
+    - "Use PROJECT-GTKB-RELIABILITY-FIXES standing auth"
+    - "Defer hygiene to a later session"
+    - "Generate formal-artifact-approval packet for the cleanup"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5c275524a04ba533
+  resolved_at: 2026-05-30T18:45:09.233190Z
+  answer: "Your questions have been answered: \"Hygiene NO-GO F1 is a real authorization-model question: PAUTH-001 v3's allowed_mutation_classes is [source_code, tests, rule_files, doctor_checks, parity_checks, hook_scripts] and explicitly excludes backlog_bulk_ops. Which authorization path do you want me to take for the WI-3474..3477 hygiene backfill?\"=\"Use PROJECT-GTKB-RELIABILITY-FIXES standing auth\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0837
+  asked_at: 2026-05-30T19:03:56.882404Z
+  question: "How should the 3 untracked loyal-opposition-hygiene-assessment SKILL.md files be handled as part of the work_list.md deletion thread?"
+  options:
+    - "Edit in place; keep untracked (Recommended)"
+    - "Edit AND commit them as canonical"
+    - "Leave skill files alone; tighten gate only"
+    - "Spin off a separate skill-migration thread first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ff5931d89ff9d8b6
+  resolved_at: 2026-05-30T19:03:56.882404Z
+  answer: "Your questions have been answered: \"How should the 3 untracked loyal-opposition-hygiene-assessment SKILL.md files be handled as part of the work_list.md deletion thread?\"=\"Edit in place; keep untracked (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0838
+  asked_at: 2026-05-30T19:04:04.625368Z
+  question: "Codex -013 NO-GO has a single P1 finding (multi-target/tuple-target enum syntax bypass — Codex's 4th iteration finding deeper escape hatches in the AST-based closed-vocabulary checker). How do you want to sequence this session?"
+  options:
+    - "Implement v4 fix now (Recommended)"
+    - "Pivot to hygiene fast-lane first"
+    - "Reconsider Slice 8 mechanism"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5b24924bef0ebdc7
+  resolved_at: 2026-05-30T19:04:04.625368Z
+  answer: "Your questions have been answered: \"Codex -013 NO-GO has a single P1 finding (multi-target/tuple-target enum syntax bypass — Codex's 4th iteration finding deeper escape hatches in the AST-based closed-vocabulary checker). How do you want to sequence this session?\"=\"Implement v4 fix now (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0839
+  asked_at: 2026-05-30T19:20:35.552557Z
+  question: "A parallel S375 session already filed REVISED-3 (-015) for the work_list.md-retirement thread and got your AUQ, but its evidence claims 3 skill files reference work_list.md when only 1 (.claude) exists in the main tree (.codex/.agent SKILL.md are absent). Two harness-B sessions are now on this thread. How should this session proceed?"
+  options:
+    - "Stand down; you relay"
+    - "I append a correction note"
+    - "I take over with corrected -015"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fe168b734ee8ae58
+  resolved_at: 2026-05-30T19:20:35.552557Z
+  answer: "Your questions have been answered: \"A parallel S375 session already filed REVISED-3 (-015) for the work_list.md-retirement thread and got your AUQ, but its evidence claims 3 skill files reference work_list.md when only 1 (.claude) exists in the main tree (.codex/.agent SKILL.md are absent). Two harness-B sessions are now on this thread. How should this session proceed?\"=\"Stand down; you relay\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0840
+  asked_at: 2026-05-30T20:33:45.438915Z
+  question: "Codex GO'd Slice 7-prime (-018). Implementation edits 5 protected narrative artifacts (CLAUDE.md + canonical-terminology / operating-model / peer-solution-advisory-loop / acting-prime-builder rules) and deletes memory/work_list.md — all formal-artifact-approval / destructive-action gated. How should I proceed?"
+  options:
+    - "Scoped auto-approval + implement now"
+    - "Implement now, per-packet approval"
+    - "Defer implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8fb75c9fd92f0c22
+  resolved_at: 2026-05-30T20:33:45.438915Z
+  answer: "Your questions have been answered: \"Codex GO'd Slice 7-prime (-018). Implementation edits 5 protected narrative artifacts (CLAUDE.md + canonical-terminology / operating-model / peer-solution-advisory-loop / acting-prime-builder rules) and deletes memory/work_list.md — all formal-artifact-approval / destructive-action gated. How should I proceed?\"=\"Scoped auto-approval + implement now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0841
+  asked_at: 2026-05-30T20:33:45.438915Z
+  question: "When memory/work_list.md is deleted, what happens to the `gt backlog migrate-work-list` migration tooling (the cli.py command + backlog.py parse/migrate backend + 2 test_cli.py tests) that functionally reads it? This determines the -019 REVISED scope."
+  options:
+    - "Retire the migration tooling"
+    - "Preserve as legacy tool"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ac40f79fe1e5d15b
+  resolved_at: 2026-05-30T20:33:45.438915Z
+  answer: "Your questions have been answered: \"When memory/work_list.md is deleted, what happens to the `gt backlog migrate-work-list` migration tooling (the cli.py command + backlog.py parse/migrate backend + 2 test_cli.py tests) that functionally reads it? This determines the -019 REVISED scope.\"=\"Retire the migration tooling\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0842
+  asked_at: 2026-05-30T20:38:49.617750Z
+  question: "What should this S374 session focus on?"
+  options:
+    - "Retraction follow-on (workflow)"
+    - "Retraction follow-on (single-thread)"
+    - "Pick from startup focus menu"
+    - "Different work entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: da814fb503ad8e2a
+  resolved_at: 2026-05-30T20:38:49.617750Z
+  answer: "Your questions have been answered: \"What should this S374 session focus on?\"=\"Retraction follow-on (workflow)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0843
+  asked_at: 2026-05-30T21:00:35.676487Z
+  question: "DECISION-0834 authorized governed retraction of 10 records but the probe evidence narrows the polluted set to 7 (DELIB-2514..2520; DELIB-2511..2513 are legitimate with in-flight dependents). Approve the narrowed scope and file the proposal?"
+  options:
+    - "Approve narrowed scope; file as drafted"
+    - "Approve narrowed scope + include provenance DELIB"
+    - "Keep DECISION-0834's wider scope (all 10)"
+    - "Show me the full draft text first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cefcdaf77e7bd44f
+  resolved_at: 2026-05-30T21:00:35.676487Z
+  answer: "Your questions have been answered: \"DECISION-0834 authorized governed retraction of 10 records but the probe evidence narrows the polluted set to 7 (DELIB-2514..2520; DELIB-2511..2513 are legitimate with in-flight dependents). Approve the narrowed scope and file the proposal?\"=\"Approve narrowed scope; file as drafted\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0844
+  asked_at: 2026-05-30T21:04:50.967032Z
+  question: "You stated a standing principle — fresh reads of the source-of-truth over cached copies/summaries. Beyond the WI-3500 reporting fix I just captured, how far should I operationalize it now?"
+  options:
+    - "Formalize + audit WI (Recommended)"
+    - "Audit WI only"
+    - "WI-3500 only for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fb289040c99ac74c
+  resolved_at: 2026-05-30T21:04:50.967032Z
+  answer: "Your questions have been answered: \"You stated a standing principle — fresh reads of the source-of-truth over cached copies/summaries. Beyond the WI-3500 reporting fix I just captured, how far should I operationalize it now?\"=\"Formalize + audit WI (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0845
+  asked_at: 2026-05-30T22:13:18.929547Z
+  question: "Codex NO-GO F3: the retraction proposal needs project-linkage metadata (Project Authorization / Project / Work Item) UNLESS reclassified to an exempt bridge_kind. How should the REVISED be classified? (F1/F2/F4 mechanical fixes happen regardless.)"
+  options:
+    - "governance_review (exempt)"
+    - "implementation_proposal + new WI"
+    - "Let me see both REVISED drafts"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 15abb8cfab3c31ab
+  resolved_at: 2026-05-30T22:13:18.929547Z
+  answer: "Your questions have been answered: \"Codex NO-GO F3: the retraction proposal needs project-linkage metadata (Project Authorization / Project / Work Item) UNLESS reclassified to an exempt bridge_kind. How should the REVISED be classified? (F1/F2/F4 mechanical fixes happen regardless.)\"=\"governance_review (exempt)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0846
+  asked_at: 2026-05-30T23:30:28.564883Z
+  question: "WI-3506 captures a real rule-vs-MemBase drift: three narrative rule files (canonical-terminology.md:414, operating-model.md:25, prime-builder-role.md:48) cite GOV-CHAT-DERIVED-SPEC-APPROVAL-001 as a live governing spec, but it does not exist in MemBase. The live equivalent is GOV-SPEC-CAPTURE-TRANSPARENCY-001. How should this be remediated? (This is captured as backlog WI-3506; it does NOT block the in-flight -005 re-review.)"
+  options:
+    - "Re-point citations (Recommended)"
+    - "Create the missing spec"
+    - "Leave as backlog only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7ff2f5ec92f25a2c
+  resolved_at: 2026-05-30T23:30:28.564883Z
+  answer: "Your questions have been answered: \"WI-3506 captures a real rule-vs-MemBase drift: three narrative rule files (canonical-terminology.md:414, operating-model.md:25, prime-builder-role.md:48) cite GOV-CHAT-DERIVED-SPEC-APPROVAL-001 as a live governing spec, but it does not exist in MemBase. The live equivalent is GOV-SPEC-CAPTURE-TRANSPARENCY-001. How should this be remediated? (This is captured as backlog WI-3506; it does NOT block the in-flight -005 re-review.)\"=\"Re-point citations (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0847
+  asked_at: 2026-05-30T23:31:54.276385Z
+  question: "Slice 8 reached VERIFIED at -017 (recommended commit type `feat`). The 2 code files are clean (+662 additions, no parallel contamination), but the tree has 275 churned files from parallel Codex sessions, HEAD has advanced twice, and bridge/INDEX.md has interleaved multi-thread edits. How should I commit the VERIFIED Slice 8?"
+  options:
+    - "Code only, scoped feat: (Recommended)"
+    - "Code + Slice 8 bridge chain + INDEX"
+    - "Hold all commits"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1f0bb7d4e5e88153
+  resolved_at: 2026-05-30T23:31:54.276385Z
+  answer: "Your questions have been answered: \"Slice 8 reached VERIFIED at -017 (recommended commit type `feat`). The 2 code files are clean (+662 additions, no parallel contamination), but the tree has 275 churned files from parallel Codex sessions, HEAD has advanced twice, and bridge/INDEX.md has interleaved multi-thread edits. How should I commit the VERIFIED Slice 8?\"=\"Code only, scoped feat: (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0848
+  asked_at: 2026-05-30T23:43:27.452794Z
+  question: "Retiring work_list.md (DELIB-S337) — does the scope cover ONLY the platform's own memory/work_list.md, or ALSO the adopter-facing work_list.md surfaces (scaffold seeding + the `isolation:work-list-no-product-entries` adopter doctor check + adopter upgrade gate/tests/fixtures/docs)? DELIB-S337 is platform-scoped, but the GO'd acceptance grep sweeps adopter surfaces whose removal cascades to files outside the approved target_paths."
+  options:
+    - "Platform-only (preserve adopter)"
+    - "Platform + adopter (clean sweep)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1809ec59af2c4f5c
+  resolved_at: 2026-05-30T23:43:27.452794Z
+  answer: "Your questions have been answered: \"Retiring work_list.md (DELIB-S337) — does the scope cover ONLY the platform's own memory/work_list.md, or ALSO the adopter-facing work_list.md surfaces (scaffold seeding + the `isolation:work-list-no-product-entries` adopter doctor check + adopter upgrade gate/tests/fixtures/docs)? DELIB-S337 is platform-scoped, but the GO'd acceptance grep sweeps adopter surfaces whose removal cascades to files outside the approved target_paths.\"=\"Platform + adopter (clean sweep)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0849
+  asked_at: 2026-05-31T04:34:33.790535Z
+  question: "The retraction is complete + verified and parked at NEW:-006 awaiting Codex. But this turn's tool channel is unreliable (contaminated Bash output, blank Read/Grep) so I can't safely verify INDEX integrity or do further writes. How should we proceed?"
+  options:
+    - "Restart session (clean channel)"
+    - "I'll retry the check here"
+    - "Stop here; nothing more needed"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 84c840dfdb67463b
+  resolved_at: 2026-05-31T04:34:33.790535Z
+  answer: "Your questions have been answered: \"The retraction is complete + verified and parked at NEW:-006 awaiting Codex. But this turn's tool channel is unreliable (contaminated Bash output, blank Read/Grep) so I can't safely verify INDEX integrity or do further writes. How should we proceed?\"=\"Restart session (clean channel)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0850
+  asked_at: 2026-05-31T04:34:33.790535Z
+  question: "Correction: the channel is actually clean and the retraction is VERIFIED/terminal — no recovery needed. The only open item is committing the VERIFIED change set (7 v2 packets + -006 + -007 + INDEX + MEMORY, fix:). How do you want to proceed?"
+  options:
+    - "Commit now, then restart"
+    - "Restart without committing"
+    - "Commit now, stay in session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 11bc3af246bd523e
+  resolved_at: 2026-05-31T04:34:33.790535Z
+  answer: "Your questions have been answered: \"Correction: the channel is actually clean and the retraction is VERIFIED/terminal — no recovery needed. The only open item is committing the VERIFIED change set (7 v2 packets + -006 + -007 + INDEX + MEMORY, fix:). How do you want to proceed?\"=\"Commit now, then restart\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0851
+  asked_at: 2026-05-31T04:53:02.014822Z
+  question: "Approve the DELIB body shown above for insertion into MemBase? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet."
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e6d09dee7427e179
+  resolved_at: 2026-05-31T04:53:02.014822Z
+  answer: "Your questions have been answered: \"Approve the DELIB body shown above for insertion into MemBase? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet.\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0852
+  asked_at: 2026-05-31T04:53:02.014822Z
+  question: "Approve the GOV body shown above for insertion into MemBase as GOV-SOURCE-OF-TRUTH-FRESHNESS-001 (type=governance, status=specified)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet."
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 71712d8a887b2e49
+  resolved_at: 2026-05-31T04:53:02.014822Z
+  answer: "Your questions have been answered: \"Approve the GOV body shown above for insertion into MemBase as GOV-SOURCE-OF-TRUTH-FRESHNESS-001 (type=governance, status=specified)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet.\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0853
+  asked_at: 2026-05-31T04:53:02.014822Z
+  question: "Approve the DCL body shown above for insertion into MemBase as DCL-REPORTING-SURFACE-FRESH-READ-001 (type=design_constraint, status=specified, affected_by GOV-SOURCE-OF-TRUTH-FRESHNESS-001)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet."
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7a6662bd6096aa1c
+  resolved_at: 2026-05-31T04:53:02.014822Z
+  answer: "Your questions have been answered: \"Approve the DCL body shown above for insertion into MemBase as DCL-REPORTING-SURFACE-FRESH-READ-001 (type=design_constraint, status=specified, affected_by GOV-SOURCE-OF-TRUTH-FRESHNESS-001)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet.\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0854
+  asked_at: 2026-05-31T05:16:47.675243Z
+  question: "Codex GO'd the final clean-sweep plan (-024). The remaining implementation is ~40 file edits + 6 approval packets + the work_list.md deletion + full verification. This is a multi-hour sweep in a session that's been running long. How should I proceed?"
+  options:
+    - "Continue in this session (Recommended)"
+    - "Wrap up and hand off to next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 33b7c1dd0a8f3b4d
+  resolved_at: 2026-05-31T05:16:47.675243Z
+  answer: "Your questions have been answered: \"Codex GO'd the final clean-sweep plan (-024). The remaining implementation is ~40 file edits + 6 approval packets + the work_list.md deletion + full verification. This is a multi-hour sweep in a session that's been running long. How should I proceed?\"=\"Continue in this session (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0855
+  asked_at: 2026-05-31T05:16:47.675243Z
+  question: "Phase 2 (all non-protected edits) is complete. Phases 3-6 are the governed approval packets + protected edits + work_list.md deletion + verification. Continue now or wrap for S377?"
+  options:
+    - "Wrap for S377 (Recommended)"
+    - "Continue now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f61b48f30ba8203
+  resolved_at: 2026-05-31T05:16:47.675243Z
+  answer: "Your questions have been answered: \"Phase 2 (all non-protected edits) is complete. Phases 3-6 are the governed approval packets + protected edits + work_list.md deletion + verification. Continue now or wrap for S377?\"=\"Wrap for S377 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0856
+  asked_at: 2026-05-31T06:07:10.777771Z
+  question: "Startup disclosure was not rendered — how should I proceed on this turn?"
+  options:
+    - "Investigate cache vs sidecar"
+    - "Skip disclosure, take direction"
+    - "Stand down, restart session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 411da3f74ea8b45a
+  resolved_at: 2026-05-31T06:07:10.777771Z
+  answer: "Your questions have been answered: \"Startup disclosure was not rendered — how should I proceed on this turn?\"=\"Skip disclosure, take direction\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0857
+  asked_at: 2026-05-31T06:17:54.870744Z
+  question: "Slice 9 is VERIFIED, but 2 of the 5 files collide with a parallel claude-md-scope-clarification session: CLAUDE.md is stale against a committed restructure (committing reverts 101 lines), and canonical-terminology.md has a mixed-in parallel edit. The other 3 files are clean + current. How should I commit Slice 9?"
+  options:
+    - "Commit 3 clean; rebase 2 (Recommended)"
+    - "Hold all Slice 9 commits"
+    - "Commit 3 clean; leave 2 in tree"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 54abe18e4dc05076
+  resolved_at: 2026-05-31T06:17:54.870744Z
+  answer: "Your questions have been answered: \"Slice 9 is VERIFIED, but 2 of the 5 files collide with a parallel claude-md-scope-clarification session: CLAUDE.md is stale against a committed restructure (committing reverts 101 lines), and canonical-terminology.md has a mixed-in parallel edit. The other 3 files are clean + current. How should I commit Slice 9?\"=\"Commit 3 clean; rebase 2 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0858
+  asked_at: 2026-05-31T06:17:54.870744Z
+  question: "Slice 9's 3 clean files are committed (736a158d). Step 2 (rebase CLAUDE.md + canonical-terminology.md) is blocked: canonical-terminology.md has a parallel session's UNCOMMITTED edit interleaved with mine in the shared working tree, and CLAUDE.md was restructured to 301 lines in HEAD (my anchor gone, at the GOV-01 cap). How should I handle the 2 remaining files?"
+  options:
+    - "Defer Step 2; leave tree as-is (Recommended)"
+    - "Clean up my 2 uncommitted edits now"
+    - "Attempt the rebase now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1a9b38d8de6b12b0
+  resolved_at: 2026-05-31T06:17:54.870744Z
+  answer: "Your questions have been answered: \"Slice 9's 3 clean files are committed (736a158d). Step 2 (rebase CLAUDE.md + canonical-terminology.md) is blocked: canonical-terminology.md has a parallel session's UNCOMMITTED edit interleaved with mine in the shared working tree, and CLAUDE.md was restructured to 301 lines in HEAD (my anchor gone, at the GOV-01 cap). How should I handle the 2 remaining files?\"=\"Defer Step 2; leave tree as-is (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0859
+  asked_at: 2026-05-31T07:32:41.916810Z
+  question: "Codex NO-GO'd -026 (F1): the 2 scaffold-golden memory/work_list.md deletions are outside the GO'd -023 target_paths. You approved that removal in S377, but the in-session AUQ didn't expand the bridge GO envelope. How should I remediate?"
+  options:
+    - "Restore + resubmit (in-scope)"
+    - "Scope-expand via new GO"
+    - "Spin the fixture regen now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ed482a369f2bf4b1
+  resolved_at: 2026-05-31T07:32:41.916810Z
+  answer: "Your questions have been answered: \"Codex NO-GO'd -026 (F1): the 2 scaffold-golden memory/work_list.md deletions are outside the GO'd -023 target_paths. You approved that removal in S377, but the in-session AUQ didn't expand the bridge GO envelope. How should I remediate?\"=\"Restore + resubmit (in-scope)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0862
+  asked_at: 2026-05-31T07:54:48.969564Z
+  question: "Slice 7-prime is complete and committed (174f8900 on develop, not pushed). What would you like next?"
+  options:
+    - "Stop here"
+    - "Push 174f8900"
+    - "Triage bridge queue"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 29916eb7f69c0851
+  resolved_at: 2026-05-31T07:54:48.969564Z
+  answer: "Your questions have been answered: \"Slice 7-prime is complete and committed (174f8900 on develop, not pushed). What would you like next?\"=\"Push 174f8900\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0863
+  asked_at: 2026-05-31T07:54:55.092227Z
+  question: "Authorize the freshness-governance commit with the explicit-pathspec scope shown above (12 bridge files + INDEX + groundtruth.db + 3 packets + 4 scratch files)? The proposal's Implementation Plan step 6 covers the commit, but explicit owner approval is appropriate given the contaminated tree and the visible-state nature of the operation."
+  options:
+    - "Approve commit as scoped (Recommended)"
+    - "Approve, but exclude INDEX.md"
+    - "Hold commit until tree stabilizes"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ad7947e9da2566dc
+  resolved_at: 2026-05-31T07:54:55.092227Z
+  answer: "Your questions have been answered: \"Authorize the freshness-governance commit with the explicit-pathspec scope shown above (12 bridge files + INDEX + groundtruth.db + 3 packets + 4 scratch files)? The proposal's Implementation Plan step 6 covers the commit, but explicit owner approval is appropriate given the contaminated tree and the visible-state nature of the operation.\"=\"Approve commit as scoped (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0864
+  asked_at: 2026-05-31T08:27:40.407823Z
+  question: "The CLAUSE-IN-ROOT fix is VERIFIED by Codex (clean, scope-confirmed). How should I land it?"
+  options:
+    - "Commit locally, scoped"
+    - "Commit locally + push"
+    - "Hold — don't commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 56e81b236d69d79a
+  resolved_at: 2026-05-31T08:27:40.407823Z
+  answer: "Your questions have been answered: \"The CLAUSE-IN-ROOT fix is VERIFIED by Codex (clean, scope-confirmed). How should I land it?\"=\"Commit locally + push\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0865
+  asked_at: 2026-05-31T08:30:18.306856Z
+  question: "Startup-relay cache mismatch on this `::init gtkb pb` session — the canonical Prime Builder startup disclosure cannot be presented. How should I proceed?"
+  options:
+    - "Diagnose cache (Recommended)"
+    - "Resume freshness-contract impl"
+    - "Skip disclosure, do ordinary work"
+    - "Stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f1f3e298e6250270
+  resolved_at: 2026-05-31T08:30:18.306856Z
+  answer: "Your questions have been answered: \"Startup-relay cache mismatch on this `::init gtkb pb` session — the canonical Prime Builder startup disclosure cannot be presented. How should I proceed?\"=\"Stand down\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0866
+  asked_at: 2026-05-31T08:33:05.627196Z
+  question: "Startup-relay failed (cache↔sidecar mismatch on last-user-visible-startup-pb.md; SessionStart freshness contract also failed). How should I proceed?"
+  options:
+    - "Investigate root cause (Recommended)"
+    - "End session, restart fresh"
+    - "Force-regenerate startup payload now"
+    - "Proceed without disclosure"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 00ddd550cb33fe4e
+  resolved_at: 2026-05-31T08:33:05.627196Z
+  answer: "Your questions have been answered: \"Startup-relay failed (cache↔sidecar mismatch on last-user-visible-startup-pb.md; SessionStart freshness contract also failed). How should I proceed?\"=\"Proceed without disclosure\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0867
+  asked_at: 2026-05-31T14:51:16.150581Z
+  question: "Slice 10 is VERIFIED at -010 and ready to commit, but the inventory-drift gate blocks because harness C \"antigravity\" was added as prime-builder in harness-state (parallel-session uncommitted work in this shared tree). My Slice 10 changes are scope-clean. How should I proceed?"
+  options:
+    - "Hold Slice 10 here (Recommended)"
+    - "File an inventory-regen chore thread now"
+    - "Bundle inventory regen into Slice 10 commit"
+    - "Investigate harness C first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 19b499ffdff3b6b6
+  resolved_at: 2026-05-31T14:51:16.150581Z
+  answer: "Your questions have been answered: \"Slice 10 is VERIFIED at -010 and ready to commit, but the inventory-drift gate blocks because harness C \"antigravity\" was added as prime-builder in harness-state (parallel-session uncommitted work in this shared tree). My Slice 10 changes are scope-clean. How should I proceed?\"=\"File an inventory-regen chore thread now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0868
+  asked_at: 2026-05-31T14:51:16.150581Z
+  question: "The inventory drift turns out to wrap an active multi-harness topology transition (live harness-state shows Codex demoted to LO-only, Claude reactivated as PB-only, Antigravity activated as PB; harness-registry version bumps 15→17, 13→16, 2→...). VERIFIED thread `gtkb-antigravity-harness-registration` (DELIB-2198/2213) is in the audit trail. How should I structure the chore?"
+  options:
+    - "Bundled chore: topology + inventory regen (Recommended)"
+    - "Two separate chore threads"
+    - "Owner-authorized --no-verify on Slice 10"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6b0d628bfc85120a
+  resolved_at: 2026-05-31T14:51:16.150581Z
+  answer: "Your questions have been answered: \"The inventory drift turns out to wrap an active multi-harness topology transition (live harness-state shows Codex demoted to LO-only, Claude reactivated as PB-only, Antigravity activated as PB; harness-registry version bumps 15→17, 13→16, 2→...). VERIFIED thread `gtkb-antigravity-harness-registration` (DELIB-2198/2213) is in the audit trail. How should I structure the chore?\"=\"Bundled chore: topology + inventory regen (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0869
+  asked_at: 2026-05-31T15:12:32.321006Z
+  question: "Codex NO-GO P1: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING's `allowed_mutation_classes` = ['source', 'test_addition', 'hook_upgrade']. My chore's targets are harness-state/*.json + .groundtruth/inventory/*. No active PAUTH I queried (~30) covers inventory/harness-state/governance-state mutation classes. How should I authorize the chore?"
+  options:
+    - "Archive S378 AUQ as DELIB, refile with DELIB-only auth (Recommended)"
+    - "Owner extends reliability PAUTH mutation classes"
+    - "Owner-authorized --no-verify on Slice 10 (skip chore)"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0fab5fe9c0f442db
+  resolved_at: 2026-05-31T15:12:32.321006Z
+  answer: "Your questions have been answered: \"Codex NO-GO P1: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING's `allowed_mutation_classes` = ['source', 'test_addition', 'hook_upgrade']. My chore's targets are harness-state/*.json + .groundtruth/inventory/*. No active PAUTH I queried (~30) covers inventory/harness-state/governance-state mutation classes. How should I authorize the chore?\"=\"Archive S378 AUQ as DELIB, refile with DELIB-only auth (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0871
+  asked_at: 2026-05-31T19:59:10.958472Z
+  question: "Another agent's uncommitted INDEX changes (-226 lines + new dispatch-scoping thread entry) got bundled into the staging. How should I commit?"
+  options:
+    - "Restore INDEX to HEAD + add only my 2 lines (Recommended)"
+    - "Commit the broader INDEX state as-is"
+    - "Hold the commit until the other agent commits separately"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8b35eebf03a1356e
+  resolved_at: 2026-05-31T19:59:10.958472Z
+  answer: "Your questions have been answered: \"Another agent's uncommitted INDEX changes (-226 lines + new dispatch-scoping thread entry) got bundled into the staging. How should I commit?\"=\"Restore INDEX to HEAD + add only my 2 lines (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
@@ -10262,4 +9375,1444 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: a85e640ff55fd405
   resolved_at: 2026-04-30T15:57:14.433487Z
   answer: "User has answered your questions: \"Candidate Spec #6 of 6 — `GOV-RELEASE-MANIFEST-README-001` (governance, parent=gtkb): \"GitHub release artifacts MUST include a release manifest and README release section detailing constituent platform component versions.\" Source: your statement archived as DELIB-1404 §6. Decision?\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0123
+  asked_at: 2026-04-30T16:47:34.088219Z
+  question: "How should I handle the two stale plan-level GO entries dispatched by the smart poller?"
+  options:
+    - "Stand down"
+    - "Write closure acks"
+    - "File dispatcher fix"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 21ecef4638ca6096
+  resolved_at: 2026-04-30T16:47:34.088219Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0124
+  asked_at: 2026-04-30T17:00:12.770886Z
+  question: "What's next now that the verified-runner REVISED-2 is filed and waiting on Codex?"
+  options:
+    - "Take up candidate-spec-intake NO-GO"
+    - "Pause for Codex on -007"
+    - "Pick a different work-list item"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 258285ca90091442
+  resolved_at: 2026-04-30T17:00:12.770886Z
+  answer: "User has answered your questions: \"What's next now that the verified-runner REVISED-2 is filed and waiting on Codex?\"=\"Take up candidate-spec-intake NO-GO\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0125
+  asked_at: 2026-04-30T17:00:12.770886Z
+  question: "Codex `-006` requirement #3 offers two paths. Which should I take?"
+  options:
+    - "Revise workflow (Recommended)"
+    - "Actually file all 5 follow-ons"
+    - "Defer this NO-GO again"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dfec1957f6a6fcce
+  resolved_at: 2026-04-30T17:00:12.770886Z
+  answer: "User has answered your questions: \"Codex `-006` requirement #3 offers two paths. Which should I take?\"=\"Revise workflow (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0127
+  asked_at: 2026-04-30T17:01:56.968040Z
+  question: "How should I follow up on the stale GO bridge dispatch?"
+  options:
+    - "Propose CS-2 hook slice"
+    - "Propose IR-0 inventory slice"
+    - "Switch to other priority"
+    - "Stop and await direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cae7f07e6e9c0e59
+  resolved_at: 2026-04-30T17:01:56.968040Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0129
+  asked_at: 2026-04-30T17:38:30.156185Z
+  question: "How should the stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006) be handled so the smart poller stops re-flagging them?"
+  options:
+    - "Update poller routing (Recommended)"
+    - "Append acknowledgement files"
+    - "Leave as-is"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8e11c3c9b55041cb
+  resolved_at: 2026-04-30T17:38:30.156185Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0131
+  asked_at: 2026-04-30T17:46:43.218072Z
+  question: "How should the two stale architectural-GO bridge entries (gtkb-command-surface-004, gtkb-incident-response-006) be dispositioned?"
+  options:
+    - "Leave as-is (Recommended)"
+    - "File closing post-impl reports"
+    - "Tune smart poller routing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 187526eb4246e3a9
+  resolved_at: 2026-04-30T17:46:43.218072Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0132
+  asked_at: 2026-04-30T18:15:27.572640Z
+  question: "How should I respond to the OPERATING-MODEL-ALIGNMENT-REMEDIATION advisory?"
+  options:
+    - "Scoped Slice 0 (Recommended)"
+    - "Slice 1 as Codex recommends"
+    - "Add to backlog and defer"
+    - "Decline / counter-propose"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e582567cfcaebdf6
+  resolved_at: 2026-04-30T18:15:27.572640Z
+  answer: "User has answered your questions: \"How should I respond to the OPERATING-MODEL-ALIGNMENT-REMEDIATION advisory?\"=\"Scoped Slice 0 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0134
+  asked_at: 2026-04-30T18:19:45.956417Z
+  question: "Both auto-dispatched bridge entries are plan-level GOs (architecture authorizations, not implementation authorizations). Which direction should I take next?"
+  options:
+    - "Draft CS-2 dispatcher bridge (Recommended)"
+    - "Advance ADR-isolation-application-placement to implementation"
+    - "Pick a different work_list item instead"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cbd77895e2d8a9dd
+  resolved_at: 2026-04-30T18:19:45.956417Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0136
+  asked_at: 2026-04-30T18:24:07.804359Z
+  question: "How should I close the docs/gtkb-idp-concept.md audit gap that's blocking the smart-poller-src-docstring REVISED-2?"
+  options:
+    - "Document an owner waiver (Recommended)"
+    - "File a separate closure bridge"
+    - "Revert gtkb-idp-concept.md"
+    - "Take up operating-model REVISED-1 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6c850926e82a571e
+  resolved_at: 2026-04-30T18:24:07.804359Z
+  answer: "User has answered your questions: \"How should I close the docs/gtkb-idp-concept.md audit gap that's blocking the smart-poller-src-docstring REVISED-2?\"=\"Document an owner waiver (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0138
+  asked_at: 2026-04-30T18:26:50.041449Z
+  question: "Which live bridge GO should I pick up next, since the dispatched umbrella entries are non-actionable?"
+  options:
+    - "Slice 0 inventory (Recommended)"
+    - "Spec lifecycle schema"
+    - "Active workspace declaration"
+    - "Stop / different choice"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4fdc631b845871cd
+  resolved_at: 2026-04-30T18:26:50.041449Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0139
+  asked_at: 2026-04-30T18:26:51.438091Z
+  question: "The two dispatched parent GOs (gtkb-command-surface-004, gtkb-incident-response-006) need no parent-level Prime action — they are planning-tier GOs whose implementation flows through child slice bridges, and the work_list/INDEX state is already canonical. The smart poller over-flagged them. How do you want me to proceed?"
+  options:
+    - "Stop here, no action (Recommended)"
+    - "Tune notify.py to skip planning GOs"
+    - "File CS-2 implementation bridge"
+    - "File IR-0 implementation bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: df4393719ee853b2
+  resolved_at: 2026-04-30T18:26:51.438091Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0141
+  asked_at: 2026-04-30T18:29:23.207509Z
+  question: "Both dispatched GO entries are plan-level (no implementation owed). What should I take on next?"
+  options:
+    - "CS-2 slice bridge (Recommended)"
+    - "Membase Slice A bridge"
+    - "Stop and review backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 217faaa0494d2007
+  resolved_at: 2026-04-30T18:29:23.207509Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0142
+  asked_at: 2026-04-30T19:17:12.280451Z
+  question: "The operating-model Slice 0 GO is the only Prime-actionable bridge item. Context is ~12% remaining. How should I proceed?"
+  options:
+    - "Start the DRAFT artifact only (Recommended)"
+    - "Start nothing this turn"
+    - "Try to complete all four deliverables now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 160547912b41c8a3
+  resolved_at: 2026-04-30T19:17:12.280451Z
+  answer: "User has answered your questions: \"The operating-model Slice 0 GO is the only Prime-actionable bridge item. Context is ~12% remaining. How should I proceed?\"=\"Start the DRAFT artifact only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0143
+  asked_at: 2026-04-30T19:17:12.280451Z
+  question: "Given ~54% context remaining, how should I sequence the remaining Slice 0 deliverables?"
+  options:
+    - "Delta annotations (§3.5) next (Recommended)"
+    - "Terminology table (§3.2) next"
+    - "Drift inventory (§3.3) next"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 29fdf92cf55a0c00
+  resolved_at: 2026-04-30T19:17:12.280451Z
+  answer: "User has answered your questions: \"Given ~54% context remaining, how should I sequence the remaining Slice 0 deliverables?\"=\"Delta annotations (§3.5) next (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0144
+  asked_at: 2026-04-30T19:17:12.280451Z
+  question: "Continue Slice 0 implementation this turn?"
+  options:
+    - "Terminology table (§3.2) next (Recommended)"
+    - "Drift inventory (§3.3) next"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d13943d629cca034
+  resolved_at: 2026-04-30T19:17:12.280451Z
+  answer: "User has answered your questions: \"Continue Slice 0 implementation this turn?\"=\"Terminology table (§3.2) next (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0145
+  asked_at: 2026-04-30T19:17:12.280451Z
+  question: "Continue to §3.3 drift inventory + §3.4 post-impl, or stop with 3 of 4 done?"
+  options:
+    - "Continue with §3.3 + §3.4 this turn"
+    - "Just §3.3 this turn"
+    - "Stop with 3 of 4"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f6362d91048d9bb5
+  resolved_at: 2026-04-30T19:17:12.280451Z
+  answer: "User has answered your questions: \"Continue to §3.3 drift inventory + §3.4 post-impl, or stop with 3 of 4 done?\"=\"Continue with §3.3 + §3.4 this turn\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0147
+  asked_at: 2026-04-30T19:20:16.539135Z
+  question: "Auto-dispatch landed on two stale plan-level GO entries (no PB action authorized by either GO body). What should Prime Builder do next?"
+  options:
+    - "Pull from work_list.md"
+    - "Propose CS-2 slice"
+    - "Refine smart-poller routing"
+    - "Idle until owner direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b0ed8ccae6c053c4
+  resolved_at: 2026-04-30T19:20:16.539135Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0148
+  asked_at: 2026-04-30T19:32:06.628543Z
+  question: "F1 closure: drift inventory path. Codex offers two paths."
+  options:
+    - "Move + gitignore exception (Recommended)"
+    - "Revised proposal for docs/ path"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a03e390046dfe8cf
+  resolved_at: 2026-04-30T19:32:06.628543Z
+  answer: "User has answered your questions: \"F1 closure: drift inventory path. Codex offers two paths.\"=\"Move + gitignore exception (Recommended)\", \"F2 closure: corpus-coverage stop criterion. Codex offers two paths.\"=\"Complete the one-pass read (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0149
+  asked_at: 2026-04-30T19:32:06.628543Z
+  question: "F2 closure: corpus-coverage stop criterion. Codex offers two paths."
+  options:
+    - "Complete the one-pass read (Recommended)"
+    - "Revised proposal changing stop criterion"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8749c05fc6dfd4d0
+  resolved_at: 2026-04-30T19:32:06.628543Z
+  answer: "User has answered your questions: \"F1 closure: drift inventory path. Codex offers two paths.\"=\"Move + gitignore exception (Recommended)\", \"F2 closure: corpus-coverage stop criterion. Codex offers two paths.\"=\"Complete the one-pass read (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0151
+  asked_at: 2026-04-30T19:33:25.870870Z
+  question: "Both auto-dispatched GO entries are plan-level only; neither authorizes implementation. What should I do next?"
+  options:
+    - "Stand down, no action"
+    - "Draft revised ADR proposal"
+    - "Draft CS-2 slice proposal"
+    - "Draft both follow-ups"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d6020b6a824845eb
+  resolved_at: 2026-04-30T19:33:25.870870Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0154
+  asked_at: 2026-04-30T19:35:53.326190Z
+  question: "Both auto-dispatched bridge entries are stale plan-level GOs (already implemented via slice sub-threads). What should I do next?"
+  options:
+    - "Revise slice-0 inventory (Recommended)"
+    - "File routing-defect backlog item"
+    - "Both — revise then file backlog"
+    - "Stop and wait for further direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9fa23dde09f6515d
+  resolved_at: 2026-04-30T19:35:53.326190Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0155
+  asked_at: 2026-04-30T22:57:43.823794Z
+  question: "Should I record the Prime parent/plan-level GO false-positive class as actionable follow-on?"
+  options:
+    - "Record as work_list row only"
+    - "File as a NEW bridge proposal now"
+    - "Note in this turn only; no record"
+    - "Stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 57055d2699a23347
+  resolved_at: 2026-04-30T22:57:43.823794Z
+  answer: "User has answered your questions: \"Should I record the Prime parent/plan-level GO false-positive class as actionable follow-on?\"=\"Record as work_list row only\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0156
+  asked_at: 2026-04-30T23:03:37.051045Z
+  question: "Should I record the 'refactor bridge + smart-poller for simplicity' intent in the backlog now?"
+  options:
+    - "Add a work_list row now (Recommended)"
+    - "Note in this turn only"
+    - "Stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d17424f143ecd464
+  resolved_at: 2026-04-30T23:03:37.051045Z
+  answer: "User has answered your questions: \"Should I record the 'refactor bridge + smart-poller for simplicity' intent in the backlog now?\"=\"Add a work_list row now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0078
+  asked_at: 2026-04-29T18:14:32.418962Z
+  question: "rrent latest status awaiting your input."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: cc189cee7a45fc45
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0079
+  asked_at: 2026-04-29T18:20:40.875069Z
+  question: "rrent latest status awaiting your input\"`). I'll wait for y"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: f225e9dd77617892
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0080
+  asked_at: 2026-04-29T18:31:01.168043Z
+  question: "ositives detecting \"awaiting your input\" in my own text. Re"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 6339ac11d703eefa
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0081
+  asked_at: 2026-04-29T18:38:22.768539Z
+  question: "ing-backlog item. **Should I (a) draft the Slice 2 upstream proposal now, (b) wait for your GOV-17 ack on DORA Track 1, or (c) advance whichever standing-backlog item you prioritize?**"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 3e326649019a3ecb
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0082
+  asked_at: 2026-04-29T18:53:30.651276Z
+  question: "ion picks them up.  Awaiting owner direction. No further action"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 9fedce014a91ac7f
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0083
+  asked_at: 2026-04-29T18:56:12.804524Z
+  question: "trail is preserved. Awaiting owner direction before filing any n"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 65a128ee76925b61
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0084
+  asked_at: 2026-04-29T19:04:22.711734Z
+  question: "───────────────`  **Awaiting your direction on next concrete st"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 3e50c72e86229ec4
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0085
+  asked_at: 2026-04-29T19:14:14.228092Z
+  question: "its on `develop`  **Awaiting your direction on next concrete st"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 280bbb2602c502f8
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0086
+  asked_at: 2026-04-29T19:43:59.907389Z
+  question: "ven session scope)  Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: ec8b749b83ff24db
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0087
+  asked_at: 2026-04-29T23:01:28.809266Z
+  question: "rectly remain at GO awaiting your direction on the next-step pr"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 785464f15c6de597
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0088
+  asked_at: 2026-04-29T23:14:09.337671Z
+  question: "uality Slice 2:** - Should I draft the Slice 2 implementation proposal now, or defer? It is substantial d"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: b992e452fdd0e770
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0089
+  asked_at: 2026-04-29T23:14:09.337671Z
+  question: "their audit trail. Awaiting owner direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: c0030a1977bb112f
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0090
+  asked_at: 2026-04-29T23:14:17.725451Z
+  question: "ose anti-patterns (\"awaiting your input\", etc.) from the ow"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 7e898284f06ee356
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0091
+  asked_at: 2026-04-29T23:16:55.765092Z
+  question: "W following a GO).  Awaiting owner direction on items 1–3."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 78d3b4edf6e529f9
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0092
+  asked_at: 2026-04-29T23:16:59.982350Z
+  question: "discussion *about* \"awaiting your input\" prose as an instance of \"awaiting your input\" prose. This is the"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 4ba3a6d491d45e1b
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0093
+  asked_at: 2026-04-29T23:16:59.982350Z
+  question: "lla; high impact).  Want me to (a) recover the NO-GO immediately, (b) draft the spec-lifecycle REVISED-1 addressing F1-F3, or (c) something else?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: c71860b45bd7fb67
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0094
+  asked_at: 2026-04-29T23:32:04.175320Z
+  question: "— another dimension awaiting owner direction. - Acting now would"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: a495fa4d63b10703
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0095
+  asked_at: 2026-04-29T23:36:01.193872Z
+  question: "──────────────`  ## Your decision  How would you like me to handle row 7?  1. **Approve the e"
+  detected_via: prose:your_decision_q
+  status: resolved
+  question_hash: afbc90239b6f3e9e
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0096
+  asked_at: 2026-04-30T00:22:57.160878Z
+  question: "says \"awaits GO\"). Awaiting your approval to apply.  **No bri"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 5fbe22f9484ee92d
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0102
+  asked_at: 2026-04-30T02:09:58.752306Z
+  question: "written.) - **Or** should I instead defer one or both — for example, the dora `-008` GO is purely a confirmation of an already-GO'd contract, so an alternative is to mark this thread closed without a `-009` report and rely on the existing audit trail?  Please confirm how"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 4f21ef356e77d170
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0103
+  asked_at: 2026-04-30T03:21:24.898715Z
+  question: "pending) records: *\"Should I (a) draft the Slice 2 upstream proposal now, (b) wait for your GOV-17 ack on DORA Track 1, or (c) advance whichever standing-backlog item you prioritize?\"*  GOV-17 for DORA-"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: e070f3ddd1dbf13f
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0104
+  asked_at: 2026-04-30T03:21:24.898715Z
+  question: "dit trail intact. - Awaiting owner choice on DECISION-0081 (Track 1 vs. S"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 797760def434b877
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0105
+  asked_at: 2026-04-30T03:34:41.657186Z
+  question: "e any code change.  Want me to pick one autonomously per the standing pre-approval, or hold for your direction?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 3d6f78992db59303
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0106
+  asked_at: 2026-04-30T03:42:05.375231Z
+  question: "less you redirect.  Want me to keep watching for Codex's verdict, or address something else while waiting?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f60d0ca5320c8d75
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0107
+  asked_at: 2026-04-30T03:42:57.404940Z
+  question: "utations performed. Awaiting your direction on items 1–3."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 08c0f755897d88f8
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0108
+  asked_at: 2026-04-30T03:51:48.959041Z
+  question: "INDEX.md untouched. Awaiting your direction on (A)/(B)/(C)."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 94aaf77bfee5c038
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0109
+  asked_at: 2026-04-30T03:53:05.074876Z
+  question: "o audit-trail gaps. Awaiting your direction before opening eith"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 835c10f9897697b5
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0110
+  asked_at: 2026-04-30T05:16:57.742153Z
+  question: "h in-root routing.\" Want me to draft that Slice 2 proposal now, or defer it (it has no deadline pressure and trades focus against ISOLATION-016 Phase 8 / MEMBASE-EFFECTIVE-USE-RECOVERY Slice A which are higher-priority on row 19 and row 2)?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f6435363bf07b581
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0111
+  asked_at: 2026-04-30T05:57:32.324453Z
+  question: "nsumed parent GOs.  Awaiting your direction. No bridge-modifyin"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: e5d975b4cf44a588
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0112
+  asked_at: 2026-04-30T05:58:50.516680Z
+  question: "ction of their own. Awaiting owner direction on (1) vs (2). No b"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 25ff2dc2960b8fa3
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0113
+  asked_at: 2026-04-30T05:59:08.094056Z
+  question: "eady-VERIFIED work. Should I treat acknowledgement as sufficient (no new bridge entry, no commit), or do you want a formal Prime ack version filed? 2. **Slice 2 of cod"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 797ba9a652b4917e
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0114
+  asked_at: 2026-04-30T13:20:59.954720Z
+  question: "te prose-asks like \"should I do A or B?\" without calling As"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 8aecd2322bee3154
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0121
+  asked_at: 2026-04-30T16:43:51.105853Z
+  question: "ge-swimlane.json`.  Want me to take up the candidate-spec-intake NO-GO next, or pause for Codex to review `-007`?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 1ccfcbaa8dd4b456
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0122
+  asked_at: 2026-04-30T16:47:19.099540Z
+  question: ".  Which way do you want me to go — stand down, write closure acknowledgements, or file the dispatcher-refinement backlog item?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 554d97bd502f0498
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0126
+  asked_at: 2026-04-30T17:01:33.376347Z
+  question: "ment ADR for IR-0). Want me to pick one and propose, or should I move to a different priority?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f0a5ea21d8c502b6
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0128
+  asked_at: 2026-04-30T17:38:10.779982Z
+  question: "overnance ceremony. Want me to file Option 2, or accept Option 1 and update the smart poller's kind-aware routing instead?  `★ Insight ───────"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 3582211e16491da9
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0130
+  asked_at: 2026-04-30T17:46:19.502879Z
+  question: "it trail preserved. Awaiting your decision on disposition."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 456b4c626d8c4506
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0133
+  asked_at: 2026-04-30T18:19:13.710794Z
+  question: "onfirm direction:** Should I draft the CS-2 dispatcher bridge proposal now (option 1), or is there a different priority you want me to pick up first?  I have **not** mod"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 97d5bd095f33023f
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0135
+  asked_at: 2026-04-30T18:19:45.956417Z
+  question: "alog was dismissed. Awaiting your direction on which thread to"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 34f172c168664f7c
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0137
+  asked_at: 2026-04-30T18:26:25.333888Z
+  question: "04-29-006.md` (GO)  Want me to pivot to the Slice 0 inventory (today's GO) or one of the others? Per the one-decisio"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: cf19ea44de1b2985
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0140
+  asked_at: 2026-04-30T18:28:49.589162Z
+  question: "actionable queue.  Want me to file the CS-2 slice bridge, the membase Slice A bridge, or a different work item?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 135f1fc995da2999
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0146
+  asked_at: 2026-04-30T19:19:54.614551Z
+  question: "for this dispatch.  Standing by for next owner direction or `Bridge` scan."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 6f19f0d496039d2c
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0150
+  asked_at: 2026-04-30T19:32:57.647885Z
+  question: "ace beyond CS-1.5.  Should I draft either of these as a NEW bridge proposal, or stand down and wait for explicit direction on which (if either) is the next priority? I would not start e"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 6fe18c134f778a54
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0152
+  asked_at: 2026-04-30T19:33:25.870870Z
+  question: "ithout a selection. Standing by for explicit direction — no implementation"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 296eb601df7e7be2
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0153
+  asked_at: 2026-04-30T19:35:31.167005Z
+  question: "for owner review.  Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 9bc4977d8e200b33
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0157
+  asked_at: 2026-05-01T00:10:02.827410Z
+  question: "matter). Otherwise, awaiting your next direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 1009b183ef5e37b6
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0159
+  asked_at: 2026-05-01T00:10:24.471794Z
+  question: "Question canceled. Awaiting your direction on the next move."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: c6446374385ca835
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0160
+  asked_at: 2026-05-01T00:26:58.594263Z
+  question: "ositives detecting 'awaiting your input' in my own text\"* — the hook caught a sentence describing the false-positive problem itself; DECISION-0092 is even more m"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: e0a6a1f8e850ae91
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0161
+  asked_at: 2026-05-01T00:37:57.113964Z
+  question: "a REVISED proposal. Want me to proceed with that, or do you want a fresh CS-2 / CS-3 / IR follow-up slice proposal drafted instead?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 31a99acfe2bfe5d7
+  resolved_at: 2026-05-01T00:50:25.116555Z
+  resolved_in_session: S324
+  answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0158
+  asked_at: 2026-05-01T00:10:24.471794Z
+  question: "How should I handle the recurring smart-poller over-flagging of plan-level GOs as implementation triggers?"
+  options:
+    - "File backlog entry (Recommended)"
+    - "File as deliberation only"
+    - "Defer — no action"
+    - "Different scope (specify)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c41e7e52685f1af1
+  resolved_at: 2026-05-01T00:10:24.471794Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0162
+  asked_at: 2026-05-01T00:38:15.970499Z
+  question: "Both auto-dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are stale plan-level GOs that don't authorize implementation. Which Prime action should I take next?"
+  options:
+    - "Revise dashboard NO-GO (Recommended)"
+    - "Draft CS-2 slice proposal"
+    - "Draft IR follow-up slice proposal"
+    - "Pull from work_list.md backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e96e801984284dba
+  resolved_at: 2026-05-01T00:38:15.970499Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0163
+  asked_at: 2026-05-01T00:57:21.983194Z
+  question: "How should the 47 entries in memory/pending-owner-decisions.md be disposed?"
+  options:
+    - "clear pending (bulk dismiss)"
+    - "defer all (acknowledge, keep)"
+    - "Sample 10 entries, then decide"
+    - "Full triage (resolve each)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9adb3f19306b2efb
+  resolved_at: 2026-05-01T00:57:21.983194Z
+  answer: "User has answered your questions: \"How should the 47 entries in memory/pending-owner-decisions.md be disposed?\"=\"Full triage (resolve each)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0165
+  asked_at: 2026-05-01T02:17:46.535439Z
+  question: "g-or-choice prose (\"Want me to wait or do you want to trigger Codex manually?\") — same false-posi"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 0272f03b5d22c089
+  resolved_at: 2026-05-01T04:30:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (offering_or_choice meta-discussion). The detector caught Claude's own description of DECISION-0164's false-positive class — quoting the prior false-positive prose to discuss it. Same recursive-meta pattern as DECISION-0080, 0090, 0092, 0114, 0160. Not a real owner question. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0166
+  asked_at: 2026-05-01T02:18:26.151555Z
+  question: "wrap`, `::bridge`). Want me to file that proposal, or do you have a different next priority?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 47c664d8cda0e80d
+  resolved_at: 2026-05-01T04:30:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (offering_or_choice). Detector caught Claude's prose offering paths-from-here at end of status report. Same class as DECISION-0164. Owner answered subsequently via AskUserQuestion (Full triage / Implement dashboard-link / etc.); the prose-ask was rhetorical-closing, not a real decision request. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0169
+  asked_at: 2026-05-01T03:54:14.743710Z
+  question: "dispatcher logic.  Want me to draft the option-2 closure proposals, the option-3 dispatcher backlog entry, both, or neither?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: d714cda96b4b142e
+  resolved_at: 2026-05-01T04:30:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (offering_or_choice). Same class as DECISION-0165, 0166, 0164. Detector caught Claude's status-report prose. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0164
+  asked_at: 2026-05-01T00:57:21.983194Z
+  question: "operational state. Want me to wait or do you want to trigger Codex manually?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 750ff2e1bdfd58d8
+  resolved_at: 2026-05-01T01:05:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (offering_or_choice). Same class as the 5 false_positive_meta entries from earlier this session. Detector caught Claude's own closing prose at the end of a status report; owner gave direction in the next turn (manual bridge scan + relay of Codex NO-GO -004 findings) which made the prose-ask irrelevant. Resolved inline as part of the same Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0167
+  asked_at: 2026-05-01T02:18:42.220342Z
+  question: "How should we proceed with Codex review of -005?"
+  options:
+    - "Wait — smart-poller"
+    - "You'll trigger Codex"
+    - "Pivot to other work"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d2bda4802ae4483c
+  resolved_at: 2026-05-01T02:18:42.220342Z
+  answer: "User has answered your questions: \"How should we proceed with Codex review of -005?\"=\"Wait — smart-poller\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0168
+  asked_at: 2026-05-01T02:18:53.242829Z
+  question: "Both dispatched bridge GOs are stale plan-level entries with downstream slices already VERIFIED. What's next?"
+  options:
+    - "File CS-2 (Recommended)"
+    - "File CS-1 instead"
+    - "File CS-1 and CS-2 in parallel"
+    - "Stand down — pick from elsewhere"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c9b66346d008115f
+  resolved_at: 2026-05-01T02:18:53.242829Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0170
+  asked_at: 2026-05-01T03:54:39.922159Z
+  question: "Both dispatched bridge GOs are stale (plan-level GOs that explicitly forbid implementation in the parent thread; downstream slices already VERIFIED). What should Prime Builder do?"
+  options:
+    - "Draft both: closure + dispatcher fix (Recommended)"
+    - "Draft closure proposals only"
+    - "Draft dispatcher backlog item only"
+    - "Take no action"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 96e1aaaf86fbd771
+  resolved_at: 2026-05-01T03:54:39.922159Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0171
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "How should the F2 (failing-test waiver) finding be addressed?"
+  options:
+    - "Grant explicit waiver"
+    - "Narrow verification scope"
+    - "Fix the failing test"
+    - "File separate hotfix bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5f73761aa9ea65cf
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"How should the F2 (failing-test waiver) finding be addressed?\"=\"Fix the failing test\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0172
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "The release-gate fails on 3 unrelated pre-existing ruff errors in tests/scripts/test_run_spec_derived_tests.py (workstream gtkb-platform-spec-coverage-verified-runner, currently VERIFIED). How do I proceed?"
+  options:
+    - "Fix the 3 ruff errors in this thread"
+    - "Document as out-of-scope; cite drift in REVISED post-impl"
+    - "File separate hotfix bridge for ruff drift first"
+    - "Skip release-gate in this thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dfa5183b024ce913
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"The release-gate fails on 3 unrelated pre-existing ruff errors in tests/scripts/test_run_spec_derived_tests.py (workstream gtkb-platform-spec-coverage-verified-runner, currently VERIFIED). How do I proceed?\"=\"Fix the 3 ruff errors in this thread\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0173
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "How do I proceed with the release-gate's broken hardcoded test reference?"
+  options:
+    - "Stop scope expansion; narrow verification surface"
+    - "Fix the gate's hardcoded list too"
+    - "File separate hotfix bridge for the gate"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4adc545ec657d101
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"How do I proceed with the release-gate's broken hardcoded test reference?\"=\"Fix the gate's hardcoded list too\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0174
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "The release-gate has at least 2 more pre-existing problems blocking a clean run (internal test failure + 180s timeout vs. >180s suite). How do I proceed?"
+  options:
+    - "STOP cascade. Narrow verification surface."
+    - "Keep going"
+    - "Park dashboard-link, file release-gate hotfix bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 846f3ab0d62f7438
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"The release-gate has at least 2 more pre-existing problems blocking a clean run (internal test failure + 180s timeout vs. >180s suite). How do I proceed?\"=\"STOP cascade. Narrow verification surface.\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0177
+  asked_at: 2026-05-01T05:04:50.340526Z
+  question: "reserved unchanged. Awaiting owner direction on whether to surfa"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: b9252b35f96bac2a
+  resolved_at: 2026-05-01T05:15:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169/0175. Truncated prose-detector capture from a status report. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0175
+  asked_at: 2026-05-01T04:54:11.171778Z
+  question: "sory-only feedback. Awaiting owner direction on whether to: - (a"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 1993ed8371b77b88
+  resolved_at: 2026-05-01T05:00:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169. Detector caught Claude's prose fragment from a status report. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0176
+  asked_at: 2026-05-01T04:54:32.154553Z
+  question: "Both auto-dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are stale plan-level GOs whose follow-on slices are already VERIFIED. What should Prime Builder pick up next?"
+  options:
+    - "Revise dashboard-link NO-GO -010"
+    - "Revise ADR-eval-enforcement NO-GO -002"
+    - "Propose next CS slice"
+    - "Advance work_list.md item"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 10da0e5a56c14ab6
+  resolved_at: 2026-05-01T04:54:32.154553Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0178
+  asked_at: 2026-05-01T05:05:07.547262Z
+  question: "Both umbrella GOs are acknowledged with their first sub-slices VERIFIED. What next?"
+  options:
+    - "Stand down"
+    - "Surface CS shortlist"
+    - "Surface IR shortlist"
+    - "Surface both shortlists"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6375e76f8f4ba228
+  resolved_at: 2026-05-01T05:05:07.547262Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0179
+  asked_at: 2026-05-01T05:06:46.274366Z
+  question: "How should I close the dashboard-link F1 (cascade scope outside -006 GO)?"
+  options:
+    - "Supplemental REVISED in same thread"
+    - "Separate cascade bridge"
+    - "Formal bridge-protocol waiver"
+    - "Revert the cascade entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2e50ef97aa1c286c
+  resolved_at: 2026-05-01T05:06:46.274366Z
+  answer: "User has answered your questions: \"How should I close the dashboard-link F1 (cascade scope outside -006 GO)?\"=\"Separate cascade bridge\", \"For ADR-eval REVISED-2, how should S1's originating DA record be sourced?\"=\"Archive S324 directive as owner_conversation DA\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0180
+  asked_at: 2026-05-01T05:06:46.274366Z
+  question: "For ADR-eval REVISED-2, how should S1's originating DA record be sourced?"
+  options:
+    - "Archive S324 directive as owner_conversation DA"
+    - "Generate a fresh owner statement"
+    - "Defer DA archival to S1 bridge time"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1de07ad96e7d135f
+  resolved_at: 2026-05-01T05:06:46.274366Z
+  answer: "User has answered your questions: \"How should I close the dashboard-link F1 (cascade scope outside -006 GO)?\"=\"Separate cascade bridge\", \"For ADR-eval REVISED-2, how should S1's originating DA record be sourced?\"=\"Archive S324 directive as owner_conversation DA\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0181
+  asked_at: 2026-05-01T05:09:08.761676Z
+  question: "DECISION-0177 in pending-owner-decisions.md is a truncated prose-detector capture ('reserved unchanged. Awaiting owner direction on whether to surfa') with no real recoverable question. How should I dispose of it?"
+  options:
+    - "Clear pending (dismiss)"
+    - "Defer all"
+    - "Investigate source"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f370a00999261c2f
+  resolved_at: 2026-05-01T05:09:08.761676Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0189
+  asked_at: 2026-05-01T05:28:09.181538Z
+  question: "s its own session.  Want me to begin #1 (dashboard-link parent close-out) now, or hold for explicit direction?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 3aa6e3014809c813
+  resolved_at: 2026-05-01T05:35:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (offering_or_choice). The same prose ask was formalized via AskUserQuestion in the same turn; detector caught the prose form anyway. Owner answered \"Yes, begin #1 now\" via the structured dialog. Not a missed decision. Same false-positive class as DECISION-0164 etc. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0182
+  asked_at: 2026-05-01T05:16:37.566781Z
+  question: "idge files written. Awaiting owner direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 5905132ffcd99c98
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169/0175/0177. Truncated prose-detector capture. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0184
+  asked_at: 2026-05-01T05:18:32.505373Z
+  question: "idge files written. Awaiting owner direction.\") — auto-detected"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 85257539e70d75d8
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input meta-discussion). Detector caught Claude's own description of DECISION-0182's false-positive class. Same recursive-meta pattern as DECISION-0080/0090/0092/0114/0160. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0186
+  asked_at: 2026-05-01T05:20:20.224132Z
+  question: "idge files written. Awaiting owner direction.\"). Not real owner"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 8891b782903e6515
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input recursive-meta). Same class as DECISION-0184. Detector caught Claude's discussion of the discussion of the false-positive pattern. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0188
+  asked_at: 2026-05-01T05:20:51.597297Z
+  question: "ode mutations made. Awaiting your direction on next move."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: d5ad3acea9790ec0
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Truncated prose fragment from a status report. Same class as DECISION-0182. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0183
+  asked_at: 2026-05-01T05:16:58.025039Z
+  question: "How should I dispose of the two dispatched plan-level GO entries (gtkb-command-surface-004, gtkb-incident-response-006)?"
+  options:
+    - "Leave as-is (Recommended)"
+    - "File closure markers"
+    - "Backlog: smart-poller plan-GO filter"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2917a72719cf1b7c
+  resolved_at: 2026-05-01T05:16:58.025039Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0185
+  asked_at: 2026-05-01T05:18:52.451156Z
+  question: "How should the two stale umbrella GO bridge threads (gtkb-command-surface-004 and gtkb-incident-response-006) be handled? Both are architecture/plan-level GOs whose downstream slices (CS-1.5, IR-0.1) are already VERIFIED."
+  options:
+    - "File close-out post-impls"
+    - "Leave both open"
+    - "Add poller filter proposal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b7e57e373b7fb448
+  resolved_at: 2026-05-01T05:18:52.451156Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0187
+  asked_at: 2026-05-01T05:20:51.597297Z
+  question: "Both dispatched GOs are stale (umbrella plans whose sub-threads already VERIFIED). What should Prime Builder do next?"
+  options:
+    - "Address live NO-GO"
+    - "File CS-2 sub-proposal"
+    - "Triage DECISION-0182/0184"
+    - "Stand down + standing backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d7f7cff763870a4c
+  resolved_at: 2026-05-01T05:20:51.597297Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0190
+  asked_at: 2026-05-01T05:31:48.388130Z
+  question: "Should I begin #1 (dashboard-link parent close-out) now?"
+  options:
+    - "Yes, begin #1 now"
+    - "Hold; pick a different item"
+    - "Hold; await Codex on S0"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 18f78c903f9d56e5
+  resolved_at: 2026-05-01T05:31:48.388130Z
+  answer: "User has answered your questions: \"Should I begin #1 (dashboard-link parent close-out) now?\"=\"Yes, begin #1 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0191
+  asked_at: 2026-05-01T05:31:48.388130Z
+  question: "Should I author S0 REVISED-1 -003 now to address the two blocking findings?"
+  options:
+    - "Yes, author REVISED-1 now"
+    - "Hold; wait for dashboard-link VERIFIED first"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f56c27bc14d6ff1a
+  resolved_at: 2026-05-01T05:31:48.388130Z
+  answer: "User has answered your questions: \"Should I author S0 REVISED-1 -003 now to address the two blocking findings?\"=\"Hold; wait for dashboard-link VERIFIED first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0193
+  asked_at: 2026-05-01T05:43:28.784250Z
+  question: "What's the next move now that dashboard-link is VERIFIED-terminal?"
+  options:
+    - "File S0 REVISED-1 -003 now"
+    - "Pivot to a different top-10 item"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 032e6ab9135b5d5b
+  resolved_at: 2026-05-01T05:43:28.784250Z
+  answer: "User has answered your questions: \"What's the next move now that dashboard-link is VERIFIED-terminal?\"=\"File S0 REVISED-1 -003 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0194
+  asked_at: 2026-05-01T05:44:09.138702Z
+  question: "Both auto-dispatch GO entries (gtkb-command-surface, gtkb-incident-response) are plan-level approvals that don't authorize code directly. Which next move would you like Prime Builder to take? (DECISION-0192)"
+  options:
+    - "Draft CS-1.5 slice proposal (Recommended)"
+    - "Advance ADR-isolation post-impl"
+    - "Pick a different work_list item"
+    - "Hold; brief me first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f96b23b326a4b3d
+  resolved_at: 2026-05-01T05:44:09.138702Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0195
+  asked_at: 2026-05-01T05:50:19.026378Z
+  question: "Should I file S0 REVISED-2 -005 now to close the -004 NO-GO?"
+  options:
+    - "Yes, file REVISED-2 now"
+    - "Hold; pivot to row 24 hygiene first"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6c4cb4b460d035f0
+  resolved_at: 2026-05-01T05:50:19.026378Z
+  answer: "User has answered your questions: \"Should I file S0 REVISED-2 -005 now to close the -004 NO-GO?\"=\"Hold; pivot to row 24 hygiene first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0197
+  asked_at: 2026-05-01T05:52:09.826829Z
+  question: "Both auto-dispatched GOs are stale (plan-level, already actioned via slice sub-bridges). What should Prime Builder do next?"
+  options:
+    - "Revise s0-audit NO-GO"
+    - "Propose next CS slice"
+    - "Propose IR-1 phase"
+    - "Pick from work_list.md"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 152680b2ee6616aa
+  resolved_at: 2026-05-01T05:52:09.826829Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0198
+  asked_at: 2026-05-01T06:01:24.052446Z
+  question: "The wrap-scan exit code 2 says mutating wrap shouldn't proceed without explicit owner override. All 22 errors are pre-existing prior-session debt, not S324-caused. How do you want to handle this?"
+  options:
+    - "Override and proceed with mutating wrap"
+    - "Stop wrap; address phantom-INDEX errors first"
+    - "Stop wrap; just proceed manually"
+    - "Review reports first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b6c6b25740d3ee55
+  resolved_at: 2026-05-01T06:01:24.052446Z
+  answer: "User has answered your questions: \"The wrap-scan exit code 2 says mutating wrap shouldn't proceed without explicit owner override. All 22 errors are pre-existing prior-session debt, not S324-caused. How do you want to handle this?\"=\"Stop wrap; address phantom-INDEX errors first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0200
+  asked_at: 2026-05-01T14:04:56.476808Z
+  question: "Both bridge GOs (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level only and do not authorize implementation. Which next step should Prime advance?"
+  options:
+    - "File CS-1.5 NEW proposal (Recommended)"
+    - "File CS-1 NEW proposal"
+    - "Verify ADR-supersession landing"
+    - "Defer / different priority"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e4b091b4241025bd
+  resolved_at: 2026-05-01T14:04:56.476808Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0203
+  asked_at: 2026-05-01T14:17:58.843600Z
+  question: "How should I handle the gtkb-command-surface-004 GO (architecture-only; needs per-slice proposals before any implementation)?"
+  options:
+    - "Park"
+    - "Draft CS-1.5 proposal"
+    - "Draft CS-2 proposal"
+    - "Pick a different slice"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2460b4f0952df596
+  resolved_at: 2026-05-01T14:17:58.843600Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0205
+  asked_at: 2026-05-01T14:19:51.344868Z
+  question: "Both auto-dispatched GOs are plan-level and don't authorize implementation. Which next step would you like me to take?"
+  options:
+    - "Stand down — no action"
+    - "Draft CS-2 slice proposal"
+    - "Draft CS-1 slice proposal"
+    - "Log dispatch as row-22 evidence"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f349028451162ac9
+  resolved_at: 2026-05-01T14:19:51.344868Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0207
+  asked_at: 2026-05-01T14:22:19.949659Z
+  question: "How do you want me to apply the ISOLATION priority elevation given current S324 state?"
+  options:
+    - "Finalize S324: update work_list priority + run wrap; start ISOLATION-016 next session"
+    - "Update work_list priority now, continue S324 work but prioritize ISOLATION-016 prep"
+    - "Pivot immediately to ISOLATION-016 (abandon wrap close-out and other in-flight)"
+    - "Just update the priority in work_list (treat as deferred re-ordering)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 952470b1b4a81f76
+  resolved_at: 2026-05-01T14:22:19.949659Z
+  answer: "User has answered your questions: \"How do you want me to apply the ISOLATION priority elevation given current S324 state?\"=\"Finalize S324: update work_list priority + run wrap; start ISOLATION-016 next session\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0196
+  asked_at: 2026-05-01T05:51:39.702417Z
+  question: "(not Prime's turn)  Awaiting owner direction on whether to (a) r"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 08fb30c7f58c7285
+  resolved_at: 2026-05-01T14:31:48.135471Z
+  resolved_in_session: S324
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0199
+  asked_at: 2026-05-01T14:04:33.278107Z
+  question: "the auto-tracker — awaiting owner direction. No action from me"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 47439deba4564083
+  resolved_at: 2026-05-01T14:31:48.135501Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0201
+  asked_at: 2026-05-01T14:04:56.476808Z
+  question: "Acknowledged — awaiting your direction. No bridge files wr"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 98ec195ea72760c1
+  resolved_at: 2026-05-01T14:31:48.135507Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0202
+  asked_at: 2026-05-01T14:17:36.319570Z
+  question: "it trail preserved. Awaiting owner direction on (a)/(b)/(c) for"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 9a53fce1198cc5a6
+  resolved_at: 2026-05-01T14:31:48.135510Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0204
+  asked_at: 2026-05-01T14:19:17.248539Z
+  question: "0199 / 0196) remain awaiting your direction; I did not auto-res"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: b1a1cb2783113320
+  resolved_at: 2026-05-01T14:31:48.135514Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0206
+  asked_at: 2026-05-01T14:19:51.344868Z
+  question: "r dispatched entry. Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 59b8222c267f65a4
+  resolved_at: 2026-05-01T14:31:48.135517Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0209
+  asked_at: 2026-05-01T14:56:32.933101Z
+  question: "Both auto-dispatched GOs are stale plan-level approvals (no implementation authorization). Which next move should I take?"
+  options:
+    - "Revise Wave 3 NO-GO"
+    - "File CS-2 sub-bridge"
+    - "Check ADR landing for IR-0"
+    - "Stand down; end turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b09d30da60811845
+  resolved_at: 2026-05-01T14:56:32.933101Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0211
+  asked_at: 2026-05-01T15:11:03.094682Z
+  question: "Both auto-dispatched GOs are plan-level (non-implementing). What should I do next?"
+  options:
+    - "ISOLATION-016 Wave 3 REVISED-2"
+    - "File CS-2 slice bridge"
+    - "Resolve DECISION-0208"
+    - "Stand down — end turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 77934f3dd42a9baf
+  resolved_at: 2026-05-01T15:11:03.094682Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0213
+  asked_at: 2026-05-01T15:49:09.006572Z
+  question: "Codex NO-GO at -004 with two Prime-fixable findings (F1 amendment-text precision, F2 GOV-20 IPR/CVR scope). Proceed with REVISED-2?"
+  options:
+    - "Proceed with REVISED-2 (Recommended)"
+    - "Pause and review -004 first"
+    - "Different direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c30487f3266ad179
+  resolved_at: 2026-05-01T15:49:09.006572Z
+  answer: "User has answered your questions: \"Codex NO-GO at -004 with two Prime-fixable findings (F1 amendment-text precision, F2 GOV-20 IPR/CVR scope). Proceed with REVISED-2?\"=\"Proceed with REVISED-2 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0215
+  asked_at: 2026-05-01T15:50:55.696792Z
+  question: "Both bridge GOs (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level only — neither authorizes implementation. Wave 3 REVISED-2 is already in Codex's queue, and three owner decisions remain unresolved. What should Prime do next?"
+  options:
+    - "Resolve DECISION-0212 (Wave 3) (Recommended)"
+    - "File CS-1 slice as NEW"
+    - "File IR-0.1 as NEW"
+    - "Resolve DECISION-0208 or 0210"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1798aa0b216f2ae9
+  resolved_at: 2026-05-01T15:50:55.696792Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0217
+  asked_at: 2026-05-01T15:55:54.138018Z
+  question: "Which lane should I advance next? (Resolves pending DECISION-0210/0212/0214.)"
+  options:
+    - "Wave 3 REVISED-3 (Recommended)"
+    - "File CS-2 slice as NEW"
+    - "Address DECISION-0208"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 360cb57ef4726e8c
+  resolved_at: 2026-05-01T15:55:54.138018Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0219
+  asked_at: 2026-05-01T16:48:46.417120Z
+  question: "Both dispatched GOs are stale plan-level approvals from S310 with no Prime action owed. Which work should I take up next?"
+  options:
+    - "Wave3 -008/-009 first (Recommended)"
+    - "Begin command-surface slice CS-1"
+    - "Pull next item from work_list.md"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a75b0fb0e297983b
+  resolved_at: 2026-05-01T16:48:46.417120Z
+  answer: "Answer questions?"
   notes: ""
