@@ -94,7 +94,10 @@ def test_a_pathset_includes_role_governance_family():
     assert ".claude/rules/*.md" in patterns
     assert "AGENTS.md" in patterns
     assert "CLAUDE.md" in patterns
-    assert "memory/work_list.md" in patterns
+    # The former memory/ standing-backlog markdown view is no longer protected
+    # (retired at the GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH Slice 7-prime conclusion,
+    # GO -024, WI-3490); no backlog-markdown path remains in the family.
+    assert not any("work_list" in pattern for pattern in patterns)
 
     # Per Codex GO -004 §3 baseline caveat: MEMORY.md and broad memory/*.md must be excluded.
     assert "MEMORY.md" not in patterns
@@ -166,9 +169,9 @@ def test_a_block_with_packet_target_mismatch(tmp_path):
     target = REPO_ROOT / rel_target
     new_content = "new content\n"
 
-    # Packet says it's for memory/work_list.md, but the write targets .claude/rules/example.md
+    # Packet says it's for AGENTS.md, but the write targets .claude/rules/example.md
     packet_path = tmp_path / "packet.json"
-    packet = _make_packet("memory/work_list.md", new_content)
+    packet = _make_packet("AGENTS.md", new_content)
     packet_path.write_text(json.dumps(packet), encoding="utf-8")
 
     payload = {

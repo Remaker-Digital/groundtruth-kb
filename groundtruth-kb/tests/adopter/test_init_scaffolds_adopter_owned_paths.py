@@ -78,7 +78,6 @@ def test_clean_adopter_scaffold_count_is_nonzero(
         "CLAUDE.md",
         "MEMORY.md",
         "README.md",
-        "memory/work_list.md",
         "memory/release-readiness.md",
         ".codex/hooks.json",
         ".groundtruth/formal-artifact-approvals/.gitkeep",

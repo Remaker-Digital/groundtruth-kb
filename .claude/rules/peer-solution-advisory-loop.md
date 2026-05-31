@@ -61,6 +61,67 @@ The loop runs as follows:
 
 The loop's defining feature is that **no peer-solution advisory dies in chat scrollback.** Every advisory ends in one of five recorded states, with the rationale captured in a structure that future sessions can recall.
 
+## Owner-Grilling Gate (Authority: GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001)
+
+Any LO advisory whose recommended Prime Builder disposition is `adopt` or
+`adapt` MUST include a `## Required Prime Builder Owner-Grilling Gate`
+section in the advisory body. The gate section enumerates:
+
+1. Whether this advisory implies future implementation work (yes/no with
+   brief rationale).
+2. What Prime Builder must grill the owner about before drafting any
+   implementation proposal derived from this advisory.
+3. What owner decisions must be durable, recorded via `AskUserQuestion`
+   per `.claude/rules/prime-builder-role.md` § "AskUserQuestion as the
+   Only Valid Owner-Decision Channel", before an implementation
+   proposal can exist.
+
+Prime Builder must conduct a structured owner clarification/grilling
+pass — using the `/grill-me-for-clarification` skill or an equivalent
+AUQ-recorded structured interview — and the resulting AUQ evidence
+MUST land in the resulting bridge proposal's mandatory `## Owner
+Decisions / Input` section (per `.claude/rules/file-bridge-protocol.md`
+§ "Mandatory Owner Decisions / Input Section Gate") before the proposal
+is filed as `NEW`.
+
+Scope: The gate fires for `adopt`/`adapt` classifications only.
+`reject`/`monitor` advisories are terminal; `defer` advisories receive
+the gate at defer-trigger reactivation, not at original filing.
+
+Mechanical contract: `DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001` specifies
+advisory-shape detection, gate-presence assertion, gate-content
+assertion, two-phase enforcement (warning then blocking via separate
+owner approval), and the owner-waiver path. The deterministic lint that
+enforces the contract lands in Slice 3 of
+PROJECT-LO-ADVISORY-OWNER-GRILLING-GATE-001; Slices 1 and 2 are
+advisory-only until Slice 3 ships the lint.
+
+LO authors start from the following skeleton when authoring an advisory
+classified `adopt` or `adapt`. It is a fenced documentation example
+(rendered as code, not a live section of this rule); copy the inner
+content into the advisory body:
+
+```
+## Required Prime Builder Owner-Grilling Gate
+
+### Implementation implied
+Yes — this advisory recommends adopt/adapt of <pattern>, which requires
+<files/specs> to be modified. OR: No — recommendation is procedural only,
+no source mutation expected.
+
+### Grill-the-owner questions
+Prime Builder must obtain durable AUQ-recorded answers to:
+1. <question 1 about scope>
+2. <question 2 about rule home / authority>
+3. <question 3 about risks or alternatives>
+
+### Required durable owner decisions
+The following AUQ answers must exist before an implementation proposal
+can be filed:
+- <decision 1>
+- <decision 2>
+```
+
 ## Bridge Integration
 
 Peer-solution advisories enter the bridge through two paths depending on system state:
@@ -75,7 +136,7 @@ Prime responses (the classification + the follow-on artifact) are bridge-tracked
 
 ## Approval-Gate
 
-When a Prime `adopt` or `adapt` response calls for editing protected paths (e.g., `.claude/rules/*.md`, `AGENTS.md`, `CLAUDE.md`, `memory/work_list.md`), the standard `GOV-ARTIFACT-APPROVAL-001` + `DCL-ARTIFACT-APPROVAL-HOOK-001` packet workflow applies. The peer-solution advisory and Prime's adoption decision do NOT substitute for the per-protected-path approval packet; the packet remains required.
+When a Prime `adopt` or `adapt` response calls for editing protected paths (e.g., `.claude/rules/*.md`, `AGENTS.md`, `CLAUDE.md`), the standard `GOV-ARTIFACT-APPROVAL-001` + `DCL-ARTIFACT-APPROVAL-HOOK-001` packet workflow applies. The peer-solution advisory and Prime's adoption decision do NOT substitute for the per-protected-path approval packet; the packet remains required.
 
 This separation preserves the layered approval model: owner approves the strategic decision (adopt vs adapt) at the bridge-review level; owner approves the specific protected-file content at the per-artifact packet level. A peer solution's adoption can be approved without committing the owner to every detail of its protected-file implementation.
 

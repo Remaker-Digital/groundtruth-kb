@@ -124,7 +124,6 @@ verification suite. Each isolation check returns one of `pass` / `fail` /
 | `isolation:no-writable-product-paths` | `fail` when at least one product-scope path is writable from the adopter session. | The session has filesystem write permission on a `gt-kb-managed` path. Remediation: depends on the deployment; the check is a detection contract, not a filesystem-permission setter. |
 | `isolation:hooks-point-to-wrappers` | `pass` for wrapper-shaped hook registrations; `warning` for embedded inline logic. | Adopter's `.claude/settings.json` has a hook command with embedded shell logic instead of a wrapper invocation. Remediation: refactor the registration to invoke a script under `.claude/hooks/` or `${CLAUDE_PLUGIN_ROOT}`. |
 | `isolation:workstream-focus-hook-absent` | `pass` when absent; `warning` when present. | The deprecated `.claude/hooks/workstream-focus.py` reappeared. Remediation: delete the file. |
-| `isolation:work-list-no-product-entries` | `pass` when no product-scope IDs match; `warning` otherwise. | `memory/work_list.md` contains entries with `GTKB-` IDs or `gt-kb subject` markers that belong in the platform's work list, not the adopter's. Remediation: move the entries to the platform backlog. |
 | `isolation:release-readiness-app-subject-header` | `pass` when the file leads with an application-subject header; `warning` when the header omits "application" or combines GT-KB readiness with green keywords. | Adopter's `memory/release-readiness.md` claims GT-KB platform readiness alongside adopter readiness. Remediation: scope the file to the adopter only and rename the header. |
 | `isolation:chroma-regeneratable` | `pass` when chroma is absent or paired with a non-empty `groundtruth.db`; `warning` when chroma exists without a usable database. | An orphaned `.groundtruth-chroma/` directory exists but the database that feeds it is missing or empty. Remediation: regenerate the database or remove the orphan cache. |
 
@@ -172,7 +171,7 @@ The Slice 4 partition determines what each isolation failure mode does:
 |---|---|---|---|
 | Hard refuse | `isolation:adopter-root-placement` | `IsolationLocationFailureError` | Same — relocation cannot be auto-fixed. |
 | Auto-fixable | `isolation:service-endpoint`, `isolation:work-subject`, `isolation:workstream-focus-hook-absent`, `isolation:release-readiness-app-subject-header` | `IsolationMigrationRequiredError` | Auto-fixer runs; outcomes recorded in the receipt's `isolation_migration` block. |
-| Needs adopter input | `isolation:no-writable-product-paths`, `isolation:hooks-point-to-wrappers`, `isolation:work-list-no-product-entries`, `isolation:chroma-regeneratable` | `IsolationMigrationRequiredError` | `IsolationNonAutoFixableError` — adopter must address manually. |
+| Needs adopter input | `isolation:no-writable-product-paths`, `isolation:hooks-point-to-wrappers`, `isolation:chroma-regeneratable` | `IsolationMigrationRequiredError` | `IsolationNonAutoFixableError` — adopter must address manually. |
 
 Rollback reverses the merge while preserving the receipt:
 
@@ -290,7 +289,7 @@ either restore the database or remove the orphan.
 Slice 5 ships only the stale-detection portion of the overlay contract.
 The overlay **refresh** API and the **disposability** test (rebuild from
 authoritative records produces equivalent state) are tracked in
-`memory/work_list.md` row 31 as `GTKB-ISOLATION-017-SLICE-5.5` and ship in a
+MemBase work item `GTKB-ISOLATION-017-SLICE-5.5` and ship in a
 follow-on slice. Until that slice lands, overlay refresh is a manual
 operation outside the GT-KB CLI surface.
 

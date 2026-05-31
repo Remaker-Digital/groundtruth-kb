@@ -74,18 +74,6 @@ def test_check_bridge_file_orphaned_from_index(tmp_path: Path) -> None:
     assert orphan_findings[0]["severity"] == w2.SEVERITY_WARN
 
 
-def test_check_worklist_cites_missing_bridge_file(tmp_path: Path) -> None:
-    memory_dir = tmp_path / "memory"
-    memory_dir.mkdir()
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-    (bridge_dir / "real-001.md").write_text("NEW")
-    (memory_dir / "work_list.md").write_text("row 1: see `bridge/real-001.md`\nrow 2: see `bridge/missing-005.md`\n")
-    findings = w2.check_worklist_cites_missing_bridge_file(tmp_path)
-    assert any("missing-005.md" in f["message"] for f in findings)
-    assert all(f["severity"] == w2.SEVERITY_WARN for f in findings)
-
-
 def test_render_markdown_clean_state() -> None:
     output = w2.render_markdown([])
     assert "No findings" in output

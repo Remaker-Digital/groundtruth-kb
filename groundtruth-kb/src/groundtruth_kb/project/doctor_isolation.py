@@ -384,65 +384,9 @@ def _check_isolation_workstream_focus_hook_absent(target: Path) -> ToolCheck:
 
 
 # ---------------------------------------------------------------------------
-# Check 7: work_list has no product-scope entries
+# Check 7: (retired at Slice 7-prime — standing-backlog markdown check
+# removed per DELIB-S337; MemBase work_items is the sole canonical backlog)
 # ---------------------------------------------------------------------------
-
-_PRODUCT_SCOPE_HEURISTIC_RE = re.compile(
-    r"(?i)\b(?:GTKB-(?:GOV|CORE|MASS|ISOLATION|DASHBOARD|BRIDGE-POLLER|DORA|"
-    r"COMMAND-SURFACE|DB-BACKUP|ARTIFACT-RECORDER|MEMBASE-EFFECTIVE-USE|"
-    r"STARTUP-ENHANCEMENTS|WRAPUP-ENHANCEMENTS|ROLE-ENHANCEMENT|"
-    r"GOV-PROPOSAL-STANDARDS|GOV-DA-ENFORCEMENT|GOV-CODE-QUALITY-BASELINE|"
-    r"GOV-OWNER-DECISION-SURFACING|GOV-BACKLOG-DISCIPLINE|"
-    r"COMMIT-TRIAGE|CANDIDATE-SPEC-INTAKE)|gt-kb subject)"
-)
-
-
-def _check_isolation_work_list_no_product_entries(target: Path) -> ToolCheck:
-    """Check 7 per Phase 9 §4 line 216."""
-    work_list = target / "memory" / "work_list.md"
-    if not work_list.exists():
-        return ToolCheck(
-            name="isolation:work-list-no-product-entries",
-            required=True,
-            found=False,
-            status="info",
-            message="memory/work_list.md absent; no work list to check",
-        )
-    try:
-        text = work_list.read_text(encoding="utf-8")
-    except OSError:
-        return ToolCheck(
-            name="isolation:work-list-no-product-entries",
-            required=True,
-            found=True,
-            status="warning",
-            message=f"work_list.md unreadable at {work_list}",
-        )
-    matches: list[int] = []
-    for lineno, line in enumerate(text.splitlines(), start=1):
-        if _PRODUCT_SCOPE_HEURISTIC_RE.search(line):
-            matches.append(lineno)
-    if matches:
-        sample = matches[:5]
-        suffix = "..." if len(matches) > 5 else ""
-        return ToolCheck(
-            name="isolation:work-list-no-product-entries",
-            required=True,
-            found=True,
-            status="warning",
-            message=(
-                f"work_list.md contains {len(matches)} product-scope-heuristic "
-                f"entries on lines {sample}{suffix}; per Phase 9 line 216 the "
-                f"adopter work list should not carry product-scope items"
-            ),
-        )
-    return ToolCheck(
-        name="isolation:work-list-no-product-entries",
-        required=True,
-        found=True,
-        status="pass",
-        message="work_list.md has no product-scope-heuristic entries",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -567,7 +511,6 @@ def run_isolation_checks(target: Path, profile: str, *, product_root: Path) -> l
         _check_isolation_no_writable_product_paths(target, profile),
         _check_isolation_hooks_point_to_wrappers(target, profile),
         _check_isolation_workstream_focus_hook_absent(target),
-        _check_isolation_work_list_no_product_entries(target),
         _check_isolation_release_readiness_app_subject_header(target),
         _check_isolation_chroma_regeneratable(target),
     ]

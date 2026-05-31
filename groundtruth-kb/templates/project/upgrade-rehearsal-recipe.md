@@ -43,7 +43,6 @@ This:
 3. Refuses if any of checks #4 / #5 / #7 / #9 fail — **needs adopter input**:
    - `isolation:no-writable-product-paths` — adopter has files in product-managed paths; decide what to keep.
    - `isolation:hooks-point-to-wrappers` — `.claude/settings.json` has hook commands that aren't wrapper-shaped; manually delete or rewrap each adopter customization (check passes once all hook commands point under `.claude/hooks/`, invoke `groundtruth_kb`, or use `${CLAUDE_PLUGIN_ROOT}`).
-   - `isolation:work-list-no-product-entries` — `memory/work_list.md` contains product entries; scrub manually.
    - `isolation:chroma-regeneratable` — orphan ChromaDB cache; decide whether to regenerate or delete.
 4. Runs the 4 in-place auto-fixers (checks #2, #3, #6, #8) inside a payload branch.
 5. Writes a rollback receipt with an `isolation_migration` audit block recording each fixer's outcome + prior policy.

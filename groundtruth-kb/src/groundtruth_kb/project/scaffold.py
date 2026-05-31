@@ -20,6 +20,11 @@ from groundtruth_kb.bootstrap import (
     _write_groundtruth_toml,
     _write_project_gitignore,
 )
+from groundtruth_kb.project.core_spec_intake import (
+    append_initial_prompt,
+    enroll_project_for_intake,
+    next_missing_slot,
+)
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -113,12 +118,123 @@ class ScaffoldOptions:
     lo_provider_id: str = "codex"
     python_version: str = "3.11"
     integrations: bool = False
+    opt_out_core_spec_intake: bool = False
     # GTKB-ISOLATION-017 Slice 3: host-root binding. When set, the literal-path
     # contract from ADR-ISOLATION-APPLICATION-PLACEMENT-001 is enforced: target
     # must live under ``gt_kb_root/applications/``. When omitted (legacy library
     # callers and existing tests), the binding is skipped — only ``gt project
     # init`` (CLI) sets this to enforce the user-facing contract.
     gt_kb_root: Path | None = None
+
+
+@dataclass(frozen=True)
+class ScaffoldPackagingValidation:
+    """Minimum-file and internal-leakage validation for a scaffolded adopter."""
+
+    target: Path
+    profile_name: str
+    cloud_provider: str
+    expected_paths: tuple[str, ...]
+    observed_paths: tuple[str, ...]
+    missing_paths: tuple[str, ...]
+    leaked_paths: tuple[str, ...]
+    unexpected_paths: tuple[str, ...]
+
+    @property
+    def passed(self) -> bool:
+        """Return True when all minimum paths exist and no platform paths leak."""
+        return not self.missing_paths and not self.leaked_paths
+
+    def summary(self) -> str:
+        """Return a compact human-readable validation summary."""
+        if self.passed:
+            return (
+                f"PASS scaffold packaging validation for {self.profile_name}: "
+                f"{len(self.expected_paths)} expected paths present; no internal-platform leakage"
+            )
+        parts: list[str] = []
+        if self.missing_paths:
+            parts.append(f"missing={list(self.missing_paths)}")
+        if self.leaked_paths:
+            parts.append(f"leaked={list(self.leaked_paths)}")
+        return f"FAIL scaffold packaging validation for {self.profile_name}: " + "; ".join(parts)
+
+
+_INTERNAL_PLATFORM_LEAK_PREFIXES = (
+    ".gtkb-state/",
+    ".claude/worktrees/",
+    "groundtruth-kb/",
+    "harness-state/",
+    "independent-progress-assessments/",
+)
+
+_MINIMUM_PATH_ALIASES = {
+    # Base scaffolds currently emit a reusable tooling fragment rather than an
+    # application-owned pyproject.toml. Treat it as satisfying the minimum
+    # tooling-config presence check without changing existing scaffold output.
+    "pyproject.toml": ("pyproject.toml", "pyproject-sections.toml"),
+}
+
+
+def _project_relative_files(target: Path) -> set[str]:
+    """Return project-relative file paths, excluding transient VCS internals."""
+    files: set[str] = set()
+    for path in target.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(target).as_posix()
+        if relative == ".git" or relative.startswith(".git/"):
+            continue
+        files.add(relative)
+    return files
+
+
+def _is_internal_platform_leak(relative_path: str, *, expected_paths: set[str]) -> bool:
+    """Return True when a path is an unowned GT-KB platform artifact."""
+    normalized = relative_path.rstrip("/")
+    if normalized in expected_paths or any(path.startswith(f"{normalized}/") for path in expected_paths):
+        return False
+    with_slash = f"{normalized}/"
+    return any(
+        normalized == prefix.rstrip("/") or with_slash.startswith(prefix) for prefix in _INTERNAL_PLATFORM_LEAK_PREFIXES
+    )
+
+
+def _minimum_path_exists(target: Path, relative_path: str) -> bool:
+    """Return True when a minimum path or its current scaffold alias exists."""
+    aliases = _MINIMUM_PATH_ALIASES.get(relative_path, (relative_path,))
+    return any((target / alias).exists() for alias in aliases)
+
+
+def validate_scaffold_minimum_and_no_leakage(
+    target: Path,
+    profile_name: str,
+    *,
+    cloud_provider: str = "none",
+) -> ScaffoldPackagingValidation:
+    """Validate minimum scaffold output and absence of internal-platform leakage.
+
+    The minimum file set is derived from :func:`enumerate_scaffold_outputs`,
+    keeping validation tied to the live ``gt project init`` scaffold surface.
+    Option-dependent adopter-owned extras are reported as diagnostics but do
+    not fail the check; missing minimum files and internal GT-KB platform paths
+    do fail it.
+    """
+    expected = set(enumerate_scaffold_outputs(profile_name, cloud_provider=cloud_provider))
+    observed_files = _project_relative_files(target)
+    missing = sorted(path for path in expected if not _minimum_path_exists(target, path))
+    leaked = sorted(path for path in observed_files if _is_internal_platform_leak(path, expected_paths=expected))
+    unexpected = sorted(path for path in observed_files if path not in expected)
+    return ScaffoldPackagingValidation(
+        target=target,
+        profile_name=profile_name,
+        cloud_provider=cloud_provider,
+        expected_paths=tuple(sorted(expected)),
+        observed_paths=tuple(sorted(observed_files)),
+        missing_paths=tuple(missing),
+        leaked_paths=tuple(leaked),
+        unexpected_paths=tuple(unexpected),
+    )
 
 
 def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none") -> list[str]:
@@ -177,7 +293,6 @@ def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none
             "pyproject.toml",
             # GTKB-ISOLATION-017 Slice 3: Phase 9 §1 scaffold artifacts
             "README.md",
-            "memory/work_list.md",
             "memory/release-readiness.md",
             ".codex/hooks.json",
             ".groundtruth/formal-artifact-approvals/.gitkeep",
@@ -307,6 +422,7 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
         project_name=options.project_name,
         copyright_notice=copyright_notice,
     )
+    _copy_registry_file_templates(target, profile.name)
 
     # ── Seed governance data ──────────────────────────────────────────
     _seed_database(target, include_example=options.seed_example)
@@ -320,6 +436,18 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
         cloud_provider=options.cloud_provider,
     )
     write_manifest(target / "groundtruth.toml", manifest)
+
+    if not options.opt_out_core_spec_intake:
+        from groundtruth_kb.db import KnowledgeDB
+
+        db = KnowledgeDB(target / "groundtruth.db")
+        try:
+            project_id = enroll_project_for_intake(db, options.project_name)
+            first_missing = next_missing_slot(db, project_id)
+        finally:
+            db.close()
+        if first_missing is not None:
+            append_initial_prompt(target / "MEMORY.md", first_missing)
 
     # ── F6: Optional spec scaffold into the freshly-created KB ───────
     # Runs AFTER _seed_database so the governance seed is already in place;
@@ -393,6 +521,21 @@ def _copy_base_templates(target: Path) -> None:
     _write_pyproject_sections(target)
 
 
+def _copy_registry_file_templates(target: Path, profile_name: str) -> None:
+    """Copy registry FILE-class templates not already emitted by generators."""
+    templates = get_templates_dir()
+    for artifact in artifacts_for_scaffold(profile_name, class_="file"):
+        assert isinstance(artifact, FileArtifact)
+        dst = target / artifact.target_path
+        if dst.exists():
+            continue
+        src = templates / artifact.template_path
+        if not src.exists():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+
 def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: str) -> None:
     """Emit the Phase 9 §1 scaffold artifacts owned by GTKB-ISOLATION-017 Slice 3.
 
@@ -406,9 +549,8 @@ def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: st
     - ``.groundtruth/formal-artifact-approvals/.gitkeep``
       (Phase 9 §1 lines 131–132).
 
-    ``memory/work_list.md`` is also seeded with a placeholder per Phase 9 §1
-    lines 120–122 if it does not already exist (other emitters may write a
-    fuller version).
+    Standing-backlog seeding was retired at Slice 7-prime per DELIB-S337;
+    new adopters use MemBase-only backlog (no markdown standing-backlog file).
     """
     templates = get_templates_dir()
 
@@ -428,18 +570,6 @@ def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: st
         memory_dir.mkdir(parents=True, exist_ok=True)
         (memory_dir / "release-readiness.md").write_text(
             _render(banner_src.read_text(encoding="utf-8")),
-            encoding="utf-8",
-        )
-
-    work_list_path = target / "memory" / "work_list.md"
-    if not work_list_path.exists():
-        work_list_path.parent.mkdir(parents=True, exist_ok=True)
-        work_list_path.write_text(
-            "# Active Work List\n\n"
-            "<!-- Adopter-owned backlog. The single placeholder below documents\n"
-            "     the convention; replace it with your first work item. Items\n"
-            "     are processed top-down by priority. -->\n\n"
-            "- [ ] _placeholder — replace with your first scoped work item._\n",
             encoding="utf-8",
         )
 
@@ -783,7 +913,9 @@ def _render_all_templates(
         "{{RESPONSIBILITY}}": "Implementation, specs, and project bootstrap",
         "{{REVIEWER}}": ("codex (Loyal Opposition)" if profile.includes_bridge else "owner"),
         "{{NOTES}}": "Replace with your actual collaboration topology.",
-        "{{PATH_TO_ENTRYPOINT}}": ("bridge/INDEX.md + cross-harness event-driven trigger" if profile.includes_bridge else "TBD"),
+        "{{PATH_TO_ENTRYPOINT}}": (
+            "bridge/INDEX.md + cross-harness event-driven trigger" if profile.includes_bridge else "TBD"
+        ),
         "{{WHAT_IT_DOES}}": (
             "File bridge queue for Prime Builder and Loyal Opposition review handoffs"
             if profile.includes_bridge
@@ -801,9 +933,7 @@ def _render_all_templates(
         "{{AUTOMATION_NAME}}": "file-bridge-cross-harness-trigger",
         "{{SCHEDULE}}": "Event-driven on tool-use; manual fallback via 'Bridge' prompt",
         "{{EXECUTOR}}": "claude -p / codex exec invoked by the cross-harness event-driven trigger",
-        "{{SOURCE}}": (
-            "Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json"
-        ),
+        "{{SOURCE}}": ("Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json"),
         "{{FAILURE_SIGNAL}}": "No dispatch-state updates after INDEX changes",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (
             "File-based latest-status queue in bridge/INDEX.md. Entries are newest-first."
@@ -1146,7 +1276,9 @@ def scaffold_summary(target: Path, profile: str) -> str:
             [
                 "  - AGENTS.md (Loyal Opposition contract)",
                 "  - BRIDGE-INVENTORY.md",
-                "  - bridge-os-poller-setup-prompt.md (DEPRECATED stub; smart poller retired in Slice 4. Bridge dispatch is automated by the cross-harness event-driven trigger via .claude/settings.json and .codex/hooks.json hook registrations.)",
+                "  - bridge-os-poller-setup-prompt.md (DEPRECATED stub; smart poller retired in Slice 4. "
+                "Bridge dispatch is automated by the cross-harness event-driven trigger via "
+                ".claude/settings.json and .codex/hooks.json hook registrations.)",
                 "  - Bridge rules and hooks",
                 "  - independent-progress-assessments/ (Codex reports)",
             ]

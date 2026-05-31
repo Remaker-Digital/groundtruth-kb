@@ -274,11 +274,10 @@ issue or ticket (external-system terms).
 ### backlog
 
 **Definition:** The ordered set of active and candidate work for an
-application or platform, organized by priority. Implemented as
-`memory/work_list.md` historically; per
-`ADR-STANDING-BACKLOG-DB-AUTHORITY-001` (S327), the canonical
-implementation is the `backlog_items` table in MemBase, with
-`memory/work_list.md` as a generated read-only view.
+application or platform, organized by priority. Per
+`ADR-STANDING-BACKLOG-DB-AUTHORITY-001`, the canonical
+implementation is the `backlog_items` table in MemBase, read via
+`gt backlog list`.
 
 **Not to be confused with:** ignore list or deprecated work (forbidden
 uses per operating-model §2); backlog snapshot (point-in-time export).

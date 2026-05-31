@@ -66,7 +66,7 @@ The terms below have canonical meanings in GT-KB. Allowed synonyms appear in par
 
 - **work item** — the atomic unit of known work in the backlog. All work items are backlog items; there is no separate conceptual class of "backlog item" distinct from work items. Allowed synonyms: "WI", "WI-NNNN" (KB ID prefix), "task" (loose). Forbidden: confusing with "issue" or "ticket" (those are external-system terms).
 
-- **backlog** — the unified view of all known work for an application or platform, including all work items and the project/sub-project groupings that organize those work items. Known work converges into one MemBase source of truth (the canonical `work_items` table). During the migration window, generated views such as `memory/work_list.md` provide transitional human-readable compatibility. Per S337 owner directive (`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), at the conclusion of the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration, `memory/work_list.md` is deleted; the post-completion steady state is "MemBase only." Allowed synonyms: "work_list", "the work list", "standing backlog". Forbidden: using "backlog" as a synonym for "ignore list" or "deprecated"; using "backlog item" as a separate conceptual class distinct from work item.
+- **backlog** — the unified view of all known work for an application or platform, including all work items and the project/sub-project groupings that organize those work items. Known work lives in one MemBase source of truth (the canonical `work_items` table), surfaced through `gt backlog list`. Per S337 owner directive (`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration is complete: the former transitional markdown backlog view under `memory/` was deleted (Slice 7-prime), and the steady state is "MemBase only." Allowed synonyms: "work_list", "the work list", "standing backlog". Forbidden: using "backlog" as a synonym for "ignore list" or "deprecated"; using "backlog item" as a separate conceptual class distinct from work item.
 
 - **specification** — an owner-articulated record of what the system must do, recorded in MemBase as one of the spec subtypes (`SPEC-NNNN`, `GOV-NNN`, `DCL-NNN`, `ADR-NNN`, `PB-NNN`, `REQ-NNN`). Allowed synonyms: "spec", per-subtype IDs. Forbidden: using "specification" for technical-design documents, implementation proposals, or tests.
 
@@ -99,7 +99,7 @@ This artifact describes the operating model the platform is designed to embody. 
 - Smart-poller with kind-aware routing and single-instance lock (per `gtkb-bridge-poller-001` umbrella).
 - Formal-artifact-approval gate for canonical artifact creation.
 - Bridge-compliance-gate hook hard-blocking non-compliant proposals/VERIFIED reports.
-- Transitional standing backlog view at `memory/work_list.md` while known work converges into one MemBase source of truth (per `GOV-STANDING-BACKLOG-001` and owner clarification, 2026-05-06).
+- MemBase-only standing backlog (canonical `work_items` table surfaced via `gt backlog list`); the transitional markdown view was retired at migration conclusion (per `GOV-STANDING-BACKLOG-001`, `DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`, and owner clarification, 2026-05-06).
 - CLI surfaces for `gt deliberations`, project initialization, doctor health checks.
 
 **Intended-but-partial (as of 2026-04-30):**

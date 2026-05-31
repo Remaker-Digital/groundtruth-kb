@@ -110,13 +110,12 @@ def test_check_9_chroma_warns_when_db_missing(
         "isolation:no-writable-product-paths",
         "isolation:hooks-point-to-wrappers",
         "isolation:workstream-focus-hook-absent",
-        "isolation:work-list-no-product-entries",
         "isolation:release-readiness-app-subject-header",
         "isolation:chroma-regeneratable",
     ],
 )
 def test_orchestrator_emits_every_named_check(clean_adopter: tuple[Path, Path], expected_check_name: str) -> None:
-    """The orchestrator returns all 9 checks by name in every run."""
+    """The orchestrator returns all 8 checks by name in every run."""
     adopter, doctor_root = clean_adopter
     by_name = _checks_by_name(adopter, doctor_root)
     assert expected_check_name in by_name, (

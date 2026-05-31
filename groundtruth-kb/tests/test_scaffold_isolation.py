@@ -338,10 +338,6 @@ def test_tp_integ_1_scaffold_emits_phase9_section1_enumeration(in_root_sandbox: 
     # TP3: groundtruth.db initialized
     assert (in_root_sandbox / "groundtruth.db").exists()
 
-    # TP5: memory/work_list.md placeholder
-    work_list_text = (in_root_sandbox / "memory" / "work_list.md").read_text(encoding="utf-8")
-    assert "Active Work List" in work_list_text
-
     # TP6: memory/release-readiness.md banner
     banner_text = (in_root_sandbox / "memory" / "release-readiness.md").read_text(encoding="utf-8")
     # Strip blockquote `> ` markers + collapse whitespace so the line-wrapped
@@ -413,7 +409,6 @@ def test_tp16_enumerate_outputs_lists_new_scaffold_files() -> None:
     paths = set(enumerate_scaffold_outputs("local-only"))
     expected_new = {
         "README.md",
-        "memory/work_list.md",
         "memory/release-readiness.md",
         ".codex/hooks.json",
         ".groundtruth/formal-artifact-approvals/.gitkeep",

@@ -205,9 +205,7 @@ def test_t3_auto_fixable_migration_succeeds(tmp_path: Path) -> None:
     "trigger_check_name",
     sorted(_PARTITION_NEEDS_ADOPTER_INPUT),
 )
-def test_t4_needs_adopter_input_refuses_with_accept_migration(
-    tmp_path: Path, trigger_check_name: str
-) -> None:
+def test_t4_needs_adopter_input_refuses_with_accept_migration(tmp_path: Path, trigger_check_name: str) -> None:
     _write_minimal_toml(tmp_path)
     product_root = tmp_path / "_pretend_product_root"
     product_root.mkdir()
@@ -227,22 +225,9 @@ def test_t4_needs_adopter_input_refuses_with_accept_migration(
         settings_dir.mkdir(parents=True, exist_ok=True)
         (settings_dir / "settings.json").write_text(
             json.dumps(
-                {
-                    "hooks": {
-                        "PreToolUse": [
-                            {"hooks": [{"type": "command", "command": "bash /tmp/adopter-script.sh"}]}
-                        ]
-                    }
-                }
+                {"hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "bash /tmp/adopter-script.sh"}]}]}}
             ),
             encoding="utf-8",
-        )
-    elif trigger_check_name == "isolation:work-list-no-product-entries":
-        # Trigger by writing work_list.md with product-scope entries.
-        memory_dir = tmp_path / "memory"
-        memory_dir.mkdir(parents=True, exist_ok=True)
-        (memory_dir / "work_list.md").write_text(
-            "# Work list\n\n- GTKB-DASHBOARD-002 Slice 5\n- GTKB-CORE-001\n", encoding="utf-8"
         )
     elif trigger_check_name == "isolation:chroma-regeneratable":
         # Trigger by creating .groundtruth-chroma without groundtruth.db (empty/missing).
@@ -359,7 +344,9 @@ def test_t8_auto_fixable_idempotent(tmp_path: Path) -> None:
     subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "post-migration", "--allow-empty"],
-        cwd=tmp_path, check=True, capture_output=True,
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
     )
 
     # Second run: isolation checks should now all pass; isolation pre-flight
@@ -388,6 +375,7 @@ def test_t9_no_behavior_change_when_isolation_clean() -> None:
     don't introduce import-time errors that would break the other test module.
     """
     import groundtruth_kb.project.upgrade
+
     assert hasattr(groundtruth_kb.project.upgrade, "execute_upgrade")
     assert hasattr(groundtruth_kb.project.upgrade, "plan_upgrade")
 
@@ -441,10 +429,6 @@ def test_t11_partition_contract_exhaustive_and_no_dead_keys(tmp_path: Path) -> N
     # Add triggers for needs-adopter-input checks.
     hooks_dir = tmp_path / ".claude" / "hooks"
     (hooks_dir / "spec-classifier.py").write_text("# managed file\n", encoding="utf-8")
-    memory_dir = tmp_path / "memory"
-    (memory_dir / "work_list.md").write_text(
-        "# Work list\n\n- GTKB-DASHBOARD-002 Slice 5\n- GTKB-CORE-001\n", encoding="utf-8"
-    )
     chroma = tmp_path / ".groundtruth-chroma"
     chroma.mkdir()
 
@@ -455,9 +439,7 @@ def test_t11_partition_contract_exhaustive_and_no_dead_keys(tmp_path: Path) -> N
     live_names = {c.name for c in checks}
     fired_names = {c.name for c in checks if c.status in ("fail", "warning")}
 
-    partition_keys = (
-        _PARTITION_HARD_REFUSE | _PARTITION_AUTO_FIXABLE | _PARTITION_NEEDS_ADOPTER_INPUT
-    )
+    partition_keys = _PARTITION_HARD_REFUSE | _PARTITION_AUTO_FIXABLE | _PARTITION_NEEDS_ADOPTER_INPUT
 
     # 1. Every live check name (regardless of status) is in partition_keys.
     unknown_live = live_names - partition_keys
@@ -467,17 +449,14 @@ def test_t11_partition_contract_exhaustive_and_no_dead_keys(tmp_path: Path) -> N
     )
 
     # 2. Pairwise disjoint.
-    assert not (_PARTITION_HARD_REFUSE & _PARTITION_AUTO_FIXABLE), \
-        "hard_refuse and auto_fixable overlap"
-    assert not (_PARTITION_HARD_REFUSE & _PARTITION_NEEDS_ADOPTER_INPUT), \
-        "hard_refuse and needs_adopter_input overlap"
-    assert not (_PARTITION_AUTO_FIXABLE & _PARTITION_NEEDS_ADOPTER_INPUT), \
+    assert not (_PARTITION_HARD_REFUSE & _PARTITION_AUTO_FIXABLE), "hard_refuse and auto_fixable overlap"
+    assert not (_PARTITION_HARD_REFUSE & _PARTITION_NEEDS_ADOPTER_INPUT), "hard_refuse and needs_adopter_input overlap"
+    assert not (_PARTITION_AUTO_FIXABLE & _PARTITION_NEEDS_ADOPTER_INPUT), (
         "auto_fixable and needs_adopter_input overlap"
-
-    # 3. Partition sum == 9.
-    assert len(partition_keys) == 9, (
-        f"Partition union has {len(partition_keys)} keys, expected 9 (live universe size)"
     )
+
+    # 3. Partition sum == 8 (work-list check removed at Slice 7-prime).
+    assert len(partition_keys) == 8, f"Partition union has {len(partition_keys)} keys, expected 8 (live universe size)"
 
     # 4. _ISOLATION_FIXER_MAP keys equal _PARTITION_AUTO_FIXABLE.
     assert set(_ISOLATION_FIXER_MAP.keys()) == _PARTITION_AUTO_FIXABLE, (
@@ -511,8 +490,9 @@ def test_t12a_no_fixers_invoked_without_accept_migration(tmp_path: Path) -> None
         execute_upgrade(tmp_path, actions=[], accept_migration=False, product_root=product_root)
 
     # Verify no isolation-fix mutation happened: workstream-focus.py should still exist.
-    assert (tmp_path / ".claude" / "hooks" / "workstream-focus.py").exists(), \
+    assert (tmp_path / ".claude" / "hooks" / "workstream-focus.py").exists(), (
         "workstream-focus.py was deleted despite accept_migration=False"
+    )
 
 
 def test_t12b_out_of_surface_mutation_raises_violation() -> None:
@@ -538,8 +518,9 @@ def test_t12c_arbitrary_other_preserve_files_not_touched(tmp_path: Path) -> None
     execute_upgrade(tmp_path, actions=[], accept_migration=True, product_root=product_root)
 
     # README.md must be unchanged.
-    assert readme.read_text(encoding="utf-8") == "# Adopter-customized README — DO NOT TOUCH\n", \
+    assert readme.read_text(encoding="utf-8") == "# Adopter-customized README — DO NOT TOUCH\n", (
         "Migration mutated README.md outside the isolation-fix surface"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -579,6 +560,7 @@ def test_t13c_empty_input_returns_empty_list(tmp_path: Path) -> None:
 
 def test_t13d_unknown_check_name_raises_runtime_error(tmp_path: Path) -> None:
     from types import SimpleNamespace
+
     bogus = SimpleNamespace(name="isolation:does-not-exist", status="warning", message="")
     with pytest.raises(RuntimeError, match="missing helper"):
         _run_isolation_fixers(tmp_path, "dual-agent", [bogus])  # type: ignore[list-item]
@@ -642,11 +624,13 @@ def test_t15a_deletion_makes_check_pass(tmp_path: Path) -> None:
     execute_upgrade(tmp_path, actions=[], accept_migration=True, product_root=product_root)
 
     # Confirm post-state: check #6 is passing (file is deleted).
-    assert not (tmp_path / ".claude" / "hooks" / "workstream-focus.py").exists(), \
+    assert not (tmp_path / ".claude" / "hooks" / "workstream-focus.py").exists(), (
         "check #6 fixer did not delete the legacy hook file"
+    )
     pf_post = _run_isolation_preflight(tmp_path, "dual-agent", product_root)
-    assert not any(c.name == "isolation:workstream-focus-hook-absent" for c in pf_post.auto_fixable), \
+    assert not any(c.name == "isolation:workstream-focus-hook-absent" for c in pf_post.auto_fixable), (
         "check #6 still failing after fixer ran"
+    )
 
 
 def test_t15b_no_op_when_legacy_hook_already_absent(tmp_path: Path) -> None:

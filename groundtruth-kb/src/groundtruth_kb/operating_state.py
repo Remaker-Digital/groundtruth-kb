@@ -390,8 +390,7 @@ def _probe_system_interface_map(root: Path) -> tuple[str, str, str, dict[str, An
         else ""
     )
     backlog_ok = backlog is not None and all(
-        token in backlog_text
-        for token in ("current_work_items", "work_items", "memory/work_list.md", "bridge/INDEX.md")
+        token in backlog_text for token in ("current_work_items", "work_items", "bridge/INDEX.md")
     )
     status = "PASS" if companion.exists() and backlog_ok else "WARN"
     companion_state = "present" if companion.exists() else "missing"

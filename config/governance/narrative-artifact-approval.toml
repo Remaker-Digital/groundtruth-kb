@@ -40,7 +40,21 @@ patterns = [
   "CLAUDE.md",
   "CLAUDE-REFERENCE.md",
   "CLAUDE-ARCHITECTURE.md",
-  "memory/work_list.md",
+]
+required_evidence = [
+  "approval_packet",
+  "presented_to_user=true",
+  "transcript_captured=true",
+  "explicit_change_request",
+]
+
+[[protected_artifacts]]
+id = "application-scope-rules"
+description = "Application-scope narrative authority surfaces for managed applications under applications/<name>/. Per F4 decision in bridge/gtkb-claude-md-scope-clarification-slice-2-003.md (Codex GO at -004); implemented under PAUTH-GTKB-CLAUDE-MD-SCOPE-CORRECTION-SLICE-3-V2 + Slice 3 GO at bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-007.md."
+patterns = [
+  "applications/*/CLAUDE.md",
+  "applications/*/CLAUDE-REFERENCE.md",
+  "applications/*/CLAUDE-ARCHITECTURE.md",
 ]
 required_evidence = [
   "approval_packet",
@@ -117,9 +131,10 @@ Topic files in memory/ are operational subsystems (per .claude/rules/
 canonical-terminology.md ADR-0001 three-tier memory architecture). High-churn
 notepad tier. Same rationale as MEMORY.md.
 
-Notable exception within this exclusion: memory/work_list.md IS protected
-because it is the standing-backlog narrative authority per DELIB-0838 +
-GOV-STANDING-BACKLOG-001, not operational notepad.
+(The former standing-backlog markdown view under memory/ was a notable
+exception to this exclusion until it was retired at the
+GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH migration conclusion; the backlog now lives
+solely in the MemBase work_items table.)
 """
 
 [[excluded_by_design.items]]

@@ -113,7 +113,13 @@ def test_standing_backlog_audit_summarizes_membase_work_items_and_release_blocke
 
 
 def test_standing_backlog_contains_harvested_source_items() -> None:
-    work_list = (REPO_ROOT / "memory" / "work_list.md").read_text(encoding="utf-8")
+    """Verifies that harvest disposition and snapshot reports contain expected items.
+
+    The standing backlog was migrated to MemBase per DELIB-S337; the former
+    markdown standing-backlog file is retired. Assertions that read that file
+    are removed; remaining assertions verify the LO disposition and harvest
+    snapshot reports.
+    """
     disposition_report = (
         REPO_ROOT
         / "independent-progress-assessments"
@@ -128,23 +134,6 @@ def test_standing_backlog_contains_harvested_source_items() -> None:
     ).read_text(encoding="utf-8")
     current_harvest_report = _most_recent_dated_snapshot(DROPBOX_DIR).read_text(encoding="utf-8")
 
-    for item_id in (
-        "GTKB-GOV-004",
-        "GTKB-GOV-005",
-        "GTKB-GOV-006",
-        "GTKB-GOV-007",
-        "GTKB-GOV-008",
-        "GTKB-GOV-009",
-        "GTKB-GOV-010",
-    ):
-        assert item_id in work_list
-
-    assert "audit_standing_backlog_sources.py" in work_list
-    assert "STANDING-BACKLOG-HARVEST-2026-04-20.md" in work_list
-    assert "STANDING-BACKLOG-BRIDGE-DISPOSITIONS-2026-04-20.md" in work_list
-    assert "GTKB-GOV-005 - DONE" in work_list
-    assert "gtkb-azure-cicd-gates" in work_list
-    assert "commercial-readiness-spec-1833-ready-propagation" in work_list
     assert "`gtkb-azure-cicd-gates` `GO`" in disposition_report
     assert "`gtkb-azure-cicd-gates` at `VERIFIED`" in azure_verified_baseline_harvest_report
     assert "bridge/gtkb-azure-cicd-gates-010.md" in azure_verified_baseline_harvest_report

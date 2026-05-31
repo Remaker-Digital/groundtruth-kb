@@ -6,9 +6,8 @@ Spec: 3 fixture trees representing pre-isolation adopter shapes drive the
 
 1. ``pre_isolation_minimal`` — 4 auto-fixable checks fire; ``--accept-migration``
    converges. Outcome: success.
-2. ``pre_isolation_with_managed_drift`` — adds a needs-adopter-input check
-   (``isolation:work-list-no-product-entries``). Outcome:
-   ``IsolationNonAutoFixableError``.
+2. ``pre_isolation_with_managed_drift`` — adds a needs-adopter-input check.
+   Outcome: ``IsolationNonAutoFixableError``.
 3. ``pre_isolation_under_product_root`` — adopter laid out under product
    root (constructed inline; no static tree). Outcome:
    ``IsolationLocationFailureError`` — refused regardless of
@@ -68,7 +67,7 @@ def test_pre_isolation_minimal_accepts_migration_and_clears_auto_fixable_checks(
 def test_pre_isolation_with_managed_drift_refuses_with_non_auto_fixable_error(
     tmp_path: Path,
 ) -> None:
-    """Adopter has 4 auto-fixable + 1 needs-adopter-input failures.
+    """Adopter has auto-fixable + needs-adopter-input (chroma orphan) failures.
 
     With ``accept_migration=True``, the auto-fixer would run for the
     auto-fixable subset, but the presence of any needs-adopter-input

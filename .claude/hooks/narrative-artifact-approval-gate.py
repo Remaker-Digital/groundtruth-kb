@@ -3,7 +3,7 @@
 Claude Code PreToolUse hook -- Narrative-artifact approval gate.
 
 Blocks Write/Edit on narrative-artifact paths (rule files, AGENTS.md,
-CLAUDE*.md, memory/work_list.md) unless the call references a valid
+CLAUDE*.md) unless the call references a valid
 approval packet that proves owner-visible packet display per DELIB-0835.
 
 Slice A of GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001.

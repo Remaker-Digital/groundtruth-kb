@@ -84,7 +84,6 @@ def _make_minimal_legacy_root(tmp_path: Path) -> Path:
         + "\n",
         encoding="utf-8",
     )
-    (legacy / "memory" / "work_list.md").write_text("# work list\n", encoding="utf-8")
     (legacy / "memory" / "release-readiness.md").write_text("# release readiness\n", encoding="utf-8")
     (legacy / "pyproject.toml").write_text("[project]\nname='stub'\n", encoding="utf-8")
     (legacy / ".github" / "workflows" / "build.yml").write_text("name: build\n", encoding="utf-8")
@@ -357,7 +356,7 @@ def test_run_copies_required_inputs_to_sandbox_as_real_files_not_symlinks(tmp_pa
     legacy = _make_minimal_legacy_root(tmp_path)
     _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
     sandbox = tmp_path / "output" / "dashboard_regen" / "sandbox"
-    for rel in ("groundtruth.db", "bridge/INDEX.md", "memory/work_list.md", "pyproject.toml"):
+    for rel in ("groundtruth.db", "bridge/INDEX.md", "pyproject.toml"):
         p = sandbox / rel
         assert p.is_file(), f"Required input {rel} not in sandbox"
         assert not p.is_symlink(), f"Required input {rel} is a symlink (must be real file)"
@@ -582,11 +581,11 @@ def test_audit_hook_rejects_legacy_dotenv_local_read(tmp_path: Path) -> None:
     assert is_allowed(str(target)) is False
 
 
-def test_audit_hook_rejects_legacy_memory_work_list_read(tmp_path: Path) -> None:
+def test_audit_hook_rejects_legacy_memory_release_readiness_read(tmp_path: Path) -> None:
     legacy, sandbox = _setup_runner_fixture(tmp_path)
     (legacy / "memory").mkdir()
-    target = legacy / "memory" / "work_list.md"
-    target.write_text("# work list\n", encoding="utf-8")
+    target = legacy / "memory" / "release-readiness.md"
+    target.write_text("# release readiness\n", encoding="utf-8")
     is_allowed = _dashboard_regen_runner.build_is_allowed(legacy, sandbox)
     assert is_allowed(str(target)) is False
 
@@ -595,9 +594,9 @@ def test_audit_hook_rejects_path_traversal_via_dotdot(tmp_path: Path) -> None:
     """`..` traversal is canonicalized away → still denied."""
     legacy, sandbox = _setup_runner_fixture(tmp_path)
     (legacy / "memory").mkdir()
-    (legacy / "memory" / "work_list.md").write_text("x", encoding="utf-8")
-    # Construct a traversal path that resolves to legacy/memory/work_list.md
-    traversal = sandbox / ".." / "legacy" / "memory" / "work_list.md"
+    (legacy / "memory" / "release-readiness.md").write_text("x", encoding="utf-8")
+    # Construct a traversal path that resolves to legacy/memory/release-readiness.md
+    traversal = sandbox / ".." / "legacy" / "memory" / "release-readiness.md"
     is_allowed = _dashboard_regen_runner.build_is_allowed(legacy, sandbox)
     assert is_allowed(str(traversal)) is False
 
@@ -609,15 +608,15 @@ def test_audit_hook_rejects_symlink_to_legacy_data(tmp_path: Path) -> None:
     """
     legacy, sandbox = _setup_runner_fixture(tmp_path)
     (legacy / "memory").mkdir()
-    real_target = legacy / "memory" / "work_list.md"
+    real_target = legacy / "memory" / "release-readiness.md"
     real_target.write_text("x", encoding="utf-8")
-    link_path = sandbox / "linked_work_list.md"
+    link_path = sandbox / "linked_release_readiness.md"
     try:
         os.symlink(real_target, link_path)
     except (OSError, NotImplementedError):
         pytest.skip("symlinks not supported in this environment")
     is_allowed = _dashboard_regen_runner.build_is_allowed(legacy, sandbox)
-    # Path.resolve() follows symlinks; the link resolves to legacy/memory/work_list.md → denied.
+    # Path.resolve() follows symlinks; the link resolves to legacy/memory/release-readiness.md → denied.
     assert is_allowed(str(link_path)) is False
 
 
@@ -648,7 +647,7 @@ def test_audit_hook_terminates_subprocess_on_first_open_violation(tmp_path: Path
     ``terminate_after_violation=True`` (default).
     """
     legacy, sandbox = _setup_runner_fixture(tmp_path)
-    target = legacy / "memory" / "work_list.md"
+    target = legacy / "memory" / "release-readiness.md"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("legacy data", encoding="utf-8")
 

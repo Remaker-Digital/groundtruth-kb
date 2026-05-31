@@ -6,10 +6,17 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-clause-in-root-failure-pattern-tightening
+NEW: bridge/gtkb-clause-in-root-failure-pattern-tightening-001.md
+
 Document: antigravity-inspection-results-053026-options-for-implementation
 ADVISORY: bridge/antigravity-inspection-results-053026-options-for-implementation-001.md
 
 Document: gtkb-source-of-truth-freshness-governance
+VERIFIED: bridge/gtkb-source-of-truth-freshness-governance-012.md
+REVISED: bridge/gtkb-source-of-truth-freshness-governance-011.md
+NO-GO: bridge/gtkb-source-of-truth-freshness-governance-010.md
+NEW: bridge/gtkb-source-of-truth-freshness-governance-009.md
 GO: bridge/gtkb-source-of-truth-freshness-governance-008.md
 REVISED: bridge/gtkb-source-of-truth-freshness-governance-007.md
 GO: bridge/gtkb-source-of-truth-freshness-governance-006.md
@@ -39,6 +46,7 @@ NO-GO: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-0
 NEW: bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-001.md
 
 Document: gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates
+VERIFIED: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-010.md
 NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-009.md
 GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-008.md
 REVISED: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-007.md
@@ -58,6 +66,11 @@ GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-002.md
 NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-001.md
 
 Document: gtkb-gov-backlog-source-of-truth-2026-05-02
+VERIFIED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-029.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-028.md
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-027.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-026.md
+NEW: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-025.md
 GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-024.md
 REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-023.md
 NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-022.md

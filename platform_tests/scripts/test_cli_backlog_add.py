@@ -4,14 +4,14 @@ Authority: bridge/gtkb-backlog-add-cli-slice-1-003.md (REVISED-1), Codex GO at
 ``bridge/gtkb-backlog-add-cli-slice-1-004.md``. Source work item: WI-3270.
 
 Covers the 14-test Specification-Derived Verification Plan (T1-T14):
-required-field + enum validation, dry-run no-mutation, no MEMORY.md /
-work_list.md write, monotonic WI-NNNN allocation, link preservation,
+required-field + enum validation, dry-run no-mutation, no MEMORY.md
+write, monotonic WI-NNNN allocation, link preservation,
 ``backlog list`` round-trip, duplicate-id guard, fail-closed harness
 attribution, fallback-author absence, and ``--json`` machine readability.
 
 Every test runs against a temporary ``groundtruth.db`` created from a temp
-``groundtruth.toml``; no test mutates the production ``groundtruth.db``,
-``memory/MEMORY.md``, or ``memory/work_list.md``.
+``groundtruth.toml``; no test mutates the production ``groundtruth.db``
+or ``memory/MEMORY.md``.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 Licensed under AGPL-3.0-or-later.
@@ -194,7 +194,7 @@ def test_add_dry_run_does_not_mutate(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# T6 - command never writes memory/MEMORY.md or memory/work_list.md
+# T6 - command never writes memory/MEMORY.md
 # ---------------------------------------------------------------------------
 
 
@@ -203,20 +203,15 @@ def test_add_does_not_write_memory_md(tmp_path: Path) -> None:
     memory_dir = root / "memory"
     memory_dir.mkdir()
     memory_md = memory_dir / "MEMORY.md"
-    work_list = memory_dir / "work_list.md"
     memory_md.write_text("# memory\n", encoding="utf-8")
-    work_list.write_text("# work list\n", encoding="utf-8")
     memory_before = memory_md.stat().st_mtime_ns
-    work_list_before = work_list.stat().st_mtime_ns
 
     with mock.patch.dict("os.environ", {"GTKB_HARNESS_NAME": "claude"}):
         result = CliRunner().invoke(main, _add_args(config))
     assert result.exit_code == 0, result.output
 
     assert memory_md.stat().st_mtime_ns == memory_before
-    assert work_list.stat().st_mtime_ns == work_list_before
     assert memory_md.read_text(encoding="utf-8") == "# memory\n"
-    assert work_list.read_text(encoding="utf-8") == "# work list\n"
 
 
 # ---------------------------------------------------------------------------

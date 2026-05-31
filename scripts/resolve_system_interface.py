@@ -61,7 +61,7 @@ REQUIRED_SEED_IDS = {
     "mcp-server",
     "resource-alias-registry",
 }
-BACKLOG_REQUIRED_TOKENS = ("current_work_items", "work_items", "memory/work_list.md", "bridge/INDEX.md", "dashboard")
+BACKLOG_REQUIRED_TOKENS = ("current_work_items", "work_items", "bridge/INDEX.md", "dashboard")
 
 
 def load_map(path: Path = MAP_PATH) -> dict[str, Any]:

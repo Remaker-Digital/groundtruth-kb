@@ -71,7 +71,6 @@ _REQUIRED_SANDBOX_INPUTS: tuple[str, ...] = (
     "bridge/INDEX.md",
     "harness-state/harness-identities.json",
     "harness-state/role-assignments.json",
-    "memory/work_list.md",
     "memory/release-readiness.md",
     "pyproject.toml",
 )

@@ -6,7 +6,7 @@ Authority: bridge/gtkb-backlog-add-cli-slice-1-003.md (REVISED-1), Codex GO at
 ``gt backlog add`` (and ``python -m groundtruth_kb backlog add`` parity)
 captures a single MemBase ``work_items`` candidate row per invocation so that
 agents can record noticed issues or enhancement opportunities during normal
-work without parking them in ``memory/MEMORY.md`` or ``memory/work_list.md``.
+work without parking them in ``memory/MEMORY.md``.
 
 Capture is NOT implementation approval. The new row records a candidate for
 future implementation consideration; implementing the captured item still
@@ -179,8 +179,7 @@ def add_backlog_item(config: GTConfig, request: BacklogAddRequest) -> dict[str, 
     allocated_id = _allocate_next_work_item_id(db)
     if db.get_work_item(allocated_id) is not None:
         raise BacklogAddError(
-            f"allocated id {allocated_id} already exists; refusing to overwrite "
-            "(allocation race — retry the command)"
+            f"allocated id {allocated_id} already exists; refusing to overwrite (allocation race — retry the command)"
         )
 
     insert_kwargs: dict[str, Any] = {
@@ -217,9 +216,7 @@ def add_backlog_item(config: GTConfig, request: BacklogAddRequest) -> dict[str, 
 
     row = db.insert_work_item(**insert_kwargs)
     if row is None:
-        raise BacklogAddError(
-            f"Unexpected error: inserted work item {allocated_id} not found on readback."
-        )
+        raise BacklogAddError(f"Unexpected error: inserted work item {allocated_id} not found on readback.")
 
     return {
         "created": True,

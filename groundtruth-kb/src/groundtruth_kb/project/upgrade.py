@@ -62,27 +62,32 @@ _NO_UPGRADE_ACTION_POLICIES: frozenset[str] = frozenset({"preserve", "transient"
 # Check #5 (`isolation:hooks-point-to-wrappers`) reclassified from
 # auto-fixable to needs-adopter-input in REVISED-4 (`-011`) per Codex
 # `-010` NO-GO + S328 owner reclassify decision.
-_PARTITION_HARD_REFUSE: frozenset[str] = frozenset({
-    "isolation:adopter-root-placement",
-})
-_PARTITION_AUTO_FIXABLE: frozenset[str] = frozenset({
-    "isolation:service-endpoint",
-    "isolation:work-subject",
-    "isolation:workstream-focus-hook-absent",
-    "isolation:release-readiness-app-subject-header",
-})
+_PARTITION_HARD_REFUSE: frozenset[str] = frozenset(
+    {
+        "isolation:adopter-root-placement",
+    }
+)
+_PARTITION_AUTO_FIXABLE: frozenset[str] = frozenset(
+    {
+        "isolation:service-endpoint",
+        "isolation:work-subject",
+        "isolation:workstream-focus-hook-absent",
+        "isolation:release-readiness-app-subject-header",
+    }
+)
 # Per Codex `-010` NO-GO + S328 owner remediation choice (reclassify, not
 # aggressive-fixer): isolation:hooks-point-to-wrappers moved here from
 # auto-fixable. The `_compute_target_event_list` machinery cannot reliably
 # clear all live check-#5 warning modes (specifically adopter-owned
 # non-wrapper hooks); rather than deleting adopter customizations
 # destructively, the upgrade refuses with adopter-input guidance.
-_PARTITION_NEEDS_ADOPTER_INPUT: frozenset[str] = frozenset({
-    "isolation:no-writable-product-paths",
-    "isolation:hooks-point-to-wrappers",
-    "isolation:work-list-no-product-entries",
-    "isolation:chroma-regeneratable",
-})
+_PARTITION_NEEDS_ADOPTER_INPUT: frozenset[str] = frozenset(
+    {
+        "isolation:no-writable-product-paths",
+        "isolation:hooks-point-to-wrappers",
+        "isolation:chroma-regeneratable",
+    }
+)
 
 # The exact relative paths the 4 isolation auto-fixers may touch. Defense in
 # depth against scope creep: each helper asserts its target file is in this
@@ -93,12 +98,14 @@ _PARTITION_NEEDS_ADOPTER_INPUT: frozenset[str] = frozenset({
 # NOT the TOML's [durable_state] block. The fixer therefore writes the
 # JSON file and the TOML's `work_subject = "application"` is no longer
 # the authority. Same defect class as -006 F1.
-_ISOLATION_FIX_SURFACE_FILES: frozenset[str] = frozenset({
-    "groundtruth.toml",                       # touched by check #2 (service endpoint)
-    ".claude/session/work-subject.json",      # touched by check #3 (work subject)
-    ".claude/hooks/workstream-focus.py",      # touched by check #6 (DELETED, not modified)
-    "memory/release-readiness.md",            # touched by check #8
-})
+_ISOLATION_FIX_SURFACE_FILES: frozenset[str] = frozenset(
+    {
+        "groundtruth.toml",  # touched by check #2 (service endpoint)
+        ".claude/session/work-subject.json",  # touched by check #3 (work subject)
+        ".claude/hooks/workstream-focus.py",  # touched by check #6 (DELETED, not modified)
+        "memory/release-readiness.md",  # touched by check #8
+    }
+)
 # Note: `.claude/settings.json` previously listed for check #5 was removed in
 # REVISED-4 (`-011`) when check #5 reclassified to needs-adopter-input per
 # Codex `-010` NO-GO + S328 owner choice.
@@ -106,10 +113,12 @@ _ISOLATION_FIX_SURFACE_FILES: frozenset[str] = frozenset({
 # Files in the isolation-fix surface whose `upgrade_policy=preserve` is
 # overridden ONLY when --accept-migration is set. Recorded in the rollback
 # receipt's `prior_policy` field for adopter audit.
-_ISOLATION_FIX_PRESERVE_OVERRIDE_FILES: frozenset[str] = frozenset({
-    "groundtruth.toml",
-    "memory/release-readiness.md",
-})
+_ISOLATION_FIX_PRESERVE_OVERRIDE_FILES: frozenset[str] = frozenset(
+    {
+        "groundtruth.toml",
+        "memory/release-readiness.md",
+    }
+)
 
 
 @dataclass
@@ -184,7 +193,6 @@ class IsolationNonAutoFixableError(RuntimeError):
     """Raised when needs-adopter-input checks fail AND ``--accept-migration`` IS set.
 
     These checks (``isolation:no-writable-product-paths``,
-    ``isolation:work-list-no-product-entries``,
     ``isolation:chroma-regeneratable``) require adopter judgment on
     disposition; the upgrade refuses with per-check guidance.
     """
@@ -1303,9 +1311,7 @@ def execute_upgrade(
         # upgrade actions. Single payload + single receipt + single revert path.
         isolation_fixer_results: list[IsolationFixerResult] = []
         if accept_migration and isolation_result.auto_fixable:
-            isolation_fixer_results = _run_isolation_fixers(
-                target, profile_name_for_iso, isolation_result.auto_fixable
-            )
+            isolation_fixer_results = _run_isolation_fixers(target, profile_name_for_iso, isolation_result.auto_fixable)
             for fr in isolation_fixer_results:
                 tag = "FIXED" if fr.outcome == "fixed" else fr.outcome.upper()
                 # Use append rather than prepend; results list ordering is informational.
@@ -1364,8 +1370,7 @@ def execute_upgrade(
                     for fr in isolation_fixer_results
                 ],
                 "left_for_adopter": [
-                    {"check_name": c.name, "message": c.message}
-                    for c in isolation_result.needs_adopter_input
+                    {"check_name": c.name, "message": c.message} for c in isolation_result.needs_adopter_input
                 ],
                 "preserve_override_authority": (
                     "DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE "

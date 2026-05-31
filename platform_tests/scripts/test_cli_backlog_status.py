@@ -24,8 +24,8 @@ Covers the 10-test Specification-Derived Verification Plan (T1-T10):
   ever reaches ``scripts.project_verified_completion_scanner``.
 
 Every test runs against a temporary ``groundtruth.db`` created from a temp
-``groundtruth.toml``; no test mutates the canonical ``groundtruth.db``,
-``memory/MEMORY.md``, or ``memory/work_list.md``.
+``groundtruth.toml``; no test mutates the canonical ``groundtruth.db``
+or ``memory/MEMORY.md``.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 Licensed under AGPL-3.0-or-later.
@@ -281,9 +281,7 @@ class _FakeReadiness:
         }
 
 
-def test_status_retire_ready_uses_scanner(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_status_retire_ready_uses_scanner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root, config_file = _project(tmp_path)
     _seed_basic_project(root / "groundtruth.db")
 
@@ -324,9 +322,7 @@ def test_status_retire_ready_uses_scanner(
 # ---------------------------------------------------------------------------
 
 
-def test_status_verified_coverage_annotation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_status_verified_coverage_annotation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root, config_file = _project(tmp_path)
     _seed_basic_project(root / "groundtruth.db")
 
@@ -361,9 +357,7 @@ def test_status_verified_coverage_annotation(
 # ---------------------------------------------------------------------------
 
 
-def test_status_scanner_caveat_present_when_flags_set(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_status_scanner_caveat_present_when_flags_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root, config_file = _project(tmp_path)
     _seed_basic_project(root / "groundtruth.db")
 
@@ -387,9 +381,9 @@ def test_status_scanner_caveat_present_when_flags_set(
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     caveat = payload["scanner_caveat"]
-    assert (
-        "gtkb-project-completion-scanner-addressing-thread-fix" in caveat
-    ), f"canonical scanner-fix slug missing; caveat={caveat!r}"
+    assert "gtkb-project-completion-scanner-addressing-thread-fix" in caveat, (
+        f"canonical scanner-fix slug missing; caveat={caveat!r}"
+    )
     # The withdrawn duplicate must NOT appear (proposal F1 correction). We
     # detect it by looking for the disambiguating ``-implementation.md``
     # filename fragment so the substring check does not false-positive on the
@@ -425,9 +419,7 @@ def test_status_makes_no_db_writes(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
 
     hash_after = _file_hash(db_path)
-    assert hash_before == hash_after, (
-        "gt backlog status mutated the database; this command must be read-only"
-    )
+    assert hash_before == hash_after, "gt backlog status mutated the database; this command must be read-only"
 
 
 # ---------------------------------------------------------------------------
@@ -461,9 +453,7 @@ def test_status_flags_doubled_prefix_project(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_status_base_has_no_scanner_dependency(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_status_base_has_no_scanner_dependency(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root, config_file = _project(tmp_path)
     _seed_basic_project(root / "groundtruth.db")
 

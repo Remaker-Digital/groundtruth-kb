@@ -156,8 +156,13 @@ artifacts when the owner asks for such an accounting.
 Owner decision `DELIB-0838` and formal records `GOV-STANDING-BACKLOG-001`,
 `PB-STANDING-BACKLOG-CONTINUITY-001`,
 `ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001`, and
-`DCL-STANDING-BACKLOG-SCHEMA-001` establish `memory/work_list.md` as the
-current human-readable standing backlog authority for GroundTruth-KB.
+`DCL-STANDING-BACKLOG-SCHEMA-001` establish the standing backlog
+governance contract for GroundTruth-KB. Following the
+`GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration (Slice 7-prime, per
+`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), the canonical
+standing backlog authority is the MemBase `work_items` table, surfaced via
+`gt backlog list`; the former transitional markdown view under `memory/`
+was retired.
 
 The standing backlog governance contract is treated like other formal
 GroundTruth-KB specifications: it is represented in MemBase, linked to a
@@ -247,8 +252,8 @@ procedures with steps expressible as "compute X from Y" — Prime Builder
 must:
 
 1. Surface the repetition explicitly.
-2. File it as a backlog item in `memory/work_list.md` with scope and
-   tradeoff analysis.
+2. File it as a backlog item in the MemBase `work_items` table (e.g., via
+   `gt backlog add`) with scope and tradeoff analysis.
 3. Not silently absorb the friction (which would make the cost
    invisible to governance).
 
@@ -264,7 +269,7 @@ and cases where friction is itself the governance value (e.g.,
 deliberation-forcing slowness) remain appropriately AI-mediated.
 
 First concrete manifestation: `GTKB-ARTIFACT-RECORDER-CLI`
-(`memory/work_list.md` row 15) — moves formal-artifact insertion
+(MemBase `work_items`) — moves formal-artifact insertion
 plumbing behind a `gt <artifact-type> record` CLI; reduces AI surface
 by ~85%.
 

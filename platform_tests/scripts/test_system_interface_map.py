@@ -39,7 +39,6 @@ def test_backlog_row_points_to_unified_work_items_authority() -> None:
 
     assert backlog["authoritative_source"] == "MemBase table: current_work_items"
     assert "current_work_items" in combined
-    assert "memory/work_list.md" in combined
     assert "work_items" in combined
     assert "bridge/INDEX.md" in combined
     assert "dashboard/startup rows are summaries" in combined

@@ -44,7 +44,7 @@ confirmation before touching adopter-owned ones.
 
 1. Adjust `groundtruth.toml` `app_title`, `brand_mark`, and `[service].endpoint`.
 2. Run `gt project doctor --profile <your-profile>` to verify the workspace.
-3. Open `memory/work_list.md` to plan your first work items.
+3. Run `gt backlog list` to plan your first work items.
 
 ---
 

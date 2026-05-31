@@ -372,19 +372,18 @@ work item, not a separate artifact type.
 may contain sub-projects, work items, or both. Sub-projects contain work
 items. Work items are the atomic known-work units.
 
-**Source-of-truth intent:** Known work converges into one MemBase source
-of truth (the canonical `work_items` table). During the migration window,
-`memory/work_list.md` is a transitional generated view; the file is
-regenerated empty as canonical content moves to MemBase.
+**Source-of-truth intent:** Known work lives in one MemBase source
+of truth (the canonical `work_items` table), surfaced through
+`gt backlog list`. The migration to a MemBase-only backlog is complete;
+no transitional markdown view persists.
 
 **Lifecycle endpoint:** Per S337 owner directive
 (`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), at the
-conclusion of the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration,
-`memory/work_list.md` is deleted. The post-migration steady state is
-"MemBase only" — no markdown view persists. Migration-completion is gated
-by parent thread Slice 7-prime
-(`bridge/gtkb-gov-backlog-source-of-truth-2026-05-02`) which physically
-removes the file after Slices 2-6 land.
+conclusion of the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration the former
+transitional markdown backlog view under `memory/` was deleted (Slice
+7-prime, `bridge/gtkb-gov-backlog-source-of-truth-2026-05-02`). The steady
+state is "MemBase only" — the canonical `work_items` table is the sole
+backlog authority.
 
 **Not to be confused with:** ignore list or deprecated work (forbidden
 uses per operating-model §2); backlog snapshot (point-in-time export);
@@ -993,6 +992,39 @@ between work subject and session scope).
 **Implementation pointer:** `.claude/session/work-subject.json`. Owner
 commands: `work subject GT-KB`, `application mode`, `agent red mode`.
 
+### session-stated role
+
+**Definition:** An ephemeral, session-scoped role declared by the owner via the
+canonical init keyword `::init gtkb (pb|lo)` on an interactive owner prompt. It
+overrides the durable operating role for in-session surfaces — SessionStart
+disclosure rendering, the AXIS 2 Claude-native surface filter, the
+workstream-focus menu shape, MemBase `changed_by` attribution, and AUQ-keyed
+routing — for the rest of the session. It is held in the ephemeral marker
+`.claude/session/active-session-role.json` and is invalidated at the next
+SessionStart; it carries no durable record and does not survive compaction or
+resume.
+
+**Canonical alias:** interactive session role; session-scoped role.
+
+**Not to be confused with:** `operating role` (the durable, cross-session role
+in `harness-state/role-assignments.json`; session-stated role overrides it only
+for interactive in-session surfaces, never for headless dispatch routing);
+`session lane` (a non-authority work classification); `session focus` (the
+owner-facing startup focus selection); `work subject` (the active subject area;
+an orthogonal axis).
+
+**Source:** `GOV-SESSION-ROLE-AUTHORITY-001` (authority split),
+`DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution table),
+`ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives);
+`DELIB-2507` (S371 originating owner directive); `DCL-CONCEPT-ON-CONTACT-001`
+(authority for first-contact glossary addition).
+
+**Implementation pointer:** `.claude/session/active-session-role.json` (runtime
+marker); written by `scripts/workstream_focus.py` on init-keyword match;
+invalidated by both `.claude/hooks/session_start_dispatch.py` and
+`.codex/gtkb-hooks/session_start_dispatch.py` at SessionStart; resolution rules
+in `scripts/session_role_resolution.py`.
+
 ### smart poller
 
 **Status:** RETIRED 2026-05-09 (Slice 4 retirement; runtime archived to
@@ -1285,8 +1317,10 @@ protected narrative-authority file with matching
 formal-artifact-approval-packet evidence. Includes MemBase rows for GOV /
 ADR / DCL / PB / SPEC / REQ types, Deliberation Archive records, and the
 protected narrative artifacts at `.claude/rules/*.md`, `AGENTS.md`,
-`CLAUDE.md`, `CLAUDE-REFERENCE.md`, `CLAUDE-ARCHITECTURE.md`, and
-`memory/work_list.md`. Canonical artifacts are subject to append-only
+`CLAUDE.md`, `CLAUDE-REFERENCE.md`, `CLAUDE-ARCHITECTURE.md`,
+`applications/<name>/CLAUDE.md`,
+`applications/<name>/CLAUDE-REFERENCE.md`, and
+`applications/<name>/CLAUDE-ARCHITECTURE.md`. Canonical artifacts are subject to append-only
 versioning discipline.
 
 **Not to be confused with:** operational state files (`MEMORY.md`,

@@ -345,7 +345,8 @@ def test_acting_prime_builder_rule_maps_prime_skill_labels_to_assigned_role() ->
     assert "PB-STANDING-BACKLOG-CONTINUITY-001" in rule
     assert "ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001" in rule
     assert "DCL-STANDING-BACKLOG-SCHEMA-001" in rule
-    assert "memory/work_list.md" in rule
+    assert "standing backlog" in rule.lower()
+    assert "MemBase" in rule
     assert "treated like other formal" in rule
     assert "Individual backlog entries remain queue/work items" in rule
     assert "must not be silently" in rule
@@ -507,9 +508,7 @@ def test_standing_backlog_is_formalized_as_governed_artifact() -> None:
                     f"{spec_id} ({spec_type}) must carry structural testability; got {spec['testability']!r}"
                 )
                 assert "DELIB-0838" in (spec["affected_by"] or ""), f"{spec_id} must cite DELIB-0838 in affected_by"
-                assert "memory/work_list.md" in (spec["source_paths"] or ""), (
-                    f"{spec_id} must reference memory/work_list.md in source_paths"
-                )
+                assert spec.get("source_paths"), f"{spec_id} must have populated source_paths"
 
         gov = db.get_spec("GOV-STANDING-BACKLOG-001")
         assert "durable cross-session queue" in gov["description"]
@@ -817,61 +816,37 @@ def test_standing_priorities_load_artifact_oriented_governance_directive() -> No
     assert "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001" in priorities
 
 
-def test_work_queue_prioritizes_candidate_skill_and_doctor_items() -> None:
-    work_list = _read("memory/work_list.md")
+def test_governance_adoption_milestones_are_in_membase() -> None:
+    """Governance-adoption milestone artifacts exist in MemBase.
 
-    assert "GTKB-GOV-000 — DONE" in work_list
-    assert "strict formal artifact approval gate" in work_list
-    assert "scoped auto-approval mode" in work_list
-    assert "transcript capture" in work_list
-    assert ".groundtruth/formal-artifact-approvals/2026-04-20-strict-gov-enforcement-verified.json" in work_list
-    assert "GTKB-GOV-000A" in work_list
-    assert "Codex hook parity package" in work_list
-    assert "check_codex_hook_parity.py" in work_list
-    assert "DELIB-0836" in work_list
-    assert "2026-04-20-codex-hook-parity-decision.json" in work_list
-    assert "GTKB-GOV-000B" in work_list
-    assert "DELIB-0837" in work_list
-    assert "GOV-SESSION-FORMALIZATION-AUDIT-001" in work_list
-    assert "2026-04-20-session-formalization-audit-batch.json" in work_list
-    assert "GTKB-GOV-000C" in work_list
-    assert "DELIB-0838" in work_list
-    assert "GOV-STANDING-BACKLOG-001" in work_list
-    assert "PB-STANDING-BACKLOG-CONTINUITY-001" in work_list
-    assert "ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001" in work_list
-    assert "DCL-STANDING-BACKLOG-SCHEMA-001" in work_list
-    assert "Individual backlog entries remain queue/work items" in work_list
-    assert "2026-04-20-standing-backlog-formalization.json" in work_list
-    assert "GTKB-GOV-000D" in work_list
-    assert "DELIB-0874" in work_list
-    assert "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001" in work_list
-    assert "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001" in work_list
-    assert "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001" in work_list
-    assert "Artifact-Oriented Governance directive" in work_list
-    assert "2026-04-22-artifact-oriented-governance.json" in work_list
-    assert "GTKB-CORE-001" in work_list
-    assert "DELIB-0875" in work_list
-    assert "SPEC-CORE-INTAKE-001" in work_list
-    assert "SPEC-CORE-INTAKE-002" in work_list
-    assert "ADR-CORE-INTAKE-001" in work_list
-    assert "DCL-CORE-INTAKE-001" in work_list
-    assert "2026-04-22-core-spec-intake-phase0.json" in work_list
-    assert "Current formal status is `specified`" in work_list
-    assert "GTKB-GOV-011" in work_list
-    assert "DELIB-0840" in work_list
-    assert "DELIB-0841" in work_list
-    assert "GOV-SESSION-SELF-INITIALIZATION-001" in work_list
-    assert "GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001" in work_list
-    assert "PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001" in work_list
-    assert "PB-SESSION-WRAP-UP-PROACTIVE-001" in work_list
-    assert "SPEC-PROJECT-DASHBOARD-KPI-LINK-001" in work_list
-    assert "DCL-SESSION-STARTUP-TOKEN-BUDGET-001" in work_list
-    assert "DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001" in work_list
-    assert "live project dashboard link" in work_list
-    assert "time-series KPI" in work_list
-    assert "three top priority user actions" in work_list
-    assert "token-budget" in work_list
-    assert "GTKB-GOV-002" in work_list
-    assert "release-candidate gate" in work_list
-    assert "GTKB-GOV-003" in work_list
-    assert "governance-adoption doctor" in work_list
+    Replaces the retired markdown-backlog-based milestone assertion test.
+    The governance artifacts (DELIB, GOV, PB, ADR, DCL, SPEC) that were
+    previously validated via the transitional backlog view are now validated
+    through their canonical MemBase records in sibling test functions:
+    - test_standing_backlog_is_formalized_as_governed_artifact
+    - test_session_self_initialization_records_are_in_membase
+    - test_session_lifecycle_engagement_records_are_in_membase
+    - test_artifact_oriented_governance_records_are_in_membase
+    - test_core_spec_intake_phase0_records_are_in_membase
+    - test_formal_artifact_approval_records_are_in_membase
+    - test_session_governance_principles_have_membase_records
+
+    This test validates the key governance specs that anchor the milestone
+    set are present and verified in MemBase.
+    """
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        # Core governance-adoption specs that anchor the milestone set
+        for spec_id in [
+            "GOV-STANDING-BACKLOG-001",
+            "GOV-SESSION-SELF-INITIALIZATION-001",
+            "GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001",
+            "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+            "GOV-ARTIFACT-APPROVAL-001",
+            "GOV-SESSION-FORMALIZATION-AUDIT-001",
+        ]:
+            spec = db.get_spec(spec_id)
+            assert spec is not None, f"{spec_id} must exist in MemBase"
+            assert spec["status"] == "verified", f"{spec_id} must be verified"
+    finally:
+        db.close()

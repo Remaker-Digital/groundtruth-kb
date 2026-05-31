@@ -162,7 +162,7 @@ def test_system_interface_map_probe_reports_compact_health(project_dir: Path) ->
                 'canonical_name = "backlog"',
                 'accepted_aliases = ["backlog"]',
                 'authoritative_source = "MemBase table: current_work_items"',
-                'read_method = "current_work_items, work_items, memory/work_list.md, bridge/INDEX.md"',
+                'read_method = "current_work_items, work_items, bridge/INDEX.md"',
                 'harness_caveats = "dashboard summaries are non-authoritative"',
                 "",
                 "[[systems]]",

@@ -1,13 +1,15 @@
-# CLAUDE.md - Agent Red Customer Experience
+# CLAUDE.md — GroundTruth-KB Platform
 
-This document provides active guidance for AI assistants working on the Agent Red Customer Experience commercial project. It is loaded at the start of every session. **GOV-01: This file MUST NOT exceed 300 lines.**
+This document provides active guidance for AI assistants working on the GroundTruth-KB (GT-KB) platform. **Unless Mike explicitly says the session is application work (e.g., Agent Red), assume active work is GroundTruth-KB.** **GOV-01: This file MUST NOT exceed 300 lines.**
 
-**Role precedence:** obey the newest owner role assignment reflected in `AGENTS.md` and the startup role-mapping rules under `.claude/rules/`. Loyal Opposition guidance applies only when the owner has explicitly activated that mode for Codex; otherwise Codex operates as Prime Builder.
+For application-scope guidance (Application Identity, Copyright, Adding Commercial Features, Branching Strategy, Hotfix Workflow), see [`applications/Agent_Red/CLAUDE.md`](applications/Agent_Red/CLAUDE.md). Application-scope files are consulted only when the active work subject is `application` and the named application is Agent Red.
 
-> **📁 Reference data** (legal, pricing, infrastructure, AGNTCY rules): `CLAUDE-REFERENCE.md` — read on demand.
-> **📁 Architecture** (project structure, module inventory): `CLAUDE-ARCHITECTURE.md` — read on demand.
-> **📁 Historical archive** (session logs, technical decisions): `CLAUDE_ARCHIVE.md` — read when investigating historical decisions.
-> **📁 Session memory** (operational patterns, lessons): `memory/MEMORY.md` — active GT-KB memory must resolve inside `E:\GT-KB`, not a home-directory mirror or legacy project path.
+**Role precedence:** active role is resolved at session start from `harness-state/harness-identities.json` (persistent harness identity) and `harness-state/role-assignments.json` (role set; the single source-of-truth durable role map). `.claude/rules/operating-role.md`, `AGENTS.md`, and `.claude/rules/*.md` files are explanatory guidance only — they describe behavior contracts but cannot override the durable role assignment map. If markdown text and the durable map differ, the durable map wins; surface the divergence as a defect rather than acting on the markdown. Interactive sessions MAY override the durable role for in-session surfaces (SessionStart disclosure, AXIS 2 Claude-native surface, focus menu, MemBase attribution, AUQ routing) by typing the canonical init keyword `::init gtkb (pb|lo)` on an owner prompt; the override lives in the ephemeral `.claude/session/active-session-role.json` marker for the rest of the session and is invalidated by the next SessionStart. Headless dispatch routing remains keyed to the durable role per `GOV-SESSION-ROLE-AUTHORITY-001` and `DCL-SESSION-ROLE-RESOLUTION-001`.
+
+> **📁 Application-scope reference** (Agent Red legal, pricing, infrastructure, AGNTCY rules): [`applications/Agent_Red/CLAUDE-REFERENCE.md`](applications/Agent_Red/CLAUDE-REFERENCE.md) — read on demand when working on Agent Red.
+> **📁 Application-scope architecture** (Agent Red project structure, module inventory): [`applications/Agent_Red/CLAUDE-ARCHITECTURE.md`](applications/Agent_Red/CLAUDE-ARCHITECTURE.md) — read on demand.
+> **📁 Application-scope historical archive** (Agent Red session logs, technical decisions): [`applications/Agent_Red/CLAUDE_ARCHIVE.md`](applications/Agent_Red/CLAUDE_ARCHIVE.md) — read when investigating Agent Red historical decisions.
+> **📁 Platform session memory** (operational patterns, lessons): `memory/MEMORY.md` — active GT-KB memory must resolve inside `E:\GT-KB`, not a home-directory mirror or legacy project path.
 
 ### Canonical Terminology
 
@@ -39,25 +41,6 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 
 ---
 
-## Application Identity
-
-| Attribute | Value |
-|-----------|-------|
-| **Application Name** | Agent Red Customer Experience |
-| **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | See `memory/MEMORY.md` for versions, test counts, and release progress. |
-| **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
-
-### Copyright Notice
-
-All new work in this repository must include:
-
-```
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-```
-
----
-
 ## Roles
 
 **Owner role:** Provides direction (actions to take) and decisions (specifications to create, approve, or modify). The owner supplies the *what* and *why*.
@@ -68,11 +51,12 @@ All new work in this repository must include:
 
 **GroundTruth KB vision filter:** For GroundTruth-related work, prefer choices that reduce the owner's role to adding or refining specifications, answering clarification questions, and making explicit trade-off decisions. Flag approaches that leave routine implementation, deployment plumbing, traceability reconciliation, generated-artifact inspection, or cross-agent process state with the owner.
 
-**Strategic self-improvement directive:** Self-improvement is a GT-KB strategic imperative. When Prime Builder or Loyal Opposition notices a fix-worthy issue or useful workflow enhancement that would improve future work, add it to the MemBase standing backlog/work items for review and future consideration unless it is already tracked. Do not park future work in MEMORY.md or harness-local auto-memory. Backlog capture is not implementation approval; implementation-approved backlog items require explicit owner/governance approval and AskUserQuestion evidence when owner approval is required. Executing a review/consideration item means presenting the insight and implementation options to the owner and using AskUserQuestion to formalize selection and approval to proceed with an implementation proposal.
+**Strategic self-improvement directive:** Self-improvement is a GT-KB strategic imperative. When Prime Builder or Loyal Opposition notices a fix-worthy issue or useful workflow enhancement that would improve future work, add it to the MemBase standing backlog/work items for review and future consideration unless it is already tracked. Do not park future work in MEMORY.md or harness-local auto-memory. Backlog capture is not implementation approval; implementation-approved backlog items require explicit owner/governance approval and AskUserQuestion evidence when owner approval is required.
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
-**operating procedure.** File-based bridge protocol. See `.claude/rules/file-bridge-protocol.md`.
+**Operating procedure.** File-based bridge protocol. See `.claude/rules/file-bridge-protocol.md` and `.claude/rules/bridge-essential.md` §"Operational Mode".
+
 - **DO NOT implement anything without first preparing an implementation proposal and having it reviewed by Codex.**
 - **All implementation proposals MUST be reviewed by Codex before any code is written.**
 - **All post-implementation reports MUST be reviewed by Codex before committing.**
@@ -81,14 +65,14 @@ All new work in this repository must include:
 - **Execute:** After Codex GO, implement code, tests, and verify.
 - **Report:** Save post-implementation report as new version, add NEW entry for verification.
 - **Verify:** Codex reviews report and adds VERIFIED or NO-GO version.
-- Both agents scan the index when triggered manually by the owner (`Bridge` or `Bridge scan` prompt). Automated polling was halted 2026-04-25; see `.claude/rules/bridge-essential.md` §"Operational Mode" and §"Bridge Polling: Halted" below.
-- Before you deploy any build, ask this question: Is Agent Red ready for a full production deployment?
+- **Dispatch:** Bridge dispatch automation is the **cross-harness event-driven trigger** at `scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger fires on tool-use and Stop events. It dispatches Codex on latest `NEW` or `REVISED` (Loyal-Opposition-actionable) and Prime on latest `GO` or `NO-GO` (Prime-Builder-actionable). `VERIFIED` is terminal and not dispatched. The retired OS pollers and the retired smart poller are archived; do not re-enable without owner approval per `.claude/rules/bridge-essential.md` §"Re-Enabling Pollers".
+- **Manual scan is fallback** when the trigger is unhealthy or intentionally stopped: the owner triggers a bridge scan with a brief prompt such as `Bridge` or `Bridge scan`; agents then read `bridge/INDEX.md` and act on role-appropriate actionable entries.
 
 ---
 
 ## Artifacts and Change Control
 
-**9 managed artifact types + 2 supporting records** in KB (`groundtruth.db`). See `CLAUDE-ARCHITECTURE.md` § Artifact Inventory for full table/schema details.
+**9 managed artifact types + 2 supporting records** in KB (`groundtruth.db`). See application-side architecture documentation (when active) for application-specific schema details; for platform-side artifact authority, see `.claude/rules/operating-model.md`.
 
 **Key principles:** Append-only versioning (`UNIQUE(id, version)`), no UPDATE/DELETE. Orchestrating artifacts (test plan, backlog) reference other artifacts by ID without duplicating content (SPEC-1499).
 
@@ -160,7 +144,7 @@ When the owner describes what the system **must do**, **should do**, **must incl
 
 ### Work Item Taxonomy
 
-See `CLAUDE-ARCHITECTURE.md` § Work Item Taxonomy for full origin/component lists (SPEC-1496).
+For application-specific origin/component taxonomy, see application-side architecture documentation when active (SPEC-1496).
 
 ---
 
@@ -169,7 +153,7 @@ See `CLAUDE-ARCHITECTURE.md` § Work Item Taxonomy for full origin/component lis
 ### Starting a New Session
 
 ```
-Continue work on Agent Red Customer Experience commercial project.
+Continue work on GroundTruth-KB platform.
 Location: E:\GT-KB
 Key files: CLAUDE.md, memory/MEMORY.md
 Next: [describe task].
@@ -177,48 +161,23 @@ Next: [describe task].
 
 ### Session Start: Bridge Index Scan (Mandatory)
 
-At session start, scan `bridge/INDEX.md` for pending work:
+At session start, scan `bridge/INDEX.md` for pending work using a **role-specific** filter:
 
-1. **Read** `bridge/INDEX.md` and look for entries with GO or NO-GO status that haven't been actioned.
+1. **Read** `bridge/INDEX.md` and look for actionable entries for the active role:
+   - **Prime Builder sessions:** look for latest `GO` or `NO-GO` per thread (Codex's verdicts on Prime's proposals/reports).
+   - **Loyal Opposition sessions:** look for latest `NEW` or `REVISED` per thread (Prime's proposals/reports awaiting review).
 2. **Report** any findings: "Bridge scan: N entries need attention" or "Bridge scan: clear."
-3. **Process** the oldest actionable entry first (GO → implement, NO-GO → revise).
+3. **Process** the oldest actionable entry first.
 
-### Bridge Polling: Halted (2026-04-25 owner directive)
-
-The poller is not the bridge. The bridge is the durable handoff/review
-mechanism in `bridge/INDEX.md`; the poller is only a monitoring/activation
-service.
-
-**Both the OS-level Windows scheduled-task pollers, the foreground bridge
-monitor watchdog, and the in-session `CronCreate` poller are now retired.**
-Bridge scans are manual:
-
-- The owner triggers a Prime bridge scan with a brief prompt such as
-  `Bridge` or `Bridge scan`.
-- Prime then reads `bridge/INDEX.md`, identifies actionable entries
-  (NEW/REVISED needing Prime response; GO/NO-GO from Codex needing Prime
-  acknowledgement), and acts.
-- Codex bridge scans are similarly owner-triggered in the Codex harness.
-
-Do NOT recreate the in-session `CronCreate` poller, restore the bridge
-monitor watchdog startup shortcut, or re-enable the Windows scheduled tasks
-(`AgentRedFileBridgeIndexScan-*`, `AgentRedBridgeLivenessAlert`,
-`AgentRedPollerLivenessWatcher`) without explicit owner approval and the
-cost/benefit analysis required by `.claude/rules/bridge-essential.md`
-§"Re-Enabling Pollers".
-
-Rationale: the OS Claude poller (activated ~2026-04-23) fired on a
-fixed interval regardless of bridge activity — a ~10× spawn jump
-(~12.5M tokens/day) mostly doing work without information, not token
-volume. The bridge protocol itself is unaffected.
+The cross-harness event-driven trigger (registered as PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch automatically; the session-start scan above is the in-session entry point and ensures awareness of items that landed while the session was idle.
 
 ### Session Start: Active Work List (Mandatory)
 
-After the bridge scan, read `memory/work_list.md`. If it contains unchecked items, continue working through the list following the standard bridge protocol (propose → Codex GO → implement → post-impl report → Codex VERIFIED → commit → drop from list). Owner pre-approval is granted for all items on the list.
+After the bridge scan, review the active backlog in MemBase (`gt backlog list`). If it contains implementable items, continue working through them following the standard bridge protocol (propose → Codex GO → implement → post-impl report → Codex VERIFIED → commit). Items already authorized for implementation (via project authorization or a recorded owner decision) may proceed without a fresh owner approval.
 
 ### Protected Behaviors & Removal Rule
 
-**Never remove code, tests, features, or procedure entries without explicit owner approval.** If something looks wrong — ASK rather than act. Protected behaviors are specifications with `type = 'protected_behavior'` (PB-* IDs) carrying machine-verifiable assertions. The Build & Deploy Phase 0 regression gate checks these before every build.
+**Never remove code, tests, features, or procedure entries without explicit owner approval.** If something looks wrong — ASK rather than act. Protected behaviors are specifications with `type = 'protected_behavior'` (PB-* IDs) carrying machine-verifiable assertions.
 
 ### Work Priority Bias
 
@@ -233,7 +192,7 @@ After the bridge scan, read `memory/work_list.md`. If it contains unchecked item
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
 - **DO NOT create new markdown files** to store canonical project knowledge or session memory outside approved exception paths.
-- **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
+- **Permitted markdown:** CLAUDE.md (platform rules), `applications/<name>/CLAUDE.md` (application rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
 
 ### Deliberation Archive Protocol
@@ -259,43 +218,12 @@ After the bridge scan, read `memory/work_list.md`. If it contains unchecked item
 
 Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when observing: terminology inconsistency, bare approvals, credential exposure, or missing structure.
 
----
+### AskUserQuestion as the Only Valid Owner-Decision Channel
 
-## Adding Commercial Features
+Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are invalid. See `.claude/rules/prime-builder-role.md` § AskUserQuestion as the Only Valid Owner-Decision Channel for the full enforcement contract (Stop-mode hook detection, prose-pattern matching, `memory/pending-owner-decisions.md` recording).
 
-1. Create features in `src/` exclusively
-2. Add copyright notice to all new files
-3. Test integration patterns independently
-4. Never commit AGNTCY source code into this repo
-5. Read AGNTCY from public repo: https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service
+In-scope decision classes (use `AskUserQuestion`, never prose): approvals, waivers, priority choices, formal artifact approvals, requirement clarifications, destructive actions, deployments, blocking owner decisions.
 
 ---
 
-## Branching Strategy
-
-| Branch | Purpose | Updated when |
-|--------|---------|-------------|
-| `main` | Production mirror. Always matches the most recent production deployment. | Merge from `develop` at deployment time. |
-| `develop` | Continuous development. All new features, fixes, and experiments land here. | Every session. |
-| `hotfix/*` | Emergency production patches. Branched from `main`, merged back to both `main` and `develop`. | Critical production issues only. |
-
-**Workflow:** `develop` → build/test → deploy to staging → staging verified → merge to `main` → deploy to production.
-
-**Rules:**
-1. Never commit directly to `main`. All work happens on `develop`.
-2. Merge to `main` only as part of a production deployment operation.
-3. `main` must always be deployable — it represents what is running in production.
-4. Version tags (v1.98.x) are created on `develop` at build time and propagated to `main` via merge.
-5. Hotfixes follow the hotfix workflow below.
-
-**Hotfix Workflow:**
-1. Branch from `main` at the current production tag: `hotfix/v{version}-{issue}` (e.g., `hotfix/v1.98.92-critic-timeout`).
-2. Implement the minimal fix. CI (lint, tests, security scan) runs automatically on `hotfix/**` branches.
-3. Deploy the hotfix branch to staging for verification.
-4. After staging verification, merge to `main` and deploy to production (GOV-16 approval required).
-5. Immediately backport: merge `main` to `develop` to prevent divergence.
-6. Delete the hotfix branch after both merges are confirmed.
-
----
-
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved. Last Updated: 2026-04-30 (S324). Version: 66.1.0.*
+*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved. Last Updated: 2026-05-29 (Slice 3 of `gtkb-claude-md-scope-clarification`). Version: 67.0.0.*

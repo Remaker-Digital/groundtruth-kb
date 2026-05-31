@@ -56,7 +56,7 @@ def _build_fixture_matrix(matrix_path: Path) -> None:
         "|---|---|---|---|---|---|\n"
         "| `groundtruth.toml` | App root manifest | App-local | Update profile | Define schema | Verify schema |\n"
         "| `bridge/INDEX.md` | Subject-mixed bridge state | App bridge | Write app bridge | Write product bridge | Verify split |\n"
-        "| `memory/work_list.md` | Mixed backlog | App backlog | Update app items | Manage product backlog | Verify subject-scoped |\n\n"
+        "| `memory/release-readiness.md` | Mixed readiness | App readiness | Update app state | Manage product state | Verify subject-scoped |\n\n"
         "## Next Section\n",
         encoding="utf-8",
     )

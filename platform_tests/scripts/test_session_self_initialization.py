@@ -2538,34 +2538,33 @@ def test_write_session_start_json_handles_filesystem_errors_gracefully(tmp_path,
 # ---------------------------------------------------------------------------
 
 
-def _make_recommender_fixture(tmp_path, work_list_text: str, index_text: str) -> Path:
-    """Build a synthetic project root with memory/work_list.md and bridge/INDEX.md."""
-    (tmp_path / "memory").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "memory" / "work_list.md").write_text(work_list_text, encoding="utf-8")
+def _make_recommender_fixture(tmp_path, backlog_items: list[dict[str, str]], index_text: str) -> Path:
+    """Build a synthetic project root with bridge/INDEX.md for recommender tests.
+
+    ``backlog_items`` is a list of dicts with at least ``id``, ``title``, and
+    ``body`` keys — the same shape returned by ``_backlog_items_from_membase``.
+    """
     (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
     (tmp_path / "bridge" / "INDEX.md").write_text(index_text, encoding="utf-8")
     return tmp_path
 
 
-def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path) -> None:
+def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, monkeypatch) -> None:
     """T-recommender-1: items whose mapped bridge thread is VERIFIED are filtered."""
     module = _load_module()
-    work_list = (
-        "## Active Items\n\n"
-        "### GTKB-SHIPPED-ITEM-001 - Already shipped\n\n"
-        "Body of done item.\n\n"
-        "### GTKB-ACTIVE-ITEM-002 - Still in flight\n\n"
-        "Body of active item.\n\n"
-        "### GTKB-ACTIVE-ITEM-003 - Also in flight\n\n"
-        "Body of third item.\n\n"
-    )
+    backlog_items = [
+        {"id": "GTKB-SHIPPED-ITEM-001", "title": "Already shipped", "body": "Body of done item."},
+        {"id": "GTKB-ACTIVE-ITEM-002", "title": "Still in flight", "body": "Body of active item."},
+        {"id": "GTKB-ACTIVE-ITEM-003", "title": "Also in flight", "body": "Body of third item."},
+    ]
     index = (
         "Document: gtkb-shipped-item-001\n"
         "VERIFIED: bridge/gtkb-shipped-item-001-004.md\n\n"
         "Document: gtkb-active-item-002\n"
         "GO: bridge/gtkb-active-item-002-002.md\n"
     )
-    root = _make_recommender_fixture(tmp_path, work_list, index)
+    root = _make_recommender_fixture(tmp_path, backlog_items, index)
+    monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
     module.classify_dashboard_scope = lambda row: "gtkb"
     module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
     module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
@@ -2589,12 +2588,15 @@ def test_recommender_2_work_item_id_maps_to_bridge_document_name() -> None:
     assert module._work_item_id_to_bridge_document("AGENT-RED-RUFF-CLEANUP-001") == "agent-red-ruff-cleanup-001"
 
 
-def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path) -> None:
+def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatch) -> None:
     """T-recommender-3: items with no matching bridge Document remain eligible."""
     module = _load_module()
-    work_list = "## Active Items\n\n### GTKB-NO-BRIDGE-001 - Item without a bridge thread\n\nBody.\n\n"
+    backlog_items = [
+        {"id": "GTKB-NO-BRIDGE-001", "title": "Item without a bridge thread", "body": "Body."},
+    ]
     index = "Document: gtkb-other-thread\nGO: bridge/gtkb-other-thread-002.md\n"
-    root = _make_recommender_fixture(tmp_path, work_list, index)
+    root = _make_recommender_fixture(tmp_path, backlog_items, index)
+    monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
     module.classify_dashboard_scope = lambda row: "gtkb"
     module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
     module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
@@ -2604,17 +2606,19 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path) -> None:
     assert metrics["filtered_verified_ids"] == []
 
 
-def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path) -> None:
+def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, monkeypatch) -> None:
     """T-recommender-4: **Status:** VERIFIED (residual: ...) marker keeps item recommended."""
     module = _load_module()
-    work_list = (
-        "## Active Items\n\n"
-        "### GTKB-VERIFIED-WITH-RESIDUAL-001 - Verified but residual work\n\n"
-        "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\n"
-        "Body explaining the residual work.\n\n"
-    )
+    backlog_items = [
+        {
+            "id": "GTKB-VERIFIED-WITH-RESIDUAL-001",
+            "title": "Verified but residual work",
+            "body": "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\nBody explaining the residual work.",
+        },
+    ]
     index = "Document: gtkb-verified-with-residual-001\nVERIFIED: bridge/gtkb-verified-with-residual-001-004.md\n"
-    root = _make_recommender_fixture(tmp_path, work_list, index)
+    root = _make_recommender_fixture(tmp_path, backlog_items, index)
+    monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
     module.classify_dashboard_scope = lambda row: "gtkb"
     module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
     module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}

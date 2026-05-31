@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import os
@@ -51,6 +52,8 @@ try:
         CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,
     )
     from scripts.workstream_focus import (
+        FOCUS_APPLICATION,
+        FOCUS_GTKB_INFRASTRUCTURE,
         SubjectScopeError,  # noqa: F401  # intentional re-export for module.SubjectScopeError test access
         assert_readiness_subject_scope,
         render_active_work_subject,
@@ -64,6 +67,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution path
         CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,
     )
     from workstream_focus import (  # type: ignore[no-redef]
+        FOCUS_APPLICATION,
+        FOCUS_GTKB_INFRASTRUCTURE,
         SubjectScopeError,  # noqa: F401  # intentional re-export for module.SubjectScopeError test access
         assert_readiness_subject_scope,
         render_active_work_subject,
@@ -835,6 +840,33 @@ def _github_repo_url(repo_slug: str) -> str:
     return f"https://github.com/{repo_slug}.git"
 
 
+def _active_work_subject(project_root: Path) -> str:
+    """Return the canonical active work subject for repo-selection branching.
+
+    Reads ``.claude/session/work-subject.json`` via ``scripts.workstream_focus.load_state``.
+    Returns one of ``FOCUS_GTKB_INFRASTRUCTURE`` (``"gtkb_infrastructure"``) or
+    ``FOCUS_APPLICATION`` (``"application"``).
+
+    Fail-soft default: returns ``FOCUS_GTKB_INFRASTRUCTURE`` on any error,
+    missing canonical-state file, malformed JSON, or unrecognized value. This
+    matches the convention that a clean GT-KB checkout defaults to the GT-KB
+    platform work subject.
+
+    Per WI-3409 / ``bridge/gtkb-work-subject-aware-testing-integration-probe-003.md``
+    GO at ``-004``: the testing/tool integration probe must respect the active
+    work subject when selecting the GitHub repository query target so the
+    rollup label and underlying data agree.
+    """
+    try:
+        state = _workstream_load_state(project_root)
+        subject = state.get("current_subject")
+        if subject in (FOCUS_APPLICATION, FOCUS_GTKB_INFRASTRUCTURE):
+            return subject
+    except Exception:  # noqa: BLE001 - fail-soft per proposal Risks/Rollback contract
+        pass
+    return FOCUS_GTKB_INFRASTRUCTURE
+
+
 def _normalize_path(value: str) -> str:
     return value.replace("\\", "/").strip().lstrip("./").lower()
 
@@ -1095,42 +1127,37 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
     }
 
 
-def _parse_active_work_items(work_list_text: str) -> list[dict[str, str]]:
+def _backlog_items_from_membase(project_root: Path) -> list[dict[str, str]]:
+    """Query MemBase work_items via ``gt backlog list --json`` (canonical backlog surface).
+
+    Returns a list of dicts with at least ``id``, ``title``, and ``body`` keys
+    so callers get the same shape as the retired ``_parse_active_work_items``.
+
+    Per DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION, the canonical
+    backlog is MemBase ``work_items``; the legacy markdown backlog view is retired.
+    """
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "groundtruth_kb", "backlog", "list", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(project_root),
+        )
+        if result.returncode != 0:
+            return []
+        raw_items: list[dict[str, Any]] = json.loads(result.stdout)
+    except Exception:
+        return []
     items: list[dict[str, str]] = []
-    in_active = False
-    current: dict[str, str] | None = None
-    body_lines: list[str] = []
-    for line in work_list_text.splitlines():
-        if line.startswith("## Active Items"):
-            in_active = True
-            continue
-        if in_active and line.startswith("## "):
-            if current:
-                current["body"] = "\n".join(body_lines).strip()
-                items.append(current)
-            break
-        if not in_active:
-            continue
-        if line.startswith("### "):
-            if current:
-                current["body"] = "\n".join(body_lines).strip()
-                items.append(current)
-            heading = line[4:].strip()
-            body_lines = []
-            if re.search(r"\b(DONE|PAUSED|OBSOLETE|RETIRED)\b", heading, re.IGNORECASE):
-                current = None
-                continue
-            match = re.match(r"(?P<id>[A-Z0-9-]+)\s+[â€”-]\s+(?P<title>.+)", heading)
-            if match:
-                current = {"id": match.group("id"), "title": match.group("title")}
-            else:
-                current = {"id": heading.split()[0], "title": heading}
-            continue
-        if current:
-            body_lines.append(line)
-    if in_active and current and current not in items:
-        current["body"] = "\n".join(body_lines).strip()
-        items.append(current)
+    for row in raw_items:
+        items.append(
+            {
+                "id": str(row.get("id", "")),
+                "title": str(row.get("title", "")),
+                "body": str(row.get("description") or row.get("status_detail") or ""),
+            }
+        )
     return items
 
 
@@ -1167,7 +1194,7 @@ def _residual_override_present(body: str) -> bool:
 
 
 def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    items = _parse_active_work_items(_read_text(project_root / "memory" / "work_list.md"))
+    items = _backlog_items_from_membase(project_root)
     bridge_status = _bridge_index_latest_status(project_root)
     classified = []
     for item in items:
@@ -1196,7 +1223,7 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
         "active_item_count": len(eligible),
         "raw_active_item_count": len(items),
         "top_priority_actions": eligible[:3],
-        "source": "memory/work_list.md",
+        "source": "MemBase work_items",
         "scope_counts": dict(sorted(Counter(item["scope"] for item in classified).items())),
         "scope_confidence": "gtkb_current_heuristic",
         "filtered_verified_ids": filtered_verified_ids,
@@ -1860,9 +1887,65 @@ def _workflow_inventory(project_root: Path) -> dict[str, dict[str, Any]]:
 
 
 def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dict[str, Any]:
+    # Per WI-3409 / bridge/gtkb-work-subject-aware-testing-integration-probe-003.md
+    # GO at -004: branch GitHub query repo on active work subject. The previous
+    # implementation unconditionally queried AGENT_RED_GITHUB_REPO; GT-KB sessions
+    # then saw Agent Red CI labeled as "GT-KB Testing/tool rollup", a coupling
+    # defect. The fix reads the canonical work subject from
+    # scripts.workstream_focus.load_state and selects:
+    #   - FOCUS_GTKB_INFRASTRUCTURE -> GROUND_TRUTH_GITHUB_REPO (or git remote fallback)
+    #   - FOCUS_APPLICATION         -> AGENT_RED_GITHUB_REPO
+    work_subject = _active_work_subject(project_root)
+    if work_subject == FOCUS_APPLICATION:
+        env_var_name = "AGENT_RED_GITHUB_REPO"
+    else:
+        # FOCUS_GTKB_INFRASTRUCTURE branch (or unknown via fail-soft default)
+        env_var_name = "GROUND_TRUTH_GITHUB_REPO"
     if gh_auth_status != "authenticated":
-        return {"available": False, "reason": gh_auth_status, "runs_by_workflow": {}}
-    repo = _github_repo_slug(_local_env_value(project_root, "AGENT_RED_GITHUB_REPO"))
+        return {
+            "available": False,
+            "reason": gh_auth_status,
+            "runs_by_workflow": {},
+            "queried_work_subject": work_subject,
+            "queried_repo": None,
+            "queried_env_var": env_var_name,
+        }
+    repo = _github_repo_slug(_local_env_value(project_root, env_var_name))
+    # Per WI-3409 proposal -003 IP-2 (LO -006 NO-GO finding P1-001): the
+    # FOCUS_APPLICATION branch must explicitly fall back to the `agent-red`
+    # named git remote when AGENT_RED_GITHUB_REPO is empty, and return
+    # no-recent-run rather than silently querying the current `origin`
+    # remote (which on a GT-KB checkout is Remaker-Digital/groundtruth-kb
+    # and would re-introduce the cross-subject coupling defect this fix
+    # is supposed to eliminate, just in the opposite direction).
+    if not repo and work_subject == FOCUS_APPLICATION:
+        try:
+            agent_red_remote = subprocess.run(
+                ["git", "remote", "get-url", "agent-red"],
+                cwd=project_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            agent_red_remote = None
+        if agent_red_remote is not None and agent_red_remote.returncode == 0 and agent_red_remote.stdout.strip():
+            repo = _github_repo_slug(agent_red_remote.stdout.strip())
+        if not repo:
+            # No env var, no agent-red git remote: return a no-recent-run
+            # result rather than invoking `gh run list` against the current
+            # origin remote.
+            return {
+                "available": False,
+                "reason": "application_session_missing_agent_red_target",
+                "runs_by_workflow": {},
+                "queried_work_subject": work_subject,
+                "queried_repo": None,
+                "queried_env_var": env_var_name,
+            }
     command = [
         "gh",
         "run",
@@ -1886,15 +1969,36 @@ def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dic
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"available": False, "reason": str(exc), "runs_by_workflow": {}}
+        return {
+            "available": False,
+            "reason": str(exc),
+            "runs_by_workflow": {},
+            "queried_work_subject": work_subject,
+            "queried_repo": repo or None,
+            "queried_env_var": env_var_name,
+        }
 
     if result.returncode != 0:
-        return {"available": False, "reason": result.stderr.strip(), "runs_by_workflow": {}}
+        return {
+            "available": False,
+            "reason": result.stderr.strip(),
+            "runs_by_workflow": {},
+            "queried_work_subject": work_subject,
+            "queried_repo": repo or None,
+            "queried_env_var": env_var_name,
+        }
 
     try:
         runs = json.loads(result.stdout or "[]")
     except json.JSONDecodeError as exc:
-        return {"available": False, "reason": f"invalid gh json: {exc}", "runs_by_workflow": {}}
+        return {
+            "available": False,
+            "reason": f"invalid gh json: {exc}",
+            "runs_by_workflow": {},
+            "queried_work_subject": work_subject,
+            "queried_repo": repo or None,
+            "queried_env_var": env_var_name,
+        }
 
     latest: dict[str, dict[str, Any]] = {}
     for run in runs:
@@ -1907,6 +2011,9 @@ def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dic
         "repository": repo or "current git remote",
         "runs": runs,
         "runs_by_workflow": latest,
+        "queried_work_subject": work_subject,
+        "queried_repo": repo or "current git remote",
+        "queried_env_var": env_var_name,
     }
 
 
@@ -2374,6 +2481,12 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
             "latest_run_source": "gh run list" if gh_runs.get("available") else gh_runs.get("reason"),
             "latest_run_repository": gh_runs.get("repository"),
             "workflow_runs": gh_runs.get("runs", [])[:100],
+            # Per WI-3409: surface work-subject-aware probe metadata so the
+            # rollup label, dashboard intelligence, and consumers downstream
+            # can reflect the actual repository queried for this session.
+            "queried_work_subject": gh_runs.get("queried_work_subject"),
+            "queried_repo": gh_runs.get("queried_repo"),
+            "queried_env_var": gh_runs.get("queried_env_var"),
             "gate_role": "Parent CI runner and repository service for automated release evidence.",
             "remediation": "Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions.",
             "evidence": [
@@ -2383,12 +2496,13 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
                 f"gh CLI: {gh_auth_status}",
                 f"plugin: {'yes' if github_plugin_detected else 'no'}",
                 f"release gate: {'yes' if 'release-candidate-gate.yml' in workflow_set else 'no'}",
+                f"queried repo: {gh_runs.get('queried_repo') or 'unknown'} (work subject: {gh_runs.get('queried_work_subject') or 'unknown'})",
             ],
             "artifacts": ["GitHub Actions runs", "uploaded CI artifacts", "PR checks"],
             "gaps": []
             if gh_runs.get("available")
             else ["Latest workflow run state was not available during generation."],
-            "state_source": "AGENT_RED_GITHUB_REPO or local git remote, .github/workflows, local harness plugin cache, gh CLI status, and gh run list when available",
+            "state_source": "GROUND_TRUTH_GITHUB_REPO or AGENT_RED_GITHUB_REPO per active work subject, plus local git remote, .github/workflows, local harness plugin cache, gh CLI status, and gh run list when available",
         }
     }
     integrations["pytest_coverage"] = _integration(
@@ -2902,7 +3016,7 @@ def _dashboard_intelligence(
                 "action": f"{item['id']}: {item['title']}",
                 "why": "Standing backlog top priority.",
                 "remediation": "Execute or disposition through the governed backlog/bridge process.",
-                "shortcut": _shortcut("Open standing backlog", "memory/work_list.md"),
+                "shortcut": _shortcut("Query MemBase backlog", "gt backlog list", "command"),
                 "source": "Standing Backlog",
             }
         )
@@ -2985,6 +3099,12 @@ def _dashboard_intelligence(
                 for item in integrations.values()
                 if item.get("health") in {"passing", "configured"} or item.get("status") == "ready"
             ),
+            # Per WI-3409: surface the work-subject-aware queried repo so the
+            # rollup label can reflect the actual GitHub repository whose CI
+            # this rollup summarizes (avoids the GT-KB-session-but-Agent-Red-data
+            # coupling defect).
+            "queried_repo": integrations.get("github", {}).get("queried_repo"),
+            "queried_work_subject": integrations.get("github", {}).get("queried_work_subject"),
         },
         "data_freshness": {
             "generated_at": generated_at,
@@ -2996,7 +3116,6 @@ def _dashboard_intelligence(
             "scope_version": DASHBOARD_SCOPE_VERSION,
             "sources": [
                 "groundtruth.db",
-                "memory/work_list.md",
                 "memory/release-readiness.md",
                 "bridge/INDEX.md",
                 ".github/workflows",
@@ -3008,7 +3127,7 @@ def _dashboard_intelligence(
         "shortcuts": [
             _shortcut("Open dashboard data", "docs/gtkb-dashboard/dashboard-data.json"),
             _shortcut("Open release readiness", "memory/release-readiness.md"),
-            _shortcut("Open standing backlog", "memory/work_list.md"),
+            _shortcut("Query MemBase backlog", "gt backlog list", "command"),
             _shortcut("Open bridge index", "bridge/INDEX.md"),
             _shortcut("Open dev environment inventory", "docs/release/dev-environment-inventory.md"),
             _shortcut(
@@ -3964,9 +4083,16 @@ def _render_session_startup_briefing(model: dict[str, Any]) -> str:
             "### Operating State",
             f"- Release blockers: {release.get('blocker_count', metrics.get('regression', {}).get('release_blocker_count'))}.",
             (
-                f"- Testing/tools: {quality.get('failing', 'unknown')} failing, "
+                # Per WI-3409: append queried_repo as parenthetical SUFFIX so the
+                # pre-existing label-format contract "Testing/tools: ..." is
+                # preserved (downstream consumers parse on the colon position).
+                # The queried_repo is also exposed structurally via
+                # quality_rollup["queried_repo"] for non-string consumers.
+                f"- Testing/tools: "
+                f"{quality.get('failing', 'unknown')} failing, "
                 f"{quality.get('manual', 'unknown')} manual, "
-                f"{quality.get('ready_or_passing', 'unknown')} ready/passing."
+                f"{quality.get('ready_or_passing', 'unknown')} ready/passing "
+                f"(queried repo: {quality.get('queried_repo') or 'unknown'})."
             ),
             f"- Dev environment inventory: {_dev_inventory_compact_text(dev_inventory)}",
             f"- Harness parity: {_harness_parity_compact_text(harness_parity)}",
@@ -4158,10 +4284,17 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
             f"- {subject_label} dashboard-scoped bridge/contention entries, non-authoritative for queue state: {metrics['contention'].get('actionable_count')}",
             f"- {subject_label} drift changed paths: {metrics['drift'].get('changed_path_count')}",
             (
+                # Per WI-3409: append queried_repo as parenthetical SUFFIX so the
+                # pre-existing label-format contract "Testing/tool rollup: ..." is
+                # preserved (downstream consumers + the test
+                # platform_tests/scripts/test_session_self_initialization.py
+                # test_dashboard_and_report_are_written_with_time_series_kpi
+                # parse on the colon position).
                 f"- {subject_label} Testing/tool rollup: "
                 f"{quality.get('failing', 'unknown')} failing, "
                 f"{quality.get('manual', 'unknown')} manual, "
-                f"{quality.get('ready_or_passing', 'unknown')} ready/passing"
+                f"{quality.get('ready_or_passing', 'unknown')} ready/passing "
+                f"(queried repo: {quality.get('queried_repo') or 'unknown'})"
             ),
             f"- Bridge role slot: `{role_slot}` (prime-builder, loyal-opposition, or shared)",
             f"- Harness topology: `{topology_mode}` (single_harness or multi_harness)",
@@ -4513,6 +4646,66 @@ def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _load_startup_glossary(project_root: Path) -> dict[str, Any]:
+    try:
+        from scripts.startup_glossary_load import load_glossary_for_startup
+    except Exception as exc:  # noqa: BLE001 - startup must render fail-soft.
+        return {
+            "status": "error",
+            "source": ".claude/rules/canonical-terminology.md",
+            "terms": {},
+            "term_order": [],
+            "error": f"loader import failed: {exc}",
+        }
+    try:
+        return load_glossary_for_startup(project_root)
+    except Exception as exc:  # noqa: BLE001 - startup must render fail-soft.
+        return {
+            "status": "error",
+            "source": ".claude/rules/canonical-terminology.md",
+            "terms": {},
+            "term_order": [],
+            "error": str(exc),
+        }
+
+
+def _truncate_startup_glossary_definition(value: str, limit: int = 180) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[: limit - 3].rstrip()}..."
+
+
+def _render_startup_glossary_section(project_root: Path, *, max_terms: int = 8) -> str:
+    glossary = _load_startup_glossary(project_root)
+    source = str(glossary.get("source") or ".claude/rules/canonical-terminology.md")
+    status = str(glossary.get("status") or "missing")
+    terms = glossary.get("terms") if isinstance(glossary.get("terms"), dict) else {}
+    term_order = glossary.get("term_order") if isinstance(glossary.get("term_order"), list) else []
+
+    lines = ["### Glossary", ""]
+    if status != "loaded" or not terms:
+        detail = f" ({glossary.get('error')})" if glossary.get("error") else ""
+        lines.append(
+            f"- Canonical terminology source unavailable: `{source}`; startup continues without term summaries{detail}."
+        )
+        return "\n".join(lines)
+
+    lines.append(f"- Source: `{source}`")
+    for name in [str(item) for item in term_order[:max_terms]]:
+        entry = terms.get(name)
+        if not isinstance(entry, dict):
+            continue
+        definition = _truncate_startup_glossary_definition(str(entry.get("definition") or ""))
+        if not definition:
+            continue
+        lines.append(f"- **{name}**: {definition}")
+    omitted = max(0, len(term_order) - max_terms)
+    if omitted:
+        lines.append(f"- ... {omitted} additional canonical term(s) omitted from startup summary.")
+    return "\n".join(lines)
+
+
 def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path) -> str:
     """Render the startup report markdown.
 
@@ -4584,6 +4777,8 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
             "",
             _markdown_list(model["governance_stance"]),
+            "",
+            _render_startup_glossary_section(project_root),
             "",
             "### Live Project Dashboard",
             "",
@@ -6057,6 +6252,132 @@ def _source_file_observation(project_root: Path, relative_path: str, *, required
     }
 
 
+def _source_file_signature(path: Path, *, source: str, required: bool = True) -> dict[str, Any]:
+    if not path.is_file():
+        return {
+            "source": source.replace("\\", "/"),
+            "kind": "local_file",
+            "required": required,
+            "status": "missing",
+            "path": str(path),
+            "modified_at": None,
+            "modified_ns": None,
+            "sha256": None,
+        }
+    stat = path.stat()
+    try:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        digest = None
+    return {
+        "source": source.replace("\\", "/"),
+        "kind": "local_file",
+        "required": required,
+        "status": "present",
+        "path": str(path),
+        "modified_at": datetime.fromtimestamp(stat.st_mtime, UTC).isoformat().replace("+00:00", "Z"),
+        "modified_ns": stat.st_mtime_ns,
+        "sha256": digest,
+    }
+
+
+def _startup_freshness_input_signatures(project_root: Path) -> dict[str, Any]:
+    role_path = role_assignments_path(project_root)
+    role_source = (
+        str(role_path.relative_to(project_root)).replace("\\", "/")
+        if role_path.is_relative_to(project_root)
+        else str(role_path)
+    )
+    return {
+        "role_assignments": _source_file_signature(role_path, source=role_source),
+        "bridge_index": _source_file_signature(project_root / "bridge" / "INDEX.md", source="bridge/INDEX.md"),
+    }
+
+
+def _startup_freshness_from_payload(payload_path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    hook_output = payload.get("hookSpecificOutput")
+    if isinstance(hook_output, dict) and isinstance(hook_output.get("startupFreshness"), dict):
+        return hook_output["startupFreshness"]
+    freshness = payload.get("startupFreshness")
+    if isinstance(freshness, dict):
+        return freshness
+    if payload.get("contract_version") == STARTUP_FRESHNESS_CONTRACT_VERSION:
+        return payload
+    return None
+
+
+def _payload_staleness_reasons(
+    payload_path: Path,
+    project_root: Path,
+    *,
+    max_age_seconds: int = 900,
+    now: datetime | None = None,
+) -> list[str]:
+    if not payload_path.is_file():
+        return ["payload_missing"]
+    try:
+        payload_stat = payload_path.stat()
+    except OSError:
+        return ["payload_unreadable"]
+
+    reasons: list[str] = []
+    current_time = now or datetime.now(UTC)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=UTC)
+    payload_age = current_time.timestamp() - payload_stat.st_mtime
+    if payload_age > max_age_seconds:
+        reasons.append("payload_age_exceeds_max")
+
+    freshness = _startup_freshness_from_payload(payload_path)
+    if freshness is None:
+        reasons.append("startup_freshness_metadata_missing")
+        return reasons
+    if freshness.get("contract_version") != STARTUP_FRESHNESS_CONTRACT_VERSION:
+        reasons.append("startup_freshness_contract_version_mismatch")
+    validation = freshness.get("validation") if isinstance(freshness.get("validation"), dict) else {}
+    if validation.get("startup_payload_fresh") is not True:
+        reasons.append("startup_freshness_validation_not_fresh")
+
+    recorded_inputs = freshness.get("freshness_inputs") if isinstance(freshness.get("freshness_inputs"), dict) else {}
+    current_inputs = _startup_freshness_input_signatures(project_root)
+    for key in ("role_assignments", "bridge_index"):
+        current = current_inputs.get(key) or {}
+        recorded = recorded_inputs.get(key) if isinstance(recorded_inputs.get(key), dict) else {}
+        if current.get("required") and current.get("status") != "present":
+            reasons.append(f"{key}_missing")
+            continue
+        current_mtime_ns = current.get("modified_ns")
+        if isinstance(current_mtime_ns, int) and current_mtime_ns > payload_stat.st_mtime_ns:
+            reasons.append(f"{key}_newer_than_payload")
+        if key == "role_assignments":
+            if not recorded.get("sha256"):
+                reasons.append("role_assignments_signature_missing")
+            elif current.get("sha256") != recorded.get("sha256"):
+                reasons.append("role_assignments_signature_changed")
+    return reasons
+
+
+def _is_payload_fresh(
+    payload_path: Path,
+    project_root: Path,
+    *,
+    max_age_seconds: int = 900,
+    now: datetime | None = None,
+) -> bool:
+    return not _payload_staleness_reasons(
+        payload_path,
+        project_root,
+        max_age_seconds=max_age_seconds,
+        now=now,
+    )
+
+
 def _workflow_inventory_observation(project_root: Path, *, required: bool = True) -> dict[str, Any]:
     workflows_dir = project_root / ".github" / "workflows"
     workflow_files = (
@@ -6093,7 +6414,6 @@ def _startup_freshness_metadata(
     generated_at = str(model.get("generated_at") or "")
     local_sources = [
         _source_file_observation(project_root, "groundtruth.db"),
-        _source_file_observation(project_root, "memory/work_list.md"),
         _source_file_observation(project_root, "memory/release-readiness.md"),
         _source_file_observation(project_root, "bridge/INDEX.md"),
         _workflow_inventory_observation(project_root),
@@ -6156,7 +6476,7 @@ def _startup_freshness_metadata(
         {
             "name": "required_local_sources_present",
             "passed": required_local_sources_ok,
-            "detail": "groundtruth.db, memory/work_list.md, memory/release-readiness.md, bridge/INDEX.md, and .github/workflows must exist for a fresh startup payload.",
+            "detail": "groundtruth.db, memory/release-readiness.md, bridge/INDEX.md, and .github/workflows must exist for a fresh startup payload.",
         },
         {
             "name": "payload_render_origin_is_in_memory",
@@ -6177,6 +6497,7 @@ def _startup_freshness_metadata(
             "sha": data_freshness.get("repo_sha"),
             "short_sha": data_freshness.get("repo_short_sha"),
         },
+        "freshness_inputs": _startup_freshness_input_signatures(project_root),
         "validation": {
             "status": validation_status,
             "startup_payload_fresh": startup_payload_fresh,
@@ -6214,7 +6535,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         "- Role authority: resolve `harness-state/harness-identities.json` first, then `harness-state/role-assignments.json`; role records may be list-valued role sets.",
         "- Bridge authority: read `bridge/INDEX.md` directly before bridge queue claims; generated bridge counts are non-authoritative after startup generation.",
         "- Work subject authority: `.claude/session/work-subject.json`; GT-KB infrastructure is default unless owner direction names an application/adopter.",
-        "- Knowledge surfaces: use `groundtruth.db`, `memory/work_list.md`, `memory/release-readiness.md`, `.claude/rules/`, `.codex/skills/`, and `docs/gtkb-dashboard/session-startup-report.md` as targeted context sources.",
+        "- Knowledge surfaces: use `groundtruth.db` (MemBase), `memory/release-readiness.md`, `.claude/rules/`, `.codex/skills/`, and `docs/gtkb-dashboard/session-startup-report.md` as targeted context sources. Backlog is queried via `gt backlog list`.",
         "- Hook handling: Codex hook `systemMessage` and `additionalContext` are operational instructions; if a hook blocks, read the cited guard/state file and clear stale lifecycle state only through the governed hook path.",
         "- Token consumption: prefer dashboard and index-first reads, then load detailed artifacts only when needed for the selected task.",
         "- Verification defaults: use repository-native commands such as `python -m pytest <target> -q --tb=short`, `python -m ruff check .`, and targeted parity checks before claiming startup/hook changes are fixed.",
@@ -6270,7 +6591,12 @@ def _startup_service_context(result: dict[str, Any]) -> str:
     )
 
 
-def _emit_startup_service_payload(result: dict[str, Any], *, request_started_at: str) -> None:
+def _emit_startup_service_payload(
+    result: dict[str, Any],
+    *,
+    request_started_at: str,
+    payload_cache_path: Path | None = None,
+) -> None:
     payload_emitted_at = _utc_now_iso()
     startup_freshness = _startup_freshness_metadata(
         project_root=result["project_root"],
@@ -6288,18 +6614,17 @@ def _emit_startup_service_payload(result: dict[str, Any], *, request_started_at:
         request_started_at=request_started_at,
         harness=_resolved_harness_name(None) or "claude",
     )
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "SessionStart",
-                    "additionalContext": _startup_service_context(result),
-                    "startupFreshness": startup_freshness,
-                }
-            },
-            ensure_ascii=False,
-        )
-    )
+    payload = {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": _startup_service_context(result),
+            "startupFreshness": startup_freshness,
+        }
+    }
+    payload_text = json.dumps(payload, ensure_ascii=False)
+    if payload_cache_path is not None:
+        _atomic_write_text(payload_cache_path, payload_text + "\n")
+    print(payload_text)
 
 
 def _write_session_start_json(
@@ -6612,6 +6937,22 @@ def main(argv: list[str] | None = None) -> int:
         _emit_no_hook_context()
         return 0
 
+    # Per bridge/generator-hardening-001-003.md Â§4.6: derive output paths
+    # from resolved project_root when CLI args are omitted, so a caller
+    # passing only --project-root <child> gets all output under <child>.
+    dashboard_dir = (
+        args.dashboard_dir.resolve() if args.dashboard_dir is not None else project_root / "docs" / "gtkb-dashboard"
+    )
+    history_path = (
+        args.history_path.resolve()
+        if args.history_path is not None
+        else project_root / "memory" / "gtkb-dashboard-history.json"
+    )
+    startup_payload_cache_path = dashboard_dir / "startup-service-payload.json"
+    if args.emit_startup_service_payload and _is_payload_fresh(startup_payload_cache_path, project_root):
+        print(startup_payload_cache_path.read_text(encoding="utf-8").strip())
+        return 0
+
     bridge_maintenance = None
     if startup_emit_requested and not args.skip_bridge_maintenance and not args.fast_hook:
         bridge_maintenance = _run_verified_bridge_startup_maintenance(project_root)
@@ -6657,7 +6998,11 @@ def main(argv: list[str] | None = None) -> int:
         }
         print(json.dumps(printable, indent=2, sort_keys=True))
     elif args.emit_startup_service_payload:
-        _emit_startup_service_payload(result, request_started_at=startup_requested_at)
+        _emit_startup_service_payload(
+            result,
+            request_started_at=startup_requested_at,
+            payload_cache_path=startup_payload_cache_path,
+        )
     elif args.emit_report:
         _emit_hook_context(str(result["report_text"]))
     elif args.emit_wrapup:

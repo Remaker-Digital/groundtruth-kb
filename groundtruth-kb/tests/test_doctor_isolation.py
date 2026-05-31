@@ -28,7 +28,6 @@ from groundtruth_kb.project.doctor_isolation import (
     _check_isolation_no_writable_product_paths,
     _check_isolation_release_readiness_app_subject_header,
     _check_isolation_service_endpoint_not_raw_db,
-    _check_isolation_work_list_no_product_entries,
     _check_isolation_workstream_focus_hook_absent,
     run_isolation_checks,
 )
@@ -259,24 +258,6 @@ def test_check_isolation_workstream_focus_hook_absent_passes_when_absent(tmp_pat
 
 
 # ---------------------------------------------------------------------------
-# T11: work-list-no-product-entries (Phase 9 §4 check 7)
-# ---------------------------------------------------------------------------
-
-
-def test_check_isolation_work_list_no_product_entries_warns_on_product_id(tmp_path: Path) -> None:
-    """T11: Phase 9 §4 check 7 - product-scope IDs in work_list.md trigger warning."""
-    memory_dir = tmp_path / "memory"
-    memory_dir.mkdir()
-    (memory_dir / "work_list.md").write_text(
-        "# Work list\n- GTKB-ISOLATION-017: Slice 1 doctor checks\n",
-        encoding="utf-8",
-    )
-    result = _check_isolation_work_list_no_product_entries(tmp_path)
-    assert result.status == "warning"
-    assert "product-scope-heuristic" in result.message
-
-
-# ---------------------------------------------------------------------------
 # T12: release-readiness-app-subject-header (Phase 9 §4 check 8)
 # ---------------------------------------------------------------------------
 
@@ -329,7 +310,6 @@ def test_run_isolation_checks_returns_checks_in_preflight_order(tmp_path: Path) 
         "isolation:no-writable-product-paths",
         "isolation:hooks-point-to-wrappers",
         "isolation:workstream-focus-hook-absent",
-        "isolation:work-list-no-product-entries",
         "isolation:release-readiness-app-subject-header",
         "isolation:chroma-regeneratable",
     ]

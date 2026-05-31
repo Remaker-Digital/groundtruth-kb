@@ -5,7 +5,7 @@ Detects the phantom-INDEX-citation class and adjacent reference-integrity failur
 
     index_cites_missing_bridge_file       (S308 phantom-INDEX recurrences)
     bridge_file_orphaned_from_index       (overlap with W1; reported with thread context)
-    worklist_cites_missing_bridge_file    (latent class)
+    (retired: legacy standing-backlog cross-ref check removed at Slice 7-prime)
     memory_md_cites_missing_topic_file    (latent class)
     claude_md_cites_missing_rule          (latent class)
     da_cites_missing_bridge_file          (latent class)
@@ -28,7 +28,6 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _wrap_io import _atomic_write_text  # noqa: E402
 
-
 SEVERITY_INFO = "info"
 SEVERITY_WARN = "warn"
 SEVERITY_ERROR = "error"
@@ -45,7 +44,6 @@ ALLOWLIST_PATH_RELATIVE = ".groundtruth/wrap-scan/historical-phantoms.toml"
 INDEX_LINE_PATTERN = re.compile(
     r"^\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/[A-Za-z0-9_-]+-\d{3}\.md)\s*$"
 )
-WORKLIST_BRIDGE_REF_PATTERN = re.compile(r"`(bridge/[A-Za-z0-9_-]+-\d{3}\.md)`")
 MEMORY_INDEX_REF_PATTERN = re.compile(r"\[[^\]]+\]\(([A-Za-z0-9_./-]+\.md)\)")
 RULE_REF_PATTERN = re.compile(r"`(\.claude/rules/[A-Za-z0-9_./-]+\.md)`")
 
@@ -81,34 +79,25 @@ def _load_allowlist(project_root: Path) -> dict[str, dict]:
         ) from exc
 
     if not isinstance(data, dict):
-        raise RuntimeError(
-            f"Allowlist at {ALLOWLIST_PATH_RELATIVE} must be a TOML mapping at the top level."
-        )
+        raise RuntimeError(f"Allowlist at {ALLOWLIST_PATH_RELATIVE} must be a TOML mapping at the top level.")
 
     schema_version = data.get("schema_version")
     if schema_version != 1:
         raise RuntimeError(
-            f"Allowlist schema_version={schema_version!r}; expected 1. "
-            "Update the allowlist file or this scanner."
+            f"Allowlist schema_version={schema_version!r}; expected 1. Update the allowlist file or this scanner."
         )
 
     phantoms = data.get("phantoms", [])
     if not isinstance(phantoms, list):
-        raise RuntimeError(
-            f"Allowlist 'phantoms' field must be a list; got {type(phantoms).__name__}."
-        )
+        raise RuntimeError(f"Allowlist 'phantoms' field must be a list; got {type(phantoms).__name__}.")
 
     by_pattern: dict[str, dict] = {}
     for entry in phantoms:
         if not isinstance(entry, dict):
-            raise RuntimeError(
-                f"Allowlist phantom entry must be a mapping; got {type(entry).__name__}: {entry!r}"
-            )
+            raise RuntimeError(f"Allowlist phantom entry must be a mapping; got {type(entry).__name__}: {entry!r}")
         pattern = entry.get("index_line_pattern")
         if not isinstance(pattern, str) or not pattern.strip():
-            raise RuntimeError(
-                f"Allowlist phantom entry missing/invalid 'index_line_pattern': {entry!r}"
-            )
+            raise RuntimeError(f"Allowlist phantom entry missing/invalid 'index_line_pattern': {entry!r}")
         by_pattern[pattern.strip()] = entry
     return by_pattern
 
@@ -182,29 +171,6 @@ def check_bridge_file_orphaned_from_index(project_root: Path) -> list[dict]:
                     path=ref,
                 )
             )
-    return findings
-
-
-def check_worklist_cites_missing_bridge_file(project_root: Path) -> list[dict]:
-    worklist = project_root / "memory" / "work_list.md"
-    if not worklist.exists():
-        return []
-    findings: list[dict] = []
-    text = worklist.read_text(encoding="utf-8")
-    for line_no, line in enumerate(text.splitlines(), 1):
-        for match in WORKLIST_BRIDGE_REF_PATTERN.finditer(line):
-            ref = match.group(1)
-            cited = project_root / ref
-            if not cited.exists():
-                findings.append(
-                    _finding(
-                        "worklist_cites_missing_bridge_file",
-                        SEVERITY_WARN,
-                        f"work_list.md line {line_no} cites missing bridge: {ref}",
-                        line_number=line_no,
-                        cited_path=ref,
-                    )
-                )
     return findings
 
 
@@ -285,9 +251,7 @@ def check_da_cites_missing_bridge_file(project_root: Path) -> list[dict]:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
         try:
-            cursor = conn.execute(
-                "SELECT id, content FROM deliberations WHERE content LIKE '%bridge/%-%.md%'"
-            )
+            cursor = conn.execute("SELECT id, content FROM deliberations WHERE content LIKE '%bridge/%-%.md%'")
             for row in cursor:
                 content = row["content"] or ""
                 for ref in re.findall(r"bridge/[A-Za-z0-9_-]+-\d{3}\.md", content):
@@ -311,7 +275,6 @@ def check_da_cites_missing_bridge_file(project_root: Path) -> list[dict]:
 CHECKS = (
     check_index_cites_missing_bridge_file,
     check_bridge_file_orphaned_from_index,
-    check_worklist_cites_missing_bridge_file,
     check_memory_md_cites_missing_topic_file,
     check_claude_md_cites_missing_rule,
     check_da_cites_missing_bridge_file,
@@ -353,7 +316,9 @@ def determine_exit_code(findings: list[dict]) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument(
-        "--report-format", choices=("json", "markdown"), default="json",
+        "--report-format",
+        choices=("json", "markdown"),
+        default="json",
     )
     parser.add_argument("--write-report", default=None)
     args = parser.parse_args(argv)
