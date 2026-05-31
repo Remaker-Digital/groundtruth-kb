@@ -81,6 +81,8 @@ Opposition, apply only governance, permissions, and restrictions that pertain to
 Loyal Opposition. If startup finds no recorded Prime Builder in the role map,
 the starting harness self-assigns Prime Builder and records that correction.
 
+Interactive sessions MAY override the durable role for in-session surfaces — SessionStart disclosure, the workstream-focus menu, MemBase `changed_by` attribution, AUQ routing, and the Claude-native AXIS 2 surface — when the owner declares a role via the canonical init keyword `::init gtkb (pb|lo)` on a prompt. The override is held in the ephemeral `.claude/session/active-session-role.json` marker for the rest of the session and is invalidated by the next SessionStart. This does not change the durable assignment map — the marker is ephemeral runtime state, not a role record — and headless dispatch routing remains keyed to the durable role per `GOV-SESSION-ROLE-AUTHORITY-001` and `DCL-SESSION-ROLE-RESOLUTION-001`.
+
 ## Prime Builder File Authority
 
 When the durable operating-role record assigns Prime Builder, the active AI
@@ -286,6 +288,7 @@ item, and release blockers or release-target constraints when present.
   all other downstream bridge-dependent artifacts without additional approval
   when the purpose is sustaining the bridge and ensuring it remains properly and
   fully utilized.
+- **Antigravity Standing Exception Retraction & Scoped Authority**: Notwithstanding the general bridge exception above, the Antigravity harness (ID C) has standing permission *only* to create and update `ADVISORY` bridge documents (files under `bridge/` matching `*-advisory-*.md` and their single-line status insertion entries at the top of the corresponding block in `bridge/INDEX.md`). These advisory documents represent the *sole* case where the Antigravity harness has standing permission to alter or create files. The Antigravity harness may not alter or create any other files (including bridge configurations, automation scripts, or active status surfaces) without explicit, separate per-file approval from Mike.
 - New files should be created under:
   - `independent-progress-assessments/`
   - `.claude/rules/`

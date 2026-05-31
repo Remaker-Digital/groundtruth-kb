@@ -73,3 +73,22 @@ In-scope decision classes (use `AskUserQuestion`, never prose):
 Bridge proposals/reports that depend on owner approval should cite this rule and include an `Owner Decisions / Input` section enumerating the AskUserQuestion answers that authorize the work. Bridge compliance gate enforcement of this section requirement lands in Sub-slice C.
 
 When in doubt, ask via `AskUserQuestion`. Verbose status updates that mention pending decisions DO NOT count as owner-decision asks; they are factual reporting (and the tightened regex per Sub-slice A no longer detects them as decision asks).
+
+## Session-Resolved Role Authority
+
+Prime Builder governance, permissions, and restrictions apply whenever the
+**resolved session role** is Prime Builder — whether that role comes from the
+durable harness assignment (`harness-state/role-assignments.json`) or from an
+interactive owner declaration via the canonical init keyword `::init gtkb pb`.
+Per `DCL-SESSION-ROLE-RESOLUTION-001`, the resolved role is the session-stated
+role when an interactive session has declared one, and the durable role
+otherwise.
+
+When an interactive session resolves to Prime Builder by session-stated override
+(the durable role is Loyal Opposition, but the owner typed `::init gtkb pb`),
+this behavior contract governs the session. Conversely, a durable-Prime harness
+running an interactive session that declared `::init gtkb lo` operates under the
+Loyal Opposition contract for that session. Headless dispatch routing is
+unaffected and remains keyed to the durable role. See
+`GOV-SESSION-ROLE-AUTHORITY-001` (authority split) and
+`ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives).

@@ -116,3 +116,31 @@ into a multi-role harness).
 ## Mode-Switch Transaction Component (Slice 1 of gtkb-operating-mode-transaction-001)
 
 Agents MUST use the deterministic mode-switch transaction component for role/topology changes rather than ad-hoc direct edits to `harness-state/role-assignments.json`. The CLI surface is `gt mode set-role --harness <id|name> --role <prime-builder|loyal-opposition> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to `harness-state/role-assignments.json` are still possible but bypass the validators (role/bridge/session-state artifact validation) and the audit-trail record; the transaction component is the supported path.
+
+## Interactive Session Role Override
+
+The durable role assignment recorded in `harness-state/role-assignments.json`
+is the authority for **headless dispatch routing**: the cross-harness
+event-driven trigger (`scripts/cross_harness_bridge_trigger.py`) consults the
+durable role to choose the recipient harness and compose the dispatched init
+keyword, and the receiver-side `STRICT_DROP` gate enforces durable set
+membership for headless dispatch. This is unchanged.
+
+An **interactive session** (no `GTKB_BRIDGE_POLLER_RUN_ID` env-var) MAY override
+the durable role for in-session surfaces by including the canonical init keyword
+`::init gtkb (pb|lo)` on an owner prompt. When declared, the session-stated role
+governs SessionStart disclosure rendering, the AXIS 2 Claude-native surface
+filter, the workstream-focus menu shape, MemBase `changed_by` attribution, and
+AUQ-keyed routing for the rest of the session. An interactive session with no
+init keyword falls back to the durable role. See `GOV-SESSION-ROLE-AUTHORITY-001`
+(authority split), `DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution
+table), and `ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected
+alternatives).
+
+The session-stated role is held in an ephemeral marker
+(`.claude/session/active-session-role.json`) that is invalidated at the next
+SessionStart; it carries no durable record and does not survive compaction or
+resume. **This does not weaken the durable-assignment invariant above**: the
+marker is ephemeral runtime state, not a rule file, so the rule that "no markdown
+rule file can override the durable role assignment map" remains exactly true.
+Durable role mutations still require the `gt mode set-role` transaction component.
