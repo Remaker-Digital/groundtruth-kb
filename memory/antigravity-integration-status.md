@@ -1,7 +1,7 @@
 # Antigravity Integration - Project Status Tracker
 
 **Project:** `PROJECT-ANTIGRAVITY-INTEGRATION` (MemBase, status `active`, rank 1)
-**Last updated:** 2026-05-27 by Prime Builder (Codex, harness A)
+**Last updated:** 2026-06-01 by Prime Builder (Claude, harness B)
 **Purpose:** operational cross-session tracker so any session can resume Antigravity
 Integration work cold.
 
@@ -127,6 +127,35 @@ multiple threads in review at once).
 - **Empty `related_bridge_threads`** on all WIs -- this is WI-3362's purpose.
 
 ## 7. Change log
+
+- 2026-06-01 -- **WI-3349 (headless Gemini LO dispatch verification) implemented**
+  under REVISED-12 (`bridge/gtkb-headless-gemini-lo-dispatch-verification-013.md`,
+  Codex **GO** at `-014`). REVISED-12 RETRACTS the NO-GO'd REVISED-11
+  home-directory PATH-enrichment design (the proposed `_candidate_path_dirs()`
+  deriving directories from the user home). The verifier relies ONLY on the
+  launching context's ambient PATH per the External Harness Executable
+  Resolution Exception **clause 2a** in `.claude/rules/project-root-boundary.md`
+  (landed VERIFIED via the `gtkb-root-boundary-external-harness-exec-exception`
+  thread at `-008`). Governance authority:
+  `DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION` (which supersedes
+  `DELIB-S366-GEMINI-SUBSTRATE-PATH-ENRICHMENT` for WI-3349). Implementation:
+  docstring on `_resolve_executable_for_host` now cites clause 2a; +3
+  boundary-assertion tests added (`test_resolver_source_contains_no_home_dir_derivation`,
+  `test_resolver_uses_only_ambient_path`, `test_resolver_clause_2a_contract_documented`);
+  13/13 tests PASS; `ruff check` + `ruff format --check` clean; no registry or
+  `groundtruth.db` mutation. Live verification: `substrate_ok=true`,
+  `resolution_applied=true` (ambient `shutil.which` resolved bare `gemini` to the
+  npm-global wrapper at runtime -- OS resolution, not a stored/computed GT-KB
+  path); `TimeoutExpired` treated as substrate-verified per the established
+  design. Doctor `_check_external_harness_exec_boundary`: PASS (3 enumerated
+  harness commands). The clause-2b `.env.local`-configured PATH override is a
+  named future extension (candidate WI under `GOV-STANDING-BACKLOG-001`).
+  Post-implementation report filed for Codex VERIFIED. NOTE: harness-C role
+  state remains in flux across the 5-30/5-31 entries below (suspend then
+  re-assign-PB); `role-assignments.json` currently shows C=prime-builder while
+  the canonical registry shows C registered/role=[] -- a stale-mirror
+  divergence flagged for the role-status-orthogonality project, NOT modified by
+  this WI-3349 work.
 
 - 2026-05-30 -- Owner directed Antigravity integration to be suspended to minimize token consumption while maintaining specialized LO capability parity. Modified generate_antigravity_skill_adapters.py to compile the complete set of 32 system skill adapters (duplicating Codex's capabilities payload). Updated role-assignments.json and harness-registry.json to set Harness C's status to 'suspended' and empty its role mapping to ensure it does not receive bridge notifications. Headless dispatch verification passed. Amended AGENTS.md File Safety Contract to restrict Harness C's standing write permission solely to creating and updating ADVISORY bridge documents, requiring explicit per-file approval for all other modifications.
 

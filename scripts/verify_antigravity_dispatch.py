@@ -84,15 +84,25 @@ def build_dispatch_command(project_root: Path, recipient: str, prompt: str) -> l
 
 
 def _resolve_executable_for_host(command: list[str]) -> list[str]:
-    """Return ``command`` with element 0 resolved via host PATH+PATHEXT lookup.
+    """Return ``command`` with element 0 resolved via the host's ambient PATH.
 
-    On Windows, Python's ``subprocess`` does not apply PATHEXT to bare command
-    names (e.g., ``gemini`` will not find ``gemini.cmd``). This helper uses
-    ``shutil.which`` which DOES apply PATHEXT, returning the absolute path of
-    the resolved executable. If resolution fails (executable not on PATH), the
-    original ``command`` is returned unchanged so ``subprocess`` raises its
-    native ``FileNotFoundError`` rather than this helper silently masking the
-    failure.
+    Resolution relies ONLY on the launching context's ambient PATH, consistent
+    with the External Harness Executable Resolution Exception clause 2a in
+    ``.claude/rules/project-root-boundary.md`` (the same mechanism by which the
+    codex/claude harness CLIs are already dispatched). This helper performs no
+    PATH enrichment: it does not compute, guess, or inject any user-profile
+    executable directory. ``shutil.which`` is used because, on Windows, Python's
+    ``subprocess`` does not apply PATHEXT to bare command names (e.g., ``gemini``
+    would not find ``gemini.cmd``); ``shutil.which`` DOES apply PATHEXT and
+    returns the absolute path of the resolved executable.
+
+    If ambient resolution fails (the executable is not on the launching
+    context's PATH), the original ``command`` is returned unchanged so
+    ``subprocess`` raises its native ``FileNotFoundError`` rather than this
+    helper silently masking the failure with a user-profile guess. Providing
+    ``gemini`` on PATH is the launcher's responsibility per clause 2a; a future
+    ``.env.local``-configured override (clause 2b, ``GOV-ENV-LOCAL-AUTHORITY-001``)
+    is a named extension, not implemented here.
 
     The registry-projected canonical argv (``argv.json`` evidence) is preserved
     via the caller recording both the projected and resolved argv separately;

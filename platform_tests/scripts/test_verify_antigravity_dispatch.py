@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -126,6 +125,56 @@ def test_resolve_executable_for_host_substitutes_resolved_path(monkeypatch):
 
 def test_resolve_executable_for_host_handles_empty_command():
     assert _resolve_executable_for_host([]) == []
+
+
+def test_resolver_source_contains_no_home_dir_derivation():
+    """Clause 2a lock: the resolver must not derive user-profile exec dirs.
+
+    Structural assertion against re-introducing the REVISED-11 home-directory
+    PATH enrichment design (NO-GO'd at -012). The resolver relies only on the
+    launching context's ambient PATH per the External Harness Executable
+    Resolution Exception clause 2a; it must not compute candidate directories
+    from the user home.
+    """
+    import inspect
+
+    src = inspect.getsource(_resolve_executable_for_host)
+    forbidden = ("expanduser", "AppData", "WindowsApps", "npm-global", "_candidate_path_dirs")
+    for token in forbidden:
+        assert token not in src, f"home-directory derivation token {token!r} reintroduced into resolver"
+
+
+def test_resolver_uses_only_ambient_path(monkeypatch):
+    """Clause 2a contract: resolution consults ambient PATH with no enrichment.
+
+    ``shutil.which`` must be called with only the command name -- no ``path=``
+    override and no positional path argument that would inject computed
+    directories. This asserts the resolver does not enrich PATH.
+    """
+    calls = []
+
+    def spy_which(cmd, *args, **kwargs):
+        calls.append((cmd, args, kwargs))
+        return "/ambient/path/gemini.cmd"
+
+    monkeypatch.setattr("scripts.verify_antigravity_dispatch.shutil.which", spy_which)
+    result = _resolve_executable_for_host(["gemini", "-p", "x"])
+    assert result == ["/ambient/path/gemini.cmd", "-p", "x"]
+    assert len(calls) == 1, "resolver should consult shutil.which exactly once"
+    cmd, args, kwargs = calls[0]
+    assert cmd == "gemini"
+    assert args == (), "no positional PATH override permitted (clause 2a: ambient only)"
+    assert "path" not in kwargs, "no enriched path= kwarg permitted (clause 2a: ambient only)"
+
+
+def test_resolver_clause_2a_contract_documented():
+    """The resolver docstring must cite the clause-2a ambient-PATH contract.
+
+    Locks the documentation to the governing rule so the boundary contract is
+    discoverable at the call site, not only in the bridge audit trail.
+    """
+    assert _resolve_executable_for_host.__doc__ is not None
+    assert "clause 2a" in _resolve_executable_for_host.__doc__
 
 
 def test_run_verification_treats_timeout_as_substrate_ok(tmp_path, monkeypatch):
