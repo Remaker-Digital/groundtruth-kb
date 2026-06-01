@@ -78,7 +78,7 @@ class BridgeVersion:
 class ExtractedClaim:
     claim_block_index: int
     command: str
-    claimed_summary: str
+    claimed_summary: str | None
     claimed_counts: dict[str, int]
 
 
@@ -86,7 +86,7 @@ class ExtractedClaim:
 class ClaimResult:
     claim_block_index: int
     command: str
-    claimed_summary: str
+    claimed_summary: str | None
     observed_summary: str | None
     status: str
     returncode: int | None
@@ -207,22 +207,75 @@ def normalize_command_line(line: str) -> str | None:
     return command
 
 
+_CROSS_BLOCK_LOOKAHEAD: Final[int] = 2
+
+
+def _first_command_in_block(block: str) -> tuple[str | None, int | None]:
+    lines = [line.rstrip() for line in block.splitlines()]
+    for index, line in enumerate(lines):
+        command = normalize_command_line(line)
+        if command is not None:
+            return command, index
+    return None, None
+
+
 def extract_claims(markdown: str) -> list[ExtractedClaim]:
+    """Extract pytest claims from a report markdown.
+
+    A claim is a (command, observed-summary) pair. The summary may live in the
+    SAME fenced block as the command, OR in a nearby following block (up to
+    ``_CROSS_BLOCK_LOOKAHEAD`` blocks ahead, stopping if any intervening block
+    introduces its own pytest command). This handles the split command/result
+    convention used by bridge post-implementation reports such as
+    ``bridge/gtkb-proposal-standards-test-claim-rerun-verifier-005.md`` per
+    Codex NO-GO ``-006`` FINDING-P1-001.
+
+    When a command block has no associated summary (in-block or in lookahead),
+    the claim is preserved with ``claimed_summary=None`` and empty
+    ``claimed_counts`` so downstream logic can surface the parser-miss state
+    instead of silently dropping the claim per FINDING-P2-002.
+    """
+
+    blocks = list(enumerate(extract_code_blocks(markdown), start=1))
     claims: list[ExtractedClaim] = []
-    for block_index, block in enumerate(extract_code_blocks(markdown), start=1):
-        lines = [line.rstrip() for line in block.splitlines()]
-        command_line: str | None = None
-        command_index: int | None = None
-        for index, line in enumerate(lines):
-            command = normalize_command_line(line)
-            if command is not None:
-                command_line = command
-                command_index = index
-                break
+    for position, (block_index, block) in enumerate(blocks):
+        command_line, command_index = _first_command_in_block(block)
         if command_line is None:
             continue
+        # In-block summary takes precedence.
+        lines = [line.rstrip() for line in block.splitlines()]
         summary_line = find_summary_line(lines, after_index=command_index)
         if summary_line is None:
+            # Cross-block lookahead: scan up to N forward blocks for a summary,
+            # stopping if any intervening block has its own command (we don't
+            # want to pair commandA with summaryB-belonging-to-commandB).
+            for next_position in range(position + 1, min(position + 1 + _CROSS_BLOCK_LOOKAHEAD, len(blocks))):
+                _, next_block = blocks[next_position]
+                next_lines = [line.rstrip() for line in next_block.splitlines()]
+                if any(normalize_command_line(line) is not None for line in next_lines):
+                    break
+                next_summary = find_summary_line(next_lines)
+                if next_summary is not None:
+                    summary_line = next_summary
+                    break
+        if summary_line is None:
+            # Only flag unassociated commands when they are actually pytest
+            # invocations. Non-pytest commands (ruff, uv, npm) without an
+            # adjacent summary block are not test-claim evidence gaps; the
+            # verifier's contract is pytest-claim re-run, so non-pytest
+            # commands without summaries are silently skipped, preserving
+            # the pre-fix behavior for those command shapes.
+            _, command_error = pytest_args_for_command(command_line)
+            if command_error is not None:
+                continue
+            claims.append(
+                ExtractedClaim(
+                    claim_block_index=block_index,
+                    command=command_line,
+                    claimed_summary=None,
+                    claimed_counts={},
+                )
+            )
             continue
         claims.append(
             ExtractedClaim(
@@ -290,6 +343,21 @@ def validate_pytest_args(project_root: Path, pytest_args: list[str]) -> str | No
 
 
 def run_pytest_claim(project_root: Path, claim: ExtractedClaim, timeout_seconds: int) -> ClaimResult:
+    if claim.claimed_summary is None:
+        # Per Codex NO-GO -006 FINDING-P2-002: a pytest command without an
+        # associated observed-result block is an evidence gap, not a clean
+        # absence; surface as ERROR so the strict-mode gate does not pass.
+        return ClaimResult(
+            claim_block_index=claim.claim_block_index,
+            command=claim.command,
+            claimed_summary=None,
+            observed_summary=None,
+            status="ERROR",
+            returncode=None,
+            reason="pytest command present, no associated observed-result block found",
+            claimed_counts={},
+            observed_counts={},
+        )
     pytest_args, error = pytest_args_for_command(claim.command)
     if error is not None or pytest_args is None:
         return ClaimResult(
@@ -423,7 +491,7 @@ def format_markdown(packet: dict[str, object]) -> str:
                 block=raw["claim_block_index"],
                 status=raw["status"],
                 command=str(raw["command"]).replace("|", "\\|"),
-                claimed=str(raw["claimed_summary"]).replace("|", "\\|"),
+                claimed=str(raw.get("claimed_summary") or "").replace("|", "\\|"),
                 observed=str(raw.get("observed_summary") or "").replace("|", "\\|"),
                 reason=str(raw["reason"]).replace("|", "\\|"),
             )

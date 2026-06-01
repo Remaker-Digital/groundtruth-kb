@@ -7,6 +7,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 Document: gtkb-deterministic-services-stale-status-reconciliation
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
 
 Document: gtkb-dispatch-owner-approval-forgery-prevention
@@ -18,6 +19,7 @@ NO-GO: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-001.md
 
 Document: gtkb-role-status-orthogonality-dispatch-slice-2-resolver
+VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-004.md
 NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-003.md
 GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-002.md
 NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-001.md
@@ -976,6 +978,7 @@ NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
 NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-001.md
 
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
+REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-007.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-006.md
 NEW: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-005.md
 GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-004.md
