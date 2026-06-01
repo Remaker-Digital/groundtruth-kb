@@ -224,9 +224,7 @@ def test_scoping_terminal_without_successor_is_included(tmp_path: Path) -> None:
     classifier remains conservative (false-negative) when the bridge protocol's
     scoping → successor pattern is not yet complete."""
     n = _notify()
-    text, root = _make_index_with_top_file(
-        tmp_path, "gtkb-example-scoping", "GO"
-    )
+    text, root = _make_index_with_top_file(tmp_path, "gtkb-example-scoping", "GO")
     parsed = n.parse_index(text)
     prime, codex = n.compute_actionable_pending(parsed, project_root=root)
     prime_names = {item.document_name for item in prime}
@@ -785,6 +783,37 @@ def test_classify_terminal_closure_kind(tmp_path: Path) -> None:
     assert _classify_with_kind(tmp_path, "closure") == "terminal"
     assert _classify_with_kind(tmp_path, "parking_acknowledgement") == "terminal"
     assert _classify_with_kind(tmp_path, "index_reconciliation") == "terminal"
+
+
+def test_classify_terminal_compliance_exempt_kinds(tmp_path: Path) -> None:
+    """Compliance-exempt non-implementation kinds (mirror of
+    bridge-compliance-gate.py BRIDGE_KIND_METADATA_EXEMPT) are dispatch-terminal,
+    so a GO does not auto-dispatch headless Prime (forgery-prevention alignment).
+    """
+    assert _classify_with_kind(tmp_path, "governance_review") == "terminal"
+    assert _classify_with_kind(tmp_path, "spec_intake") == "terminal"
+    assert _classify_with_kind(tmp_path, "loyal_opposition_advisory") == "terminal"
+
+
+def test_compliance_exempt_kinds_GO_not_dispatchable(tmp_path: Path) -> None:
+    """A GO on a compliance-exempt non-implementation kind is not Prime-dispatchable."""
+    k = _kind_aware()
+    for kind in ("governance_review", "spec_intake", "loyal_opposition_advisory"):
+        classification = _classify_with_kind(tmp_path, kind)
+        assert classification == "terminal"
+        assert k._derive_dispatchable("GO", classification) is False
+
+
+def test_compliance_exempt_kinds_review_paths_still_dispatchable(tmp_path: Path) -> None:
+    """Terminal means 'no Prime follow-up after GO', not 'no Codex review':
+    NEW/REVISED for these kinds still dispatch to Codex; NO-GO still to Prime.
+    """
+    k = _kind_aware()
+    for kind in ("governance_review", "spec_intake", "loyal_opposition_advisory"):
+        classification = _classify_with_kind(tmp_path, kind)
+        assert k._derive_dispatchable("NEW", classification) is True
+        assert k._derive_dispatchable("REVISED", classification) is True
+        assert k._derive_dispatchable("NO-GO", classification) is True
 
 
 def test_classify_dispatchable_implementation_proposal_kind(tmp_path: Path) -> None:

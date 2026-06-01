@@ -94,6 +94,15 @@ _KIND_TERMINAL_TOKENS: Final[tuple[str, ...]] = (
     "thread_reconciliation",
     "operational_state_change",
     "candidate_spec_intake",
+    # Compliance-exempt non-implementation kinds — mirror of
+    # bridge-compliance-gate.py BRIDGE_KIND_METADATA_EXEMPT. A GO on these has no
+    # Prime implementation follow-up, so they must be dispatch-terminal; this
+    # prevents headless dispatch of owner-gated governance work (the forgery
+    # enabler). Per gtkb-bridge-kind-terminal-exempt-alignment GO at -004
+    # (WI GTKB-BRIDGE-POLLER-PRIME-CLASSIFICATION-REFINEMENT).
+    "governance_review",
+    "spec_intake",  # also matched by candidate_spec_intake above; explicit for symmetry
+    "loyal_opposition_advisory",
 )
 
 _KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
