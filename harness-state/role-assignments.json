@@ -2,37 +2,35 @@
   "description": "Maps durable harness installation IDs to operating roles. Harness IDs are defined by harness-state/harness-identities.json.",
   "harnesses": {
     "A": {
-      "assigned_at": "2026-05-27T08:11:58.790133Z",
-      "assigned_by": "mode-switch-transaction",
-      "assigned_reason": "Owner requested Claude Code as Prime Builder and Codex as Loyal Opposition",
+      "assigned_at": "2026-06-01T18:08:14Z",
+      "assigned_by": "owner-directed-role-assignment",
+      "assigned_reason": "Owner directed Codex to assume active Prime Builder while Claude Code is suspended",
       "harness_type": "codex",
       "role": [
-        "loyal-opposition"
+        "prime-builder"
       ],
       "source": "compatibility-mirror"
     },
     "B": {
-      "assigned_at": "2026-05-27T08:11:58.790133Z",
-      "assigned_by": "mode-switch-transaction",
-      "assigned_reason": "Owner requested Claude Code as Prime Builder and Codex as Loyal Opposition",
+      "assigned_at": "2026-06-01T18:08:14Z",
+      "assigned_by": "owner-directed-role-assignment",
+      "assigned_reason": "Owner directed Claude Code offline/suspended; no active operating role",
       "harness_type": "claude",
-      "role": [
-        "prime-builder"
-      ],
+      "role": [],
       "source": "compatibility-mirror"
     },
     "C": {
-      "assigned_at": "2026-05-31T14:25:00Z",
+      "assigned_at": "2026-06-01T18:08:14Z",
       "assigned_by": "owner-directed-role-assignment",
-      "assigned_reason": "Owner assigned Prime Builder to Antigravity while Claude Code is offline; obsolete Antigravity restrictions lifted",
+      "assigned_reason": "Owner directed Antigravity to take Loyal Opposition with manual bridge scans",
       "harness_type": "antigravity",
       "role": [
-        "prime-builder"
+        "loyal-opposition"
       ],
-      "source": "owner-directive"
+      "source": "compatibility-mirror"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness role assignments",
-  "updated_at": "2026-05-31T14:25:00Z"
+  "updated_at": "2026-06-01T18:08:14Z"
 }

@@ -27,6 +27,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: 79be051178c54113
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0884
+  asked_at: 2026-06-01T17:43:46.900884Z
+  question: "Want me to proceed into Slice 4 now, or hold here with 3/4 VERIFIED and the gate defect captured?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: e3f34dbcec243d05
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0888
+  asked_at: 2026-06-01T17:57:53.743768Z
+  question: "Want me to seek the WI-4214 PAUTH and file REVISED `-003`, or leave the thread at NO-GO for now?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 32e2a8de4d7f6681
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -323,837 +337,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S327
   answer: "S327 clear pending: real prose decision-ask from a prior session ('Want me to action those next, or pick something else?'). Resolved by autonomous progression on the work_list-pre-approved ISOLATION-017 Slice 3 track, which reached VERIFIED at bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-014.md. Cleared via 'clear pending' instruction."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0234
-  asked_at: 2026-05-02T01:06:52.847914Z
-  question: "Remote agent can't access local groundtruth.db, Codex harness, or hooks. What scope should the agent deliver?"
-  options:
-    - "Code + tests on a branch (Recommended)"
-    - "Full attempt including KB inserts"
-    - "Just write the code, no tests/branch"
-    - "Other"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: eb01d11bbcbdf74b
-  resolved_at: 2026-05-02T01:06:52.847914Z
-  answer: "User has answered your questions: \"Remote agent can't access local groundtruth.db, Codex harness, or hooks. What scope should the agent deliver?\"=\"Code + tests on a branch (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0235
-  asked_at: 2026-05-02T01:06:52.847914Z
-  question: "When should the remote agent run? Current time is 6:01 PM Pacific Friday May 1."
-  options:
-    - "Saturday 8am Pacific (Recommended)"
-    - "Sunday 8am Pacific"
-    - "Run now (in ~5 min)"
-    - "Other"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 8fed58d985b2f3b7
-  resolved_at: 2026-05-02T01:06:52.847914Z
-  answer: "User has answered your questions: \"When should the remote agent run? Current time is 6:01 PM Pacific Friday May 1.\"=\"Saturday 8am Pacific (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0236
-  asked_at: 2026-05-02T01:06:52.847914Z
-  question: "Develop is 10 commits ahead of origin/develop, including the Slice 1 GO'd proposal -007 and the GO -008 file. The remote agent needs them. Push develop first?"
-  options:
-    - "Push develop now (Recommended)"
-    - "Inline proposal text in agent prompt"
-    - "Push develop AND inline (belt + suspenders)"
-    - "Other"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2ba72f6f5b985b88
-  resolved_at: 2026-05-02T01:06:52.847914Z
-  answer: "User has answered your questions: \"Develop is 10 commits ahead of origin/develop, including the Slice 1 GO'd proposal -007 and the GO -008 file. The remote agent needs them. Push develop first?\"=\"Push develop now (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0237
-  asked_at: 2026-05-02T01:06:52.847914Z
-  question: "Create the routine as configured above?"
-  options:
-    - "Create it (Recommended)"
-    - "Adjust prompt first"
-    - "Adjust schedule/model/env first"
-    - "Cancel"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 80c567e76a002367
-  resolved_at: 2026-05-02T01:06:52.847914Z
-  answer: "User has answered your questions: \"Create the routine as configured above?\"=\"Create it (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0238
-  asked_at: 2026-05-02T01:09:07.830379Z
-  question: "Which PR should I review for Sentry bot comments? All current open PRs are dependabot dep-bumps (#18, 19, 21-29); your scheduled agent's branch won't push until tomorrow."
-  options:
-    - "Specific PR number"
-    - "Wait until Slice 1 PR exists"
-    - "Review a recently merged PR"
-    - "Cancel"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 18378bc593a6d906
-  resolved_at: 2026-05-02T01:09:07.830379Z
-  answer: "User has answered your questions: \"Which PR should I review for Sentry bot comments? All current open PRs are dependabot dep-bumps (#18, 19, 21-29); your scheduled agent's branch won't push until tomorrow.\"=\"Wait until Slice 1 PR exists\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0239
-  asked_at: 2026-05-02T01:57:46.739847Z
-  question: "Bridge auto-dispatch flagged two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006), but a fresh NO-GO landed yesterday on TOP-priority ISOLATION-017 Slice 1 doctor checks (single P1: regex ordering bug lets sqlite:/// raw-DB endpoints pass the scoped-service check). Which path should I take?"
-  options:
-    - "Address ISOLATION-017 NO-GO (Recommended)"
-    - "Process gtkb-command-surface-004 GO"
-    - "Process gtkb-incident-response-006 GO"
-    - "Stand down; await further direction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6e852d2cedd17675
-  resolved_at: 2026-05-02T01:57:46.739847Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0242
-  asked_at: 2026-05-02T02:05:36.369803Z
-  question: "Both auto-dispatched bridge entries are stale plan-level GOs (no implementation work owed). Which direction should I take next?"
-  options:
-    - "Resume ISOLATION-017 Slice 1"
-    - "Draft CS-1.5 slice proposal"
-    - "Queue smart-poller filter fix"
-    - "Stand down — no action"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2f0f0945f75835e3
-  resolved_at: 2026-05-02T02:05:36.369803Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0243
-  asked_at: 2026-05-02T02:08:11.559340Z
-  question: "Slice 1 REVISED-1 (-011) is filed and awaits Codex VERIFIED. While that pending, which next item should I advance?"
-  options:
-    - "Slice 2 NEW (recommended)"
-    - "Row 25 banner cosmetic"
-    - "Row 24 bridge-propose helper parity"
-    - "Wait for Codex VERIFIED"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d468defd6dee66ea
-  resolved_at: 2026-05-02T02:08:11.559340Z
-  answer: "User has answered your questions: \"Slice 1 REVISED-1 (-011) is filed and awaits Codex VERIFIED. While that pending, which next item should I advance?\"=\"Slice 2 NEW (recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0245
-  asked_at: 2026-05-02T02:17:41.944916Z
-  question: "Both dispatched GOs are stale (no-op stand-down). What should Prime do next this session?"
-  options:
-    - "End session here (Recommended)"
-    - "File row 24: bridge-propose helper INDEX-parity"
-    - "File row 12: GTKB-COMMAND-SURFACE CS-2 dispatcher hook"
-    - "File row 21: a candidate-spec-intake follow-on bridge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ce69a36930b3fe0f
-  resolved_at: 2026-05-02T02:17:41.944916Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0246
-  asked_at: 2026-05-02T02:34:32.646305Z
-  question: "Bridge auto-dispatch surfaced two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006) that explicitly do NOT authorize implementation. Standing down on both is the correct dispatch-protocol action. What should I do next?"
-  options:
-    - "Pick up ISOLATION-017 Slice 2 impl (Recommended)"
-    - "Stand down only; await direction"
-    - "File CS-2 dispatcher hook bridge"
-    - "File IR-0 fallback inventory bridge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2a5b0e7a0efa1fa5
-  resolved_at: 2026-05-02T02:34:32.646305Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0248
-  asked_at: 2026-05-02T02:43:37.490866Z
-  question: "GTKB-COMMAND-SURFACE is plan-GO'd. Do you want to start a slice now, and if so which one?"
-  options:
-    - "Start CS-1.5 (.gitignore fix)"
-    - "Start CS-1 (registry foundation)"
-    - "Defer CS — work other backlog"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 10aa0da650c9253f
-  resolved_at: 2026-05-02T02:43:37.490866Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0249
-  asked_at: 2026-05-02T02:43:37.490866Z
-  question: "GTKB-INCIDENT-RESPONSE IR-0 is BLOCKED on ADR-ISOLATION-APPLICATION-PLACEMENT-001 landing in MemBase + Phase 9 annotation commit. Which path?"
-  options:
-    - "Wait for ADR path"
-    - "Use placement-neutral fallback"
-    - "Defer IR — work other backlog"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 08d5b2b13262b7bb
-  resolved_at: 2026-05-02T02:43:37.490866Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0250
-  asked_at: 2026-05-02T02:48:16.622540Z
-  question: "The two auto-dispatched GOs are plan-level only, and their implementable follow-ons have already shipped (CS-1.5, IR-0.1) — though both completed sub-threads are missing from bridge/INDEX.md. What should I take up next?"
-  options:
-    - "Revise ISOLATION-017 Slice 2 (Recommended)"
-    - "Reconcile INDEX hygiene first"
-    - "File CS-2 implementation bridge"
-    - "Stand down; await further direction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: cfbef321bd5ac6db
-  resolved_at: 2026-05-02T02:48:16.622540Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0253
-  asked_at: 2026-05-02T02:55:40.376091Z
-  question: "Bridge auto-dispatch stood down on two plan-level GOs (row-22 false-positive scenario). What should this session do next?"
-  options:
-    - "End session here"
-    - "Pivot to ISOLATION-017 Slice 2"
-    - "File row-22 refinement bridge"
-    - "Pick a different work_list item"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c14260bcc354076c
-  resolved_at: 2026-05-02T02:55:40.376091Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0254
-  asked_at: 2026-05-02T02:56:10.607730Z
-  question: "How should Prime Builder dispose of the two stale plan-level GO bridge entries (gtkb-command-surface-004 and gtkb-incident-response-006, both from S310 / 2026-04-26)?"
-  options:
-    - "Park both; rely on standing backlog"
-    - "Advance command-surface CS-1 / CS-1.5 now"
-    - "Advance incident-response IR-0 fallback path"
-    - "Advance both threads now"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 4412f0186cdaed0f
-  resolved_at: 2026-05-02T02:56:10.607730Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0256
-  asked_at: 2026-05-02T04:39:50.080822Z
-  question: "Both auto-dispatched GO entries are stale plan-level GOs (work_list row 22 false-positive pattern). Which work should I take up next?"
-  options:
-    - "Revise helper-parity bridge"
-    - "File CS-2 scoping bridge"
-    - "File ISOLATION-017 Slice 2.5"
-    - "Stand down; await direction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 24899c4f2c812ba2
-  resolved_at: 2026-05-02T04:39:50.080822Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0257
-  asked_at: 2026-05-02T04:44:08.431934Z
-  question: "Both dispatched GOs are plan-level (no Prime action authorized). Which actionable item should Prime pursue next?"
-  options:
-    - "File CS-2 scoping bridge"
-    - "File MEMBASE-RECOVERY Slice A bridge"
-    - "File a CANDIDATE-SPEC-INTAKE follow-on"
-    - "Stand by; resolve pending-owner-decisions backlog"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a913ccb3cc26c419
-  resolved_at: 2026-05-02T04:44:08.431934Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0258
-  asked_at: 2026-05-02T04:49:43.471424Z
-  question: "Both auto-dispatched bridge entries are plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006) with sub-slices already implemented and VERIFIED on separate threads. The smart poller is re-flagging them because there is no closure status on the parent threads. How should I handle them?"
-  options:
-    - "Acknowledge only (Recommended)"
-    - "File closure notes on parents"
-    - "Initiate next sub-slice"
-    - "Show me the parent-vs-child status before I decide"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 86676c6d026e0012
-  resolved_at: 2026-05-02T04:49:43.471424Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0259
-  asked_at: 2026-05-02T04:53:16.438911Z
-  question: "Both selected GOs are plan/architecture-level approvals that explicitly do NOT authorize code changes. CS-004 says \"each CS slice still needs its own bridge proposal\"; IR-006 says \"no IR-0 sub-bridge files until the application-placement ADR is inserted upstream and the Agent Red Phase 9 annotation commit lands.\" How should I proceed for gtkb-command-surface?"
-  options:
-    - "Acknowledge GO; no action"
-    - "Propose CS-1.5 as NEW"
-    - "Propose a different CS slice"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 3e4635e0d9fd877a
-  resolved_at: 2026-05-02T04:53:16.438911Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0260
-  asked_at: 2026-05-02T04:53:16.438911Z
-  question: "How should I proceed for gtkb-incident-response?"
-  options:
-    - "Acknowledge GO; no action"
-    - "Verify ADR + Phase 9 state"
-    - "Use placement-neutral fallback"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f704eb4ea3dd5896
-  resolved_at: 2026-05-02T04:53:16.438911Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0261
-  asked_at: 2026-05-02T04:57:35.242887Z
-  question: "Bridge auto-dispatch picked two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006). Neither authorizes implementation, and DECISION-0224 already flagged this. Meanwhile the in-flight thread is gtkb-isolation-017-slice2-5 (GO at -006, uncommitted in working tree). Which should I advance?"
-  options:
-    - "Implement isolation-017 Slice 2.5 (Recommended)"
-    - "File CS-2 implementation slice"
-    - "Stand down — no Prime action"
-    - "Investigate prior session decisions first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e3fd9edbd3898688
-  resolved_at: 2026-05-02T04:57:35.242887Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0263
-  asked_at: 2026-05-02T05:55:06.375677Z
-  question: "Which action should I advance first?"
-  options:
-    - "ISOLATION-017 Slice 3"
-    - "Clear pending decisions"
-    - "Re-scope BRIDGE-PROPOSE-HELPER (row 24)"
-    - "Show me ISOLATION-017 remaining slices first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d4c78027f53752d1
-  resolved_at: 2026-05-02T05:55:06.375677Z
-  answer: "User has answered your questions: \"Which action should I advance first?\"=\"ISOLATION-017 Slice 3\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0264
-  asked_at: 2026-05-02T05:55:06.375677Z
-  question: "How should I handle the 19 pending decisions while Codex reviews Slice 3?"
-  options:
-    - "Clear pending (Recommended)"
-    - "Defer all"
-    - "Walk through one-by-one"
-    - "Leave as-is, do something else"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7b617cf5151e4779
-  resolved_at: 2026-05-02T05:55:06.375677Z
-  answer: "User has answered your questions: \"How should I handle the 19 pending decisions while Codex reviews Slice 3?\"=\"Clear pending (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0208
-  asked_at: 2026-05-01T14:56:00.173625Z
-  question: "ulti-phase work.  **Awaiting owner direction.** Suggested next m"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: a660e67779b14172
-  resolved_at: 2026-05-02T05:56:37.941328Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0210
-  asked_at: 2026-05-01T15:10:44.583591Z
-  question: "ould be addressed.  Awaiting owner direction: continue with `gtkb-isolation-016` Wave 3 REVISED-2 work, file CS-2 slice, address DECISION-0208, or other."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 90b6a48199793031
-  resolved_at: 2026-05-02T05:56:37.941358Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0212
-  asked_at: 2026-05-01T15:15:14.038835Z
-  question: "ot gating on them.  Want me to proceed with REVISED-2, or pause first?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 3d2e7cf1d8eaa077
-  resolved_at: 2026-05-02T05:56:37.941366Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0214
-  asked_at: 2026-05-01T15:50:22.101232Z
-  question: "t Wave 3 thread.  **Awaiting owner direction.** Options: - (a) R"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 0743d22d24ee8f03
-  resolved_at: 2026-05-02T05:56:37.941369Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0216
-  asked_at: 2026-05-01T15:54:23.824982Z
-  question: "──────────────`  ## Awaiting owner direction  Per pending **DECISION-0210**, the right n"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 9526be218bb49677
-  resolved_at: 2026-05-02T05:56:37.941372Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0218
-  asked_at: 2026-05-01T16:48:13.881697Z
-  question: "tage GO follow-up.  Awaiting owner direction on whether to: (a)"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 533be2e81737fdbc
-  resolved_at: 2026-05-02T05:56:37.941376Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0220
-  asked_at: 2026-05-01T16:48:46.417120Z
-  question: "without an answer. Standing by for your direction on which thread to"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: c7d8d3d61fbed883
-  resolved_at: 2026-05-02T05:56:37.941378Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0224
-  asked_at: 2026-05-01T20:59:33.008014Z
-  question: "ompt was cancelled. Standing by for your direction — both dispatched GO entries are plan-level architectural approvals (not implementation work), so no Prime action is required without your input on which path to ta"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 16ba46237daf622f
-  resolved_at: 2026-05-02T05:56:37.941381Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0225
-  asked_at: 2026-05-01T21:05:38.434102Z
-  question: "anked shortlist for your decision  Which would you like me to advance next? (I can also do noth"
-  detected_via: prose:your_decision_q
-  status: resolved
-  question_hash: dc99b176dbf3c5a5
-  resolved_at: 2026-05-02T05:56:37.941383Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0230
-  asked_at: 2026-05-01T23:50:23.843875Z
-  question: ".  No code touched. Standing by for your direction on next work (e.g.,"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 0ceddfbe2d7e2316
-  resolved_at: 2026-05-02T05:56:37.941386Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0233
-  asked_at: 2026-05-02T00:59:54.345282Z
-  question: "cle count is high.  Want me to /schedule a fresh-session cleanup agent for Slice 1 implementation, or prefer to start it manually next time?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 6d2b9bd4707443b8
-  resolved_at: 2026-05-02T05:56:37.941389Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0240
-  asked_at: 2026-05-02T02:03:59.628104Z
-  question: "ntial NEW proposal. Want me to open Slice 2 NEW now, or knock out the small-but-pre-approved items 3 & 4 first?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 04a3a2089c52de57
-  resolved_at: 2026-05-02T05:56:37.941392Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0241
-  asked_at: 2026-05-02T02:05:09.154889Z
-  question: "er dispatch queue.  Awaiting your direction on whether to draft"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: a17031c015461389
-  resolved_at: 2026-05-02T05:56:37.941395Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0244
-  asked_at: 2026-05-02T02:16:58.761743Z
-  question: "new bridge files). Standing by for owner direction on real priority wo"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 26cfdee02d3a9002
-  resolved_at: 2026-05-02T05:56:37.941398Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0247
-  asked_at: 2026-05-02T02:34:32.646305Z
-  question: "s selected entries. Awaiting your direction on whether to pivot"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 3a5d2c104f202440
-  resolved_at: 2026-05-02T05:56:37.941401Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0251
-  asked_at: 2026-05-02T02:48:16.622540Z
-  question: "r work_list row 14. Awaiting your direction on which to take up"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: bd4c9a3c0f62a95d
-  resolved_at: 2026-05-02T05:56:37.941405Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0252
-  asked_at: 2026-05-02T02:55:18.333855Z
-  question: "d; no commits made. Awaiting your direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: c19316a2c8de6f4a
-  resolved_at: 2026-05-02T05:56:37.941408Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0255
-  asked_at: 2026-05-02T04:39:29.773677Z
-  question: "auto-dispatch hook. Awaiting owner direction to either (a) revis"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 800c0a1aa6704951
-  resolved_at: 2026-05-02T05:56:37.941410Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0262
-  asked_at: 2026-05-02T04:57:35.242887Z
-  question: "` landing upstream  Awaiting your direction on whether to advan"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: b834cf01f2acb293
-  resolved_at: 2026-05-02T05:56:37.941413Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0265
-  asked_at: 2026-05-02T05:55:06.375677Z
-  question: "ding by for\"` and `\"Awaiting your direction\"` via regex. It cat"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: bfd54f283e0dad9f
-  resolved_at: 2026-05-02T05:56:37.941416Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0266
-  asked_at: 2026-05-02T05:55:06.375677Z
-  question: "nti-patterns like `\"Standing by for\"` and `\"Awaiting your direction\"` via regex. It cat"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: f10151fecdc4012f
-  resolved_at: 2026-05-02T05:56:37.941419Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0267
-  asked_at: 2026-05-02T05:57:29.170730Z
-  question: "What next while Codex reviews Slice 3?"
-  options:
-    - "Stand by for Codex GO (Recommended)"
-    - "Re-scope row 24 BRIDGE-PROPOSE-HELPER"
-    - "File row 25 wave-banner cosmetic"
-    - "Wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7930c2488ac157e1
-  resolved_at: 2026-05-02T05:57:29.170730Z
-  answer: "User has answered your questions: \"What next while Codex reviews Slice 3?\"=\"Stand by for Codex GO (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0268
-  asked_at: 2026-05-02T06:13:13.525437Z
-  question: "What does \"restore to full function\" mean for the smart poller?"
-  options:
-    - "Run doctor + scope from there (Recommended)"
-    - "Drive the umbrella to VERIFIED"
-    - "Address row 22 classification first"
-    - "Reconcile rule-vs-reality drift first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: deaabd6cc679c569
-  resolved_at: 2026-05-02T06:13:13.525437Z
-  answer: "User has answered your questions: \"What does \"restore to full function\" mean for the smart poller?\"=\"Run doctor + scope from there (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0269
-  asked_at: 2026-05-02T06:13:13.525437Z
-  question: "How should I scope \"smart-poller restored to full function\"?"
-  options:
-    - "Doctor-path fix only (Recommended)"
-    - "Doctor-path fix + row 22 classification"
-    - "Drive whole umbrella to VERIFIED"
-    - "Address Slice 3 NO-GO first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7d3b8f415564afe3
-  resolved_at: 2026-05-02T06:13:13.525437Z
-  answer: "User has answered your questions: \"How should I scope \"smart-poller restored to full function\"?\"=\"Doctor-path fix only (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0270
-  asked_at: 2026-05-02T06:18:28.217491Z
-  question: "Both auto-dispatched GO entries are plan-level only (not implementation-actionable). What should I do next?"
-  options:
-    - "Stand down, end session"
-    - "Revise ISOLATION-017 Slice 3 NO-GO (Recommended)"
-    - "File CS-2 dispatcher slice proposal"
-    - "File ADR-ISOLATION-APPLICATION-PLACEMENT impl bridge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2f96ed7c7e7d9177
-  resolved_at: 2026-05-02T06:18:28.217491Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0271
-  asked_at: 2026-05-02T06:26:06.077013Z
-  question: "The dispatch picked two stale plan-level GOs (the documented row-22 false positive). What should this session do next?"
-  options:
-    - "Revise ISOLATION-017 Slice 3 (Recommended)"
-    - "Implement bridge-poller-doctor-path GO"
-    - "Stand down only"
-    - "File CS-2 sub-bridge for command-surface"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 03dbe8c47429672c
-  resolved_at: 2026-05-02T06:26:06.077013Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0275
-  asked_at: 2026-05-02T06:39:30.569902Z
-  question: "Both bridge entries dispatched this turn are plan-level GOs and not actionable. How should I proceed?"
-  options:
-    - "Pick top backlog item (Recommended)"
-    - "Address DECISION-0272"
-    - "File dispatcher-fix proposal"
-    - "Stand down this turn"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 26b1941d93b080f8
-  resolved_at: 2026-05-02T06:39:30.569902Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0276
-  asked_at: 2026-05-02T06:40:10.772245Z
-  question: "How should I handle IPR/CVR KB row insertion?"
-  options:
-    - "Approve content now — I'll insert (Recommended)"
-    - "Defer KB insertion until after VERIFIED"
-    - "Skip KB insertion entirely"
-    - "Show me the IPR/CVR content first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ec1b358cef9b6686
-  resolved_at: 2026-05-02T06:40:10.772245Z
-  answer: "User has answered your questions: \"How should I handle IPR/CVR KB row insertion?\"=\"Approve content now — I'll insert (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0278
-  asked_at: 2026-05-02T06:44:21.955193Z
-  question: "How should I handle the two dispatched planning-level GO entries (gtkb-command-surface-004 and gtkb-incident-response-006)?"
-  options:
-    - "Defer both, return to S326 (Recommended)"
-    - "Close IR-0.1 audit-trail gap"
-    - "Open a CS-1 or CS-1.5 slice bridge"
-    - "Re-bridge ADR-isolation-application-placement first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 9c02c01fb1643a6c
-  resolved_at: 2026-05-02T06:44:21.955193Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0280
-  asked_at: 2026-05-02T13:44:51.540769Z
-  question: "Both dispatched GOs are stale plan-level — what should Prime pursue this turn?"
-  options:
-    - "Revise ISOLATION-017 Slice 3 (Recommended)"
-    - "Commit S326 working tree first"
-    - "Triage 4 pending DECISION-* records"
-    - "Stand down — owner will direct"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 5caca684a136ffee
-  resolved_at: 2026-05-02T13:44:51.540769Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0281
-  asked_at: 2026-05-02T13:49:50.480677Z
-  question: "What next?"
-  options:
-    - "Address Slice 3 NO-GO"
-    - "Clear pending decisions + wrap"
-    - "Smart-poller row 22 refinement"
-    - "Wrap session now"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 5dbdb1e45d5011df
-  resolved_at: 2026-05-02T13:49:50.480677Z
-  answer: "User has answered your questions: \"What next?\"=\"Address Slice 3 NO-GO\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0282
-  asked_at: 2026-05-02T13:57:14.074889Z
-  question: "Two stale plan-level GOs were auto-dispatched (gtkb-command-surface-004 architectural GO + gtkb-incident-response-006 plan-level GO blocked on now-satisfied ADR). Both spawn new multi-slice implementation cycles. Active S326 work has gtkb-isolation-017 slice 3 sitting at NO-GO needing revision. What direction?"
-  options:
-    - "Continue isolation-017 slice 3 (Recommended)"
-    - "Spawn CS-1 next (command-surface)"
-    - "Spawn IR-0 next (incident-response)"
-    - "Close both as VERIFIED-no-impl"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 8e4b8c25f2cc0a59
-  resolved_at: 2026-05-02T13:57:14.074889Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0284
-  asked_at: 2026-05-02T14:05:35.423188Z
-  question: "Both dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are stale plan-level approvals that don't authorize implementation. What should I pivot to?"
-  options:
-    - "Revise slice3 init-defaults"
-    - "Revise helper-index-parity"
-    - "Pick from work_list.md"
-    - "Stand down"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7fbd1668379637eb
-  resolved_at: 2026-05-02T14:05:35.423188Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0285
-  asked_at: 2026-05-02T14:30:03.982290Z
-  question: "How should I proceed given the repeated NO-GOs?"
-  options:
-    - "Wrap session, defer both threads (Recommended)"
-    - "Continue revising both"
-    - "Continue Slice 3 only"
-    - "Open scoping re-discussion on Slice 3"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a037f86b4b296cf9
-  resolved_at: 2026-05-02T14:30:03.982290Z
-  answer: "User has answered your questions: \"How should I proceed given the repeated NO-GOs?\"=\"Continue revising both\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0286
-  asked_at: 2026-05-02T17:03:25.081546Z
-  question: "Bridge auto-dispatch surfaced two stale plan-level GOs from 2026-04-26 (command-surface architecture, incident-response plan). Both require new sub-slice proposals or upstream prerequisites — neither is direct code-implementation work. The active program is GTKB-ISOLATION-017 (3 of 8 slices VERIFIED in S326). How should I proceed?"
-  options:
-    - "Resume command-surface (CS-1.5)"
-    - "Unblock incident-response IR-0"
-    - "Continue GTKB-ISOLATION-017"
-    - "Address pending owner decisions"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6d69a9b8fde1dbc5
-  resolved_at: 2026-05-02T17:03:25.081546Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0288
-  asked_at: 2026-05-02T17:07:22.418034Z
-  question: "Both selected GO entries are stale (their slice threads already VERIFIED). What should I pick up next?"
-  options:
-    - "Revise helper-caller-migration"
-    - "Revise isolation-017 slice3"
-    - "Resolve pending owner decisions"
-    - "Pick from standing backlog"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a026668d8fa35f97
-  resolved_at: 2026-05-02T17:07:22.418034Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0290
-  asked_at: 2026-05-02T17:16:11.552489Z
-  question: "How should I handle caller-migration NO-GO #3?"
-  options:
-    - "Defer caller-migration; stand by for Slice 3 VERIFIED (Recommended)"
-    - "File caller-migration REVISED-3 now"
-    - "Pivot to lightweight backlog item"
-    - "Wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 9811579fb14423e7
-  resolved_at: 2026-05-02T17:16:11.552489Z
-  answer: "User has answered your questions: \"How should I handle caller-migration NO-GO #3?\"=\"Defer caller-migration; stand by for Slice 3 VERIFIED (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0272
-  asked_at: 2026-05-02T06:26:06.077013Z
-  question: "Nothing to commit. Awaiting owner direction."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 41d4480bb8d64fe6
-  resolved_at: 2026-05-02T17:19:35.223953Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0273
-  asked_at: 2026-05-02T06:39:04.813766Z
-  question: "\"Nothing to commit. Awaiting owner direction.\") remains open and"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 6b6129256d27a2d6
-  resolved_at: 2026-05-02T17:19:35.223975Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0274
-  asked_at: 2026-05-02T06:39:04.813766Z
-  question: "oing in this turn.  Standing by for owner direction or a real actionabl"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 3497417fecfba420
-  resolved_at: 2026-05-02T17:19:35.223980Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0277
-  asked_at: 2026-05-02T06:43:58.885259Z
-  question: "S326 active work.  Standing by for direction. (Ignoring the thre"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 962072dcc615a821
-  resolved_at: 2026-05-02T17:19:35.223982Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0279
-  asked_at: 2026-05-02T13:44:24.474568Z
-  question: "ed inline in S324.  Awaiting your direction on which of the abo"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 4129c7205a933bce
-  resolved_at: 2026-05-02T17:19:35.223984Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0283
-  asked_at: 2026-05-02T14:05:04.106467Z
-  question: "dispatched entries. Awaiting owner direction on whether to: 1. P"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 1eaae7ff255c67c2
-  resolved_at: 2026-05-02T17:19:35.223987Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0287
-  asked_at: 2026-05-02T17:07:01.699481Z
-  question: "on taken this turn. Standing by for owner direction on what to pick up"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: c671fe912a2740dd
-  resolved_at: 2026-05-02T17:19:35.223989Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0289
-  asked_at: 2026-05-02T17:07:22.418034Z
-  question: "Question dismissed. Standing by for owner direction via chat or new pro"
-  detected_via: prose:standing_by_for
-  status: resolved
-  question_hash: 00b751da3d93e68c
-  resolved_at: 2026-05-02T17:19:35.223991Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0292
-  asked_at: 2026-05-02T17:20:45.868335Z
-  question: "Stand-down complete on the two stale plan-level GOs. What should I action next?"
-  options:
-    - "Slice 3 NO-GO response"
-    - "Helper-caller-migration NO-GO"
-    - "Helper-index-parity NO-GO"
-    - "Stop and report"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7a84e0117a8e494a
-  resolved_at: 2026-05-02T17:20:45.868335Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0293
-  asked_at: 2026-05-02T17:36:16.049645Z
-  question: "Both auto-dispatched GO entries are plan-level (architecture/multi-phase) and explicitly do NOT authorize implementation. I'll stand down on those. What should I pick up instead?"
-  options:
-    - "ISOLATION-017 Slice 4+ (next slice)"
-    - "Re-scope deferred helper threads"
-    - "CS-2 dispatcher slice (command surface)"
-    - "Show full ranked shortlist"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f092cb8eb9a820a4
-  resolved_at: 2026-05-02T17:36:16.049645Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0297
   asked_at: 2026-05-02T19:11:34.236714Z
   question: "What should I do next with the GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH proposal?"
@@ -8360,6 +7543,59 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-01T00:37:12.104086Z
   answer: "Your questions have been answered: \"How should I handle the parallel-session thread `gtkb-adr-0001-membase-migration` (Codex NO-GO -002)? The S379 session that filed it appears inactive (stale lock).\"=\"Take over + file REVISED (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-0883
+  asked_at: 2026-06-01T17:43:46.900884Z
+  question: "The two Codex VERIFIED verdict files (-027, -017) can't be git-committed right now: the normalized_inventory_drift gate blocks on a real pytest/ruff version delta (baseline 9.0.2/0.15.5 vs live venv 9.0.3/0.15.12) that the bridge-evidence valve doesn't cover, and the concurrent session is actively committing (index.lock contention). The VERIFIED state itself is already durable (verdicts on disk + INDEX canonical). How should I handle the blocked verdict-commit?"
+  options:
+    - "Accept on-disk VERIFIED; let concurrent session sweep (Recommended)"
+    - "Fix the inventory baseline now, then commit"
+    - "Keep retrying the verdict-commit until it lands"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 39a8135012e51289
+  resolved_at: 2026-06-01T17:43:46.900884Z
+  answer: "Your questions have been answered: \"The two Codex VERIFIED verdict files (-027, -017) can't be git-committed right now: the normalized_inventory_drift gate blocks on a real pytest/ruff version delta (baseline 9.0.2/0.15.5 vs live venv 9.0.3/0.15.12) that the bridge-evidence valve doesn't cover, and the concurrent session is actively committing (index.lock contention). The VERIFIED state itself is already durable (verdicts on disk + INDEX canonical). How should I handle the blocked verdict-commit?\"=\"Accept on-disk VERIFIED; let concurrent session sweep (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0885
+  asked_at: 2026-06-01T17:48:58.755607Z
+  question: "groundtruth.db (MemBase) is gitignored, so the WI-4216 capture is already durable with no git delta to commit. The only uncommitted tracked changes are 4 files my task did not author (inventory-drift x2, concurrent session's bridge/INDEX.md, and a 15.8K-line CRLF churn in the hook notepad). How should I handle the commit?"
+  options:
+    - "Stand down — nothing to commit"
+    - "Commit inventory drift only"
+    - "Commit all 4 uncommitted files"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 745b171070f46af9
+  resolved_at: 2026-06-01T17:48:58.755607Z
+  answer: "Your questions have been answered: \"groundtruth.db (MemBase) is gitignored, so the WI-4216 capture is already durable with no git delta to commit. The only uncommitted tracked changes are 4 files my task did not author (inventory-drift x2, concurrent session's bridge/INDEX.md, and a 15.8K-line CRLF churn in the hook notepad). How should I handle the commit?\"=\"Stand down — nothing to commit\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0886
+  asked_at: 2026-06-01T17:52:16.111013Z
+  question: "The commit is blocked only by a buggy inventory-drift gate: the inventory writer and the drift checker disagree on the `gh` version-probe evidence string, so it's non-reconcilable from my context. My staged set is clean (15 bridge/inventory files, secret scan passed, no code/secrets). How should I land the commit?"
+  options:
+    - "Commit with --no-verify (skip the buggy gate)"
+    - "Edit inventory to match the checker, commit clean"
+    - "Stand down on the commit"
+    - "Something else"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2b2e66090aa1678e
+  resolved_at: 2026-06-01T17:52:16.111013Z
+  answer: "Your questions have been answered: \"The commit is blocked only by a buggy inventory-drift gate: the inventory writer and the drift checker disagree on the `gh` version-probe evidence string, so it's non-reconcilable from my context. My staged set is clean (15 bridge/inventory files, secret scan passed, no code/secrets). How should I land the commit?\"=\"Commit with --no-verify (skip the buggy gate)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0887
+  asked_at: 2026-06-01T17:57:53.743768Z
+  question: "The commit is blocked by the pre-commit inventory-drift gate (material drift in non-volatile toolchain.*.evidence: pip/pytest baseline says \"could not be executed\", live env now runs them). It's benign environmental drift, predates my work, and freezes ALL commits on this workstation. CLAUDE.md forbids --no-verify without your explicit OK. How should I land the WI-4214 bridge proposal?"
+  options:
+    - "Commit bridge files with --no-verify"
+    - "Fix the gate first, then commit"
+    - "Hold — don't commit yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8d6c31eb254c7820
+  resolved_at: 2026-06-01T17:57:53.743768Z
+  answer: "Your questions have been answered: \"The commit is blocked by the pre-commit inventory-drift gate (material drift in non-volatile toolchain.*.evidence: pip/pytest baseline says \"could not be executed\", live env now runs them). It's benign environmental drift, predates my work, and freezes ALL commits on this workstation. CLAUDE.md forbids --no-verify without your explicit OK. How should I land the WI-4214 bridge proposal?\"=\"Commit bridge files with --no-verify\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
@@ -10962,4 +10198,835 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: bfbd60b9638f82e9
   resolved_at: 2026-05-02T00:59:54.345282Z
   answer: "User has answered your questions: \"Slice 1 proposal GO'd after 4 NO-GO cycles. Implementation is ~900 LOC (450 source + 400 tests + IPR/CVR + smoke + likely 1-2 post-impl NO-GO cycles). Proceed now or wrap?\"=\"Wrap session here (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0234
+  asked_at: 2026-05-02T01:06:52.847914Z
+  question: "Remote agent can't access local groundtruth.db, Codex harness, or hooks. What scope should the agent deliver?"
+  options:
+    - "Code + tests on a branch (Recommended)"
+    - "Full attempt including KB inserts"
+    - "Just write the code, no tests/branch"
+    - "Other"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eb01d11bbcbdf74b
+  resolved_at: 2026-05-02T01:06:52.847914Z
+  answer: "User has answered your questions: \"Remote agent can't access local groundtruth.db, Codex harness, or hooks. What scope should the agent deliver?\"=\"Code + tests on a branch (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0235
+  asked_at: 2026-05-02T01:06:52.847914Z
+  question: "When should the remote agent run? Current time is 6:01 PM Pacific Friday May 1."
+  options:
+    - "Saturday 8am Pacific (Recommended)"
+    - "Sunday 8am Pacific"
+    - "Run now (in ~5 min)"
+    - "Other"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8fed58d985b2f3b7
+  resolved_at: 2026-05-02T01:06:52.847914Z
+  answer: "User has answered your questions: \"When should the remote agent run? Current time is 6:01 PM Pacific Friday May 1.\"=\"Saturday 8am Pacific (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0236
+  asked_at: 2026-05-02T01:06:52.847914Z
+  question: "Develop is 10 commits ahead of origin/develop, including the Slice 1 GO'd proposal -007 and the GO -008 file. The remote agent needs them. Push develop first?"
+  options:
+    - "Push develop now (Recommended)"
+    - "Inline proposal text in agent prompt"
+    - "Push develop AND inline (belt + suspenders)"
+    - "Other"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2ba72f6f5b985b88
+  resolved_at: 2026-05-02T01:06:52.847914Z
+  answer: "User has answered your questions: \"Develop is 10 commits ahead of origin/develop, including the Slice 1 GO'd proposal -007 and the GO -008 file. The remote agent needs them. Push develop first?\"=\"Push develop now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0237
+  asked_at: 2026-05-02T01:06:52.847914Z
+  question: "Create the routine as configured above?"
+  options:
+    - "Create it (Recommended)"
+    - "Adjust prompt first"
+    - "Adjust schedule/model/env first"
+    - "Cancel"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 80c567e76a002367
+  resolved_at: 2026-05-02T01:06:52.847914Z
+  answer: "User has answered your questions: \"Create the routine as configured above?\"=\"Create it (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0238
+  asked_at: 2026-05-02T01:09:07.830379Z
+  question: "Which PR should I review for Sentry bot comments? All current open PRs are dependabot dep-bumps (#18, 19, 21-29); your scheduled agent's branch won't push until tomorrow."
+  options:
+    - "Specific PR number"
+    - "Wait until Slice 1 PR exists"
+    - "Review a recently merged PR"
+    - "Cancel"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 18378bc593a6d906
+  resolved_at: 2026-05-02T01:09:07.830379Z
+  answer: "User has answered your questions: \"Which PR should I review for Sentry bot comments? All current open PRs are dependabot dep-bumps (#18, 19, 21-29); your scheduled agent's branch won't push until tomorrow.\"=\"Wait until Slice 1 PR exists\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0239
+  asked_at: 2026-05-02T01:57:46.739847Z
+  question: "Bridge auto-dispatch flagged two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006), but a fresh NO-GO landed yesterday on TOP-priority ISOLATION-017 Slice 1 doctor checks (single P1: regex ordering bug lets sqlite:/// raw-DB endpoints pass the scoped-service check). Which path should I take?"
+  options:
+    - "Address ISOLATION-017 NO-GO (Recommended)"
+    - "Process gtkb-command-surface-004 GO"
+    - "Process gtkb-incident-response-006 GO"
+    - "Stand down; await further direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6e852d2cedd17675
+  resolved_at: 2026-05-02T01:57:46.739847Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0242
+  asked_at: 2026-05-02T02:05:36.369803Z
+  question: "Both auto-dispatched bridge entries are stale plan-level GOs (no implementation work owed). Which direction should I take next?"
+  options:
+    - "Resume ISOLATION-017 Slice 1"
+    - "Draft CS-1.5 slice proposal"
+    - "Queue smart-poller filter fix"
+    - "Stand down — no action"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2f0f0945f75835e3
+  resolved_at: 2026-05-02T02:05:36.369803Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0243
+  asked_at: 2026-05-02T02:08:11.559340Z
+  question: "Slice 1 REVISED-1 (-011) is filed and awaits Codex VERIFIED. While that pending, which next item should I advance?"
+  options:
+    - "Slice 2 NEW (recommended)"
+    - "Row 25 banner cosmetic"
+    - "Row 24 bridge-propose helper parity"
+    - "Wait for Codex VERIFIED"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d468defd6dee66ea
+  resolved_at: 2026-05-02T02:08:11.559340Z
+  answer: "User has answered your questions: \"Slice 1 REVISED-1 (-011) is filed and awaits Codex VERIFIED. While that pending, which next item should I advance?\"=\"Slice 2 NEW (recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0245
+  asked_at: 2026-05-02T02:17:41.944916Z
+  question: "Both dispatched GOs are stale (no-op stand-down). What should Prime do next this session?"
+  options:
+    - "End session here (Recommended)"
+    - "File row 24: bridge-propose helper INDEX-parity"
+    - "File row 12: GTKB-COMMAND-SURFACE CS-2 dispatcher hook"
+    - "File row 21: a candidate-spec-intake follow-on bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ce69a36930b3fe0f
+  resolved_at: 2026-05-02T02:17:41.944916Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0246
+  asked_at: 2026-05-02T02:34:32.646305Z
+  question: "Bridge auto-dispatch surfaced two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006) that explicitly do NOT authorize implementation. Standing down on both is the correct dispatch-protocol action. What should I do next?"
+  options:
+    - "Pick up ISOLATION-017 Slice 2 impl (Recommended)"
+    - "Stand down only; await direction"
+    - "File CS-2 dispatcher hook bridge"
+    - "File IR-0 fallback inventory bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2a5b0e7a0efa1fa5
+  resolved_at: 2026-05-02T02:34:32.646305Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0248
+  asked_at: 2026-05-02T02:43:37.490866Z
+  question: "GTKB-COMMAND-SURFACE is plan-GO'd. Do you want to start a slice now, and if so which one?"
+  options:
+    - "Start CS-1.5 (.gitignore fix)"
+    - "Start CS-1 (registry foundation)"
+    - "Defer CS — work other backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 10aa0da650c9253f
+  resolved_at: 2026-05-02T02:43:37.490866Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0249
+  asked_at: 2026-05-02T02:43:37.490866Z
+  question: "GTKB-INCIDENT-RESPONSE IR-0 is BLOCKED on ADR-ISOLATION-APPLICATION-PLACEMENT-001 landing in MemBase + Phase 9 annotation commit. Which path?"
+  options:
+    - "Wait for ADR path"
+    - "Use placement-neutral fallback"
+    - "Defer IR — work other backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 08d5b2b13262b7bb
+  resolved_at: 2026-05-02T02:43:37.490866Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0250
+  asked_at: 2026-05-02T02:48:16.622540Z
+  question: "The two auto-dispatched GOs are plan-level only, and their implementable follow-ons have already shipped (CS-1.5, IR-0.1) — though both completed sub-threads are missing from bridge/INDEX.md. What should I take up next?"
+  options:
+    - "Revise ISOLATION-017 Slice 2 (Recommended)"
+    - "Reconcile INDEX hygiene first"
+    - "File CS-2 implementation bridge"
+    - "Stand down; await further direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cfbef321bd5ac6db
+  resolved_at: 2026-05-02T02:48:16.622540Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0253
+  asked_at: 2026-05-02T02:55:40.376091Z
+  question: "Bridge auto-dispatch stood down on two plan-level GOs (row-22 false-positive scenario). What should this session do next?"
+  options:
+    - "End session here"
+    - "Pivot to ISOLATION-017 Slice 2"
+    - "File row-22 refinement bridge"
+    - "Pick a different work_list item"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c14260bcc354076c
+  resolved_at: 2026-05-02T02:55:40.376091Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0254
+  asked_at: 2026-05-02T02:56:10.607730Z
+  question: "How should Prime Builder dispose of the two stale plan-level GO bridge entries (gtkb-command-surface-004 and gtkb-incident-response-006, both from S310 / 2026-04-26)?"
+  options:
+    - "Park both; rely on standing backlog"
+    - "Advance command-surface CS-1 / CS-1.5 now"
+    - "Advance incident-response IR-0 fallback path"
+    - "Advance both threads now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4412f0186cdaed0f
+  resolved_at: 2026-05-02T02:56:10.607730Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0256
+  asked_at: 2026-05-02T04:39:50.080822Z
+  question: "Both auto-dispatched GO entries are stale plan-level GOs (work_list row 22 false-positive pattern). Which work should I take up next?"
+  options:
+    - "Revise helper-parity bridge"
+    - "File CS-2 scoping bridge"
+    - "File ISOLATION-017 Slice 2.5"
+    - "Stand down; await direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 24899c4f2c812ba2
+  resolved_at: 2026-05-02T04:39:50.080822Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0257
+  asked_at: 2026-05-02T04:44:08.431934Z
+  question: "Both dispatched GOs are plan-level (no Prime action authorized). Which actionable item should Prime pursue next?"
+  options:
+    - "File CS-2 scoping bridge"
+    - "File MEMBASE-RECOVERY Slice A bridge"
+    - "File a CANDIDATE-SPEC-INTAKE follow-on"
+    - "Stand by; resolve pending-owner-decisions backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a913ccb3cc26c419
+  resolved_at: 2026-05-02T04:44:08.431934Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0258
+  asked_at: 2026-05-02T04:49:43.471424Z
+  question: "Both auto-dispatched bridge entries are plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006) with sub-slices already implemented and VERIFIED on separate threads. The smart poller is re-flagging them because there is no closure status on the parent threads. How should I handle them?"
+  options:
+    - "Acknowledge only (Recommended)"
+    - "File closure notes on parents"
+    - "Initiate next sub-slice"
+    - "Show me the parent-vs-child status before I decide"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 86676c6d026e0012
+  resolved_at: 2026-05-02T04:49:43.471424Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0259
+  asked_at: 2026-05-02T04:53:16.438911Z
+  question: "Both selected GOs are plan/architecture-level approvals that explicitly do NOT authorize code changes. CS-004 says \"each CS slice still needs its own bridge proposal\"; IR-006 says \"no IR-0 sub-bridge files until the application-placement ADR is inserted upstream and the Agent Red Phase 9 annotation commit lands.\" How should I proceed for gtkb-command-surface?"
+  options:
+    - "Acknowledge GO; no action"
+    - "Propose CS-1.5 as NEW"
+    - "Propose a different CS slice"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3e4635e0d9fd877a
+  resolved_at: 2026-05-02T04:53:16.438911Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0260
+  asked_at: 2026-05-02T04:53:16.438911Z
+  question: "How should I proceed for gtkb-incident-response?"
+  options:
+    - "Acknowledge GO; no action"
+    - "Verify ADR + Phase 9 state"
+    - "Use placement-neutral fallback"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f704eb4ea3dd5896
+  resolved_at: 2026-05-02T04:53:16.438911Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0261
+  asked_at: 2026-05-02T04:57:35.242887Z
+  question: "Bridge auto-dispatch picked two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006). Neither authorizes implementation, and DECISION-0224 already flagged this. Meanwhile the in-flight thread is gtkb-isolation-017-slice2-5 (GO at -006, uncommitted in working tree). Which should I advance?"
+  options:
+    - "Implement isolation-017 Slice 2.5 (Recommended)"
+    - "File CS-2 implementation slice"
+    - "Stand down — no Prime action"
+    - "Investigate prior session decisions first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e3fd9edbd3898688
+  resolved_at: 2026-05-02T04:57:35.242887Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0263
+  asked_at: 2026-05-02T05:55:06.375677Z
+  question: "Which action should I advance first?"
+  options:
+    - "ISOLATION-017 Slice 3"
+    - "Clear pending decisions"
+    - "Re-scope BRIDGE-PROPOSE-HELPER (row 24)"
+    - "Show me ISOLATION-017 remaining slices first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d4c78027f53752d1
+  resolved_at: 2026-05-02T05:55:06.375677Z
+  answer: "User has answered your questions: \"Which action should I advance first?\"=\"ISOLATION-017 Slice 3\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0264
+  asked_at: 2026-05-02T05:55:06.375677Z
+  question: "How should I handle the 19 pending decisions while Codex reviews Slice 3?"
+  options:
+    - "Clear pending (Recommended)"
+    - "Defer all"
+    - "Walk through one-by-one"
+    - "Leave as-is, do something else"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7b617cf5151e4779
+  resolved_at: 2026-05-02T05:55:06.375677Z
+  answer: "User has answered your questions: \"How should I handle the 19 pending decisions while Codex reviews Slice 3?\"=\"Clear pending (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0208
+  asked_at: 2026-05-01T14:56:00.173625Z
+  question: "ulti-phase work.  **Awaiting owner direction.** Suggested next m"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: a660e67779b14172
+  resolved_at: 2026-05-02T05:56:37.941328Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0210
+  asked_at: 2026-05-01T15:10:44.583591Z
+  question: "ould be addressed.  Awaiting owner direction: continue with `gtkb-isolation-016` Wave 3 REVISED-2 work, file CS-2 slice, address DECISION-0208, or other."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 90b6a48199793031
+  resolved_at: 2026-05-02T05:56:37.941358Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0212
+  asked_at: 2026-05-01T15:15:14.038835Z
+  question: "ot gating on them.  Want me to proceed with REVISED-2, or pause first?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 3d2e7cf1d8eaa077
+  resolved_at: 2026-05-02T05:56:37.941366Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0214
+  asked_at: 2026-05-01T15:50:22.101232Z
+  question: "t Wave 3 thread.  **Awaiting owner direction.** Options: - (a) R"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 0743d22d24ee8f03
+  resolved_at: 2026-05-02T05:56:37.941369Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0216
+  asked_at: 2026-05-01T15:54:23.824982Z
+  question: "──────────────`  ## Awaiting owner direction  Per pending **DECISION-0210**, the right n"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 9526be218bb49677
+  resolved_at: 2026-05-02T05:56:37.941372Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0218
+  asked_at: 2026-05-01T16:48:13.881697Z
+  question: "tage GO follow-up.  Awaiting owner direction on whether to: (a)"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 533be2e81737fdbc
+  resolved_at: 2026-05-02T05:56:37.941376Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0220
+  asked_at: 2026-05-01T16:48:46.417120Z
+  question: "without an answer. Standing by for your direction on which thread to"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: c7d8d3d61fbed883
+  resolved_at: 2026-05-02T05:56:37.941378Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0224
+  asked_at: 2026-05-01T20:59:33.008014Z
+  question: "ompt was cancelled. Standing by for your direction — both dispatched GO entries are plan-level architectural approvals (not implementation work), so no Prime action is required without your input on which path to ta"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 16ba46237daf622f
+  resolved_at: 2026-05-02T05:56:37.941381Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0225
+  asked_at: 2026-05-01T21:05:38.434102Z
+  question: "anked shortlist for your decision  Which would you like me to advance next? (I can also do noth"
+  detected_via: prose:your_decision_q
+  status: resolved
+  question_hash: dc99b176dbf3c5a5
+  resolved_at: 2026-05-02T05:56:37.941383Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0230
+  asked_at: 2026-05-01T23:50:23.843875Z
+  question: ".  No code touched. Standing by for your direction on next work (e.g.,"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 0ceddfbe2d7e2316
+  resolved_at: 2026-05-02T05:56:37.941386Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0233
+  asked_at: 2026-05-02T00:59:54.345282Z
+  question: "cle count is high.  Want me to /schedule a fresh-session cleanup agent for Slice 1 implementation, or prefer to start it manually next time?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 6d2b9bd4707443b8
+  resolved_at: 2026-05-02T05:56:37.941389Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0240
+  asked_at: 2026-05-02T02:03:59.628104Z
+  question: "ntial NEW proposal. Want me to open Slice 2 NEW now, or knock out the small-but-pre-approved items 3 & 4 first?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 04a3a2089c52de57
+  resolved_at: 2026-05-02T05:56:37.941392Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0241
+  asked_at: 2026-05-02T02:05:09.154889Z
+  question: "er dispatch queue.  Awaiting your direction on whether to draft"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: a17031c015461389
+  resolved_at: 2026-05-02T05:56:37.941395Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0244
+  asked_at: 2026-05-02T02:16:58.761743Z
+  question: "new bridge files). Standing by for owner direction on real priority wo"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 26cfdee02d3a9002
+  resolved_at: 2026-05-02T05:56:37.941398Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0247
+  asked_at: 2026-05-02T02:34:32.646305Z
+  question: "s selected entries. Awaiting your direction on whether to pivot"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 3a5d2c104f202440
+  resolved_at: 2026-05-02T05:56:37.941401Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0251
+  asked_at: 2026-05-02T02:48:16.622540Z
+  question: "r work_list row 14. Awaiting your direction on which to take up"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: bd4c9a3c0f62a95d
+  resolved_at: 2026-05-02T05:56:37.941405Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0252
+  asked_at: 2026-05-02T02:55:18.333855Z
+  question: "d; no commits made. Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: c19316a2c8de6f4a
+  resolved_at: 2026-05-02T05:56:37.941408Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0255
+  asked_at: 2026-05-02T04:39:29.773677Z
+  question: "auto-dispatch hook. Awaiting owner direction to either (a) revis"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 800c0a1aa6704951
+  resolved_at: 2026-05-02T05:56:37.941410Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0262
+  asked_at: 2026-05-02T04:57:35.242887Z
+  question: "` landing upstream  Awaiting your direction on whether to advan"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: b834cf01f2acb293
+  resolved_at: 2026-05-02T05:56:37.941413Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0265
+  asked_at: 2026-05-02T05:55:06.375677Z
+  question: "ding by for\"` and `\"Awaiting your direction\"` via regex. It cat"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: bfd54f283e0dad9f
+  resolved_at: 2026-05-02T05:56:37.941416Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0266
+  asked_at: 2026-05-02T05:55:06.375677Z
+  question: "nti-patterns like `\"Standing by for\"` and `\"Awaiting your direction\"` via regex. It cat"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: f10151fecdc4012f
+  resolved_at: 2026-05-02T05:56:37.941419Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0267
+  asked_at: 2026-05-02T05:57:29.170730Z
+  question: "What next while Codex reviews Slice 3?"
+  options:
+    - "Stand by for Codex GO (Recommended)"
+    - "Re-scope row 24 BRIDGE-PROPOSE-HELPER"
+    - "File row 25 wave-banner cosmetic"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7930c2488ac157e1
+  resolved_at: 2026-05-02T05:57:29.170730Z
+  answer: "User has answered your questions: \"What next while Codex reviews Slice 3?\"=\"Stand by for Codex GO (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0268
+  asked_at: 2026-05-02T06:13:13.525437Z
+  question: "What does \"restore to full function\" mean for the smart poller?"
+  options:
+    - "Run doctor + scope from there (Recommended)"
+    - "Drive the umbrella to VERIFIED"
+    - "Address row 22 classification first"
+    - "Reconcile rule-vs-reality drift first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: deaabd6cc679c569
+  resolved_at: 2026-05-02T06:13:13.525437Z
+  answer: "User has answered your questions: \"What does \"restore to full function\" mean for the smart poller?\"=\"Run doctor + scope from there (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0269
+  asked_at: 2026-05-02T06:13:13.525437Z
+  question: "How should I scope \"smart-poller restored to full function\"?"
+  options:
+    - "Doctor-path fix only (Recommended)"
+    - "Doctor-path fix + row 22 classification"
+    - "Drive whole umbrella to VERIFIED"
+    - "Address Slice 3 NO-GO first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7d3b8f415564afe3
+  resolved_at: 2026-05-02T06:13:13.525437Z
+  answer: "User has answered your questions: \"How should I scope \"smart-poller restored to full function\"?\"=\"Doctor-path fix only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0270
+  asked_at: 2026-05-02T06:18:28.217491Z
+  question: "Both auto-dispatched GO entries are plan-level only (not implementation-actionable). What should I do next?"
+  options:
+    - "Stand down, end session"
+    - "Revise ISOLATION-017 Slice 3 NO-GO (Recommended)"
+    - "File CS-2 dispatcher slice proposal"
+    - "File ADR-ISOLATION-APPLICATION-PLACEMENT impl bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2f96ed7c7e7d9177
+  resolved_at: 2026-05-02T06:18:28.217491Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0271
+  asked_at: 2026-05-02T06:26:06.077013Z
+  question: "The dispatch picked two stale plan-level GOs (the documented row-22 false positive). What should this session do next?"
+  options:
+    - "Revise ISOLATION-017 Slice 3 (Recommended)"
+    - "Implement bridge-poller-doctor-path GO"
+    - "Stand down only"
+    - "File CS-2 sub-bridge for command-surface"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 03dbe8c47429672c
+  resolved_at: 2026-05-02T06:26:06.077013Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0275
+  asked_at: 2026-05-02T06:39:30.569902Z
+  question: "Both bridge entries dispatched this turn are plan-level GOs and not actionable. How should I proceed?"
+  options:
+    - "Pick top backlog item (Recommended)"
+    - "Address DECISION-0272"
+    - "File dispatcher-fix proposal"
+    - "Stand down this turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 26b1941d93b080f8
+  resolved_at: 2026-05-02T06:39:30.569902Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0276
+  asked_at: 2026-05-02T06:40:10.772245Z
+  question: "How should I handle IPR/CVR KB row insertion?"
+  options:
+    - "Approve content now — I'll insert (Recommended)"
+    - "Defer KB insertion until after VERIFIED"
+    - "Skip KB insertion entirely"
+    - "Show me the IPR/CVR content first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ec1b358cef9b6686
+  resolved_at: 2026-05-02T06:40:10.772245Z
+  answer: "User has answered your questions: \"How should I handle IPR/CVR KB row insertion?\"=\"Approve content now — I'll insert (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0278
+  asked_at: 2026-05-02T06:44:21.955193Z
+  question: "How should I handle the two dispatched planning-level GO entries (gtkb-command-surface-004 and gtkb-incident-response-006)?"
+  options:
+    - "Defer both, return to S326 (Recommended)"
+    - "Close IR-0.1 audit-trail gap"
+    - "Open a CS-1 or CS-1.5 slice bridge"
+    - "Re-bridge ADR-isolation-application-placement first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9c02c01fb1643a6c
+  resolved_at: 2026-05-02T06:44:21.955193Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0280
+  asked_at: 2026-05-02T13:44:51.540769Z
+  question: "Both dispatched GOs are stale plan-level — what should Prime pursue this turn?"
+  options:
+    - "Revise ISOLATION-017 Slice 3 (Recommended)"
+    - "Commit S326 working tree first"
+    - "Triage 4 pending DECISION-* records"
+    - "Stand down — owner will direct"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5caca684a136ffee
+  resolved_at: 2026-05-02T13:44:51.540769Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0281
+  asked_at: 2026-05-02T13:49:50.480677Z
+  question: "What next?"
+  options:
+    - "Address Slice 3 NO-GO"
+    - "Clear pending decisions + wrap"
+    - "Smart-poller row 22 refinement"
+    - "Wrap session now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5dbdb1e45d5011df
+  resolved_at: 2026-05-02T13:49:50.480677Z
+  answer: "User has answered your questions: \"What next?\"=\"Address Slice 3 NO-GO\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0282
+  asked_at: 2026-05-02T13:57:14.074889Z
+  question: "Two stale plan-level GOs were auto-dispatched (gtkb-command-surface-004 architectural GO + gtkb-incident-response-006 plan-level GO blocked on now-satisfied ADR). Both spawn new multi-slice implementation cycles. Active S326 work has gtkb-isolation-017 slice 3 sitting at NO-GO needing revision. What direction?"
+  options:
+    - "Continue isolation-017 slice 3 (Recommended)"
+    - "Spawn CS-1 next (command-surface)"
+    - "Spawn IR-0 next (incident-response)"
+    - "Close both as VERIFIED-no-impl"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8e4b8c25f2cc0a59
+  resolved_at: 2026-05-02T13:57:14.074889Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0284
+  asked_at: 2026-05-02T14:05:35.423188Z
+  question: "Both dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are stale plan-level approvals that don't authorize implementation. What should I pivot to?"
+  options:
+    - "Revise slice3 init-defaults"
+    - "Revise helper-index-parity"
+    - "Pick from work_list.md"
+    - "Stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7fbd1668379637eb
+  resolved_at: 2026-05-02T14:05:35.423188Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0285
+  asked_at: 2026-05-02T14:30:03.982290Z
+  question: "How should I proceed given the repeated NO-GOs?"
+  options:
+    - "Wrap session, defer both threads (Recommended)"
+    - "Continue revising both"
+    - "Continue Slice 3 only"
+    - "Open scoping re-discussion on Slice 3"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a037f86b4b296cf9
+  resolved_at: 2026-05-02T14:30:03.982290Z
+  answer: "User has answered your questions: \"How should I proceed given the repeated NO-GOs?\"=\"Continue revising both\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0286
+  asked_at: 2026-05-02T17:03:25.081546Z
+  question: "Bridge auto-dispatch surfaced two stale plan-level GOs from 2026-04-26 (command-surface architecture, incident-response plan). Both require new sub-slice proposals or upstream prerequisites — neither is direct code-implementation work. The active program is GTKB-ISOLATION-017 (3 of 8 slices VERIFIED in S326). How should I proceed?"
+  options:
+    - "Resume command-surface (CS-1.5)"
+    - "Unblock incident-response IR-0"
+    - "Continue GTKB-ISOLATION-017"
+    - "Address pending owner decisions"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6d69a9b8fde1dbc5
+  resolved_at: 2026-05-02T17:03:25.081546Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0288
+  asked_at: 2026-05-02T17:07:22.418034Z
+  question: "Both selected GO entries are stale (their slice threads already VERIFIED). What should I pick up next?"
+  options:
+    - "Revise helper-caller-migration"
+    - "Revise isolation-017 slice3"
+    - "Resolve pending owner decisions"
+    - "Pick from standing backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a026668d8fa35f97
+  resolved_at: 2026-05-02T17:07:22.418034Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0290
+  asked_at: 2026-05-02T17:16:11.552489Z
+  question: "How should I handle caller-migration NO-GO #3?"
+  options:
+    - "Defer caller-migration; stand by for Slice 3 VERIFIED (Recommended)"
+    - "File caller-migration REVISED-3 now"
+    - "Pivot to lightweight backlog item"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9811579fb14423e7
+  resolved_at: 2026-05-02T17:16:11.552489Z
+  answer: "User has answered your questions: \"How should I handle caller-migration NO-GO #3?\"=\"Defer caller-migration; stand by for Slice 3 VERIFIED (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0272
+  asked_at: 2026-05-02T06:26:06.077013Z
+  question: "Nothing to commit. Awaiting owner direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 41d4480bb8d64fe6
+  resolved_at: 2026-05-02T17:19:35.223953Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0273
+  asked_at: 2026-05-02T06:39:04.813766Z
+  question: "\"Nothing to commit. Awaiting owner direction.\") remains open and"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 6b6129256d27a2d6
+  resolved_at: 2026-05-02T17:19:35.223975Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0274
+  asked_at: 2026-05-02T06:39:04.813766Z
+  question: "oing in this turn.  Standing by for owner direction or a real actionabl"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 3497417fecfba420
+  resolved_at: 2026-05-02T17:19:35.223980Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0277
+  asked_at: 2026-05-02T06:43:58.885259Z
+  question: "S326 active work.  Standing by for direction. (Ignoring the thre"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 962072dcc615a821
+  resolved_at: 2026-05-02T17:19:35.223982Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0279
+  asked_at: 2026-05-02T13:44:24.474568Z
+  question: "ed inline in S324.  Awaiting your direction on which of the abo"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 4129c7205a933bce
+  resolved_at: 2026-05-02T17:19:35.223984Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0283
+  asked_at: 2026-05-02T14:05:04.106467Z
+  question: "dispatched entries. Awaiting owner direction on whether to: 1. P"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 1eaae7ff255c67c2
+  resolved_at: 2026-05-02T17:19:35.223987Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0287
+  asked_at: 2026-05-02T17:07:01.699481Z
+  question: "on taken this turn. Standing by for owner direction on what to pick up"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: c671fe912a2740dd
+  resolved_at: 2026-05-02T17:19:35.223989Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0289
+  asked_at: 2026-05-02T17:07:22.418034Z
+  question: "Question dismissed. Standing by for owner direction via chat or new pro"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 00b751da3d93e68c
+  resolved_at: 2026-05-02T17:19:35.223991Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0292
+  asked_at: 2026-05-02T17:20:45.868335Z
+  question: "Stand-down complete on the two stale plan-level GOs. What should I action next?"
+  options:
+    - "Slice 3 NO-GO response"
+    - "Helper-caller-migration NO-GO"
+    - "Helper-index-parity NO-GO"
+    - "Stop and report"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7a84e0117a8e494a
+  resolved_at: 2026-05-02T17:20:45.868335Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0293
+  asked_at: 2026-05-02T17:36:16.049645Z
+  question: "Both auto-dispatched GO entries are plan-level (architecture/multi-phase) and explicitly do NOT authorize implementation. I'll stand down on those. What should I pick up instead?"
+  options:
+    - "ISOLATION-017 Slice 4+ (next slice)"
+    - "Re-scope deferred helper threads"
+    - "CS-2 dispatcher slice (command surface)"
+    - "Show full ranked shortlist"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f092cb8eb9a820a4
+  resolved_at: 2026-05-02T17:36:16.049645Z
+  answer: "Answer questions?"
   notes: ""
