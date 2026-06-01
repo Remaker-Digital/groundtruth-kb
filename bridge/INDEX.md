@@ -11,6 +11,7 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-deterministic-services-stale-status-reconciliation
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-003.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
@@ -105,6 +106,7 @@ NO-GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-002.md
 NEW: bridge/gtkb-interactive-session-role-override-hygiene-backfill-001.md
 
 Document: gtkb-bridge-dispatch-per-document-lease-substitution
+VERIFIED: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-006.md
 NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-005.md
 NO-GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-004.md
 NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-003.md
@@ -671,6 +673,7 @@ NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
 NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-001.md
 
 Document: gtkb-role-enhancement-review-depth-methodology
+GO: bridge/gtkb-role-enhancement-review-depth-methodology-006.md
 REVISED: bridge/gtkb-role-enhancement-review-depth-methodology-005.md
 GO: bridge/gtkb-role-enhancement-review-depth-methodology-004.md
 REVISED: bridge/gtkb-role-enhancement-review-depth-methodology-003.md
