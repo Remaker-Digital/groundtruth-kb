@@ -316,6 +316,71 @@ def _extract_bridge_id_from_path(file_path: str) -> str | None:
     return match.group("bridge_id") if match else None
 
 
+# Body status-token rule (GTKB-GOV-PROPOSAL-STANDARDS Slice 1; owner decision
+# DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE; GO at
+# bridge/gtkb-gov-proposal-standards-slice1-023.md). Versioned bridge files
+# (bridge/<slug>-NNN.md) must begin with a canonical status token on the first
+# non-blank line so the file is self-describing and the first line is a
+# reliable routing signal. See .claude/rules/file-bridge-protocol.md
+# "Body Status-Token Rule".
+def _first_line_is_recognized_status(first_line: str) -> bool:
+    """True when ``first_line`` is a canonical bridge status token.
+
+    Mirrors the gate's existing first-line recognition union (the ADVISORY,
+    GO/NO-GO/VERIFIED, and PENDING_PREFLIGHT_STATUSES {NEW, REVISED} checks in
+    ``_deny_reason_for_content``) plus the terminal ``WITHDRAWN`` status used
+    throughout bridge/INDEX.md. Errs toward acceptance (``.startswith`` for
+    verdicts) so the body-status-token rule never false-blocks a line the rest
+    of the gate would recognize.
+    """
+    return (
+        first_line == "ADVISORY"
+        or first_line == "WITHDRAWN"
+        or first_line in PENDING_PREFLIGHT_STATUSES
+        or first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+    )
+
+
+def _ondisk_first_nonblank_line(file_path: str) -> str | None:
+    """Return the current on-disk first non-blank line, or None when the file
+    does not exist or cannot be read. Used for body-status-token grandfathering
+    so the rule does not retroactively break historical files on overwrite.
+    """
+    try:
+        path = Path(file_path)
+        if not path.is_file():
+            return None
+        with path.open("r", encoding="utf-8-sig") as handle:
+            for raw_line in handle:
+                stripped = raw_line.strip()
+                if stripped:
+                    return stripped
+        return ""
+    except OSError:
+        return None
+
+
+def _body_status_token_violation(file_path: str, content: str) -> bool:
+    """True when a versioned bridge file's first non-blank line is not a
+    recognized status token AND the file is not grandfathered.
+
+    New files (and overwrites of files that currently have a canonical first
+    line) must keep a canonical first line. Files that already exist on disk
+    with a non-canonical first line are grandfathered. Non-versioned bridge
+    markdown (no ``-NNN`` suffix, e.g. bridge/INDEX.md is already excluded by
+    ``_is_bridge_markdown_file``) is not subject to the rule.
+    """
+    if _extract_bridge_id_from_path(file_path) is None:
+        return False
+    if _first_line_is_recognized_status(_first_nonblank_line(content)):
+        return False
+    ondisk_first = _ondisk_first_nonblank_line(file_path)
+    # Block when the file is new (no on-disk line) or its current first line is
+    # already canonical (an overwrite must not corrupt a valid status token).
+    # Grandfather only when the on-disk first line is already non-canonical.
+    return ondisk_first is None or _first_line_is_recognized_status(ondisk_first)
+
+
 def _collect_section_lines(lines: list[str], start: int) -> list[str]:
     """Collect section body lines, ignoring headings inside backtick fences."""
     section: list[str] = []
@@ -818,6 +883,17 @@ def _deny_reason_for_content(
     run_pending_preflight: bool = True,
 ) -> str | None:
     if _is_bridge_markdown_file(file_path) and content:
+        if _body_status_token_violation(file_path, content):
+            return (
+                "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must begin with a "
+                "canonical status token on the first non-blank line: one of NEW, REVISED, GO, "
+                "NO-GO, VERIFIED, ADVISORY, WITHDRAWN. The first non-blank line was "
+                f"{_first_nonblank_line(content)!r}. Put the status token on line 1 (headings "
+                "and prose follow it). Existing files with a non-canonical first line are "
+                "grandfathered. (Hard-block per GTKB-GOV-PROPOSAL-STANDARDS Slice 1 "
+                "body-status-token rule; see .claude/rules/file-bridge-protocol.md "
+                "section 'Body Status-Token Rule'.)"
+            )
         first_line = _first_nonblank_line(content)
         if first_line == "ADVISORY" and not _is_template_shaped_advisory_report(content):
             return (

@@ -103,7 +103,12 @@ def test_proposal_lacking_spec_links_blocked_with_deny() -> None:
             "hook_event_name": "PreToolUse",
             "tool_name": "Write",
             "tool_input": {
-                "file_path": "bridge/test-fake-proposal-no-spec-links-001.md",
+                # Non-versioned bridge path (no -NNN): exempts the
+                # GTKB-GOV-PROPOSAL-STANDARDS Slice 1 body-status-token rule
+                # (versioned-only) so this fixture isolates the Specification
+                # Links clause under test. Versioned-heading-first BLOCK behavior
+                # is covered by test_bridge_compliance_gate_body_status_token.py.
+                "file_path": "bridge/test-fake-proposal-no-spec-links.md",
                 "content": "# Implementation Proposal\n\nDo a thing without citing any specs.",
             },
             "session_id": "test",
@@ -469,7 +474,10 @@ def test_compliant_proposal_passes() -> None:
             "hook_event_name": "PreToolUse",
             "tool_name": "Write",
             "tool_input": {
-                "file_path": "bridge/test-fake-compliant-001.md",
+                # Non-versioned bridge path (see body-status-token note above):
+                # isolates the Specification Links clause from the versioned-only
+                # Slice 1 rule.
+                "file_path": "bridge/test-fake-compliant.md",
                 "content": (
                     "# Implementation Proposal\n\n"
                     "## Specification Links\n\n"

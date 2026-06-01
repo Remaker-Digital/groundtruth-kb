@@ -230,6 +230,30 @@ index file (after the header comments).
 | VERIFIED | Loyal Opposition | Post-implementation verification passed |
 | ADVISORY | Loyal Opposition | Owner-initiated advisory report; non-dispatchable; awaiting Prime acknowledgement and disposition decision (NOT awaiting GO/NO-GO/VERIFIED). |
 
+## Body Status-Token Rule
+
+Versioned bridge files (`bridge/<slug>-NNN.md`) MUST begin with a canonical
+status token on the first non-blank line: one of `NEW`, `REVISED`, `GO`,
+`NO-GO`, `VERIFIED`, `ADVISORY`, or `WITHDRAWN`. Headings and prose follow the
+token. This keeps each bridge file self-describing and makes the first line a
+reliable routing signal independent of `bridge/INDEX.md`.
+
+The rule is mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`
+(activated byte-for-byte from
+`groundtruth-kb/templates/hooks/bridge-compliance-gate.py`): a `Write` of a
+versioned bridge file whose first non-blank line is not a recognized status
+token is hard-blocked. The rule fires only on the `Write` tool (full file
+content); `Edit` operations are not subject to it. Files that already exist on
+disk with a non-canonical first line are grandfathered, so the rule never
+retroactively breaks historical bridge files on overwrite. `bridge/INDEX.md`
+and non-versioned bridge markdown are exempt. `WITHDRAWN` is an accepted
+canonical token even though it does not appear in the Statuses table above,
+because it is used throughout `bridge/INDEX.md` as a terminal status.
+
+Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
+(`DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`; GO at
+`bridge/gtkb-gov-proposal-standards-slice1-025.md`).
+
 ## Advisory Reports
 
 **Purpose:** Owner-initiated advisory reports are first-class workflow state, not transport workarounds via `NO-GO@001`.

@@ -17,6 +17,7 @@ REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-002.md
 NEW: bridge/gtkb-role-enhancement-isolation-dependency-reframe-001.md
 
 Document: gtkb-gov-proposal-standards-slice1
+NEW: bridge/gtkb-gov-proposal-standards-slice1-026.md
 GO: bridge/gtkb-gov-proposal-standards-slice1-025.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-024.md
 GO: bridge/gtkb-gov-proposal-standards-slice1-023.md
@@ -1162,6 +1163,7 @@ NEW: bridge/gtkb-verify-verdict-author-skill-slice-1-001.md
 
 Document: gtkb-bridge-mode-config-transactions-slice-1
 GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-008.md
+REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-009.md
 REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-007.md
 GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-006.md
 REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-005.md

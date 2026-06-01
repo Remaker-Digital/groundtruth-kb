@@ -29,6 +29,16 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 
+# Body-status-token rule (GTKB-GOV-PROPOSAL-STANDARDS Slice 1): the rule blocks a
+# heading-first first line only for VERSIONED bridge files (bridge/<slug>-NNN.md).
+# These calibration fixtures isolate the Specification Links section-scanner, so
+# they use NON-VERSIONED bridge paths (no -NNN suffix): the body-status-token rule
+# exempts them, while _is_bridge_markdown_file still routes them through the
+# spec-links logic under test. (Leading a fixture with NEW instead would subject it
+# to the pending-applicability-preflight, which hard-denies a minimal fixture whose
+# fake bridge id is absent from bridge/INDEX.md.) The versioned-heading-first BLOCK
+# behavior is covered by test_bridge_compliance_gate_body_status_token.py.
+
 
 def _run_hook(file_path: str, content: str) -> dict:
     """Run the live bridge-compliance gate on a Write payload and return the
@@ -73,7 +83,7 @@ def test_compliance_gate_heading_ambiguity_asks() -> None:
         "- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001\n"
         "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
     )
-    output = _run_hook("bridge/test-w4-heading-ambiguity-001.md", content)
+    output = _run_hook("bridge/test-w4-heading-ambiguity.md", content)
     assert _decision(output) == "ask", f"heading-format ambiguity must ask, not deny/pass; got {output}"
 
 
@@ -83,7 +93,7 @@ def test_compliance_gate_absent_section_still_denies() -> None:
     still hard-denied. A genuinely absent section is not a misdetection.
     """
     content = "# Implementation Proposal\n\nThis proposal changes behavior. It cites no governing rule.\n"
-    output = _run_hook("bridge/test-w4-absent-section-001.md", content)
+    output = _run_hook("bridge/test-w4-absent-section.md", content)
     assert _decision(output) == "deny", f"a genuinely absent section must still deny; got {output}"
     assert "Specification Links" in output.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
 
@@ -103,7 +113,7 @@ def test_compliance_gate_concrete_links_with_placeholder_word_passes() -> None:
         "none of the prior deliberations rejected this approach.\n"
         "- GOV-FILE-BRIDGE-AUTHORITY-001 - the bridge index is canonical workflow state.\n"
     )
-    output = _run_hook("bridge/test-w4-placeholder-word-001.md", content)
+    output = _run_hook("bridge/test-w4-placeholder-word.md", content)
     assert _decision(output) != "deny", (
         f"a section with genuine citations must not be denied for a placeholder word in rationale; got {output}"
     )
@@ -115,5 +125,5 @@ def test_compliance_gate_placeholder_only_section_still_rejected() -> None:
     is still hard-denied.
     """
     content = "# Implementation Proposal\n\n## Specification Links\n\n- TBD\n"
-    output = _run_hook("bridge/test-w4-placeholder-only-001.md", content)
+    output = _run_hook("bridge/test-w4-placeholder-only.md", content)
     assert _decision(output) == "deny", f"a placeholder-only section must still deny; got {output}"
