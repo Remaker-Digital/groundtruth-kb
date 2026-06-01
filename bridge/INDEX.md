@@ -6,6 +6,9 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-deterministic-services-stale-status-reconciliation
+NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
+
 Document: gtkb-dispatch-owner-approval-forgery-prevention
 NO-GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-002.md
 NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-001.md
