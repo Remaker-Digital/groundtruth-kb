@@ -30,6 +30,7 @@ from groundtruth_kb.cli_approval_packet import (
     format_result,
     run_generate_approval_packet,
 )
+from groundtruth_kb.cli_backlog_update import BacklogUpdateError, BacklogUpdateRequest, update_backlog_item
 from groundtruth_kb.cli_bridge_propose import bridge_group
 from groundtruth_kb.cli_deliberations_record import (
     DeliberationRecordError,
@@ -624,6 +625,128 @@ def backlog_add(
     click.echo(f"{action} {result['id']}")
 
 
+@backlog.command("authorize-implementation")
+@click.argument("work_item_id")
+@click.option(
+    "--owner-decision",
+    default=None,
+    help="Existing owner-authority deliberation id (DELIB-NNNN) to cite as the authorization basis.",
+)
+@click.option("--auq-id", default=None, help="Fresh AUQ evidence id (records a new owner_conversation deliberation).")
+@click.option("--auq-answer", default=None, help="Owner answer text for the fresh AUQ evidence.")
+@click.option(
+    "--decision-content-file",
+    default=None,
+    help="In-root file whose contents become the fresh owner-decision deliberation body.",
+)
+@click.option("--decision-title", default=None, help="Title for the fresh deliberation (fresh-AUQ path only).")
+@click.option("--decision-summary", default=None, help="Summary for the fresh deliberation (fresh-AUQ path only).")
+@click.option(
+    "--project",
+    "project_id",
+    default=None,
+    help="Project to authorize (defaults to the work item's sole active project membership).",
+)
+@click.option(
+    "--include-spec",
+    "include_spec_ids",
+    multiple=True,
+    help="Governing specification to include (repeatable; at least one required).",
+)
+@click.option(
+    "--allowed-mutation",
+    "allowed_mutation_classes",
+    multiple=True,
+    help="Allowed mutation class (repeatable; at least one required).",
+)
+@click.option("--forbid", "forbidden_operations", multiple=True, help="Forbidden operation (repeatable).")
+@click.option("--id", "authorization_id", default=None, help="Explicit authorization id.")
+@click.option("--name", "authorization_name", default=None, help="Authorization name.")
+@click.option("--scope", "scope_summary", default=None, help="Bounded authorization scope summary.")
+@click.option("--change-reason", required=True, help="History reason for the authorization and deliberation writes.")
+@click.option("--session-id", default=None, help="Session id for the fresh deliberation (fresh-AUQ path only).")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Resolve and validate, then report the proposed authorization without writing.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_authorize_implementation(
+    ctx: click.Context,
+    work_item_id: str,
+    owner_decision: str | None,
+    auq_id: str | None,
+    auq_answer: str | None,
+    decision_content_file: str | None,
+    decision_title: str | None,
+    decision_summary: str | None,
+    project_id: str | None,
+    include_spec_ids: tuple[str, ...],
+    allowed_mutation_classes: tuple[str, ...],
+    forbidden_operations: tuple[str, ...],
+    authorization_id: str | None,
+    authorization_name: str | None,
+    scope_summary: str | None,
+    change_reason: str,
+    session_id: str | None,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Authorize a single owner-selected work item for implementation.
+
+    Collapses the record-owner-decision-deliberation plus
+    create-project-authorization plumbing into one governed command. Requires
+    owner-decision evidence (an existing owner-authority deliberation via
+    --owner-decision, or fresh AUQ evidence) and fails closed without it; it does
+    not let Prime self-authorize and it changes no gate logic.
+    """
+    from groundtruth_kb.cli_backlog_authorize_implementation import (
+        AuthorizeImplementationError,
+        AuthorizeImplementationRequest,
+        authorize_implementation,
+    )
+
+    config = _resolve_config(ctx)
+    request = AuthorizeImplementationRequest(
+        work_item_id=work_item_id,
+        owner_decision=owner_decision,
+        auq_id=auq_id,
+        auq_answer=auq_answer,
+        decision_content_file=decision_content_file,
+        decision_title=decision_title,
+        decision_summary=decision_summary,
+        project_id=project_id,
+        include_spec_ids=include_spec_ids,
+        allowed_mutation_classes=allowed_mutation_classes,
+        forbidden_operations=forbidden_operations,
+        authorization_id=authorization_id,
+        authorization_name=authorization_name,
+        scope_summary=scope_summary,
+        change_reason=change_reason,
+        session_id=session_id,
+        dry_run=dry_run,
+    )
+    try:
+        result = authorize_implementation(config, request)
+    except (AuthorizeImplementationError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+    if result["dry_run"]:
+        click.echo(
+            f"Would authorize {result['work_item_id']} in {result['project_id']} "
+            f"(owner decision {result['owner_decision']})."
+        )
+        return
+    click.echo(
+        f"Authorized {result['work_item_id']} in {result['project_id']} with "
+        f"{result['authorization_id']} (owner decision {result['owner_decision']})."
+    )
+
+
 @backlog.command("add-work-item")
 @click.option("--title", required=True, help="Work item title.")
 @click.option(
@@ -902,6 +1025,104 @@ def backlog_status(
         click.echo(f"Orphan work items: {len(result['orphan_work_items'])}")
     if "scanner_caveat" in result:
         click.echo(f"\n[scanner_caveat] {result['scanner_caveat']}")
+
+
+@backlog.command("update")
+@click.argument("work_item_id")
+@click.option("--resolution-status", default=None, help="New resolution status.")
+@click.option("--stage", default=None, help="New stage.")
+@click.option("--priority", default=None, type=click.Choice(["P0", "P1", "P2", "P3"]), help="New priority.")
+@click.option("--related-bridge-threads", default=None, help="JSON array of related bridge file paths.")
+@click.option("--status-detail", default=None, help="New status detail.")
+@click.option("--owner-approved", is_flag=True, help="Flag proving owner approval.")
+@click.option("--change-reason", required=True, help="History reason for the update.")
+@click.option("--dry-run", is_flag=True, help="Validate and report would-be changes without writing.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_update(
+    ctx: click.Context,
+    work_item_id: str,
+    resolution_status: str | None,
+    stage: str | None,
+    priority: str | None,
+    related_bridge_threads: str | None,
+    status_detail: str | None,
+    owner_approved: bool,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Update field values of a single backlog work item."""
+    config = _resolve_config(ctx)
+    request = BacklogUpdateRequest(
+        work_item_id=work_item_id,
+        resolution_status=resolution_status,
+        stage=stage,
+        priority=priority,
+        related_bridge_threads=related_bridge_threads,
+        status_detail=status_detail,
+        owner_approved=owner_approved,
+        change_reason=change_reason,
+        dry_run=dry_run,
+    )
+    try:
+        result = update_backlog_item(config, request)
+    except (BacklogUpdateError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+
+    action = "Would update" if result["dry_run"] else "Updated"
+    click.echo(f"{action} work item {result['work_item_id']}.")
+
+
+@backlog.command("resolve")
+@click.argument("work_item_id")
+@click.option("--priority", default=None, type=click.Choice(["P0", "P1", "P2", "P3"]), help="New priority.")
+@click.option("--related-bridge-threads", default=None, help="JSON array of related bridge file paths.")
+@click.option("--status-detail", default=None, help="New status detail.")
+@click.option("--owner-approved", is_flag=True, help="Flag proving owner approval.")
+@click.option("--change-reason", required=True, help="History reason for the update.")
+@click.option("--dry-run", is_flag=True, help="Validate and report would-be changes without writing.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_resolve(
+    ctx: click.Context,
+    work_item_id: str,
+    priority: str | None,
+    related_bridge_threads: str | None,
+    status_detail: str | None,
+    owner_approved: bool,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Resolve a work item (shortcut for update --resolution-status resolved --stage resolved)."""
+    config = _resolve_config(ctx)
+    request = BacklogUpdateRequest(
+        work_item_id=work_item_id,
+        resolution_status="resolved",
+        stage="resolved",
+        priority=priority,
+        related_bridge_threads=related_bridge_threads,
+        status_detail=status_detail,
+        owner_approved=owner_approved,
+        change_reason=change_reason,
+        dry_run=dry_run,
+    )
+    try:
+        result = update_backlog_item(config, request)
+    except (BacklogUpdateError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+
+    action = "Would resolve" if result["dry_run"] else "Resolved"
+    click.echo(f"{action} work item {result['work_item_id']}.")
 
 
 # ---------------------------------------------------------------------------
