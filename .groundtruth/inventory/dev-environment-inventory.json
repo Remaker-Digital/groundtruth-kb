@@ -5,7 +5,7 @@
     "script_hash": "sha256:a5e5cfe931d26a1b101539fb979180f619ffea7a1715344d1bb80a227053001b",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-01T17:35:02Z",
+  "generated_at": "2026-06-01T18:32:33Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -62,21 +62,21 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "loyal-opposition"
+          "prime-builder"
         ],
         "status": "verified"
       },
       "B": {
         "harness_type": "claude",
-        "role": [
-          "prime-builder"
-        ],
-        "status": "verified"
+        "role": [],
+        "status": "unknown"
       },
       "C": {
         "harness_type": "antigravity",
-        "role": [],
-        "status": "unknown"
+        "role": [
+          "loyal-opposition"
+        ],
+        "status": "verified"
       }
     }
   },
@@ -285,7 +285,7 @@
   "role_by_harness_compatibility": [
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "unknown",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "prime-builder",
@@ -362,7 +362,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -439,7 +439,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "unknown",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "loyal-opposition",
@@ -516,7 +516,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
@@ -655,7 +655,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -669,7 +669,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {

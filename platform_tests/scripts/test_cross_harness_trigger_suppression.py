@@ -87,7 +87,7 @@ def _make_test_target_lo(trigger_module):
 
 
 def _write_harness_state_fixtures(project_root: Path) -> None:
-    """Write harness-state/role-assignments.json + harness-identities.json.
+    """Write harness-state/role-assignments.json + harness-identities.json + harness-registry.json.
 
     Required by run_trigger's IP-3b call to _resolve_dispatch_target. Default
     fixture: claude=B=prime-builder, codex=A=loyal-opposition (mirrors live
@@ -114,6 +114,45 @@ def _write_harness_state_fixtures(project_root: Path) -> None:
                     "B": {"role": "prime-builder", "harness_type": "claude"},
                     "A": {"role": "loyal-opposition", "harness_type": "codex"},
                 },
+            }
+        )
+    )
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "role": ["loyal-opposition"],
+                        "invocation_surfaces": {
+                            "headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}
+                        },
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "role": ["prime-builder"],
+                        "invocation_surfaces": {
+                            "headless": {
+                                "argv": [
+                                    "claude",
+                                    "-p",
+                                    "{{PROMPT}}",
+                                    "--add-dir",
+                                    "{{PROJECT_ROOT}}",
+                                    "--output-format",
+                                    "json",
+                                ]
+                            }
+                        },
+                    },
+                ],
             }
         )
     )
@@ -244,9 +283,11 @@ def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(trigge
     project_root = _make_minimal_index(tmp_path)
     state_dir = tmp_path / "state"
     state_dir.mkdir()
-    # Plant a counterpart active-claude-session lock so Prime dispatch
-    # is suppressed (recipient=prime, counterpart=claude).
-    _write_lock(state_dir, "claude")
+    # Plant a document lease so Prime dispatch is suppressed.
+    sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+    from bridge_lease_registry import acquire_lease
+
+    acquire_lease("test-suppression-fixture", action="review", state_dir=state_dir)
 
     result = _run_trigger_dry(trigger_module, project_root, state_dir)
 
@@ -273,7 +314,12 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
     state_dir = tmp_path / "state"
     state_dir.mkdir()
     # Step A: counterpart active.
-    claude_lock = _write_lock(state_dir, "claude")
+    sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+    from bridge_lease_registry import acquire_lease, release_lease
+
+    lease = acquire_lease("test-suppression-fixture", action="review", state_dir=state_dir)
+    assert lease is not None
+
     result_a = _run_trigger_dry(trigger_module, project_root, state_dir)
     prime_state_a = result_a["dispatch_state"]["recipients"]["prime-builder"]
     assert prime_state_a["last_result"] == "counterpart_active_session_present"
@@ -281,7 +327,7 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
     assert suppressed_sig is not None
 
     # Step B: counterpart exits.
-    claude_lock.unlink()
+    release_lease(lease)
     # Same INDEX content → same signature.
     result_b = _run_trigger_dry(trigger_module, project_root, state_dir)
     prime_state_b = result_b["dispatch_state"]["recipients"]["prime-builder"]
@@ -365,7 +411,10 @@ def test_run_trigger_legacy_signature_field_preserved_during_suppression(trigger
         bridge_index.read_text() + "\nDocument: another-fixture\nGO: bridge/another-fixture-001.md\n"
     )
     (project_root / "bridge" / "another-fixture-001.md").write_text("GO\n")
-    _write_lock(state_dir, "claude")
+    sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+    from bridge_lease_registry import acquire_lease
+
+    acquire_lease("another-fixture", action="review", state_dir=state_dir)
 
     _run_trigger_dry(trigger_module, project_root, state_dir)
     state_second = json.loads((state_dir / "dispatch-state.json").read_text())

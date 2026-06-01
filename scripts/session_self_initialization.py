@@ -967,7 +967,13 @@ def _scope_counts(rows: list[dict[str, Any] | sqlite3.Row]) -> dict[str, int]:
 
 def _is_agent_red_scope(row: dict[str, Any] | sqlite3.Row, *, primary_only: bool = False) -> bool:
     included = AGENT_RED_PRIMARY_SCOPE_INCLUDED if primary_only else AGENT_RED_SCOPE_INCLUDED
-    return classify_dashboard_scope(row) in included
+    if isinstance(row, dict):
+        if "_cached_scope" not in row:
+            row["_cached_scope"] = classify_dashboard_scope(row)
+        scope = row["_cached_scope"]
+    else:
+        scope = classify_dashboard_scope(row)
+    return scope in included
 
 
 def _work_item_priority_rank(row: dict[str, Any]) -> int:
