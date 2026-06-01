@@ -6,7 +6,17 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-index-agent-edit-serialization-scoping
+NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-003.md
+REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-002.md
+NEW: bridge/gtkb-index-agent-edit-serialization-scoping-001.md
+Document: gtkb-role-enhancement-isolation-dependency-reframe
+NO-GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-003.md
+REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-002.md
+NEW: bridge/gtkb-role-enhancement-isolation-dependency-reframe-001.md
+
 Document: gtkb-gov-proposal-standards-slice1
+GO: bridge/gtkb-gov-proposal-standards-slice1-025.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-024.md
 GO: bridge/gtkb-gov-proposal-standards-slice1-023.md
 NEW: bridge/gtkb-gov-proposal-standards-slice1-022.md
@@ -681,6 +691,8 @@ NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
 NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-001.md
 
 Document: gtkb-role-enhancement-review-depth-methodology
+VERIFIED: bridge/gtkb-role-enhancement-review-depth-methodology-008.md
+NEW: bridge/gtkb-role-enhancement-review-depth-methodology-007.md
 GO: bridge/gtkb-role-enhancement-review-depth-methodology-006.md
 REVISED: bridge/gtkb-role-enhancement-review-depth-methodology-005.md
 GO: bridge/gtkb-role-enhancement-review-depth-methodology-004.md
