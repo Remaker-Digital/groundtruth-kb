@@ -6,7 +6,37 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-role-status-orthogonality-dispatch-slice-2-resolver
+GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-002.md
+NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-001.md
+
+Document: gtkb-backlog-update-cli-slice-1
+REVISED: bridge/gtkb-backlog-update-cli-slice-1-003.md
+NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
+NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
+
+Document: gtkb-stale-thread-closure-slice-3-impl
+NO-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-002.md
+NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-001.md
+
+Document: gtkb-adr-0001-membase-migration
+NEW: bridge/gtkb-adr-0001-membase-migration-007.md
+GO: bridge/gtkb-adr-0001-membase-migration-006.md
+REVISED: bridge/gtkb-adr-0001-membase-migration-005.md
+GO: bridge/gtkb-adr-0001-membase-migration-004.md
+REVISED: bridge/gtkb-adr-0001-membase-migration-003.md
+NO-GO: bridge/gtkb-adr-0001-membase-migration-002.md
+NEW: bridge/gtkb-adr-0001-membase-migration-001.md
+
 Document: gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl
+VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-010.md
+REVISED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-009.md
+NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-008.md
+NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-007.md
+GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-006.md
+REVISED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-005.md
+NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-004.md
+REVISED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-003.md
 NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-002.md
 NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-001.md
 
