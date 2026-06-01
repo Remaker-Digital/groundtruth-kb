@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-06-01T17:20:16Z
+Generated: 2026-06-01T17:35:02Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:a5e5cfe931d26a1b101539fb979180f619ffea7a1715344d1bb80a227053001b)
 
 ## Project
@@ -26,9 +26,9 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:a5e5cfe931d26a1b101539fb979
 | `npm` | verified | `11.6.2` | `npm --version` |
 | `pip` | verified | `25.3` | `python -m pip --version` |
 | `playwright` | unsupported | `unknown` | `playwright --version` |
-| `pytest` | verified | `9.0.2` | `python -m pytest --version` |
+| `pytest` | verified | `9.0.3` | `python -m pytest --version` |
 | `python` | verified | `3.14.0` | `python --version` |
-| `ruff` | verified | `0.15.5` | `python -m ruff --version` |
+| `ruff` | verified | `0.15.12` | `python -m ruff --version` |
 
 ## Harness And Repo Surfaces
 

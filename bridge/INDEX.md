@@ -6,20 +6,25 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-startup-enhancements-completion-reconciliation
+GO: bridge/gtkb-startup-enhancements-completion-reconciliation-005.md
+REVISED: bridge/gtkb-startup-enhancements-completion-reconciliation-004.md
+NO-GO: bridge/gtkb-startup-enhancements-completion-reconciliation-003.md
+REVISED: bridge/gtkb-startup-enhancements-completion-reconciliation-002.md
+NEW: bridge/gtkb-startup-enhancements-completion-reconciliation-001.md
+
 Document: gtkb-da-enforcement-completion-slice1-decompose
+NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-003.md
+NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-002.md
 NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
+NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-001.md
 
 Document: gtkb-bridge-contention-consolidation
 NO-GO: bridge/gtkb-bridge-contention-consolidation-002.md
 NEW: bridge/gtkb-bridge-contention-consolidation-001.md
-
-Document: gtkb-startup-enhancements-completion-reconciliation
-NO-GO: bridge/gtkb-startup-enhancements-completion-reconciliation-003.md
-REVISED: bridge/gtkb-startup-enhancements-completion-reconciliation-002.md
-NEW: bridge/gtkb-startup-enhancements-completion-reconciliation-001.md
 
 Document: gtkb-index-agent-edit-serialization-scoping
 NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-005.md
@@ -28,6 +33,7 @@ NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-003.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-scoping-001.md
 Document: gtkb-role-enhancement-isolation-dependency-reframe
+GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-007.md
 REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-006.md
 GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-005.md
 REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-004.md
@@ -48,6 +54,7 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-deterministic-services-stale-status-reconciliation
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-008.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
@@ -1036,6 +1043,7 @@ NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
 NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-001.md
 
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
+VERIFIED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-017.md
 REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-016.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-015.md
 NEW: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-014.md
