@@ -6,17 +6,36 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-da-enforcement-completion-slice1-decompose
+NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-001.md
+
+Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
+NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-001.md
+
+Document: gtkb-bridge-contention-consolidation
+NO-GO: bridge/gtkb-bridge-contention-consolidation-002.md
+NEW: bridge/gtkb-bridge-contention-consolidation-001.md
+
+Document: gtkb-startup-enhancements-completion-reconciliation
+NO-GO: bridge/gtkb-startup-enhancements-completion-reconciliation-003.md
+REVISED: bridge/gtkb-startup-enhancements-completion-reconciliation-002.md
+NEW: bridge/gtkb-startup-enhancements-completion-reconciliation-001.md
+
 Document: gtkb-index-agent-edit-serialization-scoping
+NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-005.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-004.md
 NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-003.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-scoping-001.md
 Document: gtkb-role-enhancement-isolation-dependency-reframe
+GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-005.md
+REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-004.md
 NO-GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-003.md
 REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-002.md
 NEW: bridge/gtkb-role-enhancement-isolation-dependency-reframe-001.md
 
 Document: gtkb-gov-proposal-standards-slice1
+VERIFIED: bridge/gtkb-gov-proposal-standards-slice1-027.md
 NEW: bridge/gtkb-gov-proposal-standards-slice1-026.md
 GO: bridge/gtkb-gov-proposal-standards-slice1-025.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-024.md
@@ -28,6 +47,7 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-deterministic-services-stale-status-reconciliation
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
@@ -1015,6 +1035,9 @@ NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
 NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-001.md
 
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
+REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-016.md
+NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-015.md
+NEW: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-014.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-013.md
 REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-012.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-011.md
@@ -1120,6 +1143,10 @@ NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-002.md
 NEW: bridge/gtkb-prime-worker-delivery-regression-slice-4-001.md
 
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
+NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-010.md
+NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-009.md
+NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-008.md
+REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-007.md
 GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-006.md
 REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-005.md
 GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-004.md
@@ -1128,6 +1155,8 @@ NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-002.md
 NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-001.md
 
 Document: gtkb-prime-worker-context-aware-auq-slice-2
+NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-010.md
+REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-009.md
 NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-008.md
 REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-007.md
 NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-006.md
@@ -1138,6 +1167,8 @@ NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-002.md
 NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-001.md
 
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
+NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-008.md
+REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-007.md
 NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-006.md
 NEW: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-005.md
 GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-004.md
@@ -1162,8 +1193,12 @@ GO: bridge/gtkb-verify-verdict-author-skill-slice-1-002.md
 NEW: bridge/gtkb-verify-verdict-author-skill-slice-1-001.md
 
 Document: gtkb-bridge-mode-config-transactions-slice-1
-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-008.md
+NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-013.md
+REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-012.md
+NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-011.md
+NEW: bridge/gtkb-bridge-mode-config-transactions-slice-1-010.md
 REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-009.md
+GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-008.md
 REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-007.md
 GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-006.md
 REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-005.md
@@ -1171,6 +1206,7 @@ NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-004.md
 REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-003.md
 NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-002.md
 NEW: bridge/gtkb-bridge-mode-config-transactions-slice-1-001.md
+
 
 Document: gtkb-lo-hygiene-assessment-skill-advisory-disposition
 VERIFIED: bridge/gtkb-lo-hygiene-assessment-skill-advisory-disposition-004.md
