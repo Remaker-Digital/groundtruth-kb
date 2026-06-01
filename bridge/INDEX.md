@@ -11,6 +11,8 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-deterministic-services-stale-status-reconciliation
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-003.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
 
@@ -103,6 +105,9 @@ NO-GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-002.md
 NEW: bridge/gtkb-interactive-session-role-override-hygiene-backfill-001.md
 
 Document: gtkb-bridge-dispatch-per-document-lease-substitution
+NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-005.md
+NO-GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-004.md
+NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-003.md
 GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-002.md
 NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-001.md
 
@@ -454,6 +459,8 @@ NO-GO: bridge/gtkb-skill-modernization-scoping-002.md
 NEW: bridge/gtkb-skill-modernization-scoping-001.md
 
 Document: gtkb-headless-gemini-lo-dispatch-verification
+GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-014.md
+REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-013.md
 NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-012.md
 REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-011.md
 NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-010.md
@@ -664,6 +671,7 @@ NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
 NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-001.md
 
 Document: gtkb-role-enhancement-review-depth-methodology
+REVISED: bridge/gtkb-role-enhancement-review-depth-methodology-005.md
 GO: bridge/gtkb-role-enhancement-review-depth-methodology-004.md
 REVISED: bridge/gtkb-role-enhancement-review-depth-methodology-003.md
 NO-GO: bridge/gtkb-role-enhancement-review-depth-methodology-002.md
@@ -982,6 +990,7 @@ NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
 NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-001.md
 
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
+NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-011.md
 REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-010.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-009.md
 REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-007.md
