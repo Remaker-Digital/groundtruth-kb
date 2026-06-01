@@ -28,6 +28,7 @@ NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-003.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-scoping-001.md
 Document: gtkb-role-enhancement-isolation-dependency-reframe
+REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-006.md
 GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-005.md
 REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-004.md
 NO-GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-003.md
