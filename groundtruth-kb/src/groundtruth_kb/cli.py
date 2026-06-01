@@ -4746,6 +4746,55 @@ def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str, defe
     )
 
 
+@mode_group.command("set-bridge-substrate")
+@click.option(
+    "--substrate",
+    "substrate",
+    required=True,
+    type=click.Choice(["cross_harness_trigger", "single_harness_dispatcher", "none"]),
+    help="Bridge dispatch substrate to assign",
+)
+@click.option("--reason", "reason", default="manual substrate-switch via gt mode set-bridge-substrate")
+@click.option(
+    "--defer-to-next-session",
+    "defer",
+    is_flag=True,
+    help="Queue for SessionStart application instead of mid-session apply",
+)
+@click.pass_context
+def mode_set_bridge_substrate(ctx: click.Context, substrate: str, reason: str, defer: bool) -> None:
+    """Apply (or defer) a bridge-substrate transaction."""
+    import json as _json
+    from pathlib import Path
+
+    from groundtruth_kb.mode_switch.bridge_substrate import (
+        apply_bridge_substrate_switch,
+        defer_bridge_substrate_switch,
+    )
+    from groundtruth_kb.mode_switch.transaction import TransactionValidationError
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root)
+    if defer:
+        path = defer_bridge_substrate_switch(root, substrate, change_reason=reason)
+        click.echo(_json.dumps({"deferred": True, "pending_path": str(path)}, indent=2))
+        return
+    try:
+        audit_path = apply_bridge_substrate_switch(root, substrate, change_reason=reason)
+    except TransactionValidationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        _json.dumps(
+            {
+                "applied": True,
+                "substrate": substrate,
+                "audit_record_path": str(audit_path),
+            },
+            indent=2,
+        )
+    )
+
+
 @mode_group.command("list-pending")
 @click.pass_context
 def mode_list_pending(ctx: click.Context) -> None:
@@ -4761,8 +4810,10 @@ def mode_list_pending(ctx: click.Context) -> None:
     payload = [
         {
             "path": str(entry.path),
+            "axis": entry.axis,
             "harness_id_or_name": entry.harness_id_or_name,
             "role": entry.role,
+            "substrate": entry.substrate,
             "change_reason": entry.change_reason,
             "scheduled_at": entry.scheduled_at.isoformat().replace("+00:00", "Z"),
         }

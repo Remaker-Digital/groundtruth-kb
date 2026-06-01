@@ -60,9 +60,11 @@ class PendingTransaction:
 
     path: Path
     harness_id_or_name: str
-    role: str
+    role: str | None
     change_reason: str
     scheduled_at: datetime
+    axis: str = "role"
+    substrate: str | None = None
 
 
 @dataclass(frozen=True)
@@ -128,13 +130,16 @@ def list_pending(project_root: Path) -> list[PendingTransaction]:
             scheduled_at = datetime.fromisoformat(scheduled_raw.replace("Z", "+00:00"))
         except ValueError:
             scheduled_at = datetime.now(UTC)
+        axis = str(data.get("axis", "role"))
         result.append(
             PendingTransaction(
                 path=path,
                 harness_id_or_name=str(data.get("harness_id_or_name", "")),
-                role=str(data.get("role", "")),
+                role=data.get("role"),
                 change_reason=str(data.get("change_reason", "")),
                 scheduled_at=scheduled_at,
+                axis=axis,
+                substrate=data.get("substrate"),
             )
         )
     return result
@@ -158,13 +163,55 @@ def apply_pending(project_root: Path) -> list[ApplyResult]:
     results: list[ApplyResult] = []
     for entry in pending:
         try:
-            tx_result = apply_role_switch(
-                project_root,
-                entry.harness_id_or_name,
-                entry.role,
-                change_reason=entry.change_reason,
-            )
+            if entry.axis == "bridge_substrate":
+                from groundtruth_kb.mode_switch.bridge_substrate import apply_bridge_substrate_switch
+
+                if not entry.substrate:
+                    raise TransactionValidationError(
+                        "Missing 'substrate' in bridge_substrate pending transaction",
+                        axis="bridge_substrate",
+                    )
+                apply_bridge_substrate_switch(
+                    project_root,
+                    entry.substrate,
+                    change_reason=entry.change_reason,
+                )
+                tx_result = None
+            else:
+                if not entry.role:
+                    raise TransactionValidationError(
+                        "Missing 'role' in role pending transaction",
+                        axis="role",
+                    )
+                tx_result = apply_role_switch(
+                    project_root,
+                    entry.harness_id_or_name,
+                    entry.role,
+                    change_reason=entry.change_reason,
+                )
         except TransactionValidationError as exc:
+            # Write a failed record to .gtkb-state/mode-switches/failed/
+            try:
+                failed_dir = project_root / ".gtkb-state" / "mode-switches" / "failed"
+                failed_dir.mkdir(parents=True, exist_ok=True)
+                rec_id = uuid.uuid4().hex[:8]
+                failed_path = failed_dir / f"{_timestamp()}-{rec_id}.json"
+                failed_payload = {
+                    "schema_version": 1,
+                    "record_id": rec_id,
+                    "axis": entry.axis,
+                    "harness_id_or_name": entry.harness_id_or_name,
+                    "role": entry.role,
+                    "substrate": entry.substrate,
+                    "change_reason": entry.change_reason,
+                    "scheduled_at": entry.scheduled_at.isoformat().replace("+00:00", "Z"),
+                    "failed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                    "error": str(exc),
+                }
+                failed_path.write_text(json.dumps(failed_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            except Exception:
+                pass
+
             results.append(
                 ApplyResult(
                     pending_path=entry.path,
@@ -174,6 +221,28 @@ def apply_pending(project_root: Path) -> list[ApplyResult]:
             )
             continue
         except Exception as exc:  # noqa: BLE001 - fail-soft per design
+            # Write a failed record to .gtkb-state/mode-switches/failed/
+            try:
+                failed_dir = project_root / ".gtkb-state" / "mode-switches" / "failed"
+                failed_dir.mkdir(parents=True, exist_ok=True)
+                rec_id = uuid.uuid4().hex[:8]
+                failed_path = failed_dir / f"{_timestamp()}-{rec_id}.json"
+                failed_payload = {
+                    "schema_version": 1,
+                    "record_id": rec_id,
+                    "axis": entry.axis,
+                    "harness_id_or_name": entry.harness_id_or_name,
+                    "role": entry.role,
+                    "substrate": entry.substrate,
+                    "change_reason": entry.change_reason,
+                    "scheduled_at": entry.scheduled_at.isoformat().replace("+00:00", "Z"),
+                    "failed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                    "error": f"unexpected error: {exc}",
+                }
+                failed_path.write_text(json.dumps(failed_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            except Exception:
+                pass
+
             results.append(
                 ApplyResult(
                     pending_path=entry.path,

@@ -1244,6 +1244,47 @@ def _spawn_harness(
     return meta
 
 
+def _is_cross_harness_trigger_active_substrate(project_root: Path) -> bool:
+    """Return True if cross_harness_trigger is the active substrate.
+
+    Reads harness-state/bridge-substrate.json when present.
+    If substrate is registered but not 'cross_harness_trigger', returns False.
+    If file is missing or invalid, default to True (fail open for backwards compatibility).
+    """
+    path = project_root / "harness-state" / "bridge-substrate.json"
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                substrate = data.get("substrate")
+                if substrate and substrate != "cross_harness_trigger":
+                    return False
+        except Exception:
+            pass
+    return True
+
+
+def _record_substrate_mismatch_skip(state_dir: Path, active_substrate: str) -> None:
+    """Write durable audit + dispatch-state evidence for the substrate mismatch skip."""
+    ts = _now_iso()
+    error_message = (
+        f"Cross-harness trigger inert because the active bridge substrate is configured as {active_substrate!r} "
+        "in harness-state/bridge-substrate.json."
+    )
+    for role_label in ("prime-builder", "loyal-opposition"):
+        _record_dispatch_failure(
+            state_dir,
+            {
+                "ts": ts,
+                "dispatch_id": f"{ts}-{role_label}-substrate-mismatch",
+                "recipient": role_label,
+                "launched": False,
+                "reason": "substrate_mismatch_inert",
+                "error_message": error_message,
+            },
+        )
+
+
 def _is_single_harness_topology(project_root: Path) -> bool:
     """Return True iff the role map records a single harness ID with both
     ``prime-builder`` AND ``loyal-opposition`` in its role-set AND that harness
@@ -1369,6 +1410,19 @@ def run_trigger(
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
+
+    # Substrate check: if cross_harness_trigger is not the active substrate,
+    # record substrate mismatch skip and exit inertly.
+    if not _is_cross_harness_trigger_active_substrate(project_root):
+        active_substrate = "none"
+        sub_path = project_root / "harness-state" / "bridge-substrate.json"
+        if sub_path.is_file():
+            try:
+                active_substrate = json.loads(sub_path.read_text(encoding="utf-8")).get("substrate", "none")
+            except Exception:
+                pass
+        _record_substrate_mismatch_skip(state_dir, active_substrate)
+        return {"skipped": True, "reason": "substrate_mismatch_inert", "active_substrate": active_substrate}
 
     # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
     # mode-switch transactions BEFORE recipient resolution so a deferred

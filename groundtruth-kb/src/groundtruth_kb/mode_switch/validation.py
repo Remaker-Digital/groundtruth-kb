@@ -23,13 +23,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-BRIDGE_STATUS_TOKENS = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY"}
-)
+BRIDGE_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY"})
 
-_BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s+(bridge/\S+\.md)\s*$"
-)
+_BRIDGE_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s+(bridge/\S+\.md)\s*$")
 _BRIDGE_STATUS_SHAPED_LINE_RE = re.compile(r"^([A-Z][A-Z\-]+):\s+bridge/\S+\.md\s*$")
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+\S")
 
@@ -178,4 +174,99 @@ def validate_session_state_artifact(project_root: Path) -> ValidationResult:
         return _fail(axis, f"session-state JSON parse failed: {exc}")
     if not isinstance(data, dict):
         return _fail(axis, "session-state top-level must be a JSON object")
+    return _ok(axis)
+
+
+def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: str) -> ValidationResult:
+    """Validate bridge substrate configuration against topology and registrations.
+
+    Substrates: 'cross_harness_trigger', 'single_harness_dispatcher', 'none'.
+    Rules:
+    1. 'single_harness_dispatcher' is valid ONLY if topology is 'single_harness'.
+    2. 'cross_harness_trigger' requires 'cross_harness_bridge_trigger.py' substring
+       registered in either .claude/settings.json or .codex/hooks.json (if those files exist and contain hooks).
+    3. 'single_harness_dispatcher' when on Windows probes GTKB-SingleHarnessBridgeDispatcher scheduled task.
+    """
+    axis = "bridge_substrate"
+    allowed = {"cross_harness_trigger", "single_harness_dispatcher", "none"}
+    if new_substrate not in allowed:
+        return _fail(axis, f"unknown bridge substrate {new_substrate!r}")
+
+    if new_substrate == "single_harness_dispatcher" and topology != "single_harness":
+        return _fail(
+            axis,
+            f"bridge substrate {new_substrate!r} requires single_harness topology (current topology: {topology})",
+        )
+
+    # If new_substrate is 'cross_harness_trigger', probe registration.
+    if new_substrate == "cross_harness_trigger":
+        registered = False
+        settings_path = project_root / ".claude" / "settings.json"
+        codex_hooks_path = project_root / ".codex" / "hooks.json"
+
+        # Check settings.json
+        if settings_path.is_file():
+            try:
+                data = json.loads(settings_path.read_text(encoding="utf-8"))
+                hooks = data.get("hooks", {})
+                if isinstance(hooks, dict):
+                    for hook_list in hooks.values():
+                        if isinstance(hook_list, list):
+                            for hook in hook_list:
+                                if isinstance(hook, dict) and "cross_harness_bridge_trigger.py" in hook.get(
+                                    "command", ""
+                                ):
+                                    registered = True
+                                    break
+            except Exception:
+                pass
+
+        # Check codex hooks.json
+        if not registered and codex_hooks_path.is_file():
+            try:
+                data = json.loads(codex_hooks_path.read_text(encoding="utf-8"))
+                hooks = data.get("hooks", {})
+                if isinstance(hooks, dict):
+                    for hook_list in hooks.values():
+                        if isinstance(hook_list, list):
+                            for hook in hook_list:
+                                if isinstance(hook, dict) and "cross_harness_bridge_trigger.py" in hook.get(
+                                    "command", ""
+                                ):
+                                    registered = True
+                                    break
+            except Exception:
+                pass
+
+        if not registered:
+            return _fail(
+                axis,
+                "cross_harness_trigger is not registered in .claude/settings.json or .codex/hooks.json",
+            )
+
+    # If new_substrate is 'single_harness_dispatcher', probe Windows Scheduled Task if on Windows.
+    if new_substrate == "single_harness_dispatcher":
+        import sys
+
+        if sys.platform == "win32":
+            import subprocess
+
+            try:
+                res = subprocess.run(
+                    ["powershell", "-Command", "Get-ScheduledTask -TaskName GTKB-SingleHarnessBridgeDispatcher"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if res.returncode != 0:
+                    return _fail(
+                        axis,
+                        "GTKB-SingleHarnessBridgeDispatcher scheduled task is not registered in Windows",
+                    )
+            except Exception as exc:
+                return _fail(
+                    axis,
+                    f"Failed to check GTKB-SingleHarnessBridgeDispatcher scheduled task: {exc}",
+                )
+
     return _ok(axis)

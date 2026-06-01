@@ -74,3 +74,42 @@ def write_transaction_record(
         encoding="utf-8",
     )
     return record_path
+
+
+def write_bridge_substrate_record(
+    project_root: Path,
+    *,
+    harness_id: str,
+    previous_substrate: str | None,
+    new_substrate: str,
+    change_reason: str,
+    applied_at: datetime | None = None,
+    deferred: bool = False,
+) -> Path:
+    """Write an audit-trail record for an applied or deferred bridge-substrate switch.
+
+    Returns the path to the JSON record. Axis is 'bridge_substrate'.
+    """
+    directory = _audit_dir(project_root)
+    directory.mkdir(parents=True, exist_ok=True)
+    when = applied_at if applied_at is not None else datetime.now(UTC)
+    record_id = uuid.uuid4().hex[:8]
+    filename = f"{_timestamp()}-{record_id}.json"
+    record_path = directory / filename
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "record_id": record_id,
+        "axis": "bridge_substrate",
+        "harness_id": harness_id,
+        "previous_substrate": previous_substrate,
+        "new_substrate": new_substrate,
+        "change_reason": change_reason,
+        "requested_at": when.isoformat().replace("+00:00", "Z"),
+        "effective_at": when.isoformat().replace("+00:00", "Z"),
+        "deferred": deferred,
+    }
+    record_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return record_path

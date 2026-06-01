@@ -200,6 +200,26 @@ def _write_state(state_dir: Path, payload: dict[str, Any]) -> None:
     state_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _is_single_harness_dispatcher_active_substrate(project_root: Path) -> bool:
+    """Return True if single_harness_dispatcher is the active substrate.
+
+    Reads harness-state/bridge-substrate.json when present.
+    If substrate is registered but not 'single_harness_dispatcher', returns False.
+    If file is missing or invalid, default to True (fail open for backwards compatibility).
+    """
+    path = project_root / "harness-state" / "bridge-substrate.json"
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                substrate = data.get("substrate")
+                if substrate and substrate != "single_harness_dispatcher":
+                    return False
+        except Exception:
+            pass
+    return True
+
+
 def ensure_single_harness_automation(
     *,
     project_root: Path,
@@ -212,6 +232,14 @@ def ensure_single_harness_automation(
     force_register: bool = False,
 ) -> dict[str, Any]:
     """Ensure scheduled-task activation matches the current role-map topology."""
+    if not _is_single_harness_dispatcher_active_substrate(project_root):
+        return {
+            "skipped": True,
+            "reason": "single_harness_dispatcher_substrate_inactive",
+            "activated": False,
+            "action": "inert",
+        }
+
     dispatcher = _load_dispatcher_module()
     applicable, harness_id = dispatcher._is_single_harness_topology_applicable(project_root)
     command_handle = dispatcher._resolve_command_handle(project_root, harness_id) if harness_id else None

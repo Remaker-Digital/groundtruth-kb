@@ -22,6 +22,7 @@ from groundtruth_kb.mode_switch.derive import topology_from_role_map
 from groundtruth_kb.mode_switch.validation import (
     ValidationResult,
     validate_bridge_artifact,
+    validate_bridge_substrate,
     validate_role_artifact,
     validate_session_state_artifact,
 )
@@ -32,4 +33,5 @@ __all__ = [
     "validate_bridge_artifact",
     "validate_role_artifact",
     "validate_session_state_artifact",
+    "validate_bridge_substrate",
 ]
