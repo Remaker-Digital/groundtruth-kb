@@ -6,11 +6,15 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-gov-proposal-standards-slice1
+NEW: bridge/gtkb-gov-proposal-standards-slice1-022.md
+
 Document: gtkb-membase-effective-use-audit-test-restoration
 NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-deterministic-services-stale-status-reconciliation
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-003.md
