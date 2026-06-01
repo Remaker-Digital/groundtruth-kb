@@ -31,6 +31,7 @@ from groundtruth_kb.cli_approval_packet import (
     run_generate_approval_packet,
 )
 from groundtruth_kb.cli_backlog_update import BacklogUpdateError, BacklogUpdateRequest, update_backlog_item
+from groundtruth_kb.cli_bridge_index import bridge_index_group
 from groundtruth_kb.cli_bridge_propose import bridge_group
 from groundtruth_kb.cli_deliberations_record import (
     DeliberationRecordError,
@@ -111,6 +112,7 @@ def main(ctx: click.Context, config_path: str | None) -> None:
     ctx.obj["config"] = Path(config_path) if config_path else None
 
 
+bridge_group.add_command(bridge_index_group)
 main.add_command(bridge_group)
 
 
@@ -850,18 +852,117 @@ def backlog_add_work_item(
     click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
 
 
+_PROJECT_CONTAINS_FIELDS = (
+    "id",
+    "name",
+    "status",
+    "purpose",
+    "target_outcome",
+    "scope_note",
+    "notes",
+    "source_project_name",
+    "source_subproject_name",
+)
+_WORK_ITEM_CONTAINS_FIELDS = (
+    "id",
+    "title",
+    "description",
+    "project_name",
+    "subproject_name",
+    "stage",
+    "resolution_status",
+    "status_detail",
+    "origin",
+    "component",
+    "priority",
+    "acceptance_summary",
+)
+
+
+def _matches_any_exact(row: dict[str, object], key: str, accepted: tuple[str, ...]) -> bool:
+    if not accepted:
+        return True
+    value = row.get(key)
+    return value is not None and str(value) in set(accepted)
+
+
+def _matches_exact(row: dict[str, object], key: str, expected: str | None) -> bool:
+    if expected is None:
+        return True
+    value = row.get(key)
+    return value is not None and str(value) == expected
+
+
+def _matches_contains(row: dict[str, object], fields: tuple[str, ...], terms: tuple[str, ...]) -> bool:
+    normalized_terms = tuple(term.casefold() for term in terms if term.strip())
+    if not normalized_terms:
+        return True
+    haystack = " ".join(str(row.get(field) or "") for field in fields).casefold()
+    return all(term in haystack for term in normalized_terms)
+
+
+def _apply_limit(rows: list[dict[str, object]], limit: int | None) -> list[dict[str, object]]:
+    if limit is None:
+        return rows
+    return rows[:limit]
+
+
 @backlog.command("list")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.option("--all", "include_verified", is_flag=True, help="Include verified/closed work items.")
+@click.option("--id", "work_item_ids", multiple=True, help="Limit to an explicit work item id; repeatable.")
+@click.option("--project", "project_name", default=None, help="Limit to a project_name value.")
+@click.option("--subproject", "subproject_name", default=None, help="Limit to a subproject_name value.")
+@click.option("--priority", "priorities", multiple=True, help="Limit to one priority; repeatable.")
+@click.option(
+    "--resolution-status",
+    "resolution_statuses",
+    multiple=True,
+    help="Limit to one resolution_status; repeatable.",
+)
+@click.option("--stage", "stages", multiple=True, help="Limit to one stage; repeatable.")
+@click.option("--origin", "origins", multiple=True, help="Limit to one origin; repeatable.")
+@click.option("--component", "components", multiple=True, help="Limit to one component; repeatable.")
+@click.option("--contains", "contains_terms", multiple=True, help="Case-insensitive text filter; repeatable.")
+@click.option("--limit", type=click.IntRange(min=1), default=None, help="Return at most N rows.")
 @click.pass_context
-def backlog_list(ctx: click.Context, json_output: bool, include_verified: bool) -> None:
+def backlog_list(
+    ctx: click.Context,
+    json_output: bool,
+    include_verified: bool,
+    work_item_ids: tuple[str, ...],
+    project_name: str | None,
+    subproject_name: str | None,
+    priorities: tuple[str, ...],
+    resolution_statuses: tuple[str, ...],
+    stages: tuple[str, ...],
+    origins: tuple[str, ...],
+    components: tuple[str, ...],
+    contains_terms: tuple[str, ...],
+    limit: int | None,
+) -> None:
     """List unified backlog items from MemBase work_items."""
     config = _resolve_config(ctx)
     db = _open_db(config)
     try:
-        items = db.list_work_items() if include_verified else db.get_open_work_items()
+        include_terminal = include_verified or bool(work_item_ids) or bool(resolution_statuses)
+        items = db.list_work_items() if include_terminal else db.get_open_work_items()
     finally:
         db.close()
+    items = [
+        item
+        for item in items
+        if _matches_any_exact(item, "id", work_item_ids)
+        and _matches_exact(item, "project_name", project_name)
+        and _matches_exact(item, "subproject_name", subproject_name)
+        and _matches_any_exact(item, "priority", priorities)
+        and _matches_any_exact(item, "resolution_status", resolution_statuses)
+        and _matches_any_exact(item, "stage", stages)
+        and _matches_any_exact(item, "origin", origins)
+        and _matches_any_exact(item, "component", components)
+        and _matches_contains(item, _WORK_ITEM_CONTAINS_FIELDS, contains_terms)
+    ]
+    items = _apply_limit(items, limit)
 
     if json_output:
         click.echo(json.dumps(items, indent=2, sort_keys=True))
@@ -1144,14 +1245,34 @@ def _project_service(ctx: click.Context) -> tuple[KnowledgeDB, ProjectLifecycleS
 @projects_cmd.command("list")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.option("--all", "include_terminal", is_flag=True, help="Include completed/retired/cancelled projects.")
+@click.option("--id", "project_ids", multiple=True, help="Limit to an explicit project id; repeatable.")
+@click.option("--status", default=None, help="Limit to a project status.")
+@click.option("--contains", "contains_terms", multiple=True, help="Case-insensitive text filter; repeatable.")
+@click.option("--limit", type=click.IntRange(min=1), default=None, help="Return at most N rows.")
 @click.pass_context
-def projects_list(ctx: click.Context, json_output: bool, include_terminal: bool) -> None:
+def projects_list(
+    ctx: click.Context,
+    json_output: bool,
+    include_terminal: bool,
+    project_ids: tuple[str, ...],
+    status: str | None,
+    contains_terms: tuple[str, ...],
+    limit: int | None,
+) -> None:
     """List first-class project records."""
     db, service = _project_service(ctx)
     try:
-        projects = service.list_projects(include_terminal=include_terminal)
+        include_terminal = include_terminal or bool(project_ids) or status is not None
+        projects = service.list_projects(include_terminal=include_terminal, status=status)
     finally:
         db.close()
+    projects = [
+        project
+        for project in projects
+        if _matches_any_exact(project, "id", project_ids)
+        and _matches_contains(project, _PROJECT_CONTAINS_FIELDS, contains_terms)
+    ]
+    projects = _apply_limit(projects, limit)
 
     if json_output:
         click.echo(json.dumps(projects, indent=2, sort_keys=True))

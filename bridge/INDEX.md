@@ -6,6 +6,19 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-cli-list-subset-filters
+NEW: bridge/gtkb-cli-list-subset-filters-003.md
+GO: bridge/gtkb-cli-list-subset-filters-002.md
+NEW: bridge/gtkb-cli-list-subset-filters-001.md
+
+Document: gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli
+VERIFIED: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-006.md
+NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-005.md
+GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-004.md
+REVISED: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-003.md
+GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
+NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
+
 Document: gtkb-startup-enhancements-completion-reconciliation
 GO: bridge/gtkb-startup-enhancements-completion-reconciliation-005.md
 REVISED: bridge/gtkb-startup-enhancements-completion-reconciliation-004.md
