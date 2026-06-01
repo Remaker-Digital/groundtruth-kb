@@ -150,6 +150,41 @@ def test_extract_claims_non_pytest_command_without_summary_skipped(verifier_modu
     assert claims == []
 
 
+def test_extract_claims_non_pytest_command_with_inblock_summary_skipped(verifier_module):
+    """NO-GO -009 FINDING-P1-001 closure: a non-pytest command whose output
+    happens to contain pytest-like summary text (e.g. ``9 passed`` in the
+    JSON output of the verifier itself) must NOT be paired into an ERROR
+    claim. The pytest-shape guard is applied before any claim is added,
+    not just for unassociated-command records.
+
+    Before the fix the parser would emit a claim for the
+    ``python scripts/bridge_report_test_claim_rerun_verifier.py ...`` block
+    if the next/same block contained a summary-shaped line, then
+    ``run_pytest_claim`` would reject it as ERROR, polluting the verdict.
+    """
+    markdown = (
+        "## Live re-run\n"
+        "\n"
+        "```text\n"
+        "python scripts/bridge_report_test_claim_rerun_verifier.py --bridge-id demo --json\n"
+        "9 passed\n"
+        "```\n"
+    )
+    claims = verifier_module.extract_claims(markdown)
+    assert claims == []
+
+
+def test_extract_claims_non_pytest_command_with_split_block_summary_skipped(verifier_module):
+    """Same NO-GO -009 closure for the cross-block lookahead path: a
+    non-pytest command followed by a summary in the next block is still
+    skipped. The guard applies uniformly to in-block and cross-block
+    summary association.
+    """
+    markdown = "```text\npython -m ruff check scripts/foo.py\n```\n\nObserved result:\n\n```text\n5 passed\n```\n"
+    claims = verifier_module.extract_claims(markdown)
+    assert claims == []
+
+
 def test_extract_claims_lookahead_stops_at_next_command(verifier_module):
     """Cross-block lookahead must not associate commandA with the result of
     commandB. When the immediately following block has its own command, the
@@ -225,6 +260,42 @@ def test_run_pytest_claim_rejects_non_pytest_command(verifier_module, tmp_path):
     result = verifier_module.run_pytest_claim(_REPO_ROOT, claim, timeout_seconds=5)
     assert result.status == "ERROR"
     assert "not a python -m pytest" in result.reason or "not safely re-runnable" in result.reason
+
+
+def test_validate_pytest_args_allows_in_root_basetemp(verifier_module):
+    """NO-GO -009 FINDING-P1-001 closure: in-root path-valued options like
+    ``--basetemp=.gtkb-state/...`` are accepted.
+
+    The previous categorical PATH_OPTIONS rejection blocked the standard
+    bridge-report pytest isolation pattern (basetemp inside the project's
+    state directory). The fix validates the resolved path against the
+    project root and rejects only when it escapes.
+    """
+    args_equals = ["--basetemp=.gtkb-state/pytest-tmp-demo", "tests/foo.py"]
+    args_separate = ["--basetemp", ".gtkb-state/pytest-tmp-demo", "tests/foo.py"]
+    assert verifier_module.validate_pytest_args(_REPO_ROOT, args_equals) is None
+    assert verifier_module.validate_pytest_args(_REPO_ROOT, args_separate) is None
+
+
+def test_validate_pytest_args_rejects_out_of_root_basetemp(verifier_module):
+    """Companion to the in-root allowance: out-of-root path values for
+    PATH_OPTIONS are still rejected.
+    """
+    args = ["--basetemp=/tmp/escape-basetemp", "tests/foo.py"]
+    error = verifier_module.validate_pytest_args(_REPO_ROOT, args)
+    assert error is not None
+    assert "escapes project root" in error
+
+
+def test_validate_pytest_args_path_options_require_value(verifier_module):
+    """A PATH_OPTION without any value (e.g. trailing ``--basetemp`` at the
+    end of the arg list) must be rejected as malformed; otherwise the
+    option would silently slip through with no validation.
+    """
+    args = ["--basetemp"]
+    error = verifier_module.validate_pytest_args(_REPO_ROOT, args)
+    assert error is not None
+    assert "requires a path value" in error
 
 
 # ---------------------------------------------------------------------------

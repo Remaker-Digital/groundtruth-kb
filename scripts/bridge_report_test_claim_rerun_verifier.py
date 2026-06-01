@@ -242,6 +242,16 @@ def extract_claims(markdown: str) -> list[ExtractedClaim]:
         command_line, command_index = _first_command_in_block(block)
         if command_line is None:
             continue
+        # Per Codex NO-GO -009 FINDING-P1-001: pytest-shape validation MUST
+        # happen before any claim is added. The verifier's contract is
+        # pytest-claim re-run; non-pytest commands whose output happens to
+        # contain pytest-like summary text (e.g. a "9 passed" string in the
+        # output of `python scripts/bridge_report_test_claim_rerun_verifier.py`)
+        # must NOT be paired into ERROR claims. Apply the guard once, here,
+        # before in-block and cross-block summary search.
+        _, command_error = pytest_args_for_command(command_line)
+        if command_error is not None:
+            continue
         # In-block summary takes precedence.
         lines = [line.rstrip() for line in block.splitlines()]
         summary_line = find_summary_line(lines, after_index=command_index)
@@ -259,15 +269,6 @@ def extract_claims(markdown: str) -> list[ExtractedClaim]:
                     summary_line = next_summary
                     break
         if summary_line is None:
-            # Only flag unassociated commands when they are actually pytest
-            # invocations. Non-pytest commands (ruff, uv, npm) without an
-            # adjacent summary block are not test-claim evidence gaps; the
-            # verifier's contract is pytest-claim re-run, so non-pytest
-            # commands without summaries are silently skipped, preserving
-            # the pre-fix behavior for those command shapes.
-            _, command_error = pytest_args_for_command(command_line)
-            if command_error is not None:
-                continue
             claims.append(
                 ExtractedClaim(
                     claim_block_index=block_index,
@@ -323,15 +324,43 @@ def _path_within_root(project_root: Path, value: str) -> bool:
     return True
 
 
+def _extract_option_value(arg: str, next_arg: str | None) -> tuple[str | None, bool]:
+    """Return (value, value_consumed_next_arg) for an option-shaped arg.
+
+    Handles both ``--opt=value`` (single arg) and ``--opt value`` (two args).
+    Returns ``(None, False)`` when no value is available.
+    """
+
+    if "=" in arg:
+        return arg.split("=", 1)[1], False
+    if next_arg is not None and not next_arg.startswith("-"):
+        return next_arg, True
+    return None, False
+
+
 def validate_pytest_args(project_root: Path, pytest_args: list[str]) -> str | None:
     skip_next = False
-    for arg in pytest_args:
+    for index, arg in enumerate(pytest_args):
         if skip_next:
             skip_next = False
             continue
         option_name = arg.split("=", 1)[0]
         if option_name in PATH_OPTIONS:
-            return f"pytest option {option_name} is not safely re-runnable"
+            # Per Codex NO-GO -009 FINDING-P1-001 recommendation: allow safe
+            # in-root path-valued pytest options by validating the resolved
+            # path against the project root. The previous categorical
+            # rejection blocked legitimate in-root ``--basetemp=<in-root>``
+            # forms used by bridge post-implementation reports for test
+            # isolation. Out-of-root values remain rejected.
+            next_arg = pytest_args[index + 1] if index + 1 < len(pytest_args) else None
+            value, consumed_next = _extract_option_value(arg, next_arg)
+            if value is None:
+                return f"pytest option {option_name} requires a path value"
+            if not _path_within_root(project_root, value):
+                return f"pytest option {option_name} value escapes project root: {value}"
+            if consumed_next:
+                skip_next = True
+            continue
         if option_name in VALUE_OPTIONS and "=" not in arg:
             skip_next = True
             continue

@@ -6,6 +6,10 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-membase-effective-use-audit-test-restoration
+NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
+NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
+
 Document: gtkb-deterministic-services-stale-status-reconciliation
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
@@ -978,6 +982,8 @@ NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
 NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-001.md
 
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
+REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-010.md
+NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-009.md
 REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-007.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-006.md
 NEW: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-005.md
