@@ -299,6 +299,94 @@ def test_validate_pytest_args_path_options_require_value(verifier_module):
 
 
 # ---------------------------------------------------------------------------
+# uv-run wrapper unwrapping (NO-GO -011 FINDING-P1-001)
+# ---------------------------------------------------------------------------
+
+
+def test_uv_wrapped_python_pytest_unwrapped(verifier_module):
+    """NO-GO -011 FINDING-P1-001: the project-approved cross-shell surface
+    ``uv run --with pytest [--with pytest-timeout] python -m pytest ...`` must
+    be recognized as a pytest command, with the inner pytest args extracted.
+    """
+    cmd = "uv run --with pytest --with pytest-timeout python -m pytest platform_tests/scripts/test_foo.py -q --tb=short"
+    args, error = verifier_module.pytest_args_for_command(cmd)
+    assert error is None
+    assert args == ["platform_tests/scripts/test_foo.py", "-q", "--tb=short"]
+
+
+def test_uv_wrapped_bare_pytest_unwrapped(verifier_module):
+    """``uv run --with pytest pytest ...`` (bare pytest inner) is also unwrapped."""
+    cmd = "uv run --with pytest pytest tests/x.py -k foo"
+    args, error = verifier_module.pytest_args_for_command(cmd)
+    assert error is None
+    assert args == ["tests/x.py", "-k", "foo"]
+
+
+def test_uv_run_equals_option_form_unwrapped(verifier_module):
+    """``--opt=value`` uv options are consumed as a single token during unwrap."""
+    cmd = "uv run --python=3.14 python -m pytest tests/z.py"
+    args, error = verifier_module.pytest_args_for_command(cmd)
+    assert error is None
+    assert args == ["tests/z.py"]
+
+
+def test_uv_wrapped_non_pytest_still_rejected(verifier_module):
+    """Unwrapping must not turn a uv-wrapped non-pytest command into a claim:
+    the inner command is still validated, so ``uv run --with ruff ... ruff``
+    is rejected as non-pytest.
+    """
+    cmd = "uv run --with ruff python -m ruff check scripts/foo.py"
+    args, error = verifier_module.pytest_args_for_command(cmd)
+    assert args is None
+    assert error is not None
+
+
+def test_plain_python_pytest_still_unwrapped_noop(verifier_module):
+    """A non-uv command passes through ``_strip_uv_run_prefix`` unchanged."""
+    cmd = "python -m pytest tests/y.py"
+    args, error = verifier_module.pytest_args_for_command(cmd)
+    assert error is None
+    assert args == ["tests/y.py"]
+
+
+def test_extract_claims_uv_wrapped_split_block(verifier_module):
+    """End-to-end parser: a uv-wrapped pytest command + adjacent observed-result
+    block yields exactly one claim (not zero). This is the regression that the
+    false-negative path from NO-GO -011 would have produced ``claim_count: 0``.
+    """
+    markdown = (
+        "## Test Evidence\n"
+        "\n"
+        "```text\n"
+        "uv run --with pytest --with pytest-timeout python -m pytest "
+        "platform_tests/scripts/test_foo.py -q --no-header\n"
+        "```\n"
+        "\n"
+        "Observed result:\n"
+        "\n"
+        "```text\n"
+        "18 passed in 0.5s\n"
+        "```\n"
+    )
+    claims = verifier_module.extract_claims(markdown)
+    assert len(claims) == 1, f"Expected 1 claim, got {len(claims)}: {claims!r}"
+    assert claims[0].claimed_summary == "18 passed in 0.5s"
+    assert claims[0].claimed_counts["passed"] == 18
+
+
+def test_strip_uv_run_prefix_directly(verifier_module):
+    """``_strip_uv_run_prefix`` returns inner tokens for a uv-run wrapper and is
+    a no-op otherwise.
+    """
+    wrapped = ["uv", "run", "--with", "pytest", "python", "-m", "pytest", "tests/a.py"]
+    assert verifier_module._strip_uv_run_prefix(wrapped) == ["python", "-m", "pytest", "tests/a.py"]
+    plain = ["python", "-m", "pytest", "tests/a.py"]
+    assert verifier_module._strip_uv_run_prefix(plain) == plain
+    not_run = ["uv", "pip", "list"]
+    assert verifier_module._strip_uv_run_prefix(not_run) == not_run
+
+
+# ---------------------------------------------------------------------------
 # build_packet status logic
 # ---------------------------------------------------------------------------
 

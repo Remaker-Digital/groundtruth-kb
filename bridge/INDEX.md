@@ -7,6 +7,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 Document: gtkb-gov-proposal-standards-slice1
+GO: bridge/gtkb-gov-proposal-standards-slice1-023.md
 NEW: bridge/gtkb-gov-proposal-standards-slice1-022.md
 
 Document: gtkb-membase-effective-use-audit-test-restoration
@@ -465,6 +466,7 @@ NO-GO: bridge/gtkb-skill-modernization-scoping-002.md
 NEW: bridge/gtkb-skill-modernization-scoping-001.md
 
 Document: gtkb-headless-gemini-lo-dispatch-verification
+NEW: bridge/gtkb-headless-gemini-lo-dispatch-verification-015.md
 GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-014.md
 REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-013.md
 NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-012.md
@@ -997,6 +999,7 @@ NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
 NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-001.md
 
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
+REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-012.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-011.md
 REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-010.md
 NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-009.md

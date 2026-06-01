@@ -289,6 +289,64 @@ def extract_claims(markdown: str) -> list[ExtractedClaim]:
     return claims
 
 
+# uv-run wrapper unwrapping (Codex NO-GO -011 FINDING-P1-001). The
+# project-approved cross-shell reproducible invocation surface is
+# ``uv run --with pytest [--with pytest-timeout] python -m pytest ...``. The
+# verifier never executes the wrapper itself — it extracts the inner pytest
+# args and re-runs pytest via ``sys.executable`` (see run_pytest_claim) — so
+# unwrapping the wrapper is what lets the verifier parse and safely re-run the
+# same commands the bridge-report reproducibility rule now mandates.
+_UV_RUN_VALUE_OPTS: Final[frozenset[str]] = frozenset(
+    {
+        "--with",
+        "--with-requirements",
+        "--with-editable",
+        "--python",
+        "-p",
+        "--directory",
+        "--project",
+        "--index",
+        "--default-index",
+        "--index-url",
+        "--extra-index-url",
+        "--cache-dir",
+        "--color",
+    }
+)
+
+
+def _strip_uv_run_prefix(parts: list[str]) -> list[str]:
+    """Strip a leading ``uv run [options] [--with PKG]...`` wrapper.
+
+    Returns the inner command tokens (e.g. ``["python", "-m", "pytest", ...]``)
+    when ``parts`` begins with ``uv run``; returns ``parts`` unchanged
+    otherwise. Only value-consuming options on a known allowlist consume a
+    following token; bare flags consume one token; the first non-option token
+    is the start of the inner command. The inner command is still subject to
+    the python/pytest validation in ``pytest_args_for_command``, so an
+    unexpected wrapped executable is rejected downstream rather than executed.
+    """
+    if len(parts) < 2:
+        return parts
+    if Path(parts[0]).name.lower() not in {"uv", "uv.exe"} or parts[1] != "run":
+        return parts
+    index = 2
+    total = len(parts)
+    while index < total:
+        token = parts[index]
+        if not token.startswith("-"):
+            break  # start of the inner command
+        if "=" in token:
+            index += 1
+            continue
+        if token in _UV_RUN_VALUE_OPTS:
+            index += 2  # option + its value
+            continue
+        index += 1  # bare flag (e.g. --refresh, --no-project, --quiet)
+    inner = parts[index:]
+    return inner if inner else parts
+
+
 def pytest_args_for_command(command: str) -> tuple[list[str] | None, str | None]:
     if UNSAFE_SHELL_RE.search(command):
         return None, "command contains shell metacharacters or chaining"
@@ -298,6 +356,10 @@ def pytest_args_for_command(command: str) -> tuple[list[str] | None, str | None]
         return None, f"command cannot be parsed safely: {exc}"
     if not parts:
         return None, "empty command"
+
+    parts = _strip_uv_run_prefix(parts)
+    if not parts:
+        return None, "empty command after uv-run unwrap"
 
     executable = Path(parts[0]).name.lower()
     if executable in {"python", "python3", "python.exe", "py", "py.exe"}:
