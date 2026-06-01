@@ -1185,16 +1185,19 @@ def test_diagnostic_emitted_per_invocation(tmp_path: Path) -> None:
 
 
 def test_diagnostic_classifies_suppressed(tmp_path: Path) -> None:
-    """WI-3265 IP-2: a fresh counterpart active-session lock drives the
+    """WI-3265 IP-2: a held counterpart lease drives the
     loyal-opposition recipient to the `active_session_suppressed` class.
     """
+    from bridge_lease_registry import acquire_lease
+
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     _write_index(root, _index_with_one_new(root))
-    # codex is the loyal-opposition harness in the default fixture; a fresh
-    # active-codex-session.lock suppresses its dispatch.
-    (state_dir / "active-codex-session.lock").write_text("lock", encoding="utf-8")
+
+    # Acquire a lease on example-thread (loyal-opposition recipient)
+    handle = acquire_lease("example-thread", action="test-harness", state_dir=state_dir)
+    assert handle is not None
 
     trigger = _load_trigger()
     trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1358,7 +1361,19 @@ def test_harness_command_builds_argv_from_invocation_surfaces(tmp_path: Path) ->
     assert codex_cmd == ["codex", "exec", prompt, "--cd", str(root)]
 
     claude_cmd = trigger._harness_command(_target("claude", _CLAUDE_INVOCATION_SURFACES), prompt, root)
-    assert claude_cmd == ["claude", "-p", prompt, "--add-dir", str(root), "--output-format", "json"]
+    assert claude_cmd == [
+        "claude",
+        "-p",
+        prompt,
+        "--add-dir",
+        str(root),
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowed-tools",
+        trigger.CLAUDE_WORKER_ALLOWED_TOOLS,
+    ]
 
     third_surfaces = {"headless": {"argv": ["gemini", "-p", "{{PROMPT}}", "--root", "{{PROJECT_ROOT}}"]}}
     third_cmd = trigger._harness_command(_target("gemini", third_surfaces), prompt, root)

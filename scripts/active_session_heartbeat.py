@@ -97,13 +97,9 @@ def _handle_session_stop(state_dir: Path, role: str) -> None:
         lock.unlink()
     except FileNotFoundError:
         # Idempotent: already gone is fine.
-        sys.stderr.write(
-            f"active_session_heartbeat: lock {lock} already absent; idempotent stop\n"
-        )
+        sys.stderr.write(f"active_session_heartbeat: lock {lock} already absent; idempotent stop\n")
     except OSError as exc:
-        sys.stderr.write(
-            f"active_session_heartbeat: could not delete {lock}: {exc}\n"
-        )
+        sys.stderr.write(f"active_session_heartbeat: could not delete {lock}: {exc}\n")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -158,9 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.mode == "session-stop":
             _handle_session_stop(args.state_dir, args.role)
     except Exception as exc:  # noqa: BLE001 — fire-and-forget contract
-        sys.stderr.write(
-            f"active_session_heartbeat: error during {args.mode}: {exc}\n"
-        )
+        sys.stderr.write(f"active_session_heartbeat: error during {args.mode}: {exc}\n")
     # Always exit 0 (fire-and-forget) for any code path that reaches here.
     return 0
 

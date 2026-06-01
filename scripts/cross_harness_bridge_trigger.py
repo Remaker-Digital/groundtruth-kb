@@ -79,6 +79,8 @@ _PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src
 if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
+from bridge_lease_registry import is_lease_held  # noqa: E402
+
 # Manual-disable env var. When set to "1", this script no-ops immediately.
 # Used as an OPERATOR opt-out (debugging, emergency stop, test harness),
 # NOT as automatic loop prevention.
@@ -1559,45 +1561,58 @@ def run_trigger(
             # the field to track current signature, including empty).
             recipient_state["signature"] = signature
             results[recipient] = {"launched": False, "reason": recipient_state["last_result"]}
-        elif check_counterpart_active(target, state_dir):
-            # Active-session suppression: counterpart harness is in an
-            # active foreground session. Record the signature in the
-            # suppressed field (NOT the dispatched field) so it remains
-            # retryable when the counterpart exits. Do NOT update legacy
-            # `signature`.
-            recipient_state["last_suppressed_signature"] = signature
-            recipient_state["last_result"] = "counterpart_active_session_present"
-            results[recipient] = {
-                "launched": False,
-                "reason": "counterpart_active_session_present",
-            }
-        elif prior_dispatched == signature:
-            # Slice 2 dedup: this exact signature was already dispatched.
-            # Skip without spawning. Legacy `signature` stays in sync.
-            recipient_state["signature"] = signature
-            recipient_state["last_result"] = "unchanged"
-            results[recipient] = {"launched": False, "reason": "unchanged"}
         else:
-            # Dispatch path. Covers:
-            #   - first dispatch ever
-            #   - signature changed since last dispatch
-            #   - prior_suppressed == signature (retry after counterpart exit)
-            launch = _spawn_harness(
-                target=target,
-                items=filtered,
-                project_root=project_root,
-                state_dir=state_dir,
-                max_items=max_items,
-                dry_run=dry_run,
-            )
-            recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
-            recipient_state["last_launch"] = launch
-            recipient_state["last_dispatched_signature"] = signature
-            # Dispatch supersedes any prior suppression.
-            recipient_state["last_suppressed_signature"] = None
-            # Legacy `signature` field updated ONLY on real dispatch.
-            recipient_state["signature"] = signature
-            results[recipient] = launch
+            leased_items = [it for it in selected if is_lease_held(it.document_name, state_dir=state_dir)]
+
+            if len(leased_items) == len(selected):
+                # Active-session suppression: counterpart harness is in an
+                # active foreground session. Record the signature in the
+                # suppressed field (NOT the dispatched field) so it remains
+                # retryable when the counterpart exits. Do NOT update legacy
+                # `signature`.
+                recipient_state["last_suppressed_signature"] = signature
+                recipient_state["last_result"] = "counterpart_active_session_present"
+                results[recipient] = {
+                    "launched": False,
+                    "reason": "counterpart_active_session_present",
+                }
+            else:
+                dispatched_filtered = [
+                    it for it in filtered if not is_lease_held(it.document_name, state_dir=state_dir)
+                ]
+                dispatched_selected = _selected_oldest_first(dispatched_filtered, max_items)
+                dispatched_signature = _signature(dispatched_selected)
+
+                recipient_state["selected_count"] = len(dispatched_selected)
+                recipient_state["pending_count"] = len(dispatched_filtered)
+
+                if prior_dispatched == dispatched_signature:
+                    # Slice 2 dedup: this exact signature was already dispatched.
+                    # Skip without spawning. Legacy `signature` stays in sync.
+                    recipient_state["signature"] = dispatched_signature
+                    recipient_state["last_result"] = "unchanged"
+                    results[recipient] = {"launched": False, "reason": "unchanged"}
+                else:
+                    # Dispatch path. Covers:
+                    #   - first dispatch ever
+                    #   - signature changed since last dispatch
+                    #   - prior_suppressed == signature (retry after counterpart exit)
+                    launch = _spawn_harness(
+                        target=target,
+                        items=dispatched_filtered,
+                        project_root=project_root,
+                        state_dir=state_dir,
+                        max_items=max_items,
+                        dry_run=dry_run,
+                    )
+                    recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
+                    recipient_state["last_launch"] = launch
+                    recipient_state["last_dispatched_signature"] = dispatched_signature
+                    # Dispatch supersedes any prior suppression.
+                    recipient_state["last_suppressed_signature"] = None
+                    # Legacy `signature` field updated ONLY on real dispatch.
+                    recipient_state["signature"] = dispatched_signature
+                    results[recipient] = launch
 
         recipients_state[recipient] = recipient_state
 
