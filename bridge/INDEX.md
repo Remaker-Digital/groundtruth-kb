@@ -20,6 +20,8 @@ GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-002.md
 NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-001.md
 
 Document: gtkb-backlog-update-cli-slice-1
+VERIFIED: bridge/gtkb-backlog-update-cli-slice-1-006.md
+NEW: bridge/gtkb-backlog-update-cli-slice-1-005.md
 GO: bridge/gtkb-backlog-update-cli-slice-1-004.md
 REVISED: bridge/gtkb-backlog-update-cli-slice-1-003.md
 NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
