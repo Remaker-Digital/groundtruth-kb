@@ -323,75 +323,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S327
   answer: "S327 clear pending: real prose decision-ask from a prior session ('Want me to action those next, or pick something else?'). Resolved by autonomous progression on the work_list-pre-approved ISOLATION-017 Slice 3 track, which reached VERIFIED at bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-014.md. Cleared via 'clear pending' instruction."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0227
-  asked_at: 2026-05-01T22:35:26.474937Z
-  question: "Both dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level approvals — no code action required, and IR-0 is explicitly blocked on missing ADR + Phase 9 prerequisites. The actionable next step under gtkb-command-surface is filing the first concrete implementation slice. Which slice should I file as the next NEW bridge proposal?"
-  options:
-    - "CS-1.5 registry tracking (Recommended)"
-    - "CS-2 UserPromptSubmit hook contract"
-    - "Defer CS; revise isolation-017 -006 NO-GO"
-    - "Pause — surface other priorities"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 8042700f656b7c95
-  resolved_at: 2026-05-01T22:35:26.474937Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0228
-  asked_at: 2026-05-01T23:49:08.328001Z
-  question: "Slice 1 proposal at 4 NO-GO cycles, no code written yet. Each fix has been mechanical, but cumulative cost is high. How do you want to proceed?"
-  options:
-    - "File REVISED-3 mechanically (Recommended)"
-    - "Pause and adjust approach"
-    - "Wrap session, fresh restart"
-    - "Other"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 3e8957270f68c7a8
-  resolved_at: 2026-05-01T23:49:08.328001Z
-  answer: "User has answered your questions: \"Slice 1 proposal at 4 NO-GO cycles, no code written yet. Each fix has been mechanical, but cumulative cost is high. How do you want to proceed?\"=\"File REVISED-3 mechanically (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0229
-  asked_at: 2026-05-01T23:50:23.843875Z
-  question: "Bridge auto-dispatch flagged two GOs but both are plan-level only (not implementation-ready). Which path should I take?"
-  options:
-    - "Draft CS-1 slice proposal (Recommended)"
-    - "Draft CS-1.5 .gitignore slice"
-    - "Wait on incident-response IR-0"
-    - "Defer; pick from work_list.md instead"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c5e7ce995f3f7139
-  resolved_at: 2026-05-01T23:50:23.843875Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0231
-  asked_at: 2026-05-01T23:53:44.519013Z
-  question: "Which bridge GO should Prime Builder act on now?"
-  options:
-    - "Slice 1 doctor checks"
-    - "CS slice proposals"
-    - "Incident-response IR-0"
-    - "Skip / different work"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 8f9aadeaffbb83f8
-  resolved_at: 2026-05-01T23:53:44.519013Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0232
-  asked_at: 2026-05-02T00:59:54.345282Z
-  question: "Slice 1 proposal GO'd after 4 NO-GO cycles. Implementation is ~900 LOC (450 source + 400 tests + IPR/CVR + smoke + likely 1-2 post-impl NO-GO cycles). Proceed now or wrap?"
-  options:
-    - "Wrap session here (Recommended)"
-    - "Proceed with implementation now"
-    - "Other"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: bfbd60b9638f82e9
-  resolved_at: 2026-05-02T00:59:54.345282Z
-  answer: "User has answered your questions: \"Slice 1 proposal GO'd after 4 NO-GO cycles. Implementation is ~900 LOC (450 source + 400 tests + IPR/CVR + smoke + likely 1-2 post-impl NO-GO cycles). Proceed now or wrap?\"=\"Wrap session here (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
 - id: DECISION-0234
   asked_at: 2026-05-02T01:06:52.847914Z
   question: "Remote agent can't access local groundtruth.db, Codex harness, or hooks. What scope should the agent deliver?"
@@ -8309,6 +8240,126 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-31T21:17:51.433043Z
   answer: "Your questions have been answered: \"What ADR shape should Slice 1 use to codify the role/status orthogonality model? (Background: `ADR-SINGLE-HARNESS-OPERATING-MODE-001` is the existing ADR that established the role-set wire form and the single-PB invariant. Your S378 directive supersedes the single-PB clause but preserves the single-harness mode capability.)\"=\"New successor ADR + amend old (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-0874
+  asked_at: 2026-05-31T21:27:11.297740Z
+  question: "Approve the proposed groupings of 19 orphan work items into 9 existing projects (table presented in chat above)?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve most, change WI-3352"
+    - "Approve most, change specific items"
+    - "Reject; re-propose"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d385f5c388b8f796
+  resolved_at: 2026-05-31T21:27:11.297740Z
+  answer: "Your questions have been answered: \"Approve the proposed groupings of 19 orphan work items into 9 existing projects (table presented in chat above)?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0875
+  asked_at: 2026-05-31T21:31:39.776386Z
+  question: "Now that threads are identified + gate-satisfaction mechanism is known, how to proceed?"
+  options:
+    - "Re-attempt protected commits with bridge evidence (Recommended)"
+    - "Stop here — accept that the 27 remaining are bridge-thread work for proper sessions"
+    - "Re-attempt just the VERIFIED threads' files; defer NO-GO/GO threads"
+    - "Show me the specific commit plan first, then I decide per-cluster"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b2ba2c643ea59ecf
+  resolved_at: 2026-05-31T21:31:39.776386Z
+  answer: "Your questions have been answered: \"Now that threads are identified + gate-satisfaction mechanism is known, how to proceed?\"=\"Re-attempt protected commits with bridge evidence (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0876
+  asked_at: 2026-05-31T21:37:14.274903Z
+  question: "Approve the AGENTS.md Antigravity Standing Exception Retraction (per the displayed full diff)?"
+  options:
+    - "Approve — generate packet and commit (Recommended)"
+    - "Approve with auto-approval scope (acknowledge)"
+    - "Edit-and-approve — you want changes to the displayed content first"
+    - "Reject — revert AGENTS.md to HEAD; don't commit the change"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f0d3745fb63ed971
+  resolved_at: 2026-05-31T21:37:14.274903Z
+  answer: "Your questions have been answered: \"Approve the AGENTS.md Antigravity Standing Exception Retraction (per the displayed full diff)?\"=\"Approve — generate packet and commit (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0877
+  asked_at: 2026-05-31T22:10:04.907460Z
+  question: "Approve `ADR-ROLE-STATUS-ORTHOGONALITY-001` v1 as drafted above for insertion into MemBase?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Request revisions"
+    - "Withdraw"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1647d6b2525a42a6
+  resolved_at: 2026-05-31T22:10:04.907460Z
+  answer: "Your questions have been answered: \"Approve `ADR-ROLE-STATUS-ORTHOGONALITY-001` v1 as drafted above for insertion into MemBase?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0878
+  asked_at: 2026-05-31T22:10:04.907460Z
+  question: "Approve `DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001` v1 as drafted above for insertion into MemBase?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Request revisions"
+    - "Withdraw"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c47828bcce37fa1d
+  resolved_at: 2026-05-31T22:10:04.907460Z
+  answer: "Your questions have been answered: \"Approve `DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001` v1 as drafted above for insertion into MemBase?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0879
+  asked_at: 2026-05-31T22:10:04.907460Z
+  question: "Approve `ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3 (= v2 verbatim + the appended supersession-citation extension shown above) for insertion into MemBase?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Request revisions"
+    - "Withdraw"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3abb999d0361f84c
+  resolved_at: 2026-05-31T22:10:04.907460Z
+  answer: "Your questions have been answered: \"Approve `ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3 (= v2 verbatim + the appended supersession-citation extension shown above) for insertion into MemBase?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0880
+  asked_at: 2026-05-31T22:25:56.473000Z
+  question: "Closing the ADR-0001 storage gap: I found ADR-0001 was already authored AND Codex-VERIFIED in S297 (2026-04-17) via the `gtkb-adr-memory-architecture` thread (6 versions, 006=VERIFIED). But it only ever lived in the OLD root's gitignored MemBase (E:\\Claude-Playground\\...) and never migrated when the project moved to E:\\GT-KB. The exact 4920-char verified body + metadata is recoverable from that archived DB right now. How should I close the gap?"
+  options:
+    - "Migrate exact verified content"
+    - "Author fresh, status=specified"
+    - "Migrate body, reset to specified"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0e763322be84afc3
+  resolved_at: 2026-05-31T22:25:56.473000Z
+  answer: "Your questions have been answered: \"Closing the ADR-0001 storage gap: I found ADR-0001 was already authored AND Codex-VERIFIED in S297 (2026-04-17) via the `gtkb-adr-memory-architecture` thread (6 versions, 006=VERIFIED). But it only ever lived in the OLD root's gitignored MemBase (E:\\Claude-Playground\\...) and never migrated when the project moved to E:\\GT-KB. The exact 4920-char verified body + metadata is recoverable from that archived DB right now. How should I close the gap?\"=\"Migrate exact verified content\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0881
+  asked_at: 2026-06-01T00:24:44.006132Z
+  question: "How should I resolve NO-GO -008 findings F1 (rows don't cite literal packet path in change_reason) and F2 (gt spec update auto-suffixed the v3 packet to `-v3.json`, outside the GO glob)? Both stem from governed-CLI behavior not matching the GO -006's literal verification text."
+  options:
+    - "Owner waiver (Recommended)"
+    - "Corrective versions + F2 waiver"
+    - "Re-authorize via slice REVISED"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f8bcc7352f862ade
+  resolved_at: 2026-06-01T00:24:44.006132Z
+  answer: "Your questions have been answered: \"How should I resolve NO-GO -008 findings F1 (rows don't cite literal packet path in change_reason) and F2 (gt spec update auto-suffixed the v3 packet to `-v3.json`, outside the GO glob)? Both stem from governed-CLI behavior not matching the GO -006's literal verification text.\"=\"Owner waiver (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0882
+  asked_at: 2026-06-01T00:37:12.104086Z
+  question: "How should I handle the parallel-session thread `gtkb-adr-0001-membase-migration` (Codex NO-GO -002)? The S379 session that filed it appears inactive (stale lock)."
+  options:
+    - "Take over + file REVISED (Recommended)"
+    - "Leave for the S379 session"
+    - "Reconsider the approach"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9ec8d5ecbbfc9b20
+  resolved_at: 2026-06-01T00:37:12.104086Z
+  answer: "Your questions have been answered: \"How should I handle the parallel-session thread `gtkb-adr-0001-membase-migration` (Codex NO-GO -002)? The S379 session that filed it appears inactive (stale lock).\"=\"Take over + file REVISED (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
@@ -10842,4 +10893,73 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: da6113170c350bc8
   resolved_at: 2026-05-01T21:06:03.463668Z
   answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0227
+  asked_at: 2026-05-01T22:35:26.474937Z
+  question: "Both dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level approvals — no code action required, and IR-0 is explicitly blocked on missing ADR + Phase 9 prerequisites. The actionable next step under gtkb-command-surface is filing the first concrete implementation slice. Which slice should I file as the next NEW bridge proposal?"
+  options:
+    - "CS-1.5 registry tracking (Recommended)"
+    - "CS-2 UserPromptSubmit hook contract"
+    - "Defer CS; revise isolation-017 -006 NO-GO"
+    - "Pause — surface other priorities"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8042700f656b7c95
+  resolved_at: 2026-05-01T22:35:26.474937Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0228
+  asked_at: 2026-05-01T23:49:08.328001Z
+  question: "Slice 1 proposal at 4 NO-GO cycles, no code written yet. Each fix has been mechanical, but cumulative cost is high. How do you want to proceed?"
+  options:
+    - "File REVISED-3 mechanically (Recommended)"
+    - "Pause and adjust approach"
+    - "Wrap session, fresh restart"
+    - "Other"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3e8957270f68c7a8
+  resolved_at: 2026-05-01T23:49:08.328001Z
+  answer: "User has answered your questions: \"Slice 1 proposal at 4 NO-GO cycles, no code written yet. Each fix has been mechanical, but cumulative cost is high. How do you want to proceed?\"=\"File REVISED-3 mechanically (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0229
+  asked_at: 2026-05-01T23:50:23.843875Z
+  question: "Bridge auto-dispatch flagged two GOs but both are plan-level only (not implementation-ready). Which path should I take?"
+  options:
+    - "Draft CS-1 slice proposal (Recommended)"
+    - "Draft CS-1.5 .gitignore slice"
+    - "Wait on incident-response IR-0"
+    - "Defer; pick from work_list.md instead"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c5e7ce995f3f7139
+  resolved_at: 2026-05-01T23:50:23.843875Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0231
+  asked_at: 2026-05-01T23:53:44.519013Z
+  question: "Which bridge GO should Prime Builder act on now?"
+  options:
+    - "Slice 1 doctor checks"
+    - "CS slice proposals"
+    - "Incident-response IR-0"
+    - "Skip / different work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8f9aadeaffbb83f8
+  resolved_at: 2026-05-01T23:53:44.519013Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0232
+  asked_at: 2026-05-02T00:59:54.345282Z
+  question: "Slice 1 proposal GO'd after 4 NO-GO cycles. Implementation is ~900 LOC (450 source + 400 tests + IPR/CVR + smoke + likely 1-2 post-impl NO-GO cycles). Proceed now or wrap?"
+  options:
+    - "Wrap session here (Recommended)"
+    - "Proceed with implementation now"
+    - "Other"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bfbd60b9638f82e9
+  resolved_at: 2026-05-02T00:59:54.345282Z
+  answer: "User has answered your questions: \"Slice 1 proposal GO'd after 4 NO-GO cycles. Implementation is ~900 LOC (450 source + 400 tests + IPR/CVR + smoke + likely 1-2 post-impl NO-GO cycles). Proceed now or wrap?\"=\"Wrap session here (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
