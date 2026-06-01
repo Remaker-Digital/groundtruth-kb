@@ -917,7 +917,11 @@ def _quiesce_marker(
     }
 
 
-def _resolve_dispatch_target(needed_role_label: str, project_root: Path) -> DispatchTarget:
+def _resolve_dispatch_target(
+    needed_role_label: str,
+    project_root: Path,
+    state_dir: Path | None = None,
+) -> DispatchTarget | None:
     """Resolve which harness should receive work needing the given durable role.
 
     Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001):
@@ -927,10 +931,30 @@ def _resolve_dispatch_target(needed_role_label: str, project_root: Path) -> Disp
       3. Drift check: role_record["harness_type"] (denormalized) MUST match
          identity-derived handle.
 
+    Role/status orthogonality (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001;
+    ADR-ROLE-STATUS-ORTHOGONALITY-001): role membership and dispatch eligibility
+    are orthogonal axes. A harness is a dispatch candidate only when its role-set
+    contains ``needed_role_label`` AND its registry ``status`` is ``"active"``.
+    Multiple harnesses MAY share a role; only the single ACTIVE one is the
+    auto-dispatch target.
+
+    Resolution outcomes:
+      - Exactly one ACTIVE match -> return its ``DispatchTarget`` (assertion 4).
+      - Zero ACTIVE matches -> return ``None`` (a sentinel, NOT a raise); when
+        ``state_dir`` is provided, emit one structured ``no_active_target_for_role``
+        record to ``dispatch-failures.jsonl`` (assertion 2).
+      - Two or more ACTIVE matches -> raise ``ValueError`` naming all matching
+        harness IDs (configuration error; assertion 3).
+
+    Status handling is fail-closed (assertions 5, 6): a missing, null, empty, or
+    unrecognized ``status`` value is treated as inactive, so the resolver never
+    dispatches to a non-active harness. The legacy ``acting-prime-builder`` token
+    is READ-accepted and matches the ``prime-builder`` label (assertion 11; see
+    ``_record_has_role``).
+
     Fail-closed cases (raises ValueError):
       - Unknown role label (not in ``_LABEL_TO_CANONICAL_MODE``).
-      - Zero harnesses assigned the role.
-      - Multiple harnesses assigned the role (configuration error).
+      - Multiple ACTIVE harnesses for the role (configuration error).
       - Drift: role_record["harness_type"] disagrees with identity-derived
         handle.
       - Identity map has no entry for the resolved harness_id.
@@ -951,21 +975,61 @@ def _resolve_dispatch_target(needed_role_label: str, project_root: Path) -> Disp
     def _record_has_role(h_info: dict[str, object], wanted: str) -> bool:
         raw = h_info.get("role")
         if isinstance(raw, str):
-            return raw.strip().lower() == wanted
-        if isinstance(raw, (list, tuple, set, frozenset)):
-            return any(str(r).strip().lower() == wanted for r in raw)
-        return False
+            candidates = {raw.strip().lower()}
+        elif isinstance(raw, (list, tuple, set, frozenset)):
+            candidates = {str(r).strip().lower() for r in raw}
+        else:
+            return False
+        if wanted in candidates:
+            return True
+        # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 11: the legacy
+        # compatibility/provenance token ``acting-prime-builder`` is READ-accepted
+        # (GOV-ACTING-PRIME-BUILDER-001) and matches the ``prime-builder`` label
+        # for dispatch resolution.
+        return wanted == "prime-builder" and "acting-prime-builder" in candidates
 
-    matching = [
+    # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertions 1, 5, 6: dispatch
+    # eligibility is gated on ``status == "active"``. A missing, null, empty, or
+    # any non-"active" status is treated as inactive (fail-closed); the resolver
+    # never dispatches to a non-active harness. (Slice 6's doctor check surfaces
+    # an unknown status value as a configuration error; the resolver's only job
+    # here is to refuse to dispatch to it.)
+    def _is_active(h_info: dict[str, object]) -> bool:
+        status = h_info.get("status")
+        return isinstance(status, str) and status.strip().lower() == "active"
+
+    role_matching = [
         (h_id, h_info)
         for h_id, h_info in harnesses.items()
         if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
     ]
-    if not matching:
-        raise ValueError(f"no harness assigned role {needed_role_label!r}")
-    if len(matching) > 1:
-        raise ValueError(f"multiple harnesses assigned role {needed_role_label!r}: {[h_id for h_id, _ in matching]}")
-    harness_id, role_record = matching[0]
+    active_matching = [(h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info)]
+
+    if not active_matching:
+        # assertion 2: zero ACTIVE matches -> return a sentinel (None), NOT raise.
+        # Emit one structured audit record (when a state dir is available) so
+        # liveness diagnosis sees explicit evidence rather than inferring
+        # inertness from missing data.
+        if state_dir is not None:
+            inactive_ids = sorted(h_id for h_id, _ in role_matching)
+            note = f" (role-set members exist but none active: {inactive_ids})" if inactive_ids else ""
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "dispatch_id": _now_iso() + "-no-active-target",
+                    "recipient": needed_role_label,
+                    "launched": False,
+                    "reason": "no_active_target_for_role",
+                    "error_message": f"no active harness for role {needed_role_label!r}{note}",
+                },
+            )
+        return None
+    if len(active_matching) > 1:
+        # assertion 3: multiple ACTIVE matches is a configuration error.
+        raise ValueError(
+            f"multiple active harnesses for role {needed_role_label!r}: {sorted(h_id for h_id, _ in active_matching)}"
+        )
+    harness_id, role_record = active_matching[0]
 
     identities = _read_harness_identities(project_root)
     id_to_handle = _invert_identities(identities)
@@ -1180,7 +1244,9 @@ def _spawn_harness(
 
 def _is_single_harness_topology(project_root: Path) -> bool:
     """Return True iff the role map records a single harness ID with both
-    ``prime-builder`` AND ``loyal-opposition`` in its role-set.
+    ``prime-builder`` AND ``loyal-opposition`` in its role-set AND that harness
+    carries ``status == "active"`` (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001
+    assertion 7: single-harness mode requires the harness active).
 
     Per IP-8 of ``bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md``
     (Codex GO at ``-006``): the cross-harness trigger goes inert in
@@ -1205,7 +1271,15 @@ def _is_single_harness_topology(project_root: Path) -> bool:
     raw_role = record.get("role")
     if isinstance(raw_role, list):
         role_set = {str(r).strip().lower() for r in raw_role if isinstance(r, str)}
-        return "prime-builder" in role_set and "loyal-opposition" in role_set
+        has_both = "prime-builder" in role_set and "loyal-opposition" in role_set
+        # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 7: single-harness
+        # mode is applicable only when the single harness is status==active.
+        # Missing/unknown status -> not active -> not single-harness (the trigger
+        # then proceeds on its normal multi-harness path, where the resolver
+        # finds the inactive single harness as zero-active -> sentinel + audit).
+        status = record.get("status")
+        is_active = isinstance(status, str) and status.strip().lower() == "active"
+        return has_both and is_active
     return False
 
 
@@ -1382,14 +1456,17 @@ def run_trigger(
     # Build targets defensively: if resolution fails (drift, missing
     # identity entry, etc.), record the failure and skip that recipient
     # for this cycle without aborting the whole run.
-    pending_by_target: list[tuple[DispatchTarget | None, list[Any], str, str]] = []
+    pending_by_target: list[tuple[DispatchTarget | None, list[Any], str, str, str | None]] = []
     for legacy_recipient, needed_role_label, items in (
         ("prime", "prime-builder", actionable_for_prime),
         ("codex", "loyal-opposition", actionable_for_codex),
     ):
         try:
-            target = _resolve_dispatch_target(needed_role_label, project_root)
+            target = _resolve_dispatch_target(needed_role_label, project_root, state_dir)
         except ValueError as exc:
+            # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 3: multiple-ACTIVE
+            # (and other config errors: drift, unknown label, missing identity)
+            # raise; the caller records dispatch_target_resolution_failed.
             _record_dispatch_failure(
                 state_dir,
                 {
@@ -1400,18 +1477,31 @@ def run_trigger(
                     "error_message": str(exc),
                 },
             )
-            pending_by_target.append((None, items, needed_role_label, legacy_recipient))
+            pending_by_target.append(
+                (None, items, needed_role_label, legacy_recipient, "dispatch_target_resolution_failed")
+            )
             continue
-        pending_by_target.append((target, items, needed_role_label, legacy_recipient))
+        if target is None:
+            # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 2: zero-ACTIVE
+            # sentinel. _resolve_dispatch_target already emitted the
+            # no_active_target_for_role audit record; do NOT double-record here.
+            pending_by_target.append((None, items, needed_role_label, legacy_recipient, "no_active_target_for_role"))
+            continue
+        pending_by_target.append((target, items, needed_role_label, legacy_recipient, None))
 
     results: dict[str, Any] = {}
-    for target, items, recipient, _legacy_recipient in pending_by_target:
+    for target, items, recipient, _legacy_recipient, failure_reason in pending_by_target:
         if target is None:
-            # Resolution failed; record minimal state so the run keeps going.
-            results[recipient] = {
-                "launched": False,
-                "reason": "dispatch_target_resolution_failed",
-            }
+            # Resolution produced no dispatch target (multi-active ValueError or
+            # zero-active sentinel). Reflect the per-recipient last_result in
+            # dispatch-state.json per the DCL resolution table, then keep going.
+            reason = failure_reason or "dispatch_target_resolution_failed"
+            prior = recipients_state.get(recipient)
+            recipient_state = dict(prior) if isinstance(prior, dict) else {}
+            recipient_state["last_result"] = reason
+            recipient_state["updated_at"] = _now_iso()
+            recipients_state[recipient] = recipient_state
+            results[recipient] = {"launched": False, "reason": reason}
             continue
         # Filter by dispatchable per smart-poller-kind-aware-routing -009 §1.5.
         # Terminal-kind GO entries are not dispatched.

@@ -6,11 +6,21 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-dispatch-owner-approval-forgery-prevention
+NO-GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-002.md
+NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-001.md
+
+Document: gtkb-backlog-authorize-implementation-cli-slice-1
+NO-GO: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-002.md
+NEW: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-001.md
+
 Document: gtkb-role-status-orthogonality-dispatch-slice-2-resolver
+NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-003.md
 GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-002.md
 NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-001.md
 
 Document: gtkb-backlog-update-cli-slice-1
+GO: bridge/gtkb-backlog-update-cli-slice-1-004.md
 REVISED: bridge/gtkb-backlog-update-cli-slice-1-003.md
 NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
@@ -20,6 +30,7 @@ NO-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-002.md
 NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-001.md
 
 Document: gtkb-adr-0001-membase-migration
+VERIFIED: bridge/gtkb-adr-0001-membase-migration-008.md
 NEW: bridge/gtkb-adr-0001-membase-migration-007.md
 GO: bridge/gtkb-adr-0001-membase-migration-006.md
 REVISED: bridge/gtkb-adr-0001-membase-migration-005.md

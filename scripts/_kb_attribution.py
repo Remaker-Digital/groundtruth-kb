@@ -13,9 +13,13 @@ Three-source priority order for resolution:
 2. Environment variable `GTKB_HARNESS_NAME` (set by harness wrappers at
    session start; current default for ad-hoc CLI use under a configured
    harness session).
-3. Single Prime Builder slot in `harness-state/role-assignments.json` (only
-   when EXACTLY ONE harness is currently assigned `role: "prime-builder"`;
-   raises `RuntimeError` if zero or multiple Prime Builders exist).
+3. The single ACTIVE Prime Builder harness (only when EXACTLY ONE harness
+   currently holds `prime-builder` in its role-set AND registry
+   `status == "active"`; raises `RuntimeError` if zero or multiple active Prime
+   Builders exist). The active-status filter is applied upstream by
+   `load_role_assignments`, which returns only `status == "active"` harnesses
+   per ADR-ROLE-STATUS-ORTHOGONALITY-001 /
+   DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001.
 
 The resolver does NOT attempt to "infer" the harness from a process ID,
 parent-shell name, or any other derived signal. The above three sources
@@ -122,14 +126,22 @@ def _name_for_harness_id(harness_id: str) -> str | None:
     return None
 
 
-def _sole_prime_builder_harness_name() -> str | None:
-    """Return the harness_name of the sole Prime Builder, or None if 0 or >1.
+def _active_prime_builder_harness_name() -> str | None:
+    """Return the harness_name of the single ACTIVE Prime Builder, or None if 0 or >1.
 
     Per IP-8 of gtkb-single-harness-bridge-dispatcher-001: Prime membership is
     set-membership against the role-set wire form. Multi-element role sets
     (single-harness mode) count toward Prime membership iff they contain
     ``prime-builder`` (or the compatibility/provenance value
     ``acting-prime-builder``).
+
+    Role/status orthogonality (ADR-ROLE-STATUS-ORTHOGONALITY-001 /
+    DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001): attribution resolves to the single
+    *active* Prime Builder. The active-status filter is applied upstream by
+    ``load_role_assignments``, which returns ONLY ``status == "active"``
+    harnesses (and does not surface the status field), so role membership at
+    this layer already implies active. Two active Prime Builders (a registry
+    misconfiguration) return ``None``, and the mutating caller fails closed.
     """
     from scripts.harness_roles import is_prime_builder  # local import: avoid cycle
 
@@ -147,7 +159,7 @@ def _resolve_harness_name(harness_name: str | None) -> str | None:
     env_value = os.environ.get(ENV_VAR_HARNESS_NAME, "").strip()
     if env_value:
         return env_value
-    return _sole_prime_builder_harness_name()
+    return _active_prime_builder_harness_name()
 
 
 def _session_role_override(harness_name: str) -> str | None:
@@ -204,7 +216,9 @@ def resolve_changed_by(*, harness_name: str | None = None) -> str:
     Priority:
         1. Explicit kwarg `harness_name`.
         2. `GTKB_HARNESS_NAME` env var.
-        3. Single Prime Builder slot in `harness-state/role-assignments.json`.
+        3. The single ACTIVE Prime Builder harness (exactly one harness holding
+           `prime-builder` with registry `status == "active"`; the active-status
+           filter is applied upstream by `load_role_assignments`).
 
     Raises:
         RuntimeError: if no source resolves a harness, if the harness has

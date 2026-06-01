@@ -10,6 +10,7 @@ variant. Also asserts the 4 archive helpers no longer contain the literal
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from unittest import mock
@@ -137,3 +138,99 @@ def test_archive_helpers_do_not_use_or_none_variant(helper_path: Path) -> None:
         f"{helper_path.name} mutating helper must not use the read-only-test "
         f"variant; use resolve_changed_by() which fails closed"
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Slice 2: active Prime Builder attribution (ADR-ROLE-STATUS-ORTHOGONALITY-001
+# Consequences §1; DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001).
+# bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver (GO at -002).
+#
+# Priority-3 attribution resolves to the single ACTIVE Prime Builder. The
+# active-status filter is applied upstream by load_role_assignments (it returns
+# only status=="active" harnesses), so an inactive same-role harness is filtered
+# out. These tests redirect the registry projection read via the
+# GTKB_HARNESS_REGISTRY_PATH env override so they never read live state.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _write_attribution_registry(path: Path, harnesses: list[dict]) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": harnesses,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_active_prime_builder_attribution_filters_inactive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Priority-3 attribution resolves to the single ACTIVE Prime Builder.
+
+    claude (B) is active prime-builder; antigravity (C) is INACTIVE prime-builder.
+    load_role_assignments filters C out, so the priority-3 fallback resolves to
+    the single active PB (claude) and does NOT raise on 'two prime builders'.
+    Pins ADR-ROLE-STATUS-ORTHOGONALITY-001 Consequences §1.
+    """
+    registry = tmp_path / "harness-registry.json"
+    _write_attribution_registry(
+        registry,
+        [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder"],
+            },
+            {
+                "id": "C",
+                "harness_name": "antigravity",
+                "harness_type": "antigravity",
+                "status": "inactive",
+                "role": ["prime-builder"],
+            },
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["loyal-opposition"],
+            },
+        ],
+    )
+    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry))
+    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
+    assert resolve_changed_by() == "prime-builder/claude"
+
+
+def test_two_active_prime_builders_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two ACTIVE Prime Builders is a registry misconfiguration: priority-3
+    resolution returns None and the mutating resolver fails closed (RuntimeError).
+    """
+    registry = tmp_path / "harness-registry.json"
+    _write_attribution_registry(
+        registry,
+        [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder"],
+            },
+            {
+                "id": "C",
+                "harness_name": "antigravity",
+                "harness_type": "antigravity",
+                "status": "active",
+                "role": ["prime-builder"],
+            },
+        ],
+    )
+    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry))
+    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
+    with pytest.raises(RuntimeError):
+        resolve_changed_by()

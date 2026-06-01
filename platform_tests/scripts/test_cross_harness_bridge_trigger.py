@@ -1412,3 +1412,211 @@ def test_resolve_dispatch_target_attaches_invocation_surfaces_from_projection(
     # End-to-end: the resolved target's surfaces drive _harness_command.
     cmd = trigger._harness_command(target, "the-prompt", root)
     assert cmd == ["codex", "exec", "the-prompt", "--cd", str(root)]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Slice 2: status-aware dispatch resolver + single-harness topology gate.
+# DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertions 1-7, 10, 11.
+# (Assertions 8-9 = Slice 6 doctor; the doctor half of assertion 6 = Slice 6.)
+# bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver (GO at -002).
+# ──────────────────────────────────────────────────────────────────────────
+
+_NO_STATUS = object()
+
+
+def _write_registry(root: Path, records: list[dict]) -> None:
+    """Write a harness-state/harness-registry.json projection from records.
+
+    Both _read_role_assignments and _read_harness_identities resolve from this
+    projection (WI-3342 IP-4), so a single registry file fully drives
+    _resolve_dispatch_target and _is_single_harness_topology.
+    """
+    harness_state = root / "harness-state"
+    harness_state.mkdir(parents=True, exist_ok=True)
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": records,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _rec(harness_id: str, harness_name: str, role: list[str], status=_NO_STATUS, surfaces=None) -> dict:
+    """Build one registry record. status=_NO_STATUS omits the status key
+    (assertion 5: absent status). Pass status=None / "" / "bogus" for the other
+    inactive cases."""
+    record: dict = {
+        "id": harness_id,
+        "harness_name": harness_name,
+        "harness_type": harness_name,
+        "role": role,
+        "invocation_surfaces": surfaces or {"headless": {"argv": [harness_name, "-p", "{{PROMPT}}"]}},
+    }
+    if status is not _NO_STATUS:
+        record["status"] = status
+    return record
+
+
+def _failure_records(state_dir: Path) -> list[dict]:
+    path = state_dir / "dispatch-failures.jsonl"
+    if not path.is_file():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def test_resolve_exactly_one_active_dispatches(tmp_path: Path) -> None:
+    """Assertion 4: exactly one ACTIVE match -> DispatchTarget for that harness."""
+    trigger = _load_trigger()
+    _write_registry(
+        tmp_path,
+        [
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    pb = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
+    assert pb is not None
+    assert pb.harness_id == "B"
+    assert pb.command_handle == "claude"
+    assert pb.canonical_mode == "pb"
+    assert pb.invocation_surfaces == _CLAUDE_INVOCATION_SURFACES
+    lo = trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state")
+    assert lo is not None and lo.harness_id == "A" and lo.canonical_mode == "lo"
+
+
+def test_resolve_filters_by_active_status(tmp_path: Path) -> None:
+    """Assertion 1: an inactive same-role harness is never selected."""
+    trigger = _load_trigger()
+    _write_registry(
+        tmp_path,
+        [
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+            _rec("C", "antigravity", ["prime-builder"], "inactive"),
+        ],
+    )
+    pb = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
+    assert pb is not None and pb.harness_id == "B", "inactive C must not be selected"
+
+
+def test_resolve_zero_active_returns_sentinel_and_audits(tmp_path: Path) -> None:
+    """Assertion 2: zero ACTIVE -> None sentinel + one no_active_target_for_role audit."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder"], "inactive")])
+    target = trigger._resolve_dispatch_target("prime-builder", tmp_path, state_dir)
+    assert target is None
+    records = _failure_records(state_dir)
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["reason"] == "no_active_target_for_role"
+    assert rec["recipient"] == "prime-builder"
+    assert rec["launched"] is False
+    assert "prime-builder" in rec["error_message"]
+
+
+def test_resolve_zero_active_no_statedir_still_sentinels(tmp_path: Path) -> None:
+    """Assertion 2 (no state_dir): zero ACTIVE still returns the sentinel; the
+    audit emission is simply skipped when no state dir is provided (preserves
+    the 2-arg call form used by other tests)."""
+    trigger = _load_trigger()
+    _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder"], "inactive")])
+    assert trigger._resolve_dispatch_target("prime-builder", tmp_path) is None
+
+
+def test_resolve_multi_active_raises_naming_ids(tmp_path: Path) -> None:
+    """Assertion 3: 2+ ACTIVE -> ValueError naming all matching IDs."""
+    trigger = _load_trigger()
+    _write_registry(
+        tmp_path,
+        [
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+            _rec("C", "antigravity", ["prime-builder"], "active"),
+        ],
+    )
+    with pytest.raises(ValueError) as excinfo:
+        trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
+    msg = str(excinfo.value)
+    assert "multiple active" in msg
+    assert "'B'" in msg and "'C'" in msg
+
+
+def test_resolve_missing_status_treated_as_inactive(tmp_path: Path) -> None:
+    """Assertion 5: a record with no status key is inactive (fail-closed)."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder"])])  # status omitted
+    assert trigger._resolve_dispatch_target("prime-builder", tmp_path, state_dir) is None
+    assert _failure_records(state_dir)[0]["reason"] == "no_active_target_for_role"
+
+
+def test_resolve_empty_and_null_status_treated_as_inactive(tmp_path: Path) -> None:
+    """Assertion 5: empty-string and null status are inactive (fail-closed)."""
+    trigger = _load_trigger()
+    for bad_status in ("", None):
+        _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder"], bad_status)])
+        assert trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state") is None
+
+
+def test_resolve_unknown_status_treated_as_inactive(tmp_path: Path) -> None:
+    """Assertion 6 (resolver half): an unrecognized status is inactive.
+
+    The doctor FAIL on unknown status is Slice 6; here the resolver's only job
+    is to refuse to dispatch to it.
+    """
+    trigger = _load_trigger()
+    _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder"], "bogus")])
+    assert trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state") is None
+
+
+def test_is_single_harness_topology_requires_active(tmp_path: Path) -> None:
+    """Assertion 7: single-harness topology requires the harness status==active."""
+    trigger = _load_trigger()
+    _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"], "active")])
+    assert trigger._is_single_harness_topology(tmp_path) is True
+    _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"], "inactive")])
+    assert trigger._is_single_harness_topology(tmp_path) is False
+    _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"])])  # no status
+    assert trigger._is_single_harness_topology(tmp_path) is False
+
+
+def test_resolve_acting_prime_builder_matches_prime(tmp_path: Path) -> None:
+    """Assertion 11: legacy acting-prime-builder token matches prime-builder."""
+    trigger = _load_trigger()
+    _write_registry(
+        tmp_path,
+        [
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES),
+            _rec("B", "claude", ["acting-prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    pb = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
+    assert pb is not None and pb.harness_id == "B" and pb.canonical_mode == "pb"
+
+
+def test_resolve_ignores_session_stated_role_marker(tmp_path: Path) -> None:
+    """Assertion 10: the resolver does NOT consult the ephemeral session-stated
+    role marker; headless dispatch keys off durable role + status only."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    _write_registry(
+        tmp_path,
+        [
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    # A marker that, if (wrongly) consulted, would flip claude to loyal-opposition.
+    session_dir = tmp_path / ".claude" / "session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / "active-session-role.json").write_text(
+        json.dumps({"session_stated_role": "loyal-opposition", "harness_name": "claude"}),
+        encoding="utf-8",
+    )
+    pb = trigger._resolve_dispatch_target("prime-builder", tmp_path, state_dir)
+    lo = trigger._resolve_dispatch_target("loyal-opposition", tmp_path, state_dir)
+    assert pb is not None and pb.harness_id == "B", "durable PB resolution must ignore the marker"
+    assert lo is not None and lo.harness_id == "A", "durable LO resolution must ignore the marker"
