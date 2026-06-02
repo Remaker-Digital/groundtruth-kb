@@ -484,6 +484,7 @@ NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-2-002.md
 NEW: bridge/gtkb-claude-md-scope-clarification-slice-2-001.md
 
 Document: gtkb-claude-md-scope-clarification-scoping
+NEW: bridge/gtkb-claude-md-scope-clarification-scoping-003.md
 GO: bridge/gtkb-claude-md-scope-clarification-scoping-002.md
 NEW: bridge/gtkb-claude-md-scope-clarification-scoping-001.md
 
