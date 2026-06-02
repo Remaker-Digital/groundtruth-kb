@@ -544,6 +544,7 @@ REVISED: bridge/gtkb-hygiene-sweep-skill-scoping-002.md
 NEW: bridge/gtkb-hygiene-sweep-skill-scoping-001.md
 
 Document: gtkb-hygiene-sweep-cli-scoping
+NEW: bridge/gtkb-hygiene-sweep-cli-scoping-004.md
 GO: bridge/gtkb-hygiene-sweep-cli-scoping-003.md
 REVISED: bridge/gtkb-hygiene-sweep-cli-scoping-002.md
 NEW: bridge/gtkb-hygiene-sweep-cli-scoping-001.md
