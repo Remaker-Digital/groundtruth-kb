@@ -192,6 +192,7 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-dispatch-owner-approval-forgery-prevention
+NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-005.md
 GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-004.md
 REVISED: bridge/gtkb-dispatch-owner-approval-forgery-prevention-003.md
 NO-GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-002.md
@@ -613,6 +614,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-skill-modernization-scoping
+NEW: bridge/gtkb-skill-modernization-scoping-005.md
 GO: bridge/gtkb-skill-modernization-scoping-004.md
 REVISED: bridge/gtkb-skill-modernization-scoping-003.md
 NO-GO: bridge/gtkb-skill-modernization-scoping-002.md
