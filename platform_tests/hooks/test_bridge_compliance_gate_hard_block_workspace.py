@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -41,13 +43,71 @@ def _file_sha256(path: Path) -> str:
 
 
 def _run_hook(payload: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["python", str(ACTIVE_HOOK)],
-        input=payload,
+    payload_data = json.loads(payload)
+    session_id = str(payload_data.get("session_id") or "test")
+    bridge_id = _bridge_id_from_payload(payload_data)
+    if bridge_id is not None:
+        _claim_bridge_thread(bridge_id, session_id)
+    try:
+        return subprocess.run(
+            [sys.executable, str(ACTIVE_HOOK)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(REPO_ROOT),
+        )
+    finally:
+        if bridge_id is not None:
+            _release_bridge_thread(bridge_id, session_id)
+
+
+def _bridge_id_from_payload(payload_data: dict) -> str | None:
+    if payload_data.get("tool_name") not in {"Write", "Edit"}:
+        return None
+    tool_input = payload_data.get("tool_input") or {}
+    file_path = str(tool_input.get("file_path") or "").replace("\\", "/")
+    if not file_path.endswith(".md") or file_path.endswith("/bridge/INDEX.md"):
+        return None
+    if "/bridge/" not in f"/{file_path}":
+        return None
+    match = re.match(r"(?:.*/)?(?P<bridge_id>.+)-\d{3}\.md$", file_path)
+    return match.group("bridge_id") if match else None
+
+
+def _claim_bridge_thread(bridge_id: str, session_id: str) -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/bridge_claim_cli.py",
+            "claim",
+            bridge_id,
+            "--session-id",
+            session_id,
+            "--ttl-seconds",
+            "30",
+        ],
+        cwd=str(REPO_ROOT),
+        check=True,
         capture_output=True,
         text=True,
-        timeout=10,
+    )
+
+
+def _release_bridge_thread(bridge_id: str, session_id: str) -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/bridge_claim_cli.py",
+            "release",
+            bridge_id,
+            "--session-id",
+            session_id,
+        ],
         cwd=str(REPO_ROOT),
+        check=False,
+        capture_output=True,
+        text=True,
     )
 
 

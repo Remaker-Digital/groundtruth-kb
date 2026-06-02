@@ -590,6 +590,7 @@ REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-002.md
 NEW: bridge/gtkb-lo-hygiene-assessment-skill-build-001.md
 
 Document: gtkb-bridge-target-paths-kb-mutation-check
+REVISED: bridge/gtkb-bridge-target-paths-kb-mutation-check-005.md
 NO-GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-004.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-003.md
 GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md

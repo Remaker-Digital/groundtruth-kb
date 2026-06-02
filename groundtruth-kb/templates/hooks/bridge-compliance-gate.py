@@ -225,7 +225,7 @@ def _has_scratch_boundary_between(root: Path, cwd_path: Path) -> bool:
         rel_parts = cwd_path.resolve().relative_to(root.resolve()).parts
     except ValueError:
         return False
-    return ".tmp" in rel_parts
+    return any(part in {".tmp", ".gtkb-state"} for part in rel_parts)
 
 
 def _nearest_marker_root(cwd_path: Path) -> Path | None:
@@ -281,7 +281,8 @@ def _canonical_project_root(cwd_path: Path) -> Path:
     helpers rely on process cwd and are therefore unsafe for hook unit tests that
     pass a synthetic cwd. Linked worktrees resolve through ``git-common-dir``;
     normal subdirectories use the nearest ``groundtruth.toml`` marker; scratch
-    directories under ``.tmp`` stay hermetic and fall back to ``cwd_path``.
+    directories under ``.tmp`` or ``.gtkb-state`` stay hermetic and fall back
+    to ``cwd_path``.
     """
     if _is_under_claude_worktrees(cwd_path):
         git_root = _git_common_dir_root(cwd_path)
