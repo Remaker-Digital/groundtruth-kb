@@ -828,6 +828,7 @@ NO-GO: bridge/gtkb-isolation-015-phase7-root-enforcement-002.md
 NEW: bridge/gtkb-isolation-015-phase7-root-enforcement-001.md
 
 Document: gtkb-legacy-gov-wi-cleanup
+REVISED: bridge/gtkb-legacy-gov-wi-cleanup-009.md
 NO-GO: bridge/gtkb-legacy-gov-wi-cleanup-008.md
 REVISED: bridge/gtkb-legacy-gov-wi-cleanup-007.md
 NO-GO: bridge/gtkb-legacy-gov-wi-cleanup-006.md
