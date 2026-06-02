@@ -89,6 +89,7 @@ GO: bridge/gtkb-active-status-capability-gate-formalization-002.md
 NEW: bridge/gtkb-active-status-capability-gate-formalization-001.md
 
 Document: gtkb-rc1-canonical-ci-closure
+NEW: bridge/gtkb-rc1-canonical-ci-closure-003.md
 GO: bridge/gtkb-rc1-canonical-ci-closure-002.md
 NEW: bridge/gtkb-rc1-canonical-ci-closure-001.md
 
@@ -150,19 +151,6 @@ GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-004.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-003.md
 GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
-
-Document: gtkb-da-enforcement-completion-slice1-decompose
-VERIFIED: bridge/gtkb-da-enforcement-completion-slice1-decompose-011.md
-NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-010.md
-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-009.md
-REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-008.md
-NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-007.md
-NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-006.md
-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-005.md
-REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-004.md
-NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-003.md
-NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-002.md
-NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
 VERIFIED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-008.md
@@ -433,6 +421,7 @@ NO-GO: bridge/gtkb-lo-advisory-owner-grilling-gate-002.md
 NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-001.md
 
 Document: gtkb-discoverability-cli-slice-2-scoping
+NO-GO: bridge/gtkb-discoverability-cli-slice-2-scoping-004.md
 NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-003.md
 GO: bridge/gtkb-discoverability-cli-slice-2-scoping-002.md
 NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-001.md
