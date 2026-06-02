@@ -639,6 +639,12 @@ NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-003.md
 REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-002.md
 NEW: bridge/gtkb-lo-hygiene-assessment-skill-build-001.md
 
+Document: gtkb-worker-packet-auth-envelope-slice-2-auto-packet
+VERIFIED: bridge/gtkb-worker-packet-auth-envelope-slice-2-auto-packet-004.md
+NEW: bridge/gtkb-worker-packet-auth-envelope-slice-2-auto-packet-003.md
+GO: bridge/gtkb-worker-packet-auth-envelope-slice-2-auto-packet-002.md
+NEW: bridge/gtkb-worker-packet-auth-envelope-slice-2-auto-packet-001.md
+
 Document: gtkb-bridge-target-paths-kb-mutation-check
 NO-GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-004.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-003.md
@@ -1147,6 +1153,14 @@ NO-GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-004.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-003.md
 GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
+
+Document: gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping
+VERIFIED: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-006.md
+NEW: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-005.md
+GO: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-004.md
+REVISED: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-003.md
+NO-GO: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-002.md
+NEW: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-001.md
 
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-004.md
