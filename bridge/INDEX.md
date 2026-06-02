@@ -682,6 +682,7 @@ NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-002.md
 NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-001.md
 
 Document: gtkb-s358-w1-retirement-machinery-correction
+VERIFIED: bridge/gtkb-s358-w1-retirement-machinery-correction-021.md
 NEW: bridge/gtkb-s358-w1-retirement-machinery-correction-020.md
 GO: bridge/gtkb-s358-w1-retirement-machinery-correction-019.md
 REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-018.md
