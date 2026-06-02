@@ -6,6 +6,9 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-registry-scaffold-fixture-drift-reconciliation
+NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-001.md
+
      Authority: harness-state/role-assignments.json (role) + harness-state/harness-identities.json (identity).
      This sentinel is a checksum mirror only. It MUST NOT be used to override the durable role record.
      Prime Builder harness:    A (Codex)
