@@ -530,6 +530,7 @@ NO-GO: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-002.md
 NEW: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-001.md
 
 Document: gtkb-startup-cache-dcl-supersession-scoping
+NEW: bridge/gtkb-startup-cache-dcl-supersession-scoping-005.md
 GO: bridge/gtkb-startup-cache-dcl-supersession-scoping-004.md
 REVISED: bridge/gtkb-startup-cache-dcl-supersession-scoping-003.md
 NO-GO: bridge/gtkb-startup-cache-dcl-supersession-scoping-002.md
