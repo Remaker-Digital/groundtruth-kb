@@ -715,6 +715,7 @@ NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
 NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-001.md
 
 Document: gtkb-in-source-provenance-anchors-001-prop
+NEW: bridge/gtkb-in-source-provenance-anchors-001-prop-007.md
 GO: bridge/gtkb-in-source-provenance-anchors-001-prop-006.md
 REVISED: bridge/gtkb-in-source-provenance-anchors-001-prop-005.md
 NO-GO: bridge/gtkb-in-source-provenance-anchors-001-prop-004.md

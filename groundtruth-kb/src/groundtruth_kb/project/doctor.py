@@ -322,6 +322,91 @@ def _check_db_schema(target: Path) -> ToolCheck:
         )
 
 
+def _orphan_citation_audit_script(target: Path) -> Path:
+    target_script = target / "scripts" / "orphan_citation_audit.py"
+    if target_script.exists():
+        return target_script
+    return Path(__file__).resolve().parents[4] / "scripts" / "orphan_citation_audit.py"
+
+
+def _orphan_citation_severity(target: Path) -> Literal["warning", "fail"]:
+    env_value = os.environ.get("GTKB_ORPHAN_CITATION_SEVERITY", "").strip().lower()
+    if env_value in {"warning", "fail"}:
+        return env_value  # type: ignore[return-value]
+
+    toml_path = target / "groundtruth.toml"
+    if not toml_path.exists():
+        return "warning"
+    try:
+        import tomllib
+
+        data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    except Exception:
+        return "warning"
+    doctor_config = data.get("doctor", {}) if isinstance(data, dict) else {}
+    severity = str(doctor_config.get("orphan_citations", "")).strip().lower()
+    return "fail" if severity == "fail" else "warning"
+
+
+def _check_orphan_citations(target: Path) -> ToolCheck:
+    script_path = _orphan_citation_audit_script(target)
+    if not script_path.exists():
+        return ToolCheck(
+            name="Orphan citations",
+            required=False,
+            found=False,
+            status="warning",
+            message="orphan_citation_audit.py not found; citation-anchor audit unavailable",
+        )
+
+    cmd = [
+        sys.executable,
+        str(script_path),
+        "--root",
+        str(target),
+        "--db",
+        str(target / "groundtruth.db"),
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
+        payload = json.loads(result.stdout or "{}")
+    except (json.JSONDecodeError, OSError, subprocess.TimeoutExpired) as exc:
+        return ToolCheck(
+            name="Orphan citations",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"orphan citation audit did not return usable JSON: {exc}",
+        )
+
+    orphan_count = len(payload.get("orphans") or [])
+    scanned_files = payload.get("scanned_files", 0)
+    if result.returncode not in {0, 1}:
+        return ToolCheck(
+            name="Orphan citations",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"orphan citation audit failed with exit {result.returncode}",
+        )
+    if orphan_count:
+        severity = _orphan_citation_severity(target)
+        return ToolCheck(
+            name="Orphan citations",
+            required=False,
+            found=True,
+            status=severity,
+            message=f"{orphan_count} orphan citation(s) found across {scanned_files} scanned file(s)",
+        )
+    return ToolCheck(
+        name="Orphan citations",
+        required=False,
+        found=True,
+        status="pass",
+        message=f"No orphan citations found across {scanned_files} scanned file(s)",
+    )
+
+
 def _check_hooks(target: Path, profile_name: str) -> ToolCheck:
     hooks_dir = target / ".claude" / "hooks"
     if not hooks_dir.exists():
@@ -3254,6 +3339,7 @@ def run_doctor(
         checks.append(_check_single_harness_dispatcher_when_required(target))
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
+        checks.append(_check_orphan_citations(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
     # Local import avoids a circular dependency: doctor_isolation imports
