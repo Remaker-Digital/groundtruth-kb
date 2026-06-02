@@ -191,14 +191,6 @@ WITHDRAWN: bridge/gtkb-membase-effective-use-audit-test-restoration-003.md
 NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
-Document: gtkb-dispatch-owner-approval-forgery-prevention
-VERIFIED: bridge/gtkb-dispatch-owner-approval-forgery-prevention-006.md
-NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-005.md
-GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-004.md
-REVISED: bridge/gtkb-dispatch-owner-approval-forgery-prevention-003.md
-NO-GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-002.md
-NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-001.md
-
 Document: gtkb-backlog-authorize-implementation-cli-slice-1
 VERIFIED: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-008.md
 REVISED: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-007.md
@@ -510,14 +502,6 @@ REVISED: bridge/gtkb-env-sot-topology-spec-authoring-003.md
 NO-GO: bridge/gtkb-env-sot-topology-spec-authoring-002.md
 NEW: bridge/gtkb-env-sot-topology-spec-authoring-001.md
 
-Document: gtkb-startup-cache-dcl-supersession-scoping
-VERIFIED: bridge/gtkb-startup-cache-dcl-supersession-scoping-006.md
-NEW: bridge/gtkb-startup-cache-dcl-supersession-scoping-005.md
-GO: bridge/gtkb-startup-cache-dcl-supersession-scoping-004.md
-REVISED: bridge/gtkb-startup-cache-dcl-supersession-scoping-003.md
-NO-GO: bridge/gtkb-startup-cache-dcl-supersession-scoping-002.md
-NEW: bridge/gtkb-startup-cache-dcl-supersession-scoping-001.md
-
 Document: gtkb-spec-coherence-cli-scoping
 VERIFIED: bridge/gtkb-spec-coherence-cli-scoping-004.md
 NEW: bridge/gtkb-spec-coherence-cli-scoping-003.md
@@ -556,6 +540,7 @@ NO-GO: bridge/gtkb-platform-tests-ruff-cleanup-002.md
 NEW: bridge/gtkb-platform-tests-ruff-cleanup-001.md
 
 Document: gtkb-push-gate-slice-1-5-debt-audit
+REVISED: bridge/gtkb-push-gate-slice-1-5-debt-audit-003.md
 NO-GO: bridge/gtkb-push-gate-slice-1-5-debt-audit-002.md
 NEW: bridge/gtkb-push-gate-slice-1-5-debt-audit-001.md
 
@@ -597,15 +582,8 @@ REVISED: bridge/gtkb-work-item-priority-canonical-p0p3-migration-003.md
 NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
-Document: gtkb-skill-modernization-scoping
-VERIFIED: bridge/gtkb-skill-modernization-scoping-006.md
-NEW: bridge/gtkb-skill-modernization-scoping-005.md
-GO: bridge/gtkb-skill-modernization-scoping-004.md
-REVISED: bridge/gtkb-skill-modernization-scoping-003.md
-NO-GO: bridge/gtkb-skill-modernization-scoping-002.md
-NEW: bridge/gtkb-skill-modernization-scoping-001.md
-
 Document: gtkb-impl-report-bridge-structural-validation-mtime
+REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-005.md
 NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-004.md
 REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-003.md
 NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-002.md
@@ -1128,6 +1106,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
+REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-005.md
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-004.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-003.md
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-002.md
