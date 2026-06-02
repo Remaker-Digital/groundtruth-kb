@@ -597,6 +597,7 @@ GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-001.md
 
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
+VERIFIED: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-008.md
 REVISED: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-007.md
 NO-GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-006.md
 REVISED: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-005.md
