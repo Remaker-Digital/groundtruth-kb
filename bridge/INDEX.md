@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-rc1-pyjwt-dependency-audit-remediation
+GO: bridge/gtkb-rc1-pyjwt-dependency-audit-remediation-002.md
 NEW: bridge/gtkb-rc1-pyjwt-dependency-audit-remediation-001.md
 
 Document: gtkb-discoverability-cli-status-scanner-api-regression
