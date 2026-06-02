@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-rc1-pyjwt-dependency-audit-remediation
+NEW: bridge/gtkb-rc1-pyjwt-dependency-audit-remediation-001.md
+
 Document: gtkb-discoverability-cli-status-scanner-api-regression
 VERIFIED: bridge/gtkb-discoverability-cli-status-scanner-api-regression-004.md
 NEW: bridge/gtkb-discoverability-cli-status-scanner-api-regression-003.md
@@ -430,6 +433,7 @@ NO-GO: bridge/gtkb-lo-advisory-owner-grilling-gate-002.md
 NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-001.md
 
 Document: gtkb-discoverability-cli-slice-2-scoping
+NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-003.md
 GO: bridge/gtkb-discoverability-cli-slice-2-scoping-002.md
 NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-001.md
 
