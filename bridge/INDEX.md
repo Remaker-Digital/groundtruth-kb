@@ -477,6 +477,7 @@ NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-002.md
 NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-001.md
 
 Document: gtkb-claude-md-scope-clarification-slice-2
+NEW: bridge/gtkb-claude-md-scope-clarification-slice-2-005.md
 GO: bridge/gtkb-claude-md-scope-clarification-slice-2-004.md
 REVISED: bridge/gtkb-claude-md-scope-clarification-slice-2-003.md
 NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-2-002.md
