@@ -5,7 +5,7 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
-<!-- Role-intent sentinel (per GTKB-BRIDGE-INDEX-ROLE-INTENT-SENTINEL, Slice 1; NON-AUTHORITATIVE):
+<!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
      Authority: harness-state/role-assignments.json (role) + harness-state/harness-identities.json (identity).
      This sentinel is a checksum mirror only. It MUST NOT be used to override the durable role record.
      Prime Builder harness:    A (Codex)
@@ -38,6 +38,7 @@ GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
 
 Document: gtkb-da-enforcement-completion-slice1-decompose
+REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-008.md
 NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-007.md
 NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-006.md
 GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-005.md
