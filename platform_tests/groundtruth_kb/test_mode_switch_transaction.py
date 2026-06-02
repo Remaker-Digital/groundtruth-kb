@@ -44,9 +44,12 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+HarnessSeed = tuple[str, list[str]] | tuple[str, list[str], str]
+
 # Default harnesses for a seeded workspace: harness A (codex) loyal-opposition,
-# harness B (claude) prime-builder. Each entry is (harness_name, role-set).
-_DEFAULT_HARNESSES: dict[str, tuple[str, list[str]]] = {
+# harness B (claude) prime-builder. Each entry is (harness_name, role-set)
+# or (harness_name, role-set, status).
+_DEFAULT_HARNESSES: dict[str, HarnessSeed] = {
     "A": ("codex", ["loyal-opposition"]),
     "B": ("claude", ["prime-builder"]),
 }
@@ -55,7 +58,7 @@ _DEFAULT_HARNESSES: dict[str, tuple[str, list[str]]] = {
 def _seed_workspace(
     root: Path,
     *,
-    harnesses: dict[str, tuple[str, list[str]]] | None = None,
+    harnesses: dict[str, HarnessSeed] | None = None,
     index_text: str | None = None,
 ) -> None:
     """Seed a real ``groundtruth.db`` registry + generated projection + INDEX.
@@ -71,7 +74,9 @@ def _seed_workspace(
     if index_text is None:
         index_text = "Document: foo\nVERIFIED: bridge/foo-002.md\nNEW: bridge/foo-001.md\n"
     db = KnowledgeDB(db_path=root / "groundtruth.db")
-    for harness_id, (harness_name, role_set) in harnesses.items():
+    for harness_id, seed in harnesses.items():
+        harness_name, role_set = seed[0], seed[1]
+        status = seed[2] if len(seed) > 2 else "active"
         db.insert_harness(
             id=harness_id,
             harness_name=harness_name,
@@ -79,7 +84,7 @@ def _seed_workspace(
             role=list(role_set),
             changed_by="test",
             change_reason="WI-3342 IP-6 mode-switch transaction fixture",
-            status="active",
+            status=status,
         )
     generate_harness_projection(db, root)
     _write(root / "bridge" / "INDEX.md", index_text)
@@ -231,3 +236,20 @@ def test_apply_role_switch_prime_builder_demotes_all_non_targets(
     assert updated["B"] == ["prime-builder"]
     assert updated["A"] == ["loyal-opposition"]
     assert updated["C"] == []
+
+
+def test_apply_role_switch_preserves_non_active_retained_roles(project_root: Path) -> None:
+    """WI-4213: role membership is not erased merely because a harness is non-active."""
+    _seed_workspace(
+        project_root,
+        harnesses={
+            "A": ("codex", ["loyal-opposition"]),
+            "B": ("claude", ["prime-builder"]),
+            "C": ("antigravity", ["prime-builder"], "registered"),
+        },
+    )
+    apply_role_switch(project_root, "B", "loyal-opposition", change_reason="preserve non-active role")
+    updated = _read_role_map(project_root)
+    assert updated["A"] == ["prime-builder"]
+    assert updated["B"] == ["loyal-opposition"]
+    assert updated["C"] == ["prime-builder"]

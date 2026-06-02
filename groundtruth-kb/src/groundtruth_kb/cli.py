@@ -10,8 +10,10 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -135,6 +137,129 @@ def main(ctx: click.Context, config_path: str | None) -> None:
 
 bridge_group.add_command(bridge_index_group)
 main.add_command(bridge_group)
+
+
+@click.group("reconcile")
+def bridge_reconcile_group() -> None:
+    """Bridge/backlog reconciliation audit commands."""
+
+
+def _load_bridge_reconciliation_audit(config: GTConfig) -> Any:
+    module_path = Path(config.project_root) / "scripts" / "bridge_reconciliation_audit.py"
+    spec = importlib.util.spec_from_file_location("groundtruth_kb_bridge_reconciliation_audit_cli", module_path)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load bridge reconciliation audit module: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_bridge_index_chain_audit(config: GTConfig) -> Any:
+    module_path = Path(config.project_root) / "scripts" / "bridge_index_chain_audit.py"
+    spec = importlib.util.spec_from_file_location("groundtruth_kb_bridge_index_chain_audit_cli", module_path)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load bridge INDEX chain audit module: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_bridge_reconciliation_correction_packet(config: GTConfig) -> Any:
+    module_path = Path(config.project_root) / "scripts" / "bridge_reconciliation_correction_packet.py"
+    spec = importlib.util.spec_from_file_location(
+        "groundtruth_kb_bridge_reconciliation_correction_packet_cli",
+        module_path,
+    )
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load bridge reconciliation correction packet module: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@bridge_reconcile_group.command("audit")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option("--db-path", type=click.Path(dir_okay=False), default=None, help="Override GroundTruth DB path.")
+@click.option("--bridge-index", type=click.Path(dir_okay=False), default=None, help="Override bridge INDEX path.")
+@click.pass_context
+def bridge_reconcile_audit_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    db_path: str | None,
+    bridge_index: str | None,
+) -> None:
+    """Run the read-only bridge/backlog reconciliation audit."""
+    config = _resolve_config(ctx)
+    module = _load_bridge_reconciliation_audit(config)
+    result = module.run_audit(
+        project_root=Path(config.project_root),
+        db_path=Path(db_path) if db_path else None,
+        bridge_index=Path(bridge_index) if bridge_index else None,
+    )
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(module.render_markdown_summary(result))
+
+
+@bridge_reconcile_group.command("packet")
+@click.option("--class", "triage_class", required=True, help="Single triage class to packetize.")
+@click.option(
+    "--input",
+    "input_path",
+    required=True,
+    type=click.Path(dir_okay=False),
+    help="Audit JSON file to consume.",
+)
+@click.option("--limit", type=int, default=None, help="Optional maximum candidate count.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_reconcile_packet_cmd(
+    ctx: click.Context,
+    triage_class: str,
+    input_path: str,
+    limit: int | None,
+    json_output: bool,
+) -> None:
+    """Generate a dry-run single-class bridge reconciliation correction packet."""
+    config = _resolve_config(ctx)
+    module = _load_bridge_reconciliation_correction_packet(config)
+    try:
+        packet = module.build_packet(module.load_audit_input(Path(input_path)), triage_class=triage_class, limit=limit)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(packet, indent=2, sort_keys=True))
+    else:
+        click.echo(module.render_markdown_packet(packet))
+
+
+@bridge_reconcile_group.command("index-chain")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option("--bridge-index", type=click.Path(dir_okay=False), default=None, help="Override bridge INDEX path.")
+@click.pass_context
+def bridge_reconcile_index_chain_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    bridge_index: str | None,
+) -> None:
+    """Run the read-only bridge INDEX/file-chain deviation detector."""
+    config = _resolve_config(ctx)
+    module = _load_bridge_index_chain_audit(config)
+    result = module.run_audit(
+        project_root=Path(config.project_root),
+        bridge_index=Path(bridge_index) if bridge_index else None,
+    )
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(module.render_markdown_summary(result))
+
+
+bridge_group.add_command(bridge_reconcile_group)
 
 
 # ---------------------------------------------------------------------------

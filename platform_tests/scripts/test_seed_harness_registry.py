@@ -1,8 +1,9 @@
-"""Tests for the harness-registry seed migration (WI-3342 Slice A).
+"""Tests for the harness-registry seed migration.
 
 Spec-derived tests for ``REQ-HARNESS-REGISTRY-001`` FR1 (the ``harnesses``
-table is populated from the legacy harness-state JSON) and FR5 (the hot-path
-projection is regenerated after seeding), plus the migration's idempotence.
+table is populated from the tracked harness-state projection) and FR5 (the
+hot-path projection is regenerated after seeding), plus the migration's
+idempotence and WI-4214 status-preservation behavior.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
 All rights reserved.
@@ -47,23 +48,57 @@ def _clean_registry_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
 
 
-def _project(tmp_path: Path, role_map: dict[str, Any] | None = None) -> Path:
-    """Create a temp project with harness-state identity + role-assignment JSON."""
+def _projection_record(
+    harness_id: str,
+    name: str,
+    harness_type: str,
+    role: list[str],
+    *,
+    status: str = "active",
+    invocation_surfaces: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "capabilities_ref": None,
+        "event_driven_hooks": harness_type in {"claude", "codex"},
+        "harness_name": name,
+        "harness_type": harness_type,
+        "id": harness_id,
+        "invocation_surfaces": invocation_surfaces,
+        "reviewer_precedence": None,
+        "role": role,
+        "status": status,
+        "version": 1,
+    }
+
+
+def _project(tmp_path: Path, projection_records: list[dict[str, Any]] | None = None) -> Path:
+    """Create a temp project with a tracked harness-registry projection."""
     state = tmp_path / "harness-state"
     state.mkdir()
-    identities = {"harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}}}
-    roles = (
-        role_map
-        if role_map is not None
-        else {
-            "harnesses": {
-                "A": {"role": ["loyal-opposition"], "harness_type": "codex"},
-                "B": {"role": ["prime-builder"], "harness_type": "claude"},
-            }
-        }
-    )
-    (state / "harness-identities.json").write_text(json.dumps(identities), encoding="utf-8")
-    (state / "role-assignments.json").write_text(json.dumps(roles), encoding="utf-8")
+    records = projection_records or [
+        _projection_record(
+            "A",
+            "codex",
+            "codex",
+            ["loyal-opposition"],
+            invocation_surfaces={"headless": {"argv": ["codex", "exec", "{{PROMPT}}"]}},
+        ),
+        _projection_record(
+            "B",
+            "claude",
+            "claude",
+            ["prime-builder"],
+            invocation_surfaces={"headless": {"argv": ["claude", "-p", "{{PROMPT}}"]}},
+        ),
+    ]
+    registry = {
+        "description": "test projection",
+        "generated_at": "2026-06-02T00:00:00Z",
+        "harnesses": records,
+        "schema_version": 1,
+        "source_of_truth": "test",
+    }
+    (state / "harness-registry.json").write_text(json.dumps(registry), encoding="utf-8")
     return tmp_path
 
 
@@ -81,7 +116,7 @@ def _decode(value: Any) -> Any:
     return value
 
 
-def test_seed_inserts_live_harnesses_at_active(tmp_path: Path) -> None:
+def test_seed_inserts_projected_harnesses_with_projected_status(tmp_path: Path) -> None:
     root = _project(tmp_path)
     db = _db(tmp_path)
     _seed.seed_harness_registry(db, root)
@@ -91,7 +126,7 @@ def test_seed_inserts_live_harnesses_at_active(tmp_path: Path) -> None:
     assert harnesses["B"]["status"] == "active"
 
 
-def test_seed_carries_role_and_identity_from_legacy_json(tmp_path: Path) -> None:
+def test_seed_carries_role_identity_and_invocation_surfaces_from_projection(tmp_path: Path) -> None:
     root = _project(tmp_path)
     db = _db(tmp_path)
     _seed.seed_harness_registry(db, root)
@@ -103,6 +138,8 @@ def test_seed_carries_role_and_identity_from_legacy_json(tmp_path: Path) -> None
     assert b["harness_name"] == "claude"
     assert b["harness_type"] == "claude"
     assert _decode(b["role"]) == ["prime-builder"]
+    assert _decode(a["invocation_surfaces"]) == {"headless": {"argv": ["codex", "exec", "{{PROMPT}}"]}}
+    assert _decode(b["invocation_surfaces"]) == {"headless": {"argv": ["claude", "-p", "{{PROMPT}}"]}}
 
 
 def test_seed_is_idempotent(tmp_path: Path) -> None:
@@ -133,6 +170,44 @@ def test_seed_skips_harness_already_in_table(tmp_path: Path) -> None:
     summary = _seed.seed_harness_registry(db, root)
     assert "A" in summary["skipped"]
     assert summary["seeded"] == ["B"]
+
+
+def test_seed_preserves_registered_projection_status(tmp_path: Path) -> None:
+    root = _project(
+        tmp_path,
+        [
+            _projection_record("A", "codex", "codex", ["prime-builder"], status="active"),
+            _projection_record("C", "antigravity", "antigravity", ["prime-builder"], status="registered"),
+        ],
+    )
+    db = _db(tmp_path)
+    _seed.seed_harness_registry(db, root)
+    harnesses = {h["id"]: h for h in db.list_harnesses()}
+    assert harnesses["A"]["status"] == "active"
+    assert harnesses["C"]["status"] == "registered"
+
+
+def test_seed_ignores_stale_legacy_role_assignments_json(tmp_path: Path) -> None:
+    root = _project(
+        tmp_path,
+        [
+            _projection_record("A", "codex", "codex", ["loyal-opposition"], status="active"),
+            _projection_record("C", "antigravity", "antigravity", [], status="registered"),
+        ],
+    )
+    stale_roles = {
+        "harnesses": {
+            "A": {"harness_type": "codex", "role": ["prime-builder"]},
+            "C": {"harness_type": "antigravity", "role": ["prime-builder"]},
+        }
+    }
+    (root / "harness-state" / "role-assignments.json").write_text(json.dumps(stale_roles), encoding="utf-8")
+    db = _db(tmp_path)
+    _seed.seed_harness_registry(db, root)
+    harnesses = {h["id"]: h for h in db.list_harnesses()}
+    assert _decode(harnesses["A"]["role"]) == ["loyal-opposition"]
+    assert _decode(harnesses["C"]["role"]) == []
+    assert harnesses["C"]["status"] == "registered"
 
 
 def test_seed_regenerates_projection(tmp_path: Path) -> None:

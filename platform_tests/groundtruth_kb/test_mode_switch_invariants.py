@@ -75,6 +75,19 @@ def test_verify_role_partition_accepts_valid_partition(tmp_path: Path) -> None:
     assert verify_role_partition(tmp_path) == "A"
 
 
+def test_verify_role_partition_allows_non_active_role_retention(tmp_path: Path) -> None:
+    """WI-4213: non-active harnesses may retain roles but do not count in the active partition."""
+    _write_role_map(
+        tmp_path,
+        {
+            "A": {"role": ["prime-builder"], "status": "active"},
+            "B": {"role": ["loyal-opposition"], "status": "active"},
+            "C": {"role": ["prime-builder"], "status": "registered", "event_driven_hooks": False},
+        },
+    )
+    assert verify_role_partition(tmp_path) == "A"
+
+
 def test_verify_role_partition_rejects_zero_prime_builder(tmp_path: Path) -> None:
     _write_role_map(
         tmp_path,

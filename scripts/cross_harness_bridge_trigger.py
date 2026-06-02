@@ -971,7 +971,7 @@ def _read_harness_identities(project_root: Path) -> dict[str, Any]:
 
 
 def _invert_identities(identities: dict[str, Any]) -> dict[str, str]:
-    """Invert harness-identities.json: harness ID -> harness command handle.
+    """Invert the projected harness identity map: harness ID -> command handle.
 
     Example fixture::
 
@@ -1081,19 +1081,22 @@ def _resolve_dispatch_target(
 ) -> DispatchTarget | None:
     """Resolve which harness should receive work needing the given durable role.
 
-    Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001):
-      1. role-assignments.json: needed_role_label -> harness_id  (role authority)
-      2. harness-identities.json (inverted): harness_id -> harness_command_handle
-         (identity authority)
-      3. Drift check: role_record["harness_type"] (denormalized) MUST match
-         identity-derived handle.
+    Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 and
+    REQ-HARNESS-REGISTRY-001 FR5):
+      1. harness-registry projection record: role-set + status + capability
+         gates -> dispatchable harness_id.
+      2. harness-registry projection identity view (inverted): harness_id ->
+         harness_command_handle.
+      3. Drift check: projected role record ``harness_type`` MUST match the
+         identity-derived command handle.
 
-    Role/status orthogonality (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001;
-    ADR-ROLE-STATUS-ORTHOGONALITY-001): role membership and dispatch eligibility
-    are orthogonal axes. A harness is a dispatch candidate only when its role-set
-    contains ``needed_role_label`` AND its registry ``status`` is ``"active"``.
-    Multiple harnesses MAY share a role; only the single ACTIVE one is the
-    auto-dispatch target.
+    Role/status/capability orthogonality (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001
+    v2; ADR-ROLE-STATUS-ORTHOGONALITY-001 v2): role membership and dispatch
+    eligibility are orthogonal axes. A harness is a dispatch candidate only when
+    its role-set contains ``needed_role_label``, its registry ``status`` is
+    ``"active"``, and it advertises bridge-event reception capability via
+    ``event_driven_hooks is True``. Multiple harnesses MAY share a role; only
+    the single active event-capable one is the auto-dispatch target.
 
     Resolution outcomes:
       - Exactly one ACTIVE match -> return its ``DispatchTarget`` (assertion 4).
@@ -1123,7 +1126,7 @@ def _resolve_dispatch_target(
     role_map = _read_role_assignments(project_root)
     harnesses = role_map.get("harnesses", {})
     if not isinstance(harnesses, dict):
-        raise ValueError("role-assignments.json missing 'harnesses' mapping")
+        raise ValueError("harness-registry projection missing 'harnesses' mapping")
 
     # Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014),
     # role records carry a role-set wire form (list-of-strings or legacy scalar).
@@ -1155,12 +1158,20 @@ def _resolve_dispatch_target(
         status = h_info.get("status")
         return isinstance(status, str) and status.strip().lower() == "active"
 
+    # WI-4213 / DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 v2 assertions 12-14:
+    # event-driven bridge dispatch also requires bridge-event reception
+    # capability. Missing, false, or unknown capability is fail-closed.
+    def _is_event_capable(h_info: dict[str, object]) -> bool:
+        return h_info.get("event_driven_hooks") is True
+
     role_matching = [
         (h_id, h_info)
         for h_id, h_info in harnesses.items()
         if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
     ]
-    active_matching = [(h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info)]
+    active_matching = [
+        (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info) and _is_event_capable(h_info)
+    ]
 
     if not active_matching:
         # assertion 2: zero ACTIVE matches -> return a sentinel (None), NOT raise.
@@ -1169,7 +1180,9 @@ def _resolve_dispatch_target(
         # inertness from missing data.
         if state_dir is not None:
             inactive_ids = sorted(h_id for h_id, _ in role_matching)
-            note = f" (role-set members exist but none active: {inactive_ids})" if inactive_ids else ""
+            note = (
+                f" (role-set members exist but none active and event-capable: {inactive_ids})" if inactive_ids else ""
+            )
             _record_dispatch_failure(
                 state_dir,
                 {
@@ -1191,7 +1204,9 @@ def _resolve_dispatch_target(
     identities = _read_harness_identities(project_root)
     id_to_handle = _invert_identities(identities)
     if harness_id not in id_to_handle:
-        raise ValueError(f"role-assignments references harness ID {harness_id!r} not present in harness-identities")
+        raise ValueError(
+            f"harness-registry projection references harness ID {harness_id!r} not present in identity projection"
+        )
     identity_handle = id_to_handle[harness_id]
 
     # Drift detection: role record's denormalized harness_type (if present)
@@ -1199,7 +1214,7 @@ def _resolve_dispatch_target(
     role_record_handle = role_record.get("harness_type")
     if role_record_handle is not None and role_record_handle != identity_handle:
         raise ValueError(
-            f"drift detected: role-assignments harness_type={role_record_handle!r} "
+            f"drift detected: harness-registry projection harness_type={role_record_handle!r} "
             f"disagrees with harness-identities resolution to {identity_handle!r} "
             f"for harness ID {harness_id!r}"
         )
@@ -1449,8 +1464,9 @@ def _record_substrate_mismatch_skip(state_dir: Path, active_substrate: str) -> N
 def _is_single_harness_topology(project_root: Path) -> bool:
     """Return True iff the role map records a single harness ID with both
     ``prime-builder`` AND ``loyal-opposition`` in its role-set AND that harness
-    carries ``status == "active"`` (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001
-    assertion 7: single-harness mode requires the harness active).
+    carries ``status == "active"`` AND ``event_driven_hooks is True``
+    (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 7 and v2 capability
+    gate: single-harness mode requires an active event-capable harness).
 
     Per IP-8 of ``bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md``
     (Codex GO at ``-006``): the cross-harness trigger goes inert in
@@ -1476,14 +1492,16 @@ def _is_single_harness_topology(project_root: Path) -> bool:
     if isinstance(raw_role, list):
         role_set = {str(r).strip().lower() for r in raw_role if isinstance(r, str)}
         has_both = "prime-builder" in role_set and "loyal-opposition" in role_set
-        # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 7: single-harness
-        # mode is applicable only when the single harness is status==active.
-        # Missing/unknown status -> not active -> not single-harness (the trigger
-        # then proceeds on its normal multi-harness path, where the resolver
-        # finds the inactive single harness as zero-active -> sentinel + audit).
+        # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 7 plus WI-4213:
+        # single-harness mode is applicable only when the single harness is
+        # status==active and event-capable. Missing/unknown status or missing/
+        # false event capability -> not single-harness (the trigger then
+        # proceeds on its normal multi-harness path, where the resolver finds
+        # zero active event-capable target -> sentinel + audit).
         status = record.get("status")
         is_active = isinstance(status, str) and status.strip().lower() == "active"
-        return has_both and is_active
+        is_event_capable = record.get("event_driven_hooks") is True
+        return has_both and is_active and is_event_capable
     return False
 
 

@@ -167,6 +167,22 @@ def test_harness_suspend_last_active_rejected(tmp_path: Path) -> None:
     assert _harness_current(db_path, "A")["status"] == "active"
 
 
+def test_harness_suspend_preserves_role_metadata(tmp_path: Path) -> None:
+    """WI-4213: suspended harnesses may retain role metadata."""
+    root, config = _project(tmp_path)
+    db_path = root / "groundtruth.db"
+    _register_active(config, "A", "codex-cli")
+    _register_active(config, "B", "claude-code")
+    _seed_role_workspace(root)
+    assert _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder").exit_code == 0
+    assert json.loads(_harness_current(db_path, "B")["role"]) == ["prime-builder"]
+
+    assert _invoke(config, "suspend", "--harness", "B").exit_code == 0
+    row = _harness_current(db_path, "B")
+    assert row["status"] == "suspended"
+    assert json.loads(row["role"]) == ["prime-builder"]
+
+
 # --- T-HC-3: retire of an active harness auto-suspends ----------------------
 
 
@@ -183,6 +199,21 @@ def test_harness_retire_active_cli(tmp_path: Path) -> None:
     assert row["status"] == "retired"
     # registered -> active -> role reconciliation -> suspended -> retired.
     assert row["version"] == 5
+
+
+def test_harness_retire_preserves_role_metadata(tmp_path: Path) -> None:
+    """WI-4213: retired harnesses keep their role-set history for orthogonality."""
+    root, config = _project(tmp_path)
+    db_path = root / "groundtruth.db"
+    _register_active(config, "A", "codex-cli")
+    _register_active(config, "B", "claude-code")
+    _seed_role_workspace(root)
+    assert _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder").exit_code == 0
+
+    assert _invoke(config, "retire", "--harness", "B").exit_code == 0
+    row = _harness_current(db_path, "B")
+    assert row["status"] == "retired"
+    assert json.loads(row["role"]) == ["prime-builder"]
 
 
 # --- T-HC-4: an invalid verb use fails closed with a hint -------------------

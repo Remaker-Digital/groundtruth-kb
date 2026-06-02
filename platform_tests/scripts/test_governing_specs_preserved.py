@@ -99,6 +99,48 @@ def _write_harness_state(
         ),
         encoding="utf-8",
     )
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "role": [codex_role],
+                        "event_driven_hooks": True,
+                        "invocation_surfaces": {
+                            "headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}
+                        },
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "role": [claude_role],
+                        "event_driven_hooks": True,
+                        "invocation_surfaces": {
+                            "headless": {
+                                "argv": [
+                                    "claude",
+                                    "-p",
+                                    "{{PROMPT}}",
+                                    "--add-dir",
+                                    "{{PROJECT_ROOT}}",
+                                    "--output-format",
+                                    "json",
+                                ]
+                            }
+                        },
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────

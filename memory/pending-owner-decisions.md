@@ -6,41 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0860
-  asked_at: 2026-05-31T07:32:41.916810Z
-  question: "Want me to triage that broader 55-entry queue (most are other-stream GOs awaiting implementation), or hold here until..."
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 9f2c440ad2831146
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0861
-  asked_at: 2026-05-31T07:52:24.177485Z
-  question: "want me to triage that queue, push this commit, or stop here?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 9c86f49773c6f438
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0870
-  asked_at: 2026-05-31T17:48:18.550796Z
-  question: "Want me to (a) continue the diagnostic of the cache/sidecar mismatch I started, (b) propose unifying the startup/fres..."
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 79be051178c54113
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0884
-  asked_at: 2026-06-01T17:43:46.900884Z
-  question: "Want me to proceed into Slice 4 now, or hold here with 3/4 VERIFIED and the gate defect captured?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: e3f34dbcec243d05
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0888
-  asked_at: 2026-06-01T17:57:53.743768Z
-  question: "Want me to seek the WI-4214 PAUTH and file REVISED `-003`, or leave the thread at NO-GO for now?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 32e2a8de4d7f6681
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -7596,6 +7562,51 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-01T17:57:53.743768Z
   answer: "Your questions have been answered: \"The commit is blocked by the pre-commit inventory-drift gate (material drift in non-volatile toolchain.*.evidence: pip/pytest baseline says \"could not be executed\", live env now runs them). It's benign environmental drift, predates my work, and freezes ALL commits on this workstation. CLAUDE.md forbids --no-verify without your explicit OK. How should I land the WI-4214 bridge proposal?\"=\"Commit bridge files with --no-verify\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-0860
+  asked_at: 2026-05-31T07:32:41.916810Z
+  question: "Want me to triage that broader 55-entry queue (most are other-stream GOs awaiting implementation), or hold here until..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 9f2c440ad2831146
+  resolved_at: 2026-06-02T13:17:10.912948Z
+  answer: "Yes - triage the broader 55-entry queue."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0861
+  asked_at: 2026-05-31T07:52:24.177485Z
+  question: "want me to triage that queue, push this commit, or stop here?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 9c86f49773c6f438
+  resolved_at: 2026-06-02T13:17:11.400965Z
+  answer: "Commit and push."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0870
+  asked_at: 2026-05-31T17:48:18.550796Z
+  question: "Want me to (a) continue the diagnostic of the cache/sidecar mismatch I started, (b) propose unifying the startup/fres..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 79be051178c54113
+  resolved_at: 2026-06-02T13:17:12.176326Z
+  answer: "Option B - propose unifying the startup/fresh-session cache and sidecar contract."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0884
+  asked_at: 2026-06-01T17:43:46.900884Z
+  question: "Want me to proceed into Slice 4 now, or hold here with 3/4 VERIFIED and the gate defect captured?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: e3f34dbcec243d05
+  resolved_at: 2026-06-02T13:17:12.727129Z
+  answer: "Proceed into Slice 4 now."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0888
+  asked_at: 2026-06-01T17:57:53.743768Z
+  question: "Want me to seek the WI-4214 PAUTH and file REVISED `-003`, or leave the thread at NO-GO for now?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 32e2a8de4d7f6681
+  resolved_at: 2026-06-02T13:17:13.134396Z
+  answer: "Seek the WI-4214 PAUTH and file REVISED -003."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 

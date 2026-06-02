@@ -100,6 +100,7 @@ def _make_synthetic_project(root: Path) -> Path:
                         "harness_type": "codex",
                         "status": "active",
                         "role": ["loyal-opposition"],
+                        "event_driven_hooks": True,
                         "invocation_surfaces": _CODEX_INVOCATION_SURFACES,
                     },
                     {
@@ -108,6 +109,7 @@ def _make_synthetic_project(root: Path) -> Path:
                         "harness_type": "claude",
                         "status": "active",
                         "role": ["prime-builder"],
+                        "event_driven_hooks": True,
                         "invocation_surfaces": _CLAUDE_INVOCATION_SURFACES,
                     },
                 ],

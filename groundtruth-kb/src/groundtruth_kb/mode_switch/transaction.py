@@ -202,14 +202,15 @@ def _apply_active_role_assignment(
     for harness_id, item in harnesses.items():
         if not isinstance(item, dict):
             continue
+        if item.get("status") != STATUS_ACTIVE:
+            continue
         roles: list[str] = []
-        if item.get("status") == STATUS_ACTIVE:
-            if harness_id == lo_id:
-                roles.append(ROLE_LOYAL_OPPOSITION)
-            if harness_id == prime_id:
-                roles.append(ROLE_PRIME_BUILDER)
-            if not roles:
-                item["status"] = "suspended"
+        if harness_id == lo_id:
+            roles.append(ROLE_LOYAL_OPPOSITION)
+        if harness_id == prime_id:
+            roles.append(ROLE_PRIME_BUILDER)
+        if not roles:
+            item["status"] = "suspended"
         item["role"] = roles
     return tuple(harnesses[target_id].get("role") or [])
 
@@ -311,9 +312,9 @@ def apply_role_switch(
        ``acting-prime-builder``).
     5. Resolve harness id-or-name to harness id.
     6. Read the role map from the DB-backed registry projection; compute the
-       new active-role assignments. Inactive harnesses are cleared; one active
-       harness carries PB+LO in single-active mode; PB and LO are distinct in
-       multi-active mode.
+       new active-role assignments. Non-active harness role sets are preserved;
+       one active harness carries PB+LO in single-active mode; PB and LO are
+       distinct in multi-active mode.
     7. Write audit-trail record FIRST (per failure-leaves-no-state-mutation
        invariant).
     8. WI-3342 IP-5: the transitional ``role-assignments.json`` write is
@@ -374,7 +375,9 @@ def apply_role_switch(
 
     # Active-harness assignment: the target receives the requested role, the
     # complementary role is preserved or assigned to a different active harness
-    # when possible, and inactive harnesses are cleared.
+    # when possible. Non-active harness role sets are preserved because
+    # role/status/capability are orthogonal; an active harness demoted out of
+    # the active assignment is suspended and cleared intentionally.
     new_role_set = _apply_active_role_assignment(
         harnesses,
         target_id=harness_id,

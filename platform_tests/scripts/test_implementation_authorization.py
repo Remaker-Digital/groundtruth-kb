@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -178,6 +179,68 @@ def test_bridge_entry_succeeds_for_well_formed_bridge(auth_module, tmp_path):
 def _make_groundtruth_toml(tmp_path: Path) -> None:
     """Create a minimal groundtruth.toml so groundtruth_db_path resolves."""
     (tmp_path / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+
+
+def _seed_owner_sufficiency_deliberation(
+    tmp_path: Path,
+    *,
+    deliberation_id: str = "DELIB-OWNER-SUFFICIENCY",
+    source_type: str = "owner_conversation",
+    outcome: str = "owner_decision",
+    work_item_id: str | None = "WI-OWNER-SUFFICIENCY",
+    related_work_item_id: str | None = None,
+    content: str | None = None,
+) -> str:
+    """Seed the minimal MemBase deliberation surface used by the gate."""
+    _make_groundtruth_toml(tmp_path)
+    db_path = tmp_path / "groundtruth.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """CREATE TABLE current_deliberations (
+                id TEXT PRIMARY KEY,
+                source_type TEXT NOT NULL,
+                outcome TEXT,
+                work_item_id TEXT,
+                title TEXT,
+                summary TEXT,
+                content TEXT
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE deliberation_work_items (
+                deliberation_id TEXT NOT NULL,
+                work_item_id TEXT NOT NULL,
+                role TEXT DEFAULT 'related'
+            )"""
+        )
+        conn.execute(
+            """INSERT INTO current_deliberations
+               (id, source_type, outcome, work_item_id, title, summary, content)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                deliberation_id,
+                source_type,
+                outcome,
+                work_item_id,
+                "Owner clarification",
+                "Existing requirements are sufficient.",
+                content
+                or (
+                    "Mike stated: Existing requirements are sufficient. "
+                    "This applies to bridge fixture-bridge and preserves all other gates."
+                ),
+            ),
+        )
+        if related_work_item_id:
+            conn.execute(
+                "INSERT INTO deliberation_work_items (deliberation_id, work_item_id) VALUES (?, ?)",
+                (deliberation_id, related_work_item_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return deliberation_id
 
 
 def _begin_packet(auth_module, tmp_path: Path, slug: str) -> dict[str, Any]:
@@ -482,6 +545,7 @@ def test_create_authorization_packet_accepts_test_plan_spec_to_test_heading(auth
         "Requirements remain sufficient",
         "Requirements are sufficient for this scope",
         "Existing requirements are sufficient for this scoped governance correction",
+        "Existing owner direction and WI-4213 are sufficient to formalize the active-status capability gate",
     ],
 )
 def test_requirement_sufficiency_state_accepts_wi3410_variants(auth_module, phrase):
@@ -527,6 +591,235 @@ def test_create_authorization_packet_accepts_requirement_sufficiency_are_suffici
     _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     packet = auth_module.create_authorization_packet(tmp_path, slug)
     assert packet["requirement_sufficiency"] == "sufficient"
+
+
+def test_create_authorization_packet_accepts_owner_direction_work_item_sufficiency(auth_module, tmp_path):
+    """WI-4213 integration: approved owner-direction/work-item phrasing authorizes."""
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "Existing owner direction and WI-4213 are sufficient to formalize the active-status capability gate.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    assert packet["requirement_sufficiency"] == "sufficient"
+
+
+# ---------------------------------------------------------------------------
+# WI-4241: owner-decision deliberation fallback for Requirement Sufficiency
+# ---------------------------------------------------------------------------
+
+
+def test_owner_sufficiency_deliberation_allows_missing_proposal_phrase(auth_module, tmp_path):
+    """WI-4241: explicit owner evidence can satisfy only the missing phrase gate."""
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "This proposal has complete requirements coverage, but no bounded phrase.",
+        )
+        + "\nWork Item: WI-OWNER-SUFFICIENCY\n",
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
+
+    packet = auth_module.create_authorization_packet(
+        tmp_path,
+        slug,
+        owner_sufficiency_deliberation_id=delib_id,
+    )
+
+    assert packet["requirement_sufficiency"] == "owner_deliberation"
+    assert packet["requirement_sufficiency_evidence"] == {
+        "mode": "owner_deliberation",
+        "deliberation_id": delib_id,
+        "source_type": "owner_conversation",
+        "outcome": "owner_decision",
+        "work_item_id": "WI-OWNER-SUFFICIENCY",
+        "matched_basis": "bridge_id",
+    }
+
+
+def test_owner_sufficiency_deliberation_can_match_work_item_relation(auth_module, tmp_path):
+    """WI-4241: applicability may come from a related work-item link."""
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "This proposal has complete requirements coverage, but no bounded phrase.",
+        )
+        + "\nWork Item: WI-RELATED\n",
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    delib_id = _seed_owner_sufficiency_deliberation(
+        tmp_path,
+        work_item_id=None,
+        related_work_item_id="WI-RELATED",
+        content="Mike stated: Existing requirements are sufficient.",
+    )
+
+    packet = auth_module.create_authorization_packet(
+        tmp_path,
+        slug,
+        owner_sufficiency_deliberation_id=delib_id,
+    )
+
+    assert packet["requirement_sufficiency"] == "owner_deliberation"
+    assert packet["requirement_sufficiency_evidence"]["matched_basis"] == "work_item_id"
+
+
+def test_missing_requirement_sufficiency_still_blocks_without_owner_evidence(auth_module, tmp_path):
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "This proposal has complete requirements coverage, but no bounded phrase.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+
+    with pytest.raises(auth_module.AuthorizationError, match="missing ## Requirement Sufficiency"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
+def test_owner_sufficiency_deliberation_rejects_non_owner_source(auth_module, tmp_path):
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "This proposal has complete requirements coverage, but no bounded phrase.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    delib_id = _seed_owner_sufficiency_deliberation(tmp_path, source_type="report")
+
+    with pytest.raises(auth_module.AuthorizationError, match="not owner_conversation"):
+        auth_module.create_authorization_packet(
+            tmp_path,
+            slug,
+            owner_sufficiency_deliberation_id=delib_id,
+        )
+
+
+def test_owner_sufficiency_deliberation_rejects_non_decision_outcome(auth_module, tmp_path):
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "This proposal has complete requirements coverage, but no bounded phrase.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    delib_id = _seed_owner_sufficiency_deliberation(tmp_path, outcome="deferred")
+
+    with pytest.raises(auth_module.AuthorizationError, match="not an owner_decision"):
+        auth_module.create_authorization_packet(
+            tmp_path,
+            slug,
+            owner_sufficiency_deliberation_id=delib_id,
+        )
+
+
+def test_owner_sufficiency_deliberation_rejects_non_applicable_evidence(auth_module, tmp_path):
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "This proposal has complete requirements coverage, but no bounded phrase.",
+        )
+        + "\nWork Item: WI-THIS-WORK\n",
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    delib_id = _seed_owner_sufficiency_deliberation(
+        tmp_path,
+        work_item_id="WI-OTHER",
+        content="Mike stated: Existing requirements are sufficient for another bridge.",
+    )
+
+    with pytest.raises(auth_module.AuthorizationError, match="does not apply"):
+        auth_module.create_authorization_packet(
+            tmp_path,
+            slug,
+            owner_sufficiency_deliberation_id=delib_id,
+        )
+
+
+def test_owner_sufficiency_deliberation_does_not_override_explicit_gap(auth_module, tmp_path):
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "New or revised requirement required before implementation.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
+
+    with pytest.raises(auth_module.AuthorizationError, match="new or revised requirements"):
+        auth_module.create_authorization_packet(
+            tmp_path,
+            slug,
+            owner_sufficiency_deliberation_id=delib_id,
+        )
+
+
+def test_begin_cli_passes_owner_sufficiency_deliberation_id(auth_module, tmp_path, capsys):
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "This proposal has complete requirements coverage, but no bounded phrase.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
+
+    rc = auth_module.main(
+        [
+            "--project-root",
+            str(tmp_path),
+            "begin",
+            "--bridge-id",
+            slug,
+            "--owner-sufficiency-deliberation-id",
+            delib_id,
+            "--no-write",
+        ]
+    )
+
+    assert rc == 0
+    packet = json.loads(capsys.readouterr().out)
+    assert packet["requirement_sufficiency"] == "owner_deliberation"
+    assert not auth_module.packet_path(tmp_path).exists()
 
 
 # ---------------------------------------------------------------------------

@@ -25,7 +25,9 @@ def project_root(tmp_path: Path) -> Path:
     # Seed required files for validator all-pass
     _write(
         tmp_path / "harness-state" / "harness-registry.json",
-        json.dumps({"harnesses": [{"id": "A", "role": ["prime-builder"], "status": "active"}]}),
+        json.dumps(
+            {"harnesses": [{"id": "A", "role": ["prime-builder"], "status": "active", "event_driven_hooks": True}]}
+        ),
     )
     _write(
         tmp_path / "bridge" / "INDEX.md",
@@ -85,8 +87,8 @@ def test_apply_rejects_substrate_topology_mismatch(project_root: Path) -> None:
         json.dumps(
             {
                 "harnesses": [
-                    {"id": "A", "role": ["prime-builder"], "status": "active"},
-                    {"id": "B", "role": ["loyal-opposition"], "status": "active"},
+                    {"id": "A", "role": ["prime-builder"], "status": "active", "event_driven_hooks": True},
+                    {"id": "B", "role": ["loyal-opposition"], "status": "active", "event_driven_hooks": True},
                 ]
             }
         ),
@@ -122,6 +124,69 @@ def test_apply_is_idempotent_when_substrate_unchanged(project_root: Path) -> Non
     assert audit1.exists()
     assert audit2.exists()
     assert audit1 != audit2
+
+
+def test_applied_by_ignores_non_active_retained_prime_builder(project_root: Path) -> None:
+    _write(
+        project_root / "harness-state" / "harness-registry.json",
+        json.dumps(
+            {
+                "harnesses": [
+                    {
+                        "id": "C",
+                        "role": ["prime-builder"],
+                        "status": "registered",
+                        "event_driven_hooks": False,
+                    },
+                    {
+                        "id": "A",
+                        "role": ["prime-builder"],
+                        "status": "active",
+                        "event_driven_hooks": True,
+                    },
+                ]
+            }
+        ),
+    )
+    _write(
+        project_root / ".claude" / "settings.json",
+        json.dumps({"hooks": {"PostToolUse": [{"command": "python scripts/cross_harness_bridge_trigger.py"}]}}),
+    )
+
+    apply_bridge_substrate_switch(
+        project_root,
+        "cross_harness_trigger",
+        change_reason="ignore retained non-active PB",
+    )
+
+    data = json.loads((project_root / "harness-state" / "bridge-substrate.json").read_text(encoding="utf-8"))
+    assert data["applied_by"] == "A"
+
+
+def test_single_harness_substrate_rejects_non_event_capable_single_holder(project_root: Path) -> None:
+    _write(
+        project_root / "harness-state" / "harness-registry.json",
+        json.dumps(
+            {
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "role": ["prime-builder", "loyal-opposition"],
+                        "status": "active",
+                        "event_driven_hooks": False,
+                    }
+                ]
+            }
+        ),
+    )
+
+    with pytest.raises(TransactionValidationError) as exc:
+        apply_bridge_substrate_switch(
+            project_root,
+            "single_harness_dispatcher",
+            change_reason="non-event-capable single holder",
+        )
+    assert "requires single_harness topology" in str(exc.value)
 
 
 def test_cli_set_bridge_substrate_invokes_apply_switch(project_root: Path) -> None:

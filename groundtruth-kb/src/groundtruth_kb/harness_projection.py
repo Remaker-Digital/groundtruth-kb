@@ -56,6 +56,8 @@ _PROJECTED_FIELDS = (
 # Fields stored as JSON text in the DB, decoded to native objects here.
 _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 
+_EVENT_DRIVEN_HOOK_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli"})
+
 
 def _now_iso() -> str:
     """UTC ISO-8601 timestamp with a ``Z`` suffix (harness-state convention)."""
@@ -85,6 +87,8 @@ def _project_harness_record(row: dict[str, Any]) -> dict[str, Any]:
     record: dict[str, Any] = {field: row.get(field) for field in _PROJECTED_FIELDS}
     for field in _JSON_DECODED_FIELDS:
         record[field] = _decode_json_field(row.get(field))
+    harness_type = str(record.get("harness_type") or "").strip().lower()
+    record["event_driven_hooks"] = harness_type in _EVENT_DRIVEN_HOOK_CAPABLE_TYPES
     return record
 
 

@@ -7,6 +7,46 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-active-status-capability-gate-harness-lifecycle-retention
+VERIFIED: bridge/gtkb-active-status-capability-gate-harness-lifecycle-retention-006.md
+REVISED: bridge/gtkb-active-status-capability-gate-harness-lifecycle-retention-005.md
+NO-GO: bridge/gtkb-active-status-capability-gate-harness-lifecycle-retention-004.md
+NEW: bridge/gtkb-active-status-capability-gate-harness-lifecycle-retention-003.md
+GO: bridge/gtkb-active-status-capability-gate-harness-lifecycle-retention-002.md
+NEW: bridge/gtkb-active-status-capability-gate-harness-lifecycle-retention-001.md
+
+Document: gtkb-active-status-capability-gate-lifecycle-substrate
+VERIFIED: bridge/gtkb-active-status-capability-gate-lifecycle-substrate-004.md
+NEW: bridge/gtkb-active-status-capability-gate-lifecycle-substrate-003.md
+GO: bridge/gtkb-active-status-capability-gate-lifecycle-substrate-002.md
+NEW: bridge/gtkb-active-status-capability-gate-lifecycle-substrate-001.md
+
+Document: gtkb-active-status-capability-gate-registry-dispatch
+VERIFIED: bridge/gtkb-active-status-capability-gate-registry-dispatch-004.md
+NEW: bridge/gtkb-active-status-capability-gate-registry-dispatch-003.md
+GO: bridge/gtkb-active-status-capability-gate-registry-dispatch-002.md
+NEW: bridge/gtkb-active-status-capability-gate-registry-dispatch-001.md
+
+Document: gtkb-active-status-capability-gate-formalization-content-drafts
+VERIFIED: bridge/gtkb-active-status-capability-gate-formalization-content-drafts-004.md
+NEW: bridge/gtkb-active-status-capability-gate-formalization-content-drafts-003.md
+GO: bridge/gtkb-active-status-capability-gate-formalization-content-drafts-002.md
+NEW: bridge/gtkb-active-status-capability-gate-formalization-content-drafts-001.md
+
+Document: gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase
+VERIFIED: bridge/gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase-006.md
+REVISED: bridge/gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase-005.md
+NO-GO: bridge/gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase-004.md
+NEW: bridge/gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase-003.md
+GO: bridge/gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase-002.md
+NEW: bridge/gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase-001.md
+
+Document: gtkb-impl-auth-owner-sufficiency-gate
+VERIFIED: bridge/gtkb-impl-auth-owner-sufficiency-gate-004.md
+NEW: bridge/gtkb-impl-auth-owner-sufficiency-gate-003.md
+GO: bridge/gtkb-impl-auth-owner-sufficiency-gate-002.md
+NEW: bridge/gtkb-impl-auth-owner-sufficiency-gate-001.md
+
 Document: gtkb-bridge-citation-freshness-test-restoration
 VERIFIED: bridge/gtkb-bridge-citation-freshness-test-restoration-005.md
 NEW: bridge/gtkb-bridge-citation-freshness-test-restoration-004.md
@@ -22,14 +62,20 @@ REVISED: bridge/gtkb-cross-harness-trigger-active-session-target-naming-002.md
 NEW: bridge/gtkb-cross-harness-trigger-active-session-target-naming-001.md
 
 Document: gtkb-inventory-drift-toolchain-flux-stability
+VERIFIED: bridge/gtkb-inventory-drift-toolchain-flux-stability-004.md
+NEW: bridge/gtkb-inventory-drift-toolchain-flux-stability-003.md
 GO: bridge/gtkb-inventory-drift-toolchain-flux-stability-002.md
 NEW: bridge/gtkb-inventory-drift-toolchain-flux-stability-001.md
 
 Document: gtkb-inventory-drift-gh-probe-parity
+VERIFIED: bridge/gtkb-inventory-drift-gh-probe-parity-004.md
+NEW: bridge/gtkb-inventory-drift-gh-probe-parity-003.md
 GO: bridge/gtkb-inventory-drift-gh-probe-parity-002.md
 NEW: bridge/gtkb-inventory-drift-gh-probe-parity-001.md
 
 Document: gtkb-active-status-capability-gate-formalization
+VERIFIED: bridge/gtkb-active-status-capability-gate-formalization-004.md
+NEW: bridge/gtkb-active-status-capability-gate-formalization-003.md
 GO: bridge/gtkb-active-status-capability-gate-formalization-002.md
 NEW: bridge/gtkb-active-status-capability-gate-formalization-001.md
 
@@ -38,21 +84,22 @@ GO: bridge/gtkb-rc1-canonical-ci-closure-002.md
 NEW: bridge/gtkb-rc1-canonical-ci-closure-001.md
 
 Document: gtkb-bridge-backlog-reconciliation-audit-cli
+VERIFIED: bridge/gtkb-bridge-backlog-reconciliation-audit-cli-004.md
+NEW: bridge/gtkb-bridge-backlog-reconciliation-audit-cli-003.md
 GO: bridge/gtkb-bridge-backlog-reconciliation-audit-cli-002.md
 NEW: bridge/gtkb-bridge-backlog-reconciliation-audit-cli-001.md
 
 Document: gtkb-bridge-index-chain-deviation-detector
+VERIFIED: bridge/gtkb-bridge-index-chain-deviation-detector-004.md
+NEW: bridge/gtkb-bridge-index-chain-deviation-detector-003.md
 GO: bridge/gtkb-bridge-index-chain-deviation-detector-002.md
 NEW: bridge/gtkb-bridge-index-chain-deviation-detector-001.md
 
 Document: gtkb-bridge-reconciliation-correction-packets
+VERIFIED: bridge/gtkb-bridge-reconciliation-correction-packets-004.md
+NEW: bridge/gtkb-bridge-reconciliation-correction-packets-003.md
 GO: bridge/gtkb-bridge-reconciliation-correction-packets-002.md
 NEW: bridge/gtkb-bridge-reconciliation-correction-packets-001.md
-
-Document: gtkb-impl-auth-requirement-sufficiency-phrase-tolerance
-NEW: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-003.md
-GO: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-002.md
-NEW: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-001.md
 
 Document: gtkb-bridge-propose-helper-caller-migration-to-writer
 VERIFIED: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-005.md
@@ -62,31 +109,14 @@ REVISED: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-002.md
 NEW: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-001.md
 
 Document: gtkb-registry-scaffold-fixture-drift-reconciliation
+VERIFIED: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-008.md
+REVISED: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-007.md
+NO-GO: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-006.md
+REVISED: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-005.md
+NO-GO: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-004.md
 NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-003.md
 GO: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-002.md
 NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-001.md
-
-Document: gtkb-terminal-project-record-retirement-batch
-VERIFIED: bridge/gtkb-terminal-project-record-retirement-batch-006.md
-NEW: bridge/gtkb-terminal-project-record-retirement-batch-005.md
-GO: bridge/gtkb-terminal-project-record-retirement-batch-004.md
-REVISED: bridge/gtkb-terminal-project-record-retirement-batch-003.md
-GO: bridge/gtkb-terminal-project-record-retirement-batch-002.md
-NEW: bridge/gtkb-terminal-project-record-retirement-batch-001.md
-
-Document: gtkb-deterministic-services-stale-status-reconciliation
-VERIFIED: bridge/gtkb-deterministic-services-stale-status-reconciliation-012.md
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-011.md
-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-010.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-009.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-008.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-003.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
 
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-008.md
@@ -113,6 +143,9 @@ GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
 
 Document: gtkb-da-enforcement-completion-slice1-decompose
+VERIFIED: bridge/gtkb-da-enforcement-completion-slice1-decompose-011.md
+NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-010.md
+GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-009.md
 REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-008.md
 NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-007.md
 NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-006.md
@@ -123,6 +156,11 @@ NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-002.md
 NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
+VERIFIED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-008.md
+REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-007.md
+NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-006.md
+NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-005.md
+GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-004.md
 REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-003.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-001.md
@@ -179,13 +217,6 @@ GO: bridge/gtkb-backlog-update-cli-slice-1-004.md
 REVISED: bridge/gtkb-backlog-update-cli-slice-1-003.md
 NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
-
-Document: gtkb-stale-thread-closure-slice-3-impl
-NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-005.md
-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-004.md
-REVISED: bridge/gtkb-stale-thread-closure-slice-3-impl-003.md
-NO-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-002.md
-NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-001.md
 
 Document: gtkb-role-status-orthogonality-dispatch-scoping
 GO: bridge/gtkb-role-status-orthogonality-dispatch-scoping-004.md
@@ -769,6 +800,7 @@ NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
 NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-001.md
 
 Document: gtkb-in-source-provenance-anchors-001-prop
+VERIFIED: bridge/gtkb-in-source-provenance-anchors-001-prop-008.md
 NEW: bridge/gtkb-in-source-provenance-anchors-001-prop-007.md
 GO: bridge/gtkb-in-source-provenance-anchors-001-prop-006.md
 REVISED: bridge/gtkb-in-source-provenance-anchors-001-prop-005.md
@@ -911,6 +943,7 @@ NO-GO: bridge/gtkb-audit-script-withdrawn-regex-fix-002.md
 NEW: bridge/gtkb-audit-script-withdrawn-regex-fix-001.md
 
 Document: gtkb-isolation-019-program-closeout
+VERIFIED: bridge/gtkb-isolation-019-program-closeout-008.md
 NEW: bridge/gtkb-isolation-019-program-closeout-007.md
 GO: bridge/gtkb-isolation-019-program-closeout-006.md
 REVISED: bridge/gtkb-isolation-019-program-closeout-005.md
@@ -982,6 +1015,7 @@ NO-GO: bridge/gtkb-impl-gate-friction-hygiene-002.md
 NEW: bridge/gtkb-impl-gate-friction-hygiene-001.md
 
 Document: gtkb-bridge-skill-protected-write-helper
+VERIFIED: bridge/gtkb-bridge-skill-protected-write-helper-006.md
 NEW: bridge/gtkb-bridge-skill-protected-write-helper-005.md
 GO: bridge/gtkb-bridge-skill-protected-write-helper-004.md
 REVISED: bridge/gtkb-bridge-skill-protected-write-helper-003.md
@@ -1212,23 +1246,6 @@ VERIFIED: bridge/gtkb-verify-verdict-author-skill-slice-1-004.md
 NEW: bridge/gtkb-verify-verdict-author-skill-slice-1-003.md
 GO: bridge/gtkb-verify-verdict-author-skill-slice-1-002.md
 NEW: bridge/gtkb-verify-verdict-author-skill-slice-1-001.md
-
-Document: gtkb-bridge-mode-config-transactions-slice-1
-VERIFIED: bridge/gtkb-bridge-mode-config-transactions-slice-1-015.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-014.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-013.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-012.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-011.md
-NEW: bridge/gtkb-bridge-mode-config-transactions-slice-1-010.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-009.md
-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-008.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-007.md
-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-006.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-005.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-004.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-003.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-002.md
-NEW: bridge/gtkb-bridge-mode-config-transactions-slice-1-001.md
 
 Document: gtkb-lo-hygiene-assessment-skill-advisory-disposition
 VERIFIED: bridge/gtkb-lo-hygiene-assessment-skill-advisory-disposition-004.md

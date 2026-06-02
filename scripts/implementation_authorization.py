@@ -58,6 +58,7 @@ REQUIREMENT_SUFFICIENCY_PHRASES = (
     "Requirements remain sufficient",
     "Requirements are sufficient for this scope",
     "Existing requirements are sufficient for this scoped governance correction",
+    "Existing owner direction and WI-4213 are sufficient",
 )
 TARGET_PATHS_RE = re.compile(
     r"(?:\*\*)?target_paths(?:\*\*)?\s*:(?:\*\*)?\s*(\[[^\n]+\])",
@@ -572,6 +573,92 @@ def _project_authorization_row(project_root: Path, authorization_id: str) -> sql
     return row
 
 
+def _owner_sufficiency_deliberation_row(project_root: Path, deliberation_id: str) -> sqlite3.Row:
+    db_path = groundtruth_db_path(project_root)
+    if not db_path.is_file():
+        raise AuthorizationError(f"GroundTruth DB not found for owner sufficiency evidence: {db_path}")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT * FROM current_deliberations WHERE id = ?",
+            (deliberation_id,),
+        ).fetchone()
+    except sqlite3.OperationalError as exc:
+        raise AuthorizationError("GroundTruth DB is missing deliberation schema") from exc
+    finally:
+        conn.close()
+    if row is None:
+        raise AuthorizationError(f"Owner sufficiency deliberation not found: {deliberation_id}")
+    return row
+
+
+def _related_deliberation_work_items(project_root: Path, deliberation_id: str) -> set[str]:
+    conn = sqlite3.connect(groundtruth_db_path(project_root))
+    try:
+        rows = conn.execute(
+            "SELECT work_item_id FROM deliberation_work_items WHERE deliberation_id = ?",
+            (deliberation_id,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return set()
+    finally:
+        conn.close()
+    return {str(row[0]) for row in rows if row and row[0]}
+
+
+def validate_owner_sufficiency_deliberation(
+    project_root: Path,
+    deliberation_id: str,
+    *,
+    bridge_id: str,
+    work_item_id: str | None = None,
+) -> dict[str, Any]:
+    row = _owner_sufficiency_deliberation_row(project_root, deliberation_id)
+    if row["source_type"] != "owner_conversation":
+        raise AuthorizationError(f"Owner sufficiency deliberation {deliberation_id} is not owner_conversation evidence")
+    if row["outcome"] != "owner_decision":
+        raise AuthorizationError(f"Owner sufficiency deliberation {deliberation_id} is not an owner_decision")
+
+    text_fields = [
+        str(row["title"] or ""),
+        str(row["summary"] or ""),
+        str(row["content"] or ""),
+    ]
+    evidence_text = "\n".join(text_fields)
+    if REQUIREMENT_GAP_RE.search(evidence_text):
+        raise AuthorizationError(
+            f"Owner sufficiency deliberation {deliberation_id} says new or revised requirements are required"
+        )
+    if not any(pattern.search(evidence_text) for pattern in REQUIREMENT_SUFFICIENCY_RES):
+        raise AuthorizationError(
+            f"Owner sufficiency deliberation {deliberation_id} does not contain a bounded sufficient-state phrase"
+        )
+
+    row_work_item_id = str(row["work_item_id"] or "")
+    related_work_items = _related_deliberation_work_items(project_root, deliberation_id)
+    if bridge_id in evidence_text:
+        matched_basis = "bridge_id"
+    elif work_item_id and (work_item_id == row_work_item_id or work_item_id in related_work_items):
+        matched_basis = "work_item_id"
+    elif work_item_id and work_item_id in evidence_text:
+        matched_basis = "work_item_id_text"
+    else:
+        raise AuthorizationError(
+            f"Owner sufficiency deliberation {deliberation_id} does not apply to bridge {bridge_id}"
+            + (f" or work item {work_item_id}" if work_item_id else "")
+        )
+
+    return {
+        "mode": "owner_deliberation",
+        "deliberation_id": deliberation_id,
+        "source_type": row["source_type"],
+        "outcome": row["outcome"],
+        "work_item_id": row_work_item_id or None,
+        "matched_basis": matched_basis,
+    }
+
+
 def packet_spec_links(packet: dict[str, Any]) -> list[str]:
     raw_links = packet.get("spec_links")
     if not isinstance(raw_links, list):
@@ -735,6 +822,7 @@ def create_authorization_packet(
     bridge_id: str,
     *,
     expires_minutes: int = DEFAULT_EXPIRY_MINUTES,
+    owner_sufficiency_deliberation_id: str | None = None,
 ) -> dict[str, Any]:
     entry = bridge_entry(project_root, bridge_id)
     proposal_rel, go_rel = approved_files_for_go(entry)
@@ -755,6 +843,8 @@ def create_authorization_packet(
     spec_links: list[str] = []
     target_paths: list[str] = []
     project_authorization: dict[str, Any] | None = None
+    proposal_work_item_id = extract_metadata_value(proposal, WORK_ITEM_KEYS)
+    owner_sufficiency_evidence: dict[str, Any] | None = None
 
     try:
         spec_links = extract_spec_links(proposal)
@@ -778,7 +868,19 @@ def create_authorization_packet(
     if sufficiency == "gap":
         errors.append("Approved proposal says new or revised requirements are required before implementation")
     elif sufficiency == "missing" and bridge_id not in BOOTSTRAP_BRIDGE_IDS:
-        errors.append("Approved proposal is missing ## Requirement Sufficiency")
+        if owner_sufficiency_deliberation_id:
+            try:
+                owner_sufficiency_evidence = validate_owner_sufficiency_deliberation(
+                    project_root,
+                    owner_sufficiency_deliberation_id,
+                    bridge_id=bridge_id,
+                    work_item_id=proposal_work_item_id,
+                )
+                sufficiency = "owner_deliberation"
+            except AuthorizationError as exc:
+                errors.append(str(exc))
+        else:
+            errors.append("Approved proposal is missing ## Requirement Sufficiency")
 
     if errors:
         raise AuthorizationError("; ".join(errors))
@@ -798,6 +900,8 @@ def create_authorization_packet(
     }
     if project_authorization is not None:
         packet["project_authorization"] = project_authorization
+    if owner_sufficiency_evidence is not None:
+        packet["requirement_sufficiency_evidence"] = owner_sufficiency_evidence
     packet["packet_hash"] = packet_hash(packet)
     return packet
 
@@ -1018,6 +1122,13 @@ def main(argv: list[str] | None = None) -> int:
     begin.add_argument(
         "--no-write", action="store_true", help="Print packet without writing current.json or the named-cache packet"
     )
+    begin.add_argument(
+        "--owner-sufficiency-deliberation-id",
+        help=(
+            "Durable owner_conversation owner_decision deliberation to use only when the approved proposal "
+            "lacks a bounded Requirement Sufficiency phrase."
+        ),
+    )
 
     validate = subparsers.add_parser("validate")
     validate.add_argument("--target", action="append", required=True)
@@ -1037,7 +1148,12 @@ def main(argv: list[str] | None = None) -> int:
     root = project_root_from_arg(args.project_root)
     try:
         if args.command == "begin":
-            packet = create_authorization_packet(root, args.bridge_id, expires_minutes=args.expires_minutes)
+            packet = create_authorization_packet(
+                root,
+                args.bridge_id,
+                expires_minutes=args.expires_minutes,
+                owner_sufficiency_deliberation_id=args.owner_sufficiency_deliberation_id,
+            )
             if not args.no_write:
                 write_packet(root, packet)
                 write_named_packet(root, packet, args.bridge_id)

@@ -50,23 +50,28 @@ def _is_active(record: Any) -> bool:
     return isinstance(record, dict) and record.get("status") == "active"
 
 
+def _is_event_capable(record: Any) -> bool:
+    return isinstance(record, dict) and record.get("event_driven_hooks") is True
+
+
 def topology_from_role_map(role_map: dict[str, Any]) -> str:
     """Return ``single_harness`` or ``multi_harness`` for the given role map.
 
-    Single-harness iff exactly one ACTIVE harness ID's role-set contains BOTH
-    ``prime-builder`` AND ``loyal-opposition``. Registered, suspended, and
-    retired harnesses are ignored for topology because registration is separate
-    from role assignment. All other shapes return ``multi_harness`` (including
-    empty/malformed maps; the dispatcher's fail-closed semantics for ambiguous
-    input is preserved by returning the multi-harness default, which makes the
-    cross-harness trigger the active substrate).
+    Single-harness iff exactly one ACTIVE event-capable harness ID's role-set
+    contains BOTH ``prime-builder`` AND ``loyal-opposition``. Registered,
+    suspended, retired, and non-event-capable harnesses are ignored for topology
+    because role membership, lifecycle status, and bridge-event reception
+    capability are orthogonal. All other shapes return ``multi_harness``
+    (including empty/malformed maps; the dispatcher's fail-closed semantics for
+    ambiguous input is preserved by returning the multi-harness default, which
+    makes the cross-harness trigger the active substrate).
     """
     if not isinstance(role_map, dict):
         return MULTI_HARNESS
     harnesses = role_map.get("harnesses")
     if not isinstance(harnesses, dict):
         return MULTI_HARNESS
-    active_records = [record for record in harnesses.values() if _is_active(record)]
+    active_records = [record for record in harnesses.values() if _is_active(record) and _is_event_capable(record)]
     if len(active_records) != 1:
         return MULTI_HARNESS
     only_record = active_records[0]

@@ -143,6 +143,28 @@ def _seed_project_authorization(root: Path, *, link_work_item: bool = True, stat
         db.close()
 
 
+def _seed_owner_sufficiency_deliberation(root: Path) -> str:
+    deliberation_id = "DELIB-OWNER-SUFFICIENCY"
+    db = KnowledgeDB(root / "groundtruth.db")
+    try:
+        db.insert_deliberation(
+            deliberation_id,
+            "owner_conversation",
+            "Owner clarified requirement sufficiency",
+            "Existing requirements are sufficient.",
+            (
+                "Mike stated: Existing requirements are sufficient. "
+                "This clarification applies to bridge sample-implementation."
+            ),
+            "test",
+            "seed owner sufficiency decision",
+            outcome="owner_decision",
+        )
+    finally:
+        db.close()
+    return deliberation_id
+
+
 def test_go_authorization_packet_allows_in_scope_apply_patch(tmp_path: Path) -> None:
     _write_thread(tmp_path)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
@@ -215,6 +237,34 @@ def test_requirement_sufficiency_are_sufficient_allows_gate_authorization(tmp_pa
     }
 
     assert packet["requirement_sufficiency"] == "sufficient"
+    assert gate.gate_decision(payload) == {}
+
+
+def test_owner_sufficiency_deliberation_packet_allows_gate_authorization(tmp_path: Path) -> None:
+    """WI-4241: owner-decision fallback packets authorize protected edits."""
+    _write_thread(
+        tmp_path,
+        proposal=_proposal(requirement_sufficiency="Complete coverage exists without the bounded phrase."),
+    )
+    delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
+    packet = auth.create_authorization_packet(
+        tmp_path,
+        "sample-implementation",
+        owner_sufficiency_deliberation_id=delib_id,
+    )
+    auth.write_packet(tmp_path, packet)
+    sample_patch = (
+        "*** Begin Patch\n" + "*** " + "Update File: scripts/sample.py\n" + "@@\n" + "+pass\n" + "*** End Patch\n"
+    )
+
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": sample_patch},
+    }
+
+    assert packet["requirement_sufficiency"] == "owner_deliberation"
+    assert packet["requirement_sufficiency_evidence"]["deliberation_id"] == delib_id
     assert gate.gate_decision(payload) == {}
 
 

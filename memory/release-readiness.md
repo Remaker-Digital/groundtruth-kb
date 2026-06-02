@@ -1,6 +1,6 @@
 # Release Readiness — v0.7.0-rc1 Path (S327 owner direction)
 
-Last updated: 2026-05-06 (S333)
+Last updated: 2026-06-02 (RC1 canonical CI closure PR-head evidence)
 
 ## Active Release Target: v0.7.0-rc1
 
@@ -67,6 +67,23 @@ Verified on 2026-05-06 with `gh run view <run-id> --repo Remaker-Digital/agent-r
 | SonarCloud | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296718961 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296718961 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
 | Security Scan | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296718958 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296718958 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
 | Python Tests | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296718963 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296718963 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
+
+### Canonical Agent Red CI closure evidence (PR-head only)
+
+Authority: `bridge/gtkb-rc1-canonical-ci-closure-001.md` with Loyal Opposition `GO` at `bridge/gtkb-rc1-canonical-ci-closure-002.md`.
+
+Captured on 2026-06-02 from canonical repository `mike-remakerdigital/agent-red` PR #124 (`codex/rc1-security-scan-canonical-ci` -> `develop`). PR #124 remains draft/open and therefore this is not tag-authorization evidence. It is PR-head evidence only until the branch is accepted/merged or an accepted canonical head is explicitly identified and the required workflows are captured on that same head.
+
+| Evidence item | Result |
+|---|---|
+| PR scope | Only `.github/workflows/security-scan.yml` changed; diff adds `python -m pip install --upgrade "pip>=26.1,<27"` before `python -m pip install pip-audit`. |
+| Waiver boundary | Existing `pip-audit --ignore-vuln CVE-2026-3219` retained; no new vulnerability waiver added for `CVE-2026-6357`. |
+| Docker Scout boundary | Docker Scout workflow content untouched; Docker Scout job skipped on the pull-request event, so Docker Scout release evidence is still pending for an accepted canonical head. |
+| PR head | `ea632196b0f2cbcb73589aafb40c1072a14c3d65`; PR merge ref observed as `7a9347b07766482fe0aea6518502ccdd9cbbdbb3`. |
+| Security Scan | Run `26801052502` completed `success`; jobs Bandit Python Security, Semgrep SAST, and Dependency Audit completed `success`; Dependency Audit logs show `pip` upgraded to `26.1.2`, `pip-audit 2.10.0` installed, and both audit invocations reported no known vulnerabilities. |
+| SonarCloud | Run `26801052501` completed `success`; historical failed SonarCloud comment on the PR was superseded by the later passing Quality Gate. |
+
+Still required before `v0.7.0-rc1` tag authorization: PR #124 must be accepted/merged or otherwise designate an accepted canonical head; Lint, Release Candidate Gate, SonarCloud, Security Scan including Docker Scout, and Python Tests must be collected on that accepted canonical head; then this section must be replaced or superseded by terminal canonical CI evidence and a bridge post-implementation report must receive Loyal Opposition `VERIFIED`.
 
 ### Tag authorization gate
 

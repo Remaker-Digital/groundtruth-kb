@@ -1,7 +1,7 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-06-01T18:32:33Z
-Collector: gtkb-dev-environment-inventory-v1 (sha256:a5e5cfe931d26a1b101539fb979180f619ffea7a1715344d1bb80a227053001b)
+Generated: 2026-06-02T13:21:12Z
+Collector: gtkb-dev-environment-inventory-v1 (sha256:e1edf438c92dec07b069904bf62c78ff23ba067734c0b3686906745409cf2ce8)
 
 ## Project
 
@@ -13,7 +13,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:a5e5cfe931d26a1b101539fb979
 ## Redaction
 
 - Status: pass
-- Sensitive local environment entries detected: 2
+- Sensitive local environment entries detected: 1
 - Public output excludes raw credential values, local-only key names, and absolute local paths.
 
 ## Toolchain
@@ -26,9 +26,9 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:a5e5cfe931d26a1b101539fb979
 | `npm` | verified | `11.6.2` | `npm --version` |
 | `pip` | verified | `25.3` | `python -m pip --version` |
 | `playwright` | unsupported | `unknown` | `playwright --version` |
-| `pytest` | verified | `9.0.2` | `python -m pytest --version` |
+| `pytest` | verified | `9.0.3` | `python -m pytest --version` |
 | `python` | verified | `3.14.0` | `python --version` |
-| `ruff` | verified | `0.15.5` | `python -m ruff --version` |
+| `ruff` | verified | `0.15.12` | `python -m ruff --version` |
 
 ## Harness And Repo Surfaces
 

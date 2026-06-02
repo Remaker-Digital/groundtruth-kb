@@ -27,8 +27,21 @@ from groundtruth_kb.mode_switch.validation import (
 
 
 def _resolve_prime_harness_id(project_root: Path) -> str:
-    """Resolve the active prime-builder harness ID from DB projection."""
+    """Resolve the active event-capable prime-builder harness ID from projection."""
     from groundtruth_kb.harness_projection import harness_registry_path
+
+    def has_prime_role(record: dict[str, object]) -> bool:
+        role = record.get("role", [])
+        if isinstance(role, list):
+            roles = {str(item).strip().lower() for item in role if str(item).strip()}
+        elif isinstance(role, str) and role.strip():
+            roles = {role.strip().lower()}
+        else:
+            return False
+        if "acting-prime-builder" in roles:
+            roles.discard("acting-prime-builder")
+            roles.add("prime-builder")
+        return "prime-builder" in roles
 
     registry_path = harness_registry_path(project_root)
     if registry_path.is_file():
@@ -38,8 +51,7 @@ def _resolve_prime_harness_id(project_root: Path) -> str:
             for rec in harnesses:
                 if not isinstance(rec, dict):
                     continue
-                role = rec.get("role", [])
-                if isinstance(role, list) and "prime-builder" in role:
+                if rec.get("status") == "active" and rec.get("event_driven_hooks") is True and has_prime_role(rec):
                     return str(rec.get("id", "C"))
         except Exception:
             pass

@@ -128,6 +128,7 @@ def _write_harness_state_fixtures(project_root: Path) -> None:
                         "harness_type": "codex",
                         "status": "active",
                         "role": ["loyal-opposition"],
+                        "event_driven_hooks": True,
                         "invocation_surfaces": {
                             "headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}
                         },
@@ -138,6 +139,7 @@ def _write_harness_state_fixtures(project_root: Path) -> None:
                         "harness_type": "claude",
                         "status": "active",
                         "role": ["prime-builder"],
+                        "event_driven_hooks": True,
                         "invocation_surfaces": {
                             "headless": {
                                 "argv": [

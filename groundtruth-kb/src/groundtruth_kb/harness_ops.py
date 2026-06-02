@@ -13,10 +13,10 @@ It is pure DB logic: it imports only the standard library and
 writes no projection — the ``gt harness`` CLI refreshes the FR5 projection
 after a successful mutation.
 
-Direct role assignment (``gt harness set-role``) is handled by the operating
-mode transaction path. Lifecycle operations still enforce role eligibility:
-inactive harnesses cannot retain operating roles, and the active harness set is
-rebalanced after activation, suspension, and retirement.
+Direct active role assignment (``gt harness set-role``) is handled by the
+operating mode transaction path. Lifecycle operations rebalance the active
+harness set while preserving non-active role retention so role assignment and
+dispatch eligibility remain orthogonal.
 
 Authority: ``REQ-HARNESS-REGISTRY-001`` (FR3, FR1, FR2); ``DELIB-2079`` Q6
 (unified ``gt harness`` command group); owner AskUserQuestion 2026-05-16
@@ -147,7 +147,9 @@ def _desired_role_assignments(
     if len(active) == 1:
         only_id = _record_id(active[0])
         return {
-            _record_id(row): ([ROLE_LOYAL_OPPOSITION, ROLE_PRIME_BUILDER] if _record_id(row) == only_id else [])
+            _record_id(row): (
+                [ROLE_LOYAL_OPPOSITION, ROLE_PRIME_BUILDER] if _record_id(row) == only_id else _current_roles(row)
+            )
             for row in rows
         }
 
@@ -178,6 +180,8 @@ def _desired_role_assignments(
     for row in rows:
         harness_id = _record_id(row)
         roles: list[str] = []
+        if harness_id not in active_by_id:
+            roles = _current_roles(row)
         if harness_id == lo_id:
             roles.append(ROLE_LOYAL_OPPOSITION)
         if harness_id == prime_id:
@@ -255,16 +259,18 @@ def reconcile_role_assignments(
     preferred_prime_id: str | None = None,
     preferred_lo_id: str | None = None,
 ) -> None:
-    """Repair operating-role assignments to match the active harness set.
+    """Repair active operating-role assignments to match the active harness set.
 
     The registrar invariant is:
 
-    - inactive harnesses have no PB/LO role assignment;
+    - non-active harnesses may retain PB/LO role assignment for interactive or
+      owner-directed work, but do not participate in active role partitioning;
     - with one active harness, that harness carries PB+LO;
     - with multiple active harnesses, exactly one active harness carries PB and
       exactly one different active harness carries LO.
 
-    The function appends only rows whose role set actually changes.
+    The function appends only rows whose role set actually changes. Non-active
+    rows carry their current role set forward unchanged.
     """
     rows = [row for row in db.list_harnesses() if isinstance(row, dict)]
     assignments = _desired_role_assignments(
@@ -274,7 +280,7 @@ def reconcile_role_assignments(
     )
     for row in rows:
         harness_id = _record_id(row)
-        desired = assignments.get(harness_id, [])
+        desired = assignments.get(harness_id, _current_roles(row))
         if _current_roles(row) == desired:
             continue
         _append_version(
@@ -350,7 +356,9 @@ def transition_harness(
     with a hint naming the correct verb. Retiring an ``active`` harness
     auto-suspends it first (``active -> suspended -> retired``) per the owner's
     2026-05-16 AskUserQuestion decision; the FSM keeps its literal four-edge
-    graph. Raises ``HarnessOperationError`` on an unknown harness, a
+    graph. Role metadata is carried forward across non-active lifecycle states
+    because role membership, lifecycle status, and dispatch capability are
+    orthogonal. Raises ``HarnessOperationError`` on an unknown harness, a
     wrong-source-state verb use, or an FSM-invalid transition.
     """
     current = db.get_harness(harness_id)
@@ -380,6 +388,8 @@ def transition_harness(
                 "harness exists to carry PB/LO after the transition"
             )
     if target_status == harness_lifecycle.STATUS_RETIRED and current_status == harness_lifecycle.STATUS_ACTIVE:
+        current_role = _decode_json_field(current.get("role"))
+        retained_role = current_role if isinstance(current_role, list) else []
         harness_lifecycle.validate_transition(harness_lifecycle.STATUS_ACTIVE, harness_lifecycle.STATUS_SUSPENDED)
         suspended = _append_version(
             db,
@@ -387,7 +397,7 @@ def transition_harness(
             changed_by=changed_by,
             change_reason=f"{change_reason} [auto-suspend before retire]",
             status=harness_lifecycle.STATUS_SUSPENDED,
-            role=[],
+            role=retained_role,
         )
         harness_lifecycle.validate_transition(harness_lifecycle.STATUS_SUSPENDED, harness_lifecycle.STATUS_RETIRED)
         _append_version(
@@ -396,7 +406,7 @@ def transition_harness(
             changed_by=changed_by,
             change_reason=change_reason,
             status=harness_lifecycle.STATUS_RETIRED,
-            role=[],
+            role=retained_role,
         )
         reconcile_role_assignments(
             db,
@@ -408,13 +418,15 @@ def transition_harness(
         harness_lifecycle.validate_transition(current_status, target_status)
     except ValueError as exc:
         raise HarnessOperationError(str(exc)) from exc
+    current_role = _decode_json_field(current.get("role"))
+    retained_role = current_role if isinstance(current_role, list) else []
     _append_version(
         db,
         current,
         changed_by=changed_by,
         change_reason=change_reason,
         status=target_status,
-        role=[] if target_status != harness_lifecycle.STATUS_ACTIVE else _decode_json_field(current.get("role")),
+        role=retained_role,
     )
     reconcile_role_assignments(
         db,

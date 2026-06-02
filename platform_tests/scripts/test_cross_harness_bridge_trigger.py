@@ -136,6 +136,7 @@ def _make_synthetic_project(root: Path) -> Path:
                         "harness_name": "codex",
                         "harness_type": "codex",
                         "status": "active",
+                        "event_driven_hooks": True,
                         "role": ["loyal-opposition"],
                         "invocation_surfaces": _CODEX_INVOCATION_SURFACES,
                     },
@@ -144,6 +145,7 @@ def _make_synthetic_project(root: Path) -> Path:
                         "harness_name": "claude",
                         "harness_type": "claude",
                         "status": "active",
+                        "event_driven_hooks": True,
                         "role": ["prime-builder"],
                         "invocation_surfaces": _CLAUDE_INVOCATION_SURFACES,
                     },
@@ -1021,6 +1023,7 @@ def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evi
                         "harness_name": "claude",
                         "harness_type": "claude",
                         "status": "active",
+                        "event_driven_hooks": True,
                         "role": ["prime-builder", "loyal-opposition"],
                     }
                 ],
@@ -1437,6 +1440,7 @@ def test_resolve_dispatch_target_attaches_invocation_surfaces_from_projection(
 # ──────────────────────────────────────────────────────────────────────────
 
 _NO_STATUS = object()
+_NO_EVENT_CAPABILITY = object()
 
 
 def _write_registry(root: Path, records: list[dict]) -> None:
@@ -1460,7 +1464,14 @@ def _write_registry(root: Path, records: list[dict]) -> None:
     )
 
 
-def _rec(harness_id: str, harness_name: str, role: list[str], status=_NO_STATUS, surfaces=None) -> dict:
+def _rec(
+    harness_id: str,
+    harness_name: str,
+    role: list[str],
+    status=_NO_STATUS,
+    surfaces=None,
+    event_driven_hooks=True,
+) -> dict:
     """Build one registry record. status=_NO_STATUS omits the status key
     (assertion 5: absent status). Pass status=None / "" / "bogus" for the other
     inactive cases."""
@@ -1473,6 +1484,8 @@ def _rec(harness_id: str, harness_name: str, role: list[str], status=_NO_STATUS,
     }
     if status is not _NO_STATUS:
         record["status"] = status
+    if event_driven_hooks is not _NO_EVENT_CAPABILITY:
+        record["event_driven_hooks"] = event_driven_hooks
     return record
 
 
@@ -1515,6 +1528,34 @@ def test_resolve_filters_by_active_status(tmp_path: Path) -> None:
     )
     pb = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
     assert pb is not None and pb.harness_id == "B", "inactive C must not be selected"
+
+
+def test_resolve_filters_by_event_driven_hooks(tmp_path: Path) -> None:
+    """WI-4213: an active same-role harness without bridge-event hooks is never selected."""
+    trigger = _load_trigger()
+    _write_registry(
+        tmp_path,
+        [
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+            _rec("C", "antigravity", ["prime-builder"], "active", event_driven_hooks=False),
+        ],
+    )
+    pb = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
+    assert pb is not None and pb.harness_id == "B", "non-event-capable C must not be selected"
+
+
+def test_resolve_missing_event_driven_hooks_treated_as_not_capable(tmp_path: Path) -> None:
+    """WI-4213: missing event-driven capability is fail-closed."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    _write_registry(
+        tmp_path,
+        [_rec("C", "antigravity", ["prime-builder"], "active", event_driven_hooks=_NO_EVENT_CAPABILITY)],
+    )
+    assert trigger._resolve_dispatch_target("prime-builder", tmp_path, state_dir) is None
+    records = _failure_records(state_dir)
+    assert records[0]["reason"] == "no_active_target_for_role"
+    assert "none active and event-capable" in records[0]["error_message"]
 
 
 def test_resolve_zero_active_returns_sentinel_and_audits(tmp_path: Path) -> None:
@@ -1595,6 +1636,11 @@ def test_is_single_harness_topology_requires_active(tmp_path: Path) -> None:
     _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"], "inactive")])
     assert trigger._is_single_harness_topology(tmp_path) is False
     _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"])])  # no status
+    assert trigger._is_single_harness_topology(tmp_path) is False
+    _write_registry(
+        tmp_path,
+        [_rec("C", "antigravity", ["prime-builder", "loyal-opposition"], "active", event_driven_hooks=False)],
+    )
     assert trigger._is_single_harness_topology(tmp_path) is False
 
 

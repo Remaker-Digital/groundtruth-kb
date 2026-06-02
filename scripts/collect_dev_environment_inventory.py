@@ -183,7 +183,7 @@ def _run_tool_version(
             "status": "unsupported",
             "version": "unknown",
             "classification": "unsupported",
-            "evidence": f"{display_command} not found on PATH",
+            "evidence": display_command,
         }
         return public, {**public, "resolved_executable": None, "returncode": None, "raw_output": ""}
 
@@ -205,7 +205,7 @@ def _run_tool_version(
             "status": "unknown",
             "version": "unknown",
             "classification": "unknown",
-            "evidence": f"{display_command} could not be executed",
+            "evidence": display_command,
         }
         return public, {**public, "resolved_executable": resolved, "returncode": None, "raw_output": str(exc)}
 

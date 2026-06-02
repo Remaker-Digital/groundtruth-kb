@@ -2,11 +2,12 @@
   "description": "Maps durable harness installation IDs to operating roles. Harness IDs are defined by harness-state/harness-identities.json.",
   "harnesses": {
     "A": {
-      "assigned_at": "2026-06-01T18:08:14Z",
+      "assigned_at": "2026-06-02T06:26:03Z",
       "assigned_by": "owner-directed-role-assignment",
-      "assigned_reason": "Owner directed Codex to assume active Prime Builder while Claude Code is suspended",
+      "assigned_reason": "Owner declared Antigravity temporarily unavailable; Codex hosts both Prime Builder and Loyal Opposition roles",
       "harness_type": "codex",
       "role": [
+        "loyal-opposition",
         "prime-builder"
       ],
       "source": "compatibility-mirror"
@@ -20,17 +21,15 @@
       "source": "compatibility-mirror"
     },
     "C": {
-      "assigned_at": "2026-06-01T18:08:14Z",
+      "assigned_at": "2026-06-02T06:26:03Z",
       "assigned_by": "owner-directed-role-assignment",
-      "assigned_reason": "Owner directed Antigravity to take Loyal Opposition with manual bridge scans",
+      "assigned_reason": "Owner declared Antigravity temporarily unavailable; no active operating role",
       "harness_type": "antigravity",
-      "role": [
-        "loyal-opposition"
-      ],
+      "role": [],
       "source": "compatibility-mirror"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness role assignments",
-  "updated_at": "2026-06-01T18:08:14Z"
+  "updated_at": "2026-06-02T06:26:03Z"
 }

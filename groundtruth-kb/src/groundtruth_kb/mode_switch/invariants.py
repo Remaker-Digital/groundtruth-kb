@@ -1,19 +1,21 @@
 """Role-map partition checks for the operating-mode subsystem.
 
-``REQ-HARNESS-REGISTRY-001`` FR9 requires that ``gt harness set-role`` leave
+``REQ-HARNESS-REGISTRY-001`` FR9-F12 require that active bridge dispatch leave
 the active harness set with exactly one ``prime-builder`` assignment and exactly
 one ``loyal-opposition`` assignment. When more than one harness is active, those
-roles must be assigned to different active harnesses. Inactive harnesses remain
-registered but carry no operating role.
+roles must be assigned to different active harnesses. Non-active harnesses may
+retain operating roles for interactive or owner-directed work; they do not
+participate in active dispatch partitioning.
 
 It reads the harness registry projection
 (``harness-state/harness-registry.json``) and computes over the role-set wire
 form — a list of role tokens, or a legacy scalar string per
 ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``.
 
-Authority: ``REQ-HARNESS-REGISTRY-001`` FR9; ``DELIB-2080`` (the
-single-prime-builder amendment); ``GOV-HARNESS-ROLE-PORTABILITY-001`` (Prime
-Builder and Loyal Opposition are portable harness-assigned roles).
+Authority: ``REQ-HARNESS-REGISTRY-001`` FR9-F12;
+``DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001`` v2;
+``GOV-HARNESS-ROLE-PORTABILITY-001`` (Prime Builder and Loyal Opposition are
+portable harness-assigned roles).
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights
 reserved.
@@ -97,8 +99,9 @@ def verify_active_role_partition(project_root: Path, *, role_path: Path | None =
     explicit ``role_path`` override) and raises ``RolePartitionViolation``
     unless exactly one active harness holds a prime-builder-class role and
     exactly one active harness holds loyal-opposition. With multiple active
-    harnesses, the two role holders must be different. Registered, suspended,
-    and retired harnesses must carry no operating role.
+    harnesses, the two role holders must be different. Registered, inactive,
+    suspended, and retired harnesses may retain roles but are ignored by the
+    active partition.
 
     WI-3342 IP-5: migrated from the retired
     ``harness-state/role-assignments.json`` to the DB-backed registry
@@ -135,18 +138,6 @@ def verify_active_role_partition(project_root: Path, *, role_path: Path | None =
     if active_roleless:
         raise RolePartitionViolation(
             "active harnesses must carry operating roles; violations: " + ", ".join(sorted(active_roleless))
-        )
-
-    inactive_with_roles: list[str] = []
-    for harness_id, record in sorted(harnesses.items()):
-        if not isinstance(record, dict) or record.get("status") == "active":
-            continue
-        tokens = _role_tokens(record.get("role"))
-        if tokens:
-            inactive_with_roles.append(f"{harness_id}={sorted(tokens)}")
-    if inactive_with_roles:
-        raise RolePartitionViolation(
-            "inactive harnesses must not carry operating roles; violations: " + ", ".join(inactive_with_roles)
         )
 
     primes = prime_builder_ids(role_document)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import types
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -219,3 +220,73 @@ def test_extract_version_path_safe_fallback_for_unstructured_output() -> None:
     # returns the truncated first line (existing behavior preserved for
     # unstructured-but-path-safe outputs).
     assert module._extract_version("custom-tool: some diagnostic text") == "custom-tool: some diagnostic text"
+
+
+def test_run_tool_version_public_evidence_is_stable_for_missing_executable(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module.shutil, "which", lambda _executable: None)
+
+    public, private = module._run_tool_version(["gh", "--version"], "gh --version")
+
+    assert public == {
+        "command": "gh --version",
+        "status": "unsupported",
+        "version": "unknown",
+        "classification": "unsupported",
+        "evidence": "gh --version",
+    }
+    assert private["resolved_executable"] is None
+    assert private["returncode"] is None
+    assert private["raw_output"] == ""
+
+
+def test_run_tool_version_public_evidence_is_stable_for_execution_error(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module.shutil, "which", lambda _executable: "C:\\Tools\\gh.exe")
+
+    def fail_run(*_args, **_kwargs):
+        raise OSError("config read failed")
+
+    monkeypatch.setattr(module.subprocess, "run", fail_run)
+
+    public, private = module._run_tool_version(["gh", "--version"], "gh --version")
+
+    assert public == {
+        "command": "gh --version",
+        "status": "unknown",
+        "version": "unknown",
+        "classification": "unknown",
+        "evidence": "gh --version",
+    }
+    assert private["resolved_executable"] == "C:\\Tools\\gh.exe"
+    assert private["returncode"] is None
+    assert private["raw_output"] == "config read failed"
+
+
+def test_run_tool_version_public_evidence_is_stable_for_success_and_nonzero(monkeypatch) -> None:
+    module = _load_module()
+    results = iter(
+        [
+            types.SimpleNamespace(stdout="gh version 2.83.2\n", stderr="", returncode=0),
+            types.SimpleNamespace(
+                stdout="",
+                stderr="failed to read configuration: open C:\\Users\\micha\\AppData\\Roaming\\gh\\config.yml",
+                returncode=1,
+            ),
+        ]
+    )
+    monkeypatch.setattr(module.shutil, "which", lambda _executable: "C:\\Tools\\gh.exe")
+    monkeypatch.setattr(module.subprocess, "run", lambda *_args, **_kwargs: next(results))
+
+    success_public, success_private = module._run_tool_version(["gh", "--version"], "gh --version")
+    failed_public, failed_private = module._run_tool_version(["gh", "--version"], "gh --version")
+
+    assert success_public["status"] == "verified"
+    assert success_public["version"] == "2.83.2"
+    assert success_public["evidence"] == "gh --version"
+    assert success_private["returncode"] == 0
+
+    assert failed_public["status"] == "unknown"
+    assert failed_public["version"] == "unknown"
+    assert failed_public["evidence"] == "gh --version"
+    assert failed_private["returncode"] == 1

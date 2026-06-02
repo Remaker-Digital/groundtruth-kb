@@ -217,9 +217,7 @@ def test_exact_volatile_paths_unaffected_by_wildcard_support() -> None:
         "toolchain": {"python": {"version": "3.14.0"}},
         "redaction": {"status": "pass", "sensitive_environment_entry_count": 7},
     }
-    normalized = module.normalize_inventory(
-        payload, ["generated_at", "redaction.sensitive_environment_entry_count"]
-    )
+    normalized = module.normalize_inventory(payload, ["generated_at", "redaction.sensitive_environment_entry_count"])
     assert "generated_at" not in normalized
     assert "sensitive_environment_entry_count" not in normalized["redaction"]
     assert normalized["redaction"]["status"] == "pass"
@@ -235,6 +233,30 @@ def _write_toolchain_volatile_registry(root: Path) -> Path:
             [
                 "schema_version = 1",
                 'volatile_inventory_paths = ["generated_at", "toolchain.*.version"]',
+                "",
+                "[[protected_artifacts]]",
+                'id = "inventory"',
+                'patterns = [".groundtruth/inventory/dev-environment-inventory.json"]',
+                'severity = "accepted_baseline_update"',
+                'route = "accepted_baseline_update"',
+                "accept_with_inventory_baseline_update = true",
+                'required_evidence = ["inventory regenerated"]',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_toolchain_availability_volatile_registry(root: Path) -> Path:
+    path = root / "config" / "governance" / "protected-artifact-inventory-drift.toml"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "\n".join(
+            [
+                "schema_version = 1",
+                'volatile_inventory_paths = ["generated_at", "toolchain.*.version", "toolchain.*.status", "toolchain.*.classification"]',
                 "",
                 "[[protected_artifacts]]",
                 'id = "inventory"',
@@ -295,6 +317,76 @@ def test_non_version_toolchain_change_still_gates(tmp_path: Path) -> None:
         "schema_version": 1,
         "generated_at": "2026-05-29T01:00:00Z",
         "toolchain": {"pytest": {"version": "9.0.3", "status": "missing"}},
+    }
+    _write_inventory(tmp_path, baseline)
+
+    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=current)
+
+    assert result["material_inventory_drift"] is True
+    assert result["diff_keys"] == ["toolchain"]
+
+
+def test_toolchain_availability_flux_with_same_public_probe_evidence_is_not_material_drift(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_toolchain_availability_volatile_registry(tmp_path)
+    baseline = {
+        "schema_version": 1,
+        "generated_at": "2026-06-02T00:00:00Z",
+        "toolchain": {
+            "gh": {
+                "version": "2.83.2",
+                "status": "verified",
+                "classification": "verified",
+                "evidence": "gh --version",
+            }
+        },
+    }
+    current = {
+        "schema_version": 1,
+        "generated_at": "2026-06-02T01:00:00Z",
+        "toolchain": {
+            "gh": {
+                "version": "unknown",
+                "status": "unsupported",
+                "classification": "unsupported",
+                "evidence": "gh --version",
+            }
+        },
+    }
+    _write_inventory(tmp_path, baseline)
+
+    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=current)
+
+    assert result["material_inventory_drift"] is False
+    assert result["diff_keys"] == []
+
+
+def test_toolchain_public_probe_evidence_change_still_gates(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_toolchain_availability_volatile_registry(tmp_path)
+    baseline = {
+        "schema_version": 1,
+        "generated_at": "2026-06-02T00:00:00Z",
+        "toolchain": {
+            "gh": {
+                "version": "2.83.2",
+                "status": "verified",
+                "classification": "verified",
+                "evidence": "gh --version",
+            }
+        },
+    }
+    current = {
+        "schema_version": 1,
+        "generated_at": "2026-06-02T01:00:00Z",
+        "toolchain": {
+            "gh": {
+                "version": "unknown",
+                "status": "unsupported",
+                "classification": "unsupported",
+                "evidence": "gh version",
+            }
+        },
     }
     _write_inventory(tmp_path, baseline)
 
