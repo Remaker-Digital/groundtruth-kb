@@ -92,6 +92,8 @@ GO: bridge/gtkb-active-status-capability-gate-formalization-002.md
 NEW: bridge/gtkb-active-status-capability-gate-formalization-001.md
 
 Document: gtkb-rc1-canonical-ci-closure
+VERIFIED: bridge/gtkb-rc1-canonical-ci-closure-006.md
+REVISED: bridge/gtkb-rc1-canonical-ci-closure-005.md
 NO-GO: bridge/gtkb-rc1-canonical-ci-closure-004.md
 NEW: bridge/gtkb-rc1-canonical-ci-closure-003.md
 GO: bridge/gtkb-rc1-canonical-ci-closure-002.md
