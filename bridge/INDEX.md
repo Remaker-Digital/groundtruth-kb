@@ -927,6 +927,7 @@ NO-GO: bridge/gtkb-impl-gate-friction-hygiene-002.md
 NEW: bridge/gtkb-impl-gate-friction-hygiene-001.md
 
 Document: gtkb-bridge-skill-protected-write-helper
+NEW: bridge/gtkb-bridge-skill-protected-write-helper-005.md
 GO: bridge/gtkb-bridge-skill-protected-write-helper-004.md
 REVISED: bridge/gtkb-bridge-skill-protected-write-helper-003.md
 NO-GO: bridge/gtkb-bridge-skill-protected-write-helper-002.md

@@ -138,6 +138,22 @@ The helper creates drafts; it does not author the substantive correction. Prime 
    ```
 5. The helper does not bypass Loyal Opposition verification. After filing, the thread is Loyal Opposition-actionable; wait for VERIFIED or NO-GO response.
 
+### Protected-file Writes
+
+**Purpose**: write protected narrative-artifact files with an immediate Layer-C universal-floor evidence verdict.
+
+**Helper**: `.claude/skills/bridge/helpers/protected_write.py`
+
+**Canonical invocation**:
+
+```powershell
+python .claude/skills/bridge/helpers/protected_write.py --target <path> --content-file <path> --packet <packet-path>
+```
+
+Use this helper for protected narrative-artifact paths governed by `config/governance/narrative-artifact-approval.toml` when an approval packet already exists. The helper validates the packet against the proposed LF-normalized content, writes the target, stages only that target path, and runs `scripts/check_narrative_artifact_evidence.py --paths <target>` semantics against the staged blob. A clean exit means the same universal-floor evidence checker used by `.githooks/pre-commit` clears the staged file.
+
+This helper is a deterministic Layer-C universal-floor evidence path. It is not a PreToolUse interception, and it does not claim to trigger or emulate any harness `Write` / `Edit` hook.
+
 ### Status
 
 **Purpose**: read-only inspection without mutation.
