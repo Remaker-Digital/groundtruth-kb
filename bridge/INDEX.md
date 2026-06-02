@@ -523,6 +523,7 @@ NO-GO: bridge/gtkb-env-sot-topology-spec-authoring-002.md
 NEW: bridge/gtkb-env-sot-topology-spec-authoring-001.md
 
 Document: gtkb-gov-08-permitted-markdown-amendment-scoping
+NEW: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-005.md
 GO: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-004.md
 REVISED: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-003.md
 NO-GO: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-002.md
