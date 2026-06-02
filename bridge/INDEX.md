@@ -680,6 +680,7 @@ NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-002.md
 NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-001.md
 
 Document: gtkb-s358-w1-retirement-machinery-correction
+NEW: bridge/gtkb-s358-w1-retirement-machinery-correction-020.md
 GO: bridge/gtkb-s358-w1-retirement-machinery-correction-019.md
 REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-018.md
 NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-017.md
@@ -1152,6 +1153,8 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping
+VERIFIED: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-006.md
+NEW: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-005.md
 GO: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-004.md
 REVISED: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-003.md
 NO-GO: bridge/gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping-002.md
