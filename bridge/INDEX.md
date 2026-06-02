@@ -13,6 +13,28 @@
      Topology:                 multi_harness
      Sentinel updated:         2026-06-02T01:03:47Z
 -->
+Document: gtkb-terminal-project-record-retirement-batch
+VERIFIED: bridge/gtkb-terminal-project-record-retirement-batch-006.md
+NEW: bridge/gtkb-terminal-project-record-retirement-batch-005.md
+GO: bridge/gtkb-terminal-project-record-retirement-batch-004.md
+REVISED: bridge/gtkb-terminal-project-record-retirement-batch-003.md
+GO: bridge/gtkb-terminal-project-record-retirement-batch-002.md
+NEW: bridge/gtkb-terminal-project-record-retirement-batch-001.md
+
+Document: gtkb-deterministic-services-stale-status-reconciliation
+VERIFIED: bridge/gtkb-deterministic-services-stale-status-reconciliation-012.md
+NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-011.md
+GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-010.md
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-009.md
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-008.md
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-003.md
+NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
+NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
+
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-008.md
 REVISED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-007.md
