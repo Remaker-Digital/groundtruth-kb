@@ -1071,6 +1071,7 @@ NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-002.md
 NEW: bridge/gtkb-prime-worker-delivery-regression-slice-4-001.md
 
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
+VERIFIED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-012.md
 REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-011.md
 NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-010.md
 NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-009.md
