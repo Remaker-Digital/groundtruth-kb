@@ -6,6 +6,9 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-impl-auth-requirement-sufficiency-phrase-tolerance
+NEW: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-001.md
+
 Document: gtkb-registry-scaffold-fixture-drift-reconciliation
 NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-001.md
 
