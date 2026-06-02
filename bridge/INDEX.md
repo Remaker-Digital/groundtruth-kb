@@ -252,6 +252,7 @@ NO-GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-
 NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-001.md
 
 Document: gtkb-interactive-session-role-override-hygiene-backfill
+REVISED: bridge/gtkb-interactive-session-role-override-hygiene-backfill-003.md
 NO-GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-002.md
 NEW: bridge/gtkb-interactive-session-role-override-hygiene-backfill-001.md
 
