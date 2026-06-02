@@ -565,6 +565,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-impl-report-bridge-structural-validation-mtime
+VERIFIED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-008.md
 NEW: bridge/gtkb-impl-report-bridge-structural-validation-mtime-007.md
 GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-006.md
 REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-005.md
@@ -590,6 +591,7 @@ REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-002.md
 NEW: bridge/gtkb-lo-hygiene-assessment-skill-build-001.md
 
 Document: gtkb-bridge-target-paths-kb-mutation-check
+VERIFIED: bridge/gtkb-bridge-target-paths-kb-mutation-check-006.md
 REVISED: bridge/gtkb-bridge-target-paths-kb-mutation-check-005.md
 NO-GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-004.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-003.md
