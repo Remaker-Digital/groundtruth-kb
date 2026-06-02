@@ -35,9 +35,7 @@ HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
 
 @pytest.fixture(scope="module")
 def hook_module():
-    spec = importlib.util.spec_from_file_location(
-        "owner_decision_tracker_struct_hook", HOOK_PATH
-    )
+    spec = importlib.util.spec_from_file_location("owner_decision_tracker_struct_hook", HOOK_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["owner_decision_tracker_struct_hook"] = module
@@ -72,37 +70,21 @@ def test_genuine_prose_ask_outside_fence_still_blocks(hook_module):
 
 def test_prose_ask_inside_triple_backtick_fence_does_not_block(hook_module):
     """Trigger inside ``` ... ``` fenced block is documentation; must NOT match."""
-    text = (
-        "Documentation example below.\n"
-        "```\n"
-        + _TRIGGER + "\n"
-        "```\n"
-        "End of documentation."
-    )
+    text = "Documentation example below.\n```\n" + _TRIGGER + "\n```\nEnd of documentation."
     matches = _scan(hook_module, text)
     assert matches == [], f"Expected 0 matches inside fence, got {matches}"
 
 
 def test_prose_ask_inside_indented_code_block_does_not_block(hook_module):
     """Trigger inside 4-space indented code block must NOT match."""
-    text = (
-        "Indented code below.\n"
-        "\n"
-        "    " + _TRIGGER + "\n"
-        "\n"
-        "End."
-    )
+    text = "Indented code below.\n\n    " + _TRIGGER + "\n\nEnd."
     matches = _scan(hook_module, text)
     assert matches == [], f"Expected 0 matches inside indented block, got {matches}"
 
 
 def test_prose_ask_inside_blockquote_does_not_block(hook_module):
     """Trigger inside ``> `` blockquote line must NOT match."""
-    text = (
-        "Quoting prior conversation:\n"
-        "> " + _TRIGGER + "\n"
-        "End."
-    )
+    text = "Quoting prior conversation:\n> " + _TRIGGER + "\nEnd."
     matches = _scan(hook_module, text)
     assert matches == [], f"Expected 0 matches inside blockquote, got {matches}"
 
@@ -116,25 +98,16 @@ def test_prose_ask_inside_html_comment_does_not_block(hook_module):
 
 def test_genuine_ask_after_fenced_documentation_block_still_blocks(hook_module):
     """Mixed-context: fenced doc THEN a genuine ask must produce exactly one match (the post-fence ask)."""
-    text = (
-        "Documentation:\n"
-        "```\n"
-        + _TRIGGER + "\n"
-        "```\n"
-        "And now I really need to ask: " + _TRIGGER
-    )
+    text = "Documentation:\n```\n" + _TRIGGER + "\n```\nAnd now I really need to ask: " + _TRIGGER
     matches = _scan(hook_module, text)
-    assert len(matches) == 1, (
-        f"Expected exactly 1 match (the post-fence ask only), got {matches}"
-    )
+    assert len(matches) == 1, f"Expected exactly 1 match (the post-fence ask only), got {matches}"
 
 
 def test_self_reference_inside_fence_does_not_block(hook_module):
     """Trigger shown as code example must NOT match (compounds with the existing self-ref guard)."""
     text = (
         "The detector matches phrasings like:\n"
-        "```regex\n"
-        + _TRIGGER + "\n"
+        "```regex\n" + _TRIGGER + "\n"
         "```\n"
         "in the imperative-decision-ask category."
     )
@@ -150,9 +123,7 @@ def test_existing_in_window_guards_still_apply(hook_module):
     """
     text = "In general, decisions are hard. Anyway, " + _TRIGGER
     matches = _scan(hook_module, text)
-    assert matches == [], (
-        f"Expected 0 matches (in-window 'decisions are hard' guard), got {matches}"
-    )
+    assert matches == [], f"Expected 0 matches (in-window 'decisions are hard' guard), got {matches}"
 
 
 def test_structural_guard_does_not_pollute_live_memory_file(tmp_path, monkeypatch):
@@ -164,11 +135,7 @@ def test_structural_guard_does_not_pollute_live_memory_file(tmp_path, monkeypatc
     must be identical.
     """
     live_pending_path = REPO_ROOT / "memory" / "pending-owner-decisions.md"
-    pre_hash = (
-        hashlib.sha256(live_pending_path.read_bytes()).hexdigest()
-        if live_pending_path.exists()
-        else None
-    )
+    pre_hash = hashlib.sha256(live_pending_path.read_bytes()).hexdigest() if live_pending_path.exists() else None
 
     project_root = tmp_path / "project"
     (project_root / "memory").mkdir(parents=True)
@@ -186,22 +153,26 @@ def test_structural_guard_does_not_pollute_live_memory_file(tmp_path, monkeypatc
     ]
     tfile = tmp_path / "transcript.jsonl"
     tfile.write_text("\n".join(json.dumps(e) for e in transcript), encoding="utf-8")
-    payload = json.dumps({
-        "session_id": "test-slice-a-followup-structural-e2e",
-        "hook_event_name": "Stop",
-        "transcript_path": str(tfile.resolve()),
-        "cwd": str(project_root),
-    })
+    payload = json.dumps(
+        {
+            "session_id": "test-slice-a-followup-structural-e2e",
+            "hook_event_name": "Stop",
+            "transcript_path": str(tfile.resolve()),
+            "cwd": str(project_root),
+        }
+    )
     env = dict(os.environ)
     env.pop("GTKB_BLOCK_ON_PROSE_DECISION_ASK", None)
     env["CLAUDE_PROJECT_DIR"] = str(project_root)
     result = subprocess.run(
         [sys.executable, str(HOOK_PATH), "--mode", "stop"],
-        input=payload, capture_output=True, text=True, env=env, timeout=10,
+        input=payload,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=10,
     )
-    assert result.returncode == 0, (
-        f"Hook exit code {result.returncode}; stderr: {result.stderr[-500:]}"
-    )
+    assert result.returncode == 0, f"Hook exit code {result.returncode}; stderr: {result.stderr[-500:]}"
 
     out = result.stdout.strip()
     if out:
@@ -210,11 +181,7 @@ def test_structural_guard_does_not_pollute_live_memory_file(tmp_path, monkeypatc
             f"Structural-guard suppression failed: hook emitted block; got {parsed!r}"
         )
 
-    post_hash = (
-        hashlib.sha256(live_pending_path.read_bytes()).hexdigest()
-        if live_pending_path.exists()
-        else None
-    )
+    post_hash = hashlib.sha256(live_pending_path.read_bytes()).hexdigest() if live_pending_path.exists() else None
     assert pre_hash == post_hash, (
         f"Live memory/pending-owner-decisions.md was mutated by test "
         f"(pre={pre_hash}, post={post_hash}); test is not hermetic"

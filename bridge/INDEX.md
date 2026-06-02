@@ -865,6 +865,7 @@ NO-GO: bridge/gtkb-lo-file-safety-pretooluse-enforcement-002.md
 NEW: bridge/gtkb-lo-file-safety-pretooluse-enforcement-001.md
 
 Document: gtkb-owner-decision-tracker-baseline-restore
+REVISED: bridge/gtkb-owner-decision-tracker-baseline-restore-007.md
 NO-GO: bridge/gtkb-owner-decision-tracker-baseline-restore-006.md
 NEW: bridge/gtkb-owner-decision-tracker-baseline-restore-005.md
 GO: bridge/gtkb-owner-decision-tracker-baseline-restore-004.md
@@ -1076,6 +1077,7 @@ NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-002.md
 NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-001.md
 
 Document: gtkb-prime-worker-context-aware-auq-slice-2
+REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-011.md
 NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-010.md
 REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-009.md
 NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-008.md

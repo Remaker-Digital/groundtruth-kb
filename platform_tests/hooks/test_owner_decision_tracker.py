@@ -71,8 +71,10 @@ def _setup_project(tmp_path: Path) -> Path:
 
 
 def _run_hook(mode: str, project_root: Path, stdin_text: str = "") -> subprocess.CompletedProcess:
-    """Invoke the hook subprocess with CLAUDE_PROJECT_DIR pointing at project_root."""
+    """Invoke the hook with worker-context env markers scrubbed by default."""
     env = os.environ.copy()
+    env.pop("GTKB_BRIDGE_POLLER_RUN_ID", None)
+    env.pop("GTKB_PROJECT_ROOT", None)
     env["CLAUDE_PROJECT_DIR"] = str(project_root)
     return subprocess.run(
         [sys.executable, str(HOOK), "--mode", mode],
@@ -517,8 +519,10 @@ def test_t16_multiple_askuserquestion_in_one_turn(tmp_path: Path) -> None:
 
 
 def _run_hook_with_env(mode: str, project_root: Path, stdin_text: str, extra_env: dict) -> subprocess.CompletedProcess:
-    """Variant of _run_hook that sets/overrides specific env vars."""
+    """Variant of _run_hook that explicitly restores caller-supplied env vars."""
     env = os.environ.copy()
+    env.pop("GTKB_BRIDGE_POLLER_RUN_ID", None)
+    env.pop("GTKB_PROJECT_ROOT", None)
     env["CLAUDE_PROJECT_DIR"] = str(project_root)
     env.update(extra_env)
     return subprocess.run(
@@ -1069,6 +1073,8 @@ def _run_hook_isolated(
 ) -> subprocess.CompletedProcess:
     """Run hook with cwd=project_root for Slice 4 isolation (NO-GO -007 F1 fix)."""
     env = os.environ.copy()
+    env.pop("GTKB_BRIDGE_POLLER_RUN_ID", None)
+    env.pop("GTKB_PROJECT_ROOT", None)
     env["CLAUDE_PROJECT_DIR"] = str(project_root)
     env.update(extra_env)
     return subprocess.run(
@@ -1086,16 +1092,17 @@ def _run_hook_isolated(
 def test_slice4_auto_archive_enabled_writes_failure_log_when_service_unavailable(
     tmp_path: Path,
 ) -> None:
-    """Env-gate-on + no DB under PROJECT_ROOT -> graceful failure-log write.
+    """Env-gate-on + archive temp-dir unavailable -> graceful failure-log write.
 
     Post NO-GO -007 F1+F2 fix: subprocess runs with cwd=tmp_path AND
-    CLAUDE_PROJECT_DIR=tmp_path. There is no groundtruth.db under tmp_path,
-    so archive_decision raises when trying to write to the absent DB. The
-    tracker catches the exception and writes a JSONL record to
+    CLAUDE_PROJECT_DIR=tmp_path. The archive temp path is blocked with a file,
+    so archive_decision raises before service writes can proceed. The tracker
+    catches the exception and writes a JSONL record to
     <tmp_path>/.gtkb-state/owner-decision-auto-archive/failures.jsonl. The
     notepad-tier write remains load-bearing (exit 0).
     """
     project = _setup_project(tmp_path)
+    (project / ".tmp").write_text("archive temp directory unavailable\n", encoding="utf-8")
     payload = _stop_payload("turn_with_askuserquestion_answered.jsonl")
     result = _run_hook_isolated(
         "stop",

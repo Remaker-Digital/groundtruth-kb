@@ -130,9 +130,7 @@ def test_mixed_event_two_genuine_asks_both_match(hook_module):
     matches = _scan(hook_module, text)
     # Both should match awaiting_input_first_person
     awaiting_matches = [m for m in matches if m[0] == "awaiting_input_first_person"]
-    assert len(awaiting_matches) >= 2, (
-        f"Expected ≥2 awaiting_input_first_person matches via finditer; got {matches!r}"
-    )
+    assert len(awaiting_matches) >= 2, f"Expected ≥2 awaiting_input_first_person matches via finditer; got {matches!r}"
 
 
 def test_quoted_fp_1_decision0001(hook_module):
@@ -258,26 +256,30 @@ def test_block_emission_end_to_end_stop_mode(tmp_path, monkeypatch):
         {"type": "user", "message": {"content": [{"type": "text", "text": "continue"}]}},
         {
             "type": "assistant",
-            "message": {
-                "content": [{"type": "text", "text": "Should I commit the changes or wait for review?"}]
-            },
+            "message": {"content": [{"type": "text", "text": "Should I commit the changes or wait for review?"}]},
         },
     ]
     tfile = tmp_path / "transcript.jsonl"
     tfile.write_text("\n".join(json.dumps(e) for e in transcript), encoding="utf-8")
-    payload = json.dumps({
-        "session_id": "test-slice-a-e2e",
-        "hook_event_name": "Stop",
-        "transcript_path": str(tfile.resolve()),
-        "cwd": str(project_root),
-    })
+    payload = json.dumps(
+        {
+            "session_id": "test-slice-a-e2e",
+            "hook_event_name": "Stop",
+            "transcript_path": str(tfile.resolve()),
+            "cwd": str(project_root),
+        }
+    )
     env = dict(os.environ)
     env.pop("GTKB_BLOCK_ON_PROSE_DECISION_ASK", None)
     # Per Codex -012 F1: redirect hook's durable-file writes to tmp_path.
     env["CLAUDE_PROJECT_DIR"] = str(project_root)
     result = subprocess.run(
         [sys.executable, str(HOOK_PATH), "--mode", "stop"],
-        input=payload, capture_output=True, text=True, env=env, timeout=10,
+        input=payload,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=10,
     )
     assert result.returncode == 0, f"Hook exit code {result.returncode}; stderr: {result.stderr[-500:]}"
     out = result.stdout.strip()
