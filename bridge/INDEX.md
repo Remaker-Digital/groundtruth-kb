@@ -533,6 +533,7 @@ NO-GO: bridge/gtkb-startup-cache-dcl-supersession-scoping-002.md
 NEW: bridge/gtkb-startup-cache-dcl-supersession-scoping-001.md
 
 Document: gtkb-spec-coherence-cli-scoping
+NEW: bridge/gtkb-spec-coherence-cli-scoping-003.md
 GO: bridge/gtkb-spec-coherence-cli-scoping-002.md
 NEW: bridge/gtkb-spec-coherence-cli-scoping-001.md
 
