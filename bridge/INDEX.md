@@ -394,6 +394,7 @@ GO: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-002.md
 NEW: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-001.md
 
 Document: gtkb-orphan-wi-membership-backfill-slice-2-scoping
+VERIFIED: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-004.md
 NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-003.md
 GO: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-002.md
 NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-001.md
