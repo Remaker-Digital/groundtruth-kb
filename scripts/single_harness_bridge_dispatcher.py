@@ -58,6 +58,15 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+_DISPATCHER_DIR = str(Path(__file__).resolve().parent)
+if _DISPATCHER_DIR not in sys.path:
+    sys.path.insert(0, _DISPATCHER_DIR)
+
+from implementation_authorization import (  # noqa: E402
+    AuthorizationError,
+    issue_dispatch_authorization_packets,
+)
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -329,6 +338,44 @@ def _build_prompt(target_mode: str, items: list[Any], max_items: int, trigger) -
     )
 
 
+def _issue_dispatch_authorization_for_selected(
+    selected: list[Any],
+    *,
+    project_root: Path,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    trigger,
+) -> dict[str, Any]:
+    """Create implementation-start packets for a selected Prime dispatch batch."""
+    bridge_ids = [str(item.document_name) for item in selected]
+    try:
+        context = issue_dispatch_authorization_packets(project_root, bridge_ids, dispatch_id=dispatch_id)
+    except AuthorizationError as exc:
+        failed_slug = bridge_ids[0] if bridge_ids else None
+        payload: dict[str, Any] = {
+            "ts": _now_iso(),
+            "dispatch_id": dispatch_id,
+            "recipient": recipient,
+            "launched": False,
+            "reason": "implementation_authorization_packet_failed",
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+            "bridge_ids": bridge_ids,
+        }
+        if failed_slug is not None:
+            payload["document_name"] = failed_slug
+        trigger._record_dispatch_failure(state_dir, payload)
+        return {
+            "ok": False,
+            "reason": "implementation_authorization_packet_failed",
+            "bridge_ids": bridge_ids,
+            "failed_slug": failed_slug,
+            "error": str(exc),
+        }
+    return {"ok": True, "reason": None, "context": context}
+
+
 def _spawn_worker(
     *,
     command_handle: str,
@@ -381,6 +428,28 @@ def _spawn_worker(
             "command_head": command[:2],
         }
 
+    packet_context: dict[str, Any] | None = None
+    if needed_role_label == "prime-builder":
+        selected = trigger._selected_oldest_first(items, max_items)
+        issue_result = _issue_dispatch_authorization_for_selected(
+            selected,
+            project_root=project_root,
+            state_dir=state_dir,
+            recipient=needed_role_label,
+            dispatch_id=dispatch_id,
+            trigger=trigger,
+        )
+        if not issue_result["ok"]:
+            return {
+                "dispatch_id": dispatch_id,
+                "recipient": needed_role_label,
+                "launched": False,
+                "reason": issue_result["reason"],
+                "failed_slug": issue_result.get("failed_slug"),
+                "error_message": issue_result.get("error"),
+            }
+        packet_context = issue_result["context"]
+
     runs_dir = state_dir / DISPATCH_RUNS_SUBDIR
     runs_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
@@ -389,6 +458,17 @@ def _spawn_worker(
     env = dict(os.environ)
     env["GTKB_PROJECT_ROOT"] = str(project_root)
     env["GTKB_BRIDGE_POLLER_RUN_ID"] = dispatch_id
+    if packet_context is not None:
+        packet_bridge_ids = [str(item) for item in packet_context.get("bridge_ids", [])]
+        packet_hashes = [
+            str(packet.get("packet_hash"))
+            for packet in packet_context.get("packets", [])
+            if isinstance(packet, dict) and packet.get("packet_hash")
+        ]
+        env["GTKB_IMPLEMENTATION_AUTH_DISPATCH_ID"] = dispatch_id
+        env["GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS"] = ",".join(packet_bridge_ids)
+        env["GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID"] = str(packet_context.get("current_bridge_id") or "")
+        env["GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES"] = ",".join(packet_hashes)
     env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = f"::init gtkb {target_mode}"
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
 

@@ -928,6 +928,51 @@ def write_named_packet(project_root: Path, packet: dict[str, Any], bridge_id: st
     return path
 
 
+def issue_dispatch_authorization_packets(
+    project_root: Path,
+    bridge_ids: list[str],
+    *,
+    dispatch_id: str | None = None,
+    expires_minutes: int = DEFAULT_EXPIRY_MINUTES,
+) -> dict[str, Any]:
+    """Create/refresh implementation packets for an automated Prime dispatch.
+
+    The function uses the same validation path as ``begin``. All packets are
+    created before any state is written, so a malformed selected GO entry fails
+    closed without spawning a partially-authorized worker. Named packets are
+    written for every selected bridge; ``current.json`` points to the first
+    selected bridge, matching the oldest-first worker prompt.
+    """
+    if not bridge_ids:
+        return {
+            "dispatch_id": dispatch_id,
+            "bridge_ids": [],
+            "current_bridge_id": None,
+            "packets": [],
+        }
+
+    packets = [
+        create_authorization_packet(project_root, bridge_id, expires_minutes=expires_minutes)
+        for bridge_id in bridge_ids
+    ]
+    for bridge_id, packet in zip(bridge_ids, packets, strict=True):
+        write_named_packet(project_root, packet, bridge_id)
+    write_packet(project_root, packets[0])
+    return {
+        "dispatch_id": dispatch_id,
+        "bridge_ids": list(bridge_ids),
+        "current_bridge_id": bridge_ids[0],
+        "packets": [
+            {
+                "bridge_id": packet["bridge_id"],
+                "packet_hash": packet["packet_hash"],
+                "target_path_globs": packet["target_path_globs"],
+            }
+            for packet in packets
+        ],
+    }
+
+
 def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
     """Validate packet hash, expiry, bridge latest-status, GO-file drift, and
     optional project-authorization drift. Raises AuthorizationError on any

@@ -166,6 +166,35 @@ def _write_bridge_file(root: Path, name: str, body: str = "# placeholder\n") -> 
     (root / "bridge" / name).write_text(body, encoding="utf-8")
 
 
+def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | None = None) -> str:
+    if target_paths is None:
+        target_paths = ["scripts/cross_harness_bridge_trigger.py"]
+    proposal = "\n".join(
+        [
+            f"# Fixture proposal {doc}",
+            "",
+            f"target_paths: {json.dumps(target_paths)}",
+            "",
+            "## Specification Links",
+            "",
+            "- GOV-FILE-BRIDGE-AUTHORITY-001 - bridge authority.",
+            "- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 - spec linkage.",
+            "",
+            "## Requirement Sufficiency",
+            "",
+            "Existing requirements are sufficient.",
+            "",
+            "## Verification Plan",
+            "",
+            "Run focused dispatch packet tests.",
+            "",
+        ]
+    )
+    _write_bridge_file(root, f"{doc}.md", proposal)
+    _write_bridge_file(root, f"{doc}-002.md", "GO\n\nFixture GO.\n")
+    return f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}.md\n"
+
+
 def _index_with_one_new(root: Path, doc: str = "example-thread") -> str:
     """Build an INDEX with one NEW entry and create the referenced file."""
     _write_bridge_file(root, f"{doc}-001.md", "bridge_kind: implementation_proposal\n")
@@ -618,6 +647,128 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
     assert child_env["GTKB_BRIDGE_POLLER_RUN_ID"] == meta["dispatch_id"], (
         "GTKB_BRIDGE_POLLER_RUN_ID must equal the dispatch_id"
     )
+    assert "GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS" not in child_env
+
+
+def test_prime_spawn_creates_dispatch_authorization_packet_and_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    doc = "prime-implementation"
+    _write_index(root, _write_authorized_go_thread(root, doc))
+    state_dir = tmp_path / "state"
+    trigger = _load_trigger()
+    captured_envs: list[dict[str, str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(*_args, **kwargs):
+        captured_envs.append(kwargs.get("env", {}))
+        return _FakeProcess()
+
+    import subprocess as _subprocess
+
+    monkeypatch.setattr(_subprocess, "Popen", _fake_popen)
+
+    fake_item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": doc,
+            "top_status": "GO",
+            "top_file": f"bridge/{doc}-002.md",
+            "dispatchable": True,
+        },
+    )()
+    prime_target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+
+    meta = trigger._spawn_harness(
+        target=prime_target,
+        items=[fake_item],
+        project_root=root,
+        state_dir=state_dir,
+        max_items=2,
+        dry_run=False,
+        dispatch_id="dispatch-prime",
+    )
+
+    assert meta["launched"] is True
+    current = json.loads(
+        (root / ".gtkb-state" / "implementation-authorizations" / "current.json").read_text(encoding="utf-8")
+    )
+    assert current["bridge_id"] == doc
+    assert current["target_path_globs"] == ["scripts/cross_harness_bridge_trigger.py"]
+    assert (root / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{doc}.json").is_file()
+    child_env = captured_envs[0]
+    assert child_env["GTKB_IMPLEMENTATION_AUTH_DISPATCH_ID"] == "dispatch-prime"
+    assert child_env["GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS"] == doc
+    assert child_env["GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID"] == doc
+    assert child_env["GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES"] == current["packet_hash"]
+
+
+def test_prime_spawn_fails_closed_when_dispatch_authorization_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    doc = "malformed-implementation"
+    _write_bridge_file(root, f"{doc}.md", "# Missing implementation packet metadata\n")
+    _write_bridge_file(root, f"{doc}-002.md", "GO\n\nFixture GO.\n")
+    _write_index(root, f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}.md\n")
+    state_dir = tmp_path / "state"
+    trigger = _load_trigger()
+    popen_calls: list[object] = []
+
+    def _fail_popen(*args, **kwargs):
+        popen_calls.append((args, kwargs))
+        raise AssertionError("subprocess.Popen must not be called after packet failure")
+
+    import subprocess as _subprocess
+
+    monkeypatch.setattr(_subprocess, "Popen", _fail_popen)
+
+    fake_item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": doc,
+            "top_status": "GO",
+            "top_file": f"bridge/{doc}-002.md",
+            "dispatchable": True,
+        },
+    )()
+    prime_target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+
+    meta = trigger._spawn_harness(
+        target=prime_target,
+        items=[fake_item],
+        project_root=root,
+        state_dir=state_dir,
+        max_items=2,
+        dry_run=False,
+        dispatch_id="dispatch-prime",
+    )
+
+    assert meta["launched"] is False
+    assert meta["reason"] == "implementation_authorization_packet_failed"
+    assert popen_calls == []
+    failures = [
+        json.loads(line) for line in (state_dir / "dispatch-failures.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert failures[-1]["document_name"] == doc
+    assert failures[-1]["reason"] == "implementation_authorization_packet_failed"
 
 
 # ──────────────────────────────────────────────────────────────────────────

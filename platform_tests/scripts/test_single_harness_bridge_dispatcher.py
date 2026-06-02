@@ -79,6 +79,16 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
             ),
             encoding="utf-8",
         )
+        registry_harnesses = [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "event_driven_hooks": True,
+                "role": ["prime-builder", "loyal-opposition"],
+            }
+        ]
     else:
         (harness_state / "role-assignments.json").write_text(
             json.dumps(
@@ -92,6 +102,28 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
             ),
             encoding="utf-8",
         )
+        registry_harnesses = [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "event_driven_hooks": True,
+                "role": ["prime-builder"],
+            },
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "event_driven_hooks": True,
+                "role": ["loyal-opposition"],
+            },
+        ]
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": registry_harnesses}),
+        encoding="utf-8",
+    )
     return root
 
 
@@ -101,6 +133,35 @@ def _write_index(root: Path, body: str) -> None:
 
 def _write_bridge_file(root: Path, name: str) -> None:
     (root / "bridge" / name).write_text("bridge_kind: implementation_proposal\n", encoding="utf-8")
+
+
+def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | None = None) -> str:
+    if target_paths is None:
+        target_paths = ["scripts/single_harness_bridge_dispatcher.py"]
+    proposal = "\n".join(
+        [
+            f"# Fixture proposal {doc}",
+            "",
+            f"target_paths: {json.dumps(target_paths)}",
+            "",
+            "## Specification Links",
+            "",
+            "- GOV-FILE-BRIDGE-AUTHORITY-001 - bridge authority.",
+            "- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 - spec linkage.",
+            "",
+            "## Requirement Sufficiency",
+            "",
+            "Existing requirements are sufficient.",
+            "",
+            "## Verification Plan",
+            "",
+            "Run focused dispatch packet tests.",
+            "",
+        ]
+    )
+    (root / "bridge" / f"{doc}.md").write_text(proposal, encoding="utf-8")
+    (root / "bridge" / f"{doc}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
+    return f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}.md\n"
 
 
 def _index_with_one_new(root: Path) -> str:
@@ -161,6 +222,24 @@ def test_dispatcher_resolves_codex_single_harness_command_handle(tmp_path: Path)
                         "harness_type": "codex",
                     }
                 },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "harness-state" / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["prime-builder", "loyal-opposition"],
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -315,6 +394,59 @@ def test_dispatcher_records_dispatch_failures_jsonl(tmp_path: Path, monkeypatch:
     # At least one line should reference the simulated failure.
     parsed = [json.loads(line) for line in lines]
     assert any(rec.get("launched") is False and "simulated" in str(rec.get("error_message", "")) for rec in parsed)
+
+
+def test_prime_worker_spawn_creates_dispatch_authorization_packet_and_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    doc = "prime-implementation"
+    _write_index(root, _write_authorized_go_thread(root, doc))
+    state_dir = tmp_path / "state"
+    dispatcher = _load_dispatcher()
+    trigger = dispatcher._load_trigger_module()
+    captured_envs: list[dict[str, str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(*_args, **kwargs):
+        captured_envs.append(kwargs.get("env", {}))
+        return _FakeProcess()
+
+    import subprocess as _subprocess
+
+    monkeypatch.setattr(_subprocess, "Popen", _fake_popen)
+    fake_item = SimpleNamespace(
+        document_name=doc,
+        top_status="GO",
+        top_file=f"bridge/{doc}-002.md",
+        dispatchable=True,
+    )
+
+    meta = dispatcher._spawn_worker(
+        command_handle="claude",
+        needed_role_label="prime-builder",
+        target_mode="pb",
+        items=[fake_item],
+        project_root=root,
+        state_dir=state_dir,
+        max_items=2,
+        dry_run=False,
+        trigger=trigger,
+    )
+
+    assert meta["launched"] is True
+    current = json.loads(
+        (root / ".gtkb-state" / "implementation-authorizations" / "current.json").read_text(encoding="utf-8")
+    )
+    assert current["bridge_id"] == doc
+    assert current["target_path_globs"] == ["scripts/single_harness_bridge_dispatcher.py"]
+    assert (root / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{doc}.json").is_file()
+    child_env = captured_envs[0]
+    assert child_env["GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS"] == doc
+    assert child_env["GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID"] == doc
+    assert child_env["GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES"] == current["packet_hash"]
 
 
 # ──────────────────────────────────────────────────────────────────────────
