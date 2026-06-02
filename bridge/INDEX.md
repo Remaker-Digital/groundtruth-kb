@@ -526,6 +526,7 @@ NO-GO: bridge/gtkb-platform-tests-ruff-cleanup-002.md
 NEW: bridge/gtkb-platform-tests-ruff-cleanup-001.md
 
 Document: gtkb-push-gate-slice-1-5-debt-audit
+WITHDRAWN: bridge/gtkb-push-gate-slice-1-5-debt-audit-005.md
 NO-GO: bridge/gtkb-push-gate-slice-1-5-debt-audit-004.md
 REVISED: bridge/gtkb-push-gate-slice-1-5-debt-audit-003.md
 NO-GO: bridge/gtkb-push-gate-slice-1-5-debt-audit-002.md
