@@ -470,6 +470,66 @@ def test_create_authorization_packet_accepts_test_plan_spec_to_test_heading(auth
 
 
 # ---------------------------------------------------------------------------
+# WI-3410: Requirement Sufficiency natural-phrase tolerance
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "Existing requirements sufficient",
+        "Existing requirements are sufficient",
+        "Requirements remain sufficient",
+        "Requirements are sufficient for this scope",
+        "Existing requirements are sufficient for this scoped governance correction",
+    ],
+)
+def test_requirement_sufficiency_state_accepts_wi3410_variants(auth_module, phrase):
+    """WI-3410: approved natural sufficient-state phrasings are accepted."""
+    markdown = f"## Requirement Sufficiency\n\n{phrase}.\n"
+    assert auth_module.requirement_sufficiency_state(markdown) == "sufficient"
+
+
+def test_requirement_sufficiency_state_is_case_and_whitespace_tolerant(auth_module):
+    """WI-3410: matching tolerates case and ordinary markdown line wrapping."""
+    markdown = "## Requirement Sufficiency\n\nexisting requirements\nare sufficient.\n"
+    assert auth_module.requirement_sufficiency_state(markdown) == "sufficient"
+
+
+def test_requirement_sufficiency_gap_takes_precedence(auth_module):
+    """WI-3410: an explicit requirements-gap declaration still blocks."""
+    markdown = (
+        "## Requirement Sufficiency\n\n"
+        "Existing requirements are sufficient, but new or revised requirement "
+        "required before implementation.\n"
+    )
+    assert auth_module.requirement_sufficiency_state(markdown) == "gap"
+
+
+def test_requirement_sufficiency_state_rejects_unapproved_phrase(auth_module):
+    """WI-3410: the matcher stays bounded to the approved phrase set."""
+    markdown = "## Requirement Sufficiency\n\nThis probably fits existing requirements.\n"
+    assert auth_module.requirement_sufficiency_state(markdown) == "missing"
+
+
+def test_create_authorization_packet_accepts_requirement_sufficiency_are_sufficient(auth_module, tmp_path):
+    """WI-3410 integration: a GO'd proposal using 'are sufficient' authorizes."""
+    slug = "fixture-bridge"
+    proposal_path = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "Existing requirements are sufficient.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    assert packet["requirement_sufficiency"] == "sufficient"
+
+
+# ---------------------------------------------------------------------------
 # WI-3333 Bug 1: `## target_paths` heading recognition in extract_target_paths
 # ---------------------------------------------------------------------------
 

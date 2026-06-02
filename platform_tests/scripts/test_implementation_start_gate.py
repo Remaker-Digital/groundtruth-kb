@@ -198,6 +198,26 @@ def test_requirement_gap_blocks_authorization(tmp_path: Path) -> None:
         auth.create_authorization_packet(tmp_path, "sample-implementation")
 
 
+def test_requirement_sufficiency_are_sufficient_allows_gate_authorization(tmp_path: Path) -> None:
+    """WI-3410: natural sufficient-state wording authorizes protected edits."""
+    _write_thread(
+        tmp_path,
+        proposal=_proposal(requirement_sufficiency="Existing requirements are sufficient for this scoped fix."),
+    )
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    sample_patch = "*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n"
+
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": sample_patch},
+    }
+
+    assert packet["requirement_sufficiency"] == "sufficient"
+    assert gate.gate_decision(payload) == {}
+
+
 def test_project_authorization_metadata_is_carried_in_packet(tmp_path: Path) -> None:
     _seed_project_authorization(tmp_path)
     proposal = (

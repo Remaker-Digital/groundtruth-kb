@@ -7,6 +7,8 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 Document: gtkb-impl-auth-requirement-sufficiency-phrase-tolerance
+NEW: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-003.md
+GO: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-002.md
 NEW: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-001.md
 
 Document: gtkb-registry-scaffold-fixture-drift-reconciliation

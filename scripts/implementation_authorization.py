@@ -51,6 +51,14 @@ VERIFICATION_TEST_EVIDENCE_RE = re.compile(
     r"(?i)(?:\bpython -m pytest\b|\bpytest\b|\bruff\b|\bnpm test\b|\bpnpm test\b"
     r"|\buv run\b|\bmake test\b|\btest_[\w./-]+\.py\b|spec-to-test)"
 )
+REQUIREMENT_GAP_PHRASE = "New or revised requirement required before implementation"
+REQUIREMENT_SUFFICIENCY_PHRASES = (
+    "Existing requirements sufficient",
+    "Existing requirements are sufficient",
+    "Requirements remain sufficient",
+    "Requirements are sufficient for this scope",
+    "Existing requirements are sufficient for this scoped governance correction",
+)
 TARGET_PATHS_RE = re.compile(
     r"(?:\*\*)?target_paths(?:\*\*)?\s*:(?:\*\*)?\s*(\[[^\n]+\])",
     re.IGNORECASE,
@@ -413,6 +421,16 @@ def section_body(markdown: str, heading: str) -> str:
     return ""
 
 
+def _phrase_re(phrase: str) -> re.Pattern[str]:
+    """Compile a bounded phrase matcher with whitespace tolerance."""
+    pattern = r"\b" + r"\s+".join(re.escape(part) for part in phrase.split()) + r"\b"
+    return re.compile(pattern, re.IGNORECASE)
+
+
+REQUIREMENT_GAP_RE = _phrase_re(REQUIREMENT_GAP_PHRASE)
+REQUIREMENT_SUFFICIENCY_RES = tuple(_phrase_re(phrase) for phrase in REQUIREMENT_SUFFICIENCY_PHRASES)
+
+
 def _bullet_has_citation(text: str) -> bool:
     """Return True when a Specification Links bullet carries a concrete citation.
 
@@ -667,9 +685,9 @@ def requirement_sufficiency_state(markdown: str) -> str:
     body = section_body(markdown, "Requirement Sufficiency")
     if not body:
         return "missing"
-    if "New or revised requirement required before implementation" in body:
+    if REQUIREMENT_GAP_RE.search(body):
         return "gap"
-    if "Existing requirements sufficient" in body:
+    if any(pattern.search(body) for pattern in REQUIREMENT_SUFFICIENCY_RES):
         return "sufficient"
     return "missing"
 
