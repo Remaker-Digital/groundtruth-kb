@@ -192,6 +192,7 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-dispatch-owner-approval-forgery-prevention
+VERIFIED: bridge/gtkb-dispatch-owner-approval-forgery-prevention-006.md
 NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-005.md
 GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-004.md
 REVISED: bridge/gtkb-dispatch-owner-approval-forgery-prevention-003.md
@@ -253,6 +254,8 @@ NO-GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-
 NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-001.md
 
 Document: gtkb-interactive-session-role-override-hygiene-backfill
+VERIFIED: bridge/gtkb-interactive-session-role-override-hygiene-backfill-006.md
+NEW: bridge/gtkb-interactive-session-role-override-hygiene-backfill-005.md
 GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-004.md
 REVISED: bridge/gtkb-interactive-session-role-override-hygiene-backfill-003.md
 NO-GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-002.md
@@ -460,12 +463,6 @@ NEW: bridge/gtkb-spec-coherence-cli-003.md
 GO: bridge/gtkb-spec-coherence-cli-002.md
 NEW: bridge/gtkb-spec-coherence-cli-001.md
 
-Document: gtkb-project-completion-scanner-addressing-thread-fix-scoping
-VERIFIED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-004.md
-NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-003.md
-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-002.md
-NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-001.md
-
 Document: gtkb-claude-md-scope-clarification-slice-3-implementation
 WITHDRAWN: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-011.md
 NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-010.md
@@ -478,20 +475,6 @@ GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-004.md
 REVISED: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-003.md
 NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-002.md
 NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-001.md
-
-Document: gtkb-claude-md-scope-clarification-slice-2
-VERIFIED: bridge/gtkb-claude-md-scope-clarification-slice-2-006.md
-NEW: bridge/gtkb-claude-md-scope-clarification-slice-2-005.md
-GO: bridge/gtkb-claude-md-scope-clarification-slice-2-004.md
-REVISED: bridge/gtkb-claude-md-scope-clarification-slice-2-003.md
-NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-2-002.md
-NEW: bridge/gtkb-claude-md-scope-clarification-slice-2-001.md
-
-Document: gtkb-claude-md-scope-clarification-scoping
-VERIFIED: bridge/gtkb-claude-md-scope-clarification-scoping-004.md
-NEW: bridge/gtkb-claude-md-scope-clarification-scoping-003.md
-GO: bridge/gtkb-claude-md-scope-clarification-scoping-002.md
-NEW: bridge/gtkb-claude-md-scope-clarification-scoping-001.md
 
 Document: gtkb-hygiene-sweep-skill
 VERIFIED: bridge/gtkb-hygiene-sweep-skill-008.md
@@ -527,15 +510,8 @@ REVISED: bridge/gtkb-env-sot-topology-spec-authoring-003.md
 NO-GO: bridge/gtkb-env-sot-topology-spec-authoring-002.md
 NEW: bridge/gtkb-env-sot-topology-spec-authoring-001.md
 
-Document: gtkb-gov-08-permitted-markdown-amendment-scoping
-VERIFIED: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-006.md
-NEW: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-005.md
-GO: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-004.md
-REVISED: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-003.md
-NO-GO: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-002.md
-NEW: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-001.md
-
 Document: gtkb-startup-cache-dcl-supersession-scoping
+VERIFIED: bridge/gtkb-startup-cache-dcl-supersession-scoping-006.md
 NEW: bridge/gtkb-startup-cache-dcl-supersession-scoping-005.md
 GO: bridge/gtkb-startup-cache-dcl-supersession-scoping-004.md
 REVISED: bridge/gtkb-startup-cache-dcl-supersession-scoping-003.md
@@ -549,6 +525,7 @@ GO: bridge/gtkb-spec-coherence-cli-scoping-002.md
 NEW: bridge/gtkb-spec-coherence-cli-scoping-001.md
 
 Document: gtkb-hygiene-sweep-skill-scoping
+VERIFIED: bridge/gtkb-hygiene-sweep-skill-scoping-006.md
 NEW: bridge/gtkb-hygiene-sweep-skill-scoping-005.md
 GO: bridge/gtkb-hygiene-sweep-skill-scoping-004.md
 REVISED: bridge/gtkb-hygiene-sweep-skill-scoping-003.md
@@ -621,6 +598,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-skill-modernization-scoping
+VERIFIED: bridge/gtkb-skill-modernization-scoping-006.md
 NEW: bridge/gtkb-skill-modernization-scoping-005.md
 GO: bridge/gtkb-skill-modernization-scoping-004.md
 REVISED: bridge/gtkb-skill-modernization-scoping-003.md
@@ -789,6 +767,7 @@ NO-GO: bridge/gtkb-agent-red-deployability-preservation-gate-002.md
 NEW: bridge/gtkb-agent-red-deployability-preservation-gate-001.md
 
 Document: gtkb-mass-adoption-readiness-scoping
+VERIFIED: bridge/gtkb-mass-adoption-readiness-scoping-006.md
 NEW: bridge/gtkb-mass-adoption-readiness-scoping-005.md
 GO: bridge/gtkb-mass-adoption-readiness-scoping-004.md
 REVISED: bridge/gtkb-mass-adoption-readiness-scoping-003.md
@@ -796,6 +775,7 @@ NO-GO: bridge/gtkb-mass-adoption-readiness-scoping-002.md
 NEW: bridge/gtkb-mass-adoption-readiness-scoping-001.md
 
 Document: gtkb-ai-assisted-delivery-maturity-model-scoping
+VERIFIED: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-006.md
 NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-005.md
 GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-004.md
 REVISED: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-003.md
@@ -1140,6 +1120,8 @@ NO-GO: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-002.md
 NEW: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-001.md
 
 Document: gtkb-bridge-advisory-report-message-advisory-disposition
+VERIFIED: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-006.md
+REVISED: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-005.md
 NO-GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-004.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-003.md
 GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
