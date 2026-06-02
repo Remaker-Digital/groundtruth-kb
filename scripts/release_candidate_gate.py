@@ -299,6 +299,13 @@ def _check_standing_backlog_health() -> None:
     print(f"PASS standing backlog health ({warn_count} warning findings)")
 
 
+def _check_isolation_program_backstop() -> None:
+    script_path = PROJECT_ROOT / "scripts" / "isolation_program_backstop.py"
+    if not script_path.is_file():
+        raise GateFailure("Isolation program backstop script is missing: scripts/isolation_program_backstop.py")
+    _run([sys.executable, "scripts/isolation_program_backstop.py"], timeout=60)
+
+
 def _python_gates() -> None:
     _run(
         [
@@ -327,6 +334,7 @@ def _python_gates() -> None:
     _run([sys.executable, "scripts/check_environment_isolation.py"], timeout=60)
     _run([sys.executable, "scripts/check_session_overlay_policy.py"], timeout=60)
     _run([sys.executable, "scripts/check_scoped_service_boundary.py"], timeout=60)
+    _check_isolation_program_backstop()
     _run(
         [
             sys.executable,
@@ -362,6 +370,7 @@ def _python_gates() -> None:
             "platform_tests/scripts/test_wrap_scan_consistency_allowlist.py",
             "platform_tests/scripts/test_rehearse_isolation.py",
             "platform_tests/scripts/test_standing_backlog_harvest.py",
+            "platform_tests/scripts/test_isolation_program_backstop.py",
             "applications/Agent_Red/tests/integrations/test_cosmos_schema_extensions.py",
             "applications/Agent_Red/tests/integrations/test_action_executor.py",
             "applications/Agent_Red/tests/integrations/test_admin_integration_framework_api.py",
