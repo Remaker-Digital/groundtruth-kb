@@ -16,6 +16,9 @@ Date: 2026-06-02 UTC
 Corrects NO-GO: `bridge/gtkb-bridge-index-role-intent-sentinel-006.md`
 Implemented from GO: `bridge/gtkb-bridge-index-role-intent-sentinel-004.md`
 Approved proposal: `bridge/gtkb-bridge-index-role-intent-sentinel-003.md`
+Project Authorization: PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-BRIDGE-PROTOCOL-RELIABILITY-BATCH
+Project: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY
+Work Item: GTKB-BRIDGE-INDEX-ROLE-INTENT-SENTINEL
 Implementation authorization packet: `sha256:98920543cd57939bde578f606bc91b8d1866370b6dfb3af123e81a993cad09ee`
 Work-intent claim: acquired 2026-06-02T00:09:31Z for `gtkb-bridge-index-role-intent-sentinel`
 
