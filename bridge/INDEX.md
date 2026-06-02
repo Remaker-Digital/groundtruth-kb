@@ -1077,6 +1077,7 @@ NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-002.md
 NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-001.md
 
 Document: gtkb-prime-worker-context-aware-auq-slice-2
+VERIFIED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-012.md
 REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-011.md
 NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-010.md
 REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-009.md
