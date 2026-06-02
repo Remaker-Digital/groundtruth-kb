@@ -458,6 +458,7 @@ GO: bridge/gtkb-spec-coherence-cli-002.md
 NEW: bridge/gtkb-spec-coherence-cli-001.md
 
 Document: gtkb-project-completion-scanner-addressing-thread-fix-scoping
+NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-003.md
 GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-002.md
 NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-001.md
 
