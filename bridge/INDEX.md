@@ -6,12 +6,62 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+
+Document: gtkb-bridge-citation-freshness-test-restoration
+VERIFIED: bridge/gtkb-bridge-citation-freshness-test-restoration-005.md
+NEW: bridge/gtkb-bridge-citation-freshness-test-restoration-004.md
+GO: bridge/gtkb-bridge-citation-freshness-test-restoration-003.md
+REVISED: bridge/gtkb-bridge-citation-freshness-test-restoration-002.md
+NEW: bridge/gtkb-bridge-citation-freshness-test-restoration-001.md
+
+Document: gtkb-cross-harness-trigger-active-session-target-naming
+GO: bridge/gtkb-cross-harness-trigger-active-session-target-naming-003.md
+REVISED: bridge/gtkb-cross-harness-trigger-active-session-target-naming-002.md
+NEW: bridge/gtkb-cross-harness-trigger-active-session-target-naming-001.md
+
+Document: gtkb-inventory-drift-toolchain-flux-stability
+GO: bridge/gtkb-inventory-drift-toolchain-flux-stability-002.md
+NEW: bridge/gtkb-inventory-drift-toolchain-flux-stability-001.md
+
+Document: gtkb-inventory-drift-gh-probe-parity
+GO: bridge/gtkb-inventory-drift-gh-probe-parity-002.md
+NEW: bridge/gtkb-inventory-drift-gh-probe-parity-001.md
+
+Document: gtkb-active-status-capability-gate-formalization
+GO: bridge/gtkb-active-status-capability-gate-formalization-002.md
+NEW: bridge/gtkb-active-status-capability-gate-formalization-001.md
+
+Document: gtkb-rc1-canonical-ci-closure
+GO: bridge/gtkb-rc1-canonical-ci-closure-002.md
+NEW: bridge/gtkb-rc1-canonical-ci-closure-001.md
+
+Document: gtkb-bridge-backlog-reconciliation-audit-cli
+GO: bridge/gtkb-bridge-backlog-reconciliation-audit-cli-002.md
+NEW: bridge/gtkb-bridge-backlog-reconciliation-audit-cli-001.md
+
+Document: gtkb-bridge-index-chain-deviation-detector
+GO: bridge/gtkb-bridge-index-chain-deviation-detector-002.md
+NEW: bridge/gtkb-bridge-index-chain-deviation-detector-001.md
+
+Document: gtkb-bridge-reconciliation-correction-packets
+GO: bridge/gtkb-bridge-reconciliation-correction-packets-002.md
+NEW: bridge/gtkb-bridge-reconciliation-correction-packets-001.md
+
 Document: gtkb-impl-auth-requirement-sufficiency-phrase-tolerance
 NEW: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-003.md
 GO: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-002.md
 NEW: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-001.md
 
+Document: gtkb-bridge-propose-helper-caller-migration-to-writer
+VERIFIED: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-005.md
+NEW: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-004.md
+GO: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-003.md
+REVISED: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-002.md
+NEW: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-001.md
+
 Document: gtkb-registry-scaffold-fixture-drift-reconciliation
+NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-003.md
+GO: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-002.md
 NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-001.md
 
 Document: gtkb-terminal-project-record-retirement-batch
@@ -1162,6 +1212,8 @@ GO: bridge/gtkb-verify-verdict-author-skill-slice-1-002.md
 NEW: bridge/gtkb-verify-verdict-author-skill-slice-1-001.md
 
 Document: gtkb-bridge-mode-config-transactions-slice-1
+VERIFIED: bridge/gtkb-bridge-mode-config-transactions-slice-1-015.md
+REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-014.md
 NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-013.md
 REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-012.md
 NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-011.md

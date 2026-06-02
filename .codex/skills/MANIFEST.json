@@ -187,7 +187,7 @@
       "canonical_name": "send-review",
       "capability_id": "skill.send-review",
       "source_relative_path": ".claude/skills/send-review/SKILL.md",
-      "source_sha256": "d1e8a85a64f3b8191c0e7495873bfb00154ffc05e35a92e448535f8cc22f5213"
+      "source_sha256": "301d7214a49a078ce5b587542085993a5f1df602d904707cec470f9f814c634b"
     },
     {
       "adapter_relative_path": ".codex/skills/spec-intake/SKILL.md",

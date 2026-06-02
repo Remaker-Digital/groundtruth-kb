@@ -117,6 +117,10 @@ into a multi-role harness).
 
 Agents MUST use the deterministic mode-switch transaction component for role/topology changes rather than ad-hoc direct edits to `harness-state/role-assignments.json`. The CLI surface is `gt mode set-role --harness <id|name> --role <prime-builder|loyal-opposition> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to `harness-state/role-assignments.json` are still possible but bypass the validators (role/bridge/session-state artifact validation) and the audit-trail record; the transaction component is the supported path.
 
+## Bridge Substrate Transaction Component (Slice 1 of gtkb-bridge-mode-config-transactions-slice-1)
+
+Agents MUST use the deterministic bridge-substrate transaction component for bridge dispatch substrate changes rather than ad-hoc direct edits to `harness-state/bridge-substrate.json` or manual hook registration edits in `.claude/settings.json` or `.codex/hooks.json`. The CLI command is `gt mode set-bridge-substrate --substrate <cross_harness_trigger|single_harness_dispatcher|none> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to `harness-state/bridge-substrate.json` or ad-hoc substrate registration edits are strictly prohibited, as they bypass the validator preflights and the audit-trail records.
+
 ## Interactive Session Role Override
 
 The durable role assignment recorded in `harness-state/role-assignments.json`

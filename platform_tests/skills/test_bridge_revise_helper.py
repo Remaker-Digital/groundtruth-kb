@@ -209,19 +209,54 @@ def test_preflight_failure_aborts_before_index_mutation(helper, tmp_path, monkey
 
 def test_index_changed_during_write_is_detected(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
-    original_insert = helper._insert_revised_index_line
+    original_insert = helper.insert_index_status
 
-    def mutate_index_then_insert(index_text, slug, line_to_insert):
+    def mutate_index_then_insert(slug, version, status, project_root, *, expected_index_raw=None):
         (bridge_dir / "INDEX.md").write_text(
-            index_text + "\nDocument: other\nNEW: bridge/other-001.md\n", encoding="utf-8"
+            (expected_index_raw or "") + "\nDocument: other\nNEW: bridge/other-001.md\n", encoding="utf-8"
         )
-        return original_insert(index_text, slug, line_to_insert)
+        return original_insert(
+            slug,
+            version,
+            status,
+            project_root,
+            expected_index_raw=expected_index_raw,
+        )
 
     monkeypatch.setattr(helper, "_run_candidate_preflights", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(helper, "_insert_revised_index_line", mutate_index_then_insert)
+    monkeypatch.setattr(helper, "insert_index_status", mutate_index_then_insert)
 
     with pytest.raises(helper.BridgeIndexConflictError):
         helper.file_revision("test-revision", content=_completed_revision(), bridge_dir=bridge_dir)
+
+
+def test_file_mode_uses_validated_bridge_writer(helper, tmp_path, monkeypatch):
+    bridge_dir = _stage_thread(tmp_path)
+    calls: list[tuple[str, object]] = []
+
+    def fake_validate(slug, status, role_slot, project_root):
+        calls.append(("validate", (slug, status, role_slot, project_root)))
+
+    def fake_write(slug, version, content, project_root, *, require_author_metadata=True):
+        calls.append(("write", (slug, version, require_author_metadata, content.startswith("REVISED"), project_root)))
+        return project_root / "bridge" / f"{slug}-{version:03d}.md"
+
+    def fake_insert(slug, version, status, project_root, *, expected_index_raw=None):
+        calls.append(("insert", (slug, version, status, expected_index_raw is not None, project_root)))
+
+    monkeypatch.setattr(helper, "_run_candidate_preflights", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(helper, "validate_transition", fake_validate)
+    monkeypatch.setattr(helper, "write_bridge_file", fake_write)
+    monkeypatch.setattr(helper, "insert_index_status", fake_insert)
+
+    helper.file_revision("test-revision", content=_completed_revision(), bridge_dir=bridge_dir)
+
+    assert [call[0] for call in calls] == ["validate", "write", "insert"]
+    assert calls[0][1][1] == "REVISED"
+    assert calls[0][1][2] == helper.PRIME_ROLE_SLOT
+    assert calls[1][1][2] is False
+    assert calls[2][1][2] == "REVISED"
+    assert calls[2][1][3] is True
 
 
 def test_real_candidate_content_preflights_pass(helper, tmp_path):

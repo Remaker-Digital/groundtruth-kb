@@ -54,7 +54,7 @@ def _registry_records() -> list[ManagedArtifact]:
 
 
 def test_registry_total_matches_current_manifest() -> None:
-    """66 total = 21 hooks + 11 rules + 11 skills + 3 files + 16 settings + 4 gitignore.
+    """67 total = 21 hooks + 11 rules + 11 skills + 4 files + 16 settings + 4 gitignore.
 
     Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
     bridge -006 GO): hook count 19→20 (+spec-event-surfacer.py), settings
@@ -87,7 +87,7 @@ def test_registry_total_matches_current_manifest() -> None:
     # GTKB-ISOLATION-017 Slice 4 (S328): 1 new file-class record
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
     # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
-    assert len(records) == 66, f"expected 66 total registry records; got {len(records)}"
+    assert len(records) == 67, f"expected 67 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
@@ -104,7 +104,7 @@ def test_registry_class_counts_match_proposal() -> None:
         "hook": 21,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
         "skill": 11,
-        "file": 3,  # GTKB-ISOLATION-017 Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
+        "file": 4,  # GTKB-ISOLATION-017 Slice 3/4 records + WI-4225 template-only coverage record
         "settings-hook-registration": 16,
         "gitignore-pattern": 4,
     }

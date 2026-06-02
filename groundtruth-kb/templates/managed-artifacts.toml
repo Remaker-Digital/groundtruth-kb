@@ -2,7 +2,7 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 66 records = 21 hooks + 11 rules + 11 skills + 3 files + 16 settings-hook-registrations + 4 gitignore-patterns.
+# 67 records = 21 hooks + 11 rules + 11 skills + 4 files + 16 settings-hook-registrations + 4 gitignore-patterns.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -904,7 +904,9 @@ adopter_divergence_policy = "warn"
 notes = "Ignore .claude/settings.local.json adopter overrides; product-managed framework gitignore policy."
 
 # =========================================================================
-# FILE (2 records — Slice 3 adopter-facing scaffold artifacts per
+# FILE (4 records: Slice 3/4 adopter-facing scaffold artifacts plus one
+# template-only approval-gate coverage record per WI-4225.
+# Slice 3 adopter-facing scaffold artifacts per
 # bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-007.md GO -008.
 # These are adopter-owned files with preserve upgrade policy: the platform
 # scaffolds them on init but does not overwrite them on upgrade.)
@@ -945,4 +947,16 @@ doctor_required_profiles = []
 ownership = "gt-kb-scaffolded"
 upgrade_policy = "preserve"
 notes = "Adopter-facing isolation-migration rehearsal recipe per GTKB-ISOLATION-017 Slice 4 (bridge -008 GO). Documents the out-of-band rehearsal recipe per DELIB-S328 decision 7 (out_of_band_recipe_only). Scaffolded once at init; adopter may customize after; upgrade does not overwrite."
+
+[[artifacts]]
+class = "file"
+id = "file.narrative-artifact-approval-gate-template"
+template_path = "hooks/narrative-artifact-approval-gate.py"
+target_path = ".claude/hooks/narrative-artifact-approval-gate.py"
+initial_profiles = []
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "transient"
+notes = "Template-only narrative-artifact approval gate coverage record per WI-4225; not scaffolded, upgrade-managed, or doctor-required until a separate bridge approval assigns lifecycle profiles."
 

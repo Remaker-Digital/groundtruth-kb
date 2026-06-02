@@ -10,6 +10,7 @@ adopter-memory-files
 adopter-requirements-local-txt
 adopter-requirements-test-txt
 adopter-webapp
+file.narrative-artifact-approval-gate-template
 file.readme-quickstart
 file.release-readiness-banner
 file.upgrade-rehearsal-recipe
@@ -21,6 +22,7 @@ gt-kb-staging
 hook._delib_common
 hook.assertion-check
 hook.bridge-compliance-gate
+hook.code-quality-baseline-proposal-check
 hook.credential-scan
 hook.delib-preflight-gate
 hook.delib-search-gate
@@ -67,6 +69,11 @@ settings.hook.spec-event-surfacer.posttooluse
 settings.hook.turn-marker.userpromptsubmit
 skill.bridge-propose.helper
 skill.bridge-propose.skill-md
+skill.bridge.impl-report-helper
+skill.bridge.revise-helper
+skill.bridge.scan-helper
+skill.bridge.show-thread-helper
+skill.bridge.skill-md
 skill.decision-capture.helper
 skill.decision-capture.skill-md
 skill.spec-intake.helper

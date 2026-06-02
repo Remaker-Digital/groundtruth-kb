@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import os
 import re
 import subprocess
 import sys
@@ -33,6 +32,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 ensure_author_metadata = importlib.import_module("scripts.bridge_author_metadata").ensure_author_metadata
+_bridge_writer = importlib.import_module("scripts.gtkb_bridge_writer")
+PRIME_ROLE_SLOT = _bridge_writer.PRIME_ROLE_SLOT
+WriterBridgeConflictError = _bridge_writer.BridgeConflictError
+WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
+insert_index_status = _bridge_writer.insert_index_status
+validate_transition = _bridge_writer.validate_transition
+write_bridge_file = _bridge_writer.write_bridge_file
 
 
 class BridgeRevisionError(RuntimeError):
@@ -314,32 +320,6 @@ def _run_candidate_preflights(slug: str, candidate_path: Path, *, project_root: 
             raise BridgePreflightError(f"Candidate preflight failed ({' '.join(command)}): {output}")
 
 
-def _insert_revised_index_line(index_text: str, slug: str, line_to_insert: str) -> str:
-    lines = index_text.splitlines(keepends=True)
-    out: list[str] = []
-    inserted = False
-    in_doc = False
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("Document:"):
-            if in_doc and not inserted:
-                raise BridgeDocumentNotFoundError(f"Document entry for {slug!r} had no version lines")
-            out.append(line)
-            in_doc = stripped.removeprefix("Document:").strip() == slug
-            continue
-        if in_doc and not inserted and stripped:
-            out.append(line_to_insert + "\n")
-            inserted = True
-            in_doc = False
-        out.append(line)
-    if in_doc and not inserted:
-        out.append(line_to_insert + "\n")
-        inserted = True
-    if not inserted:
-        raise BridgeDocumentNotFoundError(f"No exact bridge document entry found for {slug!r}")
-    return "".join(out)
-
-
 def file_revision(
     slug: str,
     *,
@@ -380,20 +360,22 @@ def file_revision(
             _run_candidate_preflights(slug, candidate_path)
         if index_path.read_text(encoding="utf-8") != original_index:
             raise BridgeIndexConflictError("bridge/INDEX.md changed before live file write")
-        live_path.parent.mkdir(parents=True, exist_ok=True)
-        live_path.write_text(content, encoding="utf-8", newline="\n")
-        new_index = _insert_revised_index_line(original_index, slug, plan.index_line)
-        temp_path = index_path.with_name(f"{index_path.name}.tmp.{os.getpid()}")
-        temp_path.write_text(new_index, encoding="utf-8", newline="\n")
         try:
-            if index_path.read_text(encoding="utf-8") != original_index:
-                temp_path.unlink(missing_ok=True)
-                raise BridgeIndexConflictError("bridge/INDEX.md changed during live filing")
-            os.replace(temp_path, index_path)
-        except Exception:
-            if temp_path.exists():
-                temp_path.unlink(missing_ok=True)
-            raise
+            validate_transition(slug, "REVISED", PRIME_ROLE_SLOT, bridge_root.parent)
+            write_bridge_file(slug, plan.next_version, content, bridge_root.parent, require_author_metadata=False)
+            insert_index_status(
+                slug,
+                plan.next_version,
+                "REVISED",
+                bridge_root.parent,
+                expected_index_raw=original_index,
+            )
+        except WriterBridgeTransitionError as exc:
+            raise BridgeLatestStatusError(str(exc)) from exc
+        except WriterBridgeConflictError as exc:
+            if "already exists" in str(exc):
+                raise BridgeFileAlreadyExistsError(str(exc)) from exc
+            raise BridgeIndexConflictError(str(exc)) from exc
     finally:
         candidate_path.unlink(missing_ok=True)
     # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.

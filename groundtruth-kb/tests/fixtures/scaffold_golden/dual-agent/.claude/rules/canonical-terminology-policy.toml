@@ -1,0 +1,121 @@
+# Canonical-terminology disambiguation policy. Composes with canonical-terminology.toml.
+# Per GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL Slice 1 (S327, bridge -006 GO).
+# Source-of-truth term list: canonical-terminology.md (sibling glossary).
+# This file declares per-term enforcement metadata for the term-disambiguation
+# lint hook (Slice 2) and bridge-compliance-gate extension (Slice 3).
+#
+# 21 generic terms (this template). Each adopter project also defines its own
+# application-instance term (e.g., the project_name itself). The GT-KB checkout's
+# own primer adds its instance term post-render for a 22-term self-install.
+# Per S327 owner directive (DELIB-S327-TERM-DISAMBIGUATION-MECHANICAL-OWNER-
+# DIRECTIVE). The 21 terms split into 8 Tier A (distinctive forms) + 13 Tier B
+# (capitalization disambiguates).
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+[meta]
+version = "1.0.0"
+
+# Pinned defaults per Codex bridge -002.md F4 (resolved in REVISED-1) +
+# bridge -004.md F1 (PreToolUse enforcement event clarified in REVISED-2).
+[defaults]
+tier_b_severity_in_bridge_proposals = "error"
+tier_b_severity_elsewhere = "warn"
+tier_c_strictness = "strict"
+forbidden_uses_severity = "error"
+sentence_initial_capitalization = "ignore"
+file_level_disable_marker = "<!-- term-disambiguation: off -->"
+override_syntax = "{!common: <term>}"
+
+# ─────────────────────────────────────────────────────────────────────
+# Tier A — Distinctive forms (8 terms)
+# Each canonical term has a unique lexical form that's unambiguous
+# (multi-word, hyphenated, or mid-word capitalization). Lint flags
+# misspellings, wrong capitalization, or wrong hyphenation.
+# ─────────────────────────────────────────────────────────────────────
+
+[term."MemBase"]
+disambiguation_tier = "A"
+distinctive_form = "MemBase"
+
+[term."Deliberation Archive"]
+disambiguation_tier = "A"
+distinctive_form = "Deliberation Archive"
+
+[term."MEMORY.md"]
+disambiguation_tier = "A"
+distinctive_form = "MEMORY.md"
+
+[term."Prime Builder"]
+disambiguation_tier = "A"
+distinctive_form = "Prime Builder"
+
+[term."Loyal Opposition"]
+disambiguation_tier = "A"
+distinctive_form = "Loyal Opposition"
+
+[term."GT-KB"]
+disambiguation_tier = "A"
+distinctive_form = "GT-KB"
+
+[term."GroundTruth-KB"]
+disambiguation_tier = "A"
+distinctive_form = "GroundTruth-KB"
+
+[term."GTKB"]
+disambiguation_tier = "A"
+distinctive_form = "GTKB"
+
+# ─────────────────────────────────────────────────────────────────────
+# Tier B — Capitalization disambiguates (13 terms)
+# Common English homonyms. Capitalize for canonical sense; lowercase for
+# general English use. Lint flags lowercase canonical-term use in canonical
+# contexts (severity per [defaults]). specific_id_prefix populated where
+# the canonical term has a corresponding KB ID space.
+# ─────────────────────────────────────────────────────────────────────
+
+[term."platform"]
+disambiguation_tier = "B"
+
+[term."application"]
+disambiguation_tier = "B"
+
+[term."hosted application"]
+disambiguation_tier = "B"
+
+[term."adopter"]
+disambiguation_tier = "B"
+
+[term."project"]
+disambiguation_tier = "B"
+
+[term."work item"]
+disambiguation_tier = "B"
+specific_id_prefix = "WI"
+
+[term."backlog"]
+disambiguation_tier = "B"
+specific_id_prefix = "BL"
+
+[term."specification"]
+disambiguation_tier = "B"
+specific_id_prefix = "SPEC"
+
+[term."requirement"]
+disambiguation_tier = "B"
+specific_id_prefix = "REQ"
+
+[term."implementation proposal"]
+disambiguation_tier = "B"
+
+[term."implementation report"]
+disambiguation_tier = "B"
+
+[term."verification"]
+disambiguation_tier = "B"
+
+[term."dashboard"]
+disambiguation_tier = "B"
+
+[term."bridge"]
+disambiguation_tier = "B"

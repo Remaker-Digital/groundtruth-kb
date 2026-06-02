@@ -150,13 +150,17 @@ TRIGGER_DIAGNOSTIC_CLASSIFICATIONS = frozenset(
     }
 )
 
+TARGET_ACTIVE_SESSION_RESULT = "target_active_session_present"
+LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT = "counterpart_active_session_present"
+
 # Maps a per-recipient ``last_result`` (the existing dispatch-branch outcome)
 # to a diagnostic classification. Unmapped results classify as ``other``.
 # ``launch_failed`` maps to ``dispatched`` because it means the dispatch branch
 # was entered (dry-run or a real spawn failure); the raw ``last_result`` is
 # also recorded verbatim so the two remain distinguishable.
 _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
-    "counterpart_active_session_present": "active_session_suppressed",
+    TARGET_ACTIVE_SESSION_RESULT: "active_session_suppressed",
+    LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT: "active_session_suppressed",
     "launched": "dispatched",
     "launch_failed": "dispatched",
     "unchanged": "no_change",
@@ -801,15 +805,15 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
 # Active-session suppression (cross-harness-trigger-active-session-suppression
 # at -005 GO at -006).
 #
-# When a counterpart harness holds an active foreground session (its
-# heartbeat lock file is present and fresh), suppress dispatch to that
+# When the target harness holds an active foreground session (its heartbeat
+# lock file is present and fresh), suppress dispatch to that
 # role to prevent duplicate auto-dispatched parallel-revision work. The
 # suppression state-machine uses two signature fields:
 #
 # - last_dispatched_signature: the signature actually spawned. Slice 2
 #   dedup field — current signature == last_dispatched_signature → skip.
 # - last_suppressed_signature: marker that suppression fired. Allows
-#   retry after counterpart exits because last_dispatched_signature was
+#   retry after target exits because last_dispatched_signature was
 #   never updated.
 #
 # Legacy ``signature`` field is preserved for backward-compat readers and
@@ -861,7 +865,7 @@ class DispatchTarget:
       - ``_dispatch_prompt`` (uses ``canonical_mode`` for ``::init gtkb <mode>``
         keyword first-line per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001).
       - ``_harness_command`` (uses ``command_handle`` for invocation choice).
-      - ``check_counterpart_active`` (uses ``active_session_lock_name``).
+      - ``check_target_active`` (uses ``active_session_lock_name``).
       - dispatch-state operations (use ``dispatch_state_key``).
     """
 
@@ -875,7 +879,7 @@ class DispatchTarget:
 
     @property
     def active_session_lock_name(self) -> str:
-        """Counterpart's active-session lock file name.
+        """Target harness active-session lock file name.
 
         Per the existing suppression contract (VERIFIED at
         ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md``):
@@ -1123,7 +1127,7 @@ def _resolve_dispatch_target(
 
     # Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014),
     # role records carry a role-set wire form (list-of-strings or legacy scalar).
-    # Counterpart resolution uses set-membership; a multi-element role set
+    # Target resolution uses set-membership; a multi-element role set
     # (single-harness topology) matches BOTH role labels.
     def _record_has_role(h_info: dict[str, object], wanted: str) -> bool:
         raw = h_info.get("role")
@@ -1224,7 +1228,7 @@ def _resolve_dispatch_target(
     )
 
 
-def check_counterpart_active(target: DispatchTarget, state_dir: Path) -> bool:
+def check_target_active(target: DispatchTarget, state_dir: Path) -> bool:
     """Return True if the dispatch target's harness has a fresh active-session lock.
 
     Per IP-3b of bridge/gtkb-canonical-init-keyword-syntax-001-007.md (Codex
@@ -1264,6 +1268,11 @@ def check_counterpart_active(target: DispatchTarget, state_dir: Path) -> bool:
     if sanity_ttl <= 0:
         sanity_ttl = 120
     return age_seconds <= sanity_ttl
+
+
+def check_counterpart_active(target: DispatchTarget, state_dir: Path) -> bool:
+    """Compatibility wrapper for callers still using the legacy predicate name."""
+    return check_target_active(target, state_dir)
 
 
 def _spawn_harness(
@@ -1771,16 +1780,16 @@ def run_trigger(
             leased_items = [it for it in selected if is_lease_held(it.document_name, state_dir=state_dir)]
 
             if len(leased_items) == len(selected):
-                # Active-session suppression: counterpart harness is in an
-                # active foreground session. Record the signature in the
-                # suppressed field (NOT the dispatched field) so it remains
-                # retryable when the counterpart exits. Do NOT update legacy
-                # `signature`.
+                # Target-active suppression: all selected documents are
+                # already leased by active target-side work. Record the
+                # signature in the suppressed field (NOT the dispatched field)
+                # so it remains retryable when the target exits. Do NOT update
+                # legacy `signature`.
                 recipient_state["last_suppressed_signature"] = signature
-                recipient_state["last_result"] = "counterpart_active_session_present"
+                recipient_state["last_result"] = TARGET_ACTIVE_SESSION_RESULT
                 results[recipient] = {
                     "launched": False,
-                    "reason": "counterpart_active_session_present",
+                    "reason": TARGET_ACTIVE_SESSION_RESULT,
                 }
             else:
                 dispatched_filtered = [
@@ -1843,7 +1852,7 @@ def run_trigger(
                     # Dispatch path. Covers:
                     #   - first dispatch ever
                     #   - signature changed since last dispatch
-                    #   - prior_suppressed == signature (retry after counterpart exit)
+                    #   - prior_suppressed == signature (retry after target exit)
                     if recipient == "prime-builder" and not dry_run:
                         if dispatch_id is None:
                             dispatch_id = _new_dispatch_id(target.dispatch_state_key)
@@ -2122,8 +2131,8 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
             lines.append(
                 f"- {name}: inert (single-harness topology; cross-harness dispatch not applicable).{annotation}"
             )
-        elif last_result == "counterpart_active_session_present":
-            lines.append(f"- {name}: suppressed (counterpart active session detected; by design).{annotation}")
+        elif last_result in {TARGET_ACTIVE_SESSION_RESULT, LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT}:
+            lines.append(f"- {name}: suppressed (target active session detected; by design).{annotation}")
         elif sig == last_dispatched and sig:
             lines.append(f"- {name}: dispatched (signature matches last_dispatched).{annotation}")
         elif last_result == "unchanged":

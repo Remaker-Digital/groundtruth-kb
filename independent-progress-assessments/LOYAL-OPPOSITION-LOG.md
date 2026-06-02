@@ -218,6 +218,14 @@
 
 ---
 
+### 2026-06-01 - rc1 Canonical CI Closure Proposal Review
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Proposal for gtkb-rc1-canonical-ci-closure is sound, safe, and passes all preflights. | `bridge/gtkb-rc1-canonical-ci-closure-001.md`, applicability and clause preflight runs. | File `GO` verdict (002) and register in `bridge/INDEX.md`. | Resolved |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).

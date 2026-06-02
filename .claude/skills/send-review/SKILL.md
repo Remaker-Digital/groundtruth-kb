@@ -1,6 +1,6 @@
 ---
 name: send-review
-description: "Create an implementation proposal in bridge/ and add it to the bridge INDEX for Loyal Opposition review."
+description: "Create an implementation proposal through the governed bridge-propose helper for Loyal Opposition review."
 argument-hint: "<descriptive-name>"
 allowed-tools: Read, Write, Edit, Bash, Glob
 license: "Proprietary - Remaker Digital"
@@ -14,36 +14,31 @@ metadata:
 
 # Send Review to Loyal Opposition
 
-Create a proposal document in `bridge/` and register it in `bridge/INDEX.md` for
-Loyal Opposition to pick up during its next scan.
+Compatibility alias for filing a Prime Builder proposal through the governed
+`gtkb-bridge-propose` helper path. Do not write proposal files or edit the
+bridge index from this skill directly.
 
 **Arguments:** `$ARGUMENTS` = descriptive kebab-case name for the proposal (e.g., `widget-refactor`).
 
 ## Behavior
 
 1. **Determine the descriptive name** from `$ARGUMENTS`. If not provided, derive
-   from the current work context.
+   a kebab-case `topic_slug` from the current work context.
 
-2. **Find the next version number** by scanning `bridge/` for existing files
-   matching `{name}-*.md` and incrementing the highest version found, or
-   starting at 001.
+2. **Draft the proposal content** with the required bridge sections from
+   `.claude/rules/file-bridge-protocol.md`, including specification links,
+   project/work-item metadata when implementation-targeting, prior
+   deliberations, owner input when applicable, and a spec-derived verification
+   plan.
 
-3. **Gather proposal content** from the current session:
-   - Summary of what was implemented and why
-   - Files changed and KB records affected
-   - Specific review questions for Loyal Opposition (numbered)
-   - Relevant commit hashes
+3. **File through `gtkb-bridge-propose`.** Use the helper-mediated bridge writer
+   described in `.claude/skills/bridge-propose/SKILL.md`. The helper performs
+   credential scanning, bridge-compliance validation for Codex paths, proposal
+   file creation, author metadata insertion, and governed bridge-index
+   registration via `gtkb-bridge-propose`.
 
-4. **Write the proposal** to `bridge/{name}-{NNN}.md` with the gathered content.
-
-5. **Update the index** by reading `bridge/INDEX.md` and inserting a new entry
-   at the top (after the header comments):
-   ```
-   Document: {name}
-   NEW: bridge/{name}-{NNN}.md
-   ```
-
-6. **Report** the file path and index entry created.
+4. **Report** the helper result: created proposal path, bridge document slug,
+   status line, and any helper error that blocked filing.
 
 ## Example
 
@@ -51,8 +46,12 @@ Loyal Opposition to pick up during its next scan.
 /send-review widget-refactor
 ```
 
-Creates `bridge/widget-refactor-001.md` and adds to INDEX.md:
+The helper creates `bridge/widget-refactor-001.md` and reports a registration
+like:
 ```
 Document: widget-refactor
 NEW: bridge/widget-refactor-001.md
 ```
+
+The example output above is produced by the bridge-propose helper. This skill is
+only the caller-facing alias.
