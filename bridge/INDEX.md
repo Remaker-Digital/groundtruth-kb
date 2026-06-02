@@ -741,6 +741,7 @@ NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-002.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-current-version-views-001.md
 
 Document: gtkb-bridge-index-role-intent-sentinel
+NEW: bridge/gtkb-bridge-index-role-intent-sentinel-007.md
 NO-GO: bridge/gtkb-bridge-index-role-intent-sentinel-006.md
 NEW: bridge/gtkb-bridge-index-role-intent-sentinel-005.md
 GO: bridge/gtkb-bridge-index-role-intent-sentinel-004.md
