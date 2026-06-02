@@ -682,6 +682,7 @@ NO-GO: bridge/gtkb-membase-effective-use-recovery-next-slice-002.md
 NEW: bridge/gtkb-membase-effective-use-recovery-next-slice-001.md
 
 Document: gtkb-mcp-stable-harness-surface-current-version-views
+VERIFIED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-010.md
 REVISED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-009.md
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-008.md
 REVISED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-007.md
