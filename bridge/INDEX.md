@@ -434,6 +434,7 @@ NO-GO: bridge/gtkb-lo-advisory-owner-grilling-gate-002.md
 NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-001.md
 
 Document: gtkb-discoverability-cli-slice-2-scoping
+VERIFIED: bridge/gtkb-discoverability-cli-slice-2-scoping-006.md
 REVISED: bridge/gtkb-discoverability-cli-slice-2-scoping-005.md
 NO-GO: bridge/gtkb-discoverability-cli-slice-2-scoping-004.md
 NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-003.md
