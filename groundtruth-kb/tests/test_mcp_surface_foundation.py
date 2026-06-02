@@ -71,9 +71,8 @@ def test_t2_assert_in_root_accepts_in_root_paths() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_t3_assert_in_root_rejects_out_of_root_paths(tmp_path: Path) -> None:
-    outside = tmp_path / "leak.txt"
-    outside.write_text("oops", encoding="utf-8")
+def test_t3_assert_in_root_rejects_out_of_root_paths() -> None:
+    outside = PROJECT_ROOT.parent / "GT-KB-outside-boundary-test-sentinel.txt"
     with pytest.raises(MCPBoundaryError):
         assert_in_root(outside, root=PROJECT_ROOT)
 
