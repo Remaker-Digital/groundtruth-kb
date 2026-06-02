@@ -222,6 +222,7 @@ NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
 
 Document: gtkb-role-status-orthogonality-dispatch-scoping
+VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-scoping-006.md
 NEW: bridge/gtkb-role-status-orthogonality-dispatch-scoping-005.md
 GO: bridge/gtkb-role-status-orthogonality-dispatch-scoping-004.md
 REVISED: bridge/gtkb-role-status-orthogonality-dispatch-scoping-003.md
@@ -359,6 +360,7 @@ GO: bridge/gtkb-implements-link-backfill-phase2-implementation-002.md
 NEW: bridge/gtkb-implements-link-backfill-phase2-implementation-001.md
 
 Document: gtkb-implements-link-backfill-phase2-scoping
+VERIFIED: bridge/gtkb-implements-link-backfill-phase2-scoping-004.md
 NEW: bridge/gtkb-implements-link-backfill-phase2-scoping-003.md
 GO: bridge/gtkb-implements-link-backfill-phase2-scoping-002.md
 NEW: bridge/gtkb-implements-link-backfill-phase2-scoping-001.md
