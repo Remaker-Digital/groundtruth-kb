@@ -78,6 +78,12 @@ scripts/lib/**/*.py[cod]
 # Codex + Prime sessions generate these under per-thread names.
 .pytest-*/
 GT-KB.pytest-*/
+# Additional pytest residue observed in GT-KB sessions:
+# - $base/ from low-level temp fixture runs
+# - groundtruth-kb/pytest-kpi-retro-codex/ from targeted retro basetemp runs
+/$base/
+/PASS
+groundtruth-kb/pytest-kpi-retro-codex/
 # Session-ephemeral one-off scripts (per-session backfill / migration helpers
 # that get created and used within a single session; not source-of-truth).
 scripts/session-tmp/
@@ -523,3 +529,7 @@ chroma/
 
 # Append pattern: .claude/settings.local.json (Adopter-owned local overlay)
 .claude/settings.local.json
+
+# Nested harness-state spillover created by session tracking when commands run
+# from subdirectories. These are runtime byproducts, not bridge content.
+bridge/.claude/
