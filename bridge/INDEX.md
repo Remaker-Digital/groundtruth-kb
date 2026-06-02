@@ -831,6 +831,7 @@ NO-GO: bridge/gtkb-isolation-015-phase7-root-enforcement-002.md
 NEW: bridge/gtkb-isolation-015-phase7-root-enforcement-001.md
 
 Document: gtkb-legacy-gov-wi-cleanup
+VERIFIED: bridge/gtkb-legacy-gov-wi-cleanup-010.md
 REVISED: bridge/gtkb-legacy-gov-wi-cleanup-009.md
 NO-GO: bridge/gtkb-legacy-gov-wi-cleanup-008.md
 REVISED: bridge/gtkb-legacy-gov-wi-cleanup-007.md
@@ -1066,6 +1067,7 @@ NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-002.md
 NEW: bridge/gtkb-prime-worker-delivery-regression-slice-4-001.md
 
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
+REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-011.md
 NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-010.md
 NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-009.md
 NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-008.md
