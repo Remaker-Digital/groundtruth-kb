@@ -542,6 +542,7 @@ GO: bridge/gtkb-spec-coherence-cli-scoping-002.md
 NEW: bridge/gtkb-spec-coherence-cli-scoping-001.md
 
 Document: gtkb-hygiene-sweep-skill-scoping
+NEW: bridge/gtkb-hygiene-sweep-skill-scoping-005.md
 GO: bridge/gtkb-hygiene-sweep-skill-scoping-004.md
 REVISED: bridge/gtkb-hygiene-sweep-skill-scoping-003.md
 REVISED: bridge/gtkb-hygiene-sweep-skill-scoping-002.md
