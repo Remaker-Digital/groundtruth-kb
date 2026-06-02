@@ -590,6 +590,7 @@ NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-002.md
 NEW: bridge/gtkb-impl-report-bridge-structural-validation-mtime-001.md
 
 Document: gtkb-agent-red-reference-adopter-framing-restoration
+REVISED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-003.md
 NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-002.md
 NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-001.md
 
@@ -743,22 +744,6 @@ GO: bridge/gtkb-agent-red-deployability-preservation-gate-004.md
 REVISED: bridge/gtkb-agent-red-deployability-preservation-gate-003.md
 NO-GO: bridge/gtkb-agent-red-deployability-preservation-gate-002.md
 NEW: bridge/gtkb-agent-red-deployability-preservation-gate-001.md
-
-Document: gtkb-mass-adoption-readiness-scoping
-VERIFIED: bridge/gtkb-mass-adoption-readiness-scoping-006.md
-NEW: bridge/gtkb-mass-adoption-readiness-scoping-005.md
-GO: bridge/gtkb-mass-adoption-readiness-scoping-004.md
-REVISED: bridge/gtkb-mass-adoption-readiness-scoping-003.md
-NO-GO: bridge/gtkb-mass-adoption-readiness-scoping-002.md
-NEW: bridge/gtkb-mass-adoption-readiness-scoping-001.md
-
-Document: gtkb-ai-assisted-delivery-maturity-model-scoping
-VERIFIED: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-006.md
-NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-005.md
-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-004.md
-REVISED: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-003.md
-NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
-NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-001.md
 
 Document: gtkb-in-source-provenance-anchors-001-prop
 VERIFIED: bridge/gtkb-in-source-provenance-anchors-001-prop-008.md
