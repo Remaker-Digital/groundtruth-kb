@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-deferred-authority-protocol-alignment
+REVISED: bridge/gtkb-deferred-authority-protocol-alignment-003.md
 NO-GO: bridge/gtkb-deferred-authority-protocol-alignment-002.md
 NEW: bridge/gtkb-deferred-authority-protocol-alignment-001.md
 
@@ -568,16 +569,6 @@ REVISED: bridge/gtkb-work-item-priority-canonical-p0p3-migration-003.md
 NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
-Document: gtkb-impl-report-bridge-structural-validation-mtime
-VERIFIED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-008.md
-NEW: bridge/gtkb-impl-report-bridge-structural-validation-mtime-007.md
-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-006.md
-REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-005.md
-NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-004.md
-REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-003.md
-NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-002.md
-NEW: bridge/gtkb-impl-report-bridge-structural-validation-mtime-001.md
-
 Document: gtkb-agent-red-reference-adopter-framing-restoration
 GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-004.md
 REVISED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-003.md
@@ -593,24 +584,6 @@ REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-004.md
 NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-003.md
 REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-002.md
 NEW: bridge/gtkb-lo-hygiene-assessment-skill-build-001.md
-
-Document: gtkb-bridge-target-paths-kb-mutation-check
-VERIFIED: bridge/gtkb-bridge-target-paths-kb-mutation-check-006.md
-REVISED: bridge/gtkb-bridge-target-paths-kb-mutation-check-005.md
-NO-GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-004.md
-NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-003.md
-GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md
-NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-001.md
-
-Document: gtkb-project-completion-scanner-wi-auto-regex-fix
-VERIFIED: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-008.md
-REVISED: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-007.md
-NO-GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-006.md
-REVISED: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-005.md
-NO-GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-004.md
-NEW: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-003.md
-GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-002.md
-NEW: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-001.md
 
 Document: gtkb-startup-disclosure-relay-truncation-fix
 WITHDRAWN: bridge/gtkb-startup-disclosure-relay-truncation-fix-003.md
@@ -669,36 +642,6 @@ GO: bridge/gtkb-agent-red-deployability-preservation-gate-004.md
 REVISED: bridge/gtkb-agent-red-deployability-preservation-gate-003.md
 NO-GO: bridge/gtkb-agent-red-deployability-preservation-gate-002.md
 NEW: bridge/gtkb-agent-red-deployability-preservation-gate-001.md
-
-Document: gtkb-in-source-provenance-anchors-001-prop
-VERIFIED: bridge/gtkb-in-source-provenance-anchors-001-prop-008.md
-NEW: bridge/gtkb-in-source-provenance-anchors-001-prop-007.md
-GO: bridge/gtkb-in-source-provenance-anchors-001-prop-006.md
-REVISED: bridge/gtkb-in-source-provenance-anchors-001-prop-005.md
-NO-GO: bridge/gtkb-in-source-provenance-anchors-001-prop-004.md
-REVISED: bridge/gtkb-in-source-provenance-anchors-001-prop-003.md
-NO-GO: bridge/gtkb-in-source-provenance-anchors-001-prop-002.md
-NEW: bridge/gtkb-in-source-provenance-anchors-001-prop-001.md
-
-Document: gtkb-membase-effective-use-recovery-next-slice
-VERIFIED: bridge/gtkb-membase-effective-use-recovery-next-slice-006.md
-NEW: bridge/gtkb-membase-effective-use-recovery-next-slice-005.md
-GO: bridge/gtkb-membase-effective-use-recovery-next-slice-004.md
-REVISED: bridge/gtkb-membase-effective-use-recovery-next-slice-003.md
-NO-GO: bridge/gtkb-membase-effective-use-recovery-next-slice-002.md
-NEW: bridge/gtkb-membase-effective-use-recovery-next-slice-001.md
-
-Document: gtkb-mcp-stable-harness-surface-current-version-views
-VERIFIED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-010.md
-REVISED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-009.md
-NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-008.md
-REVISED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-007.md
-NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-006.md
-NEW: bridge/gtkb-mcp-stable-harness-surface-current-version-views-005.md
-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-004.md
-REVISED: bridge/gtkb-mcp-stable-harness-surface-current-version-views-003.md
-NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-002.md
-NEW: bridge/gtkb-mcp-stable-harness-surface-current-version-views-001.md
 
 Document: gtkb-bridge-index-role-intent-sentinel
 VERIFIED: bridge/gtkb-bridge-index-role-intent-sentinel-008.md
@@ -1030,6 +973,7 @@ NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-002.md
 NEW: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-001.md
 
 Document: gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping
+REVISED: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-005.md
 NO-GO: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-004.md
 NEW: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-003.md
 GO: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-002.md
@@ -1073,34 +1017,6 @@ NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-004.md
 REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-003.md
 NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-002.md
 NEW: bridge/gtkb-prime-worker-delivery-regression-slice-4-001.md
-
-Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
-VERIFIED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-012.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-011.md
-NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-010.md
-NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-009.md
-NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-008.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-007.md
-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-006.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-005.md
-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-004.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-003.md
-NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-002.md
-NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-001.md
-
-Document: gtkb-prime-worker-context-aware-auq-slice-2
-VERIFIED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-012.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-011.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-010.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-009.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-008.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-007.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-006.md
-NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-005.md
-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-004.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-003.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-002.md
-NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-001.md
 
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
 NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-008.md
