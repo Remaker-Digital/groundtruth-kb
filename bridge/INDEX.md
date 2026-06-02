@@ -782,12 +782,14 @@ NO-GO: bridge/gtkb-agent-red-deployability-preservation-gate-002.md
 NEW: bridge/gtkb-agent-red-deployability-preservation-gate-001.md
 
 Document: gtkb-mass-adoption-readiness-scoping
+NEW: bridge/gtkb-mass-adoption-readiness-scoping-005.md
 GO: bridge/gtkb-mass-adoption-readiness-scoping-004.md
 REVISED: bridge/gtkb-mass-adoption-readiness-scoping-003.md
 NO-GO: bridge/gtkb-mass-adoption-readiness-scoping-002.md
 NEW: bridge/gtkb-mass-adoption-readiness-scoping-001.md
 
 Document: gtkb-ai-assisted-delivery-maturity-model-scoping
+NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-005.md
 GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-004.md
 REVISED: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-003.md
 NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
