@@ -253,6 +253,7 @@ NO-GO: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-
 NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates-001.md
 
 Document: gtkb-interactive-session-role-override-hygiene-backfill
+GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-004.md
 REVISED: bridge/gtkb-interactive-session-role-override-hygiene-backfill-003.md
 NO-GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-002.md
 NEW: bridge/gtkb-interactive-session-role-override-hygiene-backfill-001.md
@@ -460,6 +461,7 @@ GO: bridge/gtkb-spec-coherence-cli-002.md
 NEW: bridge/gtkb-spec-coherence-cli-001.md
 
 Document: gtkb-project-completion-scanner-addressing-thread-fix-scoping
+VERIFIED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-004.md
 NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-003.md
 GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-002.md
 NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-001.md
@@ -478,6 +480,7 @@ NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-002.md
 NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-001.md
 
 Document: gtkb-claude-md-scope-clarification-slice-2
+VERIFIED: bridge/gtkb-claude-md-scope-clarification-slice-2-006.md
 NEW: bridge/gtkb-claude-md-scope-clarification-slice-2-005.md
 GO: bridge/gtkb-claude-md-scope-clarification-slice-2-004.md
 REVISED: bridge/gtkb-claude-md-scope-clarification-slice-2-003.md
@@ -485,6 +488,7 @@ NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-2-002.md
 NEW: bridge/gtkb-claude-md-scope-clarification-slice-2-001.md
 
 Document: gtkb-claude-md-scope-clarification-scoping
+VERIFIED: bridge/gtkb-claude-md-scope-clarification-scoping-004.md
 NEW: bridge/gtkb-claude-md-scope-clarification-scoping-003.md
 GO: bridge/gtkb-claude-md-scope-clarification-scoping-002.md
 NEW: bridge/gtkb-claude-md-scope-clarification-scoping-001.md
@@ -524,6 +528,7 @@ NO-GO: bridge/gtkb-env-sot-topology-spec-authoring-002.md
 NEW: bridge/gtkb-env-sot-topology-spec-authoring-001.md
 
 Document: gtkb-gov-08-permitted-markdown-amendment-scoping
+VERIFIED: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-006.md
 NEW: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-005.md
 GO: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-004.md
 REVISED: bridge/gtkb-gov-08-permitted-markdown-amendment-scoping-003.md
@@ -538,6 +543,7 @@ NO-GO: bridge/gtkb-startup-cache-dcl-supersession-scoping-002.md
 NEW: bridge/gtkb-startup-cache-dcl-supersession-scoping-001.md
 
 Document: gtkb-spec-coherence-cli-scoping
+VERIFIED: bridge/gtkb-spec-coherence-cli-scoping-004.md
 NEW: bridge/gtkb-spec-coherence-cli-scoping-003.md
 GO: bridge/gtkb-spec-coherence-cli-scoping-002.md
 NEW: bridge/gtkb-spec-coherence-cli-scoping-001.md
@@ -550,6 +556,7 @@ REVISED: bridge/gtkb-hygiene-sweep-skill-scoping-002.md
 NEW: bridge/gtkb-hygiene-sweep-skill-scoping-001.md
 
 Document: gtkb-hygiene-sweep-cli-scoping
+VERIFIED: bridge/gtkb-hygiene-sweep-cli-scoping-005.md
 NEW: bridge/gtkb-hygiene-sweep-cli-scoping-004.md
 GO: bridge/gtkb-hygiene-sweep-cli-scoping-003.md
 REVISED: bridge/gtkb-hygiene-sweep-cli-scoping-002.md
