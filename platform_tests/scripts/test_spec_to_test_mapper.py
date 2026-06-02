@@ -31,6 +31,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "spec_to_test_mapper.py"
+IMPLEMENTATION_PROPOSAL_KIND = "implementation_" + "proposal"
+IMPLEMENTATION_REPORT_KIND = "implementation_" + "report"
 
 
 def _load_module():
@@ -109,6 +111,10 @@ def fixture_db(tmp_path: Path) -> Path:
     return db_path
 
 
+def _write_index(bridge_dir: Path, entry: str) -> None:
+    (bridge_dir / "INDEX.md").write_text(f"# Bridge Index\n\n{entry}", encoding="utf-8")
+
+
 def test_markdown_table_output(mapper, fixture_db, capsys):
     """Mapper emits a markdown table with the contracted column headers."""
     rc = mapper.main(["--spec-id", "SPEC-1234", "--db-path", str(fixture_db)])
@@ -162,6 +168,15 @@ def test_test_with_null_last_result_reports_not_run(mapper, fixture_db, capsys):
     assert "not_run" in out
 
 
+def test_json_null_last_result_reports_not_run(mapper, fixture_db, capsys):
+    """JSON normalizes null last_result to the same 'not_run' status as markdown."""
+    rc = mapper.main(["--spec-id", "GOV-08", "--json", "--db-path", str(fixture_db)])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    tests = payload["specs"][0]["tests"]
+    assert tests[0]["last_result"] == "not_run"
+
+
 def test_assertion_run_separate_from_per_test_status(mapper, fixture_db, capsys):
     """Assertion-run status is separate from per-test status and does not
     overwrite it. Per-test results remain authoritative; assertion run is
@@ -192,9 +207,10 @@ def test_bridge_extraction_from_specification_links(mapper, fixture_db, tmp_path
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "demo-thread-001.md").write_text(
-        "NEW\n\n## Specification Links\n\n- SPEC-1234\n- GOV-08\n",
+        f"NEW\n\nbridge_kind: {IMPLEMENTATION_PROPOSAL_KIND}\n\n## Specification Links\n\n- SPEC-1234\n- GOV-08\n",
         encoding="utf-8",
     )
+    _write_index(bridge_dir, "Document: demo-thread\nNEW: bridge/demo-thread-001.md\n")
     rc = mapper.main(
         [
             "--bridge-id",
@@ -213,13 +229,39 @@ def test_bridge_extraction_from_specification_links(mapper, fixture_db, tmp_path
     assert "GOV-08" in spec_ids
 
 
-def test_bridge_extraction_picks_latest_version(mapper, fixture_db, tmp_path, capsys):
-    """Bridge-id extraction selects the highest-numbered file in the thread."""
+def test_bridge_extraction_uses_latest_indexed_proposal_or_report(mapper, fixture_db, tmp_path, capsys):
+    """Bridge-id extraction skips later verdicts and reads the latest proposal/report."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "multi-version-001.md").write_text("NEW\n## Specification Links\n- SPEC-1234\n", encoding="utf-8")
-    (bridge_dir / "multi-version-003.md").write_text("REVISED\n## Specification Links\n- GOV-08\n", encoding="utf-8")
-    (bridge_dir / "multi-version-002.md").write_text("NO-GO\n## Specification Links\n- SPEC-9999\n", encoding="utf-8")
+    (bridge_dir / "multi-version-001.md").write_text(
+        f"NEW\n\nbridge_kind: {IMPLEMENTATION_PROPOSAL_KIND}\n\n## Specification Links\n- SPEC-1234\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / "multi-version-002.md").write_text(
+        "GO\n\nbridge_kind: proposal_verdict\n\n## Specification Links\n- SPEC-7777\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / "multi-version-003.md").write_text(
+        f"REVISED\n\nbridge_kind: {IMPLEMENTATION_REPORT_KIND}\n\n## Specification Links\n- GOV-08\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / "multi-version-004.md").write_text(
+        "NO-GO\n\nbridge_kind: verification_verdict\n\n## Specification Links\n- SPEC-9999\n",
+        encoding="utf-8",
+    )
+    _write_index(
+        bridge_dir,
+        "\n".join(
+            [
+                "Document: multi-version",
+                "NO-GO: bridge/multi-version-004.md",
+                "REVISED: bridge/multi-version-003.md",
+                "GO: bridge/multi-version-002.md",
+                "NEW: bridge/multi-version-001.md",
+                "",
+            ]
+        ),
+    )
     rc = mapper.main(
         [
             "--bridge-id",
@@ -234,9 +276,9 @@ def test_bridge_extraction_picks_latest_version(mapper, fixture_db, tmp_path, ca
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     spec_ids = {s["spec_id"] for s in payload["specs"]}
-    # Latest is -003 which cites GOV-08; not SPEC-1234 (-001) or SPEC-9999 (-002).
     assert "GOV-08" in spec_ids
     assert "SPEC-1234" not in spec_ids
+    assert "SPEC-7777" not in spec_ids
     assert "SPEC-9999" not in spec_ids
 
 
@@ -250,6 +292,7 @@ def test_missing_bridge_thread_returns_nonzero(mapper, fixture_db, tmp_path, cap
     """Missing bridge thread returns non-zero exit (bridge dir exists but empty)."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
+    _write_index(bridge_dir, "")
     rc = mapper.main(
         [
             "--bridge-id",

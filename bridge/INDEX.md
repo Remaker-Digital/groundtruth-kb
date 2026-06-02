@@ -5,20 +5,14 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+<!-- Role-intent sentinel (per GTKB-BRIDGE-INDEX-ROLE-INTENT-SENTINEL, Slice 1; NON-AUTHORITATIVE):
      Authority: harness-state/role-assignments.json (role) + harness-state/harness-identities.json (identity).
      This sentinel is a checksum mirror only. It MUST NOT be used to override the durable role record.
      Prime Builder harness:    A (Codex)
      Loyal Opposition harness: C (Antigravity)
      Topology:                 multi_harness
-     Sentinel updated:         2026-06-02T00:17:37Z
+     Sentinel updated:         2026-06-02T01:03:47Z
 -->
-Document: gtkb-terminal-project-record-retirement-batch
-NEW: bridge/gtkb-terminal-project-record-retirement-batch-005.md
-GO: bridge/gtkb-terminal-project-record-retirement-batch-004.md
-REVISED: bridge/gtkb-terminal-project-record-retirement-batch-003.md
-GO: bridge/gtkb-terminal-project-record-retirement-batch-002.md
-NEW: bridge/gtkb-terminal-project-record-retirement-batch-001.md
-
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-008.md
 REVISED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-007.md
@@ -44,6 +38,7 @@ GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
 
 Document: gtkb-da-enforcement-completion-slice1-decompose
+NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-007.md
 NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-006.md
 GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-005.md
 REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-004.md
@@ -52,6 +47,7 @@ NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-002.md
 NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
+REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-003.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-001.md
 
@@ -76,19 +72,6 @@ NEW: bridge/gtkb-gov-proposal-standards-slice1-022.md
 Document: gtkb-membase-effective-use-audit-test-restoration
 NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
-
-Document: gtkb-deterministic-services-stale-status-reconciliation
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-011.md
-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-010.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-009.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-008.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-003.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
 
 Document: gtkb-dispatch-owner-approval-forgery-prevention
 GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-004.md
@@ -361,6 +344,7 @@ NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementati
 NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-001.md
 
 Document: gtkb-spec-coherence-cli
+VERIFIED: bridge/gtkb-spec-coherence-cli-004.md
 NEW: bridge/gtkb-spec-coherence-cli-003.md
 GO: bridge/gtkb-spec-coherence-cli-002.md
 NEW: bridge/gtkb-spec-coherence-cli-001.md
@@ -732,6 +716,7 @@ NO-GO: bridge/gtkb-mcp-stable-harness-surface-current-version-views-002.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-current-version-views-001.md
 
 Document: gtkb-bridge-index-role-intent-sentinel
+VERIFIED: bridge/gtkb-bridge-index-role-intent-sentinel-008.md
 NEW: bridge/gtkb-bridge-index-role-intent-sentinel-007.md
 NO-GO: bridge/gtkb-bridge-index-role-intent-sentinel-006.md
 NEW: bridge/gtkb-bridge-index-role-intent-sentinel-005.md
@@ -951,6 +936,8 @@ NO-GO: bridge/gtkb-cli-discoverability-doctor-json-backlog-show-002.md
 NEW: bridge/gtkb-cli-discoverability-doctor-json-backlog-show-001.md
 
 Document: gtkb-verify-skill-spec-to-test-mapping
+VERIFIED: bridge/gtkb-verify-skill-spec-to-test-mapping-010.md
+REVISED: bridge/gtkb-verify-skill-spec-to-test-mapping-009.md
 NO-GO: bridge/gtkb-verify-skill-spec-to-test-mapping-008.md
 NEW: bridge/gtkb-verify-skill-spec-to-test-mapping-007.md
 GO: bridge/gtkb-verify-skill-spec-to-test-mapping-006.md

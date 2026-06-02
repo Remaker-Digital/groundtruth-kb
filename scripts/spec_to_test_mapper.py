@@ -77,27 +77,67 @@ class SpecEntry:
     latest_assertion_run: AssertionRunEntry | None = None
 
 
+def _resolve_index_path(path_token: str, bridge_dir: Path) -> Path:
+    """Resolve a bridge/INDEX.md path token against the selected bridge dir."""
+    raw_path = Path(path_token)
+    if raw_path.is_absolute():
+        return raw_path
+    parts = raw_path.parts
+    if parts and parts[0] == bridge_dir.name:
+        return bridge_dir.joinpath(*parts[1:])
+    return bridge_dir.parent / raw_path
+
+
+def _bridge_kind(content: str) -> str | None:
+    for line in content.splitlines():
+        if line.startswith("bridge_kind:"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
 def extract_spec_ids_from_bridge(bridge_id: str, bridge_dir: Path) -> tuple[list[str], Path]:
-    """Find the latest bridge file by version number and extract cited spec IDs.
+    """Find the latest INDEX-listed proposal/report file and extract spec IDs.
 
     Returns ``(spec_ids, source_file_path)``. Raises ``FileNotFoundError`` when
-    no matching ``bridge/<bridge-id>-NNN.md`` files exist.
+    ``bridge/INDEX.md`` has no matching thread, no status-filtered proposal or
+    report, or the referenced bridge file is missing.
     """
-    pattern = re.compile(rf"^{re.escape(bridge_id)}-(\d+)\.md$")
-    candidates: list[tuple[int, Path]] = []
-    for p in sorted(bridge_dir.iterdir()):
-        if not p.is_file():
+    index_path = bridge_dir / "INDEX.md"
+    if not index_path.exists():
+        raise FileNotFoundError(f"Bridge index not found at {index_path}")
+
+    in_thread = False
+    saw_thread = False
+    status_pattern = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s*(\S+)")
+    document_header = f"Document: {bridge_id}"
+
+    for line in index_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("Document: "):
+            in_thread = line.strip() == document_header
+            saw_thread = saw_thread or in_thread
             continue
-        m = pattern.match(p.name)
-        if m:
-            candidates.append((int(m.group(1)), p))
-    if not candidates:
-        raise FileNotFoundError(f"No bridge files found matching {bridge_id}-NNN.md in {bridge_dir}")
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    latest = candidates[0][1]
-    content = latest.read_text(encoding="utf-8")
-    spec_ids = sorted(set(SPEC_ID_PATTERN.findall(content)))
-    return spec_ids, latest
+        if not in_thread:
+            continue
+        status_match = status_pattern.match(line.strip())
+        if not status_match:
+            continue
+        status, path_token = status_match.groups()
+        if status not in {"NEW", "REVISED"}:
+            continue
+        source_path = _resolve_index_path(path_token, bridge_dir)
+        if not source_path.exists():
+            raise FileNotFoundError(f"Bridge index references missing file {path_token}")
+        content = source_path.read_text(encoding="utf-8")
+        if _bridge_kind(content) not in {"implementation_proposal", "implementation_report"}:
+            continue
+        spec_ids = sorted(set(SPEC_ID_PATTERN.findall(content)))
+        return spec_ids, source_path
+
+    if saw_thread:
+        raise FileNotFoundError(
+            f"No latest NEW/REVISED implementation proposal or report found for bridge thread {bridge_id}"
+        )
+    raise FileNotFoundError(f"No bridge index entry found for {bridge_id}")
 
 
 def query_tests_for_spec(conn: sqlite3.Connection, spec_id: str) -> list[TestEntry]:
@@ -189,7 +229,7 @@ def format_json(entries: list[SpecEntry]) -> str:
                     {
                         "test_id": t.test_id,
                         "test_path": t.test_path,
-                        "last_result": t.last_result,
+                        "last_result": t.last_result or "not_run",
                         "last_executed_at": t.last_executed_at,
                     }
                     for t in e.tests
