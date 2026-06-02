@@ -1,6 +1,6 @@
 # Release Readiness — v0.7.0-rc1 Path (S327 owner direction)
 
-Last updated: 2026-06-02 (RC1 canonical CI closure PR-head evidence)
+Last updated: 2026-06-02 (RC1 PyJWT remediation PR-head evidence)
 
 ## Active Release Target: v0.7.0-rc1
 
@@ -93,7 +93,22 @@ Same-head `workflow_dispatch` evidence collected on 2026-06-02:
 | Release Candidate Gate | 26822261678 | `workflow_dispatch` | `ea632196b0f2cbcb73589aafb40c1072a14c3d65` | failure | Frontend gate succeeded; Python release gate failed in `pip-audit -r requirements.txt` on `pyjwt 2.12.1` (`PYSEC-2026-175`, `PYSEC-2026-177`, `PYSEC-2026-178`, `PYSEC-2026-179`; fixed in `2.13.0`). |
 | Security Scan | 26822261836 | `workflow_dispatch` | `ea632196b0f2cbcb73589aafb40c1072a14c3d65` | failure | Bandit and Semgrep succeeded; Dependency Audit failed on the same four PyJWT findings; Docker Scout failed at Docker Hub login with a malformed authorization header. |
 
-Still required before `v0.7.0-rc1` tag authorization: PR #124 must be accepted/merged or otherwise designate an accepted canonical head; PyJWT must be remediated or formally dispositioned; Docker Hub authentication for Docker Scout must be corrected outside Codex credential scope; Lint, Release Candidate Gate, SonarCloud, Security Scan including Docker Scout, and Python Tests must be collected on the accepted canonical head; then this section must be replaced or superseded by terminal canonical CI evidence and a bridge post-implementation report must receive Loyal Opposition `VERIFIED`.
+### Canonical Agent Red PyJWT remediation evidence (PR-head only)
+
+Authority: `bridge/gtkb-rc1-pyjwt-dependency-audit-remediation-001.md` with Loyal Opposition `GO` at `bridge/gtkb-rc1-pyjwt-dependency-audit-remediation-002.md`.
+
+Captured on 2026-06-02 from canonical repository `mike-remakerdigital/agent-red` PR #124 after updating branch `codex/rc1-security-scan-canonical-ci`. PR #124 remains draft/open and therefore this is not tag-authorization evidence. It is PR-head remediation evidence only until the branch is accepted/merged or an accepted canonical head is explicitly identified.
+
+| Evidence item | Result |
+|---|---|
+| Agent Red diff | PR #124 now changes two files: `.github/workflows/security-scan.yml` for the prior pip-audit setup, and `requirements.txt` for the approved one-line `PyJWT>=2.9.0` to `PyJWT>=2.13.0` dependency floor. |
+| PR head | `df3d24e98c1b33a1a0c4a5fe2a63f58b560e6d7d`; PR merge ref observed as `3c25fee2b1f65c3e1ac96778bd4311d3163ff76e`. |
+| Release Candidate Gate | Pull-request run `26823948078` on head `df3d24e98c1b33a1a0c4a5fe2a63f58b560e6d7d` completed `success`. Python release gate job `79085948345` completed `success`; it installed `PyJWT-2.13.0`, `pip-audit -r requirements.txt` reported `No known vulnerabilities found`, selected release-gate pytest reported `755 passed, 8 skipped`, GT-KB adoption tests reported `131 passed`, and the log ended `RELEASE GATE: PASS`. Frontend build and widget tests job `79085948435` completed `success`. |
+| Security Scan | Pull-request run `26823947544` on the same head completed `success`; Bandit job `79085948335`, Dependency Audit job `79085948398`, and Semgrep job `79085948485` completed `success`. Dependency Audit installed `PyJWT-2.13.0`; both audit invocations reported `No known vulnerabilities found`. Docker Scout job `79085949011` was `skipped` on the pull-request event. |
+| Other PR-head checks | SonarCloud run `26823948358` completed `success`; Accessibility run `26823948133` completed `success`; Python Tests run `26823948191` completed `success` on the same head. |
+| Credential and waiver boundary | No Docker Scout workflow content, Docker credential handling, or vulnerability waivers changed. The existing `CVE-2026-3219` waiver remains the only pip-audit waiver. |
+
+Still required before `v0.7.0-rc1` tag authorization: PR #124 must be accepted/merged or otherwise designate an accepted canonical head; Docker Hub authentication for Docker Scout must be corrected outside Codex credential scope or a governed full-scan disposition must supersede it; Lint, Release Candidate Gate, SonarCloud, Security Scan including Docker Scout, and Python Tests must be collected on the accepted canonical head; then this section must be replaced or superseded by terminal canonical CI evidence and a bridge post-implementation report must receive Loyal Opposition `VERIFIED`.
 
 ### Tag authorization gate
 
