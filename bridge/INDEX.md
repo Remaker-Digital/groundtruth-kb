@@ -865,6 +865,7 @@ NO-GO: bridge/gtkb-lo-file-safety-pretooluse-enforcement-002.md
 NEW: bridge/gtkb-lo-file-safety-pretooluse-enforcement-001.md
 
 Document: gtkb-owner-decision-tracker-baseline-restore
+VERIFIED: bridge/gtkb-owner-decision-tracker-baseline-restore-008.md
 REVISED: bridge/gtkb-owner-decision-tracker-baseline-restore-007.md
 NO-GO: bridge/gtkb-owner-decision-tracker-baseline-restore-006.md
 NEW: bridge/gtkb-owner-decision-tracker-baseline-restore-005.md
