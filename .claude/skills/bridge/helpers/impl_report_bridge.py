@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -96,6 +97,8 @@ class ImplReportPlan:
 _STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)$")
 _SECTION_RE_TEMPLATE = r"^##\s+{heading}\s*$"
 _VERSION_RE = re.compile(r"-(\d{3})\.md$")
+_BRIDGE_KIND_RE = re.compile(r"^\s*bridge_kind:\s*(?P<kind>[A-Za-z0-9_-]+)\s*$", re.MULTILINE)
+_RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
 
 
 def _load_bridge_propose_helper():
@@ -105,6 +108,29 @@ def _load_bridge_propose_helper():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _validate_implementation_report_content(content: str) -> None:
+    kind_match = _BRIDGE_KIND_RE.search(content)
+    if not kind_match:
+        raise BridgeImplReportError("Implementation report content must include bridge_kind: implementation_report")
+    kind = kind_match.group("kind")
+    if kind != "implementation_report":
+        raise BridgeImplReportError(
+            f"Implementation report content must use bridge_kind: implementation_report; got bridge_kind: {kind}"
+        )
+    if not _RECOMMENDED_COMMIT_TYPE_RE.search(content):
+        raise BridgeImplReportError("Implementation report content must include Recommended commit type:")
+
+
+def _preserve_source_file_times(live_path: Path, content_path: Path | None) -> None:
+    if content_path is None:
+        return
+    try:
+        source_stat = content_path.stat()
+        os.utime(live_path, (source_stat.st_atime, source_stat.st_mtime))
+    except OSError:
+        pass
 
 
 def _read_index(bridge_dir: Path) -> str:
@@ -401,6 +427,7 @@ def file_report(
         content = build_report_skeleton(slug, bridge_dir=bridge_root)
     if not content.lstrip().startswith("NEW"):
         raise BridgeImplReportError("Implementation report content must start with NEW")
+    _validate_implementation_report_content(content)
 
     helper = _load_bridge_propose_helper()
     hits = helper.scan_credential_hits(content)
@@ -414,6 +441,7 @@ def file_report(
     try:
         validate_transition(slug, "NEW", PRIME_ROLE_SLOT, bridge_root.parent)
         write_bridge_file(slug, plan.next_version, content, bridge_root.parent, require_author_metadata=False)
+        _preserve_source_file_times(live_path, content_path)
         insert_index_status(
             slug,
             plan.next_version,

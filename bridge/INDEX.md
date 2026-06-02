@@ -424,25 +424,6 @@ NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-003.md
 GO: bridge/gtkb-discoverability-cli-slice-2-scoping-002.md
 NEW: bridge/gtkb-discoverability-cli-slice-2-scoping-001.md
 
-Document: gtkb-project-completion-scanner-addressing-thread-fix
-VERIFIED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-017.md
-NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-016.md
-NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-015.md
-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-014.md
-REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-013.md
-NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-012.md
-NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-011.md
-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-010.md
-REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-009.md
-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-008.md
-REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-007.md
-NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-006.md
-REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-005.md
-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-004.md
-REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-003.md
-NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-002.md
-NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-001.md
-
 Document: gtkb-project-completion-scanner-addressing-thread-fix-implementation
 WITHDRAWN: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-004.md
 REVISED: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-003.md
@@ -584,6 +565,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-impl-report-bridge-structural-validation-mtime
+NEW: bridge/gtkb-impl-report-bridge-structural-validation-mtime-007.md
 GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-006.md
 REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-005.md
 NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-004.md
@@ -612,79 +594,6 @@ NO-GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-004.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-003.md
 GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-001.md
-
-Document: gtkb-s358-w3-requirements-collection-hook-title-fix
-VERIFIED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-014.md
-REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-013.md
-NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-012.md
-NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-011.md
-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-010.md
-REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-009.md
-NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-008.md
-NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-007.md
-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-006.md
-REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-005.md
-NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-004.md
-REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-003.md
-NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-002.md
-NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-001.md
-
-Document: gtkb-s358-w2-agent-red-gov-trio-v2
-VERIFIED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-014.md
-REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-013.md
-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-012.md
-REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-011.md
-NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-010.md
-NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-009.md
-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-008.md
-REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-007.md
-NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-006.md
-REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-005.md
-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-004.md
-REVISED: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-003.md
-NO-GO: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-002.md
-NEW: bridge/gtkb-s358-w2-agent-red-gov-trio-v2-001.md
-
-Document: gtkb-s358-w1-retirement-machinery-correction
-VERIFIED: bridge/gtkb-s358-w1-retirement-machinery-correction-021.md
-NEW: bridge/gtkb-s358-w1-retirement-machinery-correction-020.md
-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-019.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-018.md
-NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-017.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-016.md
-NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-015.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-014.md
-NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-013.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-012.md
-NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-011.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-010.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-009.md
-NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-008.md
-NEW: bridge/gtkb-s358-w1-retirement-machinery-correction-007.md
-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-006.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-005.md
-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-004.md
-REVISED: bridge/gtkb-s358-w1-retirement-machinery-correction-003.md
-NO-GO: bridge/gtkb-s358-w1-retirement-machinery-correction-002.md
-NEW: bridge/gtkb-s358-w1-retirement-machinery-correction-001.md
-
-Document: gtkb-s358-w5-token-framing-correction
-VERIFIED: bridge/gtkb-s358-w5-token-framing-correction-006.md
-NEW: bridge/gtkb-s358-w5-token-framing-correction-005.md
-GO: bridge/gtkb-s358-w5-token-framing-correction-004.md
-REVISED: bridge/gtkb-s358-w5-token-framing-correction-003.md
-NO-GO: bridge/gtkb-s358-w5-token-framing-correction-002.md
-NEW: bridge/gtkb-s358-w5-token-framing-correction-001.md
-
-Document: gtkb-s358-w4-enforcement-calibration
-VERIFIED: bridge/gtkb-s358-w4-enforcement-calibration-008.md
-NEW: bridge/gtkb-s358-w4-enforcement-calibration-007.md
-GO: bridge/gtkb-s358-w4-enforcement-calibration-006.md
-REVISED: bridge/gtkb-s358-w4-enforcement-calibration-005.md
-GO: bridge/gtkb-s358-w4-enforcement-calibration-004.md
-REVISED: bridge/gtkb-s358-w4-enforcement-calibration-003.md
-NO-GO: bridge/gtkb-s358-w4-enforcement-calibration-002.md
-NEW: bridge/gtkb-s358-w4-enforcement-calibration-001.md
 
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
 NO-GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-006.md

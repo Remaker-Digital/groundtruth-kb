@@ -73,6 +73,7 @@ def _completed_report() -> str:
     return (
         "NEW\n\n"
         "# Test Implementation Report\n\n"
+        "bridge_kind: implementation_report\n\n"
         "## Implementation Claim\n\n"
         "Implemented the helper.\n\n"
         "## Specification Links\n\n"
@@ -82,6 +83,10 @@ def _completed_report() -> str:
         "No new owner decision is required.\n\n"
         "## Prior Deliberations\n\n"
         "- `bridge/test-impl-report-001.md` - approved proposal.\n\n"
+        "## Code Quality Baseline\n\n"
+        "| Rule ID | Applies? | Compliance plan | Verification | Waiver / N/A reason |\n"
+        "|---|---|---|---|---|\n"
+        "| CQ-TESTS-001 | Yes | Run focused helper tests. | pytest | |\n\n"
         "## Specification-Derived Verification Plan\n\n"
         "| Spec / governing surface | Executed verification evidence |\n"
         "| --- | --- |\n"
@@ -131,6 +136,53 @@ def test_write_mode_creates_report_and_inserts_new_line(helper, tmp_path):
         "GO: bridge/test-impl-report-002.md\n"
         "NEW: bridge/test-impl-report-001.md\n"
     ) in index
+
+
+def test_missing_bridge_kind_refuses_report(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+    report_kind = "bridge_kind: " + "implementation_report"
+    content = _completed_report().replace(f"{report_kind}\n\n", "")
+
+    with pytest.raises(helper.BridgeImplReportError, match=report_kind):
+        helper.file_report("test-impl-report", content=content, bridge_dir=bridge_dir)
+
+    assert not (bridge_dir / "test-impl-report-003.md").exists()
+
+
+def test_wrong_bridge_kind_refuses_report(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+    report_kind = "bridge_kind: " + "implementation_report"
+    proposal_kind = "bridge_kind: " + "implementation_" + "proposal"
+    content = _completed_report().replace(report_kind, proposal_kind)
+    expected_error = "got bridge_kind: " + "implementation_" + "proposal"
+
+    with pytest.raises(helper.BridgeImplReportError, match=expected_error):
+        helper.file_report("test-impl-report", content=content, bridge_dir=bridge_dir)
+
+    assert not (bridge_dir / "test-impl-report-003.md").exists()
+
+
+def test_missing_recommended_commit_type_refuses_report(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+    commit_label = "Recommended commit " + "type:"
+    content = _completed_report().replace(commit_label, "Commit type:")
+
+    with pytest.raises(helper.BridgeImplReportError, match="Recommended commit type"):
+        helper.file_report("test-impl-report", content=content, bridge_dir=bridge_dir)
+
+    assert not (bridge_dir / "test-impl-report-003.md").exists()
+
+
+def test_scaffold_content_is_compatible_with_report_validator(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+    skeleton = helper.build_report_skeleton("test-impl-report", bridge_dir=bridge_dir)
+
+    live = helper.file_report("test-impl-report", content=skeleton, bridge_dir=bridge_dir)
+
+    assert live.exists()
+    live_text = live.read_text(encoding="utf-8")
+    assert ("bridge_kind: " + "implementation_report") in live_text
+    assert ("Recommended commit " + "type:") in live_text
 
 
 def test_non_go_latest_status_refuses_write_mode(helper, tmp_path):
@@ -214,6 +266,32 @@ def test_file_mode_uses_validated_bridge_writer(helper, tmp_path, monkeypatch):
     assert calls[1][1][2] is False
     assert calls[2][1][2] == "NEW"
     assert calls[2][1][3] is True
+
+
+def test_file_report_preserves_content_file_mtime(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+    content_path = tmp_path / "completed-report.md"
+    content_path.write_text(_completed_report(), encoding="utf-8")
+    old_time = 1_700_000_000
+    helper.os.utime(content_path, (old_time, old_time))
+
+    live = helper.file_report("test-impl-report", content_path=content_path, bridge_dir=bridge_dir)
+
+    assert live.stat().st_mtime == pytest.approx(old_time, abs=1)
+
+
+def test_file_report_does_not_preserve_mtime_for_direct_content(helper, tmp_path, monkeypatch):
+    bridge_dir = _stage_thread(tmp_path)
+    calls = []
+
+    def fake_utime(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(helper.os, "utime", fake_utime)
+
+    helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
+
+    assert calls == []
 
 
 def test_proposal_spec_links_are_carried_forward_into_skeleton(helper, tmp_path):
