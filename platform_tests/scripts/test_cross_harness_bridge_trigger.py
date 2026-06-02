@@ -1074,6 +1074,95 @@ def test_stop_hook_main_returns_zero_even_on_internal_failure(
     assert "cross-harness trigger error" in captured.err
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _real_stop_hook_commands(relative_config_path: str) -> list[str]:
+    config = json.loads((_repo_root() / relative_config_path).read_text(encoding="utf-8"))
+    commands: list[str] = []
+    for group in config["hooks"]["Stop"]:
+        for hook in group.get("hooks", []):
+            command = hook.get("command")
+            if isinstance(command, str):
+                commands.append(command)
+    return commands
+
+
+def _command_indices(commands: list[str], *needles: str) -> list[int]:
+    return [index for index, command in enumerate(commands) if all(needle in command for needle in needles)]
+
+
+def _single_command_index(commands: list[str], *needles: str) -> int:
+    matches = _command_indices(commands, *needles)
+    assert len(matches) == 1, f"expected exactly one command matching {needles!r}; found {matches!r}"
+    return matches[0]
+
+
+def test_stop_hook_order_clears_codex_lock_before_bridge_reconciliation() -> None:
+    commands = _real_stop_hook_commands(".codex/hooks.json")
+
+    session_stop_index = _single_command_index(
+        commands,
+        "active_session_heartbeat.py",
+        "--mode session-stop",
+        "--role codex",
+    )
+    bridge_stop_index = _single_command_index(commands, "cross_harness_bridge_trigger.py", "--stop-hook")
+
+    assert session_stop_index == bridge_stop_index - 1
+    assert _command_indices(commands[bridge_stop_index + 1 :], "--mode session-stop", "--role codex") == []
+
+
+def test_stop_hook_order_clears_claude_lock_before_bridge_reconciliation() -> None:
+    commands = _real_stop_hook_commands(".claude/settings.json")
+
+    owner_stop_index = _single_command_index(commands, "owner-decision-tracker.py", "--mode stop")
+    session_stop_index = _single_command_index(
+        commands,
+        "active_session_heartbeat.py",
+        "--mode session-stop",
+        "--role claude",
+    )
+    bridge_stop_index = _single_command_index(commands, "cross_harness_bridge_trigger.py", "--stop-hook")
+
+    assert owner_stop_index < bridge_stop_index
+    assert session_stop_index == bridge_stop_index - 1
+    assert _command_indices(commands[bridge_stop_index + 1 :], "--mode session-stop", "--role claude") == []
+
+
+def test_stop_reconciliation_after_session_stop_sees_inactive_lock(tmp_path: Path) -> None:
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
+    )
+
+    lock_path = state_dir / target.active_session_lock_name
+    lock_path.write_text(json.dumps({"role": "codex"}), encoding="utf-8")
+    assert trigger.check_counterpart_active(target, state_dir) is True
+
+    lock_path.unlink()
+    assert trigger.check_counterpart_active(target, state_dir) is False
+
+
+def test_stop_reconciliation_preserves_existing_output_contract(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    rc = _load_trigger().main(["--project-root", str(root), "--state-dir", str(state_dir), "--stop-hook", "--dry-run"])
+    assert rc == 0
+    assert json.loads(capsys.readouterr().out) == {}
+
+
 def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path) -> None:
     """T-3-overlap-state-shared (Option A coordination): when --state-dir
     points at the smart-poller's existing dispatch-state path, the trigger

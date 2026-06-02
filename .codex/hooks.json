@@ -258,6 +258,12 @@
           },
           {
             "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode session-stop --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Active-session heartbeat (stop)",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
             "statusMessage": "Cross-harness bridge Stop reconciliation",
             "timeout": 5
@@ -267,12 +273,6 @@
             "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
             "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode session-stop --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-            "statusMessage": "Active-session heartbeat (stop)",
-            "timeout": 5
           },
           {
             "type": "command",
