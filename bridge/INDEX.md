@@ -9,13 +9,6 @@
 Document: gtkb-registry-scaffold-fixture-drift-reconciliation
 NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-001.md
 
-     Authority: harness-state/role-assignments.json (role) + harness-state/harness-identities.json (identity).
-     This sentinel is a checksum mirror only. It MUST NOT be used to override the durable role record.
-     Prime Builder harness:    A (Codex)
-     Loyal Opposition harness: C (Antigravity)
-     Topology:                 multi_harness
-     Sentinel updated:         2026-06-02T01:03:47Z
--->
 Document: gtkb-terminal-project-record-retirement-batch
 VERIFIED: bridge/gtkb-terminal-project-record-retirement-batch-006.md
 NEW: bridge/gtkb-terminal-project-record-retirement-batch-005.md
@@ -131,6 +124,7 @@ NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
 
 Document: gtkb-stale-thread-closure-slice-3-impl
+NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-005.md
 GO: bridge/gtkb-stale-thread-closure-slice-3-impl-004.md
 REVISED: bridge/gtkb-stale-thread-closure-slice-3-impl-003.md
 NO-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-002.md
@@ -381,6 +375,7 @@ GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-002.md
 NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-scoping-001.md
 
 Document: gtkb-claude-md-scope-clarification-slice-3-implementation
+WITHDRAWN: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-011.md
 NO-GO: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-010.md
 VERIFIED: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-009.md
 NEW: bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-008.md
