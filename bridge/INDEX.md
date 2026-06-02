@@ -96,6 +96,7 @@ GO: bridge/gtkb-gov-proposal-standards-slice1-023.md
 NEW: bridge/gtkb-gov-proposal-standards-slice1-022.md
 
 Document: gtkb-membase-effective-use-audit-test-restoration
+WITHDRAWN: bridge/gtkb-membase-effective-use-audit-test-restoration-003.md
 NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
