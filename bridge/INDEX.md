@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-discoverability-cli-status-scanner-api-regression
+GO: bridge/gtkb-discoverability-cli-status-scanner-api-regression-002.md
 NEW: bridge/gtkb-discoverability-cli-status-scanner-api-regression-001.md
 
 Document: gtkb-active-status-capability-gate-harness-lifecycle-retention
