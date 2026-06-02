@@ -145,6 +145,22 @@ def test_release_gate_fails_closed_when_backstop_script_missing(
         gate._check_isolation_program_backstop()
 
 
+def test_release_gate_fails_closed_when_backstop_command_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    gate = _load_gate_module()
+    script_dir = tmp_path / "scripts"
+    script_dir.mkdir()
+    (script_dir / "isolation_program_backstop.py").write_text("raise SystemExit(1)\n", encoding="utf-8")
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    def fake_run(command, *, timeout=300, env=None):
+        raise gate.GateFailure("Command failed after 0.1s: " + " ".join(command))
+
+    monkeypatch.setattr(gate, "_run", fake_run)
+
+    with pytest.raises(gate.GateFailure, match="isolation_program_backstop.py"):
+        gate._check_isolation_program_backstop()
+
+
 def test_release_gate_invokes_backstop_before_pytest(monkeypatch: pytest.MonkeyPatch) -> None:
     gate = _load_gate_module()
     commands = []
