@@ -12,7 +12,7 @@ Covers the 10-test Specification-Derived Verification Plan (T1-T10):
 * T5 ``--with-retire-ready`` surfaces a completion-ready authorization
   (via the canonical scanner module's ``completion_ready``).
 * T6 ``--with-verified-coverage`` annotates per-WI coverage (via the
-  canonical scanner module's ``verified_work_items``).
+  canonical scanner module's ``verified_work_items_by_project``).
 * T7 retire-ready / verified-coverage output carries ``scanner_caveat``
   naming the canonical thread
   ``gtkb-project-completion-scanner-addressing-thread-fix`` AND not the
@@ -297,7 +297,7 @@ def test_status_retire_ready_uses_scanner(tmp_path: Path, monkeypatch: pytest.Mo
 
     scanner_mod = importlib.import_module("scripts.project_verified_completion_scanner")
     monkeypatch.setattr(scanner_mod, "completion_ready", lambda *_a, **_kw: [sentinel])
-    monkeypatch.setattr(scanner_mod, "verified_work_items", lambda *_a, **_kw: set())
+    monkeypatch.setattr(scanner_mod, "verified_work_items_by_project", lambda *_a, **_kw: {})
 
     runner = CliRunner()
     result = runner.invoke(
@@ -329,8 +329,8 @@ def test_status_verified_coverage_annotation(tmp_path: Path, monkeypatch: pytest
     scanner_mod = importlib.import_module("scripts.project_verified_completion_scanner")
     monkeypatch.setattr(
         scanner_mod,
-        "verified_work_items",
-        lambda *_a, **_kw: {"WI-9001"},
+        "verified_work_items_by_project",
+        lambda *_a, **_kw: {"PROJECT-GTKB-X": {"WI-9001"}},
     )
     monkeypatch.setattr(scanner_mod, "completion_ready", lambda *_a, **_kw: [])
 
@@ -350,6 +350,8 @@ def test_status_verified_coverage_annotation(tmp_path: Path, monkeypatch: pytest
     payload = json.loads(result.output)
     canonical = next(p for p in payload["projects"] if p["id"] == "PROJECT-GTKB-X")
     assert canonical["verified_bridge_covered"] == {"WI-9001": True}
+    doubled = next(p for p in payload["projects"] if p["id"] == "PROJECT-PROJECT-GTKB-Y")
+    assert doubled["verified_bridge_covered"] == {"WI-9002": False}
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +364,7 @@ def test_status_scanner_caveat_present_when_flags_set(tmp_path: Path, monkeypatc
     _seed_basic_project(root / "groundtruth.db")
 
     scanner_mod = importlib.import_module("scripts.project_verified_completion_scanner")
-    monkeypatch.setattr(scanner_mod, "verified_work_items", lambda *_a, **_kw: set())
+    monkeypatch.setattr(scanner_mod, "verified_work_items_by_project", lambda *_a, **_kw: {})
     monkeypatch.setattr(scanner_mod, "completion_ready", lambda *_a, **_kw: [])
 
     runner = CliRunner()
@@ -391,6 +393,8 @@ def test_status_scanner_caveat_present_when_flags_set(tmp_path: Path, monkeypatc
     assert "addressing-thread-fix-implementation" not in caveat, (
         f"withdrawn `-implementation` duplicate slug present; caveat={caveat!r}"
     )
+    assert "VERIFIED at bridge thread" in caveat
+    assert "in flight" not in caveat
 
 
 # ---------------------------------------------------------------------------
@@ -459,8 +463,8 @@ def test_status_base_has_no_scanner_dependency(tmp_path: Path, monkeypatch: pyte
 
     # Replace the scanner module in sys.modules with a sentinel that raises
     # AttributeError on any attribute access. If the base command path
-    # reaches the scanner, calling completion_ready / verified_work_items
-    # will surface immediately and fail the test.
+    # reaches the scanner, calling completion_ready /
+    # verified_work_items_by_project will surface immediately and fail the test.
     class _Sentinel:
         def __getattr__(self, name: str) -> Any:
             raise AssertionError(

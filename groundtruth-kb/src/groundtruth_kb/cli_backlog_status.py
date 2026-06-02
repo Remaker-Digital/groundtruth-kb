@@ -20,7 +20,7 @@ Per the GO'd proposal, the base output (no flags) deliberately reports raw
 ``resolution_status`` counts instead of inventing a terminal/non-terminal
 definition. Scanner-backed behaviors are gated behind explicit opt-in flags
 (``--with-retire-ready`` and ``--with-verified-coverage``) and carry a
-``scanner_caveat`` field that points at the CANONICAL in-flight scanner-fix
+``scanner_caveat`` field that points at the CANONICAL VERIFIED scanner-fix
 thread (``gtkb-project-completion-scanner-addressing-thread-fix``), NOT the
 withdrawn ``-implementation`` duplicate.
 
@@ -58,14 +58,14 @@ if str(_PROJECT_ROOT) not in sys.path:
 # the canonical slug is present AND that the withdrawn ``-implementation``
 # slug is absent.
 _SCANNER_FIX_CANONICAL_THREAD = "gtkb-project-completion-scanner-addressing-thread-fix"
-_SCANNER_FIX_LATEST_GO_FILE = f"bridge/{_SCANNER_FIX_CANONICAL_THREAD}-004.md"
+_SCANNER_FIX_VERIFIED_FILE = f"bridge/{_SCANNER_FIX_CANONICAL_THREAD}-017.md"
 SCANNER_CAVEAT = (
     "VERIFIED-coverage uses scripts/project_verified_completion_scanner.py, "
-    "whose D3+D4 over-broad-citation fix is in flight at bridge thread "
-    f"{_SCANNER_FIX_CANONICAL_THREAD} (canonical thread; latest GO at "
-    f"{_SCANNER_FIX_LATEST_GO_FILE}). Until that fix is VERIFIED, incidental "
-    "Work Item citations in governance/reauthorization threads may over-count "
-    "coverage."
+    "whose D3+D4 over-broad-citation fix is VERIFIED at bridge thread "
+    f"{_SCANNER_FIX_CANONICAL_THREAD} (canonical thread; verdict at "
+    f"{_SCANNER_FIX_VERIFIED_FILE}). Coverage is project-scoped and counts "
+    "only Work Items covered by that project's implements-linked VERIFIED "
+    "threads."
 )
 
 
@@ -152,11 +152,12 @@ def _list_orphan_work_items(db: KnowledgeDB) -> list[dict[str, Any]]:
 def _annotate_verified_coverage(
     db: KnowledgeDB,
     project_rows: list[dict[str, Any]],
-    verified_ids: set[str],
+    verified_by_project: dict[str, set[str]],
 ) -> None:
     """In-place: add ``verified_bridge_covered`` mapping to each project row."""
     for project_row in project_rows:
         project_id = project_row["id"]
+        verified_ids = verified_by_project.get(project_id, set())
         memberships = db.list_project_work_items(project_id, include_inactive=False)
         coverage: dict[str, bool] = {}
         for member in memberships:
@@ -167,9 +168,7 @@ def _annotate_verified_coverage(
         project_row["verified_bridge_covered"] = coverage
 
 
-def build_backlog_status(
-    config: GTConfig, request: BacklogStatusRequest
-) -> dict[str, Any]:
+def build_backlog_status(config: GTConfig, request: BacklogStatusRequest) -> dict[str, Any]:
     """Build the backlog-status report for one CLI invocation.
 
     Read-only: opens MemBase, performs only reads, closes it before returning.
@@ -180,11 +179,7 @@ def build_backlog_status(
     db = KnowledgeDB(config.db_path)
     try:
         all_projects = db.list_projects(include_terminal=True)
-        projects = [
-            p
-            for p in all_projects
-            if request.project is None or str(p.get("id")) == request.project
-        ]
+        projects = [p for p in all_projects if request.project is None or str(p.get("id")) == request.project]
 
         project_rows = [_project_row(db, p) for p in projects]
 
@@ -192,12 +187,8 @@ def build_backlog_status(
             "projects": project_rows,
             "summary": {
                 "project_count": len(project_rows),
-                "doubled_prefix_project_count": sum(
-                    1 for r in project_rows if r["doubled_prefix_flag"]
-                ),
-                "total_active_memberships": sum(
-                    r["work_item_count"] for r in project_rows
-                ),
+                "doubled_prefix_project_count": sum(1 for r in project_rows if r["doubled_prefix_flag"]),
+                "total_active_memberships": sum(r["work_item_count"] for r in project_rows),
             },
         }
 
@@ -210,7 +201,7 @@ def build_backlog_status(
             # spec-derived verification matrix asserts this contract.
             from scripts.project_verified_completion_scanner import (  # noqa: PLC0415
                 completion_ready,
-                verified_work_items,
+                verified_work_items_by_project,
             )
 
             project_root = config.project_root
@@ -220,8 +211,8 @@ def build_backlog_status(
                 result["retire_ready"] = [r.as_dict() for r in ready]
 
             if request.with_verified_coverage:
-                verified_ids = verified_work_items(project_root)
-                _annotate_verified_coverage(db, project_rows, verified_ids)
+                verified_by_project = verified_work_items_by_project(project_root)
+                _annotate_verified_coverage(db, project_rows, verified_by_project)
 
             result["scanner_caveat"] = SCANNER_CAVEAT
     finally:
