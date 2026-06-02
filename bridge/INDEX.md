@@ -394,16 +394,9 @@ GO: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-002.md
 NEW: bridge/gtkb-skill-modernization-slice-0-skill-health-checker-001.md
 
 Document: gtkb-orphan-wi-membership-backfill-slice-2-scoping
+NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-003.md
 GO: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-002.md
 NEW: bridge/gtkb-orphan-wi-membership-backfill-slice-2-scoping-001.md
-
-Document: gtkb-interactive-session-role-override-scoping
-VERIFIED: bridge/gtkb-interactive-session-role-override-scoping-006.md
-NEW: bridge/gtkb-interactive-session-role-override-scoping-005.md
-GO: bridge/gtkb-interactive-session-role-override-scoping-004.md
-REVISED: bridge/gtkb-interactive-session-role-override-scoping-003.md
-NO-GO: bridge/gtkb-interactive-session-role-override-scoping-002.md
-NEW: bridge/gtkb-interactive-session-role-override-scoping-001.md
 
 Document: gtkb-discoverability-cli-slice-2-implementation
 VERIFIED: bridge/gtkb-discoverability-cli-slice-2-implementation-006.md
@@ -775,22 +768,6 @@ GO: bridge/gtkb-agent-red-deployability-preservation-gate-004.md
 REVISED: bridge/gtkb-agent-red-deployability-preservation-gate-003.md
 NO-GO: bridge/gtkb-agent-red-deployability-preservation-gate-002.md
 NEW: bridge/gtkb-agent-red-deployability-preservation-gate-001.md
-
-Document: gtkb-por-step-16-d-orphan-test-rationalization
-VERIFIED: bridge/gtkb-por-step-16-d-orphan-test-rationalization-006.md
-NEW: bridge/gtkb-por-step-16-d-orphan-test-rationalization-005.md
-GO: bridge/gtkb-por-step-16-d-orphan-test-rationalization-004.md
-REVISED: bridge/gtkb-por-step-16-d-orphan-test-rationalization-003.md
-NO-GO: bridge/gtkb-por-step-16-d-orphan-test-rationalization-002.md
-NEW: bridge/gtkb-por-step-16-d-orphan-test-rationalization-001.md
-
-Document: gtkb-zero-knowledge-architecture-phase-4-scoping
-VERIFIED: bridge/gtkb-zero-knowledge-architecture-phase-4-scoping-006.md
-NEW: bridge/gtkb-zero-knowledge-architecture-phase-4-scoping-005.md
-GO: bridge/gtkb-zero-knowledge-architecture-phase-4-scoping-004.md
-REVISED: bridge/gtkb-zero-knowledge-architecture-phase-4-scoping-003.md
-NO-GO: bridge/gtkb-zero-knowledge-architecture-phase-4-scoping-002.md
-NEW: bridge/gtkb-zero-knowledge-architecture-phase-4-scoping-001.md
 
 Document: gtkb-mass-adoption-readiness-scoping
 GO: bridge/gtkb-mass-adoption-readiness-scoping-004.md
