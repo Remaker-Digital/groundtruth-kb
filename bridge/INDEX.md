@@ -131,6 +131,7 @@ NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
 
 Document: gtkb-stale-thread-closure-slice-3-impl
+GO: bridge/gtkb-stale-thread-closure-slice-3-impl-004.md
 REVISED: bridge/gtkb-stale-thread-closure-slice-3-impl-003.md
 NO-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-002.md
 NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-001.md
