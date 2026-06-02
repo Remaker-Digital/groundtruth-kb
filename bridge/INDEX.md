@@ -540,6 +540,7 @@ NO-GO: bridge/gtkb-platform-tests-ruff-cleanup-002.md
 NEW: bridge/gtkb-platform-tests-ruff-cleanup-001.md
 
 Document: gtkb-push-gate-slice-1-5-debt-audit
+NO-GO: bridge/gtkb-push-gate-slice-1-5-debt-audit-004.md
 REVISED: bridge/gtkb-push-gate-slice-1-5-debt-audit-003.md
 NO-GO: bridge/gtkb-push-gate-slice-1-5-debt-audit-002.md
 NEW: bridge/gtkb-push-gate-slice-1-5-debt-audit-001.md
@@ -583,6 +584,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-impl-report-bridge-structural-validation-mtime
+GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-006.md
 REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-005.md
 NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-004.md
 REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-003.md
@@ -590,6 +592,7 @@ NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-002.md
 NEW: bridge/gtkb-impl-report-bridge-structural-validation-mtime-001.md
 
 Document: gtkb-agent-red-reference-adopter-framing-restoration
+GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-004.md
 REVISED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-003.md
 NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-002.md
 NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-001.md
@@ -611,6 +614,7 @@ GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-001.md
 
 Document: gtkb-s358-w3-requirements-collection-hook-title-fix
+VERIFIED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-014.md
 REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-013.md
 NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-012.md
 NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-011.md
@@ -1093,6 +1097,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
+NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-006.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-005.md
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-004.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-003.md
@@ -1121,6 +1126,7 @@ NO-GO: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-002
 NEW: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-001.md
 
 Document: gtkb-commit-scope-bundling-detection-slice-1
+VERIFIED: bridge/gtkb-commit-scope-bundling-detection-slice-1-008.md
 REVISED: bridge/gtkb-commit-scope-bundling-detection-slice-1-007.md
 NO-GO: bridge/gtkb-commit-scope-bundling-detection-slice-1-006.md
 NEW: bridge/gtkb-commit-scope-bundling-detection-slice-1-005.md
