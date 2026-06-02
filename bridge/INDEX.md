@@ -6,7 +6,16 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+<!-- Role-intent sentinel (per GTKB-BRIDGE-INDEX-ROLE-INTENT-SENTINEL, Slice 1; NON-AUTHORITATIVE):
+     Authority: harness-state/role-assignments.json (role) + harness-state/harness-identities.json (identity).
+     This sentinel is a checksum mirror only. It MUST NOT be used to override the durable role record.
+     Prime Builder harness:    A (Codex)
+     Loyal Opposition harness: C (Antigravity)
+     Topology:                 multi_harness
+     Sentinel updated:         2026-06-02T00:05:03Z
+-->
 Document: gtkb-terminal-project-record-retirement-batch
+GO: bridge/gtkb-terminal-project-record-retirement-batch-004.md
 REVISED: bridge/gtkb-terminal-project-record-retirement-batch-003.md
 GO: bridge/gtkb-terminal-project-record-retirement-batch-002.md
 NEW: bridge/gtkb-terminal-project-record-retirement-batch-001.md
@@ -36,6 +45,7 @@ GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
 
 Document: gtkb-da-enforcement-completion-slice1-decompose
+GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-005.md
 REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-004.md
 NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-003.md
 NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-002.md
@@ -46,6 +56,7 @@ NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-001.md
 
 Document: gtkb-index-agent-edit-serialization-scoping
+VERIFIED: bridge/gtkb-index-agent-edit-serialization-scoping-009.md
 NEW: bridge/gtkb-index-agent-edit-serialization-scoping-008.md
 GO: bridge/gtkb-index-agent-edit-serialization-scoping-007.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-006.md
@@ -55,6 +66,7 @@ NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-003.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-scoping-001.md
 Document: gtkb-role-enhancement-isolation-dependency-reframe
+VERIFIED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-009.md
 NEW: bridge/gtkb-role-enhancement-isolation-dependency-reframe-008.md
 GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-007.md
 REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-006.md
@@ -77,6 +89,7 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-deterministic-services-stale-status-reconciliation
+GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-010.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-009.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-008.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
@@ -88,6 +101,7 @@ NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
 
 Document: gtkb-dispatch-owner-approval-forgery-prevention
+GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-004.md
 REVISED: bridge/gtkb-dispatch-owner-approval-forgery-prevention-003.md
 NO-GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-002.md
 NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-001.md
@@ -117,6 +131,7 @@ NO-GO: bridge/gtkb-backlog-update-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
 
 Document: gtkb-stale-thread-closure-slice-3-impl
+REVISED: bridge/gtkb-stale-thread-closure-slice-3-impl-003.md
 NO-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-002.md
 NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-001.md
 
