@@ -6,7 +6,23 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-terminal-project-record-retirement-batch
+REVISED: bridge/gtkb-terminal-project-record-retirement-batch-003.md
+GO: bridge/gtkb-terminal-project-record-retirement-batch-002.md
+NEW: bridge/gtkb-terminal-project-record-retirement-batch-001.md
+
+Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
+VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-008.md
+REVISED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-007.md
+NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-006.md
+NEW: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-005.md
+GO: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-004.md
+REVISED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-003.md
+NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-002.md
+NEW: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-001.md
+
 Document: gtkb-cli-list-subset-filters
+VERIFIED: bridge/gtkb-cli-list-subset-filters-004.md
 NEW: bridge/gtkb-cli-list-subset-filters-003.md
 GO: bridge/gtkb-cli-list-subset-filters-002.md
 NEW: bridge/gtkb-cli-list-subset-filters-001.md
@@ -19,14 +35,8 @@ REVISED: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-003
 GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
 
-Document: gtkb-startup-enhancements-completion-reconciliation
-GO: bridge/gtkb-startup-enhancements-completion-reconciliation-005.md
-REVISED: bridge/gtkb-startup-enhancements-completion-reconciliation-004.md
-NO-GO: bridge/gtkb-startup-enhancements-completion-reconciliation-003.md
-REVISED: bridge/gtkb-startup-enhancements-completion-reconciliation-002.md
-NEW: bridge/gtkb-startup-enhancements-completion-reconciliation-001.md
-
 Document: gtkb-da-enforcement-completion-slice1-decompose
+REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-004.md
 NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-003.md
 NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-002.md
 NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-001.md
@@ -35,17 +45,17 @@ Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-001.md
 
-Document: gtkb-bridge-contention-consolidation
-NO-GO: bridge/gtkb-bridge-contention-consolidation-002.md
-NEW: bridge/gtkb-bridge-contention-consolidation-001.md
-
 Document: gtkb-index-agent-edit-serialization-scoping
+NEW: bridge/gtkb-index-agent-edit-serialization-scoping-008.md
+GO: bridge/gtkb-index-agent-edit-serialization-scoping-007.md
+REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-006.md
 NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-005.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-004.md
 NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-003.md
 REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-scoping-001.md
 Document: gtkb-role-enhancement-isolation-dependency-reframe
+NEW: bridge/gtkb-role-enhancement-isolation-dependency-reframe-008.md
 GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-007.md
 REVISED: bridge/gtkb-role-enhancement-isolation-dependency-reframe-006.md
 GO: bridge/gtkb-role-enhancement-isolation-dependency-reframe-005.md
@@ -67,6 +77,7 @@ NO-GO: bridge/gtkb-membase-effective-use-audit-test-restoration-002.md
 NEW: bridge/gtkb-membase-effective-use-audit-test-restoration-001.md
 
 Document: gtkb-deterministic-services-stale-status-reconciliation
+REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-009.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-008.md
 REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
 NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
@@ -77,10 +88,17 @@ NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
 
 Document: gtkb-dispatch-owner-approval-forgery-prevention
+REVISED: bridge/gtkb-dispatch-owner-approval-forgery-prevention-003.md
 NO-GO: bridge/gtkb-dispatch-owner-approval-forgery-prevention-002.md
 NEW: bridge/gtkb-dispatch-owner-approval-forgery-prevention-001.md
 
 Document: gtkb-backlog-authorize-implementation-cli-slice-1
+VERIFIED: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-008.md
+REVISED: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-007.md
+NO-GO: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-006.md
+NEW: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-005.md
+GO: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-004.md
+REVISED: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-003.md
 NO-GO: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-002.md
 NEW: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-001.md
 
@@ -101,28 +119,6 @@ NEW: bridge/gtkb-backlog-update-cli-slice-1-001.md
 Document: gtkb-stale-thread-closure-slice-3-impl
 NO-GO: bridge/gtkb-stale-thread-closure-slice-3-impl-002.md
 NEW: bridge/gtkb-stale-thread-closure-slice-3-impl-001.md
-
-Document: gtkb-adr-0001-membase-migration
-VERIFIED: bridge/gtkb-adr-0001-membase-migration-008.md
-NEW: bridge/gtkb-adr-0001-membase-migration-007.md
-GO: bridge/gtkb-adr-0001-membase-migration-006.md
-REVISED: bridge/gtkb-adr-0001-membase-migration-005.md
-GO: bridge/gtkb-adr-0001-membase-migration-004.md
-REVISED: bridge/gtkb-adr-0001-membase-migration-003.md
-NO-GO: bridge/gtkb-adr-0001-membase-migration-002.md
-NEW: bridge/gtkb-adr-0001-membase-migration-001.md
-
-Document: gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl
-VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-010.md
-REVISED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-009.md
-NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-008.md
-NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-007.md
-GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-006.md
-REVISED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-005.md
-NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-004.md
-REVISED: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-003.md
-NO-GO: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-002.md
-NEW: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-001.md
 
 Document: gtkb-role-status-orthogonality-dispatch-scoping
 GO: bridge/gtkb-role-status-orthogonality-dispatch-scoping-004.md
@@ -163,14 +159,6 @@ NEW: bridge/gtkb-interactive-session-role-override-slice-9-rule-claude-agents-up
 Document: gtkb-interactive-session-role-override-hygiene-backfill
 NO-GO: bridge/gtkb-interactive-session-role-override-hygiene-backfill-002.md
 NEW: bridge/gtkb-interactive-session-role-override-hygiene-backfill-001.md
-
-Document: gtkb-bridge-dispatch-per-document-lease-substitution
-VERIFIED: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-006.md
-NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-005.md
-NO-GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-004.md
-NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-003.md
-GO: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-002.md
-NEW: bridge/gtkb-bridge-dispatch-per-document-lease-substitution-001.md
 
 Document: gtkb-gov-backlog-source-of-truth-2026-05-02
 VERIFIED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-029.md
@@ -485,6 +473,8 @@ NO-GO: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-002.md
 NEW: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-001.md
 
 Document: gtkb-work-intent-registry-prime-write-integration
+VERIFIED: bridge/gtkb-work-intent-registry-prime-write-integration-014.md
+NEW: bridge/gtkb-work-intent-registry-prime-write-integration-013.md
 GO: bridge/gtkb-work-intent-registry-prime-write-integration-012.md
 REVISED: bridge/gtkb-work-intent-registry-prime-write-integration-011.md
 NO-GO: bridge/gtkb-work-intent-registry-prime-write-integration-010.md
@@ -519,24 +509,6 @@ REVISED: bridge/gtkb-skill-modernization-scoping-003.md
 NO-GO: bridge/gtkb-skill-modernization-scoping-002.md
 NEW: bridge/gtkb-skill-modernization-scoping-001.md
 
-Document: gtkb-headless-gemini-lo-dispatch-verification
-NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-016.md
-NEW: bridge/gtkb-headless-gemini-lo-dispatch-verification-015.md
-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-014.md
-REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-013.md
-NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-012.md
-REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-011.md
-NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-010.md
-REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-009.md
-NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-008.md
-NEW: bridge/gtkb-headless-gemini-lo-dispatch-verification-007.md
-NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-006.md
-NEW: bridge/gtkb-headless-gemini-lo-dispatch-verification-005.md
-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-004.md
-REVISED: bridge/gtkb-headless-gemini-lo-dispatch-verification-003.md
-NO-GO: bridge/gtkb-headless-gemini-lo-dispatch-verification-002.md
-NEW: bridge/gtkb-headless-gemini-lo-dispatch-verification-001.md
-
 Document: gtkb-impl-report-bridge-structural-validation-mtime
 NO-GO: bridge/gtkb-impl-report-bridge-structural-validation-mtime-004.md
 REVISED: bridge/gtkb-impl-report-bridge-structural-validation-mtime-003.md
@@ -561,13 +533,6 @@ Document: gtkb-worker-packet-auth-envelope-slice-2-auto-packet
 GO: bridge/gtkb-worker-packet-auth-envelope-slice-2-auto-packet-002.md
 NEW: bridge/gtkb-worker-packet-auth-envelope-slice-2-auto-packet-001.md
 
-     Authority: harness-state/role-assignments.json (role) + harness-state/harness-identities.json (identity).
-     This sentinel is a checksum mirror only. It MUST NOT be used to override the durable role record.
-     Prime Builder harness:    A (Codex)
-     Loyal Opposition harness: none
-     Topology:                 prime_only
-     Sentinel updated:         2026-05-20T01:14:29Z
--->
 Document: gtkb-bridge-target-paths-kb-mutation-check
 NO-GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-004.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-003.md
@@ -732,49 +697,6 @@ GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-004.md
 REVISED: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-003.md
 NO-GO: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-002.md
 NEW: bridge/gtkb-ai-assisted-delivery-maturity-model-scoping-001.md
-
-Document: gtkb-role-enhancement-review-depth-methodology
-VERIFIED: bridge/gtkb-role-enhancement-review-depth-methodology-008.md
-NEW: bridge/gtkb-role-enhancement-review-depth-methodology-007.md
-GO: bridge/gtkb-role-enhancement-review-depth-methodology-006.md
-REVISED: bridge/gtkb-role-enhancement-review-depth-methodology-005.md
-GO: bridge/gtkb-role-enhancement-review-depth-methodology-004.md
-REVISED: bridge/gtkb-role-enhancement-review-depth-methodology-003.md
-NO-GO: bridge/gtkb-role-enhancement-review-depth-methodology-002.md
-NEW: bridge/gtkb-role-enhancement-review-depth-methodology-001.md
-
-Document: gtkb-wrapup-enhancements-next-slice
-VERIFIED: bridge/gtkb-wrapup-enhancements-next-slice-006.md
-NEW: bridge/gtkb-wrapup-enhancements-next-slice-005.md
-GO: bridge/gtkb-wrapup-enhancements-next-slice-004.md
-REVISED: bridge/gtkb-wrapup-enhancements-next-slice-003.md
-NO-GO: bridge/gtkb-wrapup-enhancements-next-slice-002.md
-NEW: bridge/gtkb-wrapup-enhancements-next-slice-001.md
-
-Document: gtkb-startup-refractor-glossary-load-surface
-VERIFIED: bridge/gtkb-startup-refractor-glossary-load-surface-006.md
-NEW: bridge/gtkb-startup-refractor-glossary-load-surface-005.md
-GO: bridge/gtkb-startup-refractor-glossary-load-surface-004.md
-REVISED: bridge/gtkb-startup-refractor-glossary-load-surface-003.md
-NO-GO: bridge/gtkb-startup-refractor-glossary-load-surface-002.md
-NEW: bridge/gtkb-startup-refractor-glossary-load-surface-001.md
-
-Document: gtkb-startup-enhancements-p2-freshness-contract
-VERIFIED: bridge/gtkb-startup-enhancements-p2-freshness-contract-015.md
-NEW: bridge/gtkb-startup-enhancements-p2-freshness-contract-014.md
-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-013.md
-REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-012.md
-REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-011.md
-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-010.md
-REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-009.md
-NO-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-008.md
-NEW: bridge/gtkb-startup-enhancements-p2-freshness-contract-007.md
-NO-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-006.md
-NEW: bridge/gtkb-startup-enhancements-p2-freshness-contract-005.md
-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-004.md
-REVISED: bridge/gtkb-startup-enhancements-p2-freshness-contract-003.md
-NO-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-002.md
-NEW: bridge/gtkb-startup-enhancements-p2-freshness-contract-001.md
 
 Document: gtkb-in-source-provenance-anchors-001-prop
 GO: bridge/gtkb-in-source-provenance-anchors-001-prop-006.md
@@ -957,12 +879,12 @@ NEW: bridge/gtkb-codex-feedback-pattern-lints-001.md
 Document: gtkb-commit-scope-bundling-detection-001-prop
 WITHDRAWN: bridge/gtkb-commit-scope-bundling-detection-001-prop-003.md
 NO-GO: bridge/gtkb-commit-scope-bundling-detection-001-prop-002.md
-NEW: bridge/gtkb-commit-scope-bundling-detection-001-prop.md
+NEW: bridge/gtkb-commit-scope-bundling-detection-001-prop-001.md
 
 Document: gtkb-auto-push-investigation-001-prop
 WITHDRAWN: bridge/gtkb-auto-push-investigation-001-prop-003.md
 NO-GO: bridge/gtkb-auto-push-investigation-001-prop-002.md
-NEW: bridge/gtkb-auto-push-investigation-001-prop.md
+NEW: bridge/gtkb-auto-push-investigation-001-prop-001.md
 
 Document: gtkb-lo-file-safety-pretooluse-enforcement
 WITHDRAWN: bridge/gtkb-lo-file-safety-pretooluse-enforcement-003.md

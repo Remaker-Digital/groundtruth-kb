@@ -79,7 +79,13 @@ _PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src
 if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
-from bridge_lease_registry import is_lease_held  # noqa: E402
+from bridge_lease_registry import is_lease_held  # noqa: E402, I001
+from bridge_work_intent_registry import (  # noqa: E402, I001
+    WorkIntentRegistryError,
+    acquire as acquire_work_intent,
+    current_holder as current_work_intent_holder,
+    release as release_work_intent,
+)
 
 # Manual-disable env var. When set to "1", this script no-ops immediately.
 # Used as an OPERATOR opt-out (debugging, emergency stop, test harness),
@@ -119,6 +125,8 @@ DEFAULT_MAX_ITEMS = 2
 QUIESCE_WINDOW_SECONDS = 5.0
 QUIESCE_WINDOW_ENV_VAR = "GTKB_TRIGGER_QUIESCE_SECONDS"
 CLAUDE_WORKER_ALLOWED_TOOLS = "Read Edit Write Glob Grep Bash TodoWrite NotebookEdit"
+WORK_INTENT_TRIGGER_SESSION_PREFIX = "trigger-dispatched-"
+WORK_INTENT_TRIGGER_TTL_SECONDS = 120
 
 # WI-3265 (bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md, Codex
 # GO at -004): per-invocation diagnostic instrumentation. Observational only —
@@ -414,6 +422,149 @@ def _record_dispatch_failure(state_dir: Path, payload: dict[str, Any]) -> None:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
     except OSError:
         pass
+
+
+def _new_dispatch_id(recipient_key: str) -> str:
+    return f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{recipient_key}-{uuid.uuid4().hex[:6]}"
+
+
+def _work_intent_session_id(dispatch_id: str) -> str:
+    return f"{WORK_INTENT_TRIGGER_SESSION_PREFIX}{dispatch_id}"
+
+
+def _record_prime_work_intent_held(
+    *,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    item: Any,
+    holder: dict[str, str],
+) -> None:
+    _record_dispatch_failure(
+        state_dir,
+        {
+            "ts": _now_iso(),
+            "dispatch_id": dispatch_id,
+            "recipient": recipient,
+            "launched": False,
+            "reason": "work_intent_already_held",
+            "document_name": item.document_name,
+            "top_status": item.top_status,
+            "top_file": item.top_file,
+            "holder_session_id": holder.get("session_id"),
+            "holder_ttl_expires_at": holder.get("ttl_expires_at"),
+        },
+    )
+
+
+def _filter_prime_selected_by_work_intent(
+    selected: list[Any],
+    *,
+    project_root: Path,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    session_id: str,
+) -> dict[str, Any]:
+    """Drop Prime selected entries held by a different work-intent session."""
+    unheld: list[Any] = []
+    held_count = 0
+    for item in selected:
+        try:
+            holder = current_work_intent_holder(item.document_name, project_root=project_root)
+        except WorkIntentRegistryError as exc:
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "ts": _now_iso(),
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": "work_intent_registry_error",
+                    "document_name": item.document_name,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            )
+            return {
+                "ok": False,
+                "reason": "work_intent_registry_error",
+                "selected": [],
+                "held_count": held_count,
+            }
+        if holder is not None and holder.get("session_id") != session_id:
+            held_count += 1
+            _record_prime_work_intent_held(
+                state_dir=state_dir,
+                recipient=recipient,
+                dispatch_id=dispatch_id,
+                item=item,
+                holder=holder,
+            )
+            continue
+        unheld.append(item)
+    return {"ok": True, "reason": None, "selected": unheld, "held_count": held_count}
+
+
+def _release_prime_work_intents(slugs: list[str], *, project_root: Path, session_id: str) -> None:
+    for slug in slugs:
+        try:
+            release_work_intent(slug, session_id, project_root=project_root)
+        except WorkIntentRegistryError:
+            pass
+
+
+def _acquire_prime_work_intent_batch(
+    selected: list[Any],
+    *,
+    project_root: Path,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    session_id: str,
+) -> dict[str, Any]:
+    """Acquire all Prime selected slugs as an all-or-nothing batch."""
+    acquired_slugs: list[str] = []
+    for item in selected:
+        slug = item.document_name
+        try:
+            acquired = acquire_work_intent(
+                slug,
+                session_id,
+                ttl_seconds=WORK_INTENT_TRIGGER_TTL_SECONDS,
+                project_root=project_root,
+            )
+        except WorkIntentRegistryError as exc:
+            acquired = False
+            error_type = type(exc).__name__
+            error_message = str(exc)
+        else:
+            error_type = None
+            error_message = None
+        if not acquired:
+            _release_prime_work_intents(acquired_slugs, project_root=project_root, session_id=session_id)
+            payload: dict[str, Any] = {
+                "ts": _now_iso(),
+                "dispatch_id": dispatch_id,
+                "recipient": recipient,
+                "launched": False,
+                "reason": "work_intent_acquire_failed",
+                "document_name": slug,
+                "released_slugs": acquired_slugs,
+            }
+            if error_type is not None:
+                payload["error_type"] = error_type
+            if error_message is not None:
+                payload["error_message"] = error_message
+            _record_dispatch_failure(state_dir, payload)
+            return {
+                "ok": False,
+                "reason": "work_intent_acquire_failed",
+                "acquired_slugs": acquired_slugs,
+                "failed_slug": slug,
+            }
+        acquired_slugs.append(slug)
+    return {"ok": True, "reason": None, "acquired_slugs": acquired_slugs}
 
 
 def _dispatch_failures_max_bytes() -> int:
@@ -1123,6 +1274,7 @@ def _spawn_harness(
     state_dir: Path,
     max_items: int,
     dry_run: bool,
+    dispatch_id: str | None = None,
 ) -> dict[str, Any]:
     """Fire-and-forget dispatch a harness subprocess.
 
@@ -1154,7 +1306,7 @@ def _spawn_harness(
     prompt = _dispatch_prompt(target, items, max_items)
     command = _harness_command(target, prompt, project_root)
     recipient_key = target.dispatch_state_key
-    dispatch_id = f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{recipient_key}-{uuid.uuid4().hex[:6]}"
+    dispatch_id = dispatch_id or _new_dispatch_id(recipient_key)
 
     if command is None:
         meta = {
@@ -1636,11 +1788,52 @@ def run_trigger(
                 ]
                 dispatched_selected = _selected_oldest_first(dispatched_filtered, max_items)
                 dispatched_signature = _signature(dispatched_selected)
+                spawn_items = dispatched_filtered
+                dispatch_id: str | None = None
+                work_intent_session_id: str | None = None
+                acquired_work_intent_slugs: list[str] = []
 
                 recipient_state["selected_count"] = len(dispatched_selected)
                 recipient_state["pending_count"] = len(dispatched_filtered)
 
-                if prior_dispatched == dispatched_signature:
+                if recipient == "prime-builder" and dispatched_selected:
+                    dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                    work_intent_session_id = _work_intent_session_id(dispatch_id)
+                    work_intent_filter = _filter_prime_selected_by_work_intent(
+                        dispatched_selected,
+                        project_root=project_root,
+                        state_dir=state_dir,
+                        recipient=recipient,
+                        dispatch_id=dispatch_id,
+                        session_id=work_intent_session_id,
+                    )
+                    recipient_state["work_intent_held_filtered_count"] = work_intent_filter["held_count"]
+                    if not work_intent_filter["ok"]:
+                        recipient_state["last_result"] = work_intent_filter["reason"]
+                        results[recipient] = {
+                            "launched": False,
+                            "reason": work_intent_filter["reason"],
+                            "dispatch_id": dispatch_id,
+                            "work_intent_session_id": work_intent_session_id,
+                        }
+                        recipients_state[recipient] = recipient_state
+                        continue
+                    dispatched_selected = list(work_intent_filter["selected"])
+                    dispatched_signature = _signature(dispatched_selected)
+                    # _spawn_harness expects newest-first input and applies
+                    # _selected_oldest_first itself before building the prompt.
+                    spawn_items = list(reversed(dispatched_selected))
+                    recipient_state["selected_count"] = len(dispatched_selected)
+
+                if recipient == "prime-builder" and not dispatched_selected:
+                    recipient_state["last_result"] = "work_intent_already_held"
+                    results[recipient] = {
+                        "launched": False,
+                        "reason": "work_intent_already_held",
+                        "dispatch_id": dispatch_id,
+                        "work_intent_session_id": work_intent_session_id,
+                    }
+                elif prior_dispatched == dispatched_signature:
                     # Slice 2 dedup: this exact signature was already dispatched.
                     # Skip without spawning. Legacy `signature` stays in sync.
                     recipient_state["signature"] = dispatched_signature
@@ -1651,21 +1844,61 @@ def run_trigger(
                     #   - first dispatch ever
                     #   - signature changed since last dispatch
                     #   - prior_suppressed == signature (retry after counterpart exit)
+                    if recipient == "prime-builder" and not dry_run:
+                        if dispatch_id is None:
+                            dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                        if work_intent_session_id is None:
+                            work_intent_session_id = _work_intent_session_id(dispatch_id)
+                        acquire_result = _acquire_prime_work_intent_batch(
+                            dispatched_selected,
+                            project_root=project_root,
+                            state_dir=state_dir,
+                            recipient=recipient,
+                            dispatch_id=dispatch_id,
+                            session_id=work_intent_session_id,
+                        )
+                        if not acquire_result["ok"]:
+                            recipient_state["last_result"] = acquire_result["reason"]
+                            recipient_state["last_launch"] = {
+                                "dispatch_id": dispatch_id,
+                                "recipient": recipient,
+                                "launched": False,
+                                "reason": acquire_result["reason"],
+                                "work_intent_session_id": work_intent_session_id,
+                                "failed_slug": acquire_result.get("failed_slug"),
+                                "released_slugs": acquire_result.get("acquired_slugs", []),
+                            }
+                            results[recipient] = recipient_state["last_launch"]
+                            recipients_state[recipient] = recipient_state
+                            continue
+                        acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
                     launch = _spawn_harness(
                         target=target,
-                        items=dispatched_filtered,
+                        items=spawn_items,
                         project_root=project_root,
                         state_dir=state_dir,
                         max_items=max_items,
                         dry_run=dry_run,
+                        dispatch_id=dispatch_id,
                     )
+                    if work_intent_session_id is not None:
+                        launch["work_intent_session_id"] = work_intent_session_id
+                    if acquired_work_intent_slugs:
+                        launch["work_intent_slugs"] = acquired_work_intent_slugs
+                    if recipient == "prime-builder" and acquired_work_intent_slugs and not launch.get("launched"):
+                        _release_prime_work_intents(
+                            acquired_work_intent_slugs,
+                            project_root=project_root,
+                            session_id=work_intent_session_id or "",
+                        )
                     recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                     recipient_state["last_launch"] = launch
-                    recipient_state["last_dispatched_signature"] = dispatched_signature
-                    # Dispatch supersedes any prior suppression.
-                    recipient_state["last_suppressed_signature"] = None
-                    # Legacy `signature` field updated ONLY on real dispatch.
-                    recipient_state["signature"] = dispatched_signature
+                    if recipient != "prime-builder" or dry_run or launch.get("launched"):
+                        recipient_state["last_dispatched_signature"] = dispatched_signature
+                        # Dispatch supersedes any prior suppression.
+                        recipient_state["last_suppressed_signature"] = None
+                        # Legacy `signature` field updated ONLY on real dispatch.
+                        recipient_state["signature"] = dispatched_signature
                     results[recipient] = launch
 
         recipients_state[recipient] = recipient_state

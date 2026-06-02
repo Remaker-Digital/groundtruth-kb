@@ -27,6 +27,11 @@ from groundtruth_kb import get_templates_dir
 _HELPER_PATH = Path(get_templates_dir()) / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
 
 
+@pytest.fixture(autouse=True)
+def _work_intent_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CODEX_THREAD_ID", "gtkb-template-helper-test-session")
+
+
 def _load_helper() -> ModuleType:
     """Import ``write_bridge`` from the template tree into a stable module name.
 
@@ -431,6 +436,7 @@ def test_propose_bridge_writes_file_first_then_index(tmp_path: Path) -> None:
         body,
         mode="abort",
         bridge_dir=bridge_dir,
+        pre_populate_prior_deliberations=False,
     )
     # File on disk.
     assert result_path.exists()
@@ -628,3 +634,92 @@ def test_propose_bridge_aborts_after_2_concurrent_mods(tmp_path: Path, monkeypat
     assert "2 total attempts" in str(excinfo.value), (
         f"final error must mention '2 total attempts'; got: {excinfo.value}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 - Work-intent integration.
+# ---------------------------------------------------------------------------
+
+
+def test_template_helper_exposes_work_intent_session_resolution() -> None:
+    helper = _load_helper()
+
+    env = {
+        "CLAUDE_SESSION_ID": "claude-session",
+        "GTKB_INHERITED_SESSION_ID": "inherited-session",
+        "CODEX_SESSION_ID": "codex-session",
+        "CODEX_THREAD_ID": "codex-thread",
+        "ANTIGRAVITY_SESSION_ID": "antigravity-session",
+        "GTKB_SESSION_ID": "gtkb-session",
+    }
+    assert helper.resolve_work_intent_session_id(env) == "claude-session"
+
+    env.pop("CLAUDE_SESSION_ID")
+    assert helper.resolve_work_intent_session_id(env) == "inherited-session"
+
+    env.pop("GTKB_INHERITED_SESSION_ID")
+    assert helper.resolve_work_intent_session_id(env) == "codex-session"
+
+    env.pop("CODEX_SESSION_ID")
+    assert helper.resolve_work_intent_session_id(env) == "codex-thread"
+
+    env.pop("CODEX_THREAD_ID")
+    assert helper.resolve_work_intent_session_id(env) == "antigravity-session"
+
+    env.pop("ANTIGRAVITY_SESSION_ID")
+    assert helper.resolve_work_intent_session_id(env) == "gtkb-session"
+
+    with pytest.raises(helper.BridgeWorkIntentError):
+        helper.resolve_work_intent_session_id({})
+
+
+def test_template_propose_bridge_acquires_and_releases_work_intent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helper = _load_helper()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_fresh_index(bridge_dir / "INDEX.md")
+
+    class _RecordingRegistry:
+        def __init__(self) -> None:
+            self.events: list[tuple[Any, ...]] = []
+
+        def current_holder(self, thread_slug: str, *, project_root: Path) -> None:
+            self.events.append(("current_holder", thread_slug, project_root))
+            return None
+
+        def acquire(self, thread_slug: str, session_id: str, ttl_seconds: int, *, project_root: Path) -> bool:
+            self.events.append(("acquire", thread_slug, session_id, ttl_seconds, project_root))
+            return True
+
+        def release(self, thread_slug: str, session_id: str, *, project_root: Path) -> None:
+            self.events.append(("release", thread_slug, session_id, project_root))
+
+    fake_registry = _RecordingRegistry()
+    monkeypatch.setenv("CLAUDE_SESSION_ID", "template-session")
+    monkeypatch.setattr(helper, "_load_work_intent_registry", lambda project_root: fake_registry)
+
+    result = helper.propose_bridge(
+        "template-work-intent-topic",
+        _proposal_body("Template work-intent body."),
+        mode="abort",
+        bridge_dir=bridge_dir,
+    )
+
+    assert result.exists()
+    assert fake_registry.events == [
+        ("current_holder", "template-work-intent-topic", tmp_path.resolve()),
+        ("acquire", "template-work-intent-topic", "template-session", 300, tmp_path.resolve()),
+        ("release", "template-work-intent-topic", "template-session", tmp_path.resolve()),
+    ]
+
+
+def test_template_helper_contains_work_intent_parity_hooks() -> None:
+    content = _HELPER_PATH.read_text(encoding="utf-8")
+    assert "WORK_INTENT_TTL_SECONDS = 300" in content
+    assert "def resolve_work_intent_session_id(" in content
+    assert "current_holder(thread_slug" in content
+    assert "ttl_seconds=WORK_INTENT_TTL_SECONDS" in content
+    assert "_release_bridge_work_intent" in content

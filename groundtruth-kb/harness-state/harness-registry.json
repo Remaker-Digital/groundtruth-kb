@@ -1,0 +1,80 @@
+{
+  "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
+  "generated_at": "2026-06-01T05:06:21Z",
+  "harnesses": [
+    {
+      "capabilities_ref": null,
+      "harness_name": "codex",
+      "harness_type": "codex",
+      "id": "A",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "codex",
+            "exec",
+            "{{PROMPT}}",
+            "--cd",
+            "{{PROJECT_ROOT}}"
+          ]
+        }
+      },
+      "reviewer_precedence": null,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 17
+    },
+    {
+      "capabilities_ref": null,
+      "harness_name": "claude",
+      "harness_type": "claude",
+      "id": "B",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "claude",
+            "-p",
+            "{{PROMPT}}",
+            "--add-dir",
+            "{{PROJECT_ROOT}}",
+            "--output-format",
+            "json"
+          ]
+        }
+      },
+      "reviewer_precedence": null,
+      "role": [
+        "prime-builder"
+      ],
+      "status": "active",
+      "version": 16
+    },
+    {
+      "capabilities_ref": null,
+      "harness_name": "antigravity",
+      "harness_type": "antigravity",
+      "id": "C",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "gemini",
+            "-p",
+            "{{PROMPT}}",
+            "--approval-mode=yolo"
+          ]
+        },
+        "interactive": {
+          "kind": "ide",
+          "name": "Antigravity IDE"
+        }
+      },
+      "reviewer_precedence": null,
+      "role": [],
+      "status": "registered",
+      "version": 2
+    }
+  ],
+  "schema_version": 1,
+  "source_of_truth": "MemBase harnesses table (groundtruth.db)"
+}

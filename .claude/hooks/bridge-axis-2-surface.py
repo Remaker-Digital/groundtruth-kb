@@ -77,6 +77,14 @@ _ROLE_HEADING = {
 STATE_DIR_REL = ".gtkb-state/bridge-poller/axis-2-surface"
 DISPATCH_STATE_REL = ".gtkb-state/bridge-poller/dispatch-state.json"
 ERRORS_LOG_REL = ".gtkb-state/bridge-poller/axis-2-surface/errors.jsonl"
+WORK_INTENT_SESSION_ENV_VARS = (
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
 
 
 def _now_iso() -> str:
@@ -190,13 +198,54 @@ def _resolve_session_id(payload: dict[str, Any]) -> str:
     return "default"
 
 
-def _render_surface(items: list[Any], role_profile: str = ROLE_PRIME) -> str:
+def _resolve_work_intent_session_id(payload: dict[str, Any]) -> str:
+    sid = str(payload.get("session_id") or "").strip()
+    if sid:
+        return sid
+    for env_var in WORK_INTENT_SESSION_ENV_VARS:
+        env_value = os.environ.get(env_var, "").strip()
+        if env_value:
+            return env_value
+    return ""
+
+
+def _split_work_intent_claims(items: list[Any], session_id: str) -> tuple[list[Any], list[dict[str, Any]]]:
+    if not session_id:
+        return items, []
+    try:
+        from scripts.bridge_work_intent_registry import current_holder
+    except Exception as exc:  # pragma: no cover - hook fail-soft.
+        _log_error({"event": "work_intent_registry_unavailable", "error": str(exc)})
+        return items, []
+
+    available: list[Any] = []
+    claimed: list[dict[str, Any]] = []
+    for item in items:
+        try:
+            holder = current_holder(item.document_name, project_root=PROJECT_ROOT)
+        except Exception as exc:  # noqa: BLE001 - hook must fail soft.
+            _log_error({"event": "work_intent_holder_lookup_failed", "document": item.document_name, "error": str(exc)})
+            available.append(item)
+            continue
+        if holder and holder.get("session_id") != session_id:
+            claimed.append({"item": item, "holder": holder})
+        else:
+            available.append(item)
+    return available, claimed
+
+
+def _render_surface(
+    items: list[Any],
+    role_profile: str = ROLE_PRIME,
+    claimed_items: list[dict[str, Any]] | None = None,
+) -> str:
     """Render the additionalContext markdown block for the resolved role's work.
 
     The heading reflects the session-stated role: "Prime Work" for a Prime
     Builder session, "Loyal Opposition Work" for a Loyal Opposition session.
     """
     role_label = _ROLE_HEADING.get(role_profile, "Prime")
+    claimed_items = claimed_items or []
     lines = [
         f"### Bridge AXIS 2 Surface — Newly-Actionable {role_label} Work",
         "",
@@ -209,13 +258,29 @@ def _render_surface(items: list[Any], role_profile: str = ROLE_PRIME) -> str:
         lines.append(f"| {item.top_status} | {item.document_name} | {item.top_file} |")
     if len(items) > 10:
         lines.append(f"| … | ({len(items) - 10} more not shown) | (see `bridge/INDEX.md`) |")
+    if claimed_items:
+        lines.extend(["", "| Claim | Document | Holder | Until |", "|---|---|---|---|"])
+        for claimed in claimed_items[:10]:
+            item = claimed["item"]
+            holder = claimed["holder"]
+            lines.append(
+                "| ALREADY CLAIMED | "
+                f"{item.document_name} | {holder.get('session_id')} | {holder.get('ttl_expires_at')} |"
+            )
     lines.extend(
         [
             "",
             "_To suppress re-surfacing the same signature this session, include `dismiss bridge surface` in your next prompt. To disable globally, set `GTKB_NO_AXIS_2_SURFACE=1`._",
-            "",
         ]
     )
+    if role_profile == ROLE_PRIME:
+        lines.extend(
+            [
+                "",
+                "_To work an unclaimed thread, first run: `python scripts/bridge_claim_cli.py claim <slug>`._",
+            ]
+        )
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -265,6 +330,11 @@ def _user_prompt_handler(stdin_text: str) -> str:
     signature, items = _compute_actionable_for_role(role_profile)
     if not signature or not items:
         return ""
+    claimed_items: list[dict[str, Any]] = []
+    if role_profile == ROLE_PRIME:
+        items, claimed_items = _split_work_intent_claims(items, _resolve_work_intent_session_id(payload))
+        if not items and not claimed_items:
+            return ""
 
     cache = _read_cache(cache_path)
     last_surfaced = str(cache.get("last_surfaced_signature") or "")
@@ -284,7 +354,7 @@ def _user_prompt_handler(stdin_text: str) -> str:
         return ""
 
     # New signature with selected_count > 0. Emit + update cache.
-    rendered = _render_surface(items, role_profile)
+    rendered = _render_surface(items, role_profile, claimed_items)
     cache.update(
         {
             "last_surfaced_signature": signature,

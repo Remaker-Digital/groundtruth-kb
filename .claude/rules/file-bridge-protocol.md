@@ -112,6 +112,33 @@ relevant specs) and is mechanically enforced by
 this subsection is rule-cited soft authority; Codex's NO-GO at review time
 remains the reliable feedback loop.
 
+## Mandatory Pre-Drafting Claim Step
+
+Before substantive drafting begins on any bridge thread (NEW, REVISED, or
+post-implementation report), Prime Builder MUST acquire a work-intent claim via:
+
+```text
+python scripts/bridge_claim_cli.py claim <slug>
+```
+
+The claim establishes a holder record at `.gtkb-state/work-intent/<slug>.json`
+that other Prime sessions (interactive or auto-dispatched) consult before
+drafting. A claim is required even when no other session is currently working
+the thread; the claim is the audit-trail evidence that THIS session committed
+to the work.
+
+Claim exit code 0 authorizes drafting. Exit code 2 (held by another session)
+requires Prime to either select a different thread or, if the holder appears
+stale, surface the situation via AskUserQuestion before forcing through.
+
+The bridge-compliance-gate PreToolUse hook ENFORCES this rule at file-Write
+time: a Write to `bridge/<slug>-NNN.md` without a prior claim by this session
+is blocked with a clear error citing this rule.
+
+Claim release happens automatically when the helper completes a successful
+Write, or via TTL expiry (10 minutes default), or via explicit `release` for
+abandoned work.
+
 ## Mandatory Specification-Derived Verification Gate
 
 An implementation cannot receive `VERIFIED` unless the verification procedure

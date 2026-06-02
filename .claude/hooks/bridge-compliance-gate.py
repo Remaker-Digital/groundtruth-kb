@@ -17,6 +17,7 @@ All rights reserved.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import subprocess
@@ -55,6 +56,14 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
+WORK_INTENT_SESSION_ENV_VARS = (
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
 SPEC_LINK_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,
@@ -206,6 +215,33 @@ def _ancestor_or_self(root: Path, cwd_path: Path) -> bool:
     return resolved_root == resolved_cwd or resolved_root in resolved_cwd.parents
 
 
+def _is_under_claude_worktrees(path: Path) -> bool:
+    parts = path.resolve().parts
+    return any(left == ".claude" and right == "worktrees" for left, right in zip(parts, parts[1:], strict=False))
+
+
+def _has_scratch_boundary_between(root: Path, cwd_path: Path) -> bool:
+    try:
+        rel_parts = cwd_path.resolve().relative_to(root.resolve()).parts
+    except ValueError:
+        return False
+    return ".tmp" in rel_parts
+
+
+def _nearest_marker_root(cwd_path: Path) -> Path | None:
+    try:
+        resolved_cwd = cwd_path.resolve()
+    except OSError:
+        resolved_cwd = cwd_path
+    for candidate in (resolved_cwd, *resolved_cwd.parents):
+        if not (candidate / "groundtruth.toml").is_file():
+            continue
+        if _has_scratch_boundary_between(candidate, resolved_cwd):
+            return None
+        return candidate
+    return None
+
+
 def _git_common_dir_root(cwd_path: Path) -> Path | None:
     """Resolve the canonical root via ``git rev-parse --git-common-dir``.
 
@@ -241,27 +277,25 @@ def _canonical_project_root(cwd_path: Path) -> Path:
     a cwd that is NOT that root; trusting it makes the gate read an empty
     scaffold database and falsely block a valid proposal.
 
-    Resolution is fail-soft. A candidate is accepted only when it is
-    ``cwd_path`` itself or an ancestor of it (the canonical root always contains
-    the session cwd):
-
-      1. ``groundtruth_kb.bridge.paths.resolve_project_root()`` when importable
-         -- the same import-with-ImportError-fallback pattern this hook uses for
-         ``groundtruth_kb.governance.output``.
-      2. A dependency-free ``git rev-parse --git-common-dir`` rooted at
-         ``cwd_path``.
-      3. ``cwd_path`` -- the final fail-soft floor, preserving pre-fix behavior.
+    Resolution is fail-soft and uses ``cwd_path`` directly; package-level root
+    helpers rely on process cwd and are therefore unsafe for hook unit tests that
+    pass a synthetic cwd. Linked worktrees resolve through ``git-common-dir``;
+    normal subdirectories use the nearest ``groundtruth.toml`` marker; scratch
+    directories under ``.tmp`` stay hermetic and fall back to ``cwd_path``.
     """
-    try:
-        from groundtruth_kb.bridge.paths import resolve_project_root
-
-        candidate = resolve_project_root()
-    except Exception:  # fail-soft: import failure or resolver error falls through
-        candidate = None
-    if candidate is not None and _ancestor_or_self(candidate, cwd_path):
-        return candidate
+    if _is_under_claude_worktrees(cwd_path):
+        git_root = _git_common_dir_root(cwd_path)
+        if git_root is not None and _ancestor_or_self(git_root, cwd_path):
+            return git_root
+    marker_root = _nearest_marker_root(cwd_path)
+    if marker_root is not None:
+        return marker_root
     git_root = _git_common_dir_root(cwd_path)
-    if git_root is not None and _ancestor_or_self(git_root, cwd_path):
+    if (
+        git_root is not None
+        and _ancestor_or_self(git_root, cwd_path)
+        and not _has_scratch_boundary_between(git_root, cwd_path)
+    ):
         return git_root
     return cwd_path
 
@@ -314,6 +348,68 @@ def _extract_bridge_id_from_path(file_path: str) -> str | None:
     filename = Path(file_path.replace("\\", "/")).name
     match = re.match(r"(?P<bridge_id>.+)-\d{3}\.md$", filename)
     return match.group("bridge_id") if match else None
+
+
+def _resolve_work_intent_session_id(payload: dict) -> str:
+    session_id = str(payload.get("session_id") or "").strip()
+    if session_id:
+        return session_id
+    for env_var in WORK_INTENT_SESSION_ENV_VARS:
+        env_value = os.environ.get(env_var, "").strip()
+        if env_value:
+            return env_value
+    return ""
+
+
+def _work_intent_project_root(cwd_path: Path, file_path: str) -> Path:
+    candidate_path = Path(file_path)
+    if not candidate_path.is_absolute():
+        candidate_path = cwd_path / candidate_path
+    try:
+        bridge_dir = candidate_path.resolve().parent
+    except OSError:
+        bridge_dir = candidate_path.parent
+    if bridge_dir.name.lower() == "bridge":
+        candidate_root = bridge_dir.parent
+        if (candidate_root / "groundtruth.toml").is_file():
+            return candidate_root.resolve()
+    return _canonical_project_root(cwd_path)
+
+
+def _bridge_work_intent_deny_reason(*, cwd_path: Path, file_path: str, payload: dict) -> str | None:
+    if not _is_bridge_markdown_file(file_path):
+        return None
+    bridge_id = _extract_bridge_id_from_path(file_path)
+    if bridge_id is None:
+        return None
+    session_id = _resolve_work_intent_session_id(payload)
+    if not session_id:
+        return (
+            f"[Governance] Bridge file Write blocked: no harness session id is available for thread "
+            f"'{bridge_id}'. Acquire a work-intent claim first with: "
+            f"python scripts/bridge_claim_cli.py claim {bridge_id} --session-id <session-id>"
+        )
+    try:
+        from scripts.bridge_work_intent_registry import WorkIntentRegistryError, current_holder
+    except Exception as exc:  # pragma: no cover - defensive runtime guard.
+        return f"[Governance] Bridge file Write blocked: work-intent registry unavailable: {exc}"
+    try:
+        holder = current_holder(bridge_id, project_root=_work_intent_project_root(cwd_path, file_path))
+    except WorkIntentRegistryError as exc:
+        return f"[Governance] Bridge file Write blocked: work-intent registry error for '{bridge_id}': {exc}"
+    if holder is None:
+        return (
+            f"[Governance] Bridge file Write blocked: no prior claim for thread '{bridge_id}'. "
+            "Per .claude/rules/file-bridge-protocol.md 'Mandatory Pre-Drafting Claim Step', run: "
+            f"python scripts/bridge_claim_cli.py claim {bridge_id}"
+        )
+    if holder.get("session_id") != session_id:
+        return (
+            f"[Governance] Bridge file Write blocked: thread '{bridge_id}' is claimed by "
+            f"{holder.get('session_id')} until {holder.get('ttl_expires_at')}. Acquire claim first: "
+            f"python scripts/bridge_claim_cli.py claim {bridge_id}"
+        )
+    return None
 
 
 # Body status-token rule (GTKB-GOV-PROPOSAL-STANDARDS Slice 1; owner decision
@@ -1122,6 +1218,11 @@ def main() -> None:
     file_path = tool_input.get("file_path", "")
     if not file_path:
         emit_pass()
+        sys.exit(0)
+
+    work_intent_reason = _bridge_work_intent_deny_reason(cwd_path=cwd_path, file_path=file_path, payload=payload)
+    if work_intent_reason:
+        emit_deny("PreToolUse", work_intent_reason)
         sys.exit(0)
 
     content = str(tool_input.get("content", ""))

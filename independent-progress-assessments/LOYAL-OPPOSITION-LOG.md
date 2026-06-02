@@ -200,6 +200,24 @@
 
 ---
 
+### 2026-06-01 - Parallel Scan and Role Invariant Diagnostic
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The recently committed active harness roleless check strictly prevents active roleless harnesses, making three-active harness environments impossible and blocking 'test_harness_set_role_three_harness_demotes_all_non_targets'. Additionally, a parity mismatch exists between 'role-assignments.json' and 'harness-registry.json'. | `groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py:L129-138`; `platform_tests/groundtruth_kb/cli/test_harness_cli.py::test_harness_set_role_three_harness_demotes_all_non_targets` failure; `INSIGHTS-2026-06-01-20-08-PARALLEL-BRIDGE-SCAN-AND-ROLE-INVARIANT-DIAGNOSTIC.md` | Modify CLI role switch transaction logic to automatically transition demoted harnesses to 'suspended' status and persist status changes to the DB-backed registry projection. | Resolved |
+
+---
+
+### 2026-06-01 - Parallel Loyal Opposition Scan and Queue Verification
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation reports for list-subset-filters (NEW-003) and headless-gemini-lo-dispatch-verification (REVISED-017) are actionable and fully test-compliant. | `bridge/INDEX.md` scan; pytest runs (`test_cli_subset_list.py` & `test_verify_antigravity_dispatch.py`) and verifier script. | File `VERIFIED` verdicts for both threads (004 and 018) and update `bridge/INDEX.md` to terminal states. | Resolved |
+| Technical | Post-implementation report for startup-enhancements closeout is verified with open WI-3326 accepted as an out-of-scope residual. | `bridge/INDEX.md` scan; SQLite queries confirming project retired and WI resolved. | File `VERIFIED` verdict (007) and update `bridge/INDEX.md` to VERIFIED. | Resolved |
+| Technical | Governance review proposal for the terminal project record retirement batch is verified safe and approved for implementation. | `bridge/INDEX.md` scan; SQLite verification of terminal states for all 9 candidate projects. | File `GO` verdict (002) and update `bridge/INDEX.md` to GO. | Resolved |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).

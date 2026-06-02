@@ -39,6 +39,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -116,6 +117,10 @@ class BridgeComplianceError(RuntimeError):
     """
 
 
+class BridgeWorkIntentError(RuntimeError):
+    """Raised when bridge work-intent acquisition blocks a helper write."""
+
+
 # Credential-only catalog. Iterates ``CREDENTIAL_PATTERNS + BASH_EXTRAS``
 # directly — matching the scanner-safe-writer policy of excluding
 # ``PII_PATTERNS`` (phone, email, ipv4) so operators can reference
@@ -123,6 +128,72 @@ class BridgeComplianceError(RuntimeError):
 _SCAN_CATALOG: list[tuple[re.Pattern[str], str, str]] = [
     (spec.pattern, spec.name, spec.description) for spec in list(CREDENTIAL_PATTERNS) + list(BASH_EXTRAS)
 ]
+
+WORK_INTENT_TTL_SECONDS = 300
+WORK_INTENT_SESSION_ENV_VARS = (
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
+
+
+def resolve_work_intent_session_id(environ: Mapping[str, str] | None = None) -> str:
+    """Resolve the current helper session id from supported env vars."""
+    active_env = os.environ if environ is None else environ
+    for name in WORK_INTENT_SESSION_ENV_VARS:
+        value = active_env.get(name)
+        if value and value.strip():
+            return value.strip()
+    expected = ", ".join(WORK_INTENT_SESSION_ENV_VARS)
+    raise BridgeWorkIntentError(
+        f"Bridge work-intent session id required before writing a bridge file. Set one of: {expected}."
+    )
+
+
+def _load_work_intent_registry(project_root: Path) -> Any:
+    for scripts_dir in (project_root / "scripts", PROJECT_ROOT / "scripts"):
+        if scripts_dir.is_dir() and str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+    try:
+        return importlib.import_module("bridge_work_intent_registry")
+    except Exception as exc:  # noqa: BLE001 - raise helper-specific guidance
+        raise BridgeWorkIntentError(
+            "Bridge work-intent registry unavailable; expected scripts/bridge_work_intent_registry.py to be importable."
+        ) from exc
+
+
+def _acquire_bridge_work_intent(thread_slug: str, session_id: str, *, project_root: Path) -> Any:
+    registry = _load_work_intent_registry(project_root)
+    holder = registry.current_holder(thread_slug, project_root=project_root)
+    holder_session = holder.get("session_id") if holder else None
+    if holder_session and holder_session != session_id:
+        expires = holder.get("ttl_expires_at", "unknown expiration")
+        raise BridgeWorkIntentError(
+            f"Bridge work-intent for thread {thread_slug!r} is held by session "
+            f"{holder_session!r} until {expires}; current session {session_id!r} "
+            "cannot write. Claim another thread or wait for the holder to release/expire."
+        )
+    if registry.acquire(
+        thread_slug,
+        session_id,
+        ttl_seconds=WORK_INTENT_TTL_SECONDS,
+        project_root=project_root,
+    ):
+        return registry
+    holder = registry.current_holder(thread_slug, project_root=project_root)
+    holder_session = holder.get("session_id") if holder else "unknown"
+    expires = holder.get("ttl_expires_at", "unknown expiration") if holder else "unknown expiration"
+    raise BridgeWorkIntentError(
+        f"Bridge work-intent acquire failed for thread {thread_slug!r}; "
+        f"current holder is {holder_session!r} until {expires}."
+    )
+
+
+def _release_bridge_work_intent(registry: Any, thread_slug: str, session_id: str, *, project_root: Path) -> None:
+    registry.release(thread_slug, session_id, project_root=project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -914,6 +985,7 @@ def propose_bridge(
             2 total attempts.
     """
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
+    project_root = bridge_root.parent.resolve()
     bridge_file = bridge_root / f"{topic_slug}-001.md"
     index_path = bridge_root / "INDEX.md"
 
@@ -938,6 +1010,8 @@ def propose_bridge(
             f"{bridge_file} already exists — pick a fresh slug or bump to "
             f"-002 for a REVISED version. The skill never silently overwrites."
         )
+    session_id = resolve_work_intent_session_id()
+    work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
     bridge_file.parent.mkdir(parents=True, exist_ok=True)
     bridge_file.write_bytes(body_to_write.encode("utf-8"))
 
@@ -963,6 +1037,7 @@ def propose_bridge(
                 _trim(bridge_root.parent, current_thread=topic_slug)
             except Exception:  # noqa: BLE001 - archival must never fail a bridge write
                 pass
+            _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
             return bridge_file
         except BridgeIndexConflictError as exc:
             last_error = exc
@@ -1038,6 +1113,8 @@ def propose_bridge_codex_non_bypass(
         raise BridgeFileAlreadyExistsError(
             f"{bridge_file} already exists - pick a fresh slug or version. The skill never silently overwrites."
         )
+    session_id = resolve_work_intent_session_id()
+    work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
     bridge_file.parent.mkdir(parents=True, exist_ok=True)
     bridge_file.write_bytes(body_to_write.encode("utf-8"))
 
@@ -1051,6 +1128,7 @@ def propose_bridge_codex_non_bypass(
                 version=version,
                 status=status,
             )
+            _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
             return bridge_file
         except BridgeIndexConflictError as exc:
             last_error = exc
@@ -1067,11 +1145,14 @@ __all__ = [
     "BridgeFileAlreadyExistsError",
     "BridgeComplianceError",
     "BridgeIndexConflictError",
+    "BridgeWorkIntentError",
     "CredentialHitsFoundError",
     "DEFAULT_GLOSSARY_PATH",
     "DEFAULT_PREPOPULATION_LOG",
     "DEFAULT_PRE_POPULATION_LIMIT",
     "RedactionResidualError",
+    "WORK_INTENT_SESSION_ENV_VARS",
+    "WORK_INTENT_TTL_SECONDS",
     "compose_index_update",
     "compose_proposal",
     "handle_hits_abort_or_redact",
@@ -1079,5 +1160,6 @@ __all__ = [
     "propose_bridge",
     "propose_bridge_codex_non_bypass",
     "redact_credential_hits",
+    "resolve_work_intent_session_id",
     "scan_credential_hits",
 ]

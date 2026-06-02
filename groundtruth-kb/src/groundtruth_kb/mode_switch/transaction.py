@@ -208,6 +208,8 @@ def _apply_active_role_assignment(
                 roles.append(ROLE_LOYAL_OPPOSITION)
             if harness_id == prime_id:
                 roles.append(ROLE_PRIME_BUILDER)
+            if not roles:
+                item["status"] = "suspended"
         item["role"] = roles
     return tuple(harnesses[target_id].get("role") or [])
 
@@ -263,7 +265,9 @@ def _mirror_role_map_to_registry(
                 continue
             current_role = _decode_harness_json_field(current.get("role"))
             current_role_list = current_role if isinstance(current_role, list) else []
-            if sorted(str(r) for r in current_role_list) == sorted(new_role):
+            current_status = str(current.get("status") or "registered")
+            new_status = str(record.get("status") or "registered")
+            if sorted(str(r) for r in current_role_list) == sorted(new_role) and current_status == new_status:
                 continue
             db.insert_harness(
                 id=str(harness_id),
@@ -272,7 +276,7 @@ def _mirror_role_map_to_registry(
                 role=new_role,
                 changed_by="mode-switch-transaction",
                 change_reason=change_reason,
-                status=str(current.get("status") or "registered"),
+                status=new_status,
                 reviewer_precedence=current.get("reviewer_precedence"),
                 invocation_surfaces=_decode_harness_json_field(current.get("invocation_surfaces")),
                 capabilities_ref=current.get("capabilities_ref"),
