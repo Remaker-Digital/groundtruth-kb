@@ -383,9 +383,7 @@ class ProjectLifecycleService:
             if str(membership.get("membership_status") or "").strip().lower() == "active"
         ]
 
-    def _authorization_completion_ready(
-        self, authorization: dict[str, Any], verified_for_project: set[str]
-    ) -> bool:
+    def _authorization_completion_ready(self, authorization: dict[str, Any], verified_for_project: set[str]) -> bool:
         """True when ``authorization`` is active and every gating work item is in
         ``verified_for_project``.
 
@@ -424,12 +422,16 @@ class ProjectLifecycleService:
         contribute. Reads ``current_project_artifact_links`` (latest-version
         view) so superseded rows are excluded.
         """
-        rows = self.db._get_conn().execute(
-            "SELECT project_id, artifact_ref FROM current_project_artifact_links "
-            "WHERE artifact_type = 'bridge_thread' "
-            "AND relationship = 'implements' "
-            "AND status = 'active'"
-        ).fetchall()
+        rows = (
+            self.db._get_conn()
+            .execute(
+                "SELECT project_id, artifact_ref FROM current_project_artifact_links "
+                "WHERE artifact_type = 'bridge_thread' "
+                "AND relationship = 'implements' "
+                "AND status = 'active'"
+            )
+            .fetchall()
+        )
         by_project: dict[str, set[str]] = {}
         for project_id, slug in rows:
             if project_id and slug:

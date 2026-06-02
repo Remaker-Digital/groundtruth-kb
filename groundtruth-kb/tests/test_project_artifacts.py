@@ -557,20 +557,23 @@ def test_auto_complete_does_not_cross_project_retire(tmp_path) -> None:
     """
     bridge = tmp_path / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
-    (bridge / "thread-a-001.md").write_text(
-        "NEW\n\n# Impl report\n\nWork Item: WI-8002\n", encoding="utf-8"
-    )
+    (bridge / "thread-a-001.md").write_text("NEW\n\n# Impl report\n\nWork Item: WI-8002\n", encoding="utf-8")
     (bridge / "thread-a-002.md").write_text("VERIFIED\n\n# Codex verdict\n", encoding="utf-8")
     (bridge / "INDEX.md").write_text(
-        "# Bridge Index\n\nDocument: thread-a\n"
-        "VERIFIED: bridge/thread-a-002.md\nNEW: bridge/thread-a-001.md\n\n",
+        "# Bridge Index\n\nDocument: thread-a\nVERIFIED: bridge/thread-a-002.md\nNEW: bridge/thread-a-001.md\n\n",
         encoding="utf-8",
     )
 
     db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
     try:
         db.insert_deliberation(
-            "DELIB-SEED", "owner_conversation", "seed", "seed", "{}", "t", "s",
+            "DELIB-SEED",
+            "owner_conversation",
+            "seed",
+            "seed",
+            "{}",
+            "t",
+            "s",
             outcome="owner_decision",
         )
         db.insert_spec(id="SPEC-SEED", title="Seed", status="verified", changed_by="t", change_reason="s")
@@ -580,12 +583,24 @@ def test_auto_complete_does_not_cross_project_retire(tmp_path) -> None:
         db.insert_work_item("WI-8002", "shared WI", "new", "backlog", "open", "t", "s")
         db.link_project_work_item("PROJECT-B", "WI-8002", "t", "s")
         db.add_project_artifact_link(
-            "PROJECT-A", "bridge_thread", "thread-a", "t", "s", relationship="implements",
+            "PROJECT-A",
+            "bridge_thread",
+            "thread-a",
+            "t",
+            "s",
+            relationship="implements",
         )
         db.insert_project_authorization(
-            "PROJECT-B", "Auth B", "DELIB-SEED", "Bounded scope.", "t", "s",
-            id="PAUTH-B", status="active",
-            included_work_item_ids=["WI-8002"], included_spec_ids=["SPEC-SEED"],
+            "PROJECT-B",
+            "Auth B",
+            "DELIB-SEED",
+            "Bounded scope.",
+            "t",
+            "s",
+            id="PAUTH-B",
+            status="active",
+            included_work_item_ids=["WI-8002"],
+            included_spec_ids=["SPEC-SEED"],
         )
 
         service = ProjectLifecycleService(db)
@@ -601,7 +616,9 @@ def test_auto_complete_does_not_cross_project_retire(tmp_path) -> None:
         # complete_project_authorization() also refuses PROJECT-B directly.
         with pytest.raises(ProjectLifecycleError, match="not completion-ready"):
             service.complete_project_authorization(
-                "PAUTH-B", project_root=tmp_path, change_reason="complete",
+                "PAUTH-B",
+                project_root=tmp_path,
+                change_reason="complete",
             )
     finally:
         db.close()

@@ -308,22 +308,23 @@ def test_cross_project_implements_link_does_not_satisfy_other_project(scanner, t
     bridge = tmp_path / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
     # thread-a is PROJECT-A's VERIFIED addressing thread; it cites WI-8002.
-    (bridge / "thread-a-001.md").write_text(
-        "NEW\n\n# Impl report\n\nWork Item: WI-8002\n", encoding="utf-8"
-    )
-    (bridge / "thread-a-002.md").write_text(
-        "VERIFIED\n\n# Codex verdict\n", encoding="utf-8"
-    )
+    (bridge / "thread-a-001.md").write_text("NEW\n\n# Impl report\n\nWork Item: WI-8002\n", encoding="utf-8")
+    (bridge / "thread-a-002.md").write_text("VERIFIED\n\n# Codex verdict\n", encoding="utf-8")
     (bridge / "INDEX.md").write_text(
-        "# Bridge Index\n\nDocument: thread-a\n"
-        "VERIFIED: bridge/thread-a-002.md\nNEW: bridge/thread-a-001.md\n\n",
+        "# Bridge Index\n\nDocument: thread-a\nVERIFIED: bridge/thread-a-002.md\nNEW: bridge/thread-a-001.md\n\n",
         encoding="utf-8",
     )
 
     db = KnowledgeDB(tmp_path / "groundtruth.db")
     try:
         db.insert_deliberation(
-            "DELIB-SEED", "owner_conversation", "seed", "seed", "{}", "t", "s",
+            "DELIB-SEED",
+            "owner_conversation",
+            "seed",
+            "seed",
+            "{}",
+            "t",
+            "s",
             outcome="owner_decision",
         )
         db.insert_spec(id="SPEC-SEED", title="Seed", status="verified", changed_by="t", change_reason="s")
@@ -334,13 +335,25 @@ def test_cross_project_implements_link_does_not_satisfy_other_project(scanner, t
         db.insert_work_item("WI-8002", "shared WI", "new", "backlog", "open", "t", "s")
         db.link_project_work_item("PROJECT-B", "WI-8002", "t", "s")
         db.add_project_artifact_link(
-            "PROJECT-A", "bridge_thread", "thread-a", "t", "s", relationship="implements",
+            "PROJECT-A",
+            "bridge_thread",
+            "thread-a",
+            "t",
+            "s",
+            relationship="implements",
         )
         for pid in ("PROJECT-A", "PROJECT-B"):
             db.insert_project_authorization(
-                pid, f"Auth {pid}", "DELIB-SEED", "Bounded scope.", "t", "s",
-                id=f"PAUTH-{pid[-1]}", status="active",
-                included_work_item_ids=["WI-8002"], included_spec_ids=["SPEC-SEED"],
+                pid,
+                f"Auth {pid}",
+                "DELIB-SEED",
+                "Bounded scope.",
+                "t",
+                "s",
+                id=f"PAUTH-{pid[-1]}",
+                status="active",
+                included_work_item_ids=["WI-8002"],
+                included_spec_ids=["SPEC-SEED"],
             )
     finally:
         db.close()
@@ -352,9 +365,7 @@ def test_cross_project_implements_link_does_not_satisfy_other_project(scanner, t
 
     # PROJECT-B must NOT be completion-ready (the F1 false positive).
     ready_ids = {r.project_id for r in scanner.completion_ready(tmp_path)}
-    assert "PROJECT-B" not in ready_ids, (
-        "F1 regression: PROJECT-A's implements link must not complete PROJECT-B"
-    )
+    assert "PROJECT-B" not in ready_ids, "F1 regression: PROJECT-A's implements link must not complete PROJECT-B"
     # PROJECT-B's WI-8002 is correctly reported unverified for PROJECT-B.
     full = scanner.scan(tmp_path)
     auth_b = next(r for r in full if r.authorization_id == "PAUTH-B")
