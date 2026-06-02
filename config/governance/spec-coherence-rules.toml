@@ -1,0 +1,39 @@
+# Deterministic spec-coherence rules for Layer A (`gt validate spec-coherence`).
+# These rules emit review candidates only; they do not adjudicate final spec truth
+# or mutate MemBase.
+
+[[rules]]
+id = "surface-overlap-opposite-polarity"
+class = "surface_overlap"
+description = "Detect specs that constrain the same named surface with opposite-polarity language."
+surface_tags = [
+  "session-startup",
+  "cached_startup_snapshot_authority",
+  "startup_snapshot_authority",
+  "cached startup snapshot",
+]
+polarity_pairs = [
+  { positive = "\\blive\\s+(?:project\\s+)?sources?\\b|\\bmust\\s+(?:read|load|use|resolve)\\b[^.]{0,120}\\blive\\s+(?:project\\s+)?sources?\\b", negative = "\\bcached\\s+(?:startup\\s+)?snapshots?\\b|\\bcached\\s+summaries?\\b|\\bgenerated\\s+reports?\\b" },
+  { positive = "\\bmust\\s+use\\b|\\brequires?\\b", negative = "\\bmust\\s+not\\s+use\\b|\\bmust\\s+never\\s+use\\b|\\bprohibited\\b|\\bforbidden\\b" },
+]
+classification = "contradiction_candidate"
+remediation_hint = "Review the pair and either clarify authority ordering or split the surfaces if both constraints are valid."
+
+[[rules]]
+id = "authority-hierarchy-invariant"
+class = "hierarchy_violation"
+description = "Detect child DCL/SPEC/PB behavior that contradicts a parent GOV/ADR constraint."
+parent_types = ["governance", "architecture_decision"]
+child_types = ["design_constraint", "specification", "protected_behavior"]
+polarity_pairs = [
+  { positive = "\\bmust\\s+(?!not\\b)(?:use|read|load|write|allow|permit|require)\\b|\\brequires?\\b|\\ballows?\\b|\\bpermits?\\b", negative = "\\bmust\\s+not\\b|\\bshall\\s+not\\b|\\bmust\\s+never\\b|\\bprohibit(?:s|ed)?\\b|\\bforbid(?:s|den)?\\b|\\bdisallow(?:s|ed)?\\b" },
+]
+classification = "hierarchy_violation_candidate"
+remediation_hint = "Review the child-parent relationship and revise the lower-authority artifact or document an explicit exception."
+
+[[rules]]
+id = "status-drift"
+class = "status_drift"
+description = "Detect implemented or verified child specs whose parent was amended after the child's verification timestamp."
+classification = "verification_staleness"
+remediation_hint = "Re-run or re-open child verification after reviewing the parent amendment."

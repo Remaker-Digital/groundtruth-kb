@@ -40,6 +40,27 @@ from groundtruth_kb.cli_deliberations_record import (
 )
 from groundtruth_kb.cli_spec_record import SPEC_RECORD_TYPES, SpecRecordError, SpecRecordRequest, record_spec
 from groundtruth_kb.cli_spec_update import SpecUpdateError, SpecUpdateRequest, update_spec
+from groundtruth_kb.coherence import (
+    CoherenceRuleError,
+)
+from groundtruth_kb.coherence import (
+    emit_json as emit_coherence_json,
+)
+from groundtruth_kb.coherence import (
+    emit_markdown as emit_coherence_markdown,
+)
+from groundtruth_kb.coherence import (
+    load_rules as load_coherence_rules,
+)
+from groundtruth_kb.coherence import (
+    load_specs_from_db as load_coherence_specs_from_db,
+)
+from groundtruth_kb.coherence import (
+    make_result as make_coherence_result,
+)
+from groundtruth_kb.coherence import (
+    run_all as run_coherence_checks,
+)
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
@@ -195,6 +216,72 @@ def hygiene_sweep(
     click.echo(f"hygiene sweep: {result.finding_count} finding(s); output: {out_dir}")
     if not report_only and result.finding_count > 0:
         raise SystemExit(2)
+
+
+# ---------------------------------------------------------------------------
+# gt validate - deterministic validation services
+# ---------------------------------------------------------------------------
+
+
+@main.group("validate")
+def validate_group() -> None:
+    """Deterministic validation services."""
+
+
+@validate_group.command("spec-coherence")
+@click.option("--rule-set", default=None, help="Limit to one coherence rule id; default loads all rules.")
+@click.option(
+    "--output",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Output directory; default: .gtkb-state/spec-coherence/<run-id>/.",
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["json", "md", "both"]),
+    default="both",
+    show_default=True,
+    help="Output formats to emit.",
+)
+@click.option("--fail-on-findings", is_flag=True, default=False, help="Exit 5 when findings are emitted.")
+@click.option("--db-path", type=click.Path(dir_okay=False), default=None, help="Override GroundTruth DB path.")
+@click.pass_context
+def validate_spec_coherence(
+    ctx: click.Context,
+    rule_set: str | None,
+    output: str | None,
+    fmt: str,
+    fail_on_findings: bool,
+    db_path: str | None,
+) -> None:
+    """Run deterministic Layer A spec-coherence checks.
+
+    Reads ``current_specifications`` only and emits review-candidate findings as
+    JSON and/or markdown. It does not mutate MemBase or file remediation work.
+    """
+    config = _resolve_config(ctx)
+    rules_path = config.project_root / "config" / "governance" / "spec-coherence-rules.toml"
+    db = Path(db_path) if db_path else config.db_path
+    if not db.is_absolute():
+        db = config.project_root / db
+    try:
+        rules = load_coherence_rules(rules_path, name=rule_set)
+        specs = load_coherence_specs_from_db(db)
+        findings = run_coherence_checks(specs, rules)
+    except CoherenceRuleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    result = make_coherence_result(db_path=db, rule_set_path=rules_path, specs=specs, rules=rules, findings=findings)
+    out_dir = Path(output) if output else config.project_root / ".gtkb-state" / "spec-coherence" / result.run_id
+    if not out_dir.is_absolute():
+        out_dir = config.project_root / out_dir
+    if fmt in ("json", "both"):
+        emit_coherence_json(result, out_dir / "findings.json")
+    if fmt in ("md", "both"):
+        emit_coherence_markdown(result, out_dir / "summary.md")
+    click.echo(f"spec coherence: {result.finding_count} finding(s); output: {out_dir}")
+    if fail_on_findings and result.finding_count > 0:
+        raise SystemExit(5)
 
 
 # ---------------------------------------------------------------------------

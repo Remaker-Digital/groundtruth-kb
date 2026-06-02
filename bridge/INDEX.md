@@ -361,6 +361,7 @@ NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementati
 NEW: bridge/gtkb-project-completion-scanner-addressing-thread-fix-implementation-001.md
 
 Document: gtkb-spec-coherence-cli
+NEW: bridge/gtkb-spec-coherence-cli-003.md
 GO: bridge/gtkb-spec-coherence-cli-002.md
 NEW: bridge/gtkb-spec-coherence-cli-001.md
 
