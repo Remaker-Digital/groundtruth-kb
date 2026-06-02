@@ -683,6 +683,7 @@ NO-GO: bridge/gtkb-s358-w4-enforcement-calibration-002.md
 NEW: bridge/gtkb-s358-w4-enforcement-calibration-001.md
 
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
+REVISED: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-005.md
 NO-GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-004.md
 NEW: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-003.md
 GO: bridge/gtkb-project-completion-scanner-wi-auto-regex-fix-002.md
