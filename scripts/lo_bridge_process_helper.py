@@ -74,7 +74,9 @@ def main() -> int:
     claim_args = [sys.executable, str(SCRIPTS_DIR / "bridge_claim_cli.py"), "claim", slug, "--session-id", session_id]
     res_claim = run_cmd(claim_args)
     if res_claim.returncode != 0:
-        log(f"Work-intent claim failed with exit code {res_claim.returncode}. stdout: {res_claim.stdout.strip()} stderr: {res_claim.stderr.strip()}")
+        log(
+            f"Work-intent claim failed with exit code {res_claim.returncode}. stdout: {res_claim.stdout.strip()} stderr: {res_claim.stderr.strip()}"
+        )
         if res_claim.returncode == 2:
             log("Claim held by another session; terminating gracefully to avoid duplicate processing.")
             return 0
@@ -96,7 +98,12 @@ def main() -> int:
         log(f"Parsed metadata: bridge_kind={bridge_kind}, title='{meta.get('Title')}'")
 
         # Run preflights
-        preflight_app_args = [sys.executable, str(SCRIPTS_DIR / "bridge_applicability_preflight.py"), "--bridge-id", slug]
+        preflight_app_args = [
+            sys.executable,
+            str(SCRIPTS_DIR / "bridge_applicability_preflight.py"),
+            "--bridge-id",
+            slug,
+        ]
         res_app = run_cmd(preflight_app_args)
         log(f"Applicability Preflight exit code: {res_app.returncode}")
 
@@ -127,7 +134,7 @@ def main() -> int:
                     for kw in ("python", "groundtruth-kb"):
                         if kw in cleaned:
                             idx = cleaned.find(kw)
-                            if idx > 0 and cleaned[idx-1].isalnum():
+                            if idx > 0 and cleaned[idx - 1].isalnum():
                                 continue
                             cleaned = cleaned[idx:].strip()
                             break
@@ -138,7 +145,7 @@ def main() -> int:
                 if " expected" in cleaned:
                     cleaned = cleaned.split(" expected")[0].strip()
                 # strip leading bullets/numbers and spaces
-                cleaned = re.sub(r'^[-*\+\s\d\.]+\s+', '', cleaned)
+                cleaned = re.sub(r"^[-*\+\s\d\.]+\s+", "", cleaned)
                 test_commands.append(cleaned)
 
         log(f"Found {len(test_commands)} test verification commands to run.")
@@ -190,7 +197,7 @@ def main() -> int:
 
         # Construct verdict file markdown
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        
+
         # Build prior deliberations list
         delibs = re.findall(r"\bDELIB-[A-Z0-9_-]+\b", content)
         delib_lines = "\n".join(f"- `{d}`" for d in sorted(set(delibs))) if delibs else "- None."
@@ -204,7 +211,9 @@ def main() -> int:
         for s in sorted(set(specs)):
             matched_test = "preflight checks"
             for cmd in test_commands:
-                if s.lower() in cmd.lower() or any(p in cmd.lower() for p in ("drift", "scaffold", "isolation", "authorization", "start")):
+                if s.lower() in cmd.lower() or any(
+                    p in cmd.lower() for p in ("drift", "scaffold", "isolation", "authorization", "start")
+                ):
                     matched_test = cmd
                     break
             spec_to_test_rows.append(f"| {s} | `{matched_test}` | yes | PASS |")
@@ -219,11 +228,11 @@ def main() -> int:
 bridge_kind: governance_review
 Document: {slug}
 Version: {next_ver}
-Responds to: bridge/{slug}-{padded_ver}.md {operative_filename.split('.')[-1].upper()}
+Responds to: bridge/{slug}-{padded_ver}.md {operative_filename.split(".")[-1].upper()}
 Author: Loyal Opposition (Antigravity, harness C)
 Date: {date_str} UTC
 
-# {meta.get('Title')} - {verdict_status} Verdict
+# {meta.get("Title")} - {verdict_status} Verdict
 
 ## Applicability Preflight
 
@@ -318,10 +327,9 @@ None.
             # Remove any existing line for this verdict file to prevent duplicates
             target_pattern = f"bridge/{slug}-{next_ver}.md"
             filtered_lines = [
-                line for line in lines
-                if target_pattern not in line or line.strip().startswith("Document:")
+                line for line in lines if target_pattern not in line or line.strip().startswith("Document:")
             ]
-            
+
             updated, inserted = [], False
             new_line = f"{verdict_status}: bridge/{slug}-{next_ver}.md"
             for line in filtered_lines:
@@ -340,7 +348,14 @@ None.
 
     finally:
         # Step 3.5: Claim Release
-        release_args = [sys.executable, str(SCRIPTS_DIR / "bridge_claim_cli.py"), "release", slug, "--session-id", session_id]
+        release_args = [
+            sys.executable,
+            str(SCRIPTS_DIR / "bridge_claim_cli.py"),
+            "release",
+            slug,
+            "--session-id",
+            session_id,
+        ]
         run_cmd(release_args)
         log("Claim released.")
 
