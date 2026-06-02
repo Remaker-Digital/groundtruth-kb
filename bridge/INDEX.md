@@ -4,7 +4,7 @@
 <!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
-<!-- Role-intent sentinel (per GTKB-BRIDGE-INDEX-ROLE-INTENT-SENTINEL, Slice 1; NON-AUTHORITATIVE):
+<!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
      Authority: harness-state/role-assignments.json (role) + harness-state/harness-identities.json (identity).
      This sentinel is a checksum mirror only. It MUST NOT be used to override the durable role record.
      Prime Builder harness:    A (Codex)
@@ -13,6 +13,7 @@
      Sentinel updated:         2026-06-02T00:17:37Z
 -->
 Document: gtkb-terminal-project-record-retirement-batch
+NEW: bridge/gtkb-terminal-project-record-retirement-batch-005.md
 GO: bridge/gtkb-terminal-project-record-retirement-batch-004.md
 REVISED: bridge/gtkb-terminal-project-record-retirement-batch-003.md
 GO: bridge/gtkb-terminal-project-record-retirement-batch-002.md
@@ -43,6 +44,7 @@ GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
 NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
 
 Document: gtkb-da-enforcement-completion-slice1-decompose
+NEW: bridge/gtkb-da-enforcement-completion-slice1-decompose-006.md
 GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-005.md
 REVISED: bridge/gtkb-da-enforcement-completion-slice1-decompose-004.md
 NO-GO: bridge/gtkb-da-enforcement-completion-slice1-decompose-003.md
