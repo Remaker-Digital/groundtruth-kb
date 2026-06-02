@@ -857,6 +857,7 @@ NO-GO: bridge/gtkb-audit-script-withdrawn-regex-fix-002.md
 NEW: bridge/gtkb-audit-script-withdrawn-regex-fix-001.md
 
 Document: gtkb-isolation-019-program-closeout
+NEW: bridge/gtkb-isolation-019-program-closeout-007.md
 GO: bridge/gtkb-isolation-019-program-closeout-006.md
 REVISED: bridge/gtkb-isolation-019-program-closeout-005.md
 NO-GO: bridge/gtkb-isolation-019-program-closeout-004.md
