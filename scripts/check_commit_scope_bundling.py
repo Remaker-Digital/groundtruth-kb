@@ -279,17 +279,21 @@ def _resolve_project_root(raw_root: Path, repository_root: Path) -> Path:
 
 
 def main(argv: list[str] | None = None, *, repository_root: Path | None = None) -> int:
+    raw_argv = sys.argv[1:] if argv is None else list(argv)
+    default_project_root = repository_root or PROJECT_ROOT
+    explicit_project_root = any(arg == "--project-root" or arg.startswith("--project-root=") for arg in raw_argv)
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--staged", action="store_true", help="Read staged paths from git diff --cached")
     parser.add_argument("--paths", nargs="*", help="Explicit paths to check, relative to project root")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
-    parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    args = parser.parse_args(argv)
+    parser.add_argument("--project-root", type=Path, default=default_project_root)
+    args = parser.parse_args(raw_argv)
 
     if not args.staged and not args.paths:
         parser.error("must pass --staged or --paths")
 
-    repo_root = _repository_root(repository_root or PROJECT_ROOT)
+    repo_root = _repository_root(PROJECT_ROOT if explicit_project_root else default_project_root)
     try:
         project_root = _resolve_project_root(args.project_root, repo_root)
         result = evaluate(project_root, paths=list(args.paths) if args.paths else None)

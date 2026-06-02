@@ -611,6 +611,7 @@ GO: bridge/gtkb-bridge-target-paths-kb-mutation-check-002.md
 NEW: bridge/gtkb-bridge-target-paths-kb-mutation-check-001.md
 
 Document: gtkb-s358-w3-requirements-collection-hook-title-fix
+REVISED: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-013.md
 NO-GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-012.md
 NEW: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-011.md
 GO: bridge/gtkb-s358-w3-requirements-collection-hook-title-fix-010.md
@@ -1119,6 +1120,7 @@ NO-GO: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-002
 NEW: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-001.md
 
 Document: gtkb-commit-scope-bundling-detection-slice-1
+REVISED: bridge/gtkb-commit-scope-bundling-detection-slice-1-007.md
 NO-GO: bridge/gtkb-commit-scope-bundling-detection-slice-1-006.md
 NEW: bridge/gtkb-commit-scope-bundling-detection-slice-1-005.md
 GO: bridge/gtkb-commit-scope-bundling-detection-slice-1-004.md
