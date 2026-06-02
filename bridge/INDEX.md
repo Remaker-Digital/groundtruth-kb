@@ -7,6 +7,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-deferred-authority-protocol-alignment
+NO-GO: bridge/gtkb-deferred-authority-protocol-alignment-002.md
+NEW: bridge/gtkb-deferred-authority-protocol-alignment-001.md
+
 Document: gtkb-rc1-pyjwt-dependency-audit-remediation
 VERIFIED: bridge/gtkb-rc1-pyjwt-dependency-audit-remediation-004.md
 NEW: bridge/gtkb-rc1-pyjwt-dependency-audit-remediation-003.md
