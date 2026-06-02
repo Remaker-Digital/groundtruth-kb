@@ -72,18 +72,28 @@ Verified on 2026-05-06 with `gh run view <run-id> --repo Remaker-Digital/agent-r
 
 Authority: `bridge/gtkb-rc1-canonical-ci-closure-001.md` with Loyal Opposition `GO` at `bridge/gtkb-rc1-canonical-ci-closure-002.md`.
 
-Captured on 2026-06-02 from canonical repository `mike-remakerdigital/agent-red` PR #124 (`codex/rc1-security-scan-canonical-ci` -> `develop`). PR #124 remains draft/open and therefore this is not tag-authorization evidence. It is PR-head evidence only until the branch is accepted/merged or an accepted canonical head is explicitly identified and the required workflows are captured on that same head.
+Captured on 2026-06-02 from canonical repository `mike-remakerdigital/agent-red` PR #124 (`codex/rc1-security-scan-canonical-ci` -> `develop`) and same-head `workflow_dispatch` runs. PR #124 remains draft/open and therefore this is not tag-authorization evidence. It is PR-head evidence only until the branch is accepted/merged or an accepted canonical head is explicitly identified and the required workflows are captured on that same head.
 
 | Evidence item | Result |
 |---|---|
 | PR scope | Only `.github/workflows/security-scan.yml` changed; diff adds `python -m pip install --upgrade "pip>=26.1,<27"` before `python -m pip install pip-audit`. |
-| Waiver boundary | Existing `pip-audit --ignore-vuln CVE-2026-3219` retained; no new vulnerability waiver added for `CVE-2026-6357`. |
-| Docker Scout boundary | Docker Scout workflow content untouched; Docker Scout job skipped on the pull-request event, so Docker Scout release evidence is still pending for an accepted canonical head. |
+| Waiver boundary | Existing `pip-audit --ignore-vuln CVE-2026-3219` retained; no new vulnerability waiver added for `CVE-2026-6357` or newly observed PyJWT findings. |
+| Docker Scout boundary | Docker Scout workflow content untouched. Docker Scout skipped on pull-request event evidence, then ran on same-head `workflow_dispatch` and failed at Docker Hub login; ACR validation and ACR login succeeded. |
 | PR head | `ea632196b0f2cbcb73589aafb40c1072a14c3d65`; PR merge ref observed as `7a9347b07766482fe0aea6518502ccdd9cbbdbb3`. |
-| Security Scan | Run `26801052502` completed `success`; jobs Bandit Python Security, Semgrep SAST, and Dependency Audit completed `success`; Dependency Audit logs show `pip` upgraded to `26.1.2`, `pip-audit 2.10.0` installed, and both audit invocations reported no known vulnerabilities. |
-| SonarCloud | Run `26801052501` completed `success`; historical failed SonarCloud comment on the PR was superseded by the later passing Quality Gate. |
+| Pull-request Security Scan | Run `26801052502` completed `success`; jobs Bandit Python Security, Semgrep SAST, and Dependency Audit completed `success`; Dependency Audit logs show `pip` upgraded to `26.1.2`, `pip-audit 2.10.0` installed, and both audit invocations reported no known vulnerabilities at that time. |
+| Pull-request SonarCloud | Run `26801052501` completed `success`; historical failed SonarCloud comment on the PR was superseded by the later passing Quality Gate. |
 
-Still required before `v0.7.0-rc1` tag authorization: PR #124 must be accepted/merged or otherwise designate an accepted canonical head; Lint, Release Candidate Gate, SonarCloud, Security Scan including Docker Scout, and Python Tests must be collected on that accepted canonical head; then this section must be replaced or superseded by terminal canonical CI evidence and a bridge post-implementation report must receive Loyal Opposition `VERIFIED`.
+Same-head `workflow_dispatch` evidence collected on 2026-06-02:
+
+| Workflow | Run ID | Event | Head SHA | Conclusion | Notes |
+|---|---:|---|---|---|---|
+| Lint | 26822261683 | `workflow_dispatch` | `ea632196b0f2cbcb73589aafb40c1072a14c3d65` | success | Ruff lint and format-check workflow completed successfully. |
+| Python Tests | 26822261477 | `workflow_dispatch` | `ea632196b0f2cbcb73589aafb40c1072a14c3d65` | success | All py3.12/py3.13 shards passed; OpenAPI compatibility check skipped by workflow rules; coverage report succeeded. |
+| SonarCloud | 26822261575 | `workflow_dispatch` | `ea632196b0f2cbcb73589aafb40c1072a14c3d65` | success | SonarCloud Analysis completed successfully. |
+| Release Candidate Gate | 26822261678 | `workflow_dispatch` | `ea632196b0f2cbcb73589aafb40c1072a14c3d65` | failure | Frontend gate succeeded; Python release gate failed in `pip-audit -r requirements.txt` on `pyjwt 2.12.1` (`PYSEC-2026-175`, `PYSEC-2026-177`, `PYSEC-2026-178`, `PYSEC-2026-179`; fixed in `2.13.0`). |
+| Security Scan | 26822261836 | `workflow_dispatch` | `ea632196b0f2cbcb73589aafb40c1072a14c3d65` | failure | Bandit and Semgrep succeeded; Dependency Audit failed on the same four PyJWT findings; Docker Scout failed at Docker Hub login with a malformed authorization header. |
+
+Still required before `v0.7.0-rc1` tag authorization: PR #124 must be accepted/merged or otherwise designate an accepted canonical head; PyJWT must be remediated or formally dispositioned; Docker Hub authentication for Docker Scout must be corrected outside Codex credential scope; Lint, Release Candidate Gate, SonarCloud, Security Scan including Docker Scout, and Python Tests must be collected on the accepted canonical head; then this section must be replaced or superseded by terminal canonical CI evidence and a bridge post-implementation report must receive Loyal Opposition `VERIFIED`.
 
 ### Tag authorization gate
 
