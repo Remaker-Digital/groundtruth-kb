@@ -93,6 +93,22 @@ def test_diagnose_emits_expected_sections(tmp_path: Path) -> None:
     assert "== Recent failures ==" in output
     assert "== Liveness ==" in output
     assert "== Overall ==" in output
+    assert "suppressed (target active session detected; by design)" in output
+
+
+def test_diagnose_classifies_target_active_session_result(tmp_path: Path) -> None:
+    state_dir = tmp_path / "state"
+    _seed_state(state_dir)
+    state_path = state_dir / "dispatch-state.json"
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    payload["recipients"]["prime"]["last_result"] = "target_active_session_present"
+    state_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    output = cht._emit_diagnose_summary(state_dir)
+
+    assert "suppressed (target active session detected; by design)" in output
+    assert "HEALTHY" in output
+    assert "DEGRADED" not in output
 
 
 def test_diagnose_does_not_dispatch_or_modify_state(tmp_path: Path) -> None:

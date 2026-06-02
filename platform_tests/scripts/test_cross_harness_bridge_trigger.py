@@ -1124,7 +1124,7 @@ def test_diagnose_migrates_legacy_recipient_keys_before_liveness(tmp_path: Path)
                 "updated_at": "2026-05-19T21:00:00+00:00",
             },
             "codex": {
-                "last_result": "counterpart_active_session_present",
+                "last_result": "target_active_session_present",
                 "pending_count": 2,
                 "selected_count": 2,
                 "updated_at": "2026-05-19T21:00:00+00:00",
@@ -1139,7 +1139,7 @@ def test_diagnose_migrates_legacy_recipient_keys_before_liveness(tmp_path: Path)
     output = trigger._emit_diagnose_summary(state_dir)
 
     assert "- prime-builder: last_result=no_pending" in output
-    assert "- loyal-opposition: last_result=counterpart_active_session_present" in output
+    assert "- loyal-opposition: last_result=target_active_session_present" in output
     assert "- prime: last_result=" not in output
     assert "- codex: last_result=" not in output
     assert "HEALTHY" in output
@@ -1185,7 +1185,7 @@ def test_diagnostic_emitted_per_invocation(tmp_path: Path) -> None:
 
 
 def test_diagnostic_classifies_suppressed(tmp_path: Path) -> None:
-    """WI-3265 IP-2: a held counterpart lease drives the
+    """WI-3265 IP-2: a held target lease drives the
     loyal-opposition recipient to the `active_session_suppressed` class.
     """
     from bridge_lease_registry import acquire_lease
@@ -1204,7 +1204,7 @@ def test_diagnostic_classifies_suppressed(tmp_path: Path) -> None:
 
     lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
     assert len(lo) == 1
-    assert lo[0]["last_result"] == "counterpart_active_session_present"
+    assert lo[0]["last_result"] == "target_active_session_present"
     assert lo[0]["classification"] == "active_session_suppressed"
 
 

@@ -15,6 +15,7 @@ REVISED: bridge/gtkb-bridge-citation-freshness-test-restoration-002.md
 NEW: bridge/gtkb-bridge-citation-freshness-test-restoration-001.md
 
 Document: gtkb-cross-harness-trigger-active-session-target-naming
+NEW: bridge/gtkb-cross-harness-trigger-active-session-target-naming-004.md
 GO: bridge/gtkb-cross-harness-trigger-active-session-target-naming-003.md
 REVISED: bridge/gtkb-cross-harness-trigger-active-session-target-naming-002.md
 NEW: bridge/gtkb-cross-harness-trigger-active-session-target-naming-001.md
@@ -63,28 +64,6 @@ Document: gtkb-registry-scaffold-fixture-drift-reconciliation
 NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-003.md
 GO: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-002.md
 NEW: bridge/gtkb-registry-scaffold-fixture-drift-reconciliation-001.md
-
-Document: gtkb-terminal-project-record-retirement-batch
-VERIFIED: bridge/gtkb-terminal-project-record-retirement-batch-006.md
-NEW: bridge/gtkb-terminal-project-record-retirement-batch-005.md
-GO: bridge/gtkb-terminal-project-record-retirement-batch-004.md
-REVISED: bridge/gtkb-terminal-project-record-retirement-batch-003.md
-GO: bridge/gtkb-terminal-project-record-retirement-batch-002.md
-NEW: bridge/gtkb-terminal-project-record-retirement-batch-001.md
-
-Document: gtkb-deterministic-services-stale-status-reconciliation
-VERIFIED: bridge/gtkb-deterministic-services-stale-status-reconciliation-012.md
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-011.md
-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-010.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-009.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-008.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-007.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-005.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-004.md
-REVISED: bridge/gtkb-deterministic-services-stale-status-reconciliation-003.md
-NO-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-002.md
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md
 
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 VERIFIED: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-008.md
@@ -1210,24 +1189,6 @@ VERIFIED: bridge/gtkb-verify-verdict-author-skill-slice-1-004.md
 NEW: bridge/gtkb-verify-verdict-author-skill-slice-1-003.md
 GO: bridge/gtkb-verify-verdict-author-skill-slice-1-002.md
 NEW: bridge/gtkb-verify-verdict-author-skill-slice-1-001.md
-
-Document: gtkb-bridge-mode-config-transactions-slice-1
-VERIFIED: bridge/gtkb-bridge-mode-config-transactions-slice-1-015.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-014.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-013.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-012.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-011.md
-NEW: bridge/gtkb-bridge-mode-config-transactions-slice-1-010.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-009.md
-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-008.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-007.md
-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-006.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-005.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-004.md
-REVISED: bridge/gtkb-bridge-mode-config-transactions-slice-1-003.md
-NO-GO: bridge/gtkb-bridge-mode-config-transactions-slice-1-002.md
-NEW: bridge/gtkb-bridge-mode-config-transactions-slice-1-001.md
-
 
 Document: gtkb-lo-hygiene-assessment-skill-advisory-disposition
 VERIFIED: bridge/gtkb-lo-hygiene-assessment-skill-advisory-disposition-004.md

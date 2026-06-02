@@ -140,7 +140,7 @@ def test_stale_lease_is_reclaimed(tmp_path: Path) -> None:
 
 
 def test_dispatch_uses_lease_not_harness_lock(tmp_path: Path) -> None:
-    """T-LEASE-dispatch-uses-lease-not-harness-lock: trigger dispatch does not consult check_counterpart_active lock."""
+    """T-LEASE-dispatch-uses-lease-not-harness-lock: trigger dispatch does not consult check_target_active lock."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -149,14 +149,14 @@ def test_dispatch_uses_lease_not_harness_lock(tmp_path: Path) -> None:
     _write_bridge_file(root, "example-x-001.md", "bridge_kind: implementation_proposal\n")
     _write_index(root, "# bridge index\n\nDocument: example-x\nNEW: bridge/example-x-001.md\n")
 
-    # 2. Write a fresh, active counterpart session lock file
-    # This would normally trigger counterpart active suppression.
+    # 2. Write a fresh target active-session lock file.
+    # This would normally trigger target-active suppression.
     lock_path = state_dir / "active-claude-session.lock"
     lock_payload = {"opened_at": "2026-06-01T00:00:00Z", "last_refreshed": "2026-06-01T00:00:00Z"}
     lock_path.write_text(json.dumps(lock_payload), encoding="utf-8")
     os.utime(lock_path, None)  # Set mtime to now so it is fresh
 
-    # Verify that the counterpart active logic reports True (if called)
+    # Verify that the target-active logic reports True (if called).
     trigger = _load_trigger()
     lo_target = trigger.DispatchTarget(
         needed_role_label="loyal-opposition",
@@ -165,7 +165,7 @@ def test_dispatch_uses_lease_not_harness_lock(tmp_path: Path) -> None:
         canonical_mode="lo",
         invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
     )
-    assert trigger.check_counterpart_active(lo_target, state_dir) is True
+    assert trigger.check_target_active(lo_target, state_dir) is True
 
     # 3. Run trigger - should dispatch normally since no lease file exists for example-x
     summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)

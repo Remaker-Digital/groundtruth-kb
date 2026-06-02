@@ -5,8 +5,8 @@ Per ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-005.md``
 GO at ``-006`` (REVISED-2):
 
 These tests cover the suppression gate added to the trigger:
-- ``check_counterpart_active(recipient, state_dir)``: returns True when the
-  counterpart's lock file is present and within sanity TTL.
+- ``check_target_active(recipient, state_dir)``: returns True when the
+  target harness lock file is present and within sanity TTL.
 - ``run_trigger()`` three-way state-machine:
   - counterpart_active → record ``last_suppressed_signature``; do NOT dispatch.
   - prior_dispatched == current → ``unchanged``; do NOT dispatch.
@@ -188,49 +188,49 @@ def _make_minimal_index(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def test_check_counterpart_active_lock_absent_returns_false(trigger_module, tmp_path: Path) -> None:
+def test_check_target_active_lock_absent_returns_false(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-counterpart-absent-dispatches (predicate level)."""
-    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
-    assert trigger_module.check_counterpart_active(_make_test_target_lo(trigger_module), tmp_path) is False
+    assert trigger_module.check_target_active(_make_test_target_pb(trigger_module), tmp_path) is False
+    assert trigger_module.check_target_active(_make_test_target_lo(trigger_module), tmp_path) is False
 
 
-def test_check_counterpart_active_lock_present_fresh_returns_true(trigger_module, tmp_path: Path) -> None:
+def test_check_target_active_lock_present_fresh_returns_true(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-counterpart-active-suppresses (predicate level): lock present + fresh mtime."""
     # recipient="prime" looks for active-claude-session.lock (the harness behind Prime).
     _write_lock(tmp_path, "claude")
-    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is True
+    assert trigger_module.check_target_active(_make_test_target_pb(trigger_module), tmp_path) is True
 
 
-def test_check_counterpart_active_lock_stale_returns_false(trigger_module, tmp_path: Path) -> None:
+def test_check_target_active_lock_stale_returns_false(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-counterpart-stale-overrides-via-sanity-ttl: lock older than 120s is treated as orphaned."""
     _write_lock(tmp_path, "claude", mtime_offset_seconds=-500)  # 500s old
-    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
+    assert trigger_module.check_target_active(_make_test_target_pb(trigger_module), tmp_path) is False
 
 
-def test_check_counterpart_active_sanity_ttl_default_is_120s(trigger_module, tmp_path: Path, monkeypatch) -> None:
+def test_check_target_active_sanity_ttl_default_is_120s(trigger_module, tmp_path: Path, monkeypatch) -> None:
     """T-SUPPRESS-sanity-ttl-default-is-120s: env var unset → 120s default."""
     monkeypatch.delenv("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", raising=False)
     # Lock 119s old (within 120s default): active.
     _write_lock(tmp_path, "claude", mtime_offset_seconds=-119)
-    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is True
+    assert trigger_module.check_target_active(_make_test_target_pb(trigger_module), tmp_path) is True
 
 
-def test_check_counterpart_active_sanity_ttl_env_var_overrides(trigger_module, tmp_path: Path, monkeypatch) -> None:
+def test_check_target_active_sanity_ttl_env_var_overrides(trigger_module, tmp_path: Path, monkeypatch) -> None:
     """Operators can override the 120s default for tuning."""
     monkeypatch.setenv("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "30")
     _write_lock(tmp_path, "claude", mtime_offset_seconds=-60)  # 60s old, > 30s ttl
-    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
+    assert trigger_module.check_target_active(_make_test_target_pb(trigger_module), tmp_path) is False
 
 
-def test_check_counterpart_active_target_loyal_opposition_checks_codex_lock(trigger_module, tmp_path: Path) -> None:
+def test_check_target_active_loyal_opposition_checks_codex_lock(trigger_module, tmp_path: Path) -> None:
     """Per IP-3b: target with command_handle='codex' (loyal-opposition role) looks for active-codex-session.lock."""
     _write_lock(tmp_path, "codex")
-    assert trigger_module.check_counterpart_active(_make_test_target_lo(trigger_module), tmp_path) is True
+    assert trigger_module.check_target_active(_make_test_target_lo(trigger_module), tmp_path) is True
     # Without a Claude lock, prime-builder check returns False (looks for active-claude-session.lock).
-    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
+    assert trigger_module.check_target_active(_make_test_target_pb(trigger_module), tmp_path) is False
 
 
-def test_check_counterpart_active_target_after_role_switch_lock_resolution(trigger_module, tmp_path: Path) -> None:
+def test_check_target_active_after_role_switch_lock_resolution(trigger_module, tmp_path: Path) -> None:
     """Per IP-3b suppression-preservation: under role-switch the lock check follows the resolved command handle.
 
     Fixture: claude=loyal-opposition, codex=prime-builder (role-switched from default).
@@ -254,9 +254,19 @@ def test_check_counterpart_active_target_after_role_switch_lock_resolution(trigg
     )
     # Plant codex lock; prime-builder dispatch (now codex-handed) should suppress.
     _write_lock(tmp_path, "codex")
-    assert trigger_module.check_counterpart_active(switched_pb, tmp_path) is True
+    assert trigger_module.check_target_active(switched_pb, tmp_path) is True
     # No claude lock; loyal-opposition dispatch (now claude-handed) should NOT suppress.
-    assert trigger_module.check_counterpart_active(switched_lo, tmp_path) is False
+    assert trigger_module.check_target_active(switched_lo, tmp_path) is False
+
+
+def test_check_counterpart_active_legacy_alias_matches_target_active(trigger_module, tmp_path: Path) -> None:
+    """Legacy predicate name remains a compatibility alias."""
+    _write_lock(tmp_path, "claude")
+    target = _make_test_target_pb(trigger_module)
+    assert trigger_module.check_counterpart_active(target, tmp_path) is True
+    assert trigger_module.check_counterpart_active(target, tmp_path) == trigger_module.check_target_active(
+        target, tmp_path
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -273,10 +283,10 @@ def _run_trigger_dry(trigger_module, project_root: Path, state_dir: Path) -> dic
     return trigger_module.run_trigger(project_root=project_root, state_dir=state_dir, dry_run=True)
 
 
-def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(trigger_module, tmp_path: Path) -> None:
+def test_run_trigger_target_active_records_suppressed_not_dispatched(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-suppressed-signature-stored-not-as-dispatched (F1 fix critical).
 
-    When the counterpart is active, the current signature is recorded in
+    When the target is active, the current signature is recorded in
     last_suppressed_signature; last_dispatched_signature stays at its prior
     value; legacy `signature` field is not updated.
     """
@@ -292,7 +302,7 @@ def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(trigge
     result = _run_trigger_dry(trigger_module, project_root, state_dir)
 
     prime_state = result["dispatch_state"]["recipients"]["prime-builder"]
-    assert prime_state["last_result"] == "counterpart_active_session_present"
+    assert prime_state["last_result"] == "target_active_session_present"
     assert prime_state["last_suppressed_signature"] is not None
     # last_dispatched_signature was not set on this fire (None or absent).
     assert prime_state.get("last_dispatched_signature") in (None,), (
@@ -302,7 +312,7 @@ def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(trigge
     assert prime_state.get("signature") in (None,), f"expected None or unchanged, got {prime_state.get('signature')!r}"
 
 
-def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Path) -> None:
+def test_run_trigger_retry_after_target_exits(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-retry-after-counterpart-exits (F1 fix critical).
 
     Step A: counterpart active → suppress; record last_suppressed_signature.
@@ -313,7 +323,7 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
     project_root = _make_minimal_index(tmp_path)
     state_dir = tmp_path / "state"
     state_dir.mkdir()
-    # Step A: counterpart active.
+    # Step A: target active.
     sys.path.insert(0, str(_REPO_ROOT / "scripts"))
     from bridge_lease_registry import acquire_lease, release_lease
 
@@ -322,11 +332,11 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
 
     result_a = _run_trigger_dry(trigger_module, project_root, state_dir)
     prime_state_a = result_a["dispatch_state"]["recipients"]["prime-builder"]
-    assert prime_state_a["last_result"] == "counterpart_active_session_present"
+    assert prime_state_a["last_result"] == "target_active_session_present"
     suppressed_sig = prime_state_a["last_suppressed_signature"]
     assert suppressed_sig is not None
 
-    # Step B: counterpart exits.
+    # Step B: target exits.
     release_lease(lease)
     # Same INDEX content → same signature.
     result_b = _run_trigger_dry(trigger_module, project_root, state_dir)
@@ -334,10 +344,10 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
     # Dispatch branch entered. In dry_run, _spawn_harness returns
     # {"launched": False, "reason": "dry_run"}, and last_result becomes
     # "launch_failed" because launched is False. The critical assertion is
-    # that we did NOT enter the "unchanged" or "counterpart_active" branches.
+    # that we did NOT enter the "unchanged" or "target_active" branches.
     assert prime_state_b["last_result"] not in (
         "unchanged",
-        "counterpart_active_session_present",
+        "target_active_session_present",
     ), f"expected dispatch branch entry, got last_result={prime_state_b['last_result']!r}"
     # last_dispatched_signature is set to the current signature post-dispatch attempt.
     assert prime_state_b["last_dispatched_signature"] == suppressed_sig
