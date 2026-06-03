@@ -20,37 +20,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[2]
-CODEX_HOOK = ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
-CLAUDE_HOOK = ROOT / ".claude" / "hooks" / "session_start_dispatch.py"
+# Slice D of GTKB-STARTUP-REFRACTOR-001: main() and the pending-transaction
+# drain moved into the shared core; the thin wrappers delegate. The drain
+# ordering is therefore a single-source property of the core module.
+CORE = ROOT / "scripts" / "session_start_dispatch_core.py"
 
 
-@pytest.mark.parametrize("hook_path", [CODEX_HOOK, CLAUDE_HOOK], ids=["codex", "claude"])
-def test_session_start_dispatch_imports_apply_pending(hook_path: Path) -> None:
-    """The hook must import apply_pending from groundtruth_kb.mode_switch.pending."""
-    text = hook_path.read_text(encoding="utf-8")
+def test_session_start_dispatch_imports_apply_pending() -> None:
+    """The shared core must import apply_pending from groundtruth_kb.mode_switch.pending."""
+    text = CORE.read_text(encoding="utf-8")
     assert "from groundtruth_kb.mode_switch.pending import apply_pending" in text, (
-        f"{hook_path} missing apply_pending import"
+        f"{CORE} missing apply_pending import"
     )
 
 
-@pytest.mark.parametrize("hook_path", [CODEX_HOOK, CLAUDE_HOOK], ids=["codex", "claude"])
-def test_session_start_dispatch_apply_pending_precedes_role_resolution(hook_path: Path) -> None:
+def test_session_start_dispatch_apply_pending_precedes_role_resolution() -> None:
     """apply_pending() call must appear before _bridge_dispatch_keyword_check() in main()."""
-    text = hook_path.read_text(encoding="utf-8")
-    apply_pos = text.find("apply_pending")
-    resolution_pos = text.find("_bridge_dispatch_keyword_check()")
-    assert apply_pos > -1, f"{hook_path}: apply_pending not found"
-    assert resolution_pos > -1, f"{hook_path}: role-resolution call not found"
-    # The apply_pending import + call may appear before main(); what matters
-    # is that within main() the call site comes BEFORE role resolution.
-    # Locate the main() function body and check ordering.
+    text = CORE.read_text(encoding="utf-8")
     main_pos = text.find("def main()")
-    assert main_pos > -1, f"{hook_path}: main() not found"
-    # The apply_pending call in main() body:
+    assert main_pos > -1, f"{CORE}: main() not found"
     main_apply_pos = text.find("apply_pending", main_pos)
     main_resolution_pos = text.find("_bridge_dispatch_keyword_check()", main_pos)
-    assert main_apply_pos > -1 and main_resolution_pos > -1
-    assert main_apply_pos < main_resolution_pos, f"{hook_path}: apply_pending must precede role-resolution in main()"
+    assert main_apply_pos > -1, f"{CORE}: apply_pending call not found in main()"
+    assert main_resolution_pos > -1, f"{CORE}: role-resolution call not found in main()"
+    assert main_apply_pos < main_resolution_pos, f"{CORE}: apply_pending must precede role-resolution in main()"

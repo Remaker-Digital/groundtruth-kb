@@ -180,11 +180,15 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         from pathlib import Path as _P
 
         dispatcher_source = _P(".claude/hooks/session_start_dispatch.py").read_text(encoding="utf-8")
-        assert "session_self_initialization.py" in dispatcher_source
-        assert "--emit-startup-service-payload" in dispatcher_source
-        assert "--fast-hook" in dispatcher_source
-        assert "--harness-name" in dispatcher_source
+        # Slice D: the behavioral contract lives in the shared core; the wrapper
+        # delegates and only carries its harness identity.
+        core_source = _P("scripts/session_start_dispatch_core.py").read_text(encoding="utf-8")
+        assert "import session_start_dispatch_core" in dispatcher_source
         assert "claude" in dispatcher_source
+        assert "session_self_initialization.py" in core_source
+        assert "--emit-startup-service-payload" in core_source
+        assert "--fast-hook" in core_source
+        assert "--harness-name" in core_source
     assert any(
         "session_self_initialization.py" in hook["command"]
         and "--emit-wrapup" in hook["command"]
@@ -264,46 +268,52 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     )
 
     start_dispatcher = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
+    core_module = REPO_ROOT / "scripts" / "session_start_dispatch_core.py"
     if not start_dispatcher.is_file():
         assert os.environ.get("CI") == "true"
         return
 
     start_text = start_dispatcher.read_text(encoding="utf-8")
-    assert "--emit-startup-service-payload" in start_text
-    assert "--harness-name" in start_text
-    assert "--harness-id" in start_text
+    core_text = core_module.read_text(encoding="utf-8")
+    # Slice D: the codex wrapper carries only its harness identity + delegation;
+    # the behavioral SessionStart contract lives in the shared core.
+    assert "import session_start_dispatch_core" in start_text
     assert 'HARNESS_NAME = "codex"' in start_text
     assert 'HARNESS_ID = "A"' not in start_text
-    assert "harness_identity" in start_text
-    assert "resolved_harness_id" in start_text
-    assert "--role-profile" not in start_text
-    assert "STARTUP_SERVICE" in start_text
-    assert "STARTUP_FRESHNESS_CONTRACT_VERSION" in start_text
-    assert "Programmatic Startup Payload" in start_text
-    assert "_valid_session_start_payload" in start_text
-    assert "_purge_previous_diagnostics" in start_text
-    assert "GTKB_STARTUP_REQUESTED_AT" in start_text
-    assert "subprocess.run" in start_text
-    assert "STARTUP_SERVICE_TIMEOUT_SECONDS = 50.0" in start_text
-    assert "timeout=STARTUP_SERVICE_TIMEOUT_SECONDS" in start_text
-    assert "Startup First-Response Directive" not in start_text
-    assert "_live_bridge_index_context" not in start_text
-    assert "Mandatory Direct Live Bridge Index Read" not in start_text
-    assert "SHA-256" not in start_text
-    assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in start_text
-    assert "Would you like to proceed with established priority actions? (Y/N)" not in start_text
-    assert "Token Consumption Reduction Options second" not in start_text
-    assert "Three Top Priority Actions third" not in start_text
-    assert "hookSpecificOutput" in start_text
-    assert "hookEventName" in start_text
-    assert "SessionStart" in start_text
-    assert "additionalContext" in start_text
-    assert "startupFreshness" in start_text
-    assert "request_started_at" in start_text
-    assert "report_origin" in start_text
-    assert "startup_payload_fresh" in start_text
-    assert "last-session-start.json" in start_text
-    assert "last-session-start.err" in start_text
+    # Behavioral contract (shared core):
+    assert "--emit-startup-service-payload" in core_text
+    assert "--harness-name" in core_text
+    assert "--harness-id" in core_text
+    assert "harness_identity" in core_text
+    assert "resolved_harness_id" in core_text
+    assert "--role-profile" not in core_text
+    assert "STARTUP_SERVICE" in core_text
+    assert "STARTUP_FRESHNESS_CONTRACT_VERSION" in core_text
+    assert "Programmatic Startup Payload" in core_text
+    assert "_valid_session_start_payload" in core_text
+    assert "_purge_previous_diagnostics" in core_text
+    assert "GTKB_STARTUP_REQUESTED_AT" in core_text
+    assert "subprocess.run" in core_text
+    assert "STARTUP_SERVICE_TIMEOUT_SECONDS = 50.0" in core_text
+    assert "timeout=STARTUP_SERVICE_TIMEOUT_SECONDS" in core_text
+    assert "Startup First-Response Directive" not in core_text
+    assert "_live_bridge_index_context" not in core_text
+    assert "Mandatory Direct Live Bridge Index Read" not in core_text
+    assert "SHA-256" not in core_text
+    assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in core_text
+    assert "Would you like to proceed with established priority actions? (Y/N)" not in core_text
+    assert "Token Consumption Reduction Options second" not in core_text
+    assert "Three Top Priority Actions third" not in core_text
+    assert "hookSpecificOutput" in core_text
+    assert "hookEventName" in core_text
+    assert "SessionStart" in core_text
+    assert "additionalContext" in core_text
+    assert "startupFreshness" in core_text
+    assert "request_started_at" in core_text
+    assert "report_origin" in core_text
+    assert "startup_payload_fresh" in core_text
+    assert "last-session-start.json" in core_text
+    assert "last-session-start.err" in core_text
 
     session_start_cmd = (REPO_ROOT / ".codex" / "gtkb-hooks" / "session-start.cmd").read_text(encoding="utf-8")
     assert "harness_identity.py" in session_start_cmd

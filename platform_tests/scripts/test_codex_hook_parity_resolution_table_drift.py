@@ -46,11 +46,16 @@ import check_codex_hook_parity as parity  # noqa: E402
 # fine-grained test module so the staging behavior is identical and any
 # expansion of the helper's scope is caught by both modules.
 _PARITY_RELEVANT_FILES = (
+    "scripts/session_start_dispatch_core.py",
     ".claude/hooks/session_start_dispatch.py",
     ".codex/gtkb-hooks/session_start_dispatch.py",
     "scripts/session_role_resolution.py",
     "scripts/workstream_focus.py",
 )
+# Slice D of GTKB-STARTUP-REFRACTOR-001: the shared SessionStart primitives
+# moved into the core module, so primitive drift-class mutations target it.
+_CORE = "scripts/session_start_dispatch_core.py"
+_CORE_LABEL = "SessionStart dispatch core"
 
 
 def _stage_canonical_tree(tmp_path: Path) -> Path:
@@ -109,15 +114,14 @@ def test_startup_decision_value_drift_caught_as_parity_error(tmp_path: Path) -> 
     """
     staged_root = _stage_canonical_tree(tmp_path)
     _mutate(
-        staged_root / ".claude/hooks/session_start_dispatch.py",
+        staged_root / _CORE,
         'DISPATCH_AUTHORIZED = "dispatch_authorized"',
         'DISPATCH_AUTHORIZED = "renamed_at_drift"',
     )
     errors = parity._resolution_table_parity_errors(staged_root)
     assert errors, "drift-class regression: parity tool returned no errors despite vocabulary drift"
     assert any(
-        "Claude SessionStart dispatcher" in e and "StartupDecision.DISPATCH_AUTHORIZED" in e and "value must equal" in e
-        for e in errors
+        _CORE_LABEL in e and "StartupDecision.DISPATCH_AUTHORIZED" in e and "value must equal" in e for e in errors
     ), f"expected DISPATCH_AUTHORIZED value-divergence error in {errors!r}"
 
 
@@ -140,7 +144,7 @@ def test_cache_writer_regression_to_role_set_iteration_caught(tmp_path: Path) ->
     """
     staged_root = _stage_canonical_tree(tmp_path)
     _mutate(
-        staged_root / ".codex/gtkb-hooks/session_start_dispatch.py",
+        staged_root / _CORE,
         "for mode in sorted(_MODE_TO_ROLE_PROFILE):",
         "for role in sorted(_resolve_own_role_set()):",
     )
@@ -149,8 +153,7 @@ def test_cache_writer_regression_to_role_set_iteration_caught(tmp_path: Path) ->
     # The mutation triggers both the loop-shape error AND the forbidden-
     # reference error per assertion 9; assert the loop error specifically.
     assert any(
-        "Codex SessionStart dispatcher" in e and "_write_role_scoped_startup_relay_caches" in e and "must iterate" in e
-        for e in errors
+        _CORE_LABEL in e and "_write_role_scoped_startup_relay_caches" in e and "must iterate" in e for e in errors
     ), f"expected cache-writer loop-shape error in {errors!r}"
 
 
@@ -172,17 +175,14 @@ def test_marker_invalidation_removal_caught_as_parity_error(tmp_path: Path) -> N
     """
     staged_root = _stage_canonical_tree(tmp_path)
     _mutate(
-        staged_root / ".claude/hooks/session_start_dispatch.py",
+        staged_root / _CORE,
         "    _invalidate_session_role_marker()",
         "    pass  # drift: removed Slice 3 pre-dispatch invalidation",
     )
     errors = parity._resolution_table_parity_errors(staged_root)
     assert errors, "drift-class regression: parity tool returned no errors despite marker-invalidation removal"
     assert any(
-        "Claude SessionStart dispatcher" in e
-        and "main()" in e
-        and "must call" in e
-        and "_invalidate_session_role_marker" in e
+        _CORE_LABEL in e and "main()" in e and "must call" in e and "_invalidate_session_role_marker" in e
         for e in errors
     ), f"expected marker-invalidation absence error in {errors!r}"
 
@@ -205,12 +205,12 @@ def test_init_keyword_regex_drift_caught_as_parity_error(tmp_path: Path) -> None
     """
     staged_root = _stage_canonical_tree(tmp_path)
     _mutate(
-        staged_root / ".codex/gtkb-hooks/session_start_dispatch.py",
+        staged_root / _CORE,
         '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")',
         '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo|admin)$")',
     )
     errors = parity._resolution_table_parity_errors(staged_root)
     assert errors, "drift-class regression: parity tool returned no errors despite keyword-regex drift"
-    assert any("Codex SessionStart dispatcher" in e and "canonical init-keyword regex" in e for e in errors), (
+    assert any(_CORE_LABEL in e and "canonical init-keyword regex" in e for e in errors), (
         f"expected init-keyword regex divergence error in {errors!r}"
     )

@@ -150,12 +150,15 @@ def test_both_dispatchers_agree_on_marker_path(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("harness", sorted(_DISPATCHERS))
-def test_invalidation_ordered_before_dispatch_in_main(harness: str) -> None:
-    """In main(), the invalidation call appears after _purge_previous_diagnostics
-    and before both the mode-switch drain (apply_pending) and the dispatch check.
+def test_invalidation_ordered_before_dispatch_in_main() -> None:
+    """In the shared core's main(), the invalidation call appears after
+    _purge_previous_diagnostics and before both the mode-switch drain
+    (apply_pending) and the dispatch check.
+
+    Slice D of GTKB-STARTUP-REFRACTOR-001 single-sourced main() in
+    scripts/session_start_dispatch_core.py; the thin wrappers delegate.
     """
-    source = _DISPATCHERS[harness].read_text(encoding="utf-8")
+    source = (REPO_ROOT / "scripts" / "session_start_dispatch_core.py").read_text(encoding="utf-8")
     main_idx = source.index("def main()")
     body = source[main_idx:]
 

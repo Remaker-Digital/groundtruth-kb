@@ -49,6 +49,12 @@ CODEX_WRAPUP_TRIGGER_DISPATCHER = CODEX_WRAPPER_DIR / "session_wrapup_trigger_di
 # mechanical assertion.
 # -----------------------------------------------------------------------------
 CODEX_SESSION_START_DISPATCHER_PATH = ".codex/gtkb-hooks/session_start_dispatch.py"
+# Slice D of GTKB-STARTUP-REFRACTOR-001 (WI-4272): the shared SessionStart
+# dispatch primitives were extracted from the two byte-identical wrappers into
+# this single core module. The resolution-table primitive assertions now check
+# the core (single source); the wrappers are checked only for delegation +
+# intentional-difference guards.
+SESSION_START_DISPATCH_CORE_PATH = "scripts/session_start_dispatch_core.py"
 SESSION_ROLE_RESOLVER_PATH = "scripts/session_role_resolution.py"
 WORKSTREAM_FOCUS_PATH = "scripts/workstream_focus.py"
 
@@ -139,6 +145,28 @@ _SEPARATOR_ROW_RE = re.compile(r"^=+(?:\s+=+)+$")
 _CACHE_WRITER_LOOP_LITERAL = "for mode in sorted(_MODE_TO_ROLE_PROFILE):"
 _CACHE_WRITER_SKIP_LITERAL = "if mode == primary_mode:"
 _CACHE_WRITER_FORBIDDEN_LITERAL = "_resolve_own_role_set"
+
+# Canonical resolution-table dict content (Slice D single-source relocation).
+# Under single-sourcing the old "two dispatchers must be ast-equivalent" check
+# is moot (one copy); the stronger replacement asserts the core's dict content
+# equals these canonical mappings, so ANY content drift in the single source
+# fails the gate.
+_EXPECTED_RESOLUTION_DICTS: dict[str, dict[str, str]] = {
+    "_LABEL_TO_CANONICAL_MODE": {
+        "prime-builder": "pb",
+        "acting-prime-builder": "pb",
+        "loyal-opposition": "lo",
+    },
+    "_MODE_TO_ROLE_PROFILE": {
+        "pb": "prime-builder",
+        "lo": "loyal-opposition",
+    },
+}
+
+# Slice D delegation markers: each thin wrapper must import the shared core and
+# rebind its functions onto the wrapper namespace.
+_CORE_IMPORT_TOKEN = "import session_start_dispatch_core"
+_CORE_REBIND_TOKEN = "types.FunctionType("
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -240,39 +268,57 @@ def _wrapup_trigger_errors(wrapper_path: Path) -> list[str]:
 
 def _start_wrapper_errors(wrapper_path: Path) -> list[str]:
     dispatcher_path = CODEX_SESSION_START_DISPATCHER
+    core_path = PROJECT_ROOT / SESSION_START_DISPATCH_CORE_PATH
     if not dispatcher_path.is_file():
         if os.environ.get("CI") == "true":
             return []
         return [f"missing Codex SessionStart hook dispatcher: {dispatcher_path}"]
-    text = dispatcher_path.read_text(encoding="utf-8")
-    errors = _wrapper_errors(
-        dispatcher_path,
-        [
-            "session_self_initialization.py",
-            "--emit-startup-service-payload",
-            "--fast-hook",
-            "--harness-name",
-            "--harness-id",
-            "harness_identity",
-            "resolved_harness_id",
-            "STARTUP_SERVICE",
-            "STARTUP_FRESHNESS_CONTRACT_VERSION",
-            "Programmatic Startup Payload",
-            "_valid_session_start_payload",
-            "_purge_previous_diagnostics",
-            "GTKB_STARTUP_REQUESTED_AT",
-            "subprocess.run",
-            "hookSpecificOutput",
-            "hookEventName",
-            "SessionStart",
-            "additionalContext",
-            "startupFreshness",
-            "request_started_at",
-            "report_origin",
-            "startup_payload_fresh",
-            "last-session-start.json",
-            "last-session-start.err",
-        ],
+    if not core_path.is_file():
+        if os.environ.get("CI") == "true":
+            return []
+        return [f"missing shared SessionStart dispatch core: {core_path}"]
+    # Slice D of GTKB-STARTUP-REFRACTOR-001: the behavioral SessionStart contract
+    # lives in the shared core (scripts/session_start_dispatch_core.py); the codex
+    # wrapper delegates. Verify the wrapper delegates, then check the core for the
+    # behavioral tokens.
+    errors: list[str] = []
+    wrapper_text = dispatcher_path.read_text(encoding="utf-8")
+    if _CORE_IMPORT_TOKEN not in wrapper_text:
+        errors.append(
+            f"Codex SessionStart hook dispatcher {dispatcher_path.name} must delegate to the "
+            f"shared core ({_CORE_IMPORT_TOKEN})"
+        )
+    text = core_path.read_text(encoding="utf-8")
+    errors.extend(
+        _wrapper_errors(
+            core_path,
+            [
+                "session_self_initialization.py",
+                "--emit-startup-service-payload",
+                "--fast-hook",
+                "--harness-name",
+                "--harness-id",
+                "harness_identity",
+                "resolved_harness_id",
+                "STARTUP_SERVICE",
+                "STARTUP_FRESHNESS_CONTRACT_VERSION",
+                "Programmatic Startup Payload",
+                "_valid_session_start_payload",
+                "_purge_previous_diagnostics",
+                "GTKB_STARTUP_REQUESTED_AT",
+                "subprocess.run",
+                "hookSpecificOutput",
+                "hookEventName",
+                "SessionStart",
+                "additionalContext",
+                "startupFreshness",
+                "request_started_at",
+                "report_origin",
+                "startup_payload_fresh",
+                "last-session-start.json",
+                "last-session-start.err",
+            ],
+        )
     )
     for forbidden_term in (
         "Would you like to optimize token consumption now or defer to the next session? (Y/N)",
@@ -652,26 +698,64 @@ def _module_dict_literal_dump(source_text: str, name: str) -> str:
     return ""
 
 
-def _resolution_table_parity_errors(project_root: Path) -> list[str]:
-    """Resolution-table contract parity assertions across both SessionStart dispatchers.
+def _module_str_dict(source_text: str, name: str) -> dict[str, str] | None:
+    """Return the module-level ``{str: str}`` dict literal assigned to ``name``.
 
-    Implements Slice 8 of
-    ``PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE`` (WI-3478) per bridge
-    ``gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table-003.md``
-    GO at ``-004``.  Nine assertion classes cover marker constants, the
-    ``StartupDecision`` enum, the canonical init-keyword regex, the label/
-    profile dict literals, marker invalidation, the behavior-table receiver,
-    the audit-log primitives, the intentional-difference guard (HARNESS_NAME
-    + OUT_DIR), and the Slice 1 cache-writer parity invariant.
+    Returns ``None`` if the assignment is absent, its RHS is not a dict literal,
+    or any key/value is not a string constant (so non-string drift is reported
+    as "not a string dict" rather than silently accepted).
+    """
+
+    try:
+        tree = ast.parse(source_text)
+    except SyntaxError:
+        return None
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == name and isinstance(node.value, ast.Dict):
+                result: dict[str, str] = {}
+                for key_node, value_node in zip(node.value.keys, node.value.values):
+                    if (
+                        isinstance(key_node, ast.Constant)
+                        and isinstance(key_node.value, str)
+                        and isinstance(value_node, ast.Constant)
+                        and isinstance(value_node.value, str)
+                    ):
+                        result[key_node.value] = value_node.value
+                    else:
+                        return None
+                return result
+    return None
+
+
+def _resolution_table_parity_errors(project_root: Path) -> list[str]:
+    """Resolution-table contract parity assertions for the SessionStart dispatch core.
+
+    Slice D of GTKB-STARTUP-REFRACTOR-001 (WI-4272) extracted the shared
+    SessionStart primitives from the two byte-identical wrappers into one core
+    module (``scripts/session_start_dispatch_core.py``). The primitive
+    assertions (marker constant, ``StartupDecision`` enum, canonical
+    init-keyword regex, the label/profile dicts, marker invalidation, the
+    behavior-table receiver, the audit-log primitives, the cache-writer
+    invariant) now check the single core source. The wrappers are checked for
+    (a) delegation to the core and (b) the intentional-difference guard
+    (HARNESS_NAME + OUT_DIR). The resolver and UPS writer keep their own marker
+    constant. Originally Slice 8 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE
+    (WI-3478); relocated by Slice D per
+    ``bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-004.md``.
     """
 
     errors: list[str] = []
+    core_path = project_root / SESSION_START_DISPATCH_CORE_PATH
     claude_dispatcher_path = project_root / CLAUDE_SESSION_START_DISPATCHER
     codex_dispatcher_path = project_root / CODEX_SESSION_START_DISPATCHER_PATH
     resolver_path = project_root / SESSION_ROLE_RESOLVER_PATH
     workstream_focus_path = project_root / WORKSTREAM_FOCUS_PATH
 
     required_sources: dict[str, Path] = {
+        "SessionStart dispatch core": core_path,
         "Claude SessionStart dispatcher": claude_dispatcher_path,
         "Codex SessionStart dispatcher": codex_dispatcher_path,
         "Session role resolver (scripts/session_role_resolution.py)": resolver_path,
@@ -686,14 +770,21 @@ def _resolution_table_parity_errors(project_root: Path) -> list[str]:
     if errors:
         return errors
 
+    core_text = sources["SessionStart dispatch core"]
     claude_text = sources["Claude SessionStart dispatcher"]
     codex_text = sources["Codex SessionStart dispatcher"]
+    core_label = "SessionStart dispatch core"
 
     # ----- Assertion 1: marker constant parity ----------------------------
-    # Both dispatchers, the resolver, and the UPS writer must contain the
-    # exact ``_SESSION_ROLE_MARKER_NAME = "active-session-role.json"`` literal.
-    for label, text in sources.items():
-        if _MARKER_CONSTANT_LITERAL not in text:
+    # The core (which invalidates the marker), the resolver, and the UPS writer
+    # must contain the exact ``_SESSION_ROLE_MARKER_NAME = "active-session-role.json"``
+    # literal. The thin wrappers delegate to the core and do not redefine it.
+    for label in (
+        "SessionStart dispatch core",
+        "Session role resolver (scripts/session_role_resolution.py)",
+        "Workstream focus writer (scripts/workstream_focus.py)",
+    ):
+        if _MARKER_CONSTANT_LITERAL not in sources[label]:
             errors.append(
                 f"{label} must contain marker-constant literal "
                 f"`{_MARKER_CONSTANT_LITERAL}` "
@@ -701,85 +792,57 @@ def _resolution_table_parity_errors(project_root: Path) -> list[str]:
             )
 
     # ----- Assertion 2: StartupDecision enum parity (CLOSED set) ----------
-    # AST-parse ``class StartupDecision(Enum)`` and verify it is the EXACT
-    # five-member vocabulary in ``_STARTUP_DECISION_EXPECTED``.  Closed-set
-    # semantics — extra members, missing members, or wrong values all fail
-    # the check.  Addresses verification NO-GO -006 F2.
-    for label, text in (
-        ("Claude SessionStart dispatcher", claude_text),
-        ("Codex SessionStart dispatcher", codex_text),
-    ):
-        errors.extend(_startup_decision_vocabulary_errors(text, label))
+    # AST-parse the core's ``class StartupDecision(Enum)`` and verify the EXACT
+    # five-member vocabulary. Closed-set semantics — extra/missing members or
+    # wrong values all fail.
+    errors.extend(_startup_decision_vocabulary_errors(core_text, core_label))
 
     # ----- Assertion 3: canonical init-keyword regex parity ---------------
-    for label, text in (
-        ("Claude SessionStart dispatcher", claude_text),
-        ("Codex SessionStart dispatcher", codex_text),
-    ):
-        if _CANONICAL_KEYWORD_RE_LITERAL not in text:
-            errors.append(
-                f"{label} must contain canonical init-keyword regex literal "
-                f"`{_CANONICAL_KEYWORD_RE_LITERAL}` "
-                "(SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001)"
-            )
+    if _CANONICAL_KEYWORD_RE_LITERAL not in core_text:
+        errors.append(
+            f"{core_label} must contain canonical init-keyword regex literal "
+            f"`{_CANONICAL_KEYWORD_RE_LITERAL}` "
+            "(SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001)"
+        )
 
-    # ----- Assertion 4: label and profile map parity ----------------------
-    # Module-level dict literals must be ast-equivalent across dispatchers.
-    for dict_name in ("_LABEL_TO_CANONICAL_MODE", "_MODE_TO_ROLE_PROFILE"):
-        claude_dump = _module_dict_literal_dump(claude_text, dict_name)
-        codex_dump = _module_dict_literal_dump(codex_text, dict_name)
-        if not claude_dump:
+    # ----- Assertion 4: label and profile map content ---------------------
+    # Single-sourced: the old "two dispatchers must be ast-equivalent" check is
+    # moot (one copy). Assert the core's dict literals equal the canonical
+    # resolution-table mappings, so content drift in the single source fails.
+    for dict_name, expected in _EXPECTED_RESOLUTION_DICTS.items():
+        actual = _module_str_dict(core_text, dict_name)
+        if actual is None:
+            errors.append(f"{core_label} must define module-level string dict `{dict_name}` (resolution-table parity)")
+        elif actual != expected:
             errors.append(
-                f"Claude SessionStart dispatcher must define module-level dict `{dict_name}` (resolution-table parity)"
-            )
-        if not codex_dump:
-            errors.append(
-                f"Codex SessionStart dispatcher must define module-level dict `{dict_name}` (resolution-table parity)"
-            )
-        if claude_dump and codex_dump and claude_dump != codex_dump:
-            errors.append(
-                f"{dict_name} dict literal must be ast-equivalent between Claude and Codex "
-                "SessionStart dispatchers (resolution-table parity)"
+                f"{core_label} `{dict_name}` must equal the canonical resolution-table "
+                f"mapping {expected!r}; found {actual!r} (resolution-table parity)"
             )
 
     # ----- Assertion 5: marker invalidation parity (PRE-DISPATCH order) ---
-    # AST-walk ``main()`` and verify ``_invalidate_session_role_marker()`` is
-    # called as an executable statement before the first
-    # ``_bridge_dispatch_keyword_check()`` call.  This rejects comment-only
-    # mentions, helper-only calls, and post-fork placements (addresses
-    # verification NO-GO -006 F1).  The two ``def ...`` substring checks
-    # remain as a basic structural floor.
-    for label, text in (
-        ("Claude SessionStart dispatcher", claude_text),
-        ("Codex SessionStart dispatcher", codex_text),
-    ):
-        if "def _invalidate_session_role_marker(" not in text:
-            errors.append(
-                f"{label} must define `_invalidate_session_role_marker()` "
-                "(scoping-003 Slice 3 marker-invalidation parity)"
-            )
-        if "def _session_role_marker_path(" not in text:
-            errors.append(
-                f"{label} must define `_session_role_marker_path()` resolving to the canonical marker location"
-            )
-        order_error = _main_call_order_error(text, label)
-        if order_error is not None:
-            errors.append(order_error)
+    # AST-walk the core's ``main()`` and verify
+    # ``_invalidate_session_role_marker()`` is called as an executable statement
+    # before the first ``_bridge_dispatch_keyword_check()`` call.
+    if "def _invalidate_session_role_marker(" not in core_text:
+        errors.append(
+            f"{core_label} must define `_invalidate_session_role_marker()` "
+            "(scoping-003 Slice 3 marker-invalidation parity)"
+        )
+    if "def _session_role_marker_path(" not in core_text:
+        errors.append(
+            f"{core_label} must define `_session_role_marker_path()` resolving to the canonical marker location"
+        )
+    order_error = _main_call_order_error(core_text, core_label)
+    if order_error is not None:
+        errors.append(order_error)
 
     # ----- Assertion 6: behavior-table parity -----------------------------
-    # ``_bridge_dispatch_keyword_check`` must (a) reference each of the five
-    # StartupDecision members so the receiver-side decision-table vocabulary
-    # is byte-aligned across dispatchers AND (b) document the five-row
-    # behavior-table column headers in its docstring (the GO-approved Slice 8
-    # contract; addresses verification NO-GO -006 F3).
-    for label, text in (
-        ("Claude SessionStart dispatcher", claude_text),
-        ("Codex SessionStart dispatcher", codex_text),
-    ):
-        if "def _bridge_dispatch_keyword_check(" not in text:
-            errors.append(f"{label} must define `_bridge_dispatch_keyword_check()` (resolution-table receiver)")
-            continue
-        body_text = _function_body_text(text, "_bridge_dispatch_keyword_check")
+    # The core's ``_bridge_dispatch_keyword_check`` must reference each of the
+    # five StartupDecision members AND document the behavior-table header row.
+    if "def _bridge_dispatch_keyword_check(" not in core_text:
+        errors.append(f"{core_label} must define `_bridge_dispatch_keyword_check()` (resolution-table receiver)")
+    else:
+        body_text = _function_body_text(core_text, "_bridge_dispatch_keyword_check")
         for member_name in (
             "StartupDecision.NORMAL_STARTUP",
             "StartupDecision.DISPATCH_AUTHORIZED",
@@ -789,31 +852,25 @@ def _resolution_table_parity_errors(project_root: Path) -> list[str]:
         ):
             if member_name not in body_text:
                 errors.append(
-                    f"{label} `_bridge_dispatch_keyword_check()` must reference "
+                    f"{core_label} `_bridge_dispatch_keyword_check()` must reference "
                     f"`{member_name}` (IP-4 five-decision receiver vocabulary)"
                 )
-        errors.extend(_bridge_dispatch_behavior_table_errors(text, label))
+        errors.extend(_bridge_dispatch_behavior_table_errors(core_text, core_label))
 
     # ----- Assertion 7: audit-log parity ----------------------------------
-    # Both dispatchers must define ``_audit_log_misdirected_dispatch`` and
-    # carry the canonical kind literal + dispatch-failures path token.
-    for label, text in (
-        ("Claude SessionStart dispatcher", claude_text),
-        ("Codex SessionStart dispatcher", codex_text),
-    ):
-        if "def _audit_log_misdirected_dispatch(" not in text:
-            errors.append(f"{label} must define `_audit_log_misdirected_dispatch()` (STRICT_DROP audit record)")
-        if _AUDIT_LOG_KIND_LITERAL not in text:
-            errors.append(f"{label} must reference audit-record kind literal {_AUDIT_LOG_KIND_LITERAL}")
-        if _AUDIT_LOG_PATH_TOKEN not in text:
-            errors.append(f"{label} must reference audit-log path token `{_AUDIT_LOG_PATH_TOKEN}`")
+    # The core must define ``_audit_log_misdirected_dispatch`` and carry the
+    # canonical kind literal + dispatch-failures path token.
+    if "def _audit_log_misdirected_dispatch(" not in core_text:
+        errors.append(f"{core_label} must define `_audit_log_misdirected_dispatch()` (STRICT_DROP audit record)")
+    if _AUDIT_LOG_KIND_LITERAL not in core_text:
+        errors.append(f"{core_label} must reference audit-record kind literal {_AUDIT_LOG_KIND_LITERAL}")
+    if _AUDIT_LOG_PATH_TOKEN not in core_text:
+        errors.append(f"{core_label} must reference audit-log path token `{_AUDIT_LOG_PATH_TOKEN}`")
 
-    # ----- Assertion 8: intentional-difference catalogue ------------------
-    # Each dispatcher must contain its OWN HARNESS_NAME and OUT_DIR
-    # assignments AND must NOT contain the OTHER dispatcher's assignments.
-    # Precise assignment literals avoid false matches on docstring
-    # cross-references (each dispatcher's module docstring legitimately
-    # references the other dispatcher's path).
+    # ----- Assertion 8: intentional-difference catalogue (wrappers) -------
+    # Each WRAPPER must contain its OWN HARNESS_NAME and OUT_DIR assignments
+    # AND must NOT contain the OTHER wrapper's assignments. Precise assignment
+    # literals avoid false matches on docstring cross-references.
     if _CLAUDE_HARNESS_NAME_LITERAL not in claude_text:
         errors.append(
             f"Claude SessionStart dispatcher must contain `{_CLAUDE_HARNESS_NAME_LITERAL}` "
@@ -850,41 +907,49 @@ def _resolution_table_parity_errors(project_root: Path) -> list[str]:
             f"Codex SessionStart dispatcher must not contain `{_CLAUDE_OUT_DIR_LITERAL}` (intentional-difference guard)"
         )
 
-    # ----- Assertion 9: cache-writer parity (Slice 8 F2 fix) --------------
-    # Both dispatchers' ``_write_role_scoped_startup_relay_caches`` must
-    # iterate ``_MODE_TO_ROLE_PROFILE`` and skip ``primary_mode`` (the
-    # Slice 1 VERIFIED fix that writes both ``-pb.md`` and ``-lo.md``
-    # caches unconditionally regardless of the harness's durable role set).
-    # The function body must NOT reference ``_resolve_own_role_set`` (the
-    # pre-Slice-1 defective shape per scoping-003 line 71).  Per
-    # ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2 +
-    # DCL-SESSION-ROLE-RESOLUTION-001 + Slice 1 VERIFIED.
-    for label, text in (
-        ("Claude SessionStart dispatcher", claude_text),
-        ("Codex SessionStart dispatcher", codex_text),
-    ):
-        if "def _write_role_scoped_startup_relay_caches(" not in text:
-            errors.append(f"{label} must define `_write_role_scoped_startup_relay_caches()` (Slice 1 cache-writer)")
-            continue
-        body_text = _function_body_text(text, "_write_role_scoped_startup_relay_caches")
+    # ----- Assertion 9: cache-writer parity (core single source) ----------
+    # The core's ``_write_role_scoped_startup_relay_caches`` must iterate
+    # ``_MODE_TO_ROLE_PROFILE`` and skip ``primary_mode`` and must NOT reference
+    # ``_resolve_own_role_set`` (the pre-Slice-1 defective shape).
+    if "def _write_role_scoped_startup_relay_caches(" not in core_text:
+        errors.append(f"{core_label} must define `_write_role_scoped_startup_relay_caches()` (Slice 1 cache-writer)")
+    else:
+        body_text = _function_body_text(core_text, "_write_role_scoped_startup_relay_caches")
         if _CACHE_WRITER_LOOP_LITERAL not in body_text:
             errors.append(
-                f"{label} `_write_role_scoped_startup_relay_caches()` must iterate "
+                f"{core_label} `_write_role_scoped_startup_relay_caches()` must iterate "
                 f"`{_CACHE_WRITER_LOOP_LITERAL}` "
                 "(Slice 1 cache-writer fix; writes both -pb.md and -lo.md unconditionally per "
                 "ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2)"
             )
         if _CACHE_WRITER_SKIP_LITERAL not in body_text:
             errors.append(
-                f"{label} `_write_role_scoped_startup_relay_caches()` must skip the primary "
+                f"{core_label} `_write_role_scoped_startup_relay_caches()` must skip the primary "
                 f"mode via `{_CACHE_WRITER_SKIP_LITERAL}` (Slice 1 cache-writer fix)"
             )
         if _CACHE_WRITER_FORBIDDEN_LITERAL in body_text:
             errors.append(
-                f"{label} `_write_role_scoped_startup_relay_caches()` must NOT reference "
+                f"{core_label} `_write_role_scoped_startup_relay_caches()` must NOT reference "
                 f"`{_CACHE_WRITER_FORBIDDEN_LITERAL}` "
                 "(pre-Slice-1 defective shape that conditioned cache writes on the durable "
                 "role set; regression per scoping-003 line 71)"
+            )
+
+    # ----- Assertion 10: wrapper delegation (Slice D) ---------------------
+    # Each thin wrapper must import the shared core and rebind its functions,
+    # so the de-duplication cannot silently regress to local copies.
+    for label, text in (
+        ("Claude SessionStart dispatcher", claude_text),
+        ("Codex SessionStart dispatcher", codex_text),
+    ):
+        if _CORE_IMPORT_TOKEN not in text:
+            errors.append(
+                f"{label} must delegate to the shared core via `{_CORE_IMPORT_TOKEN}` (Slice D de-duplication)"
+            )
+        if _CORE_REBIND_TOKEN not in text:
+            errors.append(
+                f"{label} must rebind shared core functions onto its namespace via "
+                f"`{_CORE_REBIND_TOKEN}` (Slice D de-duplication)"
             )
 
     return errors
@@ -953,19 +1018,28 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         )
 
     if dispatcher_session:
-        # Dispatcher pattern: verify dispatcher source delegates correctly.
+        # Dispatcher pattern: Slice D — verify the wrapper delegates to the
+        # shared core and the core carries the startup-service contract.
         dispatcher_path = PROJECT_ROOT / CLAUDE_SESSION_START_DISPATCHER
+        core_path = PROJECT_ROOT / SESSION_START_DISPATCH_CORE_PATH
         if not dispatcher_path.is_file():
             errors.append(f"{CLAUDE_SESSION_START_DISPATCHER} referenced by SessionStart hook does not exist")
+        elif not core_path.is_file():
+            errors.append(f"{SESSION_START_DISPATCH_CORE_PATH} (shared SessionStart dispatch core) does not exist")
         else:
             dispatcher_source = dispatcher_path.read_text(encoding="utf-8")
-            if "session_self_initialization.py" not in dispatcher_source:
-                errors.append("Claude SessionStart dispatcher must delegate to session_self_initialization.py")
-            if "--emit-startup-service-payload" not in dispatcher_source:
-                errors.append("Claude SessionStart dispatcher must use the --emit-startup-service-payload contract")
-            if "--fast-hook" not in dispatcher_source:
-                errors.append("Claude SessionStart dispatcher must use the fast lifecycle hook path")
-            if "--harness-name" not in dispatcher_source or "claude" not in dispatcher_source:
+            core_source = core_path.read_text(encoding="utf-8")
+            if _CORE_IMPORT_TOKEN not in dispatcher_source:
+                errors.append(f"Claude SessionStart dispatcher must delegate to the shared core ({_CORE_IMPORT_TOKEN})")
+            if "session_self_initialization.py" not in core_source:
+                errors.append("Claude SessionStart dispatch core must delegate to session_self_initialization.py")
+            if "--emit-startup-service-payload" not in core_source:
+                errors.append("Claude SessionStart dispatch core must use the --emit-startup-service-payload contract")
+            if "--fast-hook" not in core_source:
+                errors.append("Claude SessionStart dispatch core must use the fast lifecycle hook path")
+            if "--harness-name" not in core_source:
+                errors.append("Claude SessionStart dispatch core must pass --harness-name")
+            if "claude" not in dispatcher_source:
                 errors.append("Claude SessionStart dispatcher must identify the Claude harness type")
     elif direct_session:
         # Legacy direct-invocation pattern: preserve the original assertions.
