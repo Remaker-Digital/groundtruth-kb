@@ -25,6 +25,7 @@ NO-GO: bridge/gtkb-projects-remove-item-cli-slice-1-002.md
 NEW: bridge/gtkb-projects-remove-item-cli-slice-1-001.md
 
 Document: gtkb-session-id-shared-resolver-unification
+NEW: bridge/gtkb-session-id-shared-resolver-unification-005.md
 GO: bridge/gtkb-session-id-shared-resolver-unification-004.md
 REVISED: bridge/gtkb-session-id-shared-resolver-unification-003.md
 NO-GO: bridge/gtkb-session-id-shared-resolver-unification-002.md
