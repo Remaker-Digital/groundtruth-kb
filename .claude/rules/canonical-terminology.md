@@ -705,9 +705,16 @@ role attached to the harness).
 
 **Definition:** The binding of an AI coding harness to a role (Prime Builder
 or Loyal Opposition). The owner assigns the Prime Builder role; the bridge
-counterpart is always Loyal Opposition. The role map records one role per
-harness ID. Switching a harness to Prime Builder demotes all other recorded
-harnesses to Loyal Opposition in the same update.
+counterpart is always Loyal Opposition. The role map records a role SET per harness ID (singleton lists for
+multi-harness mode, multi-element lists for single-harness mode). Switching
+an ACTIVE harness to Prime Builder updates that harness's role set; another
+active harness holding the complementary role is preserved on its current
+holder or atomically reassigned to maintain the single-active-per-role
+invariant. Inactive harnesses (registered or suspended) retain their
+existing role sets unchanged: role and status are orthogonal axes per the
+role/status orthogonality model in
+`DELIB-S378-ROLE-STATUS-ORTHOGONALITY-DISPATCH` and
+`ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3.
 
 **Canonical alias:** operating role.
 

@@ -46,10 +46,18 @@ change.
   represent the multi-harness case (one role per harness ID); multi-element
   lists represent the single-harness case (one harness ID holds both roles).
 - A role-switch command updates the role map through code as one operation.
-- **Multi-harness topology assignment:** when a harness is assigned Prime
-  Builder, all OTHER recorded harnesses are demoted to Loyal Opposition
-  (singleton `["loyal-opposition"]`) in the same role-map update. Singleton
-  role sets are the multi-harness norm.
+- **Active-harness role assignment:** role assignment via the canonical
+  `gt mode set-role` / `gt harness set-role` CLI updates the target ACTIVE
+  harness's role set. The complementary role's active assignment is preserved
+  on its current holder or atomically reassigned to a different active
+  harness, maintaining the single-ACTIVE-per-role invariant (per
+  `DELIB-S378-ROLE-STATUS-ORTHOGONALITY-DISPATCH` and FR9 of
+  `GOV-HARNESS-ROLE-PORTABILITY-001`). **Inactive harnesses (registered or
+  suspended) retain their existing role sets unchanged** — role and status
+  are orthogonal axes (per the S384 owner clarification and
+  `ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3). The CLI gates the target on
+  `status == "active"`; run `gt harness activate --harness <id>` first if
+  needed.
 - **Single-harness topology assignment:** when only one harness identity is
   recorded, its role set is `["prime-builder", "loyal-opposition"]`
   (multi-element) so the single harness can fulfill both roles via the
