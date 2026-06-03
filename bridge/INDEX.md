@@ -1033,6 +1033,7 @@ NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
 
 Document: gtkb-prime-worker-delivery-regression-slice-4
+VERIFIED: bridge/gtkb-prime-worker-delivery-regression-slice-4-011.md
 REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-010.md
 NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-009.md
 REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-008.md
