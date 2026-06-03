@@ -21,6 +21,7 @@ REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-002.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
 
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-007.md
 NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-006.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-005.md
 GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-004.md
@@ -29,6 +30,7 @@ NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
 
 Document: gtkb-understand-anything-evaluation-install
+REVISED: bridge/gtkb-understand-anything-evaluation-install-007.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-006.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-005.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-004.md
