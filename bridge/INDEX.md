@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
+NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md
+
 Document: gtkb-startup-refractor-slice-c-startup-index-overlays
 GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md
 NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-001.md
