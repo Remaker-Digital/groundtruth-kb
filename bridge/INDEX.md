@@ -11,6 +11,7 @@ Document: gtkb-bridge-revise-cli-slice-1
 NEW: bridge/gtkb-bridge-revise-cli-slice-1-001.md
 
 Document: gtkb-startup-refractor-slice-a-startup-control-inventory
+VERIFIED: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-004.md
 NEW: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-003.md
 GO: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-002.md
 NEW: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-001.md
