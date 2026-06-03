@@ -731,6 +731,7 @@ NO-GO: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-002.md
 NEW: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-001.md
 
 Document: gtkb-governance-adoption-doctor-check
+GO: bridge/gtkb-governance-adoption-doctor-check-006.md
 REVISED: bridge/gtkb-governance-adoption-doctor-check-005.md
 GO: bridge/gtkb-governance-adoption-doctor-check-004.md
 REVISED: bridge/gtkb-governance-adoption-doctor-check-003.md
@@ -738,6 +739,7 @@ NO-GO: bridge/gtkb-governance-adoption-doctor-check-002.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-001.md
 
 Document: gtkb-release-candidate-gate-managed-skill
+GO: bridge/gtkb-release-candidate-gate-managed-skill-006.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-005.md
 GO: bridge/gtkb-release-candidate-gate-managed-skill-004.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-003.md
@@ -978,6 +980,7 @@ NO-GO: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-002.
 NEW: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-001.md
 
 Document: gtkb-peer-solution-advisory-report-advisory-disposition
+NO-GO: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-006.md
 REVISED: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-005.md
 GO: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-004.md
 REVISED: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-003.md
