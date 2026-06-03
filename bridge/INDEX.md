@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-projects-remove-item-cli-slice-1
+NEW: bridge/gtkb-projects-remove-item-cli-slice-1-001.md
+
 Document: gtkb-session-id-shared-resolver-unification
 NO-GO: bridge/gtkb-session-id-shared-resolver-unification-002.md
 NEW: bridge/gtkb-session-id-shared-resolver-unification-001.md
