@@ -510,6 +510,17 @@ memory/MEMORY.md.backup-*
 .gtkb-state/
 
 # =============================================================================
+# UA-Evaluation install scope (added 2026-06-03 WI-4280)
+# =============================================================================
+# Per bridge/gtkb-understand-anything-evaluation-install-007.md REVISED-3
+# (Codex GO -008): platform-root .understand-anything/ is the evaluation
+# install root for the "Understand Anything" external tool. Root-anchored
+# so nested applications/<name>/.understand-anything/ paths remain available
+# for the future per-application graph-commit policy (CAND-SPEC-UA-GRAPH-
+# COMMIT-POLICY per DELIB-20260632 AUQ-3 = A).
+/.understand-anything/
+
+# =============================================================================
 # Formal-artifact-approval session-state packets (added 2026-04-29 S321)
 # =============================================================================
 # Per bridge/session-hygiene-drift-triage-s321-2026-04-29-003.md §2.3 +

@@ -36,6 +36,7 @@ NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
 
 Document: gtkb-understand-anything-evaluation-install
+NEW: bridge/gtkb-understand-anything-evaluation-install-009.md
 GO: bridge/gtkb-understand-anything-evaluation-install-008.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-007.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-006.md
