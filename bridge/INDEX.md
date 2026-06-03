@@ -11,6 +11,7 @@ Document: gtkb-project-membership-reconciliation-slice-1-inventory-tool
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-inventory-tool-001.md
 
 Document: gtkb-project-membership-reconciliation-slice-1-scoping
+VERIFIED: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-004.md
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-003.md
 GO: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-002.md
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-001.md
@@ -585,6 +586,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-agent-red-reference-adopter-framing-restoration
+REVISED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-007.md
 NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-006.md
 NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-005.md
 GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-004.md

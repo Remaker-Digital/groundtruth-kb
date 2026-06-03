@@ -36,8 +36,11 @@ one model name or vendor harness.
 
 All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
 demo/application files must remain within `E:\GT-KB\applications\`. Agent Red
-is a separate project, not part of GT-KB, and Agent Red files must not be used
-as live GT-KB artifacts. There are no exceptions.
+is the reference adopter application for GT-KB at
+`E:\GT-KB\applications\Agent_Red\`; its in-root application subtree is in scope
+for GT-KB review when explicitly named. Unqualified GT-KB tooling references
+must not resolve silently to Agent Red's lifecycle-independent repository or CI
+surfaces. There are no exceptions to the root-containment rule.
 Apply `.claude/rules/project-root-boundary.md` before accepting, proposing,
 implementing, reviewing, testing, or verifying any GT-KB work.
 
