@@ -28,6 +28,7 @@ GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
 
 Document: gtkb-claude-code-session-id-env-var-gap
+VERIFIED: bridge/gtkb-claude-code-session-id-env-var-gap-012.md
 NEW: bridge/gtkb-claude-code-session-id-env-var-gap-011.md
 GO: bridge/gtkb-claude-code-session-id-env-var-gap-010.md
 REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-009.md
