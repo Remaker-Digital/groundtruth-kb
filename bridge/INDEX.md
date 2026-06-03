@@ -37,6 +37,7 @@ NO-GO: bridge/gtkb-session-id-shared-resolver-unification-002.md
 NEW: bridge/gtkb-session-id-shared-resolver-unification-001.md
 
 Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
+NO-GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-006.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-005.md
 GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-004.md
 REVISED: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-003.md
