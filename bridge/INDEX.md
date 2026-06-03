@@ -7,7 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-bridge-revise-cli-slice-1
+NEW: bridge/gtkb-bridge-revise-cli-slice-1-001.md
+
 Document: gtkb-startup-refractor-slice-a-startup-control-inventory
+NEW: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-003.md
 GO: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-002.md
 NEW: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-001.md
 
