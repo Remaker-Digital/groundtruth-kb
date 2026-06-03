@@ -24,6 +24,7 @@ GO: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-002.md
 NEW: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-001.md
 
 Document: gtkb-startup-refractor-slice-b-local-settings-hygiene
+VERIFIED: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-004.md
 NEW: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-003.md
 GO: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-002.md
 NEW: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-001.md
