@@ -11,6 +11,7 @@ Document: gtkb-wi-3506-phantom-spec-citation-repoint
 NEW: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-001.md
 
 Document: gtkb-axis-2-dispatchable-filter
+NO-GO: bridge/gtkb-axis-2-dispatchable-filter-002.md
 NEW: bridge/gtkb-axis-2-dispatchable-filter-001.md
 
 Document: gtkb-wrap-scan-report-relocation-slice-1
