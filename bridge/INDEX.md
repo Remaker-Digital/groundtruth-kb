@@ -25,6 +25,7 @@ GO: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-002.md
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-001.md
 
 Document: gtkb-deferred-authority-protocol-alignment
+REVISED: bridge/gtkb-deferred-authority-protocol-alignment-010.md
 NO-GO: bridge/gtkb-deferred-authority-protocol-alignment-009.md
 REVISED: bridge/gtkb-deferred-authority-protocol-alignment-008.md
 NEW: bridge/gtkb-deferred-authority-protocol-alignment-007.md
