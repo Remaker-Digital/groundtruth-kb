@@ -578,6 +578,7 @@ NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-002.md
 NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-001.md
 
 Document: gtkb-lo-hygiene-assessment-skill-build
+REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-009.md
 NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-008.md
 VERIFIED: bridge/gtkb-lo-hygiene-assessment-skill-build-007.md
 NEW: bridge/gtkb-lo-hygiene-assessment-skill-build-006.md
@@ -973,14 +974,6 @@ NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-004.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-003.md
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-002.md
 NEW: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-001.md
-
-Document: gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping
-VERIFIED: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-006.md
-REVISED: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-005.md
-NO-GO: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-004.md
-NEW: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-003.md
-GO: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-002.md
-NEW: bridge/gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping-001.md
 
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
 NO-GO: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-007.md

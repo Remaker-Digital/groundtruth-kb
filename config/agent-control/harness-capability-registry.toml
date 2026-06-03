@@ -89,12 +89,12 @@ status = "native"
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "561406bf00e2acdd143d48cfa0c1401687d5dcb6c82a0cc37526f87093347d73"
+source_sha256 = "f11905ff9c935c622b4d37bc258997eb3153adb062c3984af2272f739b9bd3f0"
 [capabilities.antigravity]
 surface = ".agent/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "561406bf00e2acdd143d48cfa0c1401687d5dcb6c82a0cc37526f87093347d73"
+source_sha256 = "f11905ff9c935c622b4d37bc258997eb3153adb062c3984af2272f739b9bd3f0"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -618,12 +618,12 @@ status = "native"
 surface = ".codex/skills/send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/send-review/SKILL.md"
-source_sha256 = "d1e8a85a64f3b8191c0e7495873bfb00154ffc05e35a92e448535f8cc22f5213"
+source_sha256 = "301d7214a49a078ce5b587542085993a5f1df602d904707cec470f9f814c634b"
 [capabilities.antigravity]
 surface = ".agent/skills/send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/send-review/SKILL.md"
-source_sha256 = "d1e8a85a64f3b8191c0e7495873bfb00154ffc05e35a92e448535f8cc22f5213"
+source_sha256 = "301d7214a49a078ce5b587542085993a5f1df602d904707cec470f9f814c634b"
 [[capabilities]]
 id = "skill.spec-intake"
 kind = "skill"
@@ -733,6 +733,52 @@ surface = ".agent/skills/grill-me-for-clarification/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/grill-me-for-clarification/SKILL.md"
 source_sha256 = "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
+[[capabilities]]
+id = "skill.gtkb-hygiene-sweep"
+kind = "skill"
+canonical_name = "gtkb-hygiene-sweep"
+canonical_purpose = "Orchestrate gt hygiene sweep CLI; classify findings; guide owner-gated remediation child-bridge filing."
+canonical_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/gtkb-hygiene-sweep/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+source_sha256 = "92075b036c653f5783506b200d602ad646d46e22c1dbaa212927457f42d66500"
+[capabilities.antigravity]
+surface = ".agent/skills/gtkb-hygiene-sweep/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+source_sha256 = "92075b036c653f5783506b200d602ad646d46e22c1dbaa212927457f42d66500"
+[[capabilities]]
+id = "skill.loyal-opposition-hygiene-assessment"
+kind = "skill"
+canonical_name = "loyal-opposition-hygiene-assessment"
+canonical_purpose = "Assess GT-KB project hygiene as Loyal Opposition, classify drift, and prepare a Prime Builder action plan without mutating project files."
+canonical_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+source_sha256 = "89a542d5ae7fe16b82547b313005c479cfff63cdead56485bbdd6576592855f2"
+[capabilities.antigravity]
+surface = ".agent/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+source_sha256 = "89a542d5ae7fe16b82547b313005c479cfff63cdead56485bbdd6576592855f2"
 [[capabilities]]
 id = "skill.verify"
 kind = "skill"
