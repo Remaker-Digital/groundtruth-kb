@@ -990,6 +990,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
+GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-008.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-007.md
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-006.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-005.md
@@ -1032,6 +1033,7 @@ NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
 
 Document: gtkb-prime-worker-delivery-regression-slice-4
+NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-009.md
 REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-008.md
 NEW: bridge/gtkb-prime-worker-delivery-regression-slice-4-007.md
 GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-006.md
