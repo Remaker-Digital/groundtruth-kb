@@ -8,6 +8,8 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-wrap-scan-report-relocation-slice-1
+VERIFIED: bridge/gtkb-wrap-scan-report-relocation-slice-1-004.md
+NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-003.md
 GO: bridge/gtkb-wrap-scan-report-relocation-slice-1-002.md
 NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
 
