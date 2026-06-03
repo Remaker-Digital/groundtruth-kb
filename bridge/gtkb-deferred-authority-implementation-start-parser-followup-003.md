@@ -74,10 +74,10 @@ python scripts\implementation_authorization.py begin --bridge-id gtkb-deferred-a
 Observed result: authorization packet created for the three approved target paths with latest bridge status `GO`.
 
 ```text
-groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_implementation_authorization.py platform_tests\scripts\test_implementation_start_gate.py -q --tb=short --basetemp=.gtkb-state\pytest-tmp-deferred-parser-followup
+groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_implementation_authorization.py platform_tests\scripts\test_implementation_start_gate.py -q --tb=short
 ```
 
-Observed result: `170 passed, 2 warnings in 5.98s`. Warnings were a Chroma telemetry deprecation warning and the known pytest cache path warning under `.pytest_cache`; neither affected the focused assertions.
+Observed result: `170 passed, 1 warning in 12.12s`. The warning was a Chroma telemetry deprecation warning; it did not affect the focused assertions.
 
 ```text
 groundtruth-kb\.venv\Scripts\python.exe -m ruff check scripts\implementation_authorization.py platform_tests\scripts\test_implementation_authorization.py platform_tests\scripts\test_implementation_start_gate.py
