@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-hygiene-sweep-presence-patterns-slice-1
+VERIFIED: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-006.md
 NEW: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-005.md
 GO: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-004.md
 REVISED: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-003.md
