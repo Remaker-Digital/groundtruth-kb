@@ -100,6 +100,7 @@ REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
 NEW: bridge/gtkb-claude-code-session-id-env-var-gap-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-005.md
 NO-GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-004.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-003.md
 GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-002.md
