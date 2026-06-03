@@ -72,40 +72,46 @@ Carried-forward owner decision records: `DELIB-20260602-GLOSSARY-CLI-SCAN-PROJEC
 
 | Spec / governing surface | Executed verification evidence |
 | --- | --- |
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | Focused bridge index/writer/hook/audit tests passed: `133 passed`; author metadata tests passed: `13 passed`. |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Focused bridge index/writer/hook tests passed: `78 passed`; broad parser/helper/preflight tests passed: `106 passed`. `show_thread_bridge.py gtkb-deferred-authority-protocol-alignment --format json` reports no drift with `REVISED: bridge/gtkb-deferred-authority-protocol-alignment-008.md` as latest. |
 | `ADR-ISOLATION-APPLICATION-PLACEMENT-001`; `AGENTS.md`; `.claude/rules/project-root-boundary.md` | Post-remediation `rg` found no active `.claude/settings.local.json` legacy-root matches; narrow doctor subcheck returned `status='pass'`. |
 | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | This report cites the approved proposal, GO, governing specs, and owner decisions. |
 | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | This table maps each linked governing surface to executed verification evidence and explicitly records residual target gaps. |
 | `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`; `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`; `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Rule/template/helper tests and narrative updates establish `DEFERRED` as an owner-evidenced lifecycle state. |
 | `GOV-STANDING-BACKLOG-001` | Work remains bounded to one work item, `GTKB-GOV-008`; no backlog batch operation was performed. |
-| `GOV-ARTIFACT-APPROVAL-001`; `PB-ARTIFACT-APPROVAL-001`; `DCL-ARTIFACT-APPROVAL-HOOK-001` | Four approval packets exist and their `full_content_sha256` values match the edited rule files. |
+| `GOV-ARTIFACT-APPROVAL-001`; `PB-ARTIFACT-APPROVAL-001`; `DCL-ARTIFACT-APPROVAL-HOOK-001` | Four approval packets exist for the edited rule files, and `scripts\check_narrative_artifact_evidence.py --staged` passed with `PASS narrative-artifact evidence (4 cleared)`. |
 
 ## Commands Run
 
-- `groundtruth-kb\.venv\Scripts\python.exe -m pytest groundtruth-kb\tests\test_cli_bridge_index.py platform_tests\scripts\test_gtkb_bridge_writer.py platform_tests\hooks\test_bridge_compliance_gate_body_status_token.py groundtruth-kb\tests\test_cli_authority.py groundtruth-kb\tests\test_doctor_legacy_root.py groundtruth-kb\tests\test_preflight_checks.py platform_tests\scripts\test_bridge_index_chain_audit.py platform_tests\scripts\test_bridge_reconciliation_audit.py platform_tests\scripts\test_membase_effective_use_audit.py groundtruth-kb\tests\test_harvest_coverage_helper.py -q --tb=short --basetemp=.gtkb-state\pytest-tmp-deferred-authority`
-- `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\hooks\test_bridge_author_metadata_gate.py platform_tests\scripts\test_bridge_author_metadata.py -q --tb=short --basetemp=.gtkb-state\pytest-tmp-bridge-author-metadata`
+- `groundtruth-kb\.venv\Scripts\python.exe -m pytest groundtruth-kb\tests\test_cli_authority.py groundtruth-kb\tests\test_cli_bridge_index.py groundtruth-kb\tests\test_doctor_legacy_root.py platform_tests\hooks\test_bridge_compliance_gate_body_status_token.py platform_tests\scripts\test_gtkb_bridge_writer.py -q --tb=short --basetemp=.gtkb-state\pytest-tmp-deferred-authority-final-focused`
+- `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\hooks\test_bridge_author_metadata_gate.py platform_tests\scripts\test_bridge_author_metadata.py platform_tests\scripts\test_bridge_applicability_preflight.py platform_tests\scripts\test_bridge_index_chain_audit.py platform_tests\scripts\test_bridge_reconciliation_audit.py platform_tests\scripts\test_scan_bridge.py platform_tests\scripts\test_show_thread_bridge.py platform_tests\skills\test_bridge_impl_report_helper.py platform_tests\skills\test_bridge_revise_helper.py groundtruth-kb\tests\test_preflight_checks.py -q --tb=short --basetemp=.gtkb-state\pytest-tmp-deferred-authority-final-broad`
 - `groundtruth-kb\.venv\Scripts\python.exe -m ruff check <changed-python-files>`
 - `groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check <changed-python-files>`
-- `groundtruth-kb\.venv\Scripts\gt.exe --config groundtruth.toml authority resolve backlog --json`
+- `groundtruth-kb\.venv\Scripts\gt.exe --config groundtruth.toml authority resolve "bridge status" --json`
+- `groundtruth-kb\.venv\Scripts\gt.exe --config groundtruth.toml authority resolve "parked draft" --json`
+- `groundtruth-kb\.venv\Scripts\gt.exe --config groundtruth.toml authority resolve "project root" --json`
 - `groundtruth-kb\.venv\Scripts\gt.exe --config groundtruth.toml authority status --json`
 - `rg -n "E:\\Claude-Playground|E:/Claude-Playground|//e/Claude-Playground" .claude/settings.local.json`
 - Narrow doctor subcheck: `from groundtruth_kb.project.doctor import _check_active_legacy_root_references; _check_active_legacy_root_references(Path('.').resolve())`
 - Approval packet hash validation for all four `2026-06-02-claude-rules-*.json` packets.
-- Attempted full doctor smoke: `groundtruth-kb\.venv\Scripts\gt.exe --config groundtruth.toml project doctor --profile harness-memory`
-- Attempted platform map test: `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_system_interface_map.py -q --tb=short --basetemp=.gtkb-state\pytest-tmp-system-interface-map`
+- `groundtruth-kb\.venv\Scripts\gt.exe --config groundtruth.toml project doctor --profile dual-agent --json`
+- `python scripts\bridge_applicability_preflight.py --bridge-id gtkb-deferred-authority-protocol-alignment`
+- `python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-deferred-authority-protocol-alignment`
+- Staged hook-equivalent checks: `git diff --cached --check`; `groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb secrets scan --staged --redacted --fail-on verified-provider`; `groundtruth-kb\.venv\Scripts\python.exe scripts\check_dev_environment_inventory_drift.py --staged --allow-review-evidence`; `groundtruth-kb\.venv\Scripts\python.exe scripts\check_narrative_artifact_evidence.py --staged`; `groundtruth-kb\.venv\Scripts\python.exe scripts\check_ruff_format.py --staged`.
+- Attempted platform map test: `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_system_interface_map.py -q --tb=short --basetemp=.gtkb-state\pytest-tmp-system-interface-map-final`
 
 ## Observed Results
 
-- Focused pytest: `133 passed, 1 warning` (`PytestCacheWarning` for `.pytest_cache`).
-- Author metadata pytest: `13 passed, 1 warning` (`PytestCacheWarning` for `.pytest_cache`).
+- Focused pytest: `78 passed, 1 warning` (`PytestCacheWarning` for `.pytest_cache`).
+- Broad pytest: `106 passed, 1 warning` (`PytestCacheWarning` for `.pytest_cache`).
 - Ruff check: `All checks passed!`
-- Ruff format check: `37 files already formatted`.
-- `gt authority resolve backlog --json`: `status: resolved`, `system.id: backlog`, authoritative source `MemBase table: current_work_items`.
+- Ruff format check: `41 files already formatted`.
+- `gt authority resolve "bridge status" --json`, `gt authority resolve "parked draft" --json`, and `gt authority resolve "project root" --json`: each returned `status: resolved` for the expected governed system id.
 - `gt authority status --json`: `status: pass`, `systems: 34`, `human_companion_exists: false`.
 - Post-remediation settings-local legacy-root scan: no matches.
 - Narrow doctor subcheck: `ToolCheck(name='Active legacy-root references', status='pass', message='No active control-surface references to E:\Claude-Playground')`.
-- Approval packet hash validation: all four recorded `full_content_sha256` values matched current rule-file content.
-- Full doctor smoke did not run because `harness-memory` is not a valid package profile; valid profiles reported were `dual-agent`, `dual-agent-webapp`, and `local-only`. The approved proposal allowed a narrow legacy-root doctor subcheck when the full invocation was not the right checkout invocation.
+- `gt project doctor --profile dual-agent --json`: overall exit 1 due pre-existing unrelated doctor failures and warnings, but the new slice-specific `Active legacy-root references` check passed.
+- Applicability preflight passed with packet hash `sha256:d516d1d9a63962bbea9bb44bfa2febaa6f8a72a3ac7cc59fe4f9091bfa029d46`; clause preflight passed with 5 clauses evaluated, 2 `must_apply`, and 0 blocking gaps.
+- Staged checks passed: whitespace clean; staged secret scan `0 finding(s), 58 path(s) scanned`; inventory drift `PASS (review_evidence_present)` with `Changed paths: 58`; narrative artifact evidence `PASS narrative-artifact evidence (4 cleared)`; staged ruff-format `[PASS] ruff format: 41 staged Python file(s) formatted`.
 - Platform map test result: `6 passed, 2 failed`; both failures are the stale companion-doc surface (`docs/gtkb-systems-and-tools.md` missing, `human_companion_exists` false). The failing doc path and stale standalone script are outside this authorization packet.
 
 ## Files Changed
@@ -125,6 +131,9 @@ Carried-forward owner decision records: `DELIB-20260602-GLOSSARY-CLI-SCAN-PROJEC
 - `.groundtruth/formal-artifact-approvals/2026-06-02-claude-rules-file-bridge-protocol-md.json`
 - `.groundtruth/formal-artifact-approvals/2026-06-02-claude-rules-operating-model-md.json`
 - `.claude/settings.local.json` (local ignored file; active legacy-root entries removed in this checkout)
+- `bridge/INDEX.md`
+- `bridge/gtkb-deferred-authority-protocol-alignment-007.md`
+- `bridge/gtkb-deferred-authority-protocol-alignment-008.md`
 - `config/agent-control/system-interface-map.toml`
 - `groundtruth-kb/src/groundtruth_kb/authority.py`
 - `groundtruth-kb/src/groundtruth_kb/bridge/index_mutation.py`
