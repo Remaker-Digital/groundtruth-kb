@@ -61,6 +61,7 @@ from bridge_work_intent_registry import (  # noqa: E402  (path-fix import)
 DEFAULT_TTL_SECONDS = 600
 SESSION_ENV_VARS = (
     "CLAUDE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
     "GTKB_INHERITED_SESSION_ID",
     "CODEX_SESSION_ID",
     "CODEX_THREAD_ID",

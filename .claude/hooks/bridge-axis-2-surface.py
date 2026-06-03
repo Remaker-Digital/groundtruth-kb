@@ -79,6 +79,7 @@ DISPATCH_STATE_REL = ".gtkb-state/bridge-poller/dispatch-state.json"
 ERRORS_LOG_REL = ".gtkb-state/bridge-poller/axis-2-surface/errors.jsonl"
 WORK_INTENT_SESSION_ENV_VARS = (
     "CLAUDE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
     "GTKB_INHERITED_SESSION_ID",
     "CODEX_SESSION_ID",
     "CODEX_THREAD_ID",

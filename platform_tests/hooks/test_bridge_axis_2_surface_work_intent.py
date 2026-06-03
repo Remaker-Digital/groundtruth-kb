@@ -61,3 +61,52 @@ def test_render_surface_includes_claim_footer_and_claimed_annotation() -> None:
     assert "ALREADY CLAIMED" in rendered
     assert "gtkb-held-thread" in rendered
     assert "session-a" in rendered
+
+
+# ---------------------------------------------------------------------------
+# WI-4267: CLAUDE_CODE_SESSION_ID env-var resolution
+# (bridge/gtkb-claude-code-session-id-env-var-gap thread)
+# ---------------------------------------------------------------------------
+
+_AXIS2_TUPLE_ENV_VARS = (
+    "CLAUDE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
+
+
+def test_axis2_resolve_work_intent_session_id_uses_claude_code_session_id(monkeypatch) -> None:
+    """AXIS 2 surface resolver returns CLAUDE_CODE_SESSION_ID when payload
+    carries no session_id and CLAUDE_SESSION_ID is unset."""
+    mod = _load_module()
+    for name in _AXIS2_TUPLE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
+
+    assert mod._resolve_work_intent_session_id({}) == "claude-code-session-probe"
+
+
+def test_axis2_claude_session_id_takes_precedence_over_claude_code(monkeypatch) -> None:
+    """Explicit CLAUDE_SESSION_ID still wins when both are set."""
+    mod = _load_module()
+    for name in _AXIS2_TUPLE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("CLAUDE_SESSION_ID", "explicit-session-override")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
+
+    assert mod._resolve_work_intent_session_id({}) == "explicit-session-override"
+
+
+def test_axis2_work_intent_tuple_orders_claude_code_after_claude_session() -> None:
+    """Precedence contract: CLAUDE_CODE_SESSION_ID must immediately follow
+    CLAUDE_SESSION_ID in the tuple."""
+    mod = _load_module()
+    tuple_ = mod.WORK_INTENT_SESSION_ENV_VARS
+    assert "CLAUDE_CODE_SESSION_ID" in tuple_
+    claude_index = tuple_.index("CLAUDE_SESSION_ID")
+    claude_code_index = tuple_.index("CLAUDE_CODE_SESSION_ID")
+    assert claude_code_index == claude_index + 1

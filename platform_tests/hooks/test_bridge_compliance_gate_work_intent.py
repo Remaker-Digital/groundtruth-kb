@@ -79,6 +79,62 @@ def test_matching_session_claim_allows_write(gate: ModuleType, tmp_path: Path) -
     assert reason is None
 
 
+# ---------------------------------------------------------------------------
+# WI-4267: CLAUDE_CODE_SESSION_ID env-var resolution
+# (bridge/gtkb-claude-code-session-id-env-var-gap thread)
+# ---------------------------------------------------------------------------
+
+_WORK_INTENT_TUPLE_ENV_VARS = (
+    "CLAUDE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
+
+
+def _clear_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in _WORK_INTENT_TUPLE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_resolve_work_intent_session_id_uses_claude_code_session_id(
+    gate: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When only CLAUDE_CODE_SESSION_ID is set (the Claude Code harness's
+    actual session-id env var), the resolver returns it."""
+    _clear_session_env(monkeypatch)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
+
+    assert gate._resolve_work_intent_session_id({}) == "claude-code-session-probe"
+
+
+def test_resolve_work_intent_session_id_claude_session_id_takes_precedence(
+    gate: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Explicit CLAUDE_SESSION_ID overrides CLAUDE_CODE_SESSION_ID. This
+    preserves the documented operator workaround for forcing a particular
+    session-id value."""
+    _clear_session_env(monkeypatch)
+    monkeypatch.setenv("CLAUDE_SESSION_ID", "explicit-session-override")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
+
+    assert gate._resolve_work_intent_session_id({}) == "explicit-session-override"
+
+
+def test_work_intent_tuple_orders_claude_code_after_claude_session(gate: ModuleType) -> None:
+    """The tuple ordering is the precedence contract; CLAUDE_CODE_SESSION_ID
+    must come immediately after CLAUDE_SESSION_ID so the precedence above is
+    a static property of the tuple, not a runtime accident."""
+    tuple_ = gate.WORK_INTENT_SESSION_ENV_VARS
+    assert "CLAUDE_CODE_SESSION_ID" in tuple_
+    claude_index = tuple_.index("CLAUDE_SESSION_ID")
+    claude_code_index = tuple_.index("CLAUDE_CODE_SESSION_ID")
+    assert claude_code_index == claude_index + 1, "CLAUDE_CODE_SESSION_ID must immediately follow CLAUDE_SESSION_ID"
+
+
 def test_non_versioned_bridge_file_skips_claim_gate(gate: ModuleType, tmp_path: Path) -> None:
     _seed_project(tmp_path)
 
