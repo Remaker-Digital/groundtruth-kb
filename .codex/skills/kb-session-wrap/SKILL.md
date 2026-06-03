@@ -48,8 +48,8 @@ git rev-parse --show-toplevel
 git status --short --branch
 git rev-parse HEAD
 python scripts/wrap_capture_transcript.py --session-id <SESSION_ID>
-python scripts/wrap_scan_hygiene.py --report-format markdown --write-report .groundtruth/session/snapshots/<SESSION_ID>/wrap-scan-hygiene.md
-python scripts/wrap_scan_consistency.py --report-format markdown --write-report .groundtruth/session/snapshots/<SESSION_ID>/wrap-scan-consistency.md
+python scripts/wrap_scan_hygiene.py --report-format markdown --write-report .groundtruth/session/wrap-scan-reports/<SESSION_ID>/wrap-scan-hygiene.md
+python scripts/wrap_scan_consistency.py --report-format markdown --write-report .groundtruth/session/wrap-scan-reports/<SESSION_ID>/wrap-scan-consistency.md
 ```
 
 Also inspect:
