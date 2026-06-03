@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-hygiene-sweep-presence-patterns-slice-1
+NEW: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-001.md
+
 Document: gtkb-projects-remove-item-cli-slice-1
 GO: bridge/gtkb-projects-remove-item-cli-slice-1-009.md
 REVISED: bridge/gtkb-projects-remove-item-cli-slice-1-008.md
