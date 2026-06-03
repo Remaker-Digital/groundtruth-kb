@@ -7,7 +7,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-startup-refractor-slice-a-startup-control-inventory
+GO: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-002.md
+NEW: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-001.md
+
 Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
+VERIFIED: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-004.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-003.md
 GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-001.md
@@ -23,6 +28,8 @@ GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
 
 Document: gtkb-claude-code-session-id-env-var-gap
+NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-008.md
+REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-007.md
 NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-006.md
 GO: bridge/gtkb-claude-code-session-id-env-var-gap-005.md
 REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-004.md
