@@ -37,6 +37,7 @@ GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-002.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md
 
 Document: gtkb-startup-refractor-slice-c-startup-index-overlays
+NO-GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-004.md
 NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-003.md
 GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md
 NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-001.md
