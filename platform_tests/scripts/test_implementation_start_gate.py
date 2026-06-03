@@ -179,6 +179,38 @@ def test_go_authorization_packet_allows_in_scope_apply_patch(tmp_path: Path) -> 
     assert gate.gate_decision(payload) == {}
 
 
+def test_existing_packet_blocks_when_bridge_becomes_latest_deferred(tmp_path: Path) -> None:
+    (tmp_path / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    bridge = tmp_path / "bridge"
+    (bridge / "sample-implementation-003.md").write_text("DEFERRED\n\n# Owner deferral\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "\n".join(
+            [
+                "Document: sample-implementation",
+                "DEFERRED: bridge/sample-implementation-003.md",
+                "GO: bridge/sample-implementation-002.md",
+                "NEW: bridge/sample-implementation-001.md",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    target = "scripts/" + "sample.py"
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": f"*** Begin Patch\n*** Update File: {target}\n@@\n+pass\n*** End Patch\n"},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert "DEFERRED" in result["reason"]
+
+
 def test_no_auth_blocks_protected_source_edit(tmp_path: Path) -> None:
     _write_thread(tmp_path)
     payload = {

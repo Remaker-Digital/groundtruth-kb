@@ -281,7 +281,7 @@ def parse_bridge_index(project_root: Path) -> dict[str, BridgeEntry]:
             current_id = line.removeprefix("Document: ").strip()
             current_versions = []
             continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/.+\.md)$", line)
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED):\s+(bridge/.+\.md)$", line)
         if current_id and match:
             status, path = match.group(1), match.group(2)
             if not _filename_matches_doc(path, current_id):
@@ -313,7 +313,7 @@ def _validate_bridge_index_for(project_root: Path, bridge_id: str) -> None:
             in_target = doc_id == bridge_id
             continue
         if in_target:
-            match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/.+\.md)$", line)
+            match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED):\s+(bridge/.+\.md)$", line)
             if match:
                 path = match.group(2)
                 if not _filename_matches_doc(path, bridge_id):
@@ -351,6 +351,7 @@ def _post_go_chain_state(statuses_after_go: list[str]) -> str:
       awaiting Loyal Opposition review (mutating now would invalidate the
       report snapshot under review);
     - ``"terminal"``        - latest is a post-GO VERIFIED.
+    - ``"deferred"``        - latest is owner-parked DEFERRED state.
     """
     if not statuses_after_go:
         return "latest_is_go"
@@ -361,6 +362,8 @@ def _post_go_chain_state(statuses_after_go: list[str]) -> str:
         return "awaiting_review"
     if latest == "VERIFIED":
         return "terminal"
+    if latest == "DEFERRED":
+        return "deferred"
     # Defensive: a post-GO GO is handled by callers (newest-GO selection in
     # approved_files_for_go; the explicit newer-GO check in _validate_packet).
     return "awaiting_review"
@@ -397,6 +400,11 @@ def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
         raise AuthorizationError(
             "Bridge thread is VERIFIED (terminal); the implementation phase "
             "for this proposal is closed. File a new bridge proposal."
+        )
+    if state == "deferred":
+        raise AuthorizationError(
+            "Bridge thread is DEFERRED; owner-directed parking is non-actionable. "
+            "Wait for owner-directed resume or clear evidence before requesting authorization."
         )
     # state is "latest_is_go" or "resumable" - the GO authorizes the work.
     go_file = entry.versions[go_index][1]
@@ -1024,6 +1032,12 @@ def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
             f"Bridge thread is VERIFIED (terminal at {entry.latest_path}); "
             f"the implementation phase for this proposal is closed. File a "
             f"new bridge proposal for further work on this surface."
+        )
+    if state == "deferred":
+        raise AuthorizationError(
+            f"Bridge thread is DEFERRED (parked at {entry.latest_path}); "
+            f"owner-directed parking is non-actionable until the owner-directed "
+            f"resume or clear condition is met."
         )
     project_authorization = packet.get("project_authorization")
     if isinstance(project_authorization, dict):

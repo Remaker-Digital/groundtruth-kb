@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-deferred-authority-implementation-start-parser-followup
+NEW: bridge/gtkb-deferred-authority-implementation-start-parser-followup-003.md
 GO: bridge/gtkb-deferred-authority-implementation-start-parser-followup-002.md
 NEW: bridge/gtkb-deferred-authority-implementation-start-parser-followup-001.md
 
@@ -590,16 +591,6 @@ REVISED: bridge/gtkb-work-item-priority-canonical-p0p3-migration-003.md
 NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
-Document: gtkb-agent-red-reference-adopter-framing-restoration
-VERIFIED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-008.md
-REVISED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-007.md
-NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-006.md
-NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-005.md
-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-004.md
-REVISED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-003.md
-NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-002.md
-NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-001.md
-
 Document: gtkb-lo-hygiene-assessment-skill-build
 NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-010.md
 REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-009.md
@@ -1031,42 +1022,6 @@ GO: bridge/gtkb-auto-push-investigation-slice-1-004.md
 REVISED: bridge/gtkb-auto-push-investigation-slice-1-003.md
 NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
-
-Document: gtkb-prime-worker-permission-profile-slice-1
-VERIFIED: bridge/gtkb-prime-worker-permission-profile-slice-1-006.md
-NEW: bridge/gtkb-prime-worker-permission-profile-slice-1-005.md
-GO: bridge/gtkb-prime-worker-permission-profile-slice-1-004.md
-REVISED: bridge/gtkb-prime-worker-permission-profile-slice-1-003.md
-NO-GO: bridge/gtkb-prime-worker-permission-profile-slice-1-002.md
-NEW: bridge/gtkb-prime-worker-permission-profile-slice-1-001.md
-
-Document: gtkb-prime-worker-context-aware-auq-slice-2
-VERIFIED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-012.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-011.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-010.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-009.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-008.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-007.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-006.md
-NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-005.md
-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-004.md
-REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-003.md
-NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-002.md
-NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-001.md
-
-Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
-VERIFIED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-012.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-011.md
-NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-010.md
-NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-009.md
-NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-008.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-007.md
-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-006.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-005.md
-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-004.md
-REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-003.md
-NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-002.md
-NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-001.md
 
 Document: gtkb-prime-worker-delivery-regression-slice-4
 NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-004.md

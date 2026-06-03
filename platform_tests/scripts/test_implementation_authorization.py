@@ -171,6 +171,53 @@ def test_bridge_entry_succeeds_for_well_formed_bridge(auth_module, tmp_path):
     assert entry.latest_status == "GO"
 
 
+def test_parse_bridge_index_records_deferred_status(auth_module, tmp_path):
+    """DEFERRED is an indexed lifecycle status, not a line to skip."""
+    slug = "deferred-bridge"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
+    _write_index(
+        tmp_path,
+        [f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
+    )
+
+    entry = auth_module.bridge_entry(tmp_path, slug)
+
+    assert entry.latest_status == "DEFERRED"
+    assert entry.versions[0] == ("DEFERRED", f"bridge/{slug}-003.md")
+
+
+def test_bridge_entry_raises_for_misattributed_deferred_status(auth_module, tmp_path):
+    """Per-bridge filename validation applies to DEFERRED rows too."""
+    slug = "deferred-bridge"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_verdict(tmp_path, "other-bridge", version=3, verdict="DEFERRED")
+    _write_index(
+        tmp_path,
+        [f"Document: {slug}\nDEFERRED: bridge/other-bridge-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
+    )
+
+    with pytest.raises(auth_module.AuthorizationError, match="does not match enclosing Document"):
+        auth_module.bridge_entry(tmp_path, slug)
+
+
+def test_create_packet_fails_when_latest_status_is_deferred(auth_module, tmp_path):
+    """Latest DEFERRED above older GO is parked state, not implementation authority."""
+    slug = "deferred-bridge"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
+    _write_index(
+        tmp_path,
+        [f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
+    )
+
+    with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
 # ---------------------------------------------------------------------------
 # IP-2: named-packet cache + activate + list
 # ---------------------------------------------------------------------------
@@ -373,6 +420,19 @@ def test_validate_packet_fails_with_verified_after_go(auth_module, tmp_path):
     _write_index(tmp_path, [block])
     with pytest.raises(auth_module.AuthorizationError, match="VERIFIED \\(terminal"):
         auth_module.activate_packet(tmp_path, slug)
+
+
+def test_validate_packet_fails_with_deferred_after_go(auth_module, tmp_path):
+    """A packet issued under GO fails validation after owner-parking as DEFERRED."""
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _begin_packet(auth_module, tmp_path, slug)
+    _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
+    block = f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
+    _write_index(tmp_path, [block])
+
+    with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
+        auth_module.load_packet(tmp_path)
 
 
 def test_validate_packet_succeeds_with_no_go_after_post_impl(auth_module, tmp_path):
@@ -1018,6 +1078,20 @@ def test_approved_files_for_go_raises_on_post_go_verified(auth_module):
         auth_module.approved_files_for_go(entry)
 
 
+def test_approved_files_for_go_raises_on_latest_deferred(auth_module):
+    """Latest DEFERRED is non-actionable even when an older GO exists."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[
+            ("DEFERRED", "bridge/x-006.md"),
+            ("GO", "bridge/x-004.md"),
+            ("NEW", "bridge/x-001.md"),
+        ],
+    )
+    with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
+        auth_module.approved_files_for_go(entry)
+
+
 def test_approved_files_for_go_raises_when_no_go_in_chain(auth_module):
     """T17 -- a chain with no GO anywhere -> raises."""
     entry = auth_module.BridgeEntry(
@@ -1078,6 +1152,31 @@ def test_validate_packet_raises_on_post_go_revised_report_awaiting_review(auth_m
     )
     _write_index(tmp_path, [block])
     with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
+        auth_module.activate_packet(tmp_path, slug)
+
+
+def test_create_authorization_packet_raises_on_latest_deferred_above_go(auth_module, tmp_path):
+    """Latest DEFERRED above older GO must fail closed at packet creation."""
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
+    block = f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
+    _write_index(tmp_path, [block])
+
+    with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
+def test_validate_packet_raises_when_bridge_becomes_latest_deferred(auth_module, tmp_path):
+    """A previously valid packet cannot stay valid after latest DEFERRED."""
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _begin_packet(auth_module, tmp_path, slug)
+    _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
+    block = f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
+    _write_index(tmp_path, [block])
+
+    with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
         auth_module.activate_packet(tmp_path, slug)
 
 
