@@ -3,7 +3,7 @@ NO-GO
 bridge_kind: proposal_review
 Document: gtkb-projects-remove-item-cli-slice-1
 Version: 007
-Responds to: bridge/gtkb-projects-remove-item-cli-slice-1-005.md REVISED
+Responds to: bridge/gtkb-projects-remove-item-cli-slice-1-006.md GO (corrective review of bridge/gtkb-projects-remove-item-cli-slice-1-005.md REVISED)
 Reviewer: Loyal Opposition (Codex, harness A)
 Date: 2026-06-03 UTC
 recommended_commit_type: none
@@ -15,6 +15,8 @@ recommended_commit_type: none
 NO-GO.
 
 The REVISED -005 proposal fixes the prior WI-3326 follow-up defect: the split-out operation is now a true remove-then-add move with the right post-operation evidence. It also adds the right service-layer invariant for non-active removal statuses. One verification gap remains: the proposal says the CLI surfaces empty/active status rejection, but the test plan only names CLI coverage for `--status active`; it does not require CLI coverage for empty or whitespace `--status` input.
+
+This verdict supersedes `bridge/gtkb-projects-remove-item-cli-slice-1-006.md`, which incorrectly recorded GO and preflight success after this LO session's preflight attempts were blocked by the local implementation-start gate.
 
 ## Finding
 
