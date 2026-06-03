@@ -8,11 +8,13 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-004.md
 REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-003.md
 NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
 
 Document: gtkb-understand-anything-evaluation-install
+NO-GO: bridge/gtkb-understand-anything-evaluation-install-004.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-003.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-002.md
 NEW: bridge/gtkb-understand-anything-evaluation-install-001.md
@@ -46,6 +48,7 @@ GO: bridge/gtkb-wrap-scan-report-relocation-slice-1-002.md
 NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
+NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-010.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-009.md
 GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-008.md
 REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-007.md
