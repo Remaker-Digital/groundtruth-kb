@@ -978,6 +978,7 @@ NO-GO: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-002.
 NEW: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-001.md
 
 Document: gtkb-peer-solution-advisory-report-advisory-disposition
+REVISED: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-005.md
 GO: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-004.md
 REVISED: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-003.md
 NO-GO: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-002.md
