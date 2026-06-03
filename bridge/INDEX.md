@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-wi-4279-scaffold-phantom-spec-citation-repoint
+NEW: bridge/gtkb-wi-4279-scaffold-phantom-spec-citation-repoint-001.md
+
 Document: gtkb-wi-3506-phantom-spec-citation-repoint
 VERIFIED: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-006.md
 REVISED: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-005.md
@@ -30,6 +33,7 @@ GO: bridge/gtkb-wrap-scan-report-relocation-slice-1-002.md
 NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
+NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-006.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-005.md
 GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-004.md
 REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-003.md
