@@ -578,6 +578,7 @@ NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-002.md
 NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-001.md
 
 Document: gtkb-lo-hygiene-assessment-skill-build
+NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-010.md
 REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-009.md
 NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-008.md
 VERIFIED: bridge/gtkb-lo-hygiene-assessment-skill-build-007.md
