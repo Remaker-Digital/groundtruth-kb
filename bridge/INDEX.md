@@ -19,6 +19,7 @@ GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md
 NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-001.md
 
 Document: gtkb-startup-refractor-slice-e-lo-startup-text-authority
+NO-GO: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-004.md
 NEW: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-003.md
 GO: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-002.md
 NEW: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-001.md
