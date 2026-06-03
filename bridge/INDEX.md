@@ -8,7 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-projects-remove-item-cli-slice-1
-GO: bridge/gtkb-projects-remove-item-cli-slice-1-006.md
+NO-GO: bridge/gtkb-projects-remove-item-cli-slice-1-006.md
 REVISED: bridge/gtkb-projects-remove-item-cli-slice-1-005.md
 NO-GO: bridge/gtkb-projects-remove-item-cli-slice-1-004.md
 REVISED: bridge/gtkb-projects-remove-item-cli-slice-1-003.md
