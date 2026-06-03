@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
+import sys
 import tomllib
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,6 +20,11 @@ CODEX_SKILLS_RELATIVE_PATH = Path(".codex") / "skills"
 GENERATED_MARKER = "<!-- GTKB-CODEX-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-CODEX-SKILL-ADAPTER -->"
 MANIFEST_NAME = "MANIFEST.json"
+FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+
+
+class SkillFrontmatterError(ValueError):
+    """Raised when a canonical skill cannot produce a loadable Codex adapter."""
 
 
 @dataclass(frozen=True)
@@ -91,6 +98,43 @@ def _strip_generated_block(text: str) -> str:
     return text[:start] + text[end + len(GENERATED_END_MARKER) :].lstrip("\r\n")
 
 
+def validate_skill_frontmatter(text: str, path: str) -> dict[str, str]:
+    """Validate the SKILL.md frontmatter shape Codex adapters must expose."""
+    lines = text.splitlines()
+    if not lines or lines[0].lstrip("\ufeff").strip() != "---":
+        raise SkillFrontmatterError(f"{path}: missing opening YAML frontmatter delimiter")
+
+    closing_index: int | None = None
+    for index, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            closing_index = index
+            break
+    if closing_index is None:
+        raise SkillFrontmatterError(f"{path}: missing closing YAML frontmatter delimiter")
+
+    fields: dict[str, str] = {}
+    for offset, line in enumerate(lines[1:closing_index], start=2):
+        if line.startswith((" ", "\t")):
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("- "):
+            continue
+        if ":" not in stripped:
+            raise SkillFrontmatterError(f"{path}:{offset}: malformed frontmatter line")
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        if not FRONTMATTER_KEY_RE.match(key):
+            raise SkillFrontmatterError(f"{path}:{offset}: invalid frontmatter key {key!r}")
+        fields[key] = value.strip().strip("\"'")
+
+    for required in ("name", "description"):
+        if not fields.get(required):
+            raise SkillFrontmatterError(f"{path}: missing non-empty {required!r} frontmatter field")
+    return fields
+
+
 def _existing_generated_at(existing_text: str | None) -> str | None:
     if not existing_text:
         return None
@@ -101,7 +145,7 @@ def _existing_generated_at(existing_text: str | None) -> str | None:
 
 
 def render_adapter(source_text: str, adapter: SkillAdapter, *, generated_at: str) -> str:
-    source_text = _strip_generated_block(source_text).rstrip() + "\n"
+    source_text = _strip_generated_block(source_text).lstrip("\ufeff").rstrip() + "\n"
     block = _generated_block(adapter, generated_at)
     lines = source_text.splitlines(keepends=True)
     if lines and lines[0].strip() == "---":
@@ -118,6 +162,7 @@ def build_adapters(project_root: Path) -> list[SkillAdapter]:
         source_relative_path = str(capability.get("canonical_source") or "")
         source_path = project_root / source_relative_path
         source_text = source_path.read_text(encoding="utf-8")
+        validate_skill_frontmatter(_strip_generated_block(source_text), source_relative_path)
         source_sha256 = _sha256_text(_strip_generated_block(source_text).rstrip() + "\n")
         adapters.append(
             SkillAdapter(
@@ -262,8 +307,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    changed, adapter_paths = generate(args.project_root, check=args.check)
-    adapters = build_adapters(args.project_root.resolve())
+    try:
+        changed, adapter_paths = generate(args.project_root, check=args.check)
+        adapters = build_adapters(args.project_root.resolve())
+    except SkillFrontmatterError as exc:
+        print(f"Codex skill adapters: FAIL ({exc})", file=sys.stderr)
+        return 1
     if args.update_registry and update_registry(args.project_root.resolve(), adapters, check=args.check):
         changed.append(REGISTRY_RELATIVE_PATH.as_posix())
     if changed:

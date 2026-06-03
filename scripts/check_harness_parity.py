@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -37,6 +38,7 @@ ROLE_ALIASES = {
 }
 GENERATED_MARKER = "<!-- GTKB-CODEX-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-CODEX-SKILL-ADAPTER -->"
+FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
 
 @dataclass(frozen=True)
@@ -141,7 +143,7 @@ def _as_string_list(value: Any) -> list[str]:
 
 def _frontmatter_name(text: str) -> str | None:
     lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
+    if not lines or lines[0].lstrip("\ufeff").strip() != "---":
         return None
     for line in lines[1:]:
         stripped = line.strip()
@@ -149,6 +151,42 @@ def _frontmatter_name(text: str) -> str | None:
             return None
         if stripped.startswith("name:"):
             return stripped.split(":", 1)[1].strip().strip("\"'")
+    return None
+
+
+def _skill_frontmatter_error(text: str, path: str) -> str | None:
+    lines = text.splitlines()
+    if not lines or lines[0].lstrip("\ufeff").strip() != "---":
+        return f"{path}: missing opening YAML frontmatter delimiter"
+
+    closing_index: int | None = None
+    for index, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            closing_index = index
+            break
+    if closing_index is None:
+        return f"{path}: missing closing YAML frontmatter delimiter"
+
+    fields: dict[str, str] = {}
+    for offset, line in enumerate(lines[1:closing_index], start=2):
+        if line.startswith((" ", "\t")):
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("- "):
+            continue
+        if ":" not in stripped:
+            return f"{path}:{offset}: malformed frontmatter line"
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        if not FRONTMATTER_KEY_RE.match(key):
+            return f"{path}:{offset}: invalid frontmatter key {key!r}"
+        fields[key] = value.strip().strip("\"'")
+
+    for required in ("name", "description"):
+        if not fields.get(required):
+            return f"{path}: missing non-empty {required!r} frontmatter field"
     return None
 
 
@@ -238,6 +276,14 @@ def _status_for_surface(
     if configured_status == "adapter":
         if not surface_exists:
             return CapabilityResult(**common, state="MISSING", note="Generated adapter surface is absent.")
+        adapter_text = surface_path.read_text(encoding="utf-8")
+        load_error = _skill_frontmatter_error(adapter_text, surface)
+        if load_error is not None:
+            return CapabilityResult(
+                **common,
+                state="MISSING",
+                note=f"Generated adapter is not Codex-loadable: {load_error}",
+            )
         adapter_source = str(harness_config.get("adapter_source") or capability.get("canonical_source") or "").strip()
         if not adapter_source:
             return CapabilityResult(**common, state="STALE", note="Generated adapter lacks an adapter_source.")
@@ -246,7 +292,6 @@ def _status_for_surface(
             return CapabilityResult(**common, state="MISSING", note=f"Adapter source is absent: {adapter_source}")
         source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"))
         declared_source_hash = str(harness_config.get("source_sha256") or "").strip()
-        adapter_text = surface_path.read_text(encoding="utf-8")
         metadata = _adapter_metadata(adapter_text)
         adapter_source_hash = metadata.get("Canonical source sha256", "")
         adapter_source_path = metadata.get("Canonical source", "")

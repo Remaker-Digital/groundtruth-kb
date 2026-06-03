@@ -1745,6 +1745,91 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
     )
 
 
+_SKILL_FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+
+
+def _skill_frontmatter_error(text: str, path: str) -> str | None:
+    lines = text.splitlines()
+    if not lines or lines[0].lstrip("\ufeff").strip() != "---":
+        return f"{path}: missing opening YAML frontmatter delimiter"
+
+    closing_index: int | None = None
+    for index, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            closing_index = index
+            break
+    if closing_index is None:
+        return f"{path}: missing closing YAML frontmatter delimiter"
+
+    fields: dict[str, str] = {}
+    for offset, line in enumerate(lines[1:closing_index], start=2):
+        if line.startswith((" ", "\t")):
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("- "):
+            continue
+        if ":" not in stripped:
+            return f"{path}:{offset}: malformed frontmatter line"
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        if not _SKILL_FRONTMATTER_KEY_RE.match(key):
+            return f"{path}:{offset}: invalid frontmatter key {key!r}"
+        fields[key] = value.strip().strip("\"'")
+
+    for required in ("name", "description"):
+        if not fields.get(required):
+            return f"{path}: missing non-empty {required!r} frontmatter field"
+    return None
+
+
+def _check_codex_skill_load_health(target: Path) -> ToolCheck:
+    """Validate generated Codex skill adapters expose loadable frontmatter."""
+    skills_root = target / ".codex" / "skills"
+    if not skills_root.is_dir():
+        return ToolCheck(
+            name="Codex skill load health",
+            required=True,
+            found=False,
+            status="fail",
+            message=".codex/skills missing; Codex skill adapters are not configured",
+        )
+
+    failures: list[str] = []
+    checked = 0
+    for skill_file in sorted(skills_root.glob("*/SKILL.md")):
+        checked += 1
+        rel_path = skill_file.relative_to(target).as_posix()
+        try:
+            text = skill_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            failures.append(f"{rel_path}: unreadable: {exc}")
+            continue
+        error = _skill_frontmatter_error(text, rel_path)
+        if error is not None:
+            failures.append(error)
+
+    if failures:
+        preview = "; ".join(failures[:3])
+        suffix = f"; +{len(failures) - 3} more" if len(failures) > 3 else ""
+        return ToolCheck(
+            name="Codex skill load health",
+            required=True,
+            found=True,
+            status="fail",
+            message=f"Codex skill adapter load check failed for {len(failures)} of {checked}: {preview}{suffix}",
+        )
+
+    return ToolCheck(
+        name="Codex skill load health",
+        required=True,
+        found=True,
+        status="pass",
+        message=f"Codex skill adapter load check passed ({checked} adapters)",
+    )
+
+
 def _load_canonical_terminology_config(target: Path) -> dict[str, object] | None:
     """Load ``.claude/rules/canonical-terminology.toml`` or return ``None`` if absent/malformed.
 
@@ -3584,6 +3669,7 @@ def run_doctor(
         checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_spec_intake_skill_present(target, profile))
+        checks.append(_check_codex_skill_load_health(target))
         checks.append(_check_managed_artifact_drift(target, profile))
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
