@@ -244,6 +244,16 @@
 
 ---
 
+### 2026-06-03 - Deep scan capture gap recheck
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | The previously approved harness-readiness recommendation still is not present as a first-class backlog project; the live backlog still only holds routed advisory `WI-4262`. | `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-03-16-50-DEEP-SCAN-CAPTURE-GAPS.md`; SQLite query against `groundtruth.db` on 2026-06-03 showed zero `projects.name='GTKB Harness Automation Readiness'`. | Reconfirm and capture the missing project, then seed the readiness-doctor and readiness-surface work items. | Open |
+| Process | Advisory debt remains under-decomposed even after prior scans: `740` non-terminal `Route LO advisory:` items remain, `913` non-terminal items remain unprojected, and the active advisory projects still have zero member work items. | `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-03-16-50-DEEP-SCAN-CAPTURE-GAPS.md`; SQLite query against `groundtruth.db`; `scripts/advisory_backlog_router.py` still emits full `skipped_existing` payloads. | Add advisory drain-policy and compact dry-run output work items under `GTKB-LO-ADVISORY-INTAKE`. | Open |
+| Technical | Codex bridge-worker logs still over-emit repetitive migration INFO, reducing audit signal quality. | `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-03-16-50-DEEP-SCAN-CAPTURE-GAPS.md`; `.claude/hooks/.codex-bridge-worker.log` contained `26488` lines including `9066` migration INFO lines on the current scan. | Add an observability work item to suppress or aggregate repetitive KnowledgeDB migration INFO. | Open |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).
