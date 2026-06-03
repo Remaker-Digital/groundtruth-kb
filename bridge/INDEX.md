@@ -8,9 +8,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-002.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-001.md
 
 Document: gtkb-wrapup-enhancements-closure
+GO: bridge/gtkb-wrapup-enhancements-closure-002.md
 NEW: bridge/gtkb-wrapup-enhancements-closure-001.md
 
 Document: gtkb-deferred-authority-implementation-start-parser-followup
