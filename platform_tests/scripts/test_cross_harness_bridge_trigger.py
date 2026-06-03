@@ -36,6 +36,10 @@ _CLAUDE_INVOCATION_SURFACES = {
 }
 
 
+def _allowed_tool_set(raw: str) -> set[str]:
+    return {part.strip() for part in raw.split() if part.strip()}
+
+
 def _frozen_pending_signature(items: list[object]) -> str:
     """Frozen byte-identical reference for the retired smart-poller's
     ``_pending_signature`` (Slice 4 D7).
@@ -1451,6 +1455,49 @@ def test_diagnostic_classifies_suppressed(tmp_path: Path) -> None:
     assert lo[0]["classification"] == "active_session_suppressed"
 
 
+def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path: Path) -> None:
+    """Slice 4 D3: a Stop reconciliation suppressed by active worker ownership
+    remains retryable once the worker lease is gone.
+    """
+    from bridge_lease_registry import acquire_lease, release_lease
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    _write_index(root, _index_with_one_new(root))
+
+    handle = acquire_lease("example-thread", action="test-worker", state_dir=state_dir)
+    assert handle is not None
+
+    trigger = _load_trigger()
+    held = trigger.run_trigger(
+        project_root=root,
+        state_dir=state_dir,
+        dry_run=True,
+        invocation_source="Stop",
+    )
+    assert held["results"]["loyal-opposition"]["reason"] == "target_active_session_present"
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    suppressed_signature = state["recipients"]["loyal-opposition"]["last_suppressed_signature"]
+    assert suppressed_signature
+    assert state["recipients"]["loyal-opposition"].get("last_dispatched_signature") is None
+
+    release_lease(handle)
+    retried = trigger.run_trigger(
+        project_root=root,
+        state_dir=state_dir,
+        dry_run=True,
+        invocation_source="Stop",
+    )
+
+    assert retried["results"]["loyal-opposition"]["reason"] == "dry_run"
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    rec = state["recipients"]["loyal-opposition"]
+    assert rec["last_launch"]["reason"] == "dry_run"
+    assert rec["last_dispatched_signature"] == suppressed_signature
+    assert rec["last_suppressed_signature"] is None
+
+
 def test_diagnostic_classifies_dispatched(tmp_path: Path) -> None:
     """WI-3265 IP-2: when the dispatch branch is entered for a recipient, its
     diagnostic record classifies as `dispatched`. dry-run yields a
@@ -1621,6 +1668,137 @@ def test_harness_command_builds_argv_from_invocation_surfaces(tmp_path: Path) ->
     third_surfaces = {"headless": {"argv": ["gemini", "-p", "{{PROMPT}}", "--root", "{{PROJECT_ROOT}}"]}}
     third_cmd = trigger._harness_command(_target("gemini", third_surfaces), prompt, root)
     assert third_cmd == ["gemini", "-p", prompt, "--root", str(root)]
+
+
+def test_claude_worker_command_uses_accept_edits_and_authoring_allowlist(tmp_path: Path) -> None:
+    """Slice 4 D6b: auto-dispatched Claude Prime workers must be able to
+    write approved files without an interactive permission prompt.
+    """
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+
+    command = trigger._harness_command(target, "::init gtkb pb\nwork", tmp_path)
+
+    assert command is not None
+    assert command[command.index("--permission-mode") + 1] == "acceptEdits"
+    allowed = _allowed_tool_set(command[command.index("--allowed-tools") + 1])
+    assert {"Read", "Edit", "Write", "Glob", "Grep", "Bash", "TodoWrite", "NotebookEdit"} <= allowed
+    assert "AskUserQuestion" not in allowed
+    assert "WebFetch" not in allowed
+    assert "WebSearch" not in allowed
+    assert all(not tool.startswith("mcp__") for tool in allowed)
+
+
+def test_non_claude_worker_command_does_not_receive_claude_permission_flags(tmp_path: Path) -> None:
+    """Slice 4 D6b is Claude-specific; Codex argv remains the registry template."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
+    )
+
+    command = trigger._harness_command(target, "::init gtkb lo\nwork", tmp_path)
+
+    assert command == ["codex", "exec", "::init gtkb lo\nwork", "--cd", str(tmp_path)]
+    assert "--permission-mode" not in command
+    assert "--allowed-tools" not in command
+
+
+def test_dispatch_prompt_warns_worker_to_record_owner_decision_blockers() -> None:
+    """Slice 4 D2: worker prompts must not invite unattended workers to ask
+    the owner interactively.
+    """
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-prime-worker-delivery-regression-slice-4",
+            "top_status": "GO",
+            "top_file": "bridge/gtkb-prime-worker-delivery-regression-slice-4-006.md",
+        },
+    )()
+
+    prompt = trigger._dispatch_prompt(target, [item], max_items=1)
+
+    assert prompt.splitlines()[0] == "::init gtkb pb"
+    assert "cannot interactively ask the owner for input" in prompt
+    assert "record the blocker in the bridge artifact" in prompt
+    assert "asking in prose" in prompt
+    assert "GO gtkb-prime-worker-delivery-regression-slice-4" in prompt
+
+
+def test_harness_command_preserves_dispatch_prompt_as_single_argv_element(tmp_path: Path) -> None:
+    """The canonical init keyword must remain the first line of the argv prompt."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+    prompt = "::init gtkb pb\nBridge auto-dispatch notification."
+
+    command = trigger._harness_command(target, prompt, tmp_path)
+
+    assert command is not None
+    assert command[2] == prompt
+    assert command[2].splitlines()[0] == "::init gtkb pb"
+
+
+def test_spawn_records_dispatch_failure_when_worker_command_cannot_be_built(tmp_path: Path) -> None:
+    """Slice 4 D4: spawn failures are durable diagnosis records, not silent drops."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=None,
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "example-thread",
+            "top_status": "NEW",
+            "top_file": "bridge/example-thread-001.md",
+        },
+    )()
+    state_dir = tmp_path / "state"
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=state_dir,
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-missing-surfaces",
+    )
+
+    assert meta["launched"] is False
+    assert meta["reason"] == "unknown_recipient"
+    records = _failure_records(state_dir)
+    assert records[-1]["dispatch_id"] == "dispatch-missing-surfaces"
+    assert records[-1]["reason"] == "unknown_recipient"
 
 
 def test_harness_command_fails_closed_for_missing_or_malformed_surfaces(tmp_path: Path) -> None:

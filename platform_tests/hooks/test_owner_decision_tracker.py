@@ -624,6 +624,75 @@ def test_f3_block_emission_enabled_by_default_when_env_var_unset(tmp_path: Path)
     assert payload["decision"] == "block"
 
 
+def test_worker_stop_writes_owner_decision_artifact_instead_of_blocking(tmp_path: Path) -> None:
+    """Slice 4 D2: unattended workers cannot answer Stop blocks, so a prose
+    owner-decision ask becomes a structured dispatch artifact.
+    """
+    project = _setup_project(tmp_path)
+    run_id = "worker-dispatch-42"
+
+    result = _run_hook_with_env(
+        "stop",
+        project,
+        _stop_payload("turn_with_prose_decision.jsonl"),
+        {
+            "GTKB_BRIDGE_POLLER_RUN_ID": run_id,
+            "GTKB_PROJECT_ROOT": str(project),
+            "GTKB_BLOCK_ON_PROSE_DECISION_ASK": "1",
+        },
+    )
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert result.stdout == "", "worker Stop hook must not emit an interactive block"
+    artifact_path = (
+        project / ".gtkb-state" / "cross-harness-trigger" / "dispatch-runs" / f"{run_id}.owner-decision-requested.json"
+    )
+    assert artifact_path.is_file()
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    assert payload["decision"] == "requires_owner_decision"
+    assert payload["run_id"] == run_id
+    assert payload["detected_patterns"]
+    assert payload["transcript_path"].endswith("turn_with_prose_decision.jsonl")
+
+
+def test_worker_stop_still_appends_pending_owner_decision(tmp_path: Path) -> None:
+    """The worker artifact is routing metadata; the durable notepad remains
+    the load-bearing owner-decision record.
+    """
+    project = _setup_project(tmp_path)
+
+    result = _run_hook_with_env(
+        "stop",
+        project,
+        _stop_payload("turn_with_prose_decision.jsonl"),
+        {
+            "GTKB_BRIDGE_POLLER_RUN_ID": "worker-dispatch-43",
+            "GTKB_PROJECT_ROOT": str(project),
+            "GTKB_BLOCK_ON_PROSE_DECISION_ASK": "1",
+        },
+    )
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "detected_via: prose:" in _read_pending_file(project)
+
+
+def test_owner_stop_context_still_emits_block_for_prose_decision(tmp_path: Path) -> None:
+    """Slice 4 D2 is worker-scoped; normal owner-facing Stop behavior remains unchanged."""
+    project = _setup_project(tmp_path)
+
+    result = _run_hook_with_env(
+        "stop",
+        project,
+        _stop_payload("turn_with_prose_decision.jsonl"),
+        {"GTKB_BLOCK_ON_PROSE_DECISION_ASK": "1"},
+    )
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    payload = json.loads(result.stdout.strip())
+    assert payload["decision"] == "block"
+    assert "AskUserQuestion" in payload["reason"]
+
+
 def test_f3_block_emission_handles_malformed_transcript_gracefully(tmp_path: Path) -> None:
     """Graceful degradation: missing transcript must not crash."""
     project = _setup_project(tmp_path)
