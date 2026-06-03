@@ -584,6 +584,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-agent-red-reference-adopter-framing-restoration
+NO-GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-006.md
 NEW: bridge/gtkb-agent-red-reference-adopter-framing-restoration-005.md
 GO: bridge/gtkb-agent-red-reference-adopter-framing-restoration-004.md
 REVISED: bridge/gtkb-agent-red-reference-adopter-framing-restoration-003.md
