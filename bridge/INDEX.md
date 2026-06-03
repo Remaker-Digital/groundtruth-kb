@@ -34,6 +34,7 @@ GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-002.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md
 
 Document: gtkb-startup-refractor-slice-c-startup-index-overlays
+NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-003.md
 GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md
 NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-001.md
 
@@ -103,6 +104,7 @@ REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
 NEW: bridge/gtkb-claude-code-session-id-env-var-gap-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+NO-GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-006.md
 REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-005.md
 NO-GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-004.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-003.md
