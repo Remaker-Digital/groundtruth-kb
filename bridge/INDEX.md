@@ -1,4 +1,4 @@
-﻿# Bridge Index
+# Bridge Index
 
 <!-- Prime inserts new document entries at the top of the list below. -->
 <!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
