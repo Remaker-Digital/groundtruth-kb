@@ -7,6 +7,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-startup-refractor-scoping
+NEW: bridge/gtkb-startup-refractor-scoping-001.md
+
+Document: gtkb-proposal-standards-propose-scaffold-skill
+NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
+
 Document: gtkb-claude-code-session-id-env-var-gap
 NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-003.md
 REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
