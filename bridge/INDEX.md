@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-projects-remove-item-cli-slice-1
+REVISED: bridge/gtkb-projects-remove-item-cli-slice-1-008.md
 NO-GO: bridge/gtkb-projects-remove-item-cli-slice-1-007.md
 GO: bridge/gtkb-projects-remove-item-cli-slice-1-006.md
 REVISED: bridge/gtkb-projects-remove-item-cli-slice-1-005.md
@@ -21,6 +22,7 @@ NO-GO: bridge/gtkb-session-id-shared-resolver-unification-002.md
 NEW: bridge/gtkb-session-id-shared-resolver-unification-001.md
 
 Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
+REVISED: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-003.md
 GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-002.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md
 
