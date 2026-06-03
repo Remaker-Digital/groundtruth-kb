@@ -190,6 +190,65 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError("Project membership insert did not return a current membership")
         return membership
 
+    def remove_project_item(
+        self,
+        project_id: str,
+        work_item_id: str,
+        *,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+        status: str = "removed",
+    ) -> dict[str, Any]:
+        """Detach a work item from a project via an append-only non-active membership version.
+
+        Appends a new ``project_work_item_memberships`` version with a non-active
+        ``status`` (default ``"removed"``), carrying forward the current active
+        membership's role/order/source. The active-set filter in
+        ``list_project_work_items`` excludes non-active statuses, so this detaches
+        the membership while preserving the prior active version for audit.
+
+        Non-active-status invariant (WI-4266 NO-GO -004 F2): a command named
+        ``remove`` must never append an *active* membership. Empty status or any
+        case-insensitive ``"active"`` is rejected. Fails closed when there is no
+        active membership to remove.
+        """
+        normalized_status = str(status or "").strip()
+        if not normalized_status or normalized_status.lower() == "active":
+            raise ProjectLifecycleError(
+                f"remove-item requires a non-active status; got {status!r}. "
+                "A removal must not append an active membership version."
+            )
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        normalized_work_item_id = _require_nonempty(work_item_id, "work_item_id")
+        current = next(
+            (
+                membership
+                for membership in self.db.list_project_work_items(normalized_project_id)
+                if membership.get("work_item_id") == normalized_work_item_id
+            ),
+            None,
+        )
+        if current is None:
+            raise ProjectLifecycleError(
+                f"No active membership to remove for {normalized_work_item_id} in {normalized_project_id}"
+            )
+        try:
+            membership = self.db.link_project_work_item(
+                normalized_project_id,
+                normalized_work_item_id,
+                _require_nonempty(changed_by, "changed_by"),
+                _require_nonempty(change_reason, "change_reason"),
+                membership_role=current.get("membership_role") or "member",
+                membership_order=current.get("membership_order"),
+                status=normalized_status,
+                source=current.get("membership_source"),
+            )
+        except ValueError as exc:
+            raise ProjectLifecycleError(str(exc)) from exc
+        if membership is None:
+            raise ProjectLifecycleError("Project membership removal did not return a current membership")
+        return membership
+
     def reorder_project_items(
         self,
         project_id: str,

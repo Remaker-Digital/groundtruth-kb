@@ -1780,6 +1780,46 @@ def projects_add_item(
     click.echo(f"Linked {membership['work_item_id']} to {membership['project_id']} as {membership['membership_role']}")
 
 
+@projects_cmd.command("remove-item")
+@click.argument("project_id")
+@click.argument("work_item_id")
+@click.option("--status", default="removed", show_default=True, help="Non-active membership status to set.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the removal version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_remove_item(
+    ctx: click.Context,
+    project_id: str,
+    work_item_id: str,
+    status: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Detach one work item from a project (append-only, non-active membership)."""
+    db, service = _project_service(ctx)
+    try:
+        membership = service.remove_project_item(
+            project_id,
+            work_item_id,
+            status=status,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(membership, indent=2, sort_keys=True))
+        return
+    click.echo(
+        f"Removed {membership['work_item_id']} from {membership['project_id']} (status={membership.get('status')})"
+    )
+
+
 @projects_cmd.command("reorder")
 @click.argument("project_id")
 @click.argument("work_item_ids", nargs=-1)
