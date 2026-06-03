@@ -739,6 +739,7 @@ NO-GO: bridge/gtkb-governance-adoption-doctor-check-002.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-001.md
 
 Document: gtkb-release-candidate-gate-managed-skill
+NEW: bridge/gtkb-release-candidate-gate-managed-skill-007.md
 GO: bridge/gtkb-release-candidate-gate-managed-skill-006.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-005.md
 GO: bridge/gtkb-release-candidate-gate-managed-skill-004.md
@@ -1037,19 +1038,6 @@ GO: bridge/gtkb-auto-push-investigation-slice-1-004.md
 REVISED: bridge/gtkb-auto-push-investigation-slice-1-003.md
 NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
-
-Document: gtkb-prime-worker-delivery-regression-slice-4
-VERIFIED: bridge/gtkb-prime-worker-delivery-regression-slice-4-011.md
-REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-010.md
-NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-009.md
-REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-008.md
-NEW: bridge/gtkb-prime-worker-delivery-regression-slice-4-007.md
-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-006.md
-REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-005.md
-NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-004.md
-REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-003.md
-NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-002.md
-NEW: bridge/gtkb-prime-worker-delivery-regression-slice-4-001.md
 
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
 NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-008.md
