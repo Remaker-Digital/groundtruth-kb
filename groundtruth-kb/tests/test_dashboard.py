@@ -203,6 +203,27 @@ def test_pid_alive_win32_branch_parses_tasklist(monkeypatch: pytest.MonkeyPatch)
     assert _pid_alive(4321) is False
 
 
+def test_pid_alive_win32_access_denied_assumes_alive(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A hardened Windows host can return 'ERROR: Access denied.' from tasklist.
+
+    The liveness probe must not misclassify a possibly-live tracked PID as dead
+    in that indeterminate case (WI-3413 follow-up; NO-GO -004). The safe failure
+    mode for an idempotence guard is "alive" - a false "dead" would trigger a
+    duplicate dashboard start and stale-PID cleanup of a running process.
+    """
+    monkeypatch.setattr(dashboard.sys, "platform", "win32")
+
+    class _DeniedCompleted:
+        def __init__(self) -> None:
+            self.stdout = ""
+            self.stderr = "ERROR: Access denied.\n"
+            self.returncode = 1
+
+    monkeypatch.setattr(dashboard.subprocess, "run", lambda *a, **k: _DeniedCompleted())
+    # 4321 is not the current process, so the win32 branch is exercised.
+    assert _pid_alive(4321) is True
+
+
 def test_pid_alive_posix_branch_uses_signal_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(dashboard.sys, "platform", "linux")
 

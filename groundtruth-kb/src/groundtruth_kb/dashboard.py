@@ -1267,6 +1267,14 @@ def _pid_alive(pid: int) -> bool:
     """
     if pid <= 0:
         return False
+    # The current process is alive by definition. Short-circuit before any
+    # external probe so liveness of ``os.getpid()`` never depends on an
+    # external tool that may be access-restricted. On a hardened Windows host
+    # ``tasklist`` can return ``ERROR: Access denied.`` (WI-3413 follow-up),
+    # which previously misclassified the live current process as dead and
+    # failed ``test_pid_alive_true_for_current_process``.
+    if pid == os.getpid():
+        return True
     if sys.platform == "win32":
         try:
             completed = subprocess.run(
@@ -1276,10 +1284,24 @@ def _pid_alive(pid: int) -> bool:
                 text=True,
             )
         except (OSError, subprocess.SubprocessError):
-            return False
-        # ``tasklist`` prints an "INFO: No tasks ..." line when nothing matches;
-        # a match row contains the PID as a standalone whitespace token.
-        return str(pid) in completed.stdout.split()
+            # ``tasklist`` is unavailable or crashed: liveness is
+            # indeterminate. For an idempotence guard the safe failure mode is
+            # "alive" - a false "dead" causes a duplicate start and stale-PID
+            # cleanup of a process that may in fact be running.
+            return True
+        stdout = getattr(completed, "stdout", "") or ""
+        # A match row contains the PID as a standalone whitespace token.
+        if str(pid) in stdout.split():
+            return True
+        # ``tasklist`` prints "INFO: No tasks ..." (exit 0) when the PID is
+        # genuinely absent -> dead. A hardened host instead returns
+        # "ERROR: Access denied." (typically a non-zero exit) -> indeterminate.
+        # Distinguish the two: only the unambiguous "no tasks" answer is "dead";
+        # any access-denied / error / non-zero exit is treated as "alive".
+        stderr = getattr(completed, "stderr", "") or ""
+        returncode = getattr(completed, "returncode", 0)
+        combined = (stdout + stderr).lower()
+        return "access denied" in combined or "error:" in combined or returncode != 0
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

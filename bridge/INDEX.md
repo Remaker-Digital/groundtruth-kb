@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-dashboard-launcher-idempotence-pid-tracking
+REVISED: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-005.md
 NO-GO: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-004.md
 NEW: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-003.md
 GO: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-002.md
