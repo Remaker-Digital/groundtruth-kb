@@ -32,9 +32,11 @@ As of 2026-05-05, Mike designates:
 
 - `harness-state/harness-identities.json` as the persistent source of truth for
   host-local harness installation IDs.
-- `harness-state/role-assignments.json` as the single source-of-truth
-  operating-role record for those harness IDs. No markdown rule file can
-  override this durable assignment map; rule files are behavior contracts
+- `harness-state/harness-registry.json` as the canonical role registry — the
+  single source-of-truth operating-role record for those harness IDs per Slice 1
+  retirement. The legacy `harness-state/role-assignments.json` mirror is an
+  orphan compatibility surface and is not authoritative. No markdown rule file
+  can override this durable assignment map; rule files are behavior contracts
   describing how each role operates, not records of which role is active.
 
 Session startup must identify the active harness by its durable installation ID
@@ -47,7 +49,9 @@ behavior. Current host-local identities:
 
 Startup resolves the harness ID from `harness-state/harness-identities.json`,
 then resolves the role by reading that harness ID entry in
-`harness-state/role-assignments.json`. A persisted harness ID must be unique on
+`harness-state/harness-registry.json` (canonical role registry; legacy
+`harness-state/role-assignments.json` mirror is orphan/compat per Slice 1
+retirement). A persisted harness ID must be unique on
 the workstation and must not change after initial assignment except through an
 explicit owner-requested identity change operation. A startup-supplied
 `--harness-id` is only a consistency assertion; it must not silently replace the
@@ -65,8 +69,9 @@ be used as role authority.
 
 Standalone owner prompts `switch mode next session` and `change mode next
 session` are sufficient to toggle the current harness's durable next-session
-role between Prime Builder and Loyal Opposition by updating
-`harness-state/role-assignments.json`. Explicit prompts `prime builder mode next
+role between Prime Builder and Loyal Opposition via the canonical writer
+`gt mode set-role` (which updates `harness-state/harness-registry.json`).
+Explicit prompts `prime builder mode next
 session` and `loyal opposition mode next session` set the current harness's
 next-session role directly.
 
@@ -233,9 +238,12 @@ item, and release blockers or release-target constraints when present.
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 7. Resolve the active harness's durable installation ID from
    `harness-state/harness-identities.json`, then read
-   `harness-state/role-assignments.json` before applying any role-specific
-   permissions or restrictions. If the role map records no Prime Builder, the
-   starting harness assumes Prime Builder and updates the role map.
+   `harness-state/harness-registry.json` (canonical role registry per Slice 1
+   retirement; legacy `harness-state/role-assignments.json` mirror is
+   orphan/compat) before applying any role-specific permissions or
+   restrictions. If the role map records no Prime Builder, the starting
+   harness assumes Prime Builder and updates the role map via `gt mode
+   set-role` (the canonical writer).
 8. Read `.claude/rules/canonical-terminology.md` before ordinary Prime Builder
    or Loyal Opposition work so the live glossary is loaded for both roles.
 9. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.

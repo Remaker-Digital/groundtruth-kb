@@ -1,9 +1,11 @@
 """Check and maintain the bridge/INDEX.md role-intent sentinel.
 
 Slice 1 only: this script maintains a non-authoritative checksum mirror in
-``bridge/INDEX.md``. Durable role authority remains
-``harness-state/role-assignments.json`` plus
-``harness-state/harness-identities.json``.
+``bridge/INDEX.md``. Durable role authority is ``harness-state/harness-registry.json``
+(canonical role registry per Slice 1 retirement) plus
+``harness-state/harness-identities.json``. The legacy
+``harness-state/role-assignments.json`` mirror is orphan/compat and is not
+authoritative.
 """
 
 from __future__ import annotations
@@ -159,7 +161,7 @@ def render_sentinel(state: RoleIntentState, *, updated_at: datetime | None = Non
     timestamp = updated.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return (
         f"<!-- {SENTINEL_TITLE}:\n"
-        "     Authority: harness-state/role-assignments.json (role) + "
+        "     Authority: harness-state/harness-registry.json (role; canonical registry per Slice 1 retirement) + "
         "harness-state/harness-identities.json (identity).\n"
         "     This sentinel is a checksum mirror only. "
         "It MUST NOT be used to override the durable role record.\n"
@@ -321,9 +323,31 @@ def counts_output(index_text: str) -> str:
     return f"active_prime_authorization_count={prime_count}\nactive_lo_advisory_count={lo_count}\n"
 
 
+def _role_doc_from_registry(registry_doc: dict) -> dict:
+    """Adapt the registry list-of-dicts schema to the dict-keyed-by-id schema
+    that ``build_role_intent_state()`` consumes.
+
+    ``harness-state/harness-registry.json`` is the canonical role registry per
+    Slice 1 retirement of the orphan ``role-assignments.json`` mirror. Its
+    ``harnesses`` field is a list of dicts (one per harness id). The legacy
+    ``role-assignments.json`` format was a flat dict keyed by harness id, which
+    ``build_role_intent_state()`` expects. This adapter bridges the two without
+    requiring an API change to the existing builder.
+    """
+    harnesses_list = registry_doc.get("harnesses") or []
+    harnesses_dict: dict = {}
+    if isinstance(harnesses_list, list):
+        for entry in harnesses_list:
+            if isinstance(entry, dict):
+                hid = str(entry.get("id") or "").strip()
+                if hid:
+                    harnesses_dict[hid] = entry
+    return {"harnesses": harnesses_dict}
+
+
 def state_from_files(project_root: Path) -> RoleIntentState:
     return build_role_intent_state(
-        load_json(project_root / "harness-state" / "role-assignments.json"),
+        _role_doc_from_registry(load_json(project_root / "harness-state" / "harness-registry.json")),
         load_json(project_root / "harness-state" / "harness-identities.json"),
     )
 

@@ -49,8 +49,24 @@ def _write_role_files(tmp_path: Path, roles: dict[str, list[str] | str | None]) 
             for harness_id, role in roles.items()
         },
     }
+    # Slice 3 retirement: harness-registry.json is the canonical role registry
+    # (list-of-dicts schema). The legacy role-assignments.json mirror is still
+    # written for backward-compat fixtures, but state_from_files() reads the
+    # registry via _role_doc_from_registry().
+    registry = {
+        "schema_version": 1,
+        "harnesses": [
+            {
+                "id": harness_id,
+                "harness_type": harness_id.lower(),
+                "role": role,
+            }
+            for harness_id, role in roles.items()
+        ],
+    }
     (state_dir / "harness-identities.json").write_text(json.dumps(identities), encoding="utf-8")
     (state_dir / "role-assignments.json").write_text(json.dumps(assignments), encoding="utf-8")
+    (state_dir / "harness-registry.json").write_text(json.dumps(registry), encoding="utf-8")
 
 
 def _write_index(tmp_path: Path, body: str) -> Path:

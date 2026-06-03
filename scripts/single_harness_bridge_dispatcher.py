@@ -62,6 +62,10 @@ _DISPATCHER_DIR = str(Path(__file__).resolve().parent)
 if _DISPATCHER_DIR not in sys.path:
     sys.path.insert(0, _DISPATCHER_DIR)
 
+_PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src")
+if _PACKAGE_SRC not in sys.path:
+    sys.path.insert(0, _PACKAGE_SRC)
+
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     issue_dispatch_authorization_packets,
@@ -326,7 +330,7 @@ def _build_prompt(target_mode: str, items: list[Any], max_items: int, trigger) -
                 "message before processing the selected entries."
             ),
             "",
-            "Read your durable role from harness-state/role-assignments.json. Multi-element "
+            "Read your durable role from harness-state/harness-registry.json (canonical role registry per Slice 1 retirement). Multi-element "
             "role sets accept BOTH `pb` and `lo` keyword modes; this dispatch carries "
             f"mode `{target_mode}` for this work item.",
             "Read bridge/INDEX.md directly before acting. Treat the live latest status as authoritative.",

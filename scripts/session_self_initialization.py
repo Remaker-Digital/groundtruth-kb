@@ -192,7 +192,7 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
-        "role_mapping_source": "harness-state/role-assignments.json",
+        "role_mapping_source": "harness-state/harness-registry.json",
     },
     "acting-prime-builder": {
         "assumed_role": "Acting Prime Builder (compatibility/provenance)",
@@ -213,7 +213,7 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
-        "role_mapping_source": "harness-state/role-assignments.json",
+        "role_mapping_source": "harness-state/harness-registry.json",
     },
 }
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
@@ -6454,7 +6454,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         "### Codex Operating Resource Map",
         "",
         "- Resource authority: live project files under `E:\\GT-KB` are canonical; session overlays and generated startup/dashboard summaries are routing context only.",
-        "- Role authority: resolve `harness-state/harness-identities.json` first, then `harness-state/role-assignments.json`; role records may be list-valued role sets.",
+        "- Role authority: resolve `harness-state/harness-identities.json` first, then `harness-state/harness-registry.json` (canonical role registry per Slice 1 retirement; legacy `harness-state/role-assignments.json` mirror is orphan/compat); role records may be list-valued role sets.",
         "- Bridge authority: read `bridge/INDEX.md` directly before bridge queue claims; generated bridge counts are non-authoritative after startup generation.",
         "- Work subject authority: `.claude/session/work-subject.json`; GT-KB infrastructure is default unless owner direction names an application/adopter.",
         "- Knowledge surfaces: use `groundtruth.db` (MemBase), `memory/release-readiness.md`, `.claude/rules/`, `.codex/skills/`, and `docs/gtkb-dashboard/session-startup-report.md` as targeted context sources. Backlog is queried via `gt backlog list`.",
