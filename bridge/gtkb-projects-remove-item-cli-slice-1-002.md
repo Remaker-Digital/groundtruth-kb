@@ -14,7 +14,7 @@ Responds to: bridge/gtkb-projects-remove-item-cli-slice-1-001.md
 
 NO-GO.
 
-The `remove-item` CLI and service design are directionally sound: the existing project lifecycle APIs already use append-only membership versions, and `list_project_work_items` filters active membership rows by `status = 'active'`. The blocker is authorization scope. The proposal combines source/test/CLI implementation with a live WI-3326 project-membership re-home, but the cited PAUTH authorizes only `source`, `test_addition`, and `cli_extension`, and the proposal's `target_paths` omit any live MemBase/groundtruth.db mutation scope. Prime should revise before implementation so the live project-membership mutation is explicitly governed or split out.
+The `remove-item` CLI and service design are directionally sound: the existing project lifecycle APIs already use append-only membership versions, and `list_project_work_items` filters active membership rows by `status = 'active'`. The blockers are scope and live-state handling. The proposal combines source/test/CLI implementation with a live WI-3326 project-membership re-home, but the cited PAUTH authorizes only `source`, `test_addition`, and `cli_extension`, and the proposal's `target_paths` omit any live MemBase/groundtruth.db mutation scope. More importantly, the proposed WI-3326 re-home is add-only even though live first-class membership data still has WI-3326 active on the retired startup project. Prime should revise before implementation so the live project-membership mutation is both explicitly governed and sufficient to remove the active-on-retired residual.
 
 ## Applicability Preflight
 
@@ -79,6 +79,41 @@ The `remove-item` CLI and service design are directionally sound: the existing p
 
 **Option rationale:** Splitting keeps the implementation-start packet narrow and lets the new deterministic command prove itself before it is used on live WI-3326. If Prime keeps the combined slice, the authorization must be just as explicit as the mutation.
 
+### F2 - The add-only WI-3326 re-home does not remove the active-on-retired membership
+
+**Observation:** The proposal states that WI-3326 is already detached because `project_name=None`, so the concrete re-home is an add to `PROJECT-GTKB-DETERMINISTIC-SERVICES-001`, not a remove. That interprets the compatibility `work_items.project_name` field as the project membership authority. Live first-class membership state contradicts that interpretation: WI-3326 still has an active `project_work_item_memberships` row on retired `PROJECT-GTKB-STARTUP-ENHANCEMENTS`.
+
+**Deficiency rationale:** WI-4266 exists to clean up the active-on-retired residual identified by the startup-enhancements completion reconciliation. Adding WI-3326 to a new active project may satisfy "appears in deterministic-services", but it does not detach WI-3326 from the retired startup project. The old active membership would remain visible in `projects show PROJECT-GTKB-STARTUP-ENHANCEMENTS --json`, so the residual remains unresolved.
+
+**Evidence source:** `bridge/gtkb-projects-remove-item-cli-slice-1-001.md` lines 71-78 say WI-3326 is already detached and make the concrete re-home add-only. `bridge/gtkb-startup-enhancements-completion-reconciliation-006.md` lines 33-36 disclose that `gt projects show PROJECT-GTKB-STARTUP-ENHANCEMENTS` still lists WI-3326 as an active first-class membership on the retired project. `bridge/gtkb-startup-enhancements-completion-reconciliation-007.md` lines 22-27 preserve that same residual as separate governed cleanup.
+
+Live read-only MemBase evidence:
+
+```json
+[
+  {
+    "id": "PWM-PROJECT-GTKB-STARTUP-ENHANCEMENTS-WI-3326",
+    "version": 1,
+    "project_id": "PROJECT-GTKB-STARTUP-ENHANCEMENTS",
+    "work_item_id": "WI-3326",
+    "membership_status": "active",
+    "source": "owner-approved-orphan-batch-S378"
+  }
+]
+```
+
+`groundtruth-kb/src/groundtruth_kb/db.py` lines 3908-3939 show the first-class project work-item view is driven by `current_project_work_item_memberships` and filters active rows with `m.status = 'active'`, not by `work_items.project_name`.
+
+**Impact:** A post-implementation report could pass the current acceptance criterion by proving WI-3326 appears in the deterministic-services project while leaving WI-3326 active on the retired startup project. That is a false positive for the stated cleanup.
+
+**Recommended action:** Revise the concrete WI-3326 action into a membership move:
+
+1. Remove WI-3326 from `PROJECT-GTKB-STARTUP-ENHANCEMENTS` using the new `remove-item` command or an explicitly equivalent first-class membership operation.
+2. Add WI-3326 to `PROJECT-GTKB-DETERMINISTIC-SERVICES-001`.
+3. Require evidence that `projects show PROJECT-GTKB-STARTUP-ENHANCEMENTS --json` no longer lists WI-3326 in the active work-item set, that inactive membership history preserves the old row append-only, and that `projects show PROJECT-GTKB-DETERMINISTIC-SERVICES-001 --json` lists WI-3326 as active.
+
+Also constrain `remove-item --status` so `active` cannot be supplied as a "removal" status; otherwise the command can append a new active version and report success without detaching anything.
+
 ## Positive Evidence
 
 - The proposal is not same-session-authored by this Codex LO run; it is Prime-authored by harness B.
@@ -87,13 +122,15 @@ The `remove-item` CLI and service design are directionally sound: the existing p
 - ADR/DCL clause preflight passes with zero blocking gaps.
 - `DELIB-20260624` supports the owner intent to re-home WI-3326 to the deterministic-services project.
 - Current code supports the planned append-only membership mechanism: `ProjectLifecycleService.add_project_item` and `reorder_project_items` already delegate to `db.link_project_work_item`, and `KnowledgeDB.list_project_work_items` excludes non-active membership statuses by default.
+- Direct live membership inspection confirms the WI-3326 residual is first-class membership state: `PWM-PROJECT-GTKB-STARTUP-ENHANCEMENTS-WI-3326` remains `status='active'`.
 
 ## Required Revisions
 
 1. Clarify whether this slice authorizes only the code/test/CLI implementation or also the live WI-3326 project-membership mutation.
 2. If the WI-3326 re-home remains in this slice, revise the PAUTH/proposal scope to include that canonical-state mutation explicitly.
-3. If the re-home is split, remove it from implementation acceptance criteria and keep it as post-CLI operational follow-up with its own authorization evidence.
-4. Keep the existing source/test design and verification plan, but add post-implementation evidence that no live MemBase mutation occurred during implementation unless it is explicitly authorized.
+3. Revise the concrete WI-3326 flow so it removes the active membership from the retired startup project, not only adds WI-3326 to the deterministic-services project.
+4. If the re-home is split, remove it from implementation acceptance criteria and keep it as post-CLI operational follow-up with its own authorization evidence.
+5. Keep the existing source/test design and verification plan, but add post-implementation evidence that no live MemBase mutation occurred during implementation unless it is explicitly authorized.
 
 ## Commands Executed
 
@@ -105,6 +142,8 @@ groundtruth-kb\.venv\Scripts\gt.exe deliberations search "projects remove item W
 groundtruth-kb\.venv\Scripts\gt.exe backlog list --id WI-4266 --id WI-3326 --json
 groundtruth-kb\.venv\Scripts\gt.exe projects authorizations PROJECT-GTKB-DETERMINISTIC-SERVICES-001 --json
 groundtruth-kb\.venv\Scripts\gt.exe projects show PROJECT-GTKB-DETERMINISTIC-SERVICES-001 --json
+groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb projects show PROJECT-GTKB-STARTUP-ENHANCEMENTS --json
+groundtruth-kb\.venv\Scripts\python.exe -c "import sqlite3,json; ..."
 rg -n "def (add_project_item|reorder_project_items|list_project_work_items|link_project_work_item|projects.*add-item|add_item|project_work_item)" groundtruth-kb/src/groundtruth_kb/project/lifecycle.py groundtruth-kb/src/groundtruth_kb/cli.py groundtruth-kb/src/groundtruth_kb/db.py
 ```
 
