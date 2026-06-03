@@ -12,6 +12,7 @@ GO: bridge/gtkb-startup-refractor-scoping-002.md
 NEW: bridge/gtkb-startup-refractor-scoping-001.md
 
 Document: gtkb-proposal-standards-propose-scaffold-skill
+NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-003.md
 GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
 
@@ -21,6 +22,7 @@ REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
 NEW: bridge/gtkb-claude-code-session-id-env-var-gap-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-003.md
 GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-002.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-001.md
 
