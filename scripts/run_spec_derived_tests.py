@@ -34,7 +34,6 @@ from __future__ import annotations
 import argparse
 import ast
 import json
-import os
 import re
 import sqlite3
 import subprocess
@@ -63,17 +62,13 @@ DEFAULT_PYTEST_TIMEOUT_S: Final[int] = 120
 # assertion-suffix as one merged token. Includes DELIB per Codex
 # `-006` F1 NO-GO: linked deliberation records must appear in the
 # mechanical matrix, not only in narrative prose.
-SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(
-    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b"
-)
+SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
 
 # Rule-file path pattern. Per Codex `-006` F1 NO-GO: linked rule files
 # (e.g. `.claude/rules/file-bridge-protocol.md`) must appear in the
 # mechanical matrix, not only in narrative prose. Path tokens lack a
 # leading word character so word-boundary anchoring is omitted.
-RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(
-    r"\.claude/rules/[a-z0-9_-]+\.md"
-)
+RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
 
 # Section heading patterns (start anchored only; trailing text tolerated).
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
@@ -88,7 +83,7 @@ WAIVERS_HEADING_RE: Final[re.Pattern[str]] = re.compile(
 # Index parsing — mirrors bridge protocol §"Index File" format.
 INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
 INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+bridge/(\S+\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/(\S+\.md)\s*$"
 )
 
 # Waiver field parsing — supports `key: value` lines under bullet items.
@@ -303,8 +298,21 @@ def _validate_waiver_evidence(waiver: Waiver, removal_version: int | None = None
                 return "nonexistent_delib"
             # Reorder to match _delib_owner_attributed expectations:
             # index 4 = source_type, index 12 = outcome.
-            full_row = (row[0], row[1], row[2], row[3], row[4], row[5], row[6],
-                        row[7], row[8], row[9], row[10], row[11], row[12])
+            full_row = (
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+                row[4],
+                row[5],
+                row[6],
+                row[7],
+                row[8],
+                row[9],
+                row[10],
+                row[11],
+                row[12],
+            )
             if not _delib_owner_attributed(full_row):
                 return "not_owner_decision"
             if not _delib_references_spec(conn, waiver.approved_by, waiver.spec_id, row[8] or ""):
@@ -411,10 +419,15 @@ def _run_pytest(test_files: list[str], timeout_s: int) -> tuple[int, int]:
     for root, files in groups.items():
         if root == "groundtruth-kb/tests":
             cmd = [
-                sys.executable, "-m", "pytest",
+                sys.executable,
+                "-m",
+                "pytest",
                 "--rootdir=groundtruth-kb",
                 "--override-ini=testpaths=tests",
-                *files, "--tb=no", "-q", "--no-header",
+                *files,
+                "--tb=no",
+                "-q",
+                "--no-header",
             ]
         else:
             cmd = [sys.executable, "-m", "pytest", *files, "--tb=no", "-q", "--no-header"]
@@ -437,8 +450,13 @@ def _run_pytest(test_files: list[str], timeout_s: int) -> tuple[int, int]:
     return (total_passed, total_failed)
 
 
-def _format_human(matrix: dict[str, SpecMatrixEntry], waivers: dict[str, Waiver],
-                  bridge_id: str, version_count: int, verified_overall: bool) -> str:
+def _format_human(
+    matrix: dict[str, SpecMatrixEntry],
+    waivers: dict[str, Waiver],
+    bridge_id: str,
+    version_count: int,
+    verified_overall: bool,
+) -> str:
     lines = [
         f"Bridge: {bridge_id}",
         f"Cited specs: {len(matrix)} (across {version_count} versions)",
@@ -450,8 +468,10 @@ def _format_human(matrix: dict[str, SpecMatrixEntry], waivers: dict[str, Waiver]
         entry = matrix[spec_id]
         marker = "[PASS]" if entry.verified else "[FAIL]" if entry.tests_failed else "[GAP]"
         detail = (
-            f"{len(entry.tests_found)} tests, all pass" if entry.verified
-            else f"{entry.tests_failed} failed" if entry.tests_failed
+            f"{len(entry.tests_found)} tests, all pass"
+            if entry.verified
+            else f"{entry.tests_failed} failed"
+            if entry.tests_failed
             else "no derived tests found"
         )
         lines.append(f"  {spec_id:<55} {marker:<8}{detail}")
@@ -460,8 +480,9 @@ def _format_human(matrix: dict[str, SpecMatrixEntry], waivers: dict[str, Waiver]
     return "\n".join(lines)
 
 
-def run(bridge_id: str, json_output: bool = False, advisory: bool = False,
-        pytest_timeout_s: int = DEFAULT_PYTEST_TIMEOUT_S) -> int:
+def run(
+    bridge_id: str, json_output: bool = False, advisory: bool = False, pytest_timeout_s: int = DEFAULT_PYTEST_TIMEOUT_S
+) -> int:
     """Execute the full procedure. Returns exit code per CLI contract."""
     # Step 1-2: Parse INDEX + enumerate ALL versions.
     versions = _parse_index_for_document(bridge_id)
@@ -543,16 +564,13 @@ def run(bridge_id: str, json_output: bool = False, advisory: bool = False,
             (v for v, specs in cited_history.items() if spec_id in specs),
             default=0,
         )
-        next_prime_after_last_cited = [
-            v for v in sorted_prime_versions if v > last_cited_v
-        ]
-        removal_versions[spec_id] = (
-            next_prime_after_last_cited[0] if next_prime_after_last_cited
-            else last_cited_v + 1
-        )
+        next_prime_after_last_cited = [v for v in sorted_prime_versions if v > last_cited_v]
+        removal_versions[spec_id] = next_prime_after_last_cited[0] if next_prime_after_last_cited else last_cited_v + 1
         if spec_id not in waivers:
-            msg = (f"ERR_REMOVAL_WITHOUT_WAIVER: spec_id={spec_id} cited in earlier "
-                   f"version but not version {latest_v} of {bridge_id}")
+            msg = (
+                f"ERR_REMOVAL_WITHOUT_WAIVER: spec_id={spec_id} cited in earlier "
+                f"version but not version {latest_v} of {bridge_id}"
+            )
             sys.stderr.write(msg + "\n")
             return 0 if advisory else 3
 
@@ -563,9 +581,7 @@ def run(bridge_id: str, json_output: bool = False, advisory: bool = False,
         err = _validate_waiver_evidence(waiver, removal_versions.get(spec_id))
         if err:
             waiver_errors[spec_id] = err
-            sys.stderr.write(
-                f"ERR_WAIVER_{err.upper()}: spec_id={spec_id} approved_by={waiver.approved_by!r}\n"
-            )
+            sys.stderr.write(f"ERR_WAIVER_{err.upper()}: spec_id={spec_id} approved_by={waiver.approved_by!r}\n")
     if waiver_errors and not advisory:
         return 4
 
@@ -579,7 +595,10 @@ def run(bridge_id: str, json_output: bool = False, advisory: bool = False,
         test_files = _discover_derived_tests(spec_id)
         if not test_files:
             entry = SpecMatrixEntry(
-                spec_id=spec_id, tests_found=[], verified=False, reason="no_derived_tests",
+                spec_id=spec_id,
+                tests_found=[],
+                verified=False,
+                reason="no_derived_tests",
             )
             matrix[spec_id] = entry
             continue

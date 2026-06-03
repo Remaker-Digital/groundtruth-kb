@@ -26,7 +26,7 @@ DB_ENV_VAR = "GTKB_WI_COLLISION_DB_PATH"
 WORK_ITEM_RE = re.compile(r"(?im)^Work Item:\s*`?(?P<work_item>[^`\n]+?)`?\s*$")
 ID_RE = re.compile(r"\b(?:GTKB-[A-Z]+-\d+|WI-\d+)\b")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
-INDEX_STATUS_RE = re.compile(r"^(?:NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)$")
+INDEX_STATUS_RE = re.compile(r"^(?:NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)$")
 
 
 @dataclass(frozen=True)

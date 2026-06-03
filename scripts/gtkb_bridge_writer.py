@@ -26,7 +26,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from bridge_author_metadata import ensure_author_metadata
 
-VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"})
+VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
 LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED", "ADVISORY"})
 
@@ -34,13 +34,32 @@ PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
 
 _STATUS_LINE_RE = re.compile(
-    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+"
+    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+"
     r"bridge/(?P<filename>[A-Za-z0-9._\-]+)-(?P<version>\d{3,})\.md\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+(?P<name>[A-Za-z0-9._\-]+)\s*$")
 _SESSION_METADATA_RE = re.compile(
     r"^(?:author_)?session(?:_context)?_id:\s*(?P<id>\S+)\s*$",
     re.IGNORECASE | re.MULTILINE,
+)
+_OWNER_DECISIONS_HEADING_RE = re.compile(r"^#{1,6}\s*Owner Decisions(?:\s*/\s*Input)?\s*$", re.IGNORECASE)
+_DEFERRED_REASON_RE = re.compile(r"\bdeferr(?:al|ed)\s+reason\b|\breason\s*:", re.IGNORECASE)
+_DEFERRED_CLEAR_CONDITION_RE = re.compile(
+    r"\bclear\s+condition\b|\bresume\s+condition\b|\bunblock(?:ing)?\s+condition\b|\breactivat(?:e|ion)\b",
+    re.IGNORECASE,
+)
+_DEFERRED_CLEAR_EVIDENCE_RE = re.compile(
+    r"\b(?:clear(?:s|ed|ing)?|reactivat(?:es|ed|ing|ion)?|resum(?:es|ed|ing|e)?)\b.{0,80}\b(?:DEFERRED|deferr(?:al|ed))\b"
+    r"|\b(?:DEFERRED|deferr(?:al|ed))\b.{0,80}\b(?:clear(?:s|ed|ing)?|reactivat(?:es|ed|ing|ion)?|resum(?:es|ed|ing|e)?)\b",
+    re.IGNORECASE,
+)
+_OWNER_EVIDENCE_RE = re.compile(
+    r"\b(?:DELIB-[A-Z0-9_.-]+|AUQ|AskUserQuestion|owner\s+(?:decision|directive|input|approval))\b",
+    re.IGNORECASE,
+)
+_PLACEHOLDER_LINE_RE = re.compile(
+    r"^[\s>*`_\-:]*(?:tbd|todo|none|n/a|not applicable|no relevant(?: owner decisions?)?)[\s.`_\-:]*$",
+    re.IGNORECASE,
 )
 
 
@@ -203,6 +222,75 @@ def _reject_same_session_review(
         )
 
 
+def _first_nonblank_line(content: str) -> str:
+    for line in content.splitlines():
+        stripped = line.strip().lstrip("\ufeff")
+        if stripped:
+            return stripped
+    return ""
+
+
+def _owner_decisions_section_lines(content: str) -> list[str]:
+    lines = content.splitlines()
+    section: list[str] = []
+    in_section = False
+    for line in lines:
+        stripped = line.strip()
+        if _OWNER_DECISIONS_HEADING_RE.match(stripped):
+            in_section = True
+            continue
+        if in_section and stripped.startswith("#"):
+            break
+        if in_section:
+            section.append(line)
+    return section
+
+
+def _validate_deferred_status_content(content: str) -> None:
+    if _first_nonblank_line(content) != "DEFERRED":
+        raise BridgeTransitionError(
+            "DEFERRED INDEX status requires a bridge file whose first non-blank line is DEFERRED"
+        )
+    if not _DEFERRED_REASON_RE.search(content):
+        raise BridgeTransitionError("DEFERRED bridge file must state a deferral reason")
+    if not _DEFERRED_CLEAR_CONDITION_RE.search(content):
+        raise BridgeTransitionError("DEFERRED bridge file must state a clear/resume condition")
+
+    concrete_lines = [line.strip() for line in _owner_decisions_section_lines(content) if line.strip()]
+    if not concrete_lines or not any(not _PLACEHOLDER_LINE_RE.match(line) for line in concrete_lines):
+        raise BridgeTransitionError("DEFERRED bridge file must include a concrete Owner Decisions / Input section")
+    if not _OWNER_EVIDENCE_RE.search("\n".join(concrete_lines)):
+        raise BridgeTransitionError("DEFERRED bridge file must cite owner-decision evidence")
+
+
+def _validate_deferred_clear_content(content: str) -> None:
+    if _first_nonblank_line(content) == "DEFERRED":
+        raise BridgeTransitionError("clearing DEFERRED requires a non-DEFERRED bridge status file")
+
+    concrete_lines = [line.strip() for line in _owner_decisions_section_lines(content) if line.strip()]
+    section_text = "\n".join(concrete_lines)
+    if not concrete_lines or not any(not _PLACEHOLDER_LINE_RE.match(line) for line in concrete_lines):
+        raise BridgeTransitionError("clearing DEFERRED requires a concrete Owner Decisions / Input section")
+    if not _OWNER_EVIDENCE_RE.search(section_text):
+        raise BridgeTransitionError("clearing DEFERRED requires owner-decision evidence")
+    if not _DEFERRED_CLEAR_EVIDENCE_RE.search(section_text):
+        raise BridgeTransitionError("clearing DEFERRED requires explicit clear/reactivation evidence")
+
+
+def _validate_deferred_status_file(document_name: str, version: int, project_root: Path) -> None:
+    target = _bridge_dir(project_root) / f"{document_name}-{version:03d}.md"
+    if not target.is_file():
+        raise BridgeTransitionError(f"DEFERRED bridge file does not exist: {target}")
+    _validate_deferred_status_content(target.read_text(encoding="utf-8"))
+
+
+def _validate_deferred_clear_file(document_name: str, version: int, project_root: Path) -> None:
+    target = _bridge_dir(project_root) / f"{document_name}-{version:03d}.md"
+    if not target.is_file():
+        raise BridgeTransitionError(f"DEFERRED clear bridge file does not exist: {target}")
+    _validate_deferred_clear_content(target.read_text(encoding="utf-8"))
+
+
 def validate_transition(
     document_name: str,
     proposed_status: str,
@@ -284,6 +372,11 @@ def validate_transition(
             f"{document_name}: ADVISORY only permitted on a new advisory document; current latest={latest}"
         )
 
+    if proposed_status == "DEFERRED":
+        raise BridgeTransitionError(
+            f"{document_name}: DEFERRED is owner-only and cannot be written by the {role_slot} role transition path"
+        )
+
 
 def write_bridge_file(
     document_name: str,
@@ -328,10 +421,15 @@ def insert_index_status(
     """
     if status not in VALID_STATUSES:
         raise BridgeTransitionError(f"invalid status {status!r}; must be one of {sorted(VALID_STATUSES)}")
+    if status == "DEFERRED":
+        _validate_deferred_status_file(document_name, version, project_root)
     index_path = _index_path(project_root)
     raw_current = index_path.read_text(encoding="utf-8")
     if expected_index_raw is not None and expected_index_raw != raw_current:
         raise BridgeConflictError("INDEX.md changed between snapshot and write; refusing stale insert")
+    block = get_block(parse_index(raw_current), document_name)
+    if block is not None and block.latest_status == "DEFERRED" and status != "DEFERRED":
+        _validate_deferred_clear_file(document_name, version, project_root)
     new_line = f"{status}: bridge/{document_name}-{version:03d}.md"
     lines = raw_current.splitlines(keepends=True)
     updated: list[str] = []

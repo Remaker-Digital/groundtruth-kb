@@ -1188,7 +1188,7 @@ def _bridge_index_latest_status(project_root: Path) -> dict[str, str]:
             continue
         if not current:
             continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+bridge/", line)
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/", line)
         if match:
             result[current] = match.group(1)
             current = None
@@ -1248,7 +1248,7 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
             continue
         if not current_document:
             continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/[^\s]+)", line)
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+(bridge/[^\s]+)", line)
         if not match:
             continue
         entries.append({"document": current_document, "status": match.group(1), "path": match.group(2)})

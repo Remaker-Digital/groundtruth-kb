@@ -53,7 +53,8 @@ than on a fixed interval. When `bridge/INDEX.md` is modified by a tool
 call or the agent ends a turn, the trigger inspects the indexed state and
 dispatches the appropriate counterpart harness if a recipient's actionable
 queue signature has changed (Codex on latest NEW or REVISED; Prime on
-latest GO or NO-GO). VERIFIED is terminal and not dispatched. The trigger
+latest GO or NO-GO). VERIFIED is terminal, and ADVISORY, DEFERRED, and
+WITHDRAWN are non-actionable for dispatch. The trigger
 is monitoring and dispatch infrastructure only; `bridge/INDEX.md` remains
 the canonical workflow state. Per-recipient dispatch state is recorded at
 `.gtkb-state/bridge-poller/dispatch-state.json` (path retained for
@@ -246,7 +247,7 @@ by the cross-harness event-driven trigger:
 - Bridge files are append-only. Never delete a bridge file; it forms the audit
   trail.
 - Per-thread versioning is monotonic. Statuses are NEW, REVISED, GO, NO-GO,
-  VERIFIED.
+  VERIFIED, ADVISORY, DEFERRED, and WITHDRAWN.
 - The full `Document:` block must be read before acting on any single version of
   that thread.
 - Scoped commits only. Bridge work commits should not bundle unrelated source

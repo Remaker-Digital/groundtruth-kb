@@ -9,7 +9,8 @@ Filter rules (per ``.claude/rules/file-bridge-protocol.md``):
 - ``prime-builder`` acts on latest ``NO-GO`` (revise) and latest ``GO``
   (implement).
 - ``loyal-opposition`` acts on latest ``NEW`` and latest ``REVISED`` (review).
-- ``VERIFIED`` is terminal for both roles. VERIFIED threads are surfaced in
+- ``VERIFIED`` is terminal for both roles. ``ADVISORY``, ``DEFERRED``, and
+  ``WITHDRAWN`` are non-actionable for both roles. VERIFIED threads are surfaced in
   ``terminal_verified`` for context, not in ``actionable``.
 
 The helper performs no mutations and is idempotent. It implements the manual
@@ -31,8 +32,7 @@ import argparse
 import datetime as _dt
 import json
 import re
-import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -45,9 +45,7 @@ PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO"})
 LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED"})
 TERMINAL_STATUSES = frozenset({"VERIFIED"})
 
-_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)\s*$"
-)
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 
 
@@ -184,7 +182,7 @@ def scan(
         "actionable": [t.to_dict() for t in actionable],
         "terminal_verified": [t.to_dict() for t in terminal_verified],
         "summary": _summary_counts(threads),
-        "generated_at": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 
@@ -194,7 +192,7 @@ def _format_markdown(result: dict[str, Any]) -> str:
     lines.append("")
     lines.append(f"Generated: {result['generated_at']}")
     lines.append("")
-    lines.append(f"## Summary (latest-status counts across all threads)")
+    lines.append("## Summary (latest-status counts across all threads)")
     lines.append("")
     if result["summary"]:
         for status, count in sorted(result["summary"].items()):
@@ -223,7 +221,9 @@ def _format_markdown(result: dict[str, Any]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", required=True, choices=["prime-builder", "loyal-opposition"])
-    parser.add_argument("--index-path", default=None, help="Path to bridge/INDEX.md (defaults to project bridge/INDEX.md)")
+    parser.add_argument(
+        "--index-path", default=None, help="Path to bridge/INDEX.md (defaults to project bridge/INDEX.md)"
+    )
     parser.add_argument("--format", default="json", choices=["json", "markdown"], help="Output format (default: json)")
     args = parser.parse_args(argv)
 

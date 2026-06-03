@@ -75,6 +75,30 @@ def _make_bridge_file(project_root: Path, name: str, version: int, body: str = "
     (project_root / "bridge" / f"{name}-{version:03d}.md").write_text(body, encoding="utf-8")
 
 
+def _deferred_body() -> str:
+    return (
+        "DEFERRED\n\n"
+        "# Deferred Thread\n\n"
+        "## Owner Decisions / Input\n\n"
+        "- DELIB-20260602-DEFERRED-TEST: owner decision sets this deferral.\n\n"
+        "## Status\n\n"
+        "Deferral reason: waiting for owner sequencing.\n"
+        "Clear condition: owner records reactivation approval.\n"
+    )
+
+
+def _clear_body(status: str = "NEW") -> str:
+    return (
+        f"{status}\n\n"
+        "# Reactivated Thread\n\n"
+        "## Owner Decisions / Input\n\n"
+        "- DELIB-20260602-DEFERRED-CLEAR-TEST: owner decision clears the DEFERRED status "
+        "and resumes bridge work.\n\n"
+        "## Specification Links\n\n"
+        "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    )
+
+
 # ---------- parse / read ----------
 
 
@@ -90,6 +114,16 @@ def test_parse_index_extracts_blocks_and_order(tmp_path: Path) -> None:
     assert blocks[0].latest_version == 2
     assert blocks[1].name == "bar"
     assert blocks[1].latest_status == "VERIFIED"
+
+
+def test_parse_index_accepts_deferred_status(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("parked", [("DEFERRED", 2), ("GO", 1)]))
+
+    _, blocks = read_index(project)
+
+    assert blocks[0].name == "parked"
+    assert blocks[0].latest_status == "DEFERRED"
+    assert blocks[0].latest_version == 2
 
 
 def test_parse_index_skips_comments_and_blank_lines() -> None:
@@ -246,6 +280,15 @@ def test_lo_cannot_write_new(tmp_path: Path) -> None:
         validate_transition("x", "NEW", LOYAL_OPPOSITION_ROLE_SLOT, project)
 
 
+def test_roles_cannot_write_deferred_transition(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("x", [("GO", 1)]))
+
+    with pytest.raises(BridgeTransitionError, match="may not write"):
+        validate_transition("x", "DEFERRED", PRIME_ROLE_SLOT, project)
+    with pytest.raises(BridgeTransitionError, match="may not write"):
+        validate_transition("x", "DEFERRED", LOYAL_OPPOSITION_ROLE_SLOT, project)
+
+
 def test_unknown_role_slot_rejected(tmp_path: Path) -> None:
     project = _build_project(tmp_path)
     with pytest.raises(BridgeTransitionError, match="unknown role_slot"):
@@ -332,3 +375,87 @@ def test_insert_index_status_rejects_invalid_status(tmp_path: Path) -> None:
     project = _build_project(tmp_path, _doc_block("x", [("NEW", 1)]))
     with pytest.raises(BridgeTransitionError, match="invalid status"):
         insert_index_status("x", 2, "MAYBE", project)
+
+
+def test_insert_index_status_deferred_rejects_missing_owner_evidence(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("work", [("NEW", 1)]))
+    _make_bridge_file(project, "work", 2, "DEFERRED\n\nReason: waiting.\nClear condition: owner resumes.\n")
+
+    with pytest.raises(BridgeTransitionError, match="Owner Decisions"):
+        insert_index_status("work", 2, "DEFERRED", project)
+
+
+def test_insert_index_status_deferred_accepts_owner_evidence_for_work_thread(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("work", [("NEW", 1)]))
+    _make_bridge_file(project, "work", 2, _deferred_body())
+
+    insert_index_status("work", 2, "DEFERRED", project)
+
+    _, blocks = read_index(project)
+    block = get_block(blocks, "work")
+    assert block is not None
+    assert block.latest_status == "DEFERRED"
+
+
+def test_insert_index_status_clearing_deferred_requires_owner_clear_evidence(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("work", [("DEFERRED", 2), ("NEW", 1)]))
+    _make_bridge_file(project, "work", 2, _deferred_body())
+    _make_bridge_file(project, "work", 3, "NEW\n\n## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n")
+
+    with pytest.raises(BridgeTransitionError, match="clearing DEFERRED"):
+        insert_index_status("work", 3, "NEW", project)
+
+
+def test_insert_index_status_clearing_deferred_accepts_owner_clear_evidence(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("work", [("DEFERRED", 2), ("NEW", 1)]))
+    _make_bridge_file(project, "work", 2, _deferred_body())
+    _make_bridge_file(project, "work", 3, _clear_body("NEW"))
+
+    insert_index_status("work", 3, "NEW", project)
+
+    _, blocks = read_index(project)
+    block = get_block(blocks, "work")
+    assert block is not None
+    assert block.latest_status == "NEW"
+    assert block.latest_version == 3
+
+
+def test_insert_index_status_deferred_rejects_placeholder_owner_evidence(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("x", [("GO", 1)]))
+    _make_bridge_file(project, "x", 2, "DEFERRED\n\n## Owner Decisions / Input\n\nNone\n")
+
+    with pytest.raises(BridgeTransitionError, match="DEFERRED bridge file"):
+        insert_index_status("x", 2, "DEFERRED", project)
+
+
+def test_insert_index_status_deferred_accepts_owner_evidence_for_x_thread(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("x", [("GO", 1)]))
+    _make_bridge_file(
+        project,
+        "x",
+        2,
+        "\n".join(
+            [
+                "DEFERRED",
+                "",
+                "## Owner Decisions / Input",
+                "",
+                "- DELIB-TEST-OWNER-DEFERRAL: owner directive to park.",
+                "",
+                "## Deferral Reason",
+                "",
+                "Reason: awaiting owner sequencing decision.",
+                "",
+                "## Clear Condition",
+                "",
+                "Clear condition: resume when the owner supplies that decision.",
+                "",
+            ]
+        ),
+    )
+
+    insert_index_status("x", 2, "DEFERRED", project)
+
+    _, blocks = read_index(project)
+    assert blocks[0].latest_status == "DEFERRED"
+    assert blocks[0].latest_version == 2

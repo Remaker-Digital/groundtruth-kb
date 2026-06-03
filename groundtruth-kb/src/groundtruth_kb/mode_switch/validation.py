@@ -6,7 +6,7 @@ role, bridge, and session-state artifacts before writing durable state."
 
 The bridge-artifact validator mirrors the canonical bridge parser's status
 vocabulary from ``scripts/bridge_applicability_preflight.py:32`` —
-``{NEW, REVISED, GO, NO-GO, VERIFIED, WITHDRAWN, ADVISORY}`` — and does NOT
+``{NEW, REVISED, GO, NO-GO, VERIFIED, WITHDRAWN, ADVISORY, DEFERRED}`` — and does NOT
 require referenced-file existence on disk (historical INDEX entries may
 legitimately reference moved or removed files; that is bridge hygiene, not
 mode-switch safety, per Codex NO-GO at bridge ``-007`` F1 closed by
@@ -23,9 +23,11 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-BRIDGE_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY"})
+BRIDGE_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY", "DEFERRED"})
 
-_BRIDGE_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s+(bridge/\S+\.md)\s*$")
+_BRIDGE_STATUS_LINE_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
+)
 _BRIDGE_STATUS_SHAPED_LINE_RE = re.compile(r"^([A-Z][A-Z\-]+):\s+bridge/\S+\.md\s*$")
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+\S")
 

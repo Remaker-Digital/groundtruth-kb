@@ -10,8 +10,8 @@ Covers all five Codex conditions from
   ``execute_upgrade``; dry-run preserves the diagnostic skip row; CLI
   exits 4.
 - **C3** — ``_check_bridge_inflight`` parses by ``Document:`` and inspects
-  only the first status line per block; older statuses under a terminal
-  ``VERIFIED``/``NO-GO`` are silent.
+  only the first status line per block; older statuses under a terminal or
+  parked ``VERIFIED``/``NO-GO``/``DEFERRED`` state are silent.
 - **C4** — ``enumerate_scaffold_outputs`` is read-only, profile+registry-
   guaranteed only, and ``_check_scaffold_coverage`` performs no target
   writes.
@@ -299,8 +299,8 @@ def test_C3_latest_non_terminal_status_emits_warning(tmp_path: Path, status: str
     assert status in warnings[0].reason
 
 
-@pytest.mark.parametrize("status", ["VERIFIED", "NO-GO"])
-def test_C3_latest_terminal_status_is_silent(tmp_path: Path, status: str) -> None:
+@pytest.mark.parametrize("status", ["VERIFIED", "NO-GO", "DEFERRED"])
+def test_C3_latest_terminal_or_parked_status_is_silent(tmp_path: Path, status: str) -> None:
     (tmp_path / "bridge").mkdir()
     (tmp_path / "bridge" / "INDEX.md").write_text(
         f"Document: foo\n{status}: bridge/foo-002.md\nNEW: bridge/foo-001.md\n",

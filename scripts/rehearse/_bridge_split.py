@@ -31,7 +31,7 @@ from rehearse._split_helper import (
 
 _INDEX_DOCUMENT_LINE = re.compile(r"^Document:\s*(?P<name>\S+)\s*$")
 _INDEX_STATUS_LINE = re.compile(
-    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s*"
+    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s*"
     r"bridge/(?P<filename>[A-Za-z0-9_.-]+)\s*$"
 )
 _VERSION_SUFFIX = re.compile(r"-(\d{3})\.md$")

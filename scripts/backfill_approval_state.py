@@ -19,7 +19,7 @@ if str(SRC) not in sys.path:
 from groundtruth_kb.backlog.approval_state import classify_initial_state  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
-STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s+bridge/")
+STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+bridge/")
 
 
 def bridge_statuses(index_path: Path) -> dict[str, str]:

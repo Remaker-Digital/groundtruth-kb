@@ -6,7 +6,7 @@ bridge/gtkb-gov-proposal-standards-slice1-023.md).
 
 Versioned bridge files (bridge/<slug>-NNN.md) must begin with a canonical
 status token on the first non-blank line (NEW / REVISED / GO / NO-GO /
-VERIFIED / ADVISORY / WITHDRAWN). New files (and overwrites of files that
+VERIFIED / ADVISORY / DEFERRED / WITHDRAWN). New files (and overwrites of files that
 currently have a canonical first line) must comply; files already on disk
 with a non-canonical first line are grandfathered. The rule fires only on the
 Write tool (full content); the Edit tool supplies empty content to the gate
@@ -33,7 +33,7 @@ def _load_gate():
 
 _gate = _load_gate()
 
-_CANONICAL_TOKENS = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "WITHDRAWN")
+_CANONICAL_TOKENS = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN")
 
 
 def _versioned(tmp_path: Path, name: str = "gtkb-demo-thread-001.md") -> str:
@@ -119,6 +119,7 @@ def test_index_md_not_a_versioned_file(tmp_path):
 def test_recognized_status_includes_withdrawn():
     """WITHDRAWN is an accepted canonical token (Codex GO -023 non-blocking note)."""
     assert _gate._first_line_is_recognized_status("WITHDRAWN") is True
+    assert _gate._first_line_is_recognized_status("DEFERRED") is True
 
 
 def test_recognized_status_rejects_heading_and_prose():
@@ -163,6 +164,50 @@ def test_deny_reason_allows_status_first_proposal(tmp_path):
     if reason is not None:
         assert "body-status-token" not in reason.lower()
         assert "canonical status token" not in reason.lower()
+
+
+def test_deferred_file_requires_owner_evidence(tmp_path):
+    path = _versioned(tmp_path, "deferred-thread-002.md")
+    content = "DEFERRED\n\n# Deferred Thread\n\nReason: waiting.\n\nClear condition: owner resumes.\n"
+
+    reason = _gate._deny_reason_for_content(
+        cwd_path=tmp_path,
+        file_path=path,
+        content=content,
+        run_pending_preflight=False,
+    )
+
+    assert reason is not None
+    assert "DEFERRED bridge files" in reason
+
+
+def test_deferred_file_with_owner_evidence_allowed(tmp_path):
+    path = _versioned(tmp_path, "deferred-thread-002.md")
+    content = (
+        "DEFERRED\n"
+        "author_identity: Codex Prime Builder\n"
+        "author_harness_id: A\n"
+        "author_session_context_id: test-session\n"
+        "author_model: GPT-5 Codex\n"
+        "author_model_version: test\n"
+        "author_model_configuration: test\n"
+        "\n"
+        "# Deferred Thread\n\n"
+        "## Owner Decisions / Input\n\n"
+        "- DELIB-20260602-DEFERRED-TEST: owner decision sets this deferral.\n\n"
+        "## Status\n\n"
+        "Deferral reason: waiting for an external owner decision.\n"
+        "Clear condition: owner records reactivation approval.\n"
+    )
+
+    reason = _gate._deny_reason_for_content(
+        cwd_path=tmp_path,
+        file_path=path,
+        content=content,
+        run_pending_preflight=False,
+    )
+
+    assert reason is None
 
 
 def test_edit_tool_empty_content_skipped(tmp_path):

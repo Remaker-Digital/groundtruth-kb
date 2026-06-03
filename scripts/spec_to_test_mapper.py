@@ -108,7 +108,7 @@ def extract_spec_ids_from_bridge(bridge_id: str, bridge_dir: Path) -> tuple[list
 
     in_thread = False
     saw_thread = False
-    status_pattern = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s*(\S+)")
+    status_pattern = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s*(\S+)")
     document_header = f"Document: {bridge_id}"
 
     for line in index_path.read_text(encoding="utf-8").splitlines():

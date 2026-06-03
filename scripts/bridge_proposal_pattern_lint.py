@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_INDEX = PROJECT_ROOT / "bridge" / "INDEX.md"
 
 PROPOSAL_STATUSES = {"NEW", "REVISED"}
-STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)\s*$")
+STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
 CODEX_VERIFIED_PENDING_RE = re.compile(r"\bCodex\s+VERIFIED\s*\(\s*pending\s*\)", re.IGNORECASE)
 PYTEST_COMMAND_RE = re.compile(r"(?i)(?:^|[`$>]|(?:run|cmd|command):\s*)\s*pytest(?:\s|$)")
 RULE_DOCUMENTATION_RE = re.compile(

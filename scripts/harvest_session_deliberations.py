@@ -75,7 +75,7 @@ _AR_KEY_SURVIVOR_RE = re.compile(r"(ar_live|ar_user|ar_spa_plat|pk_live|arsk)_[A
 
 # Bridge INDEX.md parsing
 _DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+bridge/(.+\.md)$")
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/(.+\.md)$")
 
 # Verdict extraction for bridge files
 _VERDICT_FIELD_RE = re.compile(
@@ -407,13 +407,15 @@ def harvest(
         # Check for AR key survivors
         survivors = len(_AR_KEY_SURVIVOR_RE.findall(redacted))
         if survivors > 0:
-            results.append(HarvestResult(
-                source_ref=source_ref,
-                source_type="lo_review",
-                outcome="informational",
-                action="error",
-                warnings=[f"Redaction survivor: {survivors} AR key(s)"],
-            ))
+            results.append(
+                HarvestResult(
+                    source_ref=source_ref,
+                    source_type="lo_review",
+                    outcome="informational",
+                    action="error",
+                    warnings=[f"Redaction survivor: {survivors} AR key(s)"],
+                )
+            )
             action_counts["error"] += 1
             continue
 
@@ -424,6 +426,7 @@ def harvest(
         # Determine outcome using backfill_lo_reports patterns
         sys.path.insert(0, str(REPO_ROOT / "scripts"))
         from backfill_lo_reports import extract_outcome
+
         outcome, warnings = extract_outcome(content, filepath.name)
 
         action = "skipped"
@@ -465,15 +468,17 @@ def harvest(
         elif not apply:
             action = "would_create"
 
-        results.append(HarvestResult(
-            source_ref=source_ref,
-            source_type="lo_review",
-            outcome=outcome,
-            action=action,
-            spec_ids=spec_ids,
-            wi_ids=wi_ids,
-            warnings=warnings,
-        ))
+        results.append(
+            HarvestResult(
+                source_ref=source_ref,
+                source_type="lo_review",
+                outcome=outcome,
+                action=action,
+                spec_ids=spec_ids,
+                wi_ids=wi_ids,
+                warnings=warnings,
+            )
+        )
         action_counts[action] += 1
         source_type_counts["lo_review"] += 1
 
@@ -530,14 +535,16 @@ def harvest(
         elif not apply:
             action = "would_create"
 
-        results.append(HarvestResult(
-            source_ref=source_ref,
-            source_type=source_type,
-            outcome=outcome,
-            action=action,
-            spec_ids=spec_ids,
-            wi_ids=wi_ids,
-        ))
+        results.append(
+            HarvestResult(
+                source_ref=source_ref,
+                source_type=source_type,
+                outcome=outcome,
+                action=action,
+                spec_ids=spec_ids,
+                wi_ids=wi_ids,
+            )
+        )
         action_counts[action] += 1
         source_type_counts["bridge_thread"] += 1
 
@@ -547,13 +554,15 @@ def harvest(
             compressed = collect_compressed_bridge_threads()
         except Exception as exc:  # noqa: BLE001 -- recorded as warning, not silent failure
             compressed = []
-            results.append(HarvestResult(
-                source_ref="bridge/(thread-level collector)",
-                source_type="bridge_thread",
-                outcome="informational",
-                action="error",
-                warnings=[f"thread-level collector failed: {exc}"],
-            ))
+            results.append(
+                HarvestResult(
+                    source_ref="bridge/(thread-level collector)",
+                    source_type="bridge_thread",
+                    outcome="informational",
+                    action="error",
+                    warnings=[f"thread-level collector failed: {exc}"],
+                )
+            )
             action_counts["error"] += 1
 
         for source_ref, title, summary, content, outcome in compressed:
@@ -595,14 +604,16 @@ def harvest(
             elif not apply:
                 action = "would_create"
 
-            results.append(HarvestResult(
-                source_ref=source_ref,
-                source_type="bridge_thread",
-                outcome=outcome,
-                action=action,
-                spec_ids=spec_ids,
-                wi_ids=wi_ids,
-            ))
+            results.append(
+                HarvestResult(
+                    source_ref=source_ref,
+                    source_type="bridge_thread",
+                    outcome=outcome,
+                    action=action,
+                    spec_ids=spec_ids,
+                    wi_ids=wi_ids,
+                )
+            )
             action_counts[action] += 1
             source_type_counts["bridge_thread_compressed"] += 1
 

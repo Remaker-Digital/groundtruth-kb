@@ -53,10 +53,11 @@ from groundtruth_kb.project.upgrade import UpgradeAction
 # ---------------------------------------------------------------------------
 
 _DOCUMENT_HEADER_RE = re.compile(r"^Document:\s+(\S+)\s*$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s*bridge/")
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s*bridge/")
 
 # Non-terminal statuses: a document whose top line is one of these is still
-# in an active review cycle. VERIFIED and NO-GO are terminal and silent.
+# in an active review cycle. VERIFIED/NO-GO are terminal and DEFERRED is parked,
+# so all three are silent for this preflight.
 _NON_TERMINAL_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "ADVISORY"})
 
 

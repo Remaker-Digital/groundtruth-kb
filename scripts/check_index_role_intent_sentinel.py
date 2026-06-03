@@ -309,7 +309,7 @@ def latest_statuses(index_text: str) -> dict[str, str]:
         if line.startswith("Document:"):
             current_doc = line.removeprefix("Document:").strip()
             continue
-        if current_doc and re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):", line):
+        if current_doc and re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):", line):
             statuses.setdefault(current_doc, line.split(":", 1)[0])
     return statuses
 

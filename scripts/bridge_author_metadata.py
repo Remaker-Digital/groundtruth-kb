@@ -14,7 +14,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"})
+BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset(
+    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}
+)
 REQUIRED_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
     "author_identity",
     "author_harness_id",

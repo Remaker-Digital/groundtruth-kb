@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 SPEC_ID_RE = re.compile(r"\b(?:ADR|DCL|GOV|PB|SPEC)-[A-Z0-9][A-Z0-9_-]*\d+\b")
-STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+?\.md)\s*$")
+STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+?\.md)\s*$")
 DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 DELIB_DRAFT_RE = re.compile(r"(?im)^\s*(?:draft\s+delib|delib\s+draft|source_type\s*=\s*owner_conversation)\b")
@@ -180,7 +180,7 @@ def run_audit(
     memory_files = sorted((root / "memory").glob("*.md")) if (root / "memory").is_dir() else []
 
     findings: list[AuditFinding] = []
-    findings.extend(_verified_state_mismatches(root, bridge_entries, spec_by_id, active_db))
+    findings.extend(_verified_state_mismatches(root, bridge_entries, spec_by_id))
     findings.extend(_duplicated_canonical_content(memory_files, filtered_specs))
     findings.extend(_delib_draft_candidates(memory_files))
 
@@ -252,7 +252,6 @@ def _verified_state_mismatches(
     project_root: Path,
     bridge_entries: list[BridgeEntry],
     spec_by_id: dict[str, dict[str, Any]],
-    db: Any | None,
 ) -> list[AuditFinding]:
     findings: list[AuditFinding] = []
     for entry in bridge_entries:
@@ -261,9 +260,6 @@ def _verified_state_mismatches(
         text = _read_entry_text(project_root, entry)
         for spec_id in sorted(extract_spec_ids(text)):
             spec = spec_by_id.get(spec_id)
-            if spec is None and db is not None and hasattr(db, "get_spec"):
-                fetched = db.get_spec(spec_id)
-                spec = dict(fetched) if fetched else None
             if not spec:
                 continue
             status = str(spec.get("status", "")).strip()

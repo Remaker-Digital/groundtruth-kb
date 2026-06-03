@@ -485,7 +485,7 @@ live data + interaction); non-interactive README-style views.
 **Definition:** The Prime Builder ↔ Loyal Opposition coordination
 protocol implemented via versioned markdown files under `bridge/` and
 the canonical `bridge/INDEX.md` workflow state. Statuses: NEW, REVISED,
-GO, NO-GO, VERIFIED. Both agents read and write the index;
+GO, NO-GO, VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. Both agents read and write the index;
 implementation never proceeds without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
@@ -699,7 +699,8 @@ and Loyal Opposition on a single topic. A bridge thread is identified by a
 kebab-case slug and consists of an ordered sequence of versioned files
 (`bridge/<slug>-001.md`, `-002.md`, …) plus a single entry in
 `bridge/INDEX.md`. The thread terminates at `VERIFIED` or owner-directed
-retirement.
+retirement. `DEFERRED` parks a thread in owner-directed non-actionable state
+until its recorded clear/resume condition is met.
 
 **Not to be confused with:** bridge file (a single version within a thread);
 bridge document (the full version chain).
@@ -709,14 +710,16 @@ bridge document (the full version chain).
 **Implementation pointer:** `bridge/<slug>-NNN.md`; `bridge/INDEX.md`;
 `.claude/rules/file-bridge-protocol.md`.
 
-### GO / NO-GO / VERIFIED
+### GO / NO-GO / VERIFIED / DEFERRED
 
 **Definition:** The terminal verdicts in the file-bridge protocol, set by
 Loyal Opposition. `GO` approves a `NEW` or `REVISED` proposal for
 implementation. `NO-GO` requires Prime Builder revision. `VERIFIED` is dated
 evidence that an implementation report has been verified against the linked
 specifications. `NEW` (Prime-set, fresh proposal) and `REVISED` (Prime-set,
-after a NO-GO) are upstream Prime-side states.
+after a NO-GO) are upstream Prime-side states. `DEFERRED` is owner-directed
+bridge parking state; it is indexed and non-actionable, but it is not a Loyal
+Opposition verdict and does not authorize implementation.
 
 **Not to be confused with:** test pass/fail (a single test result); spec
 status fields like `specified`, `implemented`, `verified` (those are MemBase

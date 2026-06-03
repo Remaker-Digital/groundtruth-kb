@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -35,9 +34,7 @@ DEFAULT_INDEX_PATH = DEFAULT_BRIDGE_DIR / "INDEX.md"
 DEFAULT_PREVIEW_LINES = 200
 
 _VERSION_FILE_RE = re.compile(r"-(\d{3})\.md$")
-_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)\s*$"
-)
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 
 
@@ -216,7 +213,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("slug", help="Bridge thread slug (e.g., gtkb-bridge-convenience-verbs)")
     parser.add_argument("--bridge-dir", default=None, help="Path to bridge/ (defaults to project bridge/)")
     parser.add_argument("--index-path", default=None, help="Path to INDEX.md (defaults to <bridge-dir>/INDEX.md)")
-    parser.add_argument("--preview-lines", type=int, default=DEFAULT_PREVIEW_LINES, help=f"Per-version content preview cap (default: {DEFAULT_PREVIEW_LINES})")
+    parser.add_argument(
+        "--preview-lines",
+        type=int,
+        default=DEFAULT_PREVIEW_LINES,
+        help=f"Per-version content preview cap (default: {DEFAULT_PREVIEW_LINES})",
+    )
     parser.add_argument("--format", default="json", choices=["json", "markdown"], help="Output format (default: json)")
     args = parser.parse_args(argv)
 

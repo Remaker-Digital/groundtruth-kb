@@ -94,7 +94,7 @@ class ImplReportPlan:
         return asdict(self)
 
 
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)$")
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)$")
 _SECTION_RE_TEMPLATE = r"^##\s+{heading}\s*$"
 _VERSION_RE = re.compile(r"-(\d{3})\.md$")
 _BRIDGE_KIND_RE = re.compile(r"^\s*bridge_kind:\s*(?P<kind>[A-Za-z0-9_-]+)\s*$", re.MULTILINE)

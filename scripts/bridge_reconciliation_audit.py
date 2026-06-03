@@ -27,8 +27,8 @@ if str(GROUNDTRUTH_SRC) not in sys.path:
 
 from groundtruth_kb.db import KnowledgeDB, WORK_ITEM_TERMINAL_RESOLUTION_STATUSES
 
-STATUS_TOKENS = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "WITHDRAWN")
-STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN):\s+(bridge/\S+\.md)\s*$")
+STATUS_TOKENS = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN")
+STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN):\s+(bridge/\S+\.md)\s*$")
 VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(.+)-(\d{3})\.md$")
 BRIDGE_PATH_RE = re.compile(r"(?:^|\b)bridge/([A-Za-z0-9_.-]+?)-\d{3}\.md(?:\b|$)")
 WI_ID_RE = re.compile(r"(?<![A-Za-z0-9_.-])WI-\d+(?![A-Za-z0-9_.-])")

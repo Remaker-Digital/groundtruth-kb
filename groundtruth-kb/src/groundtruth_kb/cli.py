@@ -139,6 +139,52 @@ bridge_group.add_command(bridge_index_group)
 main.add_command(bridge_group)
 
 
+@main.group("authority")
+def authority_group() -> None:
+    """Resolve GT-KB authority/source-of-truth terms."""
+
+
+@authority_group.command("resolve")
+@click.argument("subject")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def authority_resolve_cmd(ctx: click.Context, subject: str, json_output: bool) -> None:
+    """Resolve an owner-facing term against the governed system-interface map."""
+    from groundtruth_kb.authority import AuthorityResolutionError, format_resolution, resolve_subject
+
+    config = _resolve_config(ctx)
+    try:
+        result = resolve_subject(subject, project_root=Path(config.project_root))
+    except AuthorityResolutionError as exc:
+        result = {"status": "error", "term": subject, "message": str(exc)}
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(format_resolution(result))
+    if result.get("status") != "resolved":
+        raise SystemExit(1)
+
+
+@authority_group.command("status")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def authority_status_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Report compact system-interface map health."""
+    from groundtruth_kb.authority import AuthorityResolutionError, compact_status, format_resolution
+
+    config = _resolve_config(ctx)
+    try:
+        result = compact_status(project_root=Path(config.project_root))
+    except AuthorityResolutionError as exc:
+        result = {"status": "error", "message": str(exc), "errors": [str(exc)]}
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(format_resolution(result))
+    if result.get("status") != "pass":
+        raise SystemExit(1)
+
+
 @click.group("reconcile")
 def bridge_reconcile_group() -> None:
     """Bridge/backlog reconciliation audit commands."""

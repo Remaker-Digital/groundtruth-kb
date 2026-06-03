@@ -256,14 +256,15 @@ index file (after the header comments).
 | NO-GO | Loyal Opposition | Proposal requires changes before approval |
 | VERIFIED | Loyal Opposition | Post-implementation verification passed |
 | ADVISORY | Loyal Opposition | Owner-initiated advisory report; non-dispatchable; awaiting Prime acknowledgement and disposition decision (NOT awaiting GO/NO-GO/VERIFIED). |
+| DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the owner-directed clear/resume condition is met. |
 
 ## Body Status-Token Rule
 
 Versioned bridge files (`bridge/<slug>-NNN.md`) MUST begin with a canonical
 status token on the first non-blank line: one of `NEW`, `REVISED`, `GO`,
-`NO-GO`, `VERIFIED`, `ADVISORY`, or `WITHDRAWN`. Headings and prose follow the
-token. This keeps each bridge file self-describing and makes the first line a
-reliable routing signal independent of `bridge/INDEX.md`.
+`NO-GO`, `VERIFIED`, `ADVISORY`, `DEFERRED`, or `WITHDRAWN`. Headings and prose
+follow the token. This keeps each bridge file self-describing and makes the
+first line a reliable routing signal independent of `bridge/INDEX.md`.
 
 The rule is mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`
 (activated byte-for-byte from
@@ -273,9 +274,9 @@ token is hard-blocked. The rule fires only on the `Write` tool (full file
 content); `Edit` operations are not subject to it. Files that already exist on
 disk with a non-canonical first line are grandfathered, so the rule never
 retroactively breaks historical bridge files on overwrite. `bridge/INDEX.md`
-and non-versioned bridge markdown are exempt. `WITHDRAWN` is an accepted
-canonical token even though it does not appear in the Statuses table above,
-because it is used throughout `bridge/INDEX.md` as a terminal status.
+and non-versioned bridge markdown are exempt. `WITHDRAWN` remains an accepted
+canonical token because it is used throughout `bridge/INDEX.md` as a terminal
+status.
 
 Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 (`DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`; GO at
@@ -293,6 +294,29 @@ Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 
 **Dashboard semantics:** ADVISORY rows are NOT failed proposals; dashboard counts must distinguish them from NO-GO entries. Exact dashboard-counter behavior is owned by the sibling `gtkb-advisory-report-dashboard-counters-spec` thread.
 
+## DEFERRED Status
+
+`DEFERRED` is owner-only bridge parking state. It is not a Prime Builder
+revision, not a Loyal Opposition verdict, and not a replacement for parked
+drafts.
+
+A `DEFERRED` entry MUST be recorded as both:
+
+1. an indexed status line, `DEFERRED: bridge/<slug>-NNN.md`; and
+2. a versioned bridge file whose first non-blank line is exactly `DEFERRED`.
+
+The `DEFERRED` file MUST include:
+
+- concrete `Owner Decisions / Input` evidence, such as a cited DELIB/AUQ or an
+  explicit owner directive;
+- a deferral reason; and
+- a clear/resume condition describing when the thread becomes actionable again.
+
+`DEFERRED` is non-actionable for Prime Builder, Loyal Opposition, bridge
+dispatch, and normal scan queues. It may be cleared only by owner-directed
+follow-up that files the next appropriate lifecycle entry. Parked drafts remain
+unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
+
 ## Prime Workflow
 
 1. Write the proposal as `bridge/{name}-001.md`
@@ -302,7 +326,7 @@ Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
    NEW: bridge/{name}-001.md
    ```
 3. Continue working on other tasks
-4. Periodically scan the index for GO or NO-GO responses (scheduled every 3 minutes)
+4. Periodically scan the index for GO or NO-GO responses (scheduled every 3 minutes); skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Prime implementation/revision work.
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
    incremented version, and insert a REVISED line at the top of that entry:
@@ -315,7 +339,7 @@ Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 
 ## Loyal Opposition Workflow
 
-1. Periodically scan the index for NEW or REVISED entries (automated every 3 minutes)
+1. Periodically scan the index for NEW or REVISED entries (automated every 3 minutes); skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal Opposition review work.
 2. Process entries starting from the oldest (bottom of the index)
 3. Read the indicated file and perform the review
 4. Save review findings as a new version with incremented number

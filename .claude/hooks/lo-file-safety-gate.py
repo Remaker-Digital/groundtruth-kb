@@ -50,6 +50,9 @@ CONFIG_RELATIVE_PATH = Path("config") / "governance" / "lo-file-safety.toml"
 APPROVAL_ENV_VAR = "GTKB_LO_FILE_SAFETY_APPROVAL_PACKET"
 APPROVAL_PACKET_TYPE = "lo_file_safety_authorization"
 LO_STATUS_TOKENS = frozenset({"NO-GO", "GO", "VERIFIED", "ADVISORY"})
+BRIDGE_INDEX_STATUS_TOKENS = frozenset(
+    {"NEW", "REVISED", "NO-GO", "GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"}
+)
 BRIDGE_STATUS_LINE_RE = re.compile(
     r"^(?P<status>NO-GO|GO|VERIFIED|ADVISORY):\s+bridge/(?P<slug>.+)-(?P<version>\d{3})\.md\s*$"
 )

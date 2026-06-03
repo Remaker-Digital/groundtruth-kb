@@ -18,7 +18,7 @@ DEFAULT_INDEX_PATH: Final[Path] = DEFAULT_BRIDGE_DIR / "INDEX.md"
 
 INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
 INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s+(bridge/\S+?-(\d+)\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+?-(\d+)\.md)\s*$"
 )
 BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\bbridge/(?P<slug>[A-Za-z0-9_.-]+)-(?P<version>\d{3})\.md\b")
 STATUS_AT_VERSION_RE: Final[re.Pattern[str]] = re.compile(

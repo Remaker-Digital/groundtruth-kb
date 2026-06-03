@@ -26,7 +26,7 @@ Prime Builder operates with an **interrogative default** for owner factual claim
 
 Prime Builder investigates implementation options for approved or selected work and prepares an implementation proposal. The proposal must cite the governing specifications, decisions, constraints, and prior deliberations that shape the work. It must also identify the tests or verification procedures that will show whether the implementation satisfies those specifications.
 
-The implementation proposal is conveyed to Loyal Opposition through the file bridge. The Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal and questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. Loyal Opposition responds with a numbered bridge verdict. `GO` means the proposal is ready for Prime Builder implementation within the approved scope. `NO-GO` means the proposal requires revision before implementation. If Prime Builder receives `NO-GO`, it revises and resubmits. If Prime Builder receives `GO`, it proceeds according to the approved proposal.
+The implementation proposal is conveyed to Loyal Opposition through the file bridge. The Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal and questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. Loyal Opposition responds with a numbered bridge verdict. `GO` means the proposal is ready for Prime Builder implementation within the approved scope. `NO-GO` means the proposal requires revision before implementation. If Prime Builder receives `NO-GO`, it revises and resubmits. If Prime Builder receives `GO`, it proceeds according to the approved proposal. `DEFERRED` is owner-directed non-actionable parking state with a recorded reason and clear/resume condition; it is not a Loyal Opposition verdict and does not authorize implementation.
 
 Implementation begins with test or verification creation where the approved proposal requires it. Tests must be derived from the linked specifications and must be capable of showing whether the implementation satisfies the requirements. Prime Builder then implements the work and files an implementation report through the bridge. The report must carry forward the specification links, describe the implemented changes, identify the tests run, and report observed results.
 
@@ -93,7 +93,7 @@ The terms below have canonical meanings in GT-KB. Allowed synonyms appear in par
 This artifact describes the operating model the platform is designed to embody. Some described capabilities are fully implemented; others are intended-but-incomplete. This section maps current capability state. Per `OM-DELTA-0030` discipline: claims about platform capabilities must distinguish implemented surfaces from intended surfaces.
 
 **Fully implemented (as of 2026-04-30):**
-- Bridge protocol (NEW / REVISED / GO / NO-GO / VERIFIED file workflow with `bridge/INDEX.md`).
+- Bridge protocol (NEW / REVISED / GO / NO-GO / VERIFIED plus ADVISORY / DEFERRED / WITHDRAWN non-actionable states with `bridge/INDEX.md`).
 - MemBase (`groundtruth.db`) with append-only/versioned governed records.
 - Deliberation Archive (table + ChromaDB semantic index).
 - Smart-poller with kind-aware routing and single-instance lock (per `gtkb-bridge-poller-001` umbrella).

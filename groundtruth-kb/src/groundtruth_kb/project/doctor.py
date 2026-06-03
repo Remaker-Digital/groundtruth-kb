@@ -30,6 +30,52 @@ _BRIDGE_LATEST_STATUS_RE = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
 )
 _BRIDGE_DATE_RE = re.compile(r"^Date:\s*(\d{4}-\d{2}-\d{2})(?:\s+UTC)?\s*$", re.IGNORECASE)
+_LEGACY_ROOT_MARKERS = (
+    "E:\\Claude-Playground",
+    "E:\\\\Claude-Playground",
+    "E:/Claude-Playground",
+    "//e/Claude-Playground",
+    "//E/Claude-Playground",
+)
+_ACTIVE_LEGACY_ROOT_SURFACES = (
+    Path(".claude") / "settings.local.json",
+    Path(".claude") / "settings.json",
+    Path(".codex") / "hooks.json",
+)
+_ACTIVE_LEGACY_ROOT_GLOBS = (
+    "AGENTS.md",
+    ".claude/rules/*.md",
+    ".claude/hooks/*.py",
+    ".codex/hooks.json",
+    "config/**/*",
+    "scripts/**/*.py",
+    "groundtruth-kb/src/**/*.py",
+    "groundtruth-kb/templates/**/*",
+    "groundtruth-kb/tests/fixtures/**/*",
+)
+_LEGACY_ROOT_EXCLUDED_PARTS = frozenset(
+    {
+        "__pycache__",
+        ".pytest_cache",
+        "_drift-backup-2026-04-23-S304",
+        "archive",
+        "pre-flight-results",
+        "session-tmp",
+        "worktrees",
+    }
+)
+_LEGACY_ROOT_PATTERN_SCRIPT_NAMES = frozenset(
+    {
+        "doctor.py",
+        "migrate_root_to_gtkb.py",
+        "wrap_scan_hygiene.py",
+    }
+)
+_LEGACY_ROOT_ALLOWED_CONTEXT_RE = re.compile(
+    r"archive[- ]only|not a live|must not be (?:used|treated)|forbidden_aliases|retired|migration|migrate|"
+    r"legacy[-_]root|hygiene|pattern|_LEGACY_ROOT_|No active control-surface",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -585,6 +631,77 @@ def _check_settings_classifiers(target: Path) -> ToolCheck:
     )
 
 
+def _check_active_legacy_root_references(target: Path) -> ToolCheck:
+    """Hard-fail active surfaces that still treat the retired archive root as live authority."""
+    findings: list[str] = []
+    for relative_path in _iter_active_legacy_root_surfaces(target):
+        path = target / relative_path
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            return ToolCheck(
+                name="Active legacy-root references",
+                required=True,
+                found=True,
+                status="fail",
+                message=f"Could not read active control surface {relative_path.as_posix()}: {exc}",
+            )
+        for line_index, line in enumerate(lines):
+            if any(marker in line for marker in _LEGACY_ROOT_MARKERS) and not _legacy_root_reference_is_allowed(
+                relative_path, lines, line_index
+            ):
+                line_number = line_index + 1
+                findings.append(f"{relative_path.as_posix()}:{line_number}")
+    if findings:
+        return ToolCheck(
+            name="Active legacy-root references",
+            required=True,
+            found=True,
+            status="fail",
+            message=(
+                "Active control surface references retired E:\\Claude-Playground archive root: "
+                + ", ".join(findings[:8])
+                + (f", ... (+{len(findings) - 8} more)" if len(findings) > 8 else "")
+            ),
+        )
+    return ToolCheck(
+        name="Active legacy-root references",
+        required=True,
+        found=True,
+        status="pass",
+        message="No active control-surface references to E:\\Claude-Playground",
+    )
+
+
+def _iter_active_legacy_root_surfaces(target: Path) -> list[Path]:
+    """Return active files whose legacy-root references should be inspected."""
+    paths: set[Path] = set(_ACTIVE_LEGACY_ROOT_SURFACES)
+    for pattern in _ACTIVE_LEGACY_ROOT_GLOBS:
+        for path in target.glob(pattern):
+            if not path.is_file():
+                continue
+            try:
+                relative_path = path.relative_to(target)
+            except ValueError:
+                continue
+            if any(part in _LEGACY_ROOT_EXCLUDED_PARTS for part in relative_path.parts):
+                continue
+            paths.add(relative_path)
+    return sorted(paths, key=lambda item: item.as_posix())
+
+
+def _legacy_root_reference_is_allowed(relative_path: Path, lines: list[str], line_index: int) -> bool:
+    """Classify archive/migration/hygiene mentions as non-live references."""
+    if relative_path.name in _LEGACY_ROOT_PATTERN_SCRIPT_NAMES:
+        return True
+    start = max(0, line_index - 2)
+    end = min(len(lines), line_index + 3)
+    context = "\n".join(lines[start:end])
+    return bool(_LEGACY_ROOT_ALLOWED_CONTEXT_RE.search(context))
+
+
 # Sub-slice E doctor invariants per amended DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 v2.
 # Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2; DCL DOCTOR INVARIANTS section.
 # See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
@@ -979,7 +1096,7 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
     threads: list[tuple[str, list[tuple[str, Path]]]] = []
     current_doc: str | None = None
     current_files: list[tuple[str, Path]] = []
-    line_re = _re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s*(bridge/\S+\.md)\s*$")
+    line_re = _re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN):\s*(bridge/\S+\.md)\s*$")
     for line in index_path.read_text(encoding="utf-8").splitlines():
         s = line.strip()
         if s.startswith("Document:"):
@@ -3310,6 +3427,7 @@ def run_doctor(
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
         checks.append(_check_settings_classifiers(target))
+        checks.append(_check_active_legacy_root_references(target))
         checks.append(_check_spec_classifier_canonical_path(target))
         checks.append(_check_spec_classifier_settings_registered(target))
         checks.append(_check_spec_classifier_codex_parity(target))

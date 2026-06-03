@@ -29,7 +29,7 @@ If the bridge becomes unresponsive:
 
 ## Invariants
 
-- Never reprocess VERIFIED entries
+- Never reprocess VERIFIED, ADVISORY, DEFERRED, or WITHDRAWN entries
 - Use a lock file to prevent overlapping scanner runs
 - Never delete bridge files — they form the audit trail
 - Document scanner configuration in BRIDGE-INVENTORY.md

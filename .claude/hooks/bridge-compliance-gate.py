@@ -38,7 +38,7 @@ try:
         author_metadata_gaps_for_content,
     )
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
-    BRIDGE_AUTHOR_METADATA_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"})
+    BRIDGE_AUTHOR_METADATA_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
     REQUIRED_AUTHOR_METADATA_FIELDS = (
         "author_identity",
         "author_harness_id",
@@ -120,6 +120,15 @@ PREFLIGHT_MISSING_REQUIRED_RE = re.compile(
 OWNER_DECISIONS_HEADING_RE = re.compile(
     r"^#{1,6}\s*Owner Decisions(?:\s*/\s*Input)?\s*$",
     re.IGNORECASE | re.MULTILINE,
+)
+DEFERRED_REASON_RE = re.compile(r"\bdeferr(?:al|ed)\s+reason\b|\breason\s*:", re.IGNORECASE)
+DEFERRED_CLEAR_CONDITION_RE = re.compile(
+    r"\bclear\s+condition\b|\bresume\s+condition\b|\bunblock(?:ing)?\s+condition\b",
+    re.IGNORECASE,
+)
+OWNER_EVIDENCE_RE = re.compile(
+    r"\b(?:DELIB-[A-Z0-9_.-]+|AUQ|AskUserQuestion|owner\s+(?:decision|directive|input|approval))\b",
+    re.IGNORECASE,
 )
 OWNER_APPROVAL_MARKER_RES = (
     # Marker 1: cites Sub-slice B's VERIFIED rule (the AUQ-only rule)
@@ -321,7 +330,7 @@ def _parse_bridge_index(index_path: Path) -> dict[str, str]:
             current_doc = line.removeprefix("Document:").strip()
             current_doc_status_seen = False
         elif current_doc and not current_doc_status_seen:
-            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "REVISED", "NEW"):
+            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "DEFERRED", "REVISED", "NEW"):
                 if line.startswith(status + ":"):
                     result[current_doc] = status
                     current_doc_status_seen = True
@@ -425,13 +434,14 @@ def _first_line_is_recognized_status(first_line: str) -> bool:
 
     Mirrors the gate's existing first-line recognition union (the ADVISORY,
     GO/NO-GO/VERIFIED, and PENDING_PREFLIGHT_STATUSES {NEW, REVISED} checks in
-    ``_deny_reason_for_content``) plus the terminal ``WITHDRAWN`` status used
-    throughout bridge/INDEX.md. Errs toward acceptance (``.startswith`` for
+    ``_deny_reason_for_content``) plus the non-actionable ``DEFERRED`` and
+    terminal ``WITHDRAWN`` statuses used throughout bridge/INDEX.md. Errs toward acceptance (``.startswith`` for
     verdicts) so the body-status-token rule never false-blocks a line the rest
     of the gate would recognize.
     """
     return (
         first_line == "ADVISORY"
+        or first_line == "DEFERRED"
         or first_line == "WITHDRAWN"
         or first_line in PENDING_PREFLIGHT_STATUSES
         or first_line.startswith(("GO", "NO-GO", "VERIFIED"))
@@ -663,6 +673,28 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
         return False
     nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
+
+
+def _owner_decisions_section_text(content: str) -> str:
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if OWNER_DECISIONS_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return ""
+    return "\n".join(_collect_section_lines(lines, start)).strip()
+
+
+def _has_deferred_owner_evidence(content: str) -> bool:
+    section_text = _owner_decisions_section_text(content)
+    if not section_text:
+        return False
+    concrete_lines = [line.strip() for line in section_text.splitlines() if line.strip()]
+    if not concrete_lines or not any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in concrete_lines):
+        return False
+    return bool(OWNER_EVIDENCE_RE.search(section_text))
 
 
 def _bridge_kind_is_metadata_exempt(content: str) -> bool:
@@ -899,7 +931,7 @@ def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
         if in_doc and line.startswith("Document:"):
             break
         if in_doc and latest_file is None:
-            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "REVISED", "NEW"):
+            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "DEFERRED", "REVISED", "NEW"):
                 if line.startswith(status + ":"):
                     latest_file = line.split(":", 1)[1].strip()
                     break
@@ -984,7 +1016,7 @@ def _deny_reason_for_content(
             return (
                 "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must begin with a "
                 "canonical status token on the first non-blank line: one of NEW, REVISED, GO, "
-                "NO-GO, VERIFIED, ADVISORY, WITHDRAWN. The first non-blank line was "
+                "NO-GO, VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. The first non-blank line was "
                 f"{_first_nonblank_line(content)!r}. Put the status token on line 1 (headings "
                 "and prose follow it). Existing files with a non-canonical first line are "
                 "grandfathered. (Hard-block per GTKB-GOV-PROPOSAL-STANDARDS Slice 1 "
@@ -998,6 +1030,16 @@ def _deny_reason_for_content(
                 "first line ADVISORY; header fields bridge_kind, Document, Version, Author, Date; "
                 "sections ## Source, ## Claim, ## Owner Decision Needed, "
                 "## Recommended Prime Action, and ## Classification Slot."
+            )
+        if first_line == "DEFERRED" and (
+            not _has_deferred_owner_evidence(content)
+            or not DEFERRED_REASON_RE.search(content)
+            or not DEFERRED_CLEAR_CONDITION_RE.search(content)
+        ):
+            return (
+                "[Governance] DEFERRED bridge files are owner-only parked status records. "
+                "They must include concrete Owner Decisions / Input evidence plus a deferral "
+                "reason and clear/resume condition."
             )
         if first_line in {"GO", "VERIFIED"} and not _has_clean_applicability_preflight(content):
             return (
@@ -1015,7 +1057,7 @@ def _deny_reason_for_content(
                 "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
             )
         if (
-            first_line != "ADVISORY"
+            first_line not in {"ADVISORY", "DEFERRED"}
             and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
             and not _has_concrete_spec_links(content)
             and not _specification_links_heading_misdetected(content)
@@ -1026,7 +1068,7 @@ def _deny_reason_for_content(
                 "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
             )
         if (
-            first_line != "ADVISORY"
+            first_line not in {"ADVISORY", "DEFERRED"}
             and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
             and _proposal_claims_owner_approval(content)
             and not _has_concrete_owner_decisions_section(content)

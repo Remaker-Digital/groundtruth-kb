@@ -19,8 +19,8 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-STATUS_TOKENS = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "WITHDRAWN")
-STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN):\s+(bridge/\S+\.md)\s*$")
+STATUS_TOKENS = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN")
+STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN):\s+(bridge/\S+\.md)\s*$")
 VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(.+)-(\d{3})\.md$")
 BRIDGE_FILE_REF_RE = re.compile(r"bridge/[A-Za-z0-9_.-]+-\d{3}\.md")
 

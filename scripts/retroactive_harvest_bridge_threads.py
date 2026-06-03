@@ -40,8 +40,8 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import Path
 from datetime import UTC, datetime
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_DIR = REPO_ROOT / "bridge"
@@ -50,7 +50,7 @@ KB_PATH = REPO_ROOT / "groundtruth.db"
 
 FILENAME_VERSION_RE = re.compile(r"^(.+)-(\d{3})\.md$")
 _DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+bridge/(.+\.md)$")
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/(.+\.md)$")
 _HEADER_COMMENT_KEEPERS = (
     "Prime inserts new document entries",
     "Codex scans for NEW/REVISED",
@@ -181,13 +181,15 @@ def collect_compressed_bridge_threads(
             indexed_files.add(fname)
             if path.exists():
                 version_paths.append(path)
-        records.append(ThreadRecord(
-            thread_name=entry.name,
-            source_ref=f"bridge/{entry.name}-*.md",
-            versions=version_paths,
-            active=True,
-            latest_status=entry.latest_status,
-        ))
+        records.append(
+            ThreadRecord(
+                thread_name=entry.name,
+                source_ref=f"bridge/{entry.name}-*.md",
+                versions=version_paths,
+                active=True,
+                latest_status=entry.latest_status,
+            )
+        )
 
     all_files = [f for f in bridge_dir.glob("*.md") if f.name != "INDEX.md"]
     orphan_files = [f for f in all_files if f.name not in indexed_files]
@@ -195,13 +197,15 @@ def collect_compressed_bridge_threads(
 
     for stem, files in sorted(orphan_groups.items()):
         files_sorted = sorted(files, reverse=True)
-        records.append(ThreadRecord(
-            thread_name=stem,
-            source_ref=f"bridge/{stem}-*.md",
-            versions=files_sorted,
-            active=False,
-            latest_status="ORPHAN",
-        ))
+        records.append(
+            ThreadRecord(
+                thread_name=stem,
+                source_ref=f"bridge/{stem}-*.md",
+                versions=files_sorted,
+                active=False,
+                latest_status="ORPHAN",
+            )
+        )
 
     return records
 
@@ -279,6 +283,7 @@ def build_thread_summary(record: ThreadRecord) -> tuple[str, str, str]:
 def _load_db(kb_path: str | None):
     sys.path.insert(0, str(REPO_ROOT / "tools" / "knowledge-db"))
     from db import KnowledgeDB  # type: ignore[import-not-found]
+
     return KnowledgeDB(kb_path or str(KB_PATH))
 
 
@@ -400,10 +405,7 @@ def _comment_marker(block_text: str) -> str:
 def _compact_comment_block(block: list[str]) -> tuple[list[str], int, int]:
     comment_lines = [line for line in block if line.strip().startswith("<!--")]
     block_bytes = sum(len((line + "\n").encode("utf-8")) for line in block)
-    if (
-        len(comment_lines) <= _COMMENT_COMPACTION_THRESHOLD_LINES
-        and block_bytes <= _COMMENT_COMPACTION_THRESHOLD_BYTES
-    ):
+    if len(comment_lines) <= _COMMENT_COMPACTION_THRESHOLD_LINES and block_bytes <= _COMMENT_COMPACTION_THRESHOLD_BYTES:
         return block, 0, 0
 
     marker = _comment_marker("\n".join(block))
@@ -442,7 +444,9 @@ def _compact_index_comments(index_path: Path, db) -> dict:
             i += 1
             continue
 
-        if line.strip().startswith("<!--") or (not line.strip() and i + 1 < len(lines) and lines[i + 1].strip().startswith("<!--")):
+        if line.strip().startswith("<!--") or (
+            not line.strip() and i + 1 < len(lines) and lines[i + 1].strip().startswith("<!--")
+        ):
             block: list[str] = []
             while i < len(lines) and (lines[i].strip().startswith("<!--") or not lines[i].strip()):
                 block.append(lines[i])
@@ -450,7 +454,8 @@ def _compact_index_comments(index_path: Path, db) -> dict:
 
             if pre_document:
                 keep_block = [
-                    item for item in block
+                    item
+                    for item in block
                     if (
                         not item.strip()
                         or item.startswith("#")
@@ -478,7 +483,9 @@ def _compact_index_comments(index_path: Path, db) -> dict:
 
     if preamble_pruned:
         insert_at = 0
-        while insert_at < len(kept) and (kept[insert_at].startswith("#") or not kept[insert_at].strip() or kept[insert_at].strip().startswith("<!--")):
+        while insert_at < len(kept) and (
+            kept[insert_at].startswith("#") or not kept[insert_at].strip() or kept[insert_at].strip().startswith("<!--")
+        ):
             insert_at += 1
         kept.insert(
             insert_at,
@@ -627,9 +634,7 @@ def archive_verified_threads_and_prune_index(
     db = _load_db(kb_path)
 
     # WI-3364 IP-1: never archive-and-prune the in-progress write's own thread.
-    excluded_current = sorted(
-        r.thread_name for r in verified_records_all if r.thread_name in exclude_threads
-    )
+    excluded_current = sorted(r.thread_name for r in verified_records_all if r.thread_name in exclude_threads)
     verified_records = [r for r in verified_records_all if r.thread_name not in exclude_threads]
 
     # WI-3364 IP-2: never archive-and-prune a VERIFIED thread whose work item an
@@ -661,7 +666,8 @@ def archive_verified_threads_and_prune_index(
         title, summary, content = build_thread_summary(rec)
         content_hash = hashlib.sha256(content.encode()).hexdigest()
         exact_existing = [
-            row for row in existing_rows
+            row
+            for row in existing_rows
             if row.get("source_ref") == rec.source_ref and row.get("content_hash") == content_hash
         ]
         if exact_existing:
@@ -686,11 +692,13 @@ def archive_verified_threads_and_prune_index(
                 ),
             )
             inserted += 1
-            existing_rows.append({
-                "source_type": "bridge_thread",
-                "source_ref": rec.source_ref,
-                "content_hash": row.get("content_hash", content_hash) if isinstance(row, dict) else content_hash,
-            })
+            existing_rows.append(
+                {
+                    "source_type": "bridge_thread",
+                    "source_ref": rec.source_ref,
+                    "content_hash": row.get("content_hash", content_hash) if isinstance(row, dict) else content_hash,
+                }
+            )
             archived_thread_names.add(rec.thread_name)
         except Exception as exc:  # noqa: BLE001 - keep unarchived entries visible
             failed.append(f"{rec.thread_name}: {exc}")
@@ -741,7 +749,9 @@ def run_sweep(
 
     existing_rows = db.list_deliberations(source_type="bridge_thread")
     existing_canonical_refs = {r["source_ref"] for r in existing_rows if "*" in (r.get("source_ref") or "")}
-    existing_legacy_refs = {r["source_ref"] for r in existing_rows if r.get("source_ref") and "*" not in r["source_ref"]}
+    existing_legacy_refs = {
+        r["source_ref"] for r in existing_rows if r.get("source_ref") and "*" not in r["source_ref"]
+    }
 
     # Legacy thread coverage: threads that have ANY legacy file-level row
     legacy_thread_stems: set[str] = set()
@@ -778,8 +788,7 @@ def run_sweep(
         content_hash = hashlib.sha256(content.encode()).hexdigest()
 
         existing = [
-            r for r in existing_rows
-            if r.get("source_ref") == rec.source_ref and r.get("content_hash") == content_hash
+            r for r in existing_rows if r.get("source_ref") == rec.source_ref and r.get("content_hash") == content_hash
         ]
         if existing:
             already_canonical += 1
@@ -788,15 +797,17 @@ def run_sweep(
 
         new_inserts_planned += 1
         if len(sample_records) < sample:
-            sample_records.append({
-                "thread_name": rec.thread_name,
-                "source_ref": rec.source_ref,
-                "versions": len(rec.versions),
-                "active": rec.active,
-                "latest_status": rec.latest_status,
-                "title": title,
-                "summary_preview": summary[:200],
-            })
+            sample_records.append(
+                {
+                    "thread_name": rec.thread_name,
+                    "source_ref": rec.source_ref,
+                    "versions": len(rec.versions),
+                    "active": rec.active,
+                    "latest_status": rec.latest_status,
+                    "title": title,
+                    "summary_preview": summary[:200],
+                }
+            )
 
         if execute:
             outcome = "go" if rec.latest_status == "VERIFIED" else "informational"
@@ -833,8 +844,7 @@ def run_sweep(
             "numerator_threads": len(projected_covered),
             "coverage_pct": round(100.0 * len(projected_covered) / denom, 2) if denom else 100.0,
             "uncovered_thread_names": sorted(
-                {r.thread_name for r in records if r.active and r.latest_status == "VERIFIED"}
-                - projected_covered
+                {r.thread_name for r in records if r.active and r.latest_status == "VERIFIED"} - projected_covered
             ),
             "covered_thread_names": sorted(projected_covered),
             "note": "projected (dry-run)",
@@ -885,7 +895,9 @@ def main() -> int:
     )
     parser.add_argument("--sample", type=int, default=5, help="Sample inserts to include in output (default 5)")
     parser.add_argument("--kb-path", type=str, default=None, help="Override path to groundtruth.db")
-    parser.add_argument("--output", type=str, default=None, help="Write JSON report to this path (in addition to stdout)")
+    parser.add_argument(
+        "--output", type=str, default=None, help="Write JSON report to this path (in addition to stdout)"
+    )
     args = parser.parse_args()
 
     if args.dry_run and args.execute:

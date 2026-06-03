@@ -13,6 +13,7 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from re import IGNORECASE
 from re import compile as re_compile
 from types import ModuleType
 
@@ -20,6 +21,25 @@ from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
 
 _SLUG_RE = re_compile(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
 _BRIDGE_PATH_RE = re_compile(r"^bridge/(?P<slug>[a-z0-9][a-z0-9-]*[a-z0-9])-(?P<version>\d{3})\.md$")
+_OWNER_DECISIONS_HEADING_RE = re_compile(r"^#{1,6}\s*Owner Decisions(?:\s*/\s*Input)?\s*$", IGNORECASE)
+_DEFERRED_REASON_RE = re_compile(r"\bdeferr(?:al|ed)\s+reason\b|\breason\s*:", IGNORECASE)
+_DEFERRED_CLEAR_CONDITION_RE = re_compile(
+    r"\bclear\s+condition\b|\bresume\s+condition\b|\bunblock(?:ing)?\s+condition\b|\breactivat(?:e|ion)\b",
+    IGNORECASE,
+)
+_DEFERRED_CLEAR_EVIDENCE_RE = re_compile(
+    r"\b(?:clear(?:s|ed|ing)?|reactivat(?:es|ed|ing|ion)?|resum(?:es|ed|ing|e)?)\b.{0,80}\b(?:DEFERRED|deferr(?:al|ed))\b"
+    r"|\b(?:DEFERRED|deferr(?:al|ed))\b.{0,80}\b(?:clear(?:s|ed|ing)?|reactivat(?:es|ed|ing|ion)?|resum(?:es|ed|ing|e)?)\b",
+    IGNORECASE,
+)
+_OWNER_EVIDENCE_RE = re_compile(
+    r"\b(?:DELIB-[A-Z0-9_.-]+|AUQ|AskUserQuestion|owner\s+(?:decision|directive|input|approval))\b",
+    IGNORECASE,
+)
+_PLACEHOLDER_LINE_RE = re_compile(
+    r"^[\s>*`_\-:]*(?:tbd|todo|none|n/a|not applicable|no relevant(?: owner decisions?)?)[\s.`_\-:]*$",
+    IGNORECASE,
+)
 _ALLOWED_MUTATION_STATUSES = frozenset(
     {
         BridgeStatus.NEW,
@@ -29,6 +49,7 @@ _ALLOWED_MUTATION_STATUSES = frozenset(
         BridgeStatus.VERIFIED,
         BridgeStatus.WITHDRAWN,
         BridgeStatus.ADVISORY,
+        BridgeStatus.DEFERRED,
     }
 )
 
@@ -93,6 +114,89 @@ def validate_bridge_path(document_slug: str, bridge_path: str) -> str:
     return bridge_path
 
 
+def validate_deferred_status_content(content: str) -> None:
+    """Validate owner evidence required for a DEFERRED bridge status file."""
+    first_line = next((line.strip().lstrip("\ufeff") for line in content.splitlines() if line.strip()), "")
+    if first_line != BridgeStatus.DEFERRED.value:
+        raise BridgeIndexMutationError(
+            "DEFERRED INDEX status requires a bridge file whose first non-blank line is DEFERRED"
+        )
+    if not _DEFERRED_REASON_RE.search(content):
+        raise BridgeIndexMutationError("DEFERRED bridge file must state a deferral reason")
+    if not _DEFERRED_CLEAR_CONDITION_RE.search(content):
+        raise BridgeIndexMutationError("DEFERRED bridge file must state a clear/resume condition")
+
+    lines = content.splitlines()
+    section: list[str] = []
+    in_section = False
+    for line in lines:
+        stripped = line.strip()
+        if _OWNER_DECISIONS_HEADING_RE.match(stripped):
+            in_section = True
+            continue
+        if in_section and stripped.startswith("#"):
+            break
+        if in_section:
+            section.append(line)
+    concrete_lines = [line.strip() for line in section if line.strip()]
+    if not concrete_lines or not any(not _PLACEHOLDER_LINE_RE.match(line) for line in concrete_lines):
+        raise BridgeIndexMutationError("DEFERRED bridge file must include a concrete Owner Decisions / Input section")
+    if not _OWNER_EVIDENCE_RE.search("\n".join(concrete_lines)):
+        raise BridgeIndexMutationError("DEFERRED bridge file must cite owner-decision evidence")
+
+
+def validate_deferred_clear_content(content: str) -> None:
+    """Validate owner evidence required to clear a latest DEFERRED status."""
+    first_line = next((line.strip().lstrip("\ufeff") for line in content.splitlines() if line.strip()), "")
+    if first_line == BridgeStatus.DEFERRED.value:
+        raise BridgeIndexMutationError("clearing DEFERRED requires a non-DEFERRED bridge status file")
+
+    lines = content.splitlines()
+    section: list[str] = []
+    in_section = False
+    for line in lines:
+        stripped = line.strip()
+        if _OWNER_DECISIONS_HEADING_RE.match(stripped):
+            in_section = True
+            continue
+        if in_section and stripped.startswith("#"):
+            break
+        if in_section:
+            section.append(line)
+    concrete_lines = [line.strip() for line in section if line.strip()]
+    section_text = "\n".join(concrete_lines)
+    if not concrete_lines or not any(not _PLACEHOLDER_LINE_RE.match(line) for line in concrete_lines):
+        raise BridgeIndexMutationError("clearing DEFERRED requires a concrete Owner Decisions / Input section")
+    if not _OWNER_EVIDENCE_RE.search(section_text):
+        raise BridgeIndexMutationError("clearing DEFERRED requires owner-decision evidence")
+    if not _DEFERRED_CLEAR_EVIDENCE_RE.search(section_text):
+        raise BridgeIndexMutationError("clearing DEFERRED requires explicit clear/reactivation evidence")
+
+
+def validate_deferred_status_file(project_root: Path, bridge_path: str) -> None:
+    """Validate the owner-only evidence carried by a DEFERRED bridge file."""
+    target = project_root / bridge_path
+    if not target.is_file():
+        raise BridgeIndexMutationError(f"DEFERRED bridge file does not exist: {bridge_path}")
+    try:
+        content = target.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BridgeIndexMutationError(f"cannot read DEFERRED bridge file {bridge_path}: {exc}") from exc
+    validate_deferred_status_content(content)
+
+
+def validate_deferred_clear_file(project_root: Path, bridge_path: str) -> None:
+    """Validate the owner-only evidence carried by a file that clears DEFERRED."""
+    target = project_root / bridge_path
+    if not target.is_file():
+        raise BridgeIndexMutationError(f"DEFERRED clear bridge file does not exist: {bridge_path}")
+    try:
+        content = target.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BridgeIndexMutationError(f"cannot read DEFERRED clear bridge file {bridge_path}: {exc}") from exc
+    validate_deferred_clear_content(content)
+
+
 def add_document_to_index_text(index_text: str, document_slug: str, status: str, bridge_path: str) -> str:
     """Return INDEX text with a new document block inserted at the top."""
     document_slug = validate_document_slug(document_slug)
@@ -154,12 +258,15 @@ def add_document(
     project_root = Path(project_root)
     index_path = _require_index_path(project_root)
     writer = _load_index_writer(project_root)
+    parsed_status = validate_status(status)
+    if parsed_status is BridgeStatus.DEFERRED:
+        validate_deferred_status_file(project_root, bridge_path)
 
     def mutate(current_text: str) -> str:
         return add_document_to_index_text(current_text, document_slug, status, bridge_path)
 
     written = _atomic_index_update(writer, index_path, project_root, mutate, timeout_seconds)
-    return BridgeIndexMutationResult(document_slug, validate_status(status).value, bridge_path, index_path, written)
+    return BridgeIndexMutationResult(document_slug, parsed_status.value, bridge_path, index_path, written)
 
 
 def set_status(
@@ -174,12 +281,24 @@ def set_status(
     project_root = Path(project_root)
     index_path = _require_index_path(project_root)
     writer = _load_index_writer(project_root)
+    parsed_status = validate_status(status)
+    if parsed_status is BridgeStatus.DEFERRED:
+        validate_deferred_status_file(project_root, bridge_path)
 
     def mutate(current_text: str) -> str:
+        documents = _parse_documents_or_raise(current_text)
+        matching = [document for document in documents if document.name == document_slug]
+        if (
+            matching
+            and matching[0].current_top is not None
+            and matching[0].current_top.status is BridgeStatus.DEFERRED
+            and parsed_status is not BridgeStatus.DEFERRED
+        ):
+            validate_deferred_clear_file(project_root, bridge_path)
         return set_status_in_index_text(current_text, document_slug, status, bridge_path)
 
     written = _atomic_index_update(writer, index_path, project_root, mutate, timeout_seconds)
-    return BridgeIndexMutationResult(document_slug, validate_status(status).value, bridge_path, index_path, written)
+    return BridgeIndexMutationResult(document_slug, parsed_status.value, bridge_path, index_path, written)
 
 
 def _require_index_text(index_text: str) -> None:

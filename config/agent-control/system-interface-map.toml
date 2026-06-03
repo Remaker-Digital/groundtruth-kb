@@ -151,7 +151,7 @@ related_deliberations = ["DELIB-S324-OM-DELTA-0001-CHOICE"]
 [[systems]]
 id = "file-bridge"
 canonical_name = "file bridge"
-accepted_aliases = ["file bridge", "Prime/Loyal bridge", "bridge protocol"]
+accepted_aliases = ["bridge", "file bridge", "Prime/Loyal bridge", "bridge protocol"]
 discouraged_aliases = ["poller"]
 forbidden_aliases = []
 concept_vs_artifact = "protocol_and_files"
@@ -187,6 +187,46 @@ verification_method = "tests/scripts/test_system_interface_map.py"
 lifecycle_state = "active"
 related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001"]
 related_deliberations = []
+
+[[systems]]
+id = "bridge-status"
+canonical_name = "bridge status"
+accepted_aliases = ["bridge status", "status token", "bridge lifecycle status", "DEFERRED status"]
+discouraged_aliases = ["draft status"]
+forbidden_aliases = []
+concept_vs_artifact = "protocol_vocabulary"
+authoritative_source = ".claude/rules/file-bridge-protocol.md"
+generated_or_authoritative = "authoritative_rule"
+read_method = "Read .claude/rules/file-bridge-protocol.md and bridge/INDEX.md status rows."
+mutation_method = "Change only through governed bridge protocol work; live status rows are written as numbered bridge file transitions."
+role_permissions = "Prime Builder may write NEW/REVISED reports in approved flow; Loyal Opposition may write GO/NO-GO/VERIFIED/ADVISORY; DEFERRED set/clear requires owner decision evidence."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "DEFERRED is non-actionable and owner-controlled; parked drafts are not bridge statuses."
+verification_method = "tests/scripts/test_system_interface_map.py and groundtruth-kb/tests/test_cli_authority.py"
+lifecycle_state = "active"
+related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001", "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001"]
+related_deliberations = ["DELIB-20260602-GLOSSARY-CLI-SCAN-SPLIT-SEMANTICS", "DELIB-20260602-GLOSSARY-CLI-SCAN-OWNER-ONLY-DEFERRAL-AUTHORITY"]
+
+[[systems]]
+id = "parked-draft"
+canonical_name = "parked draft"
+accepted_aliases = ["parked draft", "bridge draft", "non-indexed draft", "draft bridge file"]
+discouraged_aliases = ["DEFERRED", "bridge status"]
+forbidden_aliases = []
+concept_vs_artifact = "helper_owned_draft"
+authoritative_source = ".gtkb-state/bridge-revisions/drafts/"
+generated_or_authoritative = "non_authoritative_working_state"
+read_method = "Inspect helper-owned draft directories only as working state; bridge/INDEX.md decides live queue state."
+mutation_method = "Use bridge helper scaffold/plan/file flows; do not index parked drafts."
+role_permissions = "Both roles may create helper drafts within their governed workflow; parked drafts do not authorize implementation or suppress dispatch."
+startup_visibility = "none"
+dashboard_visibility = "none"
+harness_caveats = "A parked draft is not actionability state. Only a live indexed DEFERRED bridge file suppresses dispatch."
+verification_method = "tests/scripts/test_system_interface_map.py and groundtruth-kb/tests/test_cli_authority.py"
+lifecycle_state = "active"
+related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001"]
+related_deliberations = ["DELIB-20260602-GLOSSARY-CLI-SCAN-SPLIT-SEMANTICS"]
 
 [[systems]]
 id = "smart-poller"
@@ -427,6 +467,26 @@ verification_method = "tests/scripts/test_system_interface_map.py"
 lifecycle_state = "active"
 related_specs = ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
 related_deliberations = []
+
+[[systems]]
+id = "project-root"
+canonical_name = "project root"
+accepted_aliases = ["project root", "GT-KB root", "workspace root", "repository root"]
+discouraged_aliases = ["Claude-Playground"]
+forbidden_aliases = ["E:\\Claude-Playground"]
+concept_vs_artifact = "root_boundary"
+authoritative_source = "AGENTS.md and .claude/rules/project-root-boundary.md"
+generated_or_authoritative = "authoritative_contract"
+read_method = "Use the active checkout root E:\\GT-KB and the project-root-boundary rule."
+mutation_method = "Do not move live GT-KB authority outside E:\\GT-KB; migrations require governed root-boundary work."
+role_permissions = "Both roles must keep live GT-KB artifacts, dependencies, and verification inside E:\\GT-KB."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "E:\\Claude-Playground is archive-only and must not be treated as live authority."
+verification_method = "tests/scripts/test_system_interface_map.py and groundtruth-kb/tests/test_cli_authority.py"
+lifecycle_state = "active"
+related_specs = ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+related_deliberations = ["DELIB-20260602-GLOSSARY-CLI-SCAN-LEGACY-ROOT-HARD-FAIL"]
 
 [[systems]]
 id = "role-assignment-record"
