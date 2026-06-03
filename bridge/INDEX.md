@@ -990,6 +990,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
+REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-007.md
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-006.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-005.md
 NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-004.md
