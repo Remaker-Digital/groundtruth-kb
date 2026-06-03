@@ -218,6 +218,16 @@
 
 ---
 
+### 2026-06-03 - Deep scan log and backlog gap review
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | A June 2 owner-approved project recommendation, `GTKB Harness Automation Readiness`, was not captured in the live `projects` table; the recommendation only exists as routed advisory `WI-4262`. | `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-02-DEEP-SCAN-BACKLOG-RECOMMENDATIONS.md`; SQLite query against `groundtruth.db` on 2026-06-03 showed zero project rows with that name. | Reconfirm project approval, then create the missing project and seed its first readiness doctor / readiness surface work items. | Open |
+| Process | Advisory intake debt remains structurally under-owned: `3080` non-terminal work items have no project and `775` open items are still `Route LO advisory:` while the active advisory projects have zero member work items. | SQLite query against `groundtruth.db` on 2026-06-03; `scripts/advisory_backlog_router.py` still prints full `skipped_existing` payloads by default. | Add explicit drain-policy and compact-router-output work items under the existing LO advisory project family. | Open |
+| Technical | The live Codex bridge-worker log is dominated by repetitive migration INFO, reducing observability value. | `.claude/hooks/.codex-bridge-worker.log` contained `2432` lines on 2026-06-03, `2419` of them `Applied migration` INFO lines; bridge logging defaults to INFO in `groundtruth-kb/src/groundtruth_kb/_logging.py`. | Add an observability work item to suppress or aggregate repetitive KnowledgeDB migration INFO in bridge-worker logs. | Open |
+
+---
+
 ### 2026-06-01 - rc1 Canonical CI Closure Proposal Review
 
 | Area | Finding | Evidence / context | Suggested action | Status |
