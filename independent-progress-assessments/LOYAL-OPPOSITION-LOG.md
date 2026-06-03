@@ -226,6 +226,14 @@
 
 ---
 
+### 2026-06-03 - Scoping and Scaffolding Reviews
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Scoping and implementation proposals for startup refractor and proposal scaffolding standards are sound, compliant, and pass all preflights. | `bridge/INDEX.md` scan; preflight and clause preflight runs for `gtkb-startup-refractor-scoping` and `gtkb-proposal-standards-propose-scaffold-skill`. | File `GO` verdicts for both threads (002) and register them in `bridge/INDEX.md`. | Resolved |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).
