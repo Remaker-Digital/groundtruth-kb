@@ -45,6 +45,7 @@ class Pattern:
     exclusion_globs: tuple[str, ...]
     classification: str
     remediation_hint: str
+    match_mode: str = "content"
     _compiled_content_patterns: tuple[re.Pattern[str], ...] = field(default=())
 
     def matches_path(self, rel_path: str) -> bool:
@@ -116,6 +117,12 @@ def load_pattern_set(toml_path: Path, name: str | None = None) -> list[Pattern]:
             compiled = tuple(re.compile(p) for p in entry.get("content_patterns") or [])
         except re.error as exc:
             raise PatternSetError(f"Pattern '{pattern_id}' has invalid regex in 'content_patterns': {exc}") from exc
+        match_mode = str(entry.get("match_mode") or "content").strip().lower()
+        if match_mode not in ("content", "presence"):
+            raise PatternSetError(
+                f"Pattern '{pattern_id}' has invalid match_mode '{match_mode}' "
+                f"(expected 'content' or 'presence') in {toml_path}"
+            )
         patterns.append(
             Pattern(
                 id=pattern_id,
@@ -126,6 +133,7 @@ def load_pattern_set(toml_path: Path, name: str | None = None) -> list[Pattern]:
                 exclusion_globs=tuple(str(g) for g in entry.get("exclusion_globs") or []),
                 classification=str(entry.get("classification") or "unclassified"),
                 remediation_hint=str(entry.get("remediation_hint") or ""),
+                match_mode=match_mode,
                 _compiled_content_patterns=compiled,
             )
         )
@@ -210,6 +218,29 @@ def scan_file(
     return findings
 
 
+def presence_finding(path: Path, pattern: Pattern, root: Path) -> Finding:
+    """Emit a presence Finding for a file whose existence is itself the drift signal.
+
+    Used by ``match_mode == "presence"`` patterns: the matched path is the
+    finding (``line = 0``), with no content read. The presence of a file under
+    the pattern's ``file_globs`` (and not under its ``exclusion_globs``) is the
+    detection; ``content_patterns`` are not consulted for presence patterns.
+    """
+    try:
+        rel = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        rel = path.as_posix()
+    return Finding(
+        pattern_id=pattern.id,
+        pattern_class=pattern.pattern_class,
+        classification=pattern.classification,
+        file=rel,
+        line=0,
+        matched_excerpt=rel,
+        remediation_hint=pattern.remediation_hint,
+    )
+
+
 def run_sweep(
     root: Path,
     pattern_set_path: Path,
@@ -223,7 +254,10 @@ def run_sweep(
     for pattern in patterns:
         for file_path in walk_repo(root, pattern.file_globs, pattern.exclusion_globs):
             scanned_files.add(file_path)
-            findings.extend(scan_file(file_path, pattern, root))
+            if pattern.match_mode == "presence":
+                findings.append(presence_finding(file_path, pattern, root))
+            else:
+                findings.extend(scan_file(file_path, pattern, root))
     generated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return SweepResult(

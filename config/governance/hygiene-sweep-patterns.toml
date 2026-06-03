@@ -58,3 +58,47 @@ exclusion_globs = [
 ]
 classification = "agent_red_inherited"
 remediation_hint = "Verify path/key is in canonical GT-KB scope; relink if not. See bridge thread gtkb-sonarcloud-config-relink-gt-kb for the relink pattern."
+
+# WI-4249 (gtkb-hygiene-sweep-presence-patterns-slice-1): presence-mode detection
+# for path-presence drift classes — the file's existence under file_globs (and
+# not under exclusion_globs) is itself the finding (match_mode = "presence";
+# content_patterns not consulted). Report-only; remediation is child-bridge-gated
+# (WI-4259). The pytest-basetemp ACL class is deferred pending WI-3469.
+
+[[patterns]]
+id = "runtime-residue-paths"
+class = "runtime_residue"
+description = "Rehearsal/sandbox runtime residue committed into the tracked tree — e.g. a nested PASS/bridge/ or PASS/.claude/ sandbox-output subtree (per the project-root-boundary sandbox exception, rehearsal output belongs outside the repo or under .gtkb-state, never committed in-tree)."
+match_mode = "presence"
+file_globs = [
+    "**/PASS/bridge/**",
+    "**/PASS/.claude/**",
+    "**/PASS/.gtkb-state/**",
+]
+content_patterns = []
+exclusion_globs = [
+    ".gtkb-state/**",
+    "archive/**",
+    "applications/**",
+    "bridge/**",
+    "independent-progress-assessments/**",
+]
+classification = "runtime_residue"
+remediation_hint = "Runtime/sandbox residue committed in-tree; scrub the PASS/ subtree. Sandbox output belongs outside E:/GT-KB or under .gtkb-state per .claude/rules/project-root-boundary.md. Scanner-owned-artifact severity handling is tracked by WI-4259."
+
+[[patterns]]
+id = "snapshots-non-manifest-recursion"
+class = "config_drift"
+description = "Self-recursing snapshot residue: a snapshots/ subtree nested within another snapshots/ subtree, indicating a snapshot captured its own snapshot output (non-manifest recursion)."
+match_mode = "presence"
+file_globs = [
+    "**/snapshots/**/snapshots/**",
+]
+content_patterns = []
+exclusion_globs = [
+    ".gtkb-state/**",
+    "archive/**",
+    "applications/**",
+]
+classification = "snapshots_non_manifest"
+remediation_hint = "Snapshot self-recursion detected (snapshots nested under snapshots). Verify the snapshot generator excludes prior snapshot output from its capture set; prune the recursive subtree."
