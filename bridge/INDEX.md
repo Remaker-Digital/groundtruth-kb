@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
+GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-001.md
 
 Document: gtkb-startup-refractor-scoping
@@ -21,6 +22,7 @@ GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
 
 Document: gtkb-claude-code-session-id-env-var-gap
+GO: bridge/gtkb-claude-code-session-id-env-var-gap-005.md
 REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-004.md
 NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-003.md
 REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md

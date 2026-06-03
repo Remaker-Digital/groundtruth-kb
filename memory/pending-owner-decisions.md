@@ -6388,6 +6388,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-03T13:41:26.525307Z
   answer: "Your questions have been answered: \"Claude Code (harness B) was suspended with no active role on 2026-06-01; both roles now sit on Codex (harness A). PROJECT-GTKB-GOV-PROPOSAL-STANDARDS is 3/4 verified (Slice 4 /gtkb-propose skill not started; Slice 2 WI status stale). How do you want to proceed with this Claude Code session?\"=\"Re-activate Claude Code as Prime Builder, then do Slice 4\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-0897
+  asked_at: 2026-06-03T14:04:27.244724Z
+  question: "Slice 4 is implemented + committed; the post-impl report (-003) is awaiting the LO VERIFIED, which arrives async on the single-harness dispatcher's interval. How do you want to handle the wait for the final verdict?"
+  options:
+    - "Start a /loop to poll autonomously (Recommended)"
+    - "I'll prompt 'check again' when I want"
+    - "Pause here; close out later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0e3cb149fcb0df2d
+  resolved_at: 2026-06-03T14:04:27.244724Z
+  answer: "Your questions have been answered: \"Slice 4 is implemented + committed; the post-impl report (-003) is awaiting the LO VERIFIED, which arrives async on the single-harness dispatcher's interval. How do you want to handle the wait for the final verdict?\"=\"Start a /loop to poll autonomously (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0898
+  asked_at: 2026-06-03T14:06:59.680590Z
+  question: "I'm re-activated as session Prime Builder, but Codex holds the DURABLE Prime role (headless dispatch still routes to it). The reconciliation is done/VERIFIED. The 7 remaining open WIs are a mix of stale-status + genuinely-open work. How should I proceed on project close-out?"
+  options:
+    - "Verify + reconcile the stale ones"
+    - "Drive WI-3429 (gt bridge revise)"
+    - "Hand close-out to Codex"
+    - "Wrap here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 661ec78f4b7f0bb9
+  resolved_at: 2026-06-03T14:06:59.680590Z
+  answer: "Your questions have been answered: \"I'm re-activated as session Prime Builder, but Codex holds the DURABLE Prime role (headless dispatch still routes to it). The reconciliation is done/VERIFIED. The 7 remaining open WIs are a mix of stale-status + genuinely-open work. How should I proceed on project close-out?\"=\"Verify + reconcile the stale ones\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
