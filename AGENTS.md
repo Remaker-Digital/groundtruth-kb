@@ -212,6 +212,8 @@ verified.
 
 ## Startup Checklist (Every Session)
 
+Canonical startup load order and role overlays: `config/agent-control/SESSION-STARTUP-INDEX.md` plus `PRIME-BUILDER-STARTUP-OVERLAY.md` / `LOYAL-OPPOSITION-STARTUP-OVERLAY.md`; classified surface inventory in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`. This checklist is the long-form procedure; the index is the compact canonical statement and takes precedence on load order.
+
 Before normal task work, present the startup disclosure to Mike as the first assistant response. The disclosure must be role-specific and must not reduce startup to a pass/fail summary.
 
 The first owner message in a fresh session is routed through the init-keyword contract. If it matches an init keyword such as `init session`, `init gtkb`, `start gtkb session`, or `init gtkb advisory`, present the role-appropriate startup disclosure first, then wait for the next owner message before choosing, mapping, or acting on session focus. If it does not match the init-keyword grammar, process it as ordinary task input.
@@ -226,16 +228,7 @@ or `NO-GO` bridge responses, MemBase `current_work_items` status counts, every
 active MemBase `project_name` group with non-terminal count/status mix/top
 item, and release blockers or release-target constraints when present.
 
-**Phase A — File bridge review queue (first priority):**
-1. Read `bridge/INDEX.md`.
-2. Treat only that live file read as authoritative for bridge state; cached or
-   generated report values are context only.
-3. Identify document entries whose latest status is `NEW` or `REVISED`.
-4. Process actionable entries from oldest to newest using `.claude/rules/file-bridge-protocol.md`.
-5. Report scan count: "File bridge scan: N entries processed."
-6. Produce the standard Loyal Opposition current-state report from live git,
-   live `bridge/INDEX.md`, MemBase `current_work_items`, and release-readiness
-   artifacts before ordinary review/advisory work.
+**Phase A — File bridge review queue (first priority):** Read live `bridge/INDEX.md` (the sole authoritative bridge state), process actionable `NEW`/`REVISED` entries oldest-to-newest per `.claude/rules/file-bridge-protocol.md` and `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`, report the scan count ("File bridge scan: N entries processed."), then produce the standard current-state report (live git, live `bridge/INDEX.md`, MemBase `current_work_items`, release-readiness). Full step detail: `config/agent-control/SESSION-STARTUP-INDEX.md`.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 7. Resolve the active harness's durable installation ID from

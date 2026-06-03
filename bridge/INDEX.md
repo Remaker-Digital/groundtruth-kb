@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-wrap-scan-report-relocation-slice-1
+NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
+
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
 GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-001.md
@@ -49,6 +52,7 @@ NO-GO: bridge/gtkb-session-id-shared-resolver-unification-002.md
 NEW: bridge/gtkb-session-id-shared-resolver-unification-001.md
 
 Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
+VERIFIED: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-008.md
 REVISED: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-007.md
 NO-GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-006.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-005.md
@@ -58,6 +62,8 @@ GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-002.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md
 
 Document: gtkb-startup-refractor-slice-c-startup-index-overlays
+VERIFIED: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-006.md
+REVISED: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-005.md
 NO-GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-004.md
 NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-003.md
 GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md

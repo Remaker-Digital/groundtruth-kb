@@ -159,21 +159,11 @@ Key files: CLAUDE.md, memory/MEMORY.md
 Next: [describe task].
 ```
 
-### Session Start: Bridge Index Scan (Mandatory)
+**Canonical startup load order:** `config/agent-control/SESSION-STARTUP-INDEX.md` is the compact role-neutral statement of what loads at startup and in what order; load the role overlay (`PRIME-BUILDER-STARTUP-OVERLAY.md` or `LOYAL-OPPOSITION-STARTUP-OVERLAY.md`) and consult `SESSION-STARTUP-CONTROL-MAP.md` for the classified surface inventory. The condensed session-start guidance below defers to that index for the full step-by-step.
 
-At session start, scan `bridge/INDEX.md` for pending work using a **role-specific** filter:
+### Session Start (Mandatory)
 
-1. **Read** `bridge/INDEX.md` and look for actionable entries for the active role:
-   - **Prime Builder sessions:** look for latest `GO` or `NO-GO` per thread (Codex's verdicts on Prime's proposals/reports).
-   - **Loyal Opposition sessions:** look for latest `NEW` or `REVISED` per thread (Prime's proposals/reports awaiting review).
-2. **Report** any findings: "Bridge scan: N entries need attention" or "Bridge scan: clear."
-3. **Process** the oldest actionable entry first.
-
-The cross-harness event-driven trigger (registered as PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch automatically; the session-start scan above is the in-session entry point and ensures awareness of items that landed while the session was idle.
-
-### Session Start: Active Work List (Mandatory)
-
-After the bridge scan, review the active backlog in MemBase (`gt backlog list`). If it contains implementable items, continue working through them following the standard bridge protocol (propose → Codex GO → implement → post-impl report → Codex VERIFIED → commit). Items already authorized for implementation (via project authorization or a recorded owner decision) may proceed without a fresh owner approval.
+Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`/`NO-GO`; Loyal Opposition on latest `NEW`/`REVISED`), then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The cross-harness event-driven trigger (PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval.
 
 ### Protected Behaviors & Removal Rule
 
