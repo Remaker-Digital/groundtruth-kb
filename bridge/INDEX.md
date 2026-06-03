@@ -14,6 +14,7 @@ NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
 
 Document: gtkb-understand-anything-evaluation-install
+REVISED: bridge/gtkb-understand-anything-evaluation-install-005.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-004.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-003.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-002.md
@@ -1176,6 +1177,7 @@ NO-GO: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-002.
 NEW: bridge/gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory-001.md
 
 Document: gtkb-peer-solution-advisory-report-advisory-disposition
+REVISED: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-009.md
 NO-GO: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-008.md
 REVISED: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-007.md
 NO-GO: bridge/gtkb-peer-solution-advisory-report-advisory-disposition-006.md
