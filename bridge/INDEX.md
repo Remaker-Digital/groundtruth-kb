@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-session-id-shared-resolver-unification
+NEW: bridge/gtkb-session-id-shared-resolver-unification-001.md
+
 Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
 GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-002.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md
@@ -16,14 +19,17 @@ GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md
 NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-001.md
 
 Document: gtkb-startup-refractor-slice-e-lo-startup-text-authority
+NEW: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-003.md
 GO: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-002.md
 NEW: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-001.md
 
 Document: gtkb-startup-refractor-slice-b-local-settings-hygiene
+NEW: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-003.md
 GO: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-002.md
 NEW: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
+REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-006.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-005.md
 VERIFIED: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-004.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-003.md

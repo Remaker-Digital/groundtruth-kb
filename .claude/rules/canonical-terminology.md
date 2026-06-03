@@ -726,7 +726,7 @@ model, vendor name, or transient session.
 (Prime/LO are portable); `DELIB-0832` (installation-time role
 configuration).
 
-**Implementation pointer:** `harness-state/role-assignments.json`;
+**Implementation pointer:** `harness-state/harness-registry.json` (canonical role registry; legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement);
 `.claude/rules/operating-role.md`; `.claude/rules/prime-builder-role.md`;
 `.claude/rules/loyal-opposition.md`.
 
@@ -955,7 +955,7 @@ formal-artifact-approval packet.
 ### operating role
 
 **Definition:** The authority-bearing harness role recorded for an active
-harness ID in `harness-state/role-assignments.json`. Canonical values are
+harness ID in `harness-state/harness-registry.json` (canonical role registry; legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement). Canonical values are
 `prime-builder` (implementing authority) and `loyal-opposition` (reviewing
 authority). The legacy value `acting-prime-builder` is READ-accepted for
 backward compatibility but SET-rejected (cannot be assigned as a new role)
@@ -970,8 +970,8 @@ see below); session focus (owner-facing startup selection); work subject
 **Source:** `GOV-HARNESS-ROLE-PORTABILITY-001`; `GOV-ACTING-PRIME-BUILDER-001`;
 bridge `gtkb-role-session-lifecycle-simplification-003` REVISED-1 GO at -004.
 
-**Implementation pointer:** `harness-state/role-assignments.json` is the
-durable record; `.claude/rules/operating-role.md` is human-readable startup
+**Implementation pointer:** `harness-state/harness-registry.json` is the
+canonical durable record (legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement); `.claude/rules/operating-role.md` is human-readable startup
 guidance (not a role record); `scripts/harness_roles.py` enforces the SET/
 READ contract.
 
@@ -1048,7 +1048,7 @@ resume.
 **Canonical alias:** interactive session role; session-scoped role.
 
 **Not to be confused with:** `operating role` (the durable, cross-session role
-in `harness-state/role-assignments.json`; session-stated role overrides it only
+in `harness-state/harness-registry.json` — canonical role registry; legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement; session-stated role overrides it only
 for interactive in-session surfaces, never for headless dispatch routing);
 `session lane` (a non-authority work classification); `session focus` (the
 owner-facing startup focus selection); `work subject` (the active subject area;
@@ -1194,7 +1194,7 @@ prepare capable harnesses for either role regardless of topology);
 
 **Implementation pointer:** Topology is determined at runtime by inspecting
 the active harness's role-set cardinality in
-``harness-state/role-assignments.json``. Multi-element role set ->
+``harness-state/harness-registry.json`` (canonical role registry; legacy ``harness-state/role-assignments.json`` mirror is orphan per Slice 1 retirement). Multi-element role set ->
 single-harness mode applicable. Doctor check
 ``_check_single_harness_dispatcher_when_required`` warns when applicable but
 the scheduled task is absent.

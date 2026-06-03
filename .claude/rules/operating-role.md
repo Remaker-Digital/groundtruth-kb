@@ -75,8 +75,9 @@ change.
   self-corrects.
 - If startup finds no harness recorded as Prime Builder (no role set contains
   `prime-builder`), the starting harness assumes Prime Builder and updates
-  `harness-state/role-assignments.json` with the appropriate role set for the
-  topology.
+  the registry (via `gt mode set-role`) with the appropriate role set for the
+  topology. (Legacy `harness-state/role-assignments.json` mirror is orphan per
+  Slice 1 retirement and no longer authoritative.)
 
 The role assignment attaches to the harness ID, not to a model, vendor name, or
 transient session.
@@ -130,7 +131,7 @@ into a multi-role harness).
 
 ## Mode-Switch Transaction Component (Slice 1 of gtkb-operating-mode-transaction-001)
 
-Agents MUST use the deterministic mode-switch transaction component for role/topology changes rather than ad-hoc direct edits to `harness-state/role-assignments.json`. The CLI surface is `gt mode set-role --harness <id|name> --role <prime-builder|loyal-opposition> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to `harness-state/role-assignments.json` are still possible but bypass the validators (role/bridge/session-state artifact validation) and the audit-trail record; the transaction component is the supported path.
+Agents MUST use the deterministic mode-switch transaction component for role/topology changes rather than ad-hoc direct edits to `harness-state/harness-registry.json` (canonical role registry) or its legacy compat mirror `harness-state/role-assignments.json` (orphan per Slice 1 retirement; no live writer). The CLI surface is `gt mode set-role --harness <id|name> --role <prime-builder|loyal-opposition> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to the registry or the mirror are still possible but bypass the validators (role/bridge/session-state artifact validation) and the audit-trail record; the transaction component is the supported path.
 
 ## Bridge Substrate Transaction Component (Slice 1 of gtkb-bridge-mode-config-transactions-slice-1)
 
