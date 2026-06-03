@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
+GO: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-002.md
 NEW: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md
 
 Document: gtkb-startup-refractor-slice-c-startup-index-overlays
@@ -23,6 +24,7 @@ GO: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-002.md
 NEW: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
+NEW: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-003.md
 GO: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-001.md
 
