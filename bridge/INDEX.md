@@ -7,13 +7,22 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-dashboard-launcher-idempotence-pid-tracking
+GO: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-002.md
+NEW: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-001.md
+
+Document: gtkb-loop-multi-instance-coordinator-design-slice-1
+NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
+
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-005.md
 GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-004.md
 REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-003.md
 NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
 
 Document: gtkb-understand-anything-evaluation-install
+NO-GO: bridge/gtkb-understand-anything-evaluation-install-006.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-005.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-004.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-003.md
@@ -1232,6 +1241,7 @@ NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
 
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
+REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-009.md
 NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-008.md
 REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-007.md
 NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-006.md
