@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-wi-3506-phantom-spec-citation-repoint
+VERIFIED: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-006.md
 REVISED: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-005.md
 NO-GO: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-004.md
 NEW: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-003.md
