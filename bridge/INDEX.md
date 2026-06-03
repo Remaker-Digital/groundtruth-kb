@@ -7,6 +7,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
+GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-002.md
+NEW: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-001.md
+
 Document: gtkb-hygiene-cli-utf8-portability-slice-1
 VERIFIED: bridge/gtkb-hygiene-cli-utf8-portability-slice-1-004.md
 NEW: bridge/gtkb-hygiene-cli-utf8-portability-slice-1-003.md
