@@ -162,6 +162,20 @@ def _compute_actionable_for_role(role_profile: str) -> tuple[str, list[Any]]:
     # is Prime-actionable (GO/NO-GO); element 1 is Loyal-Opposition-actionable
     # (NEW/REVISED), per compute_actionable_pending's (prime, codex) contract.
     items = actionable_prime if role_profile == ROLE_PRIME else actionable_codex
+    # WI-4278 / gtkb-axis-2-dispatchable-filter-004 GO: compute_actionable_pending
+    # attaches a centrally-computed `dispatchable` flag (per
+    # smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4) that reflects the
+    # bridge_kind classification. Terminal-kind GO entries (governance_review,
+    # scoping, closure, parking, index/thread reconciliation,
+    # operational_state_change, candidate_spec_intake, loyal_opposition_advisory)
+    # have dispatchable=False and must be excluded from the in-session surface,
+    # mirroring the cross-harness event-driven trigger's dispatch suppression
+    # (which uses the same getattr(item, "dispatchable", True) compatibility-safe
+    # idiom). NEW/REVISED/NO-GO entries are always dispatchable=True, so this
+    # filter is a no-op for Loyal Opposition and for Prime NO-GO entries. The
+    # `getattr(..., True)` default preserves stub-tolerance for existing test
+    # doubles that omit the field.
+    items = [item for item in items if getattr(item, "dispatchable", True)]
 
     import hashlib
 

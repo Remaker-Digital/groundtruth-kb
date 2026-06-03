@@ -8,10 +8,14 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-wi-3506-phantom-spec-citation-repoint
+NO-GO: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-004.md
+NEW: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-003.md
 GO: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-002.md
 NEW: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-001.md
 
 Document: gtkb-axis-2-dispatchable-filter
+VERIFIED: bridge/gtkb-axis-2-dispatchable-filter-006.md
+NEW: bridge/gtkb-axis-2-dispatchable-filter-005.md
 GO: bridge/gtkb-axis-2-dispatchable-filter-004.md
 REVISED: bridge/gtkb-axis-2-dispatchable-filter-003.md
 NO-GO: bridge/gtkb-axis-2-dispatchable-filter-002.md
