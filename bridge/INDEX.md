@@ -7,6 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-claude-code-session-id-env-var-gap
+NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-003.md
+REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
+NEW: bridge/gtkb-claude-code-session-id-env-var-gap-001.md
+
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-002.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-001.md
