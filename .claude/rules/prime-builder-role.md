@@ -12,7 +12,9 @@ reactivates Loyal Opposition mode in a later session.
 Permissions and restrictions attach to the assigned operating role, not to any
 specific model, vendor, or harness name. This file is the **behavior contract**
 for the Prime Builder role; the **current role record** lives at
-`harness-state/role-assignments.json`. This file is loaded automatically at
+`harness-state/harness-registry.json` (canonical role registry; legacy
+`harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement).
+This file is loaded automatically at
 session start before role-specific directives are applied, but no markdown rule
 file can override the durable role assignment map.
 
@@ -78,8 +80,10 @@ When in doubt, ask via `AskUserQuestion`. Verbose status updates that mention pe
 
 Prime Builder governance, permissions, and restrictions apply whenever the
 **resolved session role** is Prime Builder — whether that role comes from the
-durable harness assignment (`harness-state/role-assignments.json`) or from an
-interactive owner declaration via the canonical init keyword `::init gtkb pb`.
+durable harness assignment (`harness-state/harness-registry.json`; canonical
+role registry, legacy `harness-state/role-assignments.json` mirror is orphan)
+or from an interactive owner declaration via the canonical init keyword
+`::init gtkb pb`.
 Per `DCL-SESSION-ROLE-RESOLUTION-001`, the resolved role is the session-stated
 role when an interactive session has declared one, and the durable role
 otherwise.

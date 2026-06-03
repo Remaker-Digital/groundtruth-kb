@@ -141,7 +141,9 @@ They are **mutually exclusive at runtime**:
   performs in-process dispatch.
 
 Substrate applicability is determined by the role-set topology in
-``harness-state/role-assignments.json``. The doctor's
+``harness-state/harness-registry.json`` (canonical role registry per
+Slice 1 retirement; legacy ``harness-state/role-assignments.json``
+mirror is orphan and not authoritative). The doctor's
 ``_check_role_set_topology_consistency`` (Slice 1) validates wire form;
 ``_check_single_harness_dispatcher_when_required`` (Slice 1 + Slice 2
 upgrade) reports applicability and registration health. Per

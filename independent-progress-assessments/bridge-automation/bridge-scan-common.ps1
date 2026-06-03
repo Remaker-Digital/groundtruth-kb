@@ -93,12 +93,17 @@ function Test-BridgeScanRoleAuthority {
         [Parameter(Mandatory)] [string] $ScannerName
     )
 
-    $rolePath = Join-Path $Workspace "harness-state\role-assignments.json"
+    # WI-4214 Slice 2: repointed from legacy role-assignments.json mirror
+    # to canonical harness-state/harness-registry.json (MemBase projection).
+    # Registry schema differs: harnesses is a LIST of objects with id + role
+    # fields; role is a LIST of role tokens (single-active-per-role: a role
+    # set may contain 'prime-builder' AND/OR 'loyal-opposition').
+    $rolePath = Join-Path $Workspace "harness-state\harness-registry.json"
     $harnessIdNormalized = $HarnessId.Trim().ToUpperInvariant()
     $expectedRoleNormalized = $ExpectedRole.Trim().ToLowerInvariant()
 
     if (-not (Test-Path -LiteralPath $rolePath)) {
-        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but role assignment map is missing: $rolePath"
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but harness registry is missing: $rolePath"
         return [pscustomobject]@{
             Allowed      = $false
             RolePath     = $rolePath
@@ -112,7 +117,7 @@ function Test-BridgeScanRoleAuthority {
     try {
         $document = Get-Content -LiteralPath $rolePath -Raw | ConvertFrom-Json -ErrorAction Stop
     } catch {
-        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName could not parse role assignment map $rolePath`: $($_.Exception.Message)"
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName could not parse harness registry $rolePath`: $($_.Exception.Message)"
         return [pscustomobject]@{
             Allowed      = $false
             RolePath     = $rolePath
@@ -123,17 +128,19 @@ function Test-BridgeScanRoleAuthority {
         }
     }
 
-    $harnesses = $document.PSObject.Properties["harnesses"]
+    # Find harness entry in the list by id field.
     $entry = $null
-    if ($null -ne $harnesses -and $null -ne $harnesses.Value) {
-        $entryProperty = $harnesses.Value.PSObject.Properties[$harnessIdNormalized]
-        if ($null -ne $entryProperty) {
-            $entry = $entryProperty.Value
+    if ($null -ne $document.harnesses) {
+        foreach ($candidate in $document.harnesses) {
+            if ($candidate.id -eq $harnessIdNormalized) {
+                $entry = $candidate
+                break
+            }
         }
     }
 
     if ($null -eq $entry) {
-        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but no role map entry exists in $rolePath"
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but no harness entry exists in $rolePath"
         return [pscustomobject]@{
             Allowed      = $false
             RolePath     = $rolePath
@@ -144,33 +151,34 @@ function Test-BridgeScanRoleAuthority {
         }
     }
 
-    $roleProperty = $entry.PSObject.Properties["role"]
-    $activeRole = if ($null -ne $roleProperty -and $null -ne $roleProperty.Value) {
-        [string]$roleProperty.Value
-    } else {
-        ""
+    # role is a list of strings in the registry. Normalize and check membership.
+    $activeRoles = @()
+    if ($null -ne $entry.role) {
+        foreach ($r in $entry.role) {
+            $activeRoles += ([string]$r).Trim().ToLowerInvariant()
+        }
     }
-    $activeRoleNormalized = $activeRole.Trim().ToLowerInvariant()
+    $activeRoleDisplay = $activeRoles -join ","
 
-    if ($activeRoleNormalized -ne $expectedRoleNormalized) {
-        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but $rolePath currently maps it to $activeRoleNormalized"
+    if ($activeRoles -notcontains $expectedRoleNormalized) {
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but $rolePath currently maps it to [$activeRoleDisplay]"
         return [pscustomobject]@{
             Allowed      = $false
             RolePath     = $rolePath
             HarnessId    = $harnessIdNormalized
             ExpectedRole = $expectedRoleNormalized
-            ActiveRole   = $activeRoleNormalized
+            ActiveRole   = $activeRoleDisplay
             Message      = $message
         }
     }
 
-    $message = "ROLE-AUTHORITY-OK: $ScannerName authorized by $rolePath harness $harnessIdNormalized role $activeRoleNormalized"
+    $message = "ROLE-AUTHORITY-OK: $ScannerName authorized by $rolePath harness $harnessIdNormalized role $expectedRoleNormalized (set=[$activeRoleDisplay])"
     return [pscustomobject]@{
         Allowed      = $true
         RolePath     = $rolePath
         HarnessId    = $harnessIdNormalized
         ExpectedRole = $expectedRoleNormalized
-        ActiveRole   = $activeRoleNormalized
+        ActiveRole   = $expectedRoleNormalized
         Message      = $message
     }
 }

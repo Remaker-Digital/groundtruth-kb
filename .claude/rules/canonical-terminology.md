@@ -1142,7 +1142,9 @@ in `groundtruth-kb/src/groundtruth_kb/project/doctor.py` (health checks).
 **Canonical alias:** role-set; durable role set.
 
 **Definition:** The wire form of a harness's durable operating-role
-assignment recorded in ``harness-state/role-assignments.json``. The role set
+assignment recorded in ``harness-state/harness-registry.json`` (canonical role
+registry; legacy ``harness-state/role-assignments.json`` mirror is orphan per
+Slice 1 retirement). The role set
 is a JSON list of role tokens drawn from ``{prime-builder, loyal-opposition}``.
 Singleton lists represent the multi-harness case (one role per harness ID);
 multi-element lists represent the single-harness case (one harness ID holds

@@ -22,7 +22,9 @@ The canonical two-role set is `prime-builder` and `loyal-opposition`. The
 SET operations: `scripts/harness_roles.py` REJECTS `acting-prime-builder`
 as a target role; only `prime-builder` and `loyal-opposition` are valid
 SET targets. READ operations: existing `acting-prime-builder` values in
-`harness-state/role-assignments.json` continue to load without error.
+the legacy `harness-state/role-assignments.json` (orphan compatibility
+mirror per Slice 1 retirement; canonical role registry is now
+`harness-state/harness-registry.json`) continue to load without error.
 
 Startup rendering for this profile labels it explicitly as
 "compatibility/provenance" (not "active operating role").

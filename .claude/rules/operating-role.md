@@ -8,13 +8,16 @@ The persistent harness identity artifact is:
 
 The single source-of-truth role artifact is:
 
-`harness-state/role-assignments.json`
+`harness-state/harness-registry.json`
+
+(legacy mirror at `harness-state/role-assignments.json` is an orphan compatibility surface per Slice 1 retirement; not authoritative).
 
 This rule file is not a role record and must not contain an `active_role:`
 assignment. It exists only as human-readable startup guidance for the role
 assignment system. No markdown rule file can override the durable role
-assignment map at `harness-state/role-assignments.json` (the single source of
-truth).
+assignment map at `harness-state/harness-registry.json` (the canonical role
+registry per `gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-008`
+VERIFIED).
 
 ## Harness Identity
 
@@ -27,7 +30,9 @@ identity artifact:
 
 Harness identity and operating role are separate concepts. Startup first reads
 `harness-state/harness-identities.json`, then uses the resolved harness ID to
-look up the role in `harness-state/role-assignments.json`.
+look up the role in `harness-state/harness-registry.json` (the canonical role
+registry; legacy `harness-state/role-assignments.json` mirror is orphan per
+Slice 1 retirement).
 
 A persisted harness ID must be unique on the workstation and must not change
 after initial assignment except through an explicit owner-requested identity
@@ -78,8 +83,10 @@ transient session.
 
 ## Role Set Schema (Active Authority)
 
-`harness-state/role-assignments.json` records each harness ID's durable role as
-a JSON list (the wire representation of a role set). The role-set schema is the
+`harness-state/harness-registry.json` is the canonical SOT recording each
+harness ID's durable role as a JSON list (the wire representation of a role
+set). The registry is a MemBase projection per `REQ-HARNESS-REGISTRY-001`;
+legacy mirror at `harness-state/role-assignments.json` is an orphan compatibility surface per Slice 1 retirement; not authoritative. The role-set schema is the
 **active runtime schema**, not a future-design framing
 (per `ADR-SINGLE-HARNESS-OPERATING-MODE-001` Path 2 atomic migration).
 
@@ -131,8 +138,9 @@ Agents MUST use the deterministic bridge-substrate transaction component for bri
 
 ## Interactive Session Role Override
 
-The durable role assignment recorded in `harness-state/role-assignments.json`
-is the authority for **headless dispatch routing**: the cross-harness
+The durable role assignment recorded in `harness-state/harness-registry.json`
+(canonical role registry; legacy `harness-state/role-assignments.json` is an
+orphan compat mirror) is the authority for **headless dispatch routing**: the cross-harness
 event-driven trigger (`scripts/cross_harness_bridge_trigger.py`) consults the
 durable role to choose the recipient harness and compose the dispatched init
 keyword, and the receiver-side `STRICT_DROP` gate enforces durable set

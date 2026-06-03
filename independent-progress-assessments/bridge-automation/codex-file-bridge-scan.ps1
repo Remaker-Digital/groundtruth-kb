@@ -203,7 +203,7 @@ Effective role: Loyal Opposition
 
 Role authority:
 - Harness self-identification: $HarnessId
-- Role map source: harness-state/role-assignments.json
+- Role map source: harness-state/harness-registry.json (canonical role registry; legacy role-assignments.json mirror is orphan per Slice 1 retirement)
 - Required durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ExpectedRole)
 - Observed durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ActiveRole)
 
@@ -226,7 +226,7 @@ Important constraints:
 - Use only the file bridge protocol and `bridge/INDEX.md` for coordination.
 - Respect the project file-safety contract. Only create new bridge review files and make the required targeted bridge/INDEX.md coordination update for processed entries.
 - $GroundtruthKbHint
-- Before writing any review result, re-read `harness-state/role-assignments.json`. If harness `$HarnessId` no longer declares role `loyal-opposition`, report `ROLE-AUTHORITY-BLOCKED`. Do not issue GO, NO-GO, or VERIFIED.
+- Before writing any review result, re-read `harness-state/harness-registry.json`. If harness `$HarnessId` no longer declares role `loyal-opposition`, report `ROLE-AUTHORITY-BLOCKED`. Do not issue GO, NO-GO, or VERIFIED.
 - Every review file you create must include a `## Role Authority` section with the role map path, harness ID, required role, and observed role.
 - Favor verification over assumption and cite concrete paths and command results.
 "@

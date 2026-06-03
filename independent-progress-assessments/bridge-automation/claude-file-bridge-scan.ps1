@@ -347,7 +347,7 @@ Effective role: Prime Builder
 
 Role authority:
 - Harness self-identification: $HarnessId
-- Role map source: harness-state/role-assignments.json
+- Role map source: harness-state/harness-registry.json (canonical role registry; legacy role-assignments.json mirror is orphan per Slice 1 retirement)
 - Required durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ExpectedRole)
 - Observed durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ActiveRole)
 
@@ -365,7 +365,7 @@ For each listed entry:
               version number. Update bridge/INDEX.md with a REVISED entry for only this document.
   - VERIFIED: Report verified. If implementation is uncommitted, commit it.
 
-Before writing any implementation result, re-read `harness-state/role-assignments.json`.
+Before writing any implementation result, re-read `harness-state/harness-registry.json`.
 If harness `$HarnessId` no longer declares role `prime-builder`, report `ROLE-AUTHORITY-BLOCKED`.
 Do not implement, revise, or file bridge updates. Every implementation or
 revision file you create must include a `## Role Authority` section with the
