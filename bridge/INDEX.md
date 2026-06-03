@@ -1147,6 +1147,7 @@ NO-GO: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-002.md
 NEW: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-001.md
 
 Document: gtkb-control-plane-placeholder-test-remediation-slice-1-revert
+REVISED: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-005.md
 NO-GO: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-004.md
 REVISED: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-003.md
 NO-GO: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-002.md
