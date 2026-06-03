@@ -7,11 +7,15 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
+NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-001.md
+
 Document: gtkb-startup-refractor-scoping
 GO: bridge/gtkb-startup-refractor-scoping-002.md
 NEW: bridge/gtkb-startup-refractor-scoping-001.md
 
 Document: gtkb-proposal-standards-propose-scaffold-skill
+VERIFIED: bridge/gtkb-proposal-standards-propose-scaffold-skill-004.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-003.md
 GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
