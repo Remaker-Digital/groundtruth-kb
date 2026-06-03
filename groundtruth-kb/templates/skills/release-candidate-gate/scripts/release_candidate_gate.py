@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path.cwd().resolve()
 
 ADOPTER_PYTHON_SCAN_TARGETS = "{{adopter_python_scan_targets}}"
 ADOPTER_SECURITY_SCAN_TARGET = "{{adopter_security_scan_target}}"
@@ -165,12 +165,19 @@ def _frontend_gates(config: GateConfig) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run non-deploying release-candidate gates.")
+    parser.add_argument(
+        "--project-root",
+        default=".",
+        help="Adopter project root to evaluate. Defaults to the current working directory.",
+    )
     parser.add_argument("--require-python", default="", help="Require a Python major.minor, for example 3.12.")
     parser.add_argument("--skip-python", action="store_true", help="Skip Python/security/governance gates.")
     parser.add_argument("--skip-frontend", action="store_true", help="Skip frontend gates.")
     parser.add_argument("--include-frontend", action="store_true", help="Run configured frontend gates.")
     args = parser.parse_args()
 
+    global PROJECT_ROOT
+    PROJECT_ROOT = Path(args.project_root).expanduser().resolve()
     config = _config_from_templates()
     try:
         _check_python_version(args.require_python or None)

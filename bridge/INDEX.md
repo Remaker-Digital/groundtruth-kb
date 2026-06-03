@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+Document: gtkb-wrapup-enhancements-closure
+NEW: bridge/gtkb-wrapup-enhancements-closure-001.md
 
 Document: gtkb-deferred-authority-implementation-start-parser-followup
 VERIFIED: bridge/gtkb-deferred-authority-implementation-start-parser-followup-004.md
@@ -741,6 +743,7 @@ NO-GO: bridge/gtkb-governance-adoption-doctor-check-002.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-001.md
 
 Document: gtkb-release-candidate-gate-managed-skill
+REVISED: bridge/gtkb-release-candidate-gate-managed-skill-011.md
 NO-GO: bridge/gtkb-release-candidate-gate-managed-skill-010.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-009.md
 NO-GO: bridge/gtkb-release-candidate-gate-managed-skill-008.md
@@ -1000,18 +1003,6 @@ NO-GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-004.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-003.md
 GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
-
-Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
-VERIFIED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-010.md
-NEW: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-009.md
-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-008.md
-REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-007.md
-NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-006.md
-REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-005.md
-NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-004.md
-REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-003.md
-NO-GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-002.md
-NEW: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-001.md
 
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
 NO-GO: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-007.md

@@ -73,9 +73,12 @@ def test_template_defaults_applied_when_adopter_omits_parameters() -> None:
     assert config.governance_commands == [["python", "-m", "groundtruth_kb", "project", "doctor", "."]]
 
 
-def test_template_script_command_order(monkeypatch) -> None:
+def test_template_script_command_order(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "requirements.txt").write_text("click==8.1.7\n", encoding="utf-8")
     module = _load_template_module()
     commands: list[list[str]] = []
+    roots: list[Path] = []
     config = module.GateConfig(
         python_scan_targets=["src", "tests"],
         security_scan_target="src",
@@ -85,18 +88,41 @@ def test_template_script_command_order(monkeypatch) -> None:
         requirements_file="requirements.txt",
     )
 
-    monkeypatch.setattr(module, "PROJECT_ROOT", Path.cwd())
-    monkeypatch.setattr(module, "_run", lambda command, **_kwargs: commands.append(command))
-    monkeypatch.setattr(Path, "is_file", lambda self: True if self.name == "requirements.txt" else Path.exists(self))
+    def record_run(command, **_kwargs):
+        commands.append(command)
+        roots.append(module.PROJECT_ROOT)
+
+    monkeypatch.setattr(module, "_run", record_run)
 
     module._python_gates(config)
 
+    assert tmp_path.resolve() == module.PROJECT_ROOT
+    assert roots == [tmp_path.resolve()] * 6
     assert commands[0][1:5] == ["-m", "groundtruth_kb", "secrets", "scan"]
     assert commands[1][1:4] == ["-m", "pip_audit", "-r"]
     assert commands[2][1:4] == ["-m", "bandit", "-r"]
     assert commands[3][1:4] == ["-m", "ruff", "check"]
     assert commands[4][1:4] == ["-m", "pytest", "tests/unit"]
     assert commands[5] == ["python", "-m", "groundtruth_kb", "project", "doctor", "."]
+
+
+def test_main_project_root_override(monkeypatch, tmp_path) -> None:
+    module = _load_template_module()
+    adopter_root = tmp_path / "adopter"
+    adopter_root.mkdir()
+    gates: list[Path] = []
+
+    def record_gates(_config):
+        gates.append(module.PROJECT_ROOT)
+
+    monkeypatch.setattr(module, "_check_python_version", lambda _required: None)
+    monkeypatch.setattr(module, "_python_gates", record_gates)
+    monkeypatch.setattr(module, "_frontend_gates", lambda _config: None)
+    monkeypatch.setattr(sys, "argv", ["release_candidate_gate.py", "--project-root", str(adopter_root)])
+
+    assert module.main() == 0
+    assert gates == [adopter_root.resolve()]
+    assert adopter_root.resolve() == module.PROJECT_ROOT
 
 
 def test_render_does_not_leak_internal_or_adopter_specific_paths() -> None:
