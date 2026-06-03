@@ -11,6 +11,7 @@ Document: gtkb-project-membership-reconciliation-slice-1-inventory-tool
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-inventory-tool-001.md
 
 Document: gtkb-project-membership-reconciliation-slice-1-scoping
+NEW: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-003.md
 GO: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-002.md
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-001.md
 
