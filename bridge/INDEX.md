@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
+NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-003.md
 GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-002.md
 NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-001.md
 
