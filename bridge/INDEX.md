@@ -739,6 +739,7 @@ NO-GO: bridge/gtkb-governance-adoption-doctor-check-002.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-001.md
 
 Document: gtkb-release-candidate-gate-managed-skill
+NO-GO: bridge/gtkb-release-candidate-gate-managed-skill-008.md
 NEW: bridge/gtkb-release-candidate-gate-managed-skill-007.md
 GO: bridge/gtkb-release-candidate-gate-managed-skill-006.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-005.md
