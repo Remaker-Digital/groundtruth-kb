@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from groundtruth_kb import get_templates_dir
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -1381,6 +1382,150 @@ def _is_command_registered_in_event(settings_path: Path, event: str, hook_filena
             if isinstance(cmd, str) and hook_filename in cmd:
                 return True
     return False
+
+
+def _ownership_drift_status(
+    artifact: FileArtifact | SettingsHookRegistration | GitignorePattern,
+) -> Literal["fail", "warning"]:
+    if artifact.ownership is None:
+        return "warning"
+    if artifact.ownership.adopter_divergence_policy == "warn":
+        return "warning"
+    return "fail"
+
+
+def _hash_file(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
+    """Aggregate doctor-required managed-artifact drift for an adopter project."""
+    check_name = "Managed artifact drift"
+    try:
+        artifacts = artifacts_for_doctor(profile_name)
+    except Exception as exc:  # pragma: no cover - defensive boundary around registry parser
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"managed artifact registry unavailable: {exc}",
+        )
+
+    if not artifacts:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="info",
+            message=f"no doctor-required managed artifacts for profile {profile_name}",
+        )
+
+    counts = {
+        "current": 0,
+        "missing": 0,
+        "drifted": 0,
+        "registration-missing": 0,
+        "gitignore-missing": 0,
+        "template-missing": 0,
+    }
+    failures: list[str] = []
+    warnings: list[str] = []
+    templates_dir = get_templates_dir()
+
+    def record(kind: str, artifact_id: str, status: Literal["fail", "warning"], detail: str) -> None:
+        counts[kind] += 1
+        entry = f"{artifact_id}: {detail}"
+        if status == "fail":
+            failures.append(entry)
+        else:
+            warnings.append(entry)
+
+    for artifact in artifacts:
+        if isinstance(artifact, FileArtifact):
+            target_path = target / artifact.target_path
+            if not target_path.is_file():
+                record("missing", artifact.id, "fail", f"{artifact.target_path} missing")
+                continue
+            template_path = templates_dir / artifact.template_path
+            if not template_path.is_file():
+                record("template-missing", artifact.id, "fail", f"template {artifact.template_path} missing")
+                continue
+            try:
+                target_hash = _hash_file(target_path)
+                template_hash = _hash_file(template_path)
+            except OSError as exc:
+                record("drifted", artifact.id, "fail", f"could not compare {artifact.target_path}: {exc}")
+                continue
+            if target_hash != template_hash:
+                record(
+                    "drifted",
+                    artifact.id,
+                    _ownership_drift_status(artifact),
+                    f"{artifact.target_path} differs from template {artifact.template_path}",
+                )
+                continue
+            counts["current"] += 1
+            continue
+
+        if isinstance(artifact, SettingsHookRegistration):
+            if _is_command_registered_in_event(
+                target / artifact.target_settings_path,
+                artifact.event,
+                artifact.hook_filename,
+            ):
+                counts["current"] += 1
+            else:
+                record(
+                    "registration-missing",
+                    artifact.id,
+                    _ownership_drift_status(artifact),
+                    f"{artifact.hook_filename} missing from {artifact.target_settings_path} {artifact.event}",
+                )
+            continue
+
+        if isinstance(artifact, GitignorePattern):
+            gitignore = target / ".gitignore"
+            try:
+                gitignore_text = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
+            except OSError as exc:
+                record("gitignore-missing", artifact.id, "fail", f"could not read .gitignore: {exc}")
+                continue
+            if artifact.pattern in gitignore_text:
+                counts["current"] += 1
+            else:
+                record(
+                    "gitignore-missing",
+                    artifact.id,
+                    _ownership_drift_status(artifact),
+                    f"pattern {artifact.pattern!r} missing from .gitignore",
+                )
+
+    status: Literal["pass", "fail", "warning", "info"] = "pass"
+    if failures:
+        status = "fail"
+    elif warnings:
+        status = "warning"
+
+    count_text = ", ".join(f"{key}={value}" for key, value in counts.items() if value)
+    if not count_text:
+        count_text = "no managed artifacts checked"
+    details = [*failures[:3], *warnings[: max(0, 3 - len(failures[:3]))]]
+    suffix = ""
+    remaining = len(failures) + len(warnings) - len(details)
+    if remaining > 0:
+        suffix = f"; +{remaining} more"
+    detail_text = f": {'; '.join(details)}{suffix}" if details else ""
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status=status,
+        message=f"{count_text}{detail_text}",
+    )
 
 
 def _check_settings_hook_registration_drift(
@@ -3439,6 +3584,7 @@ def run_doctor(
         checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_spec_intake_skill_present(target, profile))
+        checks.append(_check_managed_artifact_drift(target, profile))
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))

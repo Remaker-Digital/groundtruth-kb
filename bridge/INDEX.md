@@ -731,6 +731,7 @@ NO-GO: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-002.md
 NEW: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-001.md
 
 Document: gtkb-governance-adoption-doctor-check
+NEW: bridge/gtkb-governance-adoption-doctor-check-007.md
 GO: bridge/gtkb-governance-adoption-doctor-check-006.md
 REVISED: bridge/gtkb-governance-adoption-doctor-check-005.md
 GO: bridge/gtkb-governance-adoption-doctor-check-004.md
