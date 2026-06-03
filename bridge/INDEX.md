@@ -12,9 +12,12 @@ GO: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-002.md
 NEW: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-001.md
 
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
+GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-003.md
+REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-002.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
 
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-006.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-005.md
 GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-004.md
 REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-003.md
@@ -58,6 +61,7 @@ GO: bridge/gtkb-wrap-scan-report-relocation-slice-1-002.md
 NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
+REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-011.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-010.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-009.md
 GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-008.md
