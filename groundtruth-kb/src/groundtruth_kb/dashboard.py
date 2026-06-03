@@ -10,12 +10,14 @@ All rights reserved. Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import zipfile
@@ -570,71 +572,95 @@ def start_dashboard(
 
     paths.logs_dir.mkdir(parents=True, exist_ok=True)
     paths.pids_dir.mkdir(parents=True, exist_ok=True)
-    refresh_log = (paths.logs_dir / "refresh-service.log").open("a", encoding="utf-8")
-    grafana_log = (paths.logs_dir / "grafana.log").open("a", encoding="utf-8")
 
-    refresh_proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "groundtruth_kb.dashboard_service",
-            "--config",
-            str(config_path_for_project(paths.project_root)),
-            "--db-path",
-            str(paths.db_path),
-            "--runtime-root",
-            str(paths.runtime_root),
-            "--port",
-            str(refresh_port),
-            "--interval-minutes",
-            str(interval_minutes),
-        ],
-        cwd=paths.project_root,
-        stdout=refresh_log,
-        stderr=subprocess.STDOUT,
-    )
-    grafana_env = os.environ.copy()
-    grafana_env.update(
-        {
-            "GF_PATHS_DATA": str(paths.runtime_root / "grafana-data"),
-            "GF_PATHS_LOGS": str(paths.logs_dir),
-            "GF_PATHS_PLUGINS": str(paths.grafana_home / "data" / "plugins"),
-            "GF_PATHS_PROVISIONING": str(paths.provisioning_dir),
-            "GF_SERVER_HTTP_PORT": str(grafana_port),
-            "GF_SERVER_HTTP_ADDR": "127.0.0.1",
-            "GF_ANALYTICS_REPORTING_ENABLED": "false",
-            "GF_ANALYTICS_CHECK_FOR_UPDATES": "false",
-        }
-    )
-    grafana_proc = subprocess.Popen(
-        [str(grafana_bin), "--homepath", str(paths.grafana_home)],
-        cwd=paths.grafana_home,
-        env=grafana_env,
-        stdout=grafana_log,
-        stderr=subprocess.STDOUT,
-    )
-    _write_pid(paths.pids_dir / "refresh-service.pid", refresh_proc.pid)
-    _write_pid(paths.pids_dir / "grafana.pid", grafana_proc.pid)
+    refresh_pid_file = paths.pids_dir / "refresh-service.pid"
+    grafana_pid_file = paths.pids_dir / "grafana.pid"
+
+    # Idempotent launch (WI-3413): reuse an already-tracked live process
+    # instead of spawning a duplicate that would compete for the same port and
+    # orphan the prior PID from tracking. ``_read_live_pid`` returns the tracked
+    # PID only when that process is actually alive and otherwise clears the
+    # stale file. When no live process is tracked the spawn path below is
+    # byte-equivalent to the prior unconditional behavior.
+    refresh_pid = _read_live_pid(refresh_pid_file)
+    if refresh_pid is None:
+        refresh_log = (paths.logs_dir / "refresh-service.log").open("a", encoding="utf-8")
+        refresh_proc = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "groundtruth_kb.dashboard_service",
+                "--config",
+                str(config_path_for_project(paths.project_root)),
+                "--db-path",
+                str(paths.db_path),
+                "--runtime-root",
+                str(paths.runtime_root),
+                "--port",
+                str(refresh_port),
+                "--interval-minutes",
+                str(interval_minutes),
+            ],
+            cwd=paths.project_root,
+            stdout=refresh_log,
+            stderr=subprocess.STDOUT,
+        )
+        refresh_pid = refresh_proc.pid
+        _write_pid(refresh_pid_file, refresh_pid)
+
+    grafana_pid = _read_live_pid(grafana_pid_file)
+    if grafana_pid is None:
+        grafana_log = (paths.logs_dir / "grafana.log").open("a", encoding="utf-8")
+        grafana_env = os.environ.copy()
+        grafana_env.update(
+            {
+                "GF_PATHS_DATA": str(paths.runtime_root / "grafana-data"),
+                "GF_PATHS_LOGS": str(paths.logs_dir),
+                "GF_PATHS_PLUGINS": str(paths.grafana_home / "data" / "plugins"),
+                "GF_PATHS_PROVISIONING": str(paths.provisioning_dir),
+                "GF_SERVER_HTTP_PORT": str(grafana_port),
+                "GF_SERVER_HTTP_ADDR": "127.0.0.1",
+                "GF_ANALYTICS_REPORTING_ENABLED": "false",
+                "GF_ANALYTICS_CHECK_FOR_UPDATES": "false",
+            }
+        )
+        grafana_proc = subprocess.Popen(
+            [str(grafana_bin), "--homepath", str(paths.grafana_home)],
+            cwd=paths.grafana_home,
+            env=grafana_env,
+            stdout=grafana_log,
+            stderr=subprocess.STDOUT,
+        )
+        grafana_pid = grafana_proc.pid
+        _write_pid(grafana_pid_file, grafana_pid)
+
     return DashboardProcessInfo(
-        grafana_pid=grafana_proc.pid,
-        refresh_pid=refresh_proc.pid,
+        grafana_pid=grafana_pid,
+        refresh_pid=refresh_pid,
         grafana_url=f"http://127.0.0.1:{grafana_port}/d/{GRAFANA_DASHBOARD_UID}/groundtruth-kb-dashboard",
         refresh_url=f"http://127.0.0.1:{refresh_port}/",
     )
 
 
 def stop_dashboard(paths: DashboardPaths) -> list[int]:
-    """Stop dashboard processes started by ``start_dashboard``."""
+    """Stop dashboard processes started by ``start_dashboard``.
+
+    Only PIDs confirmed live are signalled (WI-3413): a stale (dead) or
+    unparseable PID file is cleaned up without signalling, so a PID number the
+    OS has reused for an unrelated process is not force-killed. The PID file is
+    removed in every branch (unparseable, dead, or live-and-terminated) so
+    stale files never linger.
+    """
     stopped: list[int] = []
     for pid_file in (paths.pids_dir / "refresh-service.pid", paths.pids_dir / "grafana.pid"):
         if not pid_file.exists():
             continue
         try:
             pid = int(pid_file.read_text(encoding="utf-8").strip())
-        except ValueError:
+        except (ValueError, OSError):
             pid_file.unlink(missing_ok=True)
             continue
-        if _terminate_pid(pid):
+        if _pid_alive(pid) and _terminate_pid(pid):
             stopped.append(pid)
         pid_file.unlink(missing_ok=True)
     return stopped
@@ -1210,7 +1236,81 @@ def _git_state(project_root: Path) -> dict[str, str]:
 
 
 def _write_pid(path: Path, pid: int) -> None:
-    path.write_text(f"{pid}\n", encoding="utf-8")
+    """Atomically write a PID file (WI-3413).
+
+    Writes to a uniquely-named temp file in the same directory, then
+    ``os.replace`` into place. ``os.replace`` is atomic on the same filesystem,
+    so a reader never observes a partially-written PID file even if the writer
+    is interrupted mid-write. The final content is identical to the prior
+    direct write (``"<pid>\\n"``).
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f"{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(f"{pid}\n")
+        os.replace(tmp_name, path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise
+
+
+def _pid_alive(pid: int) -> bool:
+    """Return True if a process with the given PID currently exists (WI-3413).
+
+    Stdlib-only liveness probe (``psutil`` is absent from the platform venv):
+    on win32, query ``tasklist`` filtered by PID; on POSIX, send signal ``0``
+    (``os.kill(pid, 0)``), which performs an existence/permission check without
+    delivering a signal. PID liveness does not prove process identity — the OS
+    can reuse a PID number for an unrelated process — so this narrows
+    stale-dead-PID handling rather than fully solving PID reuse.
+    """
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        try:
+            completed = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        # ``tasklist`` prints an "INFO: No tasks ..." line when nothing matches;
+        # a match row contains the PID as a standalone whitespace token.
+        return str(pid) in completed.stdout.split()
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # The process exists but is owned by another user — still "alive".
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _read_live_pid(pid_file: Path) -> int | None:
+    """Return the tracked PID from ``pid_file`` only if that process is alive.
+
+    Centralizes the "is the tracked process actually running" check plus
+    stale-file cleanup (WI-3413). Returns the PID when alive; otherwise (missing
+    file, unparseable content, or dead PID) removes the stale file and returns
+    ``None``.
+    """
+    if not pid_file.exists():
+        return None
+    try:
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
+    except (ValueError, OSError):
+        pid_file.unlink(missing_ok=True)
+        return None
+    if _pid_alive(pid):
+        return pid
+    pid_file.unlink(missing_ok=True)
+    return None
 
 
 def _terminate_pid(pid: int) -> bool:

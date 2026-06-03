@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-dashboard-launcher-idempotence-pid-tracking
+NEW: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-003.md
 GO: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-002.md
 NEW: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-001.md
 
@@ -1246,6 +1247,7 @@ NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
 
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
+GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-010.md
 REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-009.md
 NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-008.md
 REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-007.md
