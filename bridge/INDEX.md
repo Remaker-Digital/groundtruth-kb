@@ -7,7 +7,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
+GO: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-002.md
+NEW: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-001.md
+
 Document: gtkb-bridge-revise-cli-slice-1
+GO: bridge/gtkb-bridge-revise-cli-slice-1-002.md
 NEW: bridge/gtkb-bridge-revise-cli-slice-1-001.md
 
 Document: gtkb-startup-refractor-slice-a-startup-control-inventory
