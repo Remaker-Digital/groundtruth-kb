@@ -10,6 +10,7 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import subprocess
@@ -124,12 +125,36 @@ def _open_db(config: GTConfig, *, check_same_thread: bool = True) -> KnowledgeDB
     return KnowledgeDB(db_path=config.db_path, gate_registry=registry, check_same_thread=check_same_thread)
 
 
+def _ensure_utf8_streams() -> None:
+    """Make CLI stdout/stderr UTF-8 so non-cp1252 content never crashes (WI-4250).
+
+    On Windows, ``sys.stdout`` defaults to the cp1252 locale codec, so printing a
+    stored value containing a BOM or any non-cp1252 glyph raises
+    ``UnicodeEncodeError`` (observed in ``gt deliberations search``). Reconfiguring
+    the streams to UTF-8 at the single ``main()`` entry both ``gt`` and
+    ``python -m groundtruth_kb`` pass through fixes the whole CLI at once.
+
+    Guarded to be a safe no-op when the active streams are redirected or captured
+    (pytest ``capsys``, Click's ``CliRunner``, a closed pipe): such streams expose
+    no ``reconfigure`` method and are left untouched. ``errors="backslashreplace"``
+    is belt-and-suspenders — UTF-8 encodes every code point, so it only guarantees
+    no crash should a future stream still reject a character.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
 @click.group()
 @click.version_option(version=__version__, prog_name="gt")
 @click.option("--config", "config_path", type=click.Path(exists=True), default=None, help="Path to groundtruth.toml")
 @click.pass_context
 def main(ctx: click.Context, config_path: str | None) -> None:
     """GroundTruth KB — specification-driven governance toolkit."""
+    _ensure_utf8_streams()
     configure_cli_logging()
     ctx.ensure_object(dict)
     ctx.obj["config"] = Path(config_path) if config_path else None
