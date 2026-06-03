@@ -7,6 +7,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-deferred-authority-implementation-start-parser-followup
+GO: bridge/gtkb-deferred-authority-implementation-start-parser-followup-002.md
+NEW: bridge/gtkb-deferred-authority-implementation-start-parser-followup-001.md
+
 Document: gtkb-project-membership-reconciliation-slice-1-inventory-tool
 GO: bridge/gtkb-project-membership-reconciliation-slice-1-inventory-tool-002.md
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-inventory-tool-001.md
