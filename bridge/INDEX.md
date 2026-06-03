@@ -7,6 +7,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-hygiene-cli-utf8-portability-slice-1
+VERIFIED: bridge/gtkb-hygiene-cli-utf8-portability-slice-1-004.md
+NEW: bridge/gtkb-hygiene-cli-utf8-portability-slice-1-003.md
+GO: bridge/gtkb-hygiene-cli-utf8-portability-slice-1-002.md
+NEW: bridge/gtkb-hygiene-cli-utf8-portability-slice-1-001.md
+
 Document: gtkb-hygiene-sweep-presence-patterns-slice-1
 VERIFIED: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-006.md
 NEW: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-005.md
@@ -29,6 +35,8 @@ NO-GO: bridge/gtkb-projects-remove-item-cli-slice-1-002.md
 NEW: bridge/gtkb-projects-remove-item-cli-slice-1-001.md
 
 Document: gtkb-session-id-shared-resolver-unification
+VERIFIED: bridge/gtkb-session-id-shared-resolver-unification-008.md
+NEW: bridge/gtkb-session-id-shared-resolver-unification-007.md
 VERIFIED: bridge/gtkb-session-id-shared-resolver-unification-006.md
 NEW: bridge/gtkb-session-id-shared-resolver-unification-005.md
 GO: bridge/gtkb-session-id-shared-resolver-unification-004.md
