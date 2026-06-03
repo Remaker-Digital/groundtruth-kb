@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-deferred-authority-protocol-alignment
+GO: bridge/gtkb-deferred-authority-protocol-alignment-006.md
 REVISED: bridge/gtkb-deferred-authority-protocol-alignment-005.md
 NO-GO: bridge/gtkb-deferred-authority-protocol-alignment-004.md
 REVISED: bridge/gtkb-deferred-authority-protocol-alignment-003.md
