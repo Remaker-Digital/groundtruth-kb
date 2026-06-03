@@ -7,6 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-pytest-basetemp-session-isolation
+NEW: bridge/gtkb-pytest-basetemp-session-isolation-003.md
+GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
+NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
+
 Document: gtkb-dashboard-launcher-idempotence-pid-tracking
 VERIFIED: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-006.md
 REVISED: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-005.md
@@ -21,6 +26,7 @@ REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-002.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
 
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-008.md
 REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-007.md
 NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-006.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-005.md
@@ -30,6 +36,7 @@ NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
 
 Document: gtkb-understand-anything-evaluation-install
+GO: bridge/gtkb-understand-anything-evaluation-install-008.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-007.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-006.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-005.md
