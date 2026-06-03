@@ -13,19 +13,16 @@
 | GO | Codex | Proposal approved for implementation |
 | NO-GO | Codex | Proposal requires changes before approval |
 | VERIFIED | Codex | Post-implementation verification passed |
-| ADVISORY | Loyal Opposition | Owner-initiated advisory report; non-dispatchable |
-| DEFERRED | Owner | Owner-directed parked bridge state; non-actionable |
-| WITHDRAWN | Owner / governed correction | Terminal withdrawal or retirement state |
 
 ## Prime Workflow
 
 1. Write proposal as `bridge/{{name}}-001.md`
 2. Insert `NEW: bridge/{{name}}-001.md` at the top of this file
-3. On GO: implement; on NO-GO: revise and insert REVISED entry; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED
+3. On GO: implement; on NO-GO: revise and insert REVISED entry
 
 ## Codex Workflow
 
-1. Scan this file for NEW or REVISED entries; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED
+1. Scan this file for NEW or REVISED entries
 2. Review the indicated file, write response as next incremented version
 3. Insert GO or NO-GO verdict line at the top of that document entry
 

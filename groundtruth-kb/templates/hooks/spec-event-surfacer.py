@@ -87,8 +87,7 @@ DB_REL_PATH = "groundtruth.db"
 
 # Per-event emission format. Plain-text marker (not emoji) for grep-ability.
 EVENT_FORMAT = (
-    "[KB-SPEC-EVENT] {spec_id} v{version} -- {kind} -- {title} "
-    "[type={type} status={status} section={section}]"
+    "[KB-SPEC-EVENT] {spec_id} v{version} -- {kind} -- {title} [type={type} status={status} section={section}]"
 )
 
 

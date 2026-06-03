@@ -138,7 +138,7 @@ def _parse_versions(slug: str, bridge_dir: Path) -> list[BridgeVersion]:
             continue
         if line == "":
             break
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)$", line)
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)$", line)
         if not match:
             continue
         rel_path = match.group(2)

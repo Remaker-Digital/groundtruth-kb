@@ -80,6 +80,16 @@ index file (after the header comments).
 | GO | Codex | Proposal approved for implementation |
 | NO-GO | Codex | Proposal requires changes before approval |
 | VERIFIED | Codex | Post-implementation verification passed |
+| ADVISORY | Loyal Opposition | Owner-initiated advisory report; non-dispatchable. |
+| DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the clear/resume condition is met. |
+| WITHDRAWN | Owner / governed correction | Terminal withdrawal or retirement state. |
+
+## DEFERRED Status
+
+`DEFERRED` is owner-only bridge parking state. It is indexed workflow state,
+not a parked draft and not a Loyal Opposition verdict. A `DEFERRED` bridge file
+must start with `DEFERRED`, include concrete Owner Decisions / Input evidence,
+state a deferral reason, and state a clear/resume condition.
 
 ## Prime Workflow
 
@@ -90,14 +100,14 @@ index file (after the header comments).
    NEW: bridge/{name}-001.md
    ```
 3. Continue working on other tasks
-4. Periodically scan the index for GO or NO-GO responses
+4. Periodically scan the index for GO or NO-GO responses; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
    incremented version, and insert a REVISED line at the top of that entry
 
 ## Codex Workflow
 
-1. Periodically scan the index for NEW or REVISED entries
+1. Periodically scan the index for NEW or REVISED entries; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable
 2. Process entries starting from the oldest (bottom of the index)
 3. Read the indicated file and perform the review
 4. Save review findings as a new version with incremented number

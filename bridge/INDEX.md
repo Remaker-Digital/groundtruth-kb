@@ -7,6 +7,13 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-git-hooks-path-mismatch-lint
+GO: bridge/gtkb-git-hooks-path-mismatch-lint-002.md
+NEW: bridge/gtkb-git-hooks-path-mismatch-lint-001.md
+
+Document: gtkb-dispatch-envelope-adr-specs
+NEW: bridge/gtkb-dispatch-envelope-adr-specs-001.md
+
 Document: gtkb-pytest-basetemp-session-isolation
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-003.md
 GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
@@ -26,6 +33,7 @@ REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-002.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
 
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-009.md
 GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-008.md
 REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-007.md
 NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-006.md
@@ -209,6 +217,7 @@ REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
 NEW: bridge/gtkb-claude-code-session-id-env-var-gap-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-009.md
 NO-GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-008.md
 REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-007.md
 NO-GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-006.md

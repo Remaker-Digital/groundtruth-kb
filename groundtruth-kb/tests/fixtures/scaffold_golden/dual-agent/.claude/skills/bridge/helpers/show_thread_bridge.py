@@ -34,7 +34,7 @@ DEFAULT_INDEX_PATH = DEFAULT_BRIDGE_DIR / "INDEX.md"
 DEFAULT_PREVIEW_LINES = 200
 
 _VERSION_FILE_RE = re.compile(r"-(\d{3})\.md$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY):\s*(bridge/.+\.md)\s*$")
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 
 

@@ -56,14 +56,25 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
-WORK_INTENT_SESSION_ENV_VARS = (
-    "CLAUDE_SESSION_ID",
-    "GTKB_INHERITED_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-    "ANTIGRAVITY_SESSION_ID",
-    "GTKB_SESSION_ID",
-)
+# Session-id env-var membership is owned by scripts/gtkb_session_id.py
+# (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
+# unification-003 GO at -004). Import the canonical bridge work-intent order;
+# fail soft to a verbatim local copy so the hook never throws on a partial
+# install (same pattern as the bridge_author_metadata import above). The
+# drift-lock test platform_tests/scripts/test_gtkb_session_id.py + the gate
+# work-intent test lock this fallback to the canonical BRIDGE_WORK_INTENT_ORDER.
+try:
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER as WORK_INTENT_SESSION_ENV_VARS
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    WORK_INTENT_SESSION_ENV_VARS = (
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "ANTIGRAVITY_SESSION_ID",
+        "GTKB_SESSION_ID",
+    )
 SPEC_LINK_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,
@@ -225,7 +236,7 @@ def _has_scratch_boundary_between(root: Path, cwd_path: Path) -> bool:
         rel_parts = cwd_path.resolve().relative_to(root.resolve()).parts
     except ValueError:
         return False
-    return ".tmp" in rel_parts
+    return any(part in {".tmp", ".gtkb-state"} for part in rel_parts)
 
 
 def _nearest_marker_root(cwd_path: Path) -> Path | None:
@@ -281,7 +292,8 @@ def _canonical_project_root(cwd_path: Path) -> Path:
     helpers rely on process cwd and are therefore unsafe for hook unit tests that
     pass a synthetic cwd. Linked worktrees resolve through ``git-common-dir``;
     normal subdirectories use the nearest ``groundtruth.toml`` marker; scratch
-    directories under ``.tmp`` stay hermetic and fall back to ``cwd_path``.
+    directories under ``.tmp`` or ``.gtkb-state`` stay hermetic and fall back
+    to ``cwd_path``.
     """
     if _is_under_claude_worktrees(cwd_path):
         git_root = _git_common_dir_root(cwd_path)
