@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +38,28 @@ OWNER_REQUIRED_LABELS = (
     "Why it matters:",
     "Options:",
     "Reply requested:",
+)
+
+# git-hooks-path-mismatch detector (WI-3482).
+# The Git default hook directory; when ``core.hooksPath`` differs, files under
+# ``.git/hooks`` are inert because Git never consults them.
+_GIT_DEFAULT_HOOKS_PATH = ".git/hooks"
+# Inactive-surface tokens a proposal must not target when core.hooksPath differs:
+# the default hook directory and the historical staging path (both named in the
+# WI-3482 acceptance summary).
+INACTIVE_HOOK_TOKENS = (".git/hooks/", "scripts/guardrails/pre-commit")
+# Sentinel: resolve the active hook path from live git config. Tests inject an
+# explicit string (including "" for the Git default) to stay hermetic.
+_RESOLVE_HOOKS_PATH = object()
+# A dedicated guard so a proposal *describing* the hooks-path hazard (like the
+# WI-3482 proposal itself, or this module's own docs) does not self-trigger,
+# while a proposal that genuinely *targets* the inactive surface still fires.
+# Kept separate from RULE_DOCUMENTATION_RE so other detectors are unaffected.
+HOOKS_HAZARD_DOCUMENTATION_RE = re.compile(
+    r"(?i)(?:inactive|inert|never consult|overrides? the default|silently[- ]broken|"
+    r"core\.hooksPath|active (?:hook|path)|hook surface|would modify a directory|"
+    r"git never consults|git-hooks-path-mismatch|produces? (?:a |no )?finding|reproduces?|"
+    r"the detector|token scan|\bfires?\b)"
 )
 
 
@@ -77,6 +100,48 @@ def _line_documents_lint_rule(line: str) -> bool:
     return RULE_DOCUMENTATION_RE.search(line) is not None
 
 
+def _normalize_path_separators(value: str) -> str:
+    """Fold Windows-style backslashes to forward slashes for path-token matching."""
+    return value.replace("\\", "/")
+
+
+def _resolve_active_hooks_path(project_root: Path = PROJECT_ROOT) -> str:
+    """Return the repo's active ``core.hooksPath`` (normalized); ``""`` if default.
+
+    Reads ``git config --get core.hooksPath`` with ``cwd=project_root``, no shell,
+    captured output. A missing/empty/failed read degrades to ``""`` (the Git
+    default ``.git/hooks``), so a default-configured clone never trips the
+    detector. The subprocess is guarded; ``git`` absence is a no-op, not a crash.
+    """
+    try:
+        completed = subprocess.run(
+            ["git", "config", "--get", "core.hooksPath"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if completed.returncode != 0:
+        return ""
+    return _normalize_path_separators(completed.stdout.strip())
+
+
+def _line_targets_inactive_hook_surface(line: str) -> bool:
+    """True when ``line`` references an inactive hook surface but is not hazard docs.
+
+    Folds backslashes first (so ``.git\\hooks\\pre-commit`` matches), checks for an
+    inactive-surface token, and excludes lines that merely *describe* the hazard
+    via ``HOOKS_HAZARD_DOCUMENTATION_RE`` so the detector does not self-trigger on
+    a proposal that explains the check.
+    """
+    normalized = _normalize_path_separators(line)
+    if not any(token in normalized for token in INACTIVE_HOOK_TOKENS):
+        return False
+    return HOOKS_HAZARD_DOCUMENTATION_RE.search(line) is None
+
+
 def _owner_heading_line(line: str) -> bool:
     stripped = line.strip()
     markdown_heading = re.sub(r"^#+\s*", "", stripped).strip()
@@ -96,13 +161,40 @@ def _owner_action_required_needed(text: str) -> bool:
     return OWNER_INPUT_RE.search(text) is not None and APPROVAL_PACKET_RE.search(text) is not None
 
 
-def lint_text(text: str) -> list[Finding]:
+def lint_text(text: str, *, active_hooks_path: object = _RESOLVE_HOOKS_PATH) -> list[Finding]:
     findings: list[Finding] = []
     lines = text.splitlines()
+
+    # Resolve the active hook path once. ``_RESOLVE_HOOKS_PATH`` triggers a live
+    # ``git config`` read; tests inject an explicit string (including "" for the
+    # Git default) so they never touch real git config.
+    if active_hooks_path is _RESOLVE_HOOKS_PATH:
+        resolved_hooks_path = _resolve_active_hooks_path()
+    else:
+        resolved_hooks_path = _normalize_path_separators(str(active_hooks_path or ""))
+    hooks_path_is_nondefault = resolved_hooks_path not in ("", _GIT_DEFAULT_HOOKS_PATH)
 
     for index, line in enumerate(lines, start=1):
         if _line_documents_lint_rule(line):
             continue
+
+        if hooks_path_is_nondefault and _line_targets_inactive_hook_surface(line):
+            findings.append(
+                Finding(
+                    pattern_id="git-hooks-path-mismatch",
+                    title="Target surface is an inactive Git hook path",
+                    message=(
+                        "References an inactive hook surface (.git/hooks or scripts/guardrails/pre-commit) "
+                        f"while the active hook path is '{resolved_hooks_path}'. Git does not consult "
+                        ".git/hooks when core.hooksPath differs, so edits there are silently inert."
+                    ),
+                    hint=(
+                        f"Target the active hook directory '{resolved_hooks_path}' "
+                        f"(e.g. {resolved_hooks_path}/pre-commit) instead of the .git/hooks default."
+                    ),
+                    line=index,
+                )
+            )
 
         if _line_has_bare_pytest_command(line):
             findings.append(

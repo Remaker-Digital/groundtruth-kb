@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-git-hooks-path-mismatch-lint
+NEW: bridge/gtkb-git-hooks-path-mismatch-lint-003.md
 GO: bridge/gtkb-git-hooks-path-mismatch-lint-002.md
 NEW: bridge/gtkb-git-hooks-path-mismatch-lint-001.md
 
