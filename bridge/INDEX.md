@@ -1155,6 +1155,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
+DEFERRED: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-008.md
 NO-GO: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-007.md
 REVISED: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-006.md
 NEW: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-005.md
