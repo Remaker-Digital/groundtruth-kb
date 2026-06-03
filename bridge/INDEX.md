@@ -1251,6 +1251,7 @@ NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
 
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
+NEW: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-011.md
 GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-010.md
 REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-009.md
 NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-008.md
