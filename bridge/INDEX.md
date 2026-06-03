@@ -1023,6 +1023,42 @@ REVISED: bridge/gtkb-auto-push-investigation-slice-1-003.md
 NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
 
+Document: gtkb-prime-worker-permission-profile-slice-1
+VERIFIED: bridge/gtkb-prime-worker-permission-profile-slice-1-006.md
+NEW: bridge/gtkb-prime-worker-permission-profile-slice-1-005.md
+GO: bridge/gtkb-prime-worker-permission-profile-slice-1-004.md
+REVISED: bridge/gtkb-prime-worker-permission-profile-slice-1-003.md
+NO-GO: bridge/gtkb-prime-worker-permission-profile-slice-1-002.md
+NEW: bridge/gtkb-prime-worker-permission-profile-slice-1-001.md
+
+Document: gtkb-prime-worker-context-aware-auq-slice-2
+VERIFIED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-012.md
+REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-011.md
+NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-010.md
+REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-009.md
+NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-008.md
+REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-007.md
+NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-006.md
+NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-005.md
+GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-004.md
+REVISED: bridge/gtkb-prime-worker-context-aware-auq-slice-2-003.md
+NO-GO: bridge/gtkb-prime-worker-context-aware-auq-slice-2-002.md
+NEW: bridge/gtkb-prime-worker-context-aware-auq-slice-2-001.md
+
+Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
+VERIFIED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-012.md
+REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-011.md
+NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-010.md
+NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-009.md
+NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-008.md
+REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-007.md
+GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-006.md
+REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-005.md
+GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-004.md
+REVISED: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-003.md
+NO-GO: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-002.md
+NEW: bridge/gtkb-prime-worker-post-stop-dispatch-retry-slice-3-001.md
+
 Document: gtkb-prime-worker-delivery-regression-slice-4
 NO-GO: bridge/gtkb-prime-worker-delivery-regression-slice-4-004.md
 REVISED: bridge/gtkb-prime-worker-delivery-regression-slice-4-003.md
