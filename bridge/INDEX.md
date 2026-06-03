@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-project-membership-reconciliation-slice-1-scoping
+NEW: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-001.md
+
 Document: gtkb-deferred-authority-protocol-alignment
 GO: bridge/gtkb-deferred-authority-protocol-alignment-006.md
 REVISED: bridge/gtkb-deferred-authority-protocol-alignment-005.md
