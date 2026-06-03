@@ -7,6 +7,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
+NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
+
 Document: gtkb-understand-anything-evaluation-install
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-002.md
 NEW: bridge/gtkb-understand-anything-evaluation-install-001.md
