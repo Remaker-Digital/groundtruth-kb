@@ -19,6 +19,7 @@ _SCRIPT_PATH = _REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
 _CLAUDE_INVOCATION_SURFACES = {
     "headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]}
 }
+_READINESS_MARKER = "WORKER_READY"
 
 
 def _load_trigger() -> ModuleType:
@@ -57,6 +58,25 @@ def _run_worker_command(
     return process.returncode, stdout, stderr
 
 
+def _readiness_text(stdout: str) -> str:
+    raw = stdout.strip()
+    if not raw:
+        return ""
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+    if not isinstance(parsed, dict):
+        return raw
+    fields = [
+        parsed.get("result"),
+        parsed.get("response"),
+        parsed.get("message"),
+        parsed.get("content"),
+    ]
+    return "\n".join(str(field) for field in fields if field is not None)
+
+
 def _skip_if_headless_claude_unavailable(command: list[str], *, cwd: Path, env: dict[str, str]) -> None:
     code, stdout, stderr = _run_worker_command(command, cwd=cwd, env=env, timeout=25)
     if code is None:
@@ -64,9 +84,18 @@ def _skip_if_headless_claude_unavailable(command: list[str], *, cwd: Path, env: 
     if code != 0:
         pytest.skip(f"claude headless invocation unavailable: exit={code}; stderr={stderr[-500:]}")
     if stdout.strip():
-        parsed = json.loads(stdout)
-        if parsed.get("is_error") is True:
+        try:
+            parsed = json.loads(stdout)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict) and parsed.get("is_error") is True:
             pytest.skip(f"claude headless invocation unavailable: {parsed}")
+    readiness = _readiness_text(stdout)
+    if _READINESS_MARKER not in readiness:
+        pytest.skip(
+            "claude headless invocation did not return readiness marker; "
+            f"stdout={stdout[-500:]!r}; stderr={stderr[-500:]!r}"
+        )
 
 
 @pytest.mark.slow
@@ -145,9 +174,10 @@ def test_spawned_claude_worker_can_edit_authorized_file(tmp_path: Path) -> None:
     env = dict(os.environ)
     env["GTKB_PROJECT_ROOT"] = str(project)
     env["GTKB_BRIDGE_POLLER_RUN_ID"] = "pytest-worker-delivery"
+    env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = "::init gtkb pb"
     env.pop(trigger.LOOP_PREVENTION_ENV_VAR, None)
 
-    readiness_command = trigger._harness_command(target, "Return only WORKER_READY.", project)
+    readiness_command = trigger._harness_command(target, f"Return only {_READINESS_MARKER}.", project)
     assert readiness_command is not None
     _skip_if_headless_claude_unavailable(readiness_command, cwd=project, env=env)
 
