@@ -1,4 +1,4 @@
-# Bridge Index
+﻿# Bridge Index
 
 <!-- Prime inserts new document entries at the top of the list below. -->
 <!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-wrap-scan-report-relocation-slice-1
+GO: bridge/gtkb-wrap-scan-report-relocation-slice-1-002.md
 NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
