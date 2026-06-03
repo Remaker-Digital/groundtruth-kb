@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-wi-4279-scaffold-phantom-spec-citation-repoint
+GO: bridge/gtkb-wi-4279-scaffold-phantom-spec-citation-repoint-002.md
 NEW: bridge/gtkb-wi-4279-scaffold-phantom-spec-citation-repoint-001.md
 
 Document: gtkb-wi-3506-phantom-spec-citation-repoint
