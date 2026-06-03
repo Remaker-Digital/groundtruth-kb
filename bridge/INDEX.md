@@ -731,6 +731,7 @@ NO-GO: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-002.md
 NEW: bridge/gtkb-bridge-dispatcher-deferral-enforcement-repair-001.md
 
 Document: gtkb-governance-adoption-doctor-check
+VERIFIED: bridge/gtkb-governance-adoption-doctor-check-008.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-007.md
 GO: bridge/gtkb-governance-adoption-doctor-check-006.md
 REVISED: bridge/gtkb-governance-adoption-doctor-check-005.md
@@ -740,6 +741,7 @@ NO-GO: bridge/gtkb-governance-adoption-doctor-check-002.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-001.md
 
 Document: gtkb-release-candidate-gate-managed-skill
+NO-GO: bridge/gtkb-release-candidate-gate-managed-skill-010.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-009.md
 NO-GO: bridge/gtkb-release-candidate-gate-managed-skill-008.md
 NEW: bridge/gtkb-release-candidate-gate-managed-skill-007.md
@@ -1000,6 +1002,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
+VERIFIED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-010.md
 NEW: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-009.md
 GO: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-008.md
 REVISED: bridge/gtkb-codex-skill-loading-failure-cleanup-slice-1-007.md
