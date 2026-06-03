@@ -7,7 +7,16 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-startup-refractor-slice-c-startup-index-overlays
+GO: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md
+NEW: bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-001.md
+
+Document: gtkb-startup-refractor-slice-e-lo-startup-text-authority
+GO: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-002.md
+NEW: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-001.md
+
 Document: gtkb-startup-refractor-slice-b-local-settings-hygiene
+GO: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-002.md
 NEW: bridge/gtkb-startup-refractor-slice-b-local-settings-hygiene-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
@@ -15,6 +24,7 @@ GO: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoi
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-001.md
 
 Document: gtkb-bridge-revise-cli-slice-1
+VERIFIED: bridge/gtkb-bridge-revise-cli-slice-1-004.md
 NEW: bridge/gtkb-bridge-revise-cli-slice-1-003.md
 GO: bridge/gtkb-bridge-revise-cli-slice-1-002.md
 NEW: bridge/gtkb-bridge-revise-cli-slice-1-001.md
@@ -62,6 +72,7 @@ GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-002.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-001.md
 
 Document: gtkb-wrapup-enhancements-closure
+VERIFIED: bridge/gtkb-wrapup-enhancements-closure-004.md
 NEW: bridge/gtkb-wrapup-enhancements-closure-003.md
 GO: bridge/gtkb-wrapup-enhancements-closure-002.md
 NEW: bridge/gtkb-wrapup-enhancements-closure-001.md
