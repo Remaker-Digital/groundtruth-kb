@@ -303,7 +303,7 @@ proposal (a different bridge artifact); test (a verification artifact).
 **Definition:** An owner-stated capability or behavior the system must
 provide. May be functional (FR) or non-functional (NFR). Candidate
 requirements are pre-approval; promotion to formal `specification`
-requires owner-visible confirmation per `GOV-CHAT-DERIVED-SPEC-APPROVAL-001`.
+requires owner-visible confirmation per `GOV-SPEC-CAPTURE-TRANSPARENCY-001`.
 
 **Not to be confused with:** preference or wish (informal); inferred
 behavior (must not be silently promoted to requirement per
