@@ -64,25 +64,33 @@ owner assigns it.
 The owner assigns the Prime Builder role. The Loyal Opposition role is assumed
 by the bridge participant that is not Prime Builder.
 
-## Agent Red Separate-Project Boundary
+## Agent Red Reference Adopter Application Boundary
 
-Owner correction 2026-05-04 supersedes the prior Agent Red conformance framing
-for current GT-KB work: Agent Red is not part of GT-KB. It is a separate project
-whose repository is `https://github.com/mike-remakerdigital/agent-red`.
+Agent Red is the reference adopter application for GT-KB. The application subtree
+lives at `applications/Agent_Red/` per `CLAUDE.md` section Mandatory Project Root
+Boundary; its hosted form deploys from a lifecycle-independent repository at
+`https://github.com/mike-remakerdigital/agent-red`. Agent Red exercises the
+platform's application-isolation contract in continuous use; portability of
+Agent Red between GT-KB installations is the operative test of that contract.
 
-Historical owner decision `DELIB-0834` and
-`GOV-AGENT-RED-GTKB-CONFORMANCE-001` said Agent Red is a well-behaved,
-fully-conformant application supported and sustained by GroundTruth-KB, not an
-ad hoc exception, and should not be treated as an ad hoc exception. The current
-interpretation is narrower: Release-readiness work should preserve and enforce GT-KB
-supported application behavior when Agent Red is explicitly in scope, and those
-behaviors should be documented, and regression-tested where possible, without
-treating Agent Red files as live GT-KB artifacts.
+The canonical framing is established by `GOV-AGENT-RED-GTKB-CONFORMANCE-001`
+and `DELIB-0834`: Agent Red is a well-behaved, fully-conformant adopter
+supported and sustained by GroundTruth-KB, not an ad hoc exception, and is not
+to be treated as one. Active adopter-experience work tracks under
+`PROJECT-GTKB-ADOPTER-EXPERIENCE` (e.g., the Agent Red Deployability
+Preservation Gate at `bridge/gtkb-agent-red-deployability-preservation-gate-*`).
 
-GroundTruth-KB includes four small demo applications for validation and
-examples. Do not route unqualified GT-KB release, CI, bridge, source, or
-verification evidence to Agent Red. Agent Red work requires explicit owner
-scope and must use the separate Agent Red project identity.
+The 2026-05-04 owner correction narrowed tooling-reference discipline:
+unqualified GT-KB tooling references - CLI invocations, CI workflows, GitHub
+Actions, release evidence, repository state - must not resolve silently to Agent
+Red surfaces. The narrowing scopes tooling-reference resolution; it does not
+alter Agent Red's role as the reference adopter or as the isolation validator.
+Agent Red surfaces are addressed explicitly when in scope.
+
+GroundTruth-KB also includes four small demo applications used as scaffold
+examples; those are distinct from Agent Red (the reference adopter). Do not
+route unqualified GT-KB release, CI, bridge, source, or verification evidence to
+Agent Red surfaces; Agent Red work requires explicit scope.
 
 ## Formal Artifact Approval And Audit Principle
 
@@ -110,8 +118,9 @@ Owner decisions `DELIB-0828` and `DELIB-0829`, formalized as
 `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` and
 `GOV-GTKB-ADOPTION-ENFORCEMENT-001`, require production-release work to include
 governed release-readiness evidence. Any prior Agent Red adoption framing must
-be interpreted through the 2026-05-04 owner correction that Agent Red is a
-separate project, not part of GT-KB.
+be interpreted through the 2026-05-04 tooling-reference narrowing: unqualified
+GT-KB release-readiness evidence must not resolve silently to Agent Red surfaces
+unless Agent Red is explicitly in scope.
 
 New candidate skills, plug-ins, or doctor checks identified during adoption
 work must be added to the top of the outstanding work queue until adopted,

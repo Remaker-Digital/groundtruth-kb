@@ -258,9 +258,31 @@ of an application (vs. the lifecycle record managed by GT-KB).
 
 **Canonical full name:** Agent Red Customer Experience.
 
-**Definition:** A separate project, not part of GT-KB. Agent Red previously
-validated GT-KB during isolation work, but unqualified GT-KB references must not
-resolve to Agent Red files, CI, GitHub Actions, or repository state.
+**Definition:** The reference adopter application for GT-KB. Agent Red exercises
+the platform's application-isolation contract in continuous use through a
+deliberately lifecycle-independent repository and CI cadence. The application
+subtree lives at `applications/Agent_Red/` per `CLAUDE.md` section Mandatory
+Project Root Boundary and is described by
+`applications/Agent_Red/.gtkb-app-isolation.json`. The hosted form deploys from
+a lifecycle-independent repository (see "Configured GitHub repository URLs"
+below).
+
+**Role in GT-KB.** Agent Red is the isolation validator: portability of Agent Red
+between GT-KB installations is the operative test of the platform/application
+isolation contract (`ADR-APPLICATION-ISOLATION-CONTRACT-001` proposed;
+`DCL-APP-ROOT-MINIMIZATION-001` proposed;
+`applications/Agent_Red/.gtkb-app-isolation.json`). Active adopter-experience
+work tracks under `PROJECT-GTKB-ADOPTER-EXPERIENCE` (e.g., the Agent Red
+deployability preservation gate at
+`bridge/gtkb-agent-red-deployability-preservation-gate-*`).
+
+**Tooling-reference discipline (2026-05-04 narrowing).** Unqualified GT-KB tooling references
+- CLI invocations, CI workflows, GitHub Actions, release evidence, repository
+state - must not resolve silently to Agent Red surfaces.
+Agent Red surfaces are addressed explicitly when in scope (e.g.,
+adopter-experience work, isolation validation, Agent Red CI binding). The
+narrowing scopes tooling-reference resolution; it does not alter Agent Red's
+role as the reference adopter application or the isolation validator.
 
 **Configured GitHub repository URLs (canonical-migration window in effect):**
 
@@ -270,10 +292,19 @@ resolve to Agent Red files, CI, GitHub Actions, or repository state.
 When the canonical migration completes, the migration-target URL becomes the sole canonical and this entry is updated to remove the dual listing.
 
 **Not to be confused with:** the four small demo applications included with
-GT-KB, or with the GroundTruth-KB platform repository
-`https://github.com/Remaker-Digital/groundtruth-kb`.
+GT-KB (those are scaffolded examples, not the reference adopter); the
+GroundTruth-KB platform repository
+`https://github.com/Remaker-Digital/groundtruth-kb` (the platform that manages
+Agent Red as its reference adopter); a deployed Agent Red instance running in
+service (that is a "hosted application" - Agent Red's hosted form).
+Separate-repository topology is the mechanism of lifecycle independence; it
+should not be misread as severance from GT-KB.
 
-**Source:** owner correction, 2026-05-04; dual-repo clarification per S333 audit FINDING-P1-002 (downgraded to P3) and `bridge/gtkb-governance-hygiene-bundle-001.md` Change E.
+**Source:** `GOV-AGENT-RED-GTKB-CONFORMANCE-001`; `DELIB-0834`; owner directive
+2026-05-04 (tooling-reference narrowing); owner-decision capture S347
+(2026-05-24, reference-adopter framing restoration); dual-repo clarification per
+S333 audit FINDING-P1-002 (downgraded to P3) and
+`bridge/gtkb-governance-hygiene-bundle-001.md` Change E.
 
 ### adopter
 

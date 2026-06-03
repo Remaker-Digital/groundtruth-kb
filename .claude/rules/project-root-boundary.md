@@ -9,9 +9,15 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 - No GT-KB artifact may be created, read as a live dependency, updated, verified,
   or required from outside `E:\GT-KB`.
 - GT-KB demo/application files MUST be within `E:\GT-KB\applications\`.
-- Agent Red project files are not GT-KB files and must not be treated as live
-  GT-KB artifacts. Agent Red's separate repository is
-  `https://github.com/mike-remakerdigital/agent-red`.
+- Agent Red is the reference adopter application for GT-KB. Its application files
+  live at `E:\GT-KB\applications\Agent_Red\` per `CLAUDE.md` section
+  Mandatory Project Root Boundary, governed by the isolation contract at
+  `applications/Agent_Red/.gtkb-app-isolation.json`. The hosted form deploys
+  from a lifecycle-independent repository at
+  `https://github.com/mike-remakerdigital/agent-red`. Unqualified GT-KB tooling references
+  (CLI, CI workflows, GitHub Actions, release evidence) must not resolve
+  silently to Agent Red repository or CI surfaces; Agent Red surfaces are addressed
+  explicitly when in scope.
 - `E:\Claude-Playground` is an archive only. It is not a live GT-KB,
   Agent Red, harness-state, bridge, dashboard, memory, source, verification, or
   dependency location.
@@ -27,8 +33,10 @@ managed, scaffolded, upgraded, or governed by GT-KB.
   evidence. They must not be used as current instructions, defaults, examples,
   verification paths, or live dependencies.
 - Any live GT-KB artifact discovered under `E:\Claude-Playground` must be
-  relocated to its correct in-root home before that archive is deleted. Agent
-  Red artifacts belong to the separate Agent Red project, not the GT-KB root.
+  relocated to its correct in-root home before that archive is deleted. In-root
+  Agent Red application artifacts belong under `E:\GT-KB\applications\Agent_Red\`;
+  out-of-root Agent Red repository or CI artifacts are external surfaces that
+  must be explicitly scoped when used as evidence.
 - When a live path is unknown, fail closed and request or derive an in-root path.
 - Any proposal, review, implementation, or test that depends on a path outside
   the allowed roots is a NO-GO until revised to be root-contained.

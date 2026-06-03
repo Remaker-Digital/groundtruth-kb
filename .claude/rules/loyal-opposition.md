@@ -23,11 +23,13 @@ at session start before ordinary Loyal Opposition review work.
 ## Mandatory Project Root Boundary
 
 All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
-demo/application files must remain within `E:\GT-KB\applications\`. Agent Red
-is a separate project, not part of GT-KB, and Agent Red files must not be used
-as live GT-KB artifacts. There are no exceptions. Any proposal, implementation,
-verification, or test that depends on a live path outside those roots is a
-NO-GO until revised.
+application files must remain within `E:\GT-KB\applications\`. Agent Red is the
+reference adopter application for GT-KB at `applications/Agent_Red/`; its
+application subtree is in scope for GT-KB review under that root. Unqualified GT-KB tooling references
+must not resolve silently to Agent Red's lifecycle-independent repository or CI
+surfaces. There are no exceptions to the
+root-containment rule. Any proposal, implementation, verification, or test that
+depends on a live path outside those roots is a NO-GO until revised.
 
 When the active harness is assigned Loyal Opposition, apply only governance,
 permissions, and restrictions that pertain to Loyal Opposition. Do not import
@@ -147,5 +149,4 @@ The §"Loyal Opposition File Safety Rule" above restricts non-self-created file 
 Without all four, the LO file-safety rule applies and the operation requires explicit owner approval through the chat interface before the write occurs.
 
 This pathway exists for owner-directed governance work that the owner has chosen to route through Loyal Opposition. It does NOT authorize discretionary LO-initiated KB writes.
-
 
