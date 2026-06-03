@@ -595,6 +595,7 @@ NO-GO: bridge/gtkb-work-item-priority-canonical-p0p3-migration-002.md
 NEW: bridge/gtkb-work-item-priority-canonical-p0p3-migration-001.md
 
 Document: gtkb-lo-hygiene-assessment-skill-build
+VERIFIED: bridge/gtkb-lo-hygiene-assessment-skill-build-012.md
 REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-011.md
 NO-GO: bridge/gtkb-lo-hygiene-assessment-skill-build-010.md
 REVISED: bridge/gtkb-lo-hygiene-assessment-skill-build-009.md
