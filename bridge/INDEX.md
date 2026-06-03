@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-project-membership-reconciliation-slice-1-inventory-tool
+NEW: bridge/gtkb-project-membership-reconciliation-slice-1-inventory-tool-001.md
+
 Document: gtkb-project-membership-reconciliation-slice-1-scoping
 GO: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-002.md
 NEW: bridge/gtkb-project-membership-reconciliation-slice-1-scoping-001.md
