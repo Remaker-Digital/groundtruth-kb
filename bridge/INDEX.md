@@ -6,6 +6,10 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+
+Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-001.md
+
 Document: gtkb-wrapup-enhancements-closure
 NEW: bridge/gtkb-wrapup-enhancements-closure-001.md
 
@@ -743,6 +747,7 @@ NO-GO: bridge/gtkb-governance-adoption-doctor-check-002.md
 NEW: bridge/gtkb-governance-adoption-doctor-check-001.md
 
 Document: gtkb-release-candidate-gate-managed-skill
+VERIFIED: bridge/gtkb-release-candidate-gate-managed-skill-012.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-011.md
 NO-GO: bridge/gtkb-release-candidate-gate-managed-skill-010.md
 REVISED: bridge/gtkb-release-candidate-gate-managed-skill-009.md
