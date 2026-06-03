@@ -358,3 +358,20 @@ def test_handle_hook_payload_threads_payload_session_id(
     body = json.loads(_marker_path(tmp_path).read_text(encoding="utf-8"))
     assert body["session_id"] == "from-hook-payload"
     assert body["session_id_source"] == "payload"
+
+
+# ---------------------------------------------------------------------------
+# WI-4270: shared session-id resolver unification
+# (bridge/gtkb-session-id-shared-resolver-unification thread)
+# ---------------------------------------------------------------------------
+
+
+def test_marker_env_fallbacks_equals_canonical_marker_order() -> None:
+    """WI-4270: the marker writer's ``_SESSION_ID_ENV_FALLBACKS`` delegates to
+    the shared canonical ``MARKER_CONTINUITY_ORDER`` (GTKB_SESSION_ID-first), so
+    the marker membership/order is locked to the single authority. The
+    GTKB_SESSION_ID-first behavior asserted above is unchanged."""
+    from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER
+
+    module = _load_module()
+    assert tuple(module._SESSION_ID_ENV_FALLBACKS) == tuple(MARKER_CONTINUITY_ORDER)

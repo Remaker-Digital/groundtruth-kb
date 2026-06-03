@@ -77,15 +77,25 @@ _ROLE_HEADING = {
 STATE_DIR_REL = ".gtkb-state/bridge-poller/axis-2-surface"
 DISPATCH_STATE_REL = ".gtkb-state/bridge-poller/dispatch-state.json"
 ERRORS_LOG_REL = ".gtkb-state/bridge-poller/axis-2-surface/errors.jsonl"
-WORK_INTENT_SESSION_ENV_VARS = (
-    "CLAUDE_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-    "GTKB_INHERITED_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-    "ANTIGRAVITY_SESSION_ID",
-    "GTKB_SESSION_ID",
-)
+# Session-id env-var membership is owned by scripts/gtkb_session_id.py
+# (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
+# unification-003 GO at -004). Import the canonical bridge work-intent order;
+# fail soft to a verbatim local copy so this UserPromptSubmit hook never throws
+# on a partial install. The drift-lock test
+# platform_tests/scripts/test_gtkb_session_id.py + the axis-2 work-intent test
+# lock this fallback to the canonical BRIDGE_WORK_INTENT_ORDER.
+try:
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER as WORK_INTENT_SESSION_ENV_VARS
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    WORK_INTENT_SESSION_ENV_VARS = (
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "ANTIGRAVITY_SESSION_ID",
+        "GTKB_SESSION_ID",
+    )
 
 
 def _now_iso() -> str:

@@ -110,3 +110,38 @@ def test_axis2_work_intent_tuple_orders_claude_code_after_claude_session() -> No
     claude_index = tuple_.index("CLAUDE_SESSION_ID")
     claude_code_index = tuple_.index("CLAUDE_CODE_SESSION_ID")
     assert claude_code_index == claude_index + 1
+
+
+# ---------------------------------------------------------------------------
+# WI-4270: shared session-id resolver unification
+# (bridge/gtkb-session-id-shared-resolver-unification thread)
+# ---------------------------------------------------------------------------
+
+
+def test_axis2_env_vars_equals_canonical_bridge_order() -> None:
+    """WI-4270: the surface's WORK_INTENT_SESSION_ENV_VARS is the shared
+    canonical BRIDGE_WORK_INTENT_ORDER (membership de-duplicated)."""
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER
+
+    mod = _load_module()
+    assert tuple(mod.WORK_INTENT_SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)
+
+
+def test_axis2_failsoft_fallback_equals_canonical() -> None:
+    """WI-4270: with scripts.gtkb_session_id unavailable (partial install), the
+    surface's verbatim local fallback still equals the canonical order."""
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER
+
+    saved = sys.modules.get("scripts.gtkb_session_id")
+    sys.modules["scripts.gtkb_session_id"] = None  # force ImportError on the submodule
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_axis_2_surface_failsoft", HOOK_PATH)
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    finally:
+        if saved is None:
+            sys.modules.pop("scripts.gtkb_session_id", None)
+        else:
+            sys.modules["scripts.gtkb_session_id"] = saved
+    assert tuple(mod.WORK_INTENT_SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)

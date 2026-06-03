@@ -147,3 +147,33 @@ def test_claim_refused_when_other_session_holds_slug(tmp_path: Path) -> None:
     assert second.returncode == 2
     holder = json.loads(second.stdout)
     assert holder["session_id"] == "session-a"
+
+
+# ---------------------------------------------------------------------------
+# WI-4270: shared session-id resolver delegation
+# (bridge/gtkb-session-id-shared-resolver-unification thread)
+# ---------------------------------------------------------------------------
+
+
+def test_claim_resolves_claude_code_session_id_without_flag(tmp_path: Path) -> None:
+    """WI-4270: the claim CLI resolves CLAUDE_CODE_SESSION_ID from the shared
+    resolver without an explicit --session-id (delegation intact end-to-end)."""
+    claim = _run_cli(
+        tmp_path,
+        "claim",
+        "gtkb-cc-thread",
+        env={"CLAUDE_CODE_SESSION_ID": "claude-code-live"},
+    )
+    assert claim.returncode == 0, claim.stderr
+    assert json.loads(claim.stdout)["session_id"] == "claude-code-live"
+
+
+def test_session_env_vars_aliases_shared_bridge_order() -> None:
+    """WI-4270: SESSION_ENV_VARS aliases the canonical BRIDGE_WORK_INTENT_ORDER
+    so the CLI shares the single membership authority."""
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER
+
+    cli = _load_cli()
+    assert tuple(cli.SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)

@@ -57,28 +57,26 @@ from bridge_work_intent_registry import (  # noqa: E402  (path-fix import)
     current_holder,
     release,
 )
+from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id  # noqa: E402  (path-fix import)
 
 DEFAULT_TTL_SECONDS = 600
-SESSION_ENV_VARS = (
-    "CLAUDE_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-    "GTKB_INHERITED_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-    "ANTIGRAVITY_SESSION_ID",
-    "GTKB_SESSION_ID",
-)
+# Session-id env-var membership + bridge live-harness-first order are owned by
+# scripts/gtkb_session_id.py (WI-4270 shared resolver unification). SESSION_ENV_VARS
+# is retained as the public name for the error message and the precedence-contract
+# test; it aliases the canonical BRIDGE_WORK_INTENT_ORDER.
+SESSION_ENV_VARS = BRIDGE_WORK_INTENT_ORDER
 TTL_ENV_VAR = "GTKB_WORK_INTENT_TTL_SECONDS"
 
 
 def _resolve_session_id(arg_value: str | None) -> str:
-    """Return the session_id from --session-id or known harness env vars."""
-    if arg_value:
-        return arg_value
-    for env_var in SESSION_ENV_VARS:
-        env_value = os.environ.get(env_var)
-        if env_value:
-            return env_value
+    """Return the session_id from --session-id or known harness env vars.
+
+    Delegates resolution to the shared resolver (arg-first, then the bridge
+    work-intent env order) and preserves the CLI's raise-on-empty contract.
+    """
+    resolved = resolve_session_id(arg_value, order=SESSION_ENV_VARS)
+    if resolved:
+        return resolved
     env_names = ", ".join(SESSION_ENV_VARS)
     raise SystemExit(f"session_id required: pass --session-id or set one of: {env_names}")
 

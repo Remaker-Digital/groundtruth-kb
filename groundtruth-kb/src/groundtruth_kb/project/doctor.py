@@ -2812,8 +2812,12 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
 # repo-root scripts/ tree (Codex Review Ask 2 confirmed).
 _SESSION_ROLE_MARKER_NAME = "active-session-role.json"
 _SESSION_ROLE_VALID_ROLES = frozenset({"prime-builder", "loyal-opposition"})
-# MUST equal scripts.session_role_resolution._SESSION_ID_ENV_FALLBACKS /
-# scripts.workstream_focus._SESSION_ID_ENV_FALLBACKS (Slice 2/4).
+# MUST equal scripts.gtkb_session_id.MARKER_CONTINUITY_ORDER -- the single
+# session-id membership authority that scripts.workstream_focus._SESSION_ID_ENV_FALLBACKS
+# also delegates to (WI-4270 shared resolver unification). Kept as a verbatim
+# copy here (NOT imported) so the packaged groundtruth_kb doctor's import surface
+# stays out of the repo-root scripts/ tree (Codex Review Ask 2). Locked by the
+# platform_tests/scripts/test_doctor_session_role_marker.py parity tests.
 _SESSION_ID_ENV_FALLBACKS = (
     "GTKB_SESSION_ID",
     "CODEX_SESSION_ID",

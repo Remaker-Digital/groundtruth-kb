@@ -1081,13 +1081,18 @@ _MODE_TO_ROLE_PROFILE = {
     "lo": "loyal-opposition",
 }
 _SESSION_ROLE_MARKER_NAME = "active-session-role.json"
-_SESSION_ID_ENV_FALLBACKS = (
-    "GTKB_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-    "CLAUDE_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-)
+# Marker-continuity env order is owned by scripts/gtkb_session_id.py (WI-4270
+# shared resolver unification; bridge/gtkb-session-id-shared-resolver-
+# unification-003 GO at -004). Delegate to the shared MARKER_CONTINUITY_ORDER
+# (GTKB_SESSION_ID-first); behavior is identical to the prior local tuple. The
+# dual import mirrors this module's top-level import style (scripts.* package
+# path; bare name under direct script execution). The marker parity test
+# (platform_tests/hooks/test_workstream_focus_session_role_marker.py) locks
+# this to the canonical order.
+try:
+    from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER as _SESSION_ID_ENV_FALLBACKS
+except ImportError:  # pragma: no cover - direct script execution path
+    from gtkb_session_id import MARKER_CONTINUITY_ORDER as _SESSION_ID_ENV_FALLBACKS  # type: ignore[no-redef]
 _BRIDGE_DISPATCH_RUN_ID_ENV = "GTKB_BRIDGE_POLLER_RUN_ID"
 
 

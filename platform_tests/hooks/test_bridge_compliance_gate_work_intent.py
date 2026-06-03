@@ -145,3 +145,46 @@ def test_non_versioned_bridge_file_skips_claim_gate(gate: ModuleType, tmp_path: 
     )
 
     assert reason is None
+
+
+# ---------------------------------------------------------------------------
+# WI-4270: shared session-id resolver unification
+# (bridge/gtkb-session-id-shared-resolver-unification thread)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_work_intent_session_id_prefers_payload_over_env(
+    gate: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4270: the gate keeps payload-first precedence after sharing the env
+    membership; a payload session_id wins over any env candidate."""
+    _clear_session_env(monkeypatch)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "from-env")
+    assert gate._resolve_work_intent_session_id({"session_id": "from-payload"}) == "from-payload"
+
+
+def test_work_intent_env_vars_equals_canonical_bridge_order(gate: ModuleType) -> None:
+    """WI-4270: WORK_INTENT_SESSION_ENV_VARS is the shared canonical
+    BRIDGE_WORK_INTENT_ORDER (membership de-duplicated into one authority)."""
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER
+
+    assert tuple(gate.WORK_INTENT_SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)
+
+
+@pytest.mark.parametrize(("path", "label"), [(LIVE_HOOK, "live"), (TEMPLATE_HOOK, "template")])
+def test_work_intent_failsoft_fallback_equals_canonical(path: Path, label: str) -> None:
+    """WI-4270: when scripts.gtkb_session_id is unavailable (partial install),
+    the hook's verbatim local fallback still equals the canonical
+    BRIDGE_WORK_INTENT_ORDER, so a fail-soft fallback never silently diverges."""
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER
+
+    saved = sys.modules.get("scripts.gtkb_session_id")
+    sys.modules["scripts.gtkb_session_id"] = None  # force ImportError on the submodule
+    try:
+        mod = _load_gate(path, f"bridge_compliance_gate_failsoft_{label}")
+    finally:
+        if saved is None:
+            sys.modules.pop("scripts.gtkb_session_id", None)
+        else:
+            sys.modules["scripts.gtkb_session_id"] = saved
+    assert tuple(mod.WORK_INTENT_SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)

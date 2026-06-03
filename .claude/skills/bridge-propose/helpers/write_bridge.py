@@ -130,15 +130,25 @@ _SCAN_CATALOG: list[tuple[re.Pattern[str], str, str]] = [
 ]
 
 WORK_INTENT_TTL_SECONDS = 300
-WORK_INTENT_SESSION_ENV_VARS = (
-    "CLAUDE_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-    "GTKB_INHERITED_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-    "ANTIGRAVITY_SESSION_ID",
-    "GTKB_SESSION_ID",
-)
+# Session-id env-var membership is owned by scripts/gtkb_session_id.py
+# (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
+# unification-003 GO at -004). Import the canonical bridge work-intent order;
+# fail soft to a verbatim local copy so the helper never throws on a partial
+# install. The drift-lock test platform_tests/scripts/test_gtkb_session_id.py +
+# the bridge-propose work-intent test lock this fallback to the canonical
+# BRIDGE_WORK_INTENT_ORDER.
+try:
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER as WORK_INTENT_SESSION_ENV_VARS
+except Exception:  # pragma: no cover - helper fail-soft fallback for partial installs
+    WORK_INTENT_SESSION_ENV_VARS = (
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "ANTIGRAVITY_SESSION_ID",
+        "GTKB_SESSION_ID",
+    )
 
 
 def resolve_work_intent_session_id(environ: Mapping[str, str] | None = None) -> str:

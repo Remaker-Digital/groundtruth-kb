@@ -13,6 +13,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
 SCRIPTS_DIR = REPO_ROOT / "scripts"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
@@ -192,3 +194,40 @@ def test_propose_bridge_does_not_release_when_index_update_fails(
     holder = registry.current_holder("conflict-topic", project_root=tmp_path)
     assert holder is not None
     assert holder["session_id"] == "session-c"
+
+
+# ---------------------------------------------------------------------------
+# WI-4270: shared session-id resolver unification
+# (bridge/gtkb-session-id-shared-resolver-unification thread)
+# ---------------------------------------------------------------------------
+
+
+def test_helper_env_vars_equals_canonical_bridge_order() -> None:
+    """WI-4270: the helper's WORK_INTENT_SESSION_ENV_VARS is the shared
+    canonical BRIDGE_WORK_INTENT_ORDER (membership de-duplicated)."""
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER
+
+    helper = _load_helper()
+    assert tuple(helper.WORK_INTENT_SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)
+
+
+def test_helper_failsoft_fallback_equals_canonical() -> None:
+    """WI-4270: with scripts.gtkb_session_id unavailable (partial install), the
+    helper's verbatim local fallback still equals the canonical order."""
+    import importlib.util
+
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER
+
+    saved = sys.modules.get("scripts.gtkb_session_id")
+    sys.modules["scripts.gtkb_session_id"] = None  # force ImportError on the submodule
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_propose_helper_failsoft", HELPER_PATH)
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    finally:
+        if saved is None:
+            sys.modules.pop("scripts.gtkb_session_id", None)
+        else:
+            sys.modules["scripts.gtkb_session_id"] = saved
+    assert tuple(mod.WORK_INTENT_SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)

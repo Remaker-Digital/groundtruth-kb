@@ -164,3 +164,13 @@ def test_doctor_env_fallbacks_match_resolver() -> None:
     import scripts.workstream_focus as wsf
 
     assert tuple(doctor._SESSION_ID_ENV_FALLBACKS) == tuple(wsf._SESSION_ID_ENV_FALLBACKS)
+
+
+def test_doctor_env_fallbacks_match_shared_marker_order() -> None:
+    """WI-4270: the doctor keeps a verbatim copy (it must not import repo-root
+    scripts/, per the packaging constraint / Codex Review Ask 2). That copy must
+    equal the shared canonical MARKER_CONTINUITY_ORDER so it stays drift-locked
+    to the single membership authority."""
+    import scripts.gtkb_session_id as gsi
+
+    assert tuple(doctor._SESSION_ID_ENV_FALLBACKS) == tuple(gsi.MARKER_CONTINUITY_ORDER)

@@ -56,15 +56,25 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
-WORK_INTENT_SESSION_ENV_VARS = (
-    "CLAUDE_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-    "GTKB_INHERITED_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-    "ANTIGRAVITY_SESSION_ID",
-    "GTKB_SESSION_ID",
-)
+# Session-id env-var membership is owned by scripts/gtkb_session_id.py
+# (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
+# unification-003 GO at -004). Import the canonical bridge work-intent order;
+# fail soft to a verbatim local copy so the hook never throws on a partial
+# install (same pattern as the bridge_author_metadata import above). The
+# drift-lock test platform_tests/scripts/test_gtkb_session_id.py + the gate
+# work-intent test lock this fallback to the canonical BRIDGE_WORK_INTENT_ORDER.
+try:
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER as WORK_INTENT_SESSION_ENV_VARS
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    WORK_INTENT_SESSION_ENV_VARS = (
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "ANTIGRAVITY_SESSION_ID",
+        "GTKB_SESSION_ID",
+    )
 SPEC_LINK_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,
