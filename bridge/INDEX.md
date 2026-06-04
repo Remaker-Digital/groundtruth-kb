@@ -15,6 +15,7 @@ GO: bridge/gtkb-envelope-dispatch-element-001-002.md
 NEW: bridge/gtkb-envelope-dispatch-element-001-001.md
 
 Document: gtkb-session-envelope-durability-001
+NO-GO: bridge/gtkb-session-envelope-durability-001-002.md
 NEW: bridge/gtkb-session-envelope-durability-001-001.md
 
 Document: gtkb-canonical-wrap-keyword-syntax-001
