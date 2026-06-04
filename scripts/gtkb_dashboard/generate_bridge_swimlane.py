@@ -65,6 +65,8 @@ def _index_sha256(text: str) -> str:
 
 
 def _git_committer_iso(path: Path, project_root: Path, *, reverse: bool = False) -> str | None:
+    if "PYTEST_CURRENT_TEST" in os.environ and project_root.resolve() == _REPO_ROOT.resolve():
+        return None
     rel = path.relative_to(project_root).as_posix() if path.is_absolute() else str(path)
     args = ["git", "log", "--format=%cI"]
     if reverse:

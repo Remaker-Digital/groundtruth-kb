@@ -342,14 +342,34 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         ),
         encoding="utf-8",
     )
+    (harness_state / "harness-registry.json").write_text(
+        _json.dumps(
+            {
+                "schema_version": 1,
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": [
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["prime-builder", "loyal-opposition"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     state_dir = tmp_path / ".gtkb-state" / "bridge-poller"
     state_dir.mkdir(parents=True, exist_ok=True)
 
     # Register the task manually (not via installer.ps1 because installer
     # has its own argument shape; we need --dry-run + scratch project root).
     dispatcher_path = str(PROJECT_ROOT / "scripts" / "single_harness_bridge_dispatcher.py")
+    pythonw_exe = str(Path(sys.executable).with_name("pythonw.exe"))
     register_cmd = (
-        f"$action = New-ScheduledTaskAction -Execute 'pythonw.exe' "
+        f"$action = New-ScheduledTaskAction -Execute '{pythonw_exe}' "
         f'-Argument \'"{dispatcher_path}" --project-root "{tmp_path}" --dry-run\' '
         f"-WorkingDirectory '{tmp_path}'; "
         f"$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddYears(1); "

@@ -8,14 +8,17 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-git-hooks-path-mismatch-lint
+VERIFIED: bridge/gtkb-git-hooks-path-mismatch-lint-004.md
 NEW: bridge/gtkb-git-hooks-path-mismatch-lint-003.md
 GO: bridge/gtkb-git-hooks-path-mismatch-lint-002.md
 NEW: bridge/gtkb-git-hooks-path-mismatch-lint-001.md
 
 Document: gtkb-dispatch-envelope-adr-specs
+GO: bridge/gtkb-dispatch-envelope-adr-specs-002.md
 NEW: bridge/gtkb-dispatch-envelope-adr-specs-001.md
 
 Document: gtkb-pytest-basetemp-session-isolation
+VERIFIED: bridge/gtkb-pytest-basetemp-session-isolation-004.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-003.md
 GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
@@ -34,6 +37,7 @@ REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-002.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
 
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
+VERIFIED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-010.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-009.md
 GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-008.md
 REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-007.md
@@ -45,6 +49,7 @@ NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
 
 Document: gtkb-understand-anything-evaluation-install
+VERIFIED: bridge/gtkb-understand-anything-evaluation-install-010.md
 NEW: bridge/gtkb-understand-anything-evaluation-install-009.md
 GO: bridge/gtkb-understand-anything-evaluation-install-008.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-007.md
@@ -218,6 +223,7 @@ REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
 NEW: bridge/gtkb-claude-code-session-id-env-var-gap-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-010.md
 REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-009.md
 NO-GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-008.md
 REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-007.md

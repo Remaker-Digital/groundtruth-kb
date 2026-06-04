@@ -65,12 +65,19 @@ def benchmark_output_dir(run_id: str, project_root: Path | str | None = None) ->
     return out
 
 
+_COMMIT_CACHE: dict[Path, str | None] = {}
+
+
 def current_source_commit(project_root: Path | str | None = None) -> str | None:
     """Resolve ``HEAD`` SHA for the run's source_commit field.
 
     Returns None if git is unavailable or the call fails. Read-only.
     """
-    root = _resolve_project_root(project_root)
+    root = _resolve_project_root(project_root).resolve()
+    if root in _COMMIT_CACHE:
+        return _COMMIT_CACHE[root]
+
+    val = None
     try:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -81,10 +88,11 @@ def current_source_commit(project_root: Path | str | None = None) -> str | None:
             check=False,
         )
         if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
+            val = out.stdout.strip()
     except (FileNotFoundError, subprocess.SubprocessError):
-        return None
-    return None
+        pass
+    _COMMIT_CACHE[root] = val
+    return val
 
 
 def compute_idempotency_key(

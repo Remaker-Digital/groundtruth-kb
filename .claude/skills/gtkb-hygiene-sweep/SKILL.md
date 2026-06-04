@@ -38,7 +38,7 @@ Before invoking the CLI:
 
 ## Workflow
 
-1. **Invoke the CLI** — run `gt hygiene sweep` per its documented invocation (see `bridge/gtkb-hygiene-sweep-cli-004.md` and the CLI `--help` output). The CLI writes a findings JSON to a deterministic path under `.gtkb-state/hygiene-sweep/<run_id>/`.
+1. **Invoke the CLI** — run `gt hygiene sweep` per its documented invocation (see `bridge/gtkb-hygiene-sweep-cli-004.md` and the CLI `--help` output). If `gt` is unavailable on PATH in the current harness, fall back to the repo-local entrypoint `python -m groundtruth_kb hygiene sweep` (with `PYTHONPATH=groundtruth-kb/src` when needed). The CLI writes a findings JSON to a deterministic path under `.gtkb-state/hygiene-sweep/<run_id>/`.
 2. **Read findings JSON** — load the deterministic finding list, including class label and source-context metadata per finding.
 3. **Classify each finding by lifecycle trigger category** per `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` **before** recommending any action:
    - `deferred` — a finding tied to a topic the owner has explicitly deferred.

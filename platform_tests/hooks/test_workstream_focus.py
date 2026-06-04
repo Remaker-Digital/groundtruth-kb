@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -463,10 +464,13 @@ def _write_relay_cache(
     diagnostics.mkdir(parents=True, exist_ok=True)
     encoded = body.encode("utf-8")
     diagnostics.joinpath("last-user-visible-startup.md").write_text(body, encoding="utf-8", newline="\n")
+    from datetime import datetime
+
+    now_str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     meta = {
         "harness_name": "codex",
         "harness_id": "A",
-        "generated_at": "2026-05-15T00:00:00Z",
+        "generated_at": now_str,
         "byte_length": byte_length if byte_length is not None else len(encoded),
         "sha256": sha if sha is not None else hashlib.sha256(encoded).hexdigest(),
     }
@@ -481,7 +485,9 @@ def test_startup_gate_emits_bounded_pointer_not_inlined_disclosure(tmp_path, mon
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     _write_startup_gate_guard(tmp_path)
-    disclosure = "# GroundTruth-KB Fresh Session Startup\n\n" + ("disclosure body line\n" * 400)
+    disclosure = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\n" + (
+        "disclosure body line\n" * 400
+    )
     _write_relay_cache(tmp_path / ".codex" / "gtkb-hooks", disclosure)
 
     response = module.handle_hook_payload(
@@ -505,7 +511,9 @@ def test_startup_gate_message_authorizes_one_read_only_read(tmp_path, monkeypatc
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     _write_startup_gate_guard(tmp_path)
-    _write_relay_cache(tmp_path / ".codex" / "gtkb-hooks", "# Fresh Session Startup\n\nbody")
+    _write_relay_cache(
+        tmp_path / ".codex" / "gtkb-hooks", "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nbody"
+    )
 
     response = module.handle_hook_payload(
         {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
