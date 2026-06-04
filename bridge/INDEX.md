@@ -37,6 +37,7 @@ WITHDRAWN: bridge/gtkb-agent-sot-read-discipline-phase-1-002.md
 NEW: bridge/gtkb-agent-sot-read-discipline-phase-1-001.md
 
 Document: gtkb-platform-sot-consolidation-umbrella
+REVISED: bridge/gtkb-platform-sot-consolidation-umbrella-005.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-004.md
 REVISED: bridge/gtkb-platform-sot-consolidation-umbrella-003.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-002.md
