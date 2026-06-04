@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-auto-push-investigation-001-slice-1-findings
+NEW: bridge/gtkb-auto-push-investigation-001-slice-1-findings-001.md
+
 Document: gtkb-restore-systems-and-tools-doc
 VERIFIED: bridge/gtkb-restore-systems-and-tools-doc-004.md
 NEW: bridge/gtkb-restore-systems-and-tools-doc-003.md
