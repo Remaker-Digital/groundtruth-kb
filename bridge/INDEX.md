@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-v1-mechanical-enforcement-gate-scoping
+NEW: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-001.md
+
 Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
 NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-001.md
 
@@ -15,6 +18,7 @@ GO: bridge/gtkb-work-tree-hygiene-mechanism-scoping-002.md
 NEW: bridge/gtkb-work-tree-hygiene-mechanism-scoping-001.md
 
 Document: gtkb-mode-switch-validator-hook-matcher-shape-fix
+NO-GO: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-004.md
 NEW: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-003.md
 GO: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-002.md
 NEW: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-001.md
