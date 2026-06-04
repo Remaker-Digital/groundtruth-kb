@@ -19,6 +19,7 @@ NO-GO: bridge/gtkb-session-envelope-durability-001-002.md
 NEW: bridge/gtkb-session-envelope-durability-001-001.md
 
 Document: gtkb-canonical-wrap-keyword-syntax-001
+NO-GO: bridge/gtkb-canonical-wrap-keyword-syntax-001-002.md
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
 
 Document: gtkb-envelope-init-keyword-amendment-slice-1
