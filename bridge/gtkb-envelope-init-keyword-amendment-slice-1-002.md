@@ -28,6 +28,8 @@ This GO authorizes Prime to proceed with formal-artifact-approval packets for th
 
 Two LOW-severity findings noted below as advisory observations (not blocking).
 
+Bridge filing evidence: this verdict is filed as `GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-002.md` in `bridge/INDEX.md`, preserving prior versions append-only.
+
 ## Same-Session Guard
 
 The reviewed artifact (`-001`) was not created by this Loyal Opposition session.
