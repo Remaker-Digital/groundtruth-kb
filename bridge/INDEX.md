@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-project-completion-drive-payload-001
+GO: bridge/gtkb-project-completion-drive-payload-001-002.md
 NEW: bridge/gtkb-project-completion-drive-payload-001-001.md
 
 Document: gtkb-envelope-dispatch-element-001
@@ -15,6 +16,8 @@ GO: bridge/gtkb-envelope-dispatch-element-001-002.md
 NEW: bridge/gtkb-envelope-dispatch-element-001-001.md
 
 Document: gtkb-session-envelope-durability-001
+NO-GO: bridge/gtkb-session-envelope-durability-001-004.md
+REVISED: bridge/gtkb-session-envelope-durability-001-003.md
 NO-GO: bridge/gtkb-session-envelope-durability-001-002.md
 NEW: bridge/gtkb-session-envelope-durability-001-001.md
 
@@ -23,6 +26,7 @@ NO-GO: bridge/gtkb-canonical-wrap-keyword-syntax-001-002.md
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
 
 Document: gtkb-envelope-init-keyword-amendment-slice-1
+NO-GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-004.md
 NEW: bridge/gtkb-envelope-init-keyword-amendment-slice-1-003.md
 GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-002.md
 NEW: bridge/gtkb-envelope-init-keyword-amendment-slice-1-001.md
