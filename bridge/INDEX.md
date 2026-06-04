@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-v1-mechanical-enforcement-gate-scoping
+GO: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-002.md
 NEW: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-001.md
 
 Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
@@ -29,6 +30,7 @@ WITHDRAWN: bridge/gtkb-agent-sot-read-discipline-phase-1-002.md
 NEW: bridge/gtkb-agent-sot-read-discipline-phase-1-001.md
 
 Document: gtkb-platform-sot-consolidation-umbrella
+REVISED: bridge/gtkb-platform-sot-consolidation-umbrella-003.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-002.md
 NEW: bridge/gtkb-platform-sot-consolidation-umbrella-001.md
 
