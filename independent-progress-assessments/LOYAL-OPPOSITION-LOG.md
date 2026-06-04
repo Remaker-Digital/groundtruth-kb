@@ -254,6 +254,21 @@
 
 ---
 
+### 2026-06-04 - LO autonomous /loop: empty queue + bridge_kind taxonomy drift
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | LO actionable queue is empty (0 entries); 12 GOs, 121 VERIFIED, 1 NO-GO, 5 ADVISORY, 1 DEFERRED, 44 WITHDRAWN. Steady state, all LO duties discharged at this snapshot. | `python .claude/skills/bridge/helpers/scan_bridge.py --role loyal-opposition` at 13:35:56Z. | None required; observation only. | Resolved |
+| Technical | All 12 top-of-chain GO entries are correctly classified TERMINAL-OK (`target_paths: []`, `requires_verification: false`). No mis-classification stalling Prime. | Sub-agent audit of `bridge/<slug>-002.md` through `-006.md` for the 12 GO slugs; see report. | None required; positive confirmation of WI-4278 terminal-GO filter. | Resolved |
+| Technical | `bridge_kind` taxonomy drift across bridge corpus: 25+ distinct values, 11 synonyms for "LO verdict" alone (loyal_opposition_verdict 394, verification_verdict 301, review_verdict 103, loyal_opposition_review 42, etc.). Silent classifier hazard for `scan_bridge.py`, cross-harness trigger, and dashboards. | `grep -hr "^bridge_kind:" bridge/*.md \| sort \| uniq -c \| sort -rn`; full report in `INSIGHTS-2026-06-04-13-37-LO-LOOP-EMPTY-QUEUE-AND-BRIDGE-KIND-TAXONOMY-DRIFT.md`. | Land a canonical 5-7-value `bridge_kind` enum + bridge-compliance-gate lint; migrate via re-version backfill. P2. | Open |
+| Process | `.claude/session/active-session-role.json` written at 13:33:38Z with `role=prime-builder` for my session ID (4c7620e0-be99-…) despite the session resolving as Loyal Opposition via `::init gtkb lo` at SessionStart 13:30:14Z. Parallel-session marker race (same defect class as project_s_scheduled_pb_saturation_clobber). | File contents inspected; LO startup disclosure was successfully relayed from `last-user-visible-startup-lo.md` (sha256 `cad2ad18…`). | Add atomic session-stated-role marker write with cross-session clobber rejection in `scripts/workstream_focus.py`. P2. | Open |
+| Process | Bridge dispatch state (`.gtkb-state/bridge-poller/dispatch-state.json`) is 3 days stale (last update 2026-06-01T18:07:51Z) despite many VERIFIED entries landing 2026-06-04 (commits `ed23f6b5`, `e0d4cc29`, `ad45a73d`, `2fa27699`, `6beb26c2`). Likely the trigger writes only on actionable-signature change, not every fire; needs confirmation before any alarm threshold is set. | `dispatch-state.json` inspection. | Add doctor staleness WARN once write semantics are confirmed. P3. | Open |
+| Technical | Stranded atomic-write tmp file `dispatch-state.json.34252-0f2d0cc7.tmp` alongside canonical `dispatch-state.json`. Single instance, no rotation pattern. | `ls .gtkb-state/bridge-poller/`. | Add cleanup of `*.tmp` stragglers in poller-state hygiene. P3. | Open |
+
+Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-04-13-37-LO-LOOP-EMPTY-QUEUE-AND-BRIDGE-KIND-TAXONOMY-DRIFT.md`.
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).
