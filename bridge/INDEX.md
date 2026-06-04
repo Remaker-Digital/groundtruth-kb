@@ -20,6 +20,7 @@ NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
 NEW: bridge/gtkb-document-author-provenance-contract-001.md
 
 Document: gtkb-impl-start-target-paths-preflight
+REVISED: bridge/gtkb-impl-start-target-paths-preflight-008.md
 NO-GO: bridge/gtkb-impl-start-target-paths-preflight-007.md
 NEW: bridge/gtkb-impl-start-target-paths-preflight-006.md
 GO: bridge/gtkb-impl-start-target-paths-preflight-005.md
