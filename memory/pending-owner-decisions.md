@@ -7614,6 +7614,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-04T03:43:47.678653Z
   answer: "Your questions have been answered: \"How should I finish the S404 wrap? The scan is clean for my work; the tree is broad/mixed-owner with concurrent-session WIP.\"=\"MEMORY.md entry + deliberation harvest\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1003
+  asked_at: 2026-06-04T04:19:15.899866Z
+  question: "How should I handle the commit? The working tree has another session's bridge WIP (-013 file + INDEX entry, mtime 21:09/21:14) and accumulated owner-decision-tracker entries from other sessions today."
+  options:
+    - "Path-restricted: -013 + INDEX only"
+    - "All three files in one commit"
+    - "Only the tracker file"
+    - "Do not commit; stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 30f85863997d5d7b
+  resolved_at: 2026-06-04T04:19:15.899866Z
+  answer: "Your questions have been answered: \"How should I handle the commit? The working tree has another session's bridge WIP (-013 file + INDEX entry, mtime 21:09/21:14) and accumulated owner-decision-tracker entries from other sessions today.\"=\"All three files in one commit\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
