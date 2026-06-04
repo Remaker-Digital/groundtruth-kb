@@ -288,8 +288,8 @@ class TestInventoryCoverage:
         )
         repo_root = Path(__file__).resolve().parents[2]
         approved_files = [
-            repo_root / "src" / "multi_tenant" / "auth.py",
-            repo_root / "src" / "multi_tenant" / "admin_apikey_api.py",
+            repo_root / "applications" / "Agent_Red" / "src" / "multi_tenant" / "auth.py",
+            repo_root / "applications" / "Agent_Red" / "src" / "multi_tenant" / "admin_apikey_api.py",
         ]
         repo_values: set[str] = set()
         for src_file in approved_files:

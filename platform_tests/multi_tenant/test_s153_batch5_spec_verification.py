@@ -12,9 +12,10 @@ pytestmark = pytest.mark.local_env
 
 
 # ── Paths ──────────────────────────────────────────────────────────────
-SRC = Path(__file__).resolve().parents[2] / "src"
-ADMIN = Path(__file__).resolve().parents[2] / "admin"
-WIDGET = Path(__file__).resolve().parents[2] / "widget"
+APP_ROOT = Path(__file__).resolve().parents[2] / "applications" / "Agent_Red"
+SRC = APP_ROOT / "src"
+ADMIN = APP_ROOT / "admin"
+WIDGET = APP_ROOT / "widget"
 STANDALONE = ADMIN / "standalone"
 SHARED = ADMIN / "shared"
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
@@ -366,7 +367,7 @@ class TestSpec0797AGNTCYIsolation:
         )
 
     def test_agntcy_referenced_as_external(self):
-        claude_md = Path(__file__).resolve().parents[2] / "CLAUDE.md"
+        claude_md = APP_ROOT / "CLAUDE.md"
         src = claude_md.read_text(encoding="utf-8")
         assert "AGNTCY" in src, "CLAUDE.md must reference AGNTCY"
         assert "public repo" in src.lower() or "github.com" in src, "AGNTCY must be referenced as external"

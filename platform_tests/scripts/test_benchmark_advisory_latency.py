@@ -25,8 +25,8 @@ EMPTY_START = "1990-01-01T00:00:00+00:00"
 EMPTY_END = "1990-01-02T00:00:00+00:00"
 
 
-def test_advisory_latency_basic_run():
-    result = bm.run(PAST, FUTURE, REPO)
+def test_advisory_latency_basic_run(tmp_path):
+    result = bm.run(PAST, FUTURE, tmp_path)
     assert isinstance(result, BenchmarkResult)
     assert result.benchmark_id == bm.BENCHMARK_ID
     assert result.window_start == PAST
@@ -35,21 +35,21 @@ def test_advisory_latency_basic_run():
     assert isinstance(result.dimensions, dict)
 
 
-def test_advisory_latency_idempotency_dimensions():
-    a = bm.run(PAST, FUTURE, REPO)
-    b = bm.run(PAST, FUTURE, REPO)
+def test_advisory_latency_idempotency_dimensions(tmp_path):
+    a = bm.run(PAST, FUTURE, tmp_path)
+    b = bm.run(PAST, FUTURE, tmp_path)
     assert a.dimensions == b.dimensions
     assert a.value == b.value
 
 
-def test_advisory_latency_expected_dimension_keys():
-    result = bm.run(PAST, FUTURE, REPO)
+def test_advisory_latency_expected_dimension_keys(tmp_path):
+    result = bm.run(PAST, FUTURE, tmp_path)
     for k in ("advisory_count", "matched_advisories", "sample_size"):
         assert k in result.dimensions
 
 
-def test_advisory_latency_empty_window_graceful():
-    result = bm.run(EMPTY_START, EMPTY_END, REPO)
+def test_advisory_latency_empty_window_graceful(tmp_path):
+    result = bm.run(EMPTY_START, EMPTY_END, tmp_path)
     assert isinstance(result, BenchmarkResult)
     assert isinstance(result.value, (int, float))
 

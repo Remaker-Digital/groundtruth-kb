@@ -7708,6 +7708,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-04T06:33:11.450615Z
   answer: "Your questions have been answered: \"Wrap-scan is clean (W0+W1+W2 all exit 0; findings are pre-existing hygiene, not S405-introduced). How deep should the session wrap go?\"=\"Full /kb-session-wrap procedure\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1010
+  asked_at: 2026-06-04T13:39:26.860922Z
+  question: "Which item should I take next?"
+  options:
+    - "Commit WI-4301 capstone (Item 1)"
+    - "Stage owner evidence for Item 2"
+    - "Surface WI-4291 -008 evidence pending state (Item 3)"
+    - "Different focus — I will state it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 501f08da346bd5cc
+  resolved_at: 2026-06-04T13:39:26.860922Z
+  answer: "Your questions have been answered: \"Which item should I take next?\"=\"Commit WI-4301 capstone (Item 1)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

@@ -125,6 +125,8 @@ def test_t_rename_3_directory_state() -> None:
         for line in PRE_RENAME_SOURCE_LIST.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    # Filter out test_build_contract.py which was relocated to the Agent Red test tree (WI-3371)
+    pre_rename_files = [f for f in pre_rename_files if f != "platform_tests/test_host/test_build_contract.py"]
     missing = [f for f in pre_rename_files if not (PROJECT_ROOT / f).is_file()]
     assert not missing, f"{len(missing)} pre-rename files not found at new path: {missing[:5]}..."
 
