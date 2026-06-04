@@ -1,0 +1,16 @@
+{
+  "action": "update",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001",
+  "artifact_type": "governance",
+  "change_reason": "Per owner AUQ DECISION (2026-06-04, Family 3 amendment synthesis): v2 body authored from v_current + source deltas. Owner reviewed unified diff before approval. WI-4300 amendment per bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-001.md lines 426-448: append envelope-program operational mechanics paragraph; existing core sentence preserved.",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "WI-4300 amendment per bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-001.md lines 426-448: append envelope-program operational mechanics paragraph; existing core sentence preserved.",
+  "full_content": "Each Agent Red / GT-KB session must actively inform and engage the user, draw attention to priorities across all dimensions of the project, and simplify user input by suggesting concrete actions and priorities.\n\nThe envelope program (WI-4291..WI-4302 series, all GO-terminal at design phase as of 2026-06-04) provides the deterministic operational mechanics for this GOV's proactive-engagement mandate. Session openings use the canonical init keyword family (`::init <subject> <role>`, per the GO-terminal sibling thread covering WI-4291's amendment); session closures use the canonical wrap keyword family (`::wrap` plus 17 NL phrases, per WI-4292) running the deterministic 4-tier wrap procedure (per WI-4294). In-session topic work is routed via `::open <type>` / `::close <type>` per WI-4295's topic-envelope router. Recurring ops/review/audit work uses dispatch envelopes per WI-4296. The envelope.json state file per WI-4293 schema is the live session-state surface; archived envelopes provide cross-session handoff context for the deterministic handoff-prompt generator per WI-4299 (when filed and approved).\n",
+  "full_content_sha256": "dbf9871e0a2277b6345501b0775e8080e1f2eb33ff5e6d7cdd8ceb25d3ddd43e",
+  "presented_to_user": true,
+  "source_ref": "bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-001.md",
+  "target_version": 2,
+  "transcript_captured": true
+}
