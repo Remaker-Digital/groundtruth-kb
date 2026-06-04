@@ -70,6 +70,7 @@ GO: bridge/gtkb-wrap-scan-report-relocation-slice-1-002.md
 NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
+VERIFIED: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-020.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-019.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-018.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-017.md
