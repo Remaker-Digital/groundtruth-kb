@@ -11,6 +11,7 @@ Document: gtkb-v1-mechanical-enforcement-gate-scoping
 NEW: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-001.md
 
 Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
+GO: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-002.md
 NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-001.md
 
 Document: gtkb-work-tree-hygiene-mechanism-scoping
