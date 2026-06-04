@@ -1,0 +1,26 @@
+schema_version = 1
+
+governed_surfaces = [
+  "bridge/**/*.md",
+  ".claude/rules/**/*.md",
+  "independent-progress-assessments/**/*.md",
+  "memory/**/*.md",
+  "docs/**/*.md",
+]
+
+exclusions = [
+  "bridge/INDEX.md",
+  ".claude/worktrees/**",
+  ".gtkb-state/**",
+  "archive/**",
+  "**/superseded-*/**",
+]
+
+required_author_fields = [
+  "author_identity",
+  "author_harness_id",
+  "author_session_context_id",
+  "author_model",
+  "author_model_version",
+  "author_model_configuration",
+]
