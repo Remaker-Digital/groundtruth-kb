@@ -206,20 +206,21 @@ def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: 
         settings_path = project_root / ".claude" / "settings.json"
         codex_hooks_path = project_root / ".codex" / "hooks.json"
 
+        def _contains_bridge_trigger(value: object) -> bool:
+            if isinstance(value, dict):
+                command = value.get("command")
+                if isinstance(command, str) and "cross_harness_bridge_trigger.py" in command:
+                    return True
+                return any(_contains_bridge_trigger(child) for key, child in value.items() if key not in {"command"})
+            if isinstance(value, list):
+                return any(_contains_bridge_trigger(item) for item in value)
+            return False
+
         # Check settings.json
         if settings_path.is_file():
             try:
                 data = json.loads(settings_path.read_text(encoding="utf-8"))
-                hooks = data.get("hooks", {})
-                if isinstance(hooks, dict):
-                    for hook_list in hooks.values():
-                        if isinstance(hook_list, list):
-                            for hook in hook_list:
-                                if isinstance(hook, dict) and "cross_harness_bridge_trigger.py" in hook.get(
-                                    "command", ""
-                                ):
-                                    registered = True
-                                    break
+                registered = _contains_bridge_trigger(data.get("hooks", {}))
             except Exception:
                 pass
 
@@ -227,16 +228,7 @@ def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: 
         if not registered and codex_hooks_path.is_file():
             try:
                 data = json.loads(codex_hooks_path.read_text(encoding="utf-8"))
-                hooks = data.get("hooks", {})
-                if isinstance(hooks, dict):
-                    for hook_list in hooks.values():
-                        if isinstance(hook_list, list):
-                            for hook in hook_list:
-                                if isinstance(hook, dict) and "cross_harness_bridge_trigger.py" in hook.get(
-                                    "command", ""
-                                ):
-                                    registered = True
-                                    break
+                registered = _contains_bridge_trigger(data.get("hooks", {}))
             except Exception:
                 pass
 

@@ -33,6 +33,56 @@ def test_substrate_artifact_validator_reports_missing_hook_registrations(tmp_pat
     assert res.is_valid is True
 
 
+def test_substrate_artifact_validator_detects_nested_matcher_wrapper_shape(tmp_path: Path) -> None:
+    claude_root = tmp_path / "claude"
+    _write(
+        claude_root / ".claude" / "settings.json",
+        json.dumps(
+            {
+                "hooks": {
+                    "PostToolUse": [
+                        {
+                            "matcher": "Write|Edit|MultiEdit",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python scripts/cross_harness_bridge_trigger.py",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+    )
+    res = validate_bridge_substrate(claude_root, "cross_harness_trigger", "single_harness")
+    assert res.is_valid is True
+
+    codex_root = tmp_path / "codex"
+    _write(
+        codex_root / ".codex" / "hooks.json",
+        json.dumps(
+            {
+                "hooks": {
+                    "PostToolUse": [
+                        {
+                            "matcher": "shell_command|apply_patch",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python scripts/cross_harness_bridge_trigger.py",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+    )
+    res = validate_bridge_substrate(codex_root, "cross_harness_trigger", "single_harness")
+    assert res.is_valid is True
+
+
 def test_role_artifact_validator_required_before_substrate_write(tmp_path: Path) -> None:
     # Validate missing role artifact behavior
     res = validate_role_artifact(tmp_path)
