@@ -12,12 +12,14 @@ NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
 NEW: bridge/gtkb-document-author-provenance-contract-001.md
 
 Document: gtkb-impl-start-gate-pretooluse-restore
+GO: bridge/gtkb-impl-start-gate-pretooluse-restore-005.md
 REVISED: bridge/gtkb-impl-start-gate-pretooluse-restore-004.md
 NO-GO: bridge/gtkb-impl-start-gate-pretooluse-restore-003.md
 GO: bridge/gtkb-impl-start-gate-pretooluse-restore-002.md
 NEW: bridge/gtkb-impl-start-gate-pretooluse-restore-001.md
 
 Document: gtkb-impl-start-target-paths-preflight
+GO: bridge/gtkb-impl-start-target-paths-preflight-005.md
 REVISED: bridge/gtkb-impl-start-target-paths-preflight-004.md
 NO-GO: bridge/gtkb-impl-start-target-paths-preflight-003.md
 GO: bridge/gtkb-impl-start-target-paths-preflight-002.md
