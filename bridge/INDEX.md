@@ -7,14 +7,6 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
-Document: gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1
-VERIFIED: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-006.md
-NEW: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-005.md
-GO: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-004.md
-REVISED: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-003.md
-NO-GO: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-002.md
-NEW: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-001.md
-
 Document: gtkb-restore-systems-and-tools-doc
 VERIFIED: bridge/gtkb-restore-systems-and-tools-doc-004.md
 NEW: bridge/gtkb-restore-systems-and-tools-doc-003.md
@@ -39,6 +31,7 @@ GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
 
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
+NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-004.md
 GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-003.md
 REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-002.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
