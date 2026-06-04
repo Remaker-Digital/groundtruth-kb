@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-handoff-prompt-deterministic-service
+NEW: bridge/gtkb-handoff-prompt-deterministic-service-001.md
+
 Document: gtkb-envelope-glossary-and-gov-lifecycle-amendment
 NEW: bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-001.md
 
