@@ -146,11 +146,11 @@ Relevant records:
 
 | Specification | Test or Verification Command | Executed | Result |
 |---|---|---|---|
-| `REQ-HARNESS-REGISTRY-001` | `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_session_self_initialization.py platform_tests\scripts\test_single_harness_bridge_dispatcher.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.pytest_tmp_lo_mirror19_main` | yes | `78 passed in 273.32s` |
-| `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` | Same startup/dispatcher pytest lane plus `rg` readback of `operating_role_path` and role-source assertions | yes | Registry-preferred source behavior and assertions confirmed |
-| `ADR-ROLE-STATUS-ORTHOGONALITY-001` | Same startup/dispatcher pytest lane | yes | Dispatcher and startup role-source behavior passed |
-| `ADR-SINGLE-HARNESS-OPERATING-MODE-001` | Same startup/dispatcher pytest lane | yes | Single-harness dispatcher tests passed |
-| `DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001` | Same startup/dispatcher pytest lane | yes | Single-harness dispatcher tests passed |
+| `REQ-HARNESS-REGISTRY-001` | Split startup/dispatcher pytest lanes: `test_session_self_initialization.py` and `test_single_harness_bridge_dispatcher.py` | yes | Same 78-test surface reproduced as `66 passed in 203.09s` plus `12 passed in 1.39s` |
+| `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` | Split startup/dispatcher pytest lanes plus `rg` readback of `operating_role_path` and role-source assertions | yes | Registry-preferred source behavior and assertions confirmed |
+| `ADR-ROLE-STATUS-ORTHOGONALITY-001` | Split startup/dispatcher pytest lanes | yes | Dispatcher and startup role-source behavior passed |
+| `ADR-SINGLE-HARNESS-OPERATING-MODE-001` | Split startup/dispatcher pytest lanes | yes | Single-harness dispatcher tests passed |
+| `DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001` | Split startup/dispatcher pytest lanes | yes | Single-harness dispatcher tests passed |
 | `GOV-STANDING-BACKLOG-001` | `groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb backlog list --id WI-4214 --json --all` | yes | WI-4214 is the open backlogged target record |
 | `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | `groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb projects authorizations PROJECT-GTKB-ROLE-STATUS-ORTHOGONALITY-DISPATCH --json --all` | yes | Active PAUTH for WI-4214 present |
 | `GOV-FILE-BRIDGE-AUTHORITY-001` | `python .claude\skills\bridge\helpers\show_thread_bridge.py gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces --format json --preview-lines 80`; INDEX update for this verdict | yes | Thread drift was `[]`; `-019` includes INDEX evidence; `VERIFIED -020` inserted above `NEW -019` |
@@ -178,10 +178,17 @@ Relevant records:
   specifications.
 - Mandatory clause preflight passed with zero evidence gaps and zero blocking
   gaps.
-- The long startup/dispatcher lane reproduced: `78 passed in 273.32s`.
-- The root/sentinel lane reproduced: `22 passed in 1.04s`.
-- Ruff check passed for the touched startup source/test pair.
-- Ruff format check passed for the touched startup source/test pair.
+- The startup/dispatcher surface reproduced when split by file:
+  `test_session_self_initialization.py` passed `66 passed in 203.09s`, and
+  `test_single_harness_bridge_dispatcher.py` passed `12 passed in 1.39s`.
+- The combined startup/dispatcher invocation exceeded the 300-second shell
+  timeout after progressing through the session-self-initialization suite; the
+  split lanes cover the same 78 tests without changing source state.
+- The root/sentinel lane reproduced: `22 passed in 2.09s`.
+- Ruff check passed for all reviewed startup, dispatcher, sentinel, and mirror
+  test source files.
+- Ruff format check passed for all reviewed startup, dispatcher, sentinel, and
+  mirror test source files.
 - Narrative artifact evidence passed for `CLAUDE.md` and `AGENTS.md`.
 - A read-only sidecar independently recommended `VERIFIED`; its only caveat was
   to expand the carried-forward grouped test rows, which this verdict does.
@@ -196,10 +203,12 @@ No blocking findings.
 python .claude\skills\bridge\helpers\show_thread_bridge.py gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces --format json --preview-lines 80
 python scripts\bridge_applicability_preflight.py --bridge-id gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
 python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
-groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_session_self_initialization.py platform_tests\scripts\test_single_harness_bridge_dispatcher.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.pytest_tmp_lo_mirror19_main
+groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_session_self_initialization.py platform_tests\scripts\test_single_harness_bridge_dispatcher.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.pytest_tmp_lo_mirror19_startup
+groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_session_self_initialization.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.pytest_tmp_lo_mirror19_session_only --durations=10
+groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_single_harness_bridge_dispatcher.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.pytest_tmp_lo_mirror19_dispatch_only --durations=10
 groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_mirror_retirement_root_surfaces.py platform_tests\scripts\test_index_role_intent_sentinel.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.pytest_tmp_lo_mirror19_root
-groundtruth-kb\.venv\Scripts\python.exe -m ruff check scripts\session_self_initialization.py platform_tests\scripts\test_session_self_initialization.py
-groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check scripts\session_self_initialization.py platform_tests\scripts\test_session_self_initialization.py
+groundtruth-kb\.venv\Scripts\python.exe -m ruff check scripts\session_self_initialization.py scripts\single_harness_bridge_dispatcher.py scripts\check_index_role_intent_sentinel.py platform_tests\scripts\test_session_self_initialization.py platform_tests\scripts\test_single_harness_bridge_dispatcher.py platform_tests\scripts\test_mirror_retirement_root_surfaces.py platform_tests\scripts\test_index_role_intent_sentinel.py
+groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check scripts\session_self_initialization.py scripts\single_harness_bridge_dispatcher.py scripts\check_index_role_intent_sentinel.py platform_tests\scripts\test_session_self_initialization.py platform_tests\scripts\test_single_harness_bridge_dispatcher.py platform_tests\scripts\test_mirror_retirement_root_surfaces.py platform_tests\scripts\test_index_role_intent_sentinel.py
 python scripts\check_narrative_artifact_evidence.py --paths CLAUDE.md AGENTS.md
 groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb projects authorizations PROJECT-GTKB-ROLE-STATUS-ORTHOGONALITY-DISPATCH --json --all
 groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb backlog list --id WI-4214 --json --all
@@ -211,10 +220,13 @@ Observed output highlights:
 
 - Applicability preflight: `preflight_passed: true`, missing specs `[]`.
 - Clause preflight: `Blocking gaps (gate-failing): 0`.
-- Startup/dispatcher pytest: `78 passed in 273.32s`.
-- Root/sentinel pytest: `22 passed in 1.04s`.
+- Combined startup/dispatcher pytest: shell timeout after 300 seconds; not used
+  as passing evidence.
+- Split startup pytest: `66 passed in 203.09s`.
+- Split dispatcher pytest: `12 passed in 1.39s`.
+- Root/sentinel pytest: `22 passed in 2.09s`.
 - Ruff check: `All checks passed!`.
-- Ruff format check: `2 files already formatted`.
+- Ruff format check: `7 files already formatted`.
 - Narrative evidence: `PASS narrative-artifact evidence (2 cleared)`.
 
 ## Owner Action Required
