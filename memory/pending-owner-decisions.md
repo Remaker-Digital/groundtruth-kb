@@ -7750,6 +7750,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-04T14:21:43.315343Z
   answer: "Your questions have been answered: \"How should I unblock the 16+ envelope-program artifacts pending MemBase insertion (all at Codex GO)?\"=\"Scoped batch approval (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1013
+  asked_at: 2026-06-04T14:48:12.212795Z
+  question: "How should I handle the 4 TBD-ID threads + WI-4291 v3 update (next envelope-program scope)?"
+  options:
+    - "Approve all 4 in extended batch (Recommended)"
+    - "WI-4291 v3 only (unblock AXIS 2 first)"
+    - "New SPECs only (UI + handoff)"
+    - "Defer all — switch to P1 actionable drafts"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3da1b46ee39cee4b
+  resolved_at: 2026-06-04T14:48:12.212795Z
+  answer: "Your questions have been answered: \"How should I handle the 4 TBD-ID threads + WI-4291 v3 update (next envelope-program scope)?\"=\"Approve all 4 in extended batch (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
