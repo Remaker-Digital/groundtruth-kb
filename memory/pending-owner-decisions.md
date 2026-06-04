@@ -6,6 +6,8 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+(none)
+
 ## Resolved
 
 - id: DECISION-0987
@@ -28,7 +30,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-03 evening interactive PB (post /loop)
   answer: "Owner selected 'Authorize role-rule PAUTH' via the formalized AskUserQuestion (2026-06-03). This was the pre-AUQ prose version of the same offer; resolved by the AUQ answer. PAUTH-WI-4214-RETIRE-ROLE-ASSIGNMENTS-MIRROR-PY-DOC-SURFACES minted; bridge -009 filed and self-verified."
   notes: "Tracker false-positive: Prime prose offering (a)/(b)/(c); same turn formalized via AskUserQuestion which the owner answered. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-
 - id: DECISION-0925
   asked_at: 2026-06-03T17:28:49.857709Z
   question: ""
@@ -7416,6 +7417,202 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: d88c70d71a0a8039
   resolved_at: 2026-06-03T23:58:59.211775Z
   answer: "Your questions have been answered: \"How should I proceed from here?\"=\"Authorize role-rule PAUTH\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0988
+  asked_at: 2026-06-04T00:19:58.468802Z
+  question: "Given the existing session/work/authorization 'envelope' taxonomy (DELIB-2238 + DELIB-2500 + PAUTH) — and DELIB-2500's explicit warning about overloading the term — how should I reconcile the just-filed dispatch-envelope artifacts before they're formalized?"
+  options:
+    - "Rename dispatch concept; reserve 'envelope' (Recommended)"
+    - "Unify into one envelope taxonomy"
+    - "Fold into the existing envelope program"
+    - "Proceed as-is"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 53797e32242e8261
+  resolved_at: 2026-06-04T00:19:58.468802Z
+  answer: "Your questions have been answered: \"Given the existing session/work/authorization 'envelope' taxonomy (DELIB-2238 + DELIB-2500 + PAUTH) — and DELIB-2500's explicit warning about overloading the term — how should I reconcile the just-filed dispatch-envelope artifacts before they're formalized?\"=\"Fold into the existing envelope program\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0989
+  asked_at: 2026-06-04T00:36:04.227034Z
+  question: "Root decision: where should the formalized envelope program's work items live? DELIB-2238/2500 placed the *specs* under PROJECT-GTKB-V1-RELEASE-STRATEGY (corpus `80-session-lifecycle/`); but PROJECT-GTKB-ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT was later created as the dedicated envelope home (it already holds WI-3467, WI-3468, and the re-homed WI-4286)."
+  options:
+    - "Consolidate under ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT (Recommended)"
+    - "Keep under V1-RELEASE-STRATEGY / 80-session-lifecycle"
+    - "Split by tier"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9ffb7d66c1d9dd9d
+  resolved_at: 2026-06-04T00:36:04.227034Z
+  answer: "Your questions have been answered: \"Root decision: where should the formalized envelope program's work items live? DELIB-2238/2500 placed the *specs* under PROJECT-GTKB-V1-RELEASE-STRATEGY (corpus `80-session-lifecycle/`); but PROJECT-GTKB-ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT was later created as the dedicated envelope home (it already holds WI-3467, WI-3468, and the re-homed WI-4286).\"=\"Consolidate under ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0990
+  asked_at: 2026-06-04T00:36:04.227034Z
+  question: "Dispatch/routing element (from this session's Q1): DELIB-2238/2500 deliberately kept the envelope program lean — 'canonical markers + state tracking + deterministic triggers, adds NO new capability.' A schedule/calendar-driven dispatch service that routes recurring ops/review/audit work to a chosen harness/role is genuinely NEW capability (scheduled tasks, S308 activity-gate, routing records). Does it belong in THIS envelope program?"
+  options:
+    - "Defer to a separate follow-on program (Recommended)"
+    - "Include dispatch as a third element now"
+    - "Fold a light routing dimension into the work envelope only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ea8eef4d92794dfe
+  resolved_at: 2026-06-04T00:36:04.227034Z
+  answer: "Your questions have been answered: \"Dispatch/routing element (from this session's Q1): DELIB-2238/2500 deliberately kept the envelope program lean — 'canonical markers + state tracking + deterministic triggers, adds NO new capability.' A schedule/calendar-driven dispatch service that routes recurring ops/review/audit work to a chosen harness/role is genuinely NEW capability (scheduled tasks, S308 activity-gate, routing records). Does it belong in THIS envelope program?\"=\"Include dispatch as a third element now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0991
+  asked_at: 2026-06-04T00:36:04.227034Z
+  question: "Now that dispatch is in scope: where does the Prime project-completion disposition (this session's Q2 — autonomously drive a chosen project to VERIFIED-complete via event-driven verdict→re-entry, park-and-surface on owner decisions) live? Note `::open project` already exists as an interactive work-envelope activity (DELIB-2500)."
+  options:
+    - "A dispatch-envelope type (Recommended)"
+    - "Extend the `::open project` work-envelope activity"
+    - "Both, explicitly paired"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a955cbd3535e2784
+  resolved_at: 2026-06-04T00:36:04.227034Z
+  answer: "Your questions have been answered: \"Now that dispatch is in scope: where does the Prime project-completion disposition (this session's Q2 — autonomously drive a chosen project to VERIFIED-complete via event-driven verdict→re-entry, park-and-surface on owner decisions) live? Note `::open project` already exists as an interactive work-envelope activity (DELIB-2500).\"=\"A dispatch-envelope type (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0992
+  asked_at: 2026-06-04T00:36:04.227034Z
+  question: "Wrap-procedure tiering (DELIB-2238 Decision B): on `::wrap`, which philosophy governs the 10 candidate close-steps (envelope-state finalization, DA harvest, bridge attestation, task-list preservation, MemBase rollup, auto-memory delta, working-tree attestation, ChromaDB freshness, backlog-touch evidence, authorization reconciliation)? The exact per-step table is drafted in the spec WI; this sets the default."
+  options:
+    - "Lean-mandatory (Recommended)"
+    - "Comprehensive-mandatory"
+    - "Defer the tiering entirely to the spec WI"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2327ffaa2c0ebb9e
+  resolved_at: 2026-06-04T00:36:04.227034Z
+  answer: "Your questions have been answered: \"Wrap-procedure tiering (DELIB-2238 Decision B): on `::wrap`, which philosophy governs the 10 candidate close-steps (envelope-state finalization, DA harvest, bridge attestation, task-list preservation, MemBase rollup, auto-memory delta, working-tree attestation, ChromaDB freshness, backlog-touch evidence, authorization reconciliation)? The exact per-step table is drafted in the spec WI; this sets the default.\"=\"Lean-mandatory (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0993
+  asked_at: 2026-06-04T00:36:04.227034Z
+  question: "Envelope open/close disclosure UI: beyond WI-3467's removal of 'Work State' + 'Recommended Session Focus' from the opening disclosure, what's the target shape of the open vs close surfaces?"
+  options:
+    - "Minimal open, structured close (Recommended)"
+    - "Symmetric rich open + close"
+    - "Open-trim only; close unchanged"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7b8fdc58e14d9a49
+  resolved_at: 2026-06-04T00:36:04.227034Z
+  answer: "Your questions have been answered: \"Envelope open/close disclosure UI: beyond WI-3467's removal of 'Work State' + 'Recommended Session Focus' from the opening disclosure, what's the target shape of the open vs close surfaces?\"=\"Minimal open, structured close (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0994
+  asked_at: 2026-06-04T00:36:04.227034Z
+  question: "Final grilling branch — work-item slicing: how should I formalize PROJECT-GTKB-ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT? (After you choose, I create the WIs as backlog capture, reconcile the existing ones, and record the whole grilling as one consolidated DELIB continuing DELIB-2238/2500/20260635.)"
+  options:
+    - "Create the per-artifact set as proposed (Recommended)"
+    - "Create a coarser phase set"
+    - "Adjust the set first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d698ff9dc19fc3a9
+  resolved_at: 2026-06-04T00:36:04.227034Z
+  answer: "Your questions have been answered: \"Final grilling branch — work-item slicing: how should I formalize PROJECT-GTKB-ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT? (After you choose, I create the WIs as backlog capture, reconcile the existing ones, and record the whole grilling as one consolidated DELIB continuing DELIB-2238/2500/20260635.)\"=\"Create the per-artifact set as proposed (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0995
+  asked_at: 2026-06-04T01:17:16.097607Z
+  question: "Adopt your generalized envelope meta-model as the unifying frame? It (a) defines EVERY envelope as invocation + intent-hint + payload, and (b) establishes strict containment: dispatch envelope ⊇ session envelope ⊇ topic/work envelopes. This reframes 'dispatch' from a sibling third tier (grilling Q2/Q3) into the OUTER transport container wrapping a dispatched session — so 'project-completion' becomes a payload/intent a dispatch envelope carries, not a 'dispatch-envelope type.'"
+  options:
+    - "Adopt fully — anatomy + containment (Recommended)"
+    - "Adopt anatomy only"
+    - "Adopt containment only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2bbc573610d1e6c9
+  resolved_at: 2026-06-04T01:17:16.097607Z
+  answer: "Your questions have been answered: \"Adopt your generalized envelope meta-model as the unifying frame? It (a) defines EVERY envelope as invocation + intent-hint + payload, and (b) establishes strict containment: dispatch envelope ⊇ session envelope ⊇ topic/work envelopes. This reframes 'dispatch' from a sibling third tier (grilling Q2/Q3) into the OUTER transport container wrapping a dispatched session — so 'project-completion' becomes a payload/intent a dispatch envelope carries, not a 'dispatch-envelope type.'\"=\"Adopt fully — anatomy + containment (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0996
+  asked_at: 2026-06-04T01:17:16.097607Z
+  question: "You describe the session 'subject' as the specific PROJECT the session pertains to. But DELIB-2500 #4 set `::init <subject>` = the closed area vocab `{gtkb, application}` (GT-KB's canonical 'work subject') to preserve a strict parse + the Agent Red separateness boundary. How should the session envelope bind to a project?"
+  options:
+    - "Project = payload; <subject> stays the area (Recommended)"
+    - "Subject token becomes the project ID"
+    - "Add an optional project token to the keyword"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0119461a23a234e4
+  resolved_at: 2026-06-04T01:17:16.097607Z
+  answer: "Your questions have been answered: \"You describe the session 'subject' as the specific PROJECT the session pertains to. But DELIB-2500 #4 set `::init <subject>` = the closed area vocab `{gtkb, application}` (GT-KB's canonical 'work subject') to preserve a strict parse + the Agent Red separateness boundary. How should the session envelope bind to a project?\"=\"Project = payload; <subject> stays the area (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0997
+  asked_at: 2026-06-04T01:17:16.097607Z
+  question: "You want `::open <type>` to 'mechanically retrieve topic-specific information' at open — resource-access instructions + deterministically-generated state (bridge slice, relevant ADRs, DA, etc.). DELIB-2500 #3/#7 framed the inner (work) envelope as a THIN ROUTER that dispatches to an existing service and 'adds no new capability.' Adopt the context-preload dimension?"
+  options:
+    - "Adopt preload as a deterministic open-action; content per type (Recommended)"
+    - "Keep thin-router only"
+    - "Preload only for read-heavy types"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8a730c46f11e5e98
+  resolved_at: 2026-06-04T01:17:16.097607Z
+  answer: "Your questions have been answered: \"You want `::open <type>` to 'mechanically retrieve topic-specific information' at open — resource-access instructions + deterministically-generated state (bridge slice, relevant ADRs, DA, etc.). DELIB-2500 #3/#7 framed the inner (work) envelope as a THIN ROUTER that dispatches to an existing service and 'adds no new capability.' Adopt the context-preload dimension?\"=\"Adopt preload as a deterministic open-action; content per type (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0998
+  asked_at: 2026-06-04T01:17:16.097607Z
+  question: "Naming the inner `::open`/`::close` construct: you call it a 'topic envelope'; DELIB-2500 called it the 'work envelope' (#5 'no rename'). Now that it spans context-preload + activity routing + close-actions (Q-E), which name is canonical? (It's all still design-stage — nothing implemented — so renaming now is low-cost.)"
+  options:
+    - "Rename inner construct to 'topic envelope' (Recommended)"
+    - "Keep 'work envelope'; 'topic' is informal"
+    - "Two distinct constructs"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5d7017956bc553b6
+  resolved_at: 2026-06-04T01:17:16.097607Z
+  answer: "Your questions have been answered: \"Naming the inner `::open`/`::close` construct: you call it a 'topic envelope'; DELIB-2500 called it the 'work envelope' (#5 'no rename'). Now that it spans context-preload + activity routing + close-actions (Q-E), which name is canonical? (It's all still design-stage — nothing implemented — so renaming now is low-cost.)\"=\"Rename inner construct to 'topic envelope' (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0999
+  asked_at: 2026-06-04T01:17:16.097607Z
+  question: "Topic-envelope vocabulary: you list WORK/OPS/SPECS as intent-hint 'envelope types' and `::open build/spec/ops` as openers; DELIB-2500 set the activity vocab `{deliberation,build,test,push,project,upgrade,operation}` (no 'spec'/'ops'). Since each type now defines its own preload+routing (Q-E), the `::open <type>` argument must be a closed enumerated set. What structure?"
+  options:
+    - "One unified closed topic-type vocabulary (Recommended)"
+    - "Two-level: coarse type (WORK/OPS/SPECS) + fine activity"
+    - "Keep DELIB-2500's activity vocab; just add spec/ops"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6c37790c7f0d7436
+  resolved_at: 2026-06-04T01:17:16.097607Z
+  answer: "Your questions have been answered: \"Topic-envelope vocabulary: you list WORK/OPS/SPECS as intent-hint 'envelope types' and `::open build/spec/ops` as openers; DELIB-2500 set the activity vocab `{deliberation,build,test,push,project,upgrade,operation}` (no 'spec'/'ops'). Since each type now defines its own preload+routing (Q-E), the `::open <type>` argument must be a closed enumerated set. What structure?\"=\"One unified closed topic-type vocabulary (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1000
+  asked_at: 2026-06-04T01:34:42.844519Z
+  question: "Confirm the sequencing strategy for the v1.0 + Envelope major release (this becomes the standing content goal I'll record). All three deliver the same content; they differ in order."
+  options:
+    - "Stabilize → machinery → envelope → gate (Recommended)"
+    - "Dispatcher-early as force-multiplier"
+    - "Envelope-first (headline content)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3ca0f38ccff320a2
+  resolved_at: 2026-06-04T01:34:42.844519Z
+  answer: "Your questions have been answered: \"Confirm the sequencing strategy for the v1.0 + Envelope major release (this becomes the standing content goal I'll record). All three deliver the same content; they differ in order.\"=\"Stabilize → machinery → envelope → gate (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1001
+  asked_at: 2026-06-04T01:34:42.844519Z
+  question: "The standing content goal is recorded as DELIB-20260638 (a durable owner_decision). Do you want it promoted to a GOV specification so it's mechanically enforced in release-gate checks (like GOV-STANDING-BACKLOG-001), or is the DELIB record sufficient?"
+  options:
+    - "Promote to a GOV spec (Recommended)"
+    - "Keep as the DELIB record"
+    - "Promote later — capture a tracking WI"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9f82b8cb30237f43
+  resolved_at: 2026-06-04T01:34:42.844519Z
+  answer: "Your questions have been answered: \"The standing content goal is recorded as DELIB-20260638 (a durable owner_decision). Do you want it promoted to a GOV specification so it's mechanically enforced in release-gate checks (like GOV-STANDING-BACKLOG-001), or is the DELIB record sufficient?\"=\"Promote to a GOV spec (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1002
+  asked_at: 2026-06-04T03:43:47.678653Z
+  question: "How should I finish the S404 wrap? The scan is clean for my work; the tree is broad/mixed-owner with concurrent-session WIP."
+  options:
+    - "Scoped MEMORY.md entry + commit"
+    - "MEMORY.md entry + deliberation harvest"
+    - "Summary only — no mutation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 02c5c342f35611d4
+  resolved_at: 2026-06-04T03:43:47.678653Z
+  answer: "Your questions have been answered: \"How should I finish the S404 wrap? The scan is clean for my work; the tree is broad/mixed-owner with concurrent-session WIP.\"=\"MEMORY.md entry + deliberation harvest\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
