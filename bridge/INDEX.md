@@ -11,6 +11,7 @@ Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
 NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-001.md
 
 Document: gtkb-work-tree-hygiene-mechanism-scoping
+GO: bridge/gtkb-work-tree-hygiene-mechanism-scoping-002.md
 NEW: bridge/gtkb-work-tree-hygiene-mechanism-scoping-001.md
 
 Document: gtkb-mode-switch-validator-hook-matcher-shape-fix
@@ -23,6 +24,7 @@ WITHDRAWN: bridge/gtkb-agent-sot-read-discipline-phase-1-002.md
 NEW: bridge/gtkb-agent-sot-read-discipline-phase-1-001.md
 
 Document: gtkb-platform-sot-consolidation-umbrella
+NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-002.md
 NEW: bridge/gtkb-platform-sot-consolidation-umbrella-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1
