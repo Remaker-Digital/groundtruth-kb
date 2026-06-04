@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-envelope-disclosure-ui-redesign
+NEW: bridge/gtkb-envelope-disclosure-ui-redesign-001.md
+
 Document: gtkb-handoff-prompt-deterministic-service
 NEW: bridge/gtkb-handoff-prompt-deterministic-service-001.md
 
