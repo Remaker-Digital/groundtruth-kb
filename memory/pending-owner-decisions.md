@@ -7628,6 +7628,73 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-04T04:19:15.899866Z
   answer: "Your questions have been answered: \"How should I handle the commit? The working tree has another session's bridge WIP (-013 file + INDEX entry, mtime 21:09/21:14) and accumulated owner-decision-tracker entries from other sessions today.\"=\"All three files in one commit\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1004
+  asked_at: 2026-06-04T04:40:39.305138Z
+  question: "WI-3467's status_detail already says WI-4298 'subsumes this removal.' What is WI-3467's intended life?"
+  options:
+    - "Terminally superseded by WI-4298 — close WI-3467, do the removal inside WI-4298"
+    - "Stand-alone fast removal NOW, before WI-4298's broader UI work"
+    - "Stand-alone AND replace the data with a single dashboard / on-demand link"
+    - "Defer — owner needs to think about whether the underlying data should remain accessible"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dfc259bd5dd2d5b6
+  resolved_at: 2026-06-04T04:40:39.305138Z
+  answer: "Your questions have been answered: \"WI-3467's status_detail already says WI-4298 'subsumes this removal.' What is WI-3467's intended life?\"=\"Terminally superseded by WI-4298 — close WI-3467, do the removal inside WI-4298\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1005
+  asked_at: 2026-06-04T04:40:39.305138Z
+  question: "WI-3468 is already resolved (grilling placeholder fulfilled), but its project membership is still active. What disposition?"
+  options:
+    - "Retire project membership (membership status=completed) — align with resolved state"
+    - "Re-open + run a fresh grilling now — there may be NEW envelope questions since the 2026-06-04 grill that aren't yet in WI-4291..WI-4302"
+    - "Leave as-is — historical anchor, no cleanup needed"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a4dae0334cc8339b
+  resolved_at: 2026-06-04T04:40:39.305138Z
+  answer: "Your questions have been answered: \"WI-3468 is already resolved (grilling placeholder fulfilled), but its project membership is still active. What disposition?\"=\"Retire project membership (membership status=completed) — align with resolved state\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1006
+  asked_at: 2026-06-04T04:40:39.305138Z
+  question: "WI-4286 is resolved, superseded by WI-4296 + WI-4297. Project membership in the envelope project still active. What disposition?"
+  options:
+    - "Retire envelope-project membership as superseded (membership status=superseded) — single mutation"
+    - "Retire membership AND reconcile project_name (set to None or PROJECT-GTKB-ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT)"
+    - "Leave everything as-is"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b6edd6085b8f07b8
+  resolved_at: 2026-06-04T04:40:39.305138Z
+  answer: "Your questions have been answered: \"WI-4286 is resolved, superseded by WI-4296 + WI-4297. Project membership in the envelope project still active. What disposition?\"=\"Retire membership AND reconcile project_name (set to None or PROJECT-GTKB-ENVELOPE-OPEN-CLOSE-ACTION-REFINEMENT)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1007
+  asked_at: 2026-06-04T04:40:39.305138Z
+  question: "WI-4291 says '<subject> <role>' but role 'asserts, never sets' while status_detail says session PROJECT binds via payload, not keyword. What is the load-bearing semantic?"
+  options:
+    - "Keyword sets subject (work-subject.json), asserts role (errors on mismatch with durable harness role)"
+    - "Keyword sets subject AND ephemerally overrides role (current behavior preserved for role; subject is new)"
+    - "Keyword only asserts both (errors if mismatch with durable role AND with current subject)"
+    - "Defer this WI — the semantic conflict between description ('role asserts') and current rules ('role overrides ephemerally') needs a deliberation before the WI can be implementation-approved"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6845755c4d7debbe
+  resolved_at: 2026-06-04T04:40:39.305138Z
+  answer: "Your questions have been answered: \"WI-4291 says '<subject> <role>' but role 'asserts, never sets' while status_detail says session PROJECT binds via payload, not keyword. What is the load-bearing semantic?\"=\"[User dismissed — do not proceed, wait for next instruction]\", \"What's the migration/compat posture for the existing '::init gtkb pb' form when the new '::init <subject> <role>' form lands?\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1008
+  asked_at: 2026-06-04T04:40:39.305138Z
+  question: "What's the migration/compat posture for the existing '::init gtkb pb' form when the new '::init <subject> <role>' form lands?"
+  options:
+    - "Existing form parses unchanged ('gtkb' is a valid subject); no compat shim needed"
+    - "Existing form deprecated with a 1-release grace window; emit a warning + auto-translate"
+    - "Existing form rejected at the parser; all emitters must migrate atomically"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1ec4fc67eba567bb
+  resolved_at: 2026-06-04T04:40:39.305138Z
+  answer: "Your questions have been answered: \"WI-4291 says '<subject> <role>' but role 'asserts, never sets' while status_detail says session PROJECT binds via payload, not keyword. What is the load-bearing semantic?\"=\"[User dismissed — do not proceed, wait for next instruction]\", \"What's the migration/compat posture for the existing '::init gtkb pb' form when the new '::init <subject> <role>' form lands?\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
