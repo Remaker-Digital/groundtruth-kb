@@ -21,12 +21,12 @@ moving authoritative current state to per-harness
 `.claude/session/envelope.json` to an optional non-authoritative projection.
 That correction should be preserved.
 
-The revised DCL body still cannot receive GO because its schema omits required
-payload fields from the governing owner decision in `DELIB-20260637`: project
-ID, work items, and model ID. A durability DCL that defines the session-envelope
-schema without those fields would under-specify the owner's adopted envelope
-meta-model and force later implementation or formal-artifact authors to
-re-infer them.
+The revised DCL body still cannot receive GO for two schema reasons. First, it
+omits required payload fields from the governing owner decision in
+`DELIB-20260637`: project ID, work items, and model ID. Second, it conflates the
+asserted role token with the resolved operating role even though
+`DELIB-20260648` says that an omitted role token leaves only the session-stated
+override unset while the durable harness role still applies for all surfaces.
 
 ## Same-Session Guard
 
@@ -131,6 +131,51 @@ from `-003` and extends the top-level schema with explicit fields for:
 The revision should explain nullable/default behavior for sessions that are not
 project-bound or are started before a model identifier can be observed.
 
+### F2 - P1 - The role field conflates asserted keyword input with resolved authority
+
+Observation:
+
+- The `-003` schema defines `role` as "resolved operating role for the session"
+  and then says it is nullable when an accepted init keyword omits a role token
+  at `bridge/gtkb-session-envelope-durability-001-003.md:98-100`.
+- `DELIB-20260648` says the absent-role-token case means the durable harness role
+  from `harness-state/harness-registry.json` applies for all in-session
+  surfaces. The session-stated role is unset; the effective role is not
+  undefined.
+- Prior Loyal Opposition advisory evidence recommended explicit
+  `role_asserted` and `role_resolved` fields at
+  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-29-07-12-delib-2500-envelope-convention-advisory.md:58`.
+
+Deficiency rationale:
+
+A single nullable `role` field cannot represent both "no role token was
+asserted" and "the durable role resolved to Prime Builder or Loyal Opposition."
+If implementations store null, valid role-omitted init sessions look roleless.
+If implementations store the durable role, the record loses whether the owner or
+dispatcher explicitly asserted a role token.
+
+Impact:
+
+Startup disclosure, wrap reporting, attribution, and future dispatch/topic
+routing code would need to re-infer the authority split from other state, which
+defeats the purpose of making this DCL the durable envelope-state schema.
+
+Recommended action:
+
+Add separate fields:
+
+1. `role_asserted`: nullable enum (`pb`, `lo`, or null) for the role token
+   present in the accepted init keyword.
+2. `role_resolved`: non-null resolved operating role for `status=open` and
+   `status=closed`, derived from the asserted role when present or from the
+   durable harness registry when absent.
+3. `role_resolved: null` should be allowed only for `status=error`, with
+   `last_error` explaining the failed durable-role resolution.
+
+Consider the same asserted/resolved split for subject state, especially for
+`subject=application`, where the closed keyword token and resolved active
+application identity are separate facts.
+
 ## Positive Confirmations
 
 - The per-harness authoritative path correction resolves the shared
@@ -146,6 +191,7 @@ python groundtruth-kb\templates\skills\bridge\helpers\scan_bridge.py --index-pat
 python scripts\bridge_applicability_preflight.py --bridge-id gtkb-session-envelope-durability-001
 python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-session-envelope-durability-001
 groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb deliberations search "DELIB-20260637 envelope project model id work item harness" --limit 10 --json
+groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb deliberations get DELIB-20260648 --json
 ```
 
 No `python -m pytest`, `ruff check`, or `ruff format --check` lane is
