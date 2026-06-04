@@ -7,6 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-bash-hook-destructive-substring-false-positive
+NEW: bridge/gtkb-bash-hook-destructive-substring-false-positive-003.md
+GO: bridge/gtkb-bash-hook-destructive-substring-false-positive-002.md
+NEW: bridge/gtkb-bash-hook-destructive-substring-false-positive-001.md
+
 Document: gtkb-git-hooks-path-mismatch-lint
 VERIFIED: bridge/gtkb-git-hooks-path-mismatch-lint-004.md
 NEW: bridge/gtkb-git-hooks-path-mismatch-lint-003.md
@@ -14,6 +19,7 @@ GO: bridge/gtkb-git-hooks-path-mismatch-lint-002.md
 NEW: bridge/gtkb-git-hooks-path-mismatch-lint-001.md
 
 Document: gtkb-dispatch-envelope-adr-specs
+WITHDRAWN: bridge/gtkb-dispatch-envelope-adr-specs-003.md
 GO: bridge/gtkb-dispatch-envelope-adr-specs-002.md
 NEW: bridge/gtkb-dispatch-envelope-adr-specs-001.md
 

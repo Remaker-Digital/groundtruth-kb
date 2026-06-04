@@ -196,3 +196,86 @@ class TestPythonRecursiveDeletionParity:
             "substring (node_modules) appears in a comment. "
             "Got: result is None (would have allowed the deletion)."
         )
+
+
+# ---------------------------------------------------------------------------
+# WI-3493: quote-aware git / hook-bypass verb families.
+# bridge/gtkb-bash-hook-destructive-substring-false-positive-002.md (GO, option b).
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def gate_module():
+    """Load and return the full destructive-gate module (for helper-level tests)."""
+    spec = importlib.util.spec_from_file_location("destructive_gate_full", _HOOK_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestWI3493QuoteAwareDestructiveVerbs:
+    """A destructive verb inside a quoted span / scope text must not false-block,
+    while a genuine unquoted destructive command still blocks (GO -002 option b:
+    mask _GIT_DESTRUCTIVE + _HOOK_BYPASS; keep _DB_DESTRUCTIVE raw)."""
+
+    # --- False positive removed (quoted / scope text) ---
+
+    def test_quoted_git_rm_scope_text_not_blocked(self, check_destructive):
+        result = check_destructive('echo "remember to git rm the stale fixture before promotion"')
+        assert result is None
+
+    def test_quoted_git_reset_hard_in_python_literal_not_blocked(self, check_destructive):
+        result = check_destructive("""python -c "msg = 'git reset --hard rewrites history'; print(msg)" """)
+        assert result is None
+
+    def test_quoted_no_verify_in_commit_message_not_blocked(self, check_destructive):
+        result = check_destructive('git commit -m "WIP: never pass --no-verify on this repo"')
+        assert result is None
+
+    def test_quoted_force_push_scope_text_not_blocked(self, check_destructive):
+        result = check_destructive('echo "the proposal forbids git push --force to develop"')
+        assert result is None
+
+    # --- True positive preserved (genuine unquoted command) ---
+
+    def test_genuine_unquoted_git_rm_still_blocks(self, check_destructive):
+        result = check_destructive("git rm --cached secrets.env")
+        assert result is not None
+        assert "git" in result.lower()
+
+    def test_genuine_unquoted_git_reset_hard_still_blocks(self, check_destructive):
+        result = check_destructive("git reset --hard HEAD~3")
+        assert result is not None
+
+    def test_genuine_unquoted_no_verify_commit_still_blocks(self, check_destructive):
+        result = check_destructive('git commit --no-verify -m "skip the gates"')
+        assert result is not None
+        assert "bypass" in result.lower()
+
+    def test_genuine_unquoted_force_push_still_blocks(self, check_destructive):
+        result = check_destructive("git push --force origin main")
+        assert result is not None
+
+    # --- R3 option b: _DB_DESTRUCTIVE stays RAW (quoted DROP TABLE still blocks) ---
+
+    def test_db_destructive_remains_raw_blocks_quoted_drop_table(self, check_destructive):
+        result = check_destructive("""python -c "cur.execute('DROP TABLE users')" """)
+        assert result is not None
+        assert "database" in result.lower()
+
+    # --- Helper-level coverage ---
+
+    def test_mask_blanks_quoted_interior_preserves_quotes(self, gate_module):
+        # Interior "git rm x" is 8 characters -> 8 blanks; quote chars preserved.
+        masked = gate_module._mask_quoted_spans('echo "git rm x"')
+        assert masked == 'echo "        "'
+
+    def test_mask_leaves_unquoted_text_intact(self, gate_module):
+        masked = gate_module._mask_quoted_spans("git rm --cached f")
+        assert masked == "git rm --cached f"
+
+    def test_mask_unbalanced_quote_blanks_to_end(self, gate_module):
+        # Fail-closed: an unbalanced quote masks to end-of-string (exposes nothing
+        # structural that was outside the quote).
+        masked = gate_module._mask_quoted_spans('git rm "oops unterminated')
+        assert masked == 'git rm "                 '
