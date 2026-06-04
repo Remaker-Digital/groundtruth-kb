@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "SPEC-PRIME-PROJECT-COMPLETION-ENVELOPE-001",
+  "artifact_type": "requirement",
+  "change_reason": "Per S408 owner AUQ batch approval (Family 4 dispatch-envelope). WI-4297 Prime Builder project-completion envelope: drive an authorized project to VERIFIED via claim-gated proposals + event-driven verdict re-entry.",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ S408-FAMILY-4-SPEC-PRIME-PROJECT-COMPLETION-ENVELOPE-001-INSERT: Author + insert in this session (S408 AUQ)",
+  "full_content": "\n**Requirement:** A Prime Builder work envelope shall drive a chosen authorized project to VERIFIED-complete via: (1) select highest-priority project with an active PAUTH and incomplete WIs; (2) fan out claim-gated proposals for ready WIs (bounded by single-LO throughput + INDEX serialization); (3) advance each thread on the event-driven verdict->re-entry path (no background watch); (4) on any AUQ-class owner decision, park (DEFERRED) and surface, then continue other WIs; (5) terminate + retire when all member WIs reach VERIFIED (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001).\n**Acceptance:** the envelope never self-authorizes an owner decision; it never relies on a session-held watch; it converges or parks every member WI; it stops at project completion.\n",
+  "full_content_sha256": "9e0e85e444f6571f88b963e8821fa6cb4c988506538e9b0fccc7df88456b75fc",
+  "presented_to_user": true,
+  "source_ref": "SPEC-PRIME-PROJECT-COMPLETION-ENVELOPE-001",
+  "transcript_captured": true
+}

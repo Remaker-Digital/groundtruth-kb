@@ -1,0 +1,3 @@
+
+**Requirement:** GT-KB shall provide one dispatch service that (a) resolves a {harness, role} target from the registry, (b) composes the spawn command from invocation_surfaces.headless.argv with {{PROMPT}}/{{PROJECT_ROOT}} + canonical init keyword, (c) consumes both event-driven (INDEX-delta) and schedule-driven (envelope) triggers, and (d) records every dispatch in the existing audit trail (dispatch-failures.jsonl, dispatch-state.json).
+**Acceptance:** existing bridge dispatch behavior preserved byte-identically (signature scheme unchanged); a scheduled envelope fires its target only when its activity-gate passes; role->harness resolution honors role/status orthogonality (skips a role-holder that is not event-active).

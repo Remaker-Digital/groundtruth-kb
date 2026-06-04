@@ -1,0 +1,3 @@
+
+**Requirement:** A Prime Builder work envelope shall drive a chosen authorized project to VERIFIED-complete via: (1) select highest-priority project with an active PAUTH and incomplete WIs; (2) fan out claim-gated proposals for ready WIs (bounded by single-LO throughput + INDEX serialization); (3) advance each thread on the event-driven verdict->re-entry path (no background watch); (4) on any AUQ-class owner decision, park (DEFERRED) and surface, then continue other WIs; (5) terminate + retire when all member WIs reach VERIFIED (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001).
+**Acceptance:** the envelope never self-authorizes an owner decision; it never relies on a session-held watch; it converges or parks every member WI; it stops at project completion.

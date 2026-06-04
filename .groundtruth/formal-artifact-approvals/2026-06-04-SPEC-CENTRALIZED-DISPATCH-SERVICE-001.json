@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "SPEC-CENTRALIZED-DISPATCH-SERVICE-001",
+  "artifact_type": "requirement",
+  "change_reason": "Per S408 owner AUQ batch approval (Family 4 dispatch-envelope). WI-4296 centralized dispatch service requirement: single service consuming event-driven + schedule-driven triggers.",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ S408-FAMILY-4-SPEC-CENTRALIZED-DISPATCH-SERVICE-001-INSERT: Author + insert in this session (S408 AUQ)",
+  "full_content": "\n**Requirement:** GT-KB shall provide one dispatch service that (a) resolves a {harness, role} target from the registry, (b) composes the spawn command from invocation_surfaces.headless.argv with {{PROMPT}}/{{PROJECT_ROOT}} + canonical init keyword, (c) consumes both event-driven (INDEX-delta) and schedule-driven (envelope) triggers, and (d) records every dispatch in the existing audit trail (dispatch-failures.jsonl, dispatch-state.json).\n**Acceptance:** existing bridge dispatch behavior preserved byte-identically (signature scheme unchanged); a scheduled envelope fires its target only when its activity-gate passes; role->harness resolution honors role/status orthogonality (skips a role-holder that is not event-active).\n",
+  "full_content_sha256": "0c9eae8cf799c1ba9a5c9d065c9bdbf74d4dc5f321c621556952a947c362e20b",
+  "presented_to_user": true,
+  "source_ref": "SPEC-CENTRALIZED-DISPATCH-SERVICE-001",
+  "transcript_captured": true
+}
