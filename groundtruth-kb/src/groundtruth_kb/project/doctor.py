@@ -2265,7 +2265,7 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
 # replacement-mechanism check is _check_cross_harness_trigger below.
 
 _BRIDGE_DISPATCH_STATE_PATH = Path(".gtkb-state/bridge-poller/dispatch-state.json")
-_BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime", "codex": "codex"}
+_BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime-builder", "codex": "loyal-opposition"}
 
 _BRIDGE_FRESH_SECS = 4 * 60  # < 4 min → OK
 _BRIDGE_WARN_SECS = 10 * 60  # 4–10 min → WARN; > 10 min → ALARM

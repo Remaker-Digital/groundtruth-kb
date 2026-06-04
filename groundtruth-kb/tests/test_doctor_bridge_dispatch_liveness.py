@@ -25,8 +25,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from groundtruth_kb.project.doctor import (
-    ToolCheck,
     _BRIDGE_DISPATCH_DOC,
+    ToolCheck,
     _check_bridge_dispatch_liveness,
     run_doctor,
 )
@@ -74,8 +74,8 @@ def _write_dispatch_state(
         "schema_version": 1,
         "updated_at": _iso_seconds_ago(0),
         "recipients": {
-            "prime": _recipient(prime_updated_at, prime_last_result, prime_pending_count),
-            "codex": _recipient(codex_updated_at, codex_last_result, codex_pending_count),
+            "prime-builder": _recipient(prime_updated_at, prime_last_result, prime_pending_count),
+            "loyal-opposition": _recipient(codex_updated_at, codex_last_result, codex_pending_count),
         },
     }
     text = json.dumps(payload)
@@ -183,9 +183,9 @@ def test_run_doctor_message_includes_pending_count(tmp_path: Path) -> None:
 
 
 def test_run_doctor_distinguishes_claude_from_codex_recipients_in_report(tmp_path: Path) -> None:
-    """TP7: agent mapping (claude→prime, codex→codex) visible in public report.
+    """TP7: agent mapping (claude→prime-builder, codex→loyal-opposition) visible in public report.
 
-    Fresh prime, stale codex → Claude check PASS, Codex check FAIL.
+    Fresh prime-builder, stale loyal-opposition → Claude check PASS, Codex check FAIL.
     """
     _write_dispatch_state(
         tmp_path,
@@ -242,7 +242,7 @@ class TestCheckBridgeDispatchHelperEdgeCases:
                 {
                     "schema_version": 1,
                     "recipients": {
-                        "codex": {
+                        "loyal-opposition": {
                             "updated_at": _iso_seconds_ago(0),
                             "last_result": "no_pending",
                             "pending_count": 0,
@@ -254,7 +254,7 @@ class TestCheckBridgeDispatchHelperEdgeCases:
         )
         result = _check_bridge_dispatch_liveness(tmp_path, "claude")
         assert result.status == "fail"
-        assert "prime" in result.message
+        assert "prime-builder" in result.message
 
     def test_ts3_returns_fail_when_updated_at_unparseable(self, tmp_path: Path) -> None:
         state_path = tmp_path / _DISPATCH_STATE_REL
@@ -264,12 +264,12 @@ class TestCheckBridgeDispatchHelperEdgeCases:
                 {
                     "schema_version": 1,
                     "recipients": {
-                        "prime": {
+                        "prime-builder": {
                             "updated_at": "not-an-iso-timestamp",
                             "last_result": "no_pending",
                             "pending_count": 0,
                         },
-                        "codex": {
+                        "loyal-opposition": {
                             "updated_at": _iso_seconds_ago(0),
                             "last_result": "no_pending",
                             "pending_count": 0,
@@ -282,3 +282,25 @@ class TestCheckBridgeDispatchHelperEdgeCases:
         result = _check_bridge_dispatch_liveness(tmp_path, "claude")
         assert result.status == "fail"
         assert "unparseable" in result.message
+
+
+def test_run_doctor_recipient_keys_match_cross_harness_trigger_canonical_labels() -> None:
+    """TP8: ensure doctor mapping targets the cross-harness trigger's ROLE_STATE_KEYS."""
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    scripts_dir = repo_root / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+
+    import cross_harness_bridge_trigger
+
+    from groundtruth_kb.project.doctor import _BRIDGE_AGENT_TO_RECIPIENT
+
+    trigger_keys = set(cross_harness_bridge_trigger.ROLE_STATE_KEYS)
+    doctor_keys = set(_BRIDGE_AGENT_TO_RECIPIENT.values())
+
+    assert doctor_keys == trigger_keys, f"Doctor keys {doctor_keys} do not match trigger keys {trigger_keys}"
+    assert "prime" not in doctor_keys
+    assert "codex" not in doctor_keys
