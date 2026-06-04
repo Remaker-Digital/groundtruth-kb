@@ -7,6 +7,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-canonical-wrap-keyword-syntax-001
+NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
+
+Document: gtkb-envelope-init-keyword-amendment-slice-1
+NEW: bridge/gtkb-envelope-init-keyword-amendment-slice-1-001.md
+
 Document: gtkb-auto-push-investigation-001-slice-1-findings
 VERIFIED: bridge/gtkb-auto-push-investigation-001-slice-1-findings-006.md
 NEW: bridge/gtkb-auto-push-investigation-001-slice-1-findings-005.md
@@ -1146,36 +1152,6 @@ WITHDRAWN: bridge/gtkb-artifact-recorder-cli-scoping-advance-003.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-scoping-advance-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-scoping-advance-001.md
 
-Document: gtkb-proposal-standards-wi-id-collision-gate
-VERIFIED: bridge/gtkb-proposal-standards-wi-id-collision-gate-010.md
-NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-009.md
-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-008.md
-REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-007.md
-NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-006.md
-REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-005.md
-NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-004.md
-REVISED: bridge/gtkb-proposal-standards-wi-id-collision-gate-003.md
-NO-GO: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md
-NEW: bridge/gtkb-proposal-standards-wi-id-collision-gate-001.md
-
-Document: gtkb-proposal-standards-test-claim-rerun-verifier
-VERIFIED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-017.md
-REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-016.md
-NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-015.md
-NEW: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-014.md
-NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-013.md
-REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-012.md
-NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-011.md
-REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-010.md
-NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-009.md
-REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-007.md
-NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-006.md
-NEW: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-005.md
-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-004.md
-REVISED: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-003.md
-NO-GO: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-002.md
-NEW: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-001.md
-
 Document: gtkb-backlog-approval-state-taxonomy-auq
 WITHDRAWN: bridge/gtkb-backlog-approval-state-taxonomy-auq-003.md
 NO-GO: bridge/gtkb-backlog-approval-state-taxonomy-auq-002.md
@@ -1232,16 +1208,6 @@ REVISED: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-003.md
 NO-GO: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-002.md
 NEW: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-001.md
 
-Document: gtkb-control-plane-placeholder-test-remediation-slice-1-revert
-VERIFIED: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-008.md
-NEW: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-007.md
-GO: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-006.md
-REVISED: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-005.md
-NO-GO: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-004.md
-REVISED: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-003.md
-NO-GO: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-002.md
-NEW: bridge/gtkb-control-plane-placeholder-test-remediation-slice-1-revert-001.md
-
 Document: gtkb-commit-scope-bundling-detection-slice-1
 VERIFIED: bridge/gtkb-commit-scope-bundling-detection-slice-1-008.md
 REVISED: bridge/gtkb-commit-scope-bundling-detection-slice-1-007.md
@@ -1259,20 +1225,6 @@ GO: bridge/gtkb-auto-push-investigation-slice-1-004.md
 REVISED: bridge/gtkb-auto-push-investigation-slice-1-003.md
 NO-GO: bridge/gtkb-auto-push-investigation-slice-1-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-1-001.md
-
-Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
-VERIFIED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-012.md
-NEW: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-011.md
-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-010.md
-REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-009.md
-NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-008.md
-REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-007.md
-NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-006.md
-NEW: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-005.md
-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-004.md
-REVISED: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-003.md
-NO-GO: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-002.md
-NEW: bridge/gtkb-lo-bridge-history-backfill-slice-1-inventory-001.md
 
 Document: gtkb-discoverability-cli-slice-1
 VERIFIED: bridge/gtkb-discoverability-cli-slice-1-008.md
