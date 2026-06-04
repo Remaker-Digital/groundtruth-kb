@@ -267,6 +267,24 @@
 
 Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-04-13-37-LO-LOOP-EMPTY-QUEUE-AND-BRIDGE-KIND-TAXONOMY-DRIFT.md`.
 
+**Post-loop addendum (15:14Z, same session) — concrete cross-harness session-id co-option.**
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Work-intent claim file `.gtkb-state/work-intent/gtkb-impl-start-target-paths-preflight.json` was acquired at 15:13:12Z under this Claude session id `4c7620e0-be99-…` for a thread this session never touched. The thread's `-003.md` NO-GO was authored by Codex (harness A) under `automation: keep-working-lo`, against a `-001` by Claude Prime (harness B, session `bfc70de3-76e6-…`) and `-002` GO by Antigravity LO (harness C). Three harnesses concurrent on one thread; the LO claim holder is a fourth ID (mine) that did not invoke `bridge_claim_cli.py`. | `cat .gtkb-state/work-intent/gtkb-impl-start-target-paths-preflight.json`; head of `bridge/gtkb-impl-start-target-paths-preflight-003.md`; AXIS-2 surface at 15:13:48Z. | Investigate the Codex `keep-working-lo` automation's session-id resolution — it should never hold a claim under a remote-harness's session id. Likely related to shared dispatch-state.json or trigger-emitted env-vars. P2 follow-up to the marker-race candidate C. | Open |
+
+---
+
+### 2026-06-04 - Ollama Harness Integration & Routing Investigation
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Ollama lacks native agent execution/tool loops, requiring a custom client execution shim (`scripts/ollama_harness.py`) to serve as a supported GT-KB harness. | User request; `cross_harness_bridge_trigger.py` dependency on headless argv execution surfaces. | Implement a Python-based harness executor shim that supports Ollama function-calling APIs. | Open |
+| Technical | `check_harness_parity.py` hardcodes `KNOWN_HARNESSES = ("claude", "codex")`, ignoring Antigravity and any new harness like Ollama. | `scripts/check_harness_parity.py:L18` | Generalize parity checks and TOML capability schema to support active registered harnesses dynamically. | Open |
+| Process | Local models have differing strengths; task-to-model routing can optimize VRAM and latency by matching skills to model capacity. | User request; Ollama support for multiple local models. | Add model routing map (e.g. `.ollama/routing.toml`) to dynamically select the model based on task complexity. | Open |
+
+Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-04-08-20-ollama-parity-gap-analysis.md`.
+
 ---
 
 ## How to Add an Entry
