@@ -26,7 +26,6 @@ NEW: bridge/gtkb-impl-start-gate-pretooluse-restore-001.md
 
 Document: gtkb-impl-start-target-paths-preflight
 NEW: bridge/gtkb-impl-start-target-paths-preflight-006.md
-NEW: bridge/gtkb-impl-start-target-paths-preflight-006.md
 GO: bridge/gtkb-impl-start-target-paths-preflight-005.md
 REVISED: bridge/gtkb-impl-start-target-paths-preflight-004.md
 NO-GO: bridge/gtkb-impl-start-target-paths-preflight-003.md
