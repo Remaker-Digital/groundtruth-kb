@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-major-release-content-goal-gov
+VERIFIED: bridge/gtkb-major-release-content-goal-gov-004.md
 NEW: bridge/gtkb-major-release-content-goal-gov-003.md
 GO: bridge/gtkb-major-release-content-goal-gov-002.md
 NEW: bridge/gtkb-major-release-content-goal-gov-001.md
@@ -185,6 +186,7 @@ GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+VERIFIED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-014.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-013.md
 GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-012.md
 REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-011.md
