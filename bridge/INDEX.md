@@ -17,12 +17,6 @@ NEW: bridge/gtkb-restore-systems-and-tools-doc-003.md
 GO: bridge/gtkb-restore-systems-and-tools-doc-002.md
 NEW: bridge/gtkb-restore-systems-and-tools-doc-001.md
 
-Document: gtkb-bash-hook-destructive-substring-false-positive
-VERIFIED: bridge/gtkb-bash-hook-destructive-substring-false-positive-004.md
-NEW: bridge/gtkb-bash-hook-destructive-substring-false-positive-003.md
-GO: bridge/gtkb-bash-hook-destructive-substring-false-positive-002.md
-NEW: bridge/gtkb-bash-hook-destructive-substring-false-positive-001.md
-
 Document: gtkb-git-hooks-path-mismatch-lint
 VERIFIED: bridge/gtkb-git-hooks-path-mismatch-lint-004.md
 NEW: bridge/gtkb-git-hooks-path-mismatch-lint-003.md
@@ -39,14 +33,6 @@ VERIFIED: bridge/gtkb-pytest-basetemp-session-isolation-004.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-003.md
 GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
-
-Document: gtkb-dashboard-launcher-idempotence-pid-tracking
-VERIFIED: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-006.md
-REVISED: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-005.md
-NO-GO: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-004.md
-NEW: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-003.md
-GO: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-002.md
-NEW: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-001.md
 
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
 GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-003.md
@@ -76,28 +62,6 @@ NO-GO: bridge/gtkb-understand-anything-evaluation-install-004.md
 REVISED: bridge/gtkb-understand-anything-evaluation-install-003.md
 NO-GO: bridge/gtkb-understand-anything-evaluation-install-002.md
 NEW: bridge/gtkb-understand-anything-evaluation-install-001.md
-
-Document: gtkb-wi-4279-scaffold-phantom-spec-citation-repoint
-VERIFIED: bridge/gtkb-wi-4279-scaffold-phantom-spec-citation-repoint-004.md
-NEW: bridge/gtkb-wi-4279-scaffold-phantom-spec-citation-repoint-003.md
-GO: bridge/gtkb-wi-4279-scaffold-phantom-spec-citation-repoint-002.md
-NEW: bridge/gtkb-wi-4279-scaffold-phantom-spec-citation-repoint-001.md
-
-Document: gtkb-wi-3506-phantom-spec-citation-repoint
-VERIFIED: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-006.md
-REVISED: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-005.md
-NO-GO: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-004.md
-NEW: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-003.md
-GO: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-002.md
-NEW: bridge/gtkb-wi-3506-phantom-spec-citation-repoint-001.md
-
-Document: gtkb-axis-2-dispatchable-filter
-VERIFIED: bridge/gtkb-axis-2-dispatchable-filter-006.md
-NEW: bridge/gtkb-axis-2-dispatchable-filter-005.md
-GO: bridge/gtkb-axis-2-dispatchable-filter-004.md
-REVISED: bridge/gtkb-axis-2-dispatchable-filter-003.md
-NO-GO: bridge/gtkb-axis-2-dispatchable-filter-002.md
-NEW: bridge/gtkb-axis-2-dispatchable-filter-001.md
 
 Document: gtkb-wrap-scan-report-relocation-slice-1
 VERIFIED: bridge/gtkb-wrap-scan-report-relocation-slice-1-004.md
@@ -209,12 +173,6 @@ NEW: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-003.md
 GO: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-002.md
 NEW: bridge/gtkb-startup-refractor-slice-a-startup-control-inventory-001.md
 
-Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
-VERIFIED: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-004.md
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-003.md
-GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-002.md
-NEW: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-001.md
-
 Document: gtkb-startup-refractor-scoping
 GO: bridge/gtkb-startup-refractor-scoping-002.md
 NEW: bridge/gtkb-startup-refractor-scoping-001.md
@@ -224,20 +182,6 @@ VERIFIED: bridge/gtkb-proposal-standards-propose-scaffold-skill-004.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-003.md
 GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
-
-Document: gtkb-claude-code-session-id-env-var-gap
-VERIFIED: bridge/gtkb-claude-code-session-id-env-var-gap-012.md
-NEW: bridge/gtkb-claude-code-session-id-env-var-gap-011.md
-GO: bridge/gtkb-claude-code-session-id-env-var-gap-010.md
-REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-009.md
-NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-008.md
-REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-007.md
-NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-006.md
-GO: bridge/gtkb-claude-code-session-id-env-var-gap-005.md
-REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-004.md
-NO-GO: bridge/gtkb-claude-code-session-id-env-var-gap-003.md
-REVISED: bridge/gtkb-claude-code-session-id-env-var-gap-002.md
-NEW: bridge/gtkb-claude-code-session-id-env-var-gap-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-010.md
@@ -250,12 +194,6 @@ NO-GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-004.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-003.md
 GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-002.md
 NEW: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-001.md
-
-Document: gtkb-wrapup-enhancements-closure
-VERIFIED: bridge/gtkb-wrapup-enhancements-closure-004.md
-NEW: bridge/gtkb-wrapup-enhancements-closure-003.md
-GO: bridge/gtkb-wrapup-enhancements-closure-002.md
-NEW: bridge/gtkb-wrapup-enhancements-closure-001.md
 
 Document: gtkb-deferred-authority-implementation-start-parser-followup
 VERIFIED: bridge/gtkb-deferred-authority-implementation-start-parser-followup-004.md
