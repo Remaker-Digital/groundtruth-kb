@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-envelope-dispatch-element-001
+NEW: bridge/gtkb-envelope-dispatch-element-001-001.md
+
 Document: gtkb-session-envelope-durability-001
 NEW: bridge/gtkb-session-envelope-durability-001-001.md
 
@@ -48,6 +51,7 @@ GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
 
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
+VERIFIED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-011.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-010.md
 GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-009.md
 REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-008.md
