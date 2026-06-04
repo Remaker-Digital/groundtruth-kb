@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-project-completion-drive-payload-001
+NEW: bridge/gtkb-project-completion-drive-payload-001-001.md
+
 Document: gtkb-envelope-dispatch-element-001
 NEW: bridge/gtkb-envelope-dispatch-element-001-001.md
 
@@ -50,19 +53,6 @@ VERIFIED: bridge/gtkb-pytest-basetemp-session-isolation-004.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-003.md
 GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
-
-Document: gtkb-loop-multi-instance-coordinator-design-slice-1
-VERIFIED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-011.md
-NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-010.md
-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-009.md
-REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-008.md
-NO-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-007.md
-REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-006.md
-NO-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-005.md
-NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-004.md
-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-003.md
-REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-002.md
-NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-001.md
 
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
 VERIFIED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-010.md
