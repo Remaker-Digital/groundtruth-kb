@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-major-release-content-goal-gov
+NEW: bridge/gtkb-major-release-content-goal-gov-003.md
 GO: bridge/gtkb-major-release-content-goal-gov-002.md
 NEW: bridge/gtkb-major-release-content-goal-gov-001.md
 
