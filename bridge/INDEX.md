@@ -7,6 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-v1-docker-isolation-validator-scoping
+REVISED: bridge/gtkb-v1-docker-isolation-validator-scoping-003.md
+NO-GO: bridge/gtkb-v1-docker-isolation-validator-scoping-002.md
+NEW: bridge/gtkb-v1-docker-isolation-validator-scoping-001.md
+
 Document: gtkb-v1-spec-corpus-distillation-scoping
 GO: bridge/gtkb-v1-spec-corpus-distillation-scoping-002.md
 NEW: bridge/gtkb-v1-spec-corpus-distillation-scoping-001.md
@@ -16,6 +21,7 @@ GO: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-002.md
 NEW: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-001.md
 
 Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
+VERIFIED: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-004.md
 NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-003.md
 GO: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-002.md
 NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-001.md
@@ -37,6 +43,9 @@ WITHDRAWN: bridge/gtkb-agent-sot-read-discipline-phase-1-002.md
 NEW: bridge/gtkb-agent-sot-read-discipline-phase-1-001.md
 
 Document: gtkb-platform-sot-consolidation-umbrella
+GO: bridge/gtkb-platform-sot-consolidation-umbrella-008.md
+REVISED: bridge/gtkb-platform-sot-consolidation-umbrella-007.md
+NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-006.md
 REVISED: bridge/gtkb-platform-sot-consolidation-umbrella-005.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-004.md
 REVISED: bridge/gtkb-platform-sot-consolidation-umbrella-003.md
