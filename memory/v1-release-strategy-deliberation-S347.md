@@ -2,9 +2,7 @@
 
 **Session:** S347
 **Date captured:** 2026-05-24
-**Status:** In-progress deliberation. **No decision has been made.** This document
-captures the analysis as of the snapshot date so the owner can resume and decide
-later.
+**Status:** RESOLVED. The owner selected Option B (Hybrid Variant - Spec-Driven Progressive Refactor) in Session S405. Captured in the Deliberation Archive as **DELIB-2234**.
 **Authority class:** Operational topic file (`memory/*.md`), per CLAUDE.md
 "Permitted markdown" list. NOT canonical; canonical knowledge lives in MemBase.
 **Related artifacts:**
