@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-envelope-glossary-and-gov-lifecycle-amendment
+NEW: bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-001.md
+
 Document: gtkb-work-envelope-router-slice-2-per-type-specs
 GO: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-002.md
 NEW: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-001.md
