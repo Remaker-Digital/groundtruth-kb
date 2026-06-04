@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-bash-hook-destructive-substring-false-positive
+VERIFIED: bridge/gtkb-bash-hook-destructive-substring-false-positive-004.md
 NEW: bridge/gtkb-bash-hook-destructive-substring-false-positive-003.md
 GO: bridge/gtkb-bash-hook-destructive-substring-false-positive-002.md
 NEW: bridge/gtkb-bash-hook-destructive-substring-false-positive-001.md
