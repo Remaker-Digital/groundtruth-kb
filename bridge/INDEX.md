@@ -7,12 +7,6 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
-Document: gtkb-major-release-content-goal-gov
-VERIFIED: bridge/gtkb-major-release-content-goal-gov-004.md
-NEW: bridge/gtkb-major-release-content-goal-gov-003.md
-GO: bridge/gtkb-major-release-content-goal-gov-002.md
-NEW: bridge/gtkb-major-release-content-goal-gov-001.md
-
 Document: gtkb-restore-systems-and-tools-doc
 VERIFIED: bridge/gtkb-restore-systems-and-tools-doc-004.md
 NEW: bridge/gtkb-restore-systems-and-tools-doc-003.md
@@ -72,6 +66,7 @@ GO: bridge/gtkb-wrap-scan-report-relocation-slice-1-002.md
 NEW: bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md
 
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
+REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-015.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-014.md
 REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-013.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces-012.md
