@@ -7,6 +7,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-envelope-implementation-umbrella-capstone
+GO: bridge/gtkb-envelope-implementation-umbrella-capstone-002.md
+NEW: bridge/gtkb-envelope-implementation-umbrella-capstone-001.md
+
 Document: gtkb-envelope-disclosure-ui-redesign
 GO: bridge/gtkb-envelope-disclosure-ui-redesign-002.md
 NEW: bridge/gtkb-envelope-disclosure-ui-redesign-001.md

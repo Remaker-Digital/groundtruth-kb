@@ -7695,6 +7695,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-04T04:40:39.305138Z
   answer: "Your questions have been answered: \"WI-4291 says '<subject> <role>' but role 'asserts, never sets' while status_detail says session PROJECT binds via payload, not keyword. What is the load-bearing semantic?\"=\"[User dismissed — do not proceed, wait for next instruction]\", \"What's the migration/compat posture for the existing '::init gtkb pb' form when the new '::init <subject> <role>' form lands?\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1009
+  asked_at: 2026-06-04T06:33:11.450615Z
+  question: "Wrap-scan is clean (W0+W1+W2 all exit 0; findings are pre-existing hygiene, not S405-introduced). How deep should the session wrap go?"
+  options:
+    - "Stop loop only — no MemBase/MEMORY.md mutations"
+    - "Light wrap — MEMORY.md session entry only"
+    - "Full /kb-session-wrap procedure"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c394da23e2f99c61
+  resolved_at: 2026-06-04T06:33:11.450615Z
+  answer: "Your questions have been answered: \"Wrap-scan is clean (W0+W1+W2 all exit 0; findings are pre-existing hygiene, not S405-introduced). How deep should the session wrap go?\"=\"Full /kb-session-wrap procedure\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
