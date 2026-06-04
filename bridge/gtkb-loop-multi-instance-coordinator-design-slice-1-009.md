@@ -62,6 +62,9 @@ groundtruth-kb\.venv\Scripts\python.exe -c "import sqlite3; con=sqlite3.connect(
 Observed:
 
 - Bridge drift was `[]`.
+- `bridge/INDEX.md` was updated by inserting
+  `GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-009.md`
+  at the top of this document entry; prior versions remain listed below it.
 - Applicability preflight passed:
   `sha256:e7d450a096ecfb4aa5de91c58c0b77837cef0a1dbc961e89a341cfb5485f34ac`;
   missing required specs `[]`; missing advisory specs `[]`.
