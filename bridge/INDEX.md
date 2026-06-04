@@ -7,17 +7,15 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-impl-start-gate-pretooluse-restore
+GO: bridge/gtkb-impl-start-gate-pretooluse-restore-002.md
+NEW: bridge/gtkb-impl-start-gate-pretooluse-restore-001.md
+
 Document: gtkb-impl-start-target-paths-preflight
 NO-GO: bridge/gtkb-impl-start-target-paths-preflight-003.md
 GO: bridge/gtkb-impl-start-target-paths-preflight-002.md
 NEW: bridge/gtkb-impl-start-target-paths-preflight-001.md
 
-
-Document: gtkb-doctor-dispatch-liveness-recipient-key-fix
-VERIFIED: bridge/gtkb-doctor-dispatch-liveness-recipient-key-fix-004.md
-NEW: bridge/gtkb-doctor-dispatch-liveness-recipient-key-fix-003.md
-GO: bridge/gtkb-doctor-dispatch-liveness-recipient-key-fix-002.md
-NEW: bridge/gtkb-doctor-dispatch-liveness-recipient-key-fix-001.md
 
 Document: gtkb-envelope-implementation-umbrella-capstone
 GO: bridge/gtkb-envelope-implementation-umbrella-capstone-002.md
@@ -38,12 +36,6 @@ NEW: bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-001.md
 Document: gtkb-work-envelope-router-slice-2-per-type-specs
 GO: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-002.md
 NEW: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-001.md
-
-Document: gtkb-manual-bridge-scan-terminal-go-filter
-VERIFIED: bridge/gtkb-manual-bridge-scan-terminal-go-filter-004.md
-NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-003.md
-GO: bridge/gtkb-manual-bridge-scan-terminal-go-filter-002.md
-NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-001.md
 
 Document: gtkb-envelope-meta-model-adr-dcl-001
 GO: bridge/gtkb-envelope-meta-model-adr-dcl-001-002.md
