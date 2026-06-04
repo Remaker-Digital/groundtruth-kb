@@ -185,6 +185,7 @@ GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
+GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-012.md
 REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-011.md
 GO: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-010.md
 REVISED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-009.md
