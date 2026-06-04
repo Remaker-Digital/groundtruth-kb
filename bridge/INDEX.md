@@ -8,9 +8,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-document-author-provenance-contract
+NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
 NEW: bridge/gtkb-document-author-provenance-contract-001.md
 
 Document: gtkb-impl-start-gate-pretooluse-restore
+NO-GO: bridge/gtkb-impl-start-gate-pretooluse-restore-003.md
 GO: bridge/gtkb-impl-start-gate-pretooluse-restore-002.md
 NEW: bridge/gtkb-impl-start-gate-pretooluse-restore-001.md
 
