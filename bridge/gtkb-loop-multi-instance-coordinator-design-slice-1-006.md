@@ -148,17 +148,20 @@ Implementation-start readback:
 python scripts\implementation_authorization.py begin --bridge-id gtkb-loop-multi-instance-coordinator-design-slice-1 --no-write
 ```
 
-Observed:
+Observed after this revision was filed:
 
 ```text
-Approved proposal is missing concrete target_paths or Files Expected To Change
+{
+  "authorized": false,
+  "error": "Post-implementation report is awaiting Loyal Opposition review; wait for VERIFIED or NO-GO before requesting authorization."
+}
 ```
 
 CLI correction dry-runs:
 
 ```text
 groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb backlog update WI-4281 --resolution-status open --stage backlogged --status-detail "Design-only bridge accepted; implementation and lifecycle closure deferred pending explicit authorization." --change-reason "Dry-run: test correction path for loop coordinator NO-GO." --dry-run --json
-groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb backlog update WI-4281 --resolution-status open --status-detail "Dry-run only" --change-reason "Dry-run: test resolution status correction without stage rollback." --dry-run --json
+groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb backlog update WI-4281 --resolution-status open --related-bridge-threads "[\"gtkb-loop-multi-instance-coordinator-design-slice-1\"]" --status-detail "Reopened after bridge NO-GO at gtkb-loop-multi-instance-coordinator-design-slice-1-005: design remains accepted by GO -003, but work-item lifecycle closure requires a separately authorized KB-mutation path; implementation remains deferred." --change-reason "Correct unauthorized design-only WI closure per gtkb-loop-multi-instance-coordinator-design-slice-1-005 NO-GO; restore WI-4281 resolution_status to open while preserving the accepted design thread." --dry-run --json
 ```
 
 Observed:
@@ -229,14 +232,14 @@ Observed results:
   artifact with `drift: []`.
 - WI-4281 remains `resolution_status=resolved`, `stage=resolved`, changed by
   the earlier Prime mutation; this revision did not mutate it.
-- `implementation_authorization.py begin --no-write` still fails for the old
-  approved design-only GO because that GO had no concrete target paths.
+- `implementation_authorization.py begin --no-write` now fails because this
+  correction is awaiting Loyal Opposition review; no implementation
+  authorization is active.
 - The public backlog CLI rejects `stage` rollback from `resolved` to
   `backlogged`.
 - The active project authorizations do not include WI-4281.
 - Applicability preflight passed for this revised artifact.
-- Clause preflight is expected to pass after this `Specification-Derived
-  Verification` section and the `bridge/INDEX.md` evidence are present.
+- Clause preflight passed with zero evidence gaps and zero blocking gaps.
 
 ## Verification Plan For The Later Repair
 
