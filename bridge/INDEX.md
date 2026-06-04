@@ -11,6 +11,7 @@ Document: gtkb-project-completion-drive-payload-001
 NEW: bridge/gtkb-project-completion-drive-payload-001-001.md
 
 Document: gtkb-envelope-dispatch-element-001
+GO: bridge/gtkb-envelope-dispatch-element-001-002.md
 NEW: bridge/gtkb-envelope-dispatch-element-001-001.md
 
 Document: gtkb-session-envelope-durability-001
