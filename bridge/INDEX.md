@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1
+REVISED: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-003.md
 NO-GO: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-002.md
 NEW: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-001.md
 
