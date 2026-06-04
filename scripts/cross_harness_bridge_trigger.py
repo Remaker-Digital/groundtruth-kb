@@ -884,7 +884,7 @@ HEARTBEAT_LOCK_TEMPLATE = "active-{role}-session.lock"
 # parameter (migration to consumption is IP-3b).
 #
 # Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001):
-#   1. role-assignments.json: needed_role_label -> harness_id  (role authority)
+#   1. harness-registry.json: needed_role_label -> harness_id  (canonical role authority)
 #   2. harness-identities.json (inverted): harness_id -> harness_command_handle
 #      (identity authority)
 #   3. Drift check: role_record["harness_type"] (denormalized) MUST match

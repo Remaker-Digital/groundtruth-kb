@@ -949,12 +949,12 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
                 overlap_label = "+".join(sorted(overlap))
                 warnings.append(
                     f"both `{current_harness}` and `{harness}` have role=`{overlap_label}` "
-                    "— counterpart bridge roles may collide; verify harness-state/role-assignments.json."
+                    "— counterpart bridge roles may collide; verify harness-state/harness-registry.json (canonical role registry)."
                 )
             elif role_set & TOGGLEABLE_ROLE_PROFILES and our_role_set & TOGGLEABLE_ROLE_PROFILES and not overlap:
                 warnings.append(
                     f"`{current_harness}` is `{our_label}`; counterpart `{harness}` is `{their_label}`. "
-                    "Treat bridge message authority per harness-state/role-assignments.json."
+                    "Treat bridge message authority per harness-state/harness-registry.json (canonical role registry)."
                 )
 
     # Read OUR subject from our own per-harness lifecycle-guard so divergence
