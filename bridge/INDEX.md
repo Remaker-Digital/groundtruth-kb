@@ -8,7 +8,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-impl-start-target-paths-preflight
+NO-GO: bridge/gtkb-impl-start-target-paths-preflight-003.md
+GO: bridge/gtkb-impl-start-target-paths-preflight-002.md
 NEW: bridge/gtkb-impl-start-target-paths-preflight-001.md
+
 
 Document: gtkb-doctor-dispatch-liveness-recipient-key-fix
 VERIFIED: bridge/gtkb-doctor-dispatch-liveness-recipient-key-fix-004.md
@@ -81,6 +84,7 @@ NO-GO: bridge/gtkb-canonical-wrap-keyword-syntax-001-002.md
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
 
 Document: gtkb-envelope-init-keyword-amendment-slice-1
+VERIFIED: bridge/gtkb-envelope-init-keyword-amendment-slice-1-012.md
 REVISED: bridge/gtkb-envelope-init-keyword-amendment-slice-1-011.md
 NO-GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-010.md
 REVISED: bridge/gtkb-envelope-init-keyword-amendment-slice-1-009.md
