@@ -12,6 +12,7 @@ NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
 NEW: bridge/gtkb-document-author-provenance-contract-001.md
 
 Document: gtkb-impl-start-gate-pretooluse-restore
+NEW: bridge/gtkb-impl-start-gate-pretooluse-restore-006.md
 GO: bridge/gtkb-impl-start-gate-pretooluse-restore-005.md
 REVISED: bridge/gtkb-impl-start-gate-pretooluse-restore-004.md
 NO-GO: bridge/gtkb-impl-start-gate-pretooluse-restore-003.md
