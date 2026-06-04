@@ -77,7 +77,12 @@ scripts/lib/**/*.py[cod]
 # Pytest sandbox/basetemp directories produced by --basetemp= flag.
 # Codex + Prime sessions generate these under per-thread names.
 .pytest-*/
+.pytest_*/
 GT-KB.pytest-*/
+# Malformed pytest cache dir name observed 2026-06-04 (concatenation glitch
+# producing names like GT-KB.gtkb-statepytest-cache without a separator).
+GT-KB.gtkb-state*/
+GT-KB.*pytest-cache/
 # Additional pytest residue observed in GT-KB sessions:
 # - $base/ from low-level temp fixture runs
 # - groundtruth-kb/pytest-kpi-retro-codex/ from targeted retro basetemp runs
