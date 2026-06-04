@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1
+NEW: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-001.md
+
 Document: gtkb-restore-systems-and-tools-doc
 VERIFIED: bridge/gtkb-restore-systems-and-tools-doc-004.md
 NEW: bridge/gtkb-restore-systems-and-tools-doc-003.md
