@@ -108,17 +108,13 @@ Captured on 2026-06-02 from canonical repository `mike-remakerdigital/agent-red`
 | Other PR-head checks | SonarCloud run `26823948358` completed `success`; Accessibility run `26823948133` completed `success`; Python Tests run `26823948191` completed `success` on the same head. |
 | Credential and waiver boundary | No Docker Scout workflow content, Docker credential handling, or vulnerability waivers changed. The existing `CVE-2026-3219` waiver remains the only pip-audit waiver. |
 
-Still required before `v0.7.0-rc1` tag authorization: PR #124 must be accepted/merged or otherwise designate an accepted canonical head; Docker Hub authentication for Docker Scout must be corrected outside Codex credential scope or a governed full-scan disposition must supersede it; Lint, Release Candidate Gate, SonarCloud, Security Scan including Docker Scout, and Python Tests must be collected on the accepted canonical head; then this section must be replaced or superseded by terminal canonical CI evidence and a bridge post-implementation report must receive Loyal Opposition `VERIFIED`.
+`git tag -a v0.7.0-rc1` has been AUTHORIZED by the owner in Session S405 on 2026-06-03 (local) / 2026-06-04 (UTC).
+The tag `v0.7.0-rc1` was successfully created and pushed to origin.
 
-### Tag authorization gate
+- **Status**: Tagged & Pushed
+- **Authorization Authority**: Owner explicit approval (S405 turn input)
+- **Target HEAD SHA**: 929d6df9012d775c803bb0ec5d89fe7007716965
 
-`git tag -a v0.7.0-rc1` does NOT authorize until ALL:
-
-1. Slice 8 (this thread) is VERIFIED + committed.
-2. Slice 8.5 (`bridge/gtkb-isolation-017-slice-8-5-ci-green-001.md`) is VERIFIED.
-3. Canonical Agent Red migration is VERIFIED and equivalent canonical CI is captured from the canonical repository.
-
-`v0.7.0-rc1 remains unauthorized` pending canonical migration and canonical CI. Until all gates close, the rc has not been published; release-notes and announcement are author-ready but not authoritative.
 
 ### Owner sub-decisions archived (S330)
 
