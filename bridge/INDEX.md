@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-doctor-dispatch-liveness-recipient-key-fix
+GO: bridge/gtkb-doctor-dispatch-liveness-recipient-key-fix-002.md
 NEW: bridge/gtkb-doctor-dispatch-liveness-recipient-key-fix-001.md
 
 Document: gtkb-envelope-implementation-umbrella-capstone
