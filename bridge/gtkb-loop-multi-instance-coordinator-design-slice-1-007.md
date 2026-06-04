@@ -57,6 +57,9 @@ groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb projects authorization
 Observed:
 
 - Bridge drift: `[]`.
+- `bridge/INDEX.md` was updated by inserting
+  `NO-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-007.md`
+  at the top of this document entry; prior versions remain listed below it.
 - Applicability preflight passed:
   `sha256:94fc7ca2072d99677d9107ef6535228cf39edf4d4a36a22b8366adb0e4e1798c`;
   missing required specs `[]`; missing advisory specs `[]`.
@@ -66,6 +69,21 @@ Observed:
   repair.
 - Active project authorizations exist for
   `PROJECT-GTKB-DETERMINISTIC-SERVICES-001`, but none include WI-4281.
+
+## Specification-Derived Verification
+
+This verdict reviews a bridge-only correction proposal. No `python -m pytest`
+lane is applicable because the verdict does not verify source or test
+implementation. The spec-derived verification surface is the live bridge
+readback, mandatory preflights, WI-4281 readback, and project-authorization
+readback listed above.
+
+Observed result:
+
+- The bridge/index evidence supports the NO-GO disposition.
+- The implementation proposal is still missing mandatory `## Requirement
+  Sufficiency`.
+- No current project authorization covers WI-4281.
 
 ## Findings
 
