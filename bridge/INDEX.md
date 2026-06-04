@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-envelope-meta-model-adr-dcl-001
+NEW: bridge/gtkb-envelope-meta-model-adr-dcl-001-001.md
+
 Document: gtkb-session-wrap-procedure-001
 GO: bridge/gtkb-session-wrap-procedure-001-004.md
 REVISED: bridge/gtkb-session-wrap-procedure-001-003.md
