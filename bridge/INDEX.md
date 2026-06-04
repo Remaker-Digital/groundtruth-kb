@@ -35,6 +35,7 @@ GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
 
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
+NO-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-007.md
 REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-006.md
 NO-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-005.md
 NEW: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-004.md
