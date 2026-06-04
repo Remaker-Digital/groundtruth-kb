@@ -177,3 +177,85 @@ def test_generated_at_iso_format(helper) -> None:
     result = helper.scan(role="prime-builder", index_text="")
     assert result["generated_at"].endswith("Z")
     assert "T" in result["generated_at"]
+
+
+# --- Terminal-kind GO filtering (WI-4278; gtkb-manual-bridge-scan-terminal-go-filter) ---
+
+
+def _write_bridge_thread(bridge_dir: Path, slug: str, operative_kind: str, latest_status: str) -> None:
+    """Write the operative Prime proposal file for a thread.
+
+    Only the operative (NEW) file needs to exist; classification reads
+    ``bridge_kind`` from the operative Prime version, not the verdict file.
+    """
+    operative = bridge_dir / f"{slug}-001.md"
+    operative.write_text(
+        f"NEW\n\nbridge_kind: {operative_kind}\nDocument: {slug}\nVersion: 001\n",
+        encoding="utf-8",
+    )
+
+
+def test_terminal_kind_go_excluded_from_prime(helper, tmp_path) -> None:
+    """A latest GO with terminal-kind bridge_kind is excluded from Prime work,
+    while a non-terminal GO and a terminal-kind NO-GO are preserved."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_bridge_thread(bridge_dir, "gtkb-gov", "governance_review", "GO")
+    _write_bridge_thread(bridge_dir, "gtkb-impl", "implementation_proposal", "GO")
+    _write_bridge_thread(bridge_dir, "gtkb-gov-nogo", "governance_review", "NO-GO")
+    index = (
+        "Document: gtkb-gov\n"
+        "GO: bridge/gtkb-gov-002.md\n"
+        "NEW: bridge/gtkb-gov-001.md\n"
+        "\n"
+        "Document: gtkb-impl\n"
+        "GO: bridge/gtkb-impl-002.md\n"
+        "NEW: bridge/gtkb-impl-001.md\n"
+        "\n"
+        "Document: gtkb-gov-nogo\n"
+        "NO-GO: bridge/gtkb-gov-nogo-002.md\n"
+        "NEW: bridge/gtkb-gov-nogo-001.md\n"
+    )
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(index, encoding="utf-8")
+
+    prime = helper.scan(role="prime-builder", index_text=index, index_path=index_path)
+    prime_docs = {t["document"] for t in prime["actionable"]}
+
+    # Terminal-kind GO excluded; non-terminal GO and terminal-kind NO-GO kept.
+    assert prime_docs == {"gtkb-impl", "gtkb-gov-nogo"}
+    assert "gtkb-gov" not in prime_docs
+
+
+def test_terminal_kind_does_not_affect_lo(helper, tmp_path) -> None:
+    """Loyal Opposition actionability (NEW/REVISED) is unaffected by kind."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_bridge_thread(bridge_dir, "gtkb-gov", "governance_review", "NEW")
+    index = "Document: gtkb-gov\nNEW: bridge/gtkb-gov-001.md\n"
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(index, encoding="utf-8")
+
+    lo = helper.scan(role="loyal-opposition", index_text=index, index_path=index_path)
+    assert {t["document"] for t in lo["actionable"]} == {"gtkb-gov"}
+
+
+def test_unreadable_operative_go_stays_actionable(helper, tmp_path) -> None:
+    """Fail-open: a GO whose operative file is missing stays Prime-actionable."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    # No operative file written -> classification fails open to actionable.
+    index = "Document: gtkb-ghost\nGO: bridge/gtkb-ghost-002.md\nNEW: bridge/gtkb-ghost-001.md\n"
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(index, encoding="utf-8")
+
+    prime = helper.scan(role="prime-builder", index_text=index, index_path=index_path)
+    assert {t["document"] for t in prime["actionable"]} == {"gtkb-ghost"}
+
+
+def test_terminal_tokens_parity_with_canonical_notify(helper) -> None:
+    """The mirrored terminal-token set must match the canonical notify set to
+    prevent classifier drift."""
+    from groundtruth_kb.bridge import notify
+
+    assert set(helper._KIND_TERMINAL_TOKENS) == set(notify._KIND_TERMINAL_TOKENS)

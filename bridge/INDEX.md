@@ -12,6 +12,7 @@ GO: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-002.md
 NEW: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-001.md
 
 Document: gtkb-manual-bridge-scan-terminal-go-filter
+NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-003.md
 GO: bridge/gtkb-manual-bridge-scan-terminal-go-filter-002.md
 NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-001.md
 
