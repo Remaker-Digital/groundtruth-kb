@@ -8,12 +8,15 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-work-envelope-router-slice-2-per-type-specs
+GO: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-002.md
 NEW: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-001.md
 
 Document: gtkb-manual-bridge-scan-terminal-go-filter
+GO: bridge/gtkb-manual-bridge-scan-terminal-go-filter-002.md
 NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-001.md
 
 Document: gtkb-envelope-meta-model-adr-dcl-001
+GO: bridge/gtkb-envelope-meta-model-adr-dcl-001-002.md
 NEW: bridge/gtkb-envelope-meta-model-adr-dcl-001-001.md
 
 Document: gtkb-session-wrap-procedure-001
@@ -51,6 +54,7 @@ NO-GO: bridge/gtkb-canonical-wrap-keyword-syntax-001-002.md
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
 
 Document: gtkb-envelope-init-keyword-amendment-slice-1
+NO-GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-008.md
 NEW: bridge/gtkb-envelope-init-keyword-amendment-slice-1-007.md
 GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-006.md
 REVISED: bridge/gtkb-envelope-init-keyword-amendment-slice-1-005.md
