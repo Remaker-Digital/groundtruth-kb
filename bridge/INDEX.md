@@ -7,11 +7,16 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-v1-spec-corpus-distillation-scoping
+GO: bridge/gtkb-v1-spec-corpus-distillation-scoping-002.md
+NEW: bridge/gtkb-v1-spec-corpus-distillation-scoping-001.md
+
 Document: gtkb-v1-mechanical-enforcement-gate-scoping
 GO: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-002.md
 NEW: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-001.md
 
 Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
+NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-003.md
 GO: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-002.md
 NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-001.md
 
@@ -20,6 +25,8 @@ GO: bridge/gtkb-work-tree-hygiene-mechanism-scoping-002.md
 NEW: bridge/gtkb-work-tree-hygiene-mechanism-scoping-001.md
 
 Document: gtkb-mode-switch-validator-hook-matcher-shape-fix
+VERIFIED: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-006.md
+REVISED: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-005.md
 NO-GO: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-004.md
 NEW: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-003.md
 GO: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-002.md
@@ -30,6 +37,7 @@ WITHDRAWN: bridge/gtkb-agent-sot-read-discipline-phase-1-002.md
 NEW: bridge/gtkb-agent-sot-read-discipline-phase-1-001.md
 
 Document: gtkb-platform-sot-consolidation-umbrella
+NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-004.md
 REVISED: bridge/gtkb-platform-sot-consolidation-umbrella-003.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-umbrella-002.md
 NEW: bridge/gtkb-platform-sot-consolidation-umbrella-001.md

@@ -503,6 +503,17 @@ def test_shell_mutation_classification_blocks_protected_write(tmp_path: Path) ->
     assert "authorization packet" in result["reason"]
 
 
+def test_memory_only_mutating_shell_payload_allowed_without_authorization(tmp_path: Path) -> None:
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "Bash",
+        "tool_input": {"command": "Set-Content -Path memory/pending-owner-decisions.md -Value 'x'"},
+    }
+
+    assert gate.changed_paths(payload) == (["memory/pending-owner-decisions.md"], True)
+    assert gate.gate_decision(payload) == {}
+
+
 def test_deliberation_search_query_with_patch_word_is_allowed_without_authorization(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),

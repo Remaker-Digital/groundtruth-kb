@@ -6,13 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-1064
-  asked_at: 2026-06-04T18:53:07.454264Z
-  question: "Want me to triage the GOs for genuine workable items, or wait out the auto-dispatched `-005`?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 9950a650f6b5e154
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -8473,6 +8467,57 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: b1ce88f49b931473
   resolved_at: 2026-06-04T18:56:36.544383Z
   answer: "Your questions have been answered: \"My -005 revision is claim-locked by an auto-dispatched peer (TTL expires shortly). What should I do next?\"=\"Triage other Prime GOs\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1067
+  asked_at: 2026-06-04T19:05:13.914039Z
+  question: "Which queue blockers should I unblock now? Each selection authorizes me to file the indicated artifact (PAUTH or implementation proposal); no source code is touched until the resulting bridge thread GO's."
+  options:
+    - "Mint envelope PAUTH (4298/4299/4301)"
+    - "Approve WI-4356 (work-tree hygiene)"
+    - "File impl proposal: gtkb-impl-start-gate-path-token-memory-prefix-fix"
+    - "None — end turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1aafbdbcb33d56ce
+  resolved_at: 2026-06-04T19:05:13.914039Z
+  answer: "Your questions have been answered: \"Which queue blockers should I unblock now? Each selection authorizes me to file the indicated artifact (PAUTH or implementation proposal); no source code is touched until the resulting bridge thread GO's.\"=\"Approve WI-4356 (work-tree hygiene)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1068
+  asked_at: 2026-06-04T19:08:39.039831Z
+  question: "WI-4356 is now PAUTH-authorized. The scoping thread (GO -002) defines a multi-slice initiative: stale-detection criteria, deterministic triage CLI, doctor check, GOV-WORK-TREE-HYGIENE-001 governance spec, and stash-disposition automation. How should I continue?"
+  options:
+    - "File WI-4356 Slice 1 impl proposal"
+    - "Wait out peer claims, re-scan bridge"
+    - "Commit pending work to git"
+    - "End turn here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ce0a1379e8a4117b
+  resolved_at: 2026-06-04T19:08:39.039831Z
+  answer: "Your questions have been answered: \"WI-4356 is now PAUTH-authorized. The scoping thread (GO -002) defines a multi-slice initiative: stale-detection criteria, deterministic triage CLI, doctor check, GOV-WORK-TREE-HYGIENE-001 governance spec, and stash-disposition automation. How should I continue?\"=\"Commit pending work to git\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1064
+  asked_at: 2026-06-04T18:53:07.454264Z
+  question: "Want me to triage the GOs for genuine workable items, or wait out the auto-dispatched `-005`?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 9950a650f6b5e154
+  resolved_at: 2026-06-04T19:10:29.795555Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1069
+  asked_at: 2026-06-04T19:22:37.628172Z
+  question: "How should I handle the gtkb-platform-sot-consolidation-umbrella NO-GO -004?"
+  options:
+    - "Wait briefly for AXIS 1 dispatch (Recommended)"
+    - "I'll handle the WI-4341/WI-4352 AUQs now, then you claim + revise here"
+    - "Spawn a chip for a dedicated session"
+    - "Defer — direct me to other work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2cbb7ee515219ee4
+  resolved_at: 2026-06-04T19:22:37.628172Z
+  answer: "Your questions have been answered: \"How should I handle the gtkb-platform-sot-consolidation-umbrella NO-GO -004?\"=\"Spawn a chip for a dedicated session\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

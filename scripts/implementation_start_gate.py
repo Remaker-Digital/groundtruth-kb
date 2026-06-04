@@ -107,7 +107,7 @@ SQLITE_WRITE_DISQUALIFIERS_RE = re.compile(
 )
 BLOCKING_CLAUSE_ID = "PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001"
 PATH_TOKEN_RE = re.compile(
-    r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
+    r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments|memory)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
 )
 PATCH_PATH_RE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
 PATCH_MOVE_RE = re.compile(r"^\*\*\* Move to: (.+)$", re.MULTILINE)
