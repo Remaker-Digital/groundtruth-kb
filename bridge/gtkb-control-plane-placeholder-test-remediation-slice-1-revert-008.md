@@ -78,13 +78,14 @@ Evidence gaps in must_apply clauses: 0
 Blocking gaps (gate-failing): 0
 ```
 
-## Spec-Derived Verification
+## Specification-Derived Verification
 
 Commands:
 
 ```text
 python .claude\skills\bridge\helpers\show_thread_bridge.py gtkb-control-plane-placeholder-test-remediation-slice-1-revert --format json --preview-lines 80
 groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb backlog show WI-3184 --json
+python -m pytest not run: no source or test target_paths were changed by this no-source governance-review slice
 python - <<read-only sqlite query for SPEC-1816, SPEC-1818, SPEC-1819, SPEC-1820, SPEC-1821, SPEC-1822, SPEC-1823, SPEC-1824, SPEC-1826, SPEC-1827 latest status and latest linked test count>>
 ```
 
