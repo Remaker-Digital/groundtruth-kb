@@ -6,7 +6,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-1064
+  asked_at: 2026-06-04T18:53:07.454264Z
+  question: "Want me to triage the GOs for genuine workable items, or wait out the auto-dispatched `-005`?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 9950a650f6b5e154
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -8274,6 +8280,199 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 0fb513c4a3f12359
   resolved_at: 2026-06-04T18:13:02.661742Z
   answer: "Your questions have been answered: \"DECISION-1019: substrate=none was set on 2026-06-01T18:08 by harness A (Codex) and disables cross-harness auto-dispatch (every trigger fire records substrate_mismatch_inert). The original prose question proposed investigating the rationale. How should I proceed?\"=\"Restore substrate to cross_harness_trigger\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1052
+  asked_at: 2026-06-04T18:22:28.836991Z
+  question: "Working-tree state is in-flight peer SoT-consolidation work (~55 files) + my small DECISION-1019 tracker resolution edit. Gate blocks my commit because the active impl-auth packet (current.json) points at the now-VERIFIED gtkb-document-author-provenance-contract thread, written by a peer Codex session at 17:18Z (auto-expires 01:18Z tomorrow). How to resolve?"
+  options:
+    - "Clear stale current.json + commit my edit"
+    - "Revert my edit; wait for peer cycle"
+    - "Stash my edit explicitly"
+    - "Investigate further before fixing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0bf4e1280f512142
+  resolved_at: 2026-06-04T18:22:28.836991Z
+  answer: "Your questions have been answered: \"Working-tree state is in-flight peer SoT-consolidation work (~55 files) + my small DECISION-1019 tracker resolution edit. Gate blocks my commit because the active impl-auth packet (current.json) points at the now-VERIFIED gtkb-document-author-provenance-contract thread, written by a peer Codex session at 17:18Z (auto-expires 01:18Z tomorrow). How to resolve?\"=\"Clear stale current.json + commit my edit\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1053
+  asked_at: 2026-06-04T18:34:57.740263Z
+  question: "Working-tree hygiene gap: 9 git stashes abandoned 3 days to 2 weeks ago by sessions that didn't return. Current working tree files are <3h old (peer in-flight). What disposition for THIS situation + the recurring mechanism?"
+  options:
+    - "Triage stashes now + file bridge for recurring mech"
+    - "File bridge first; defer stash triage"
+    - "Quick batch decision on stashes; no bridge yet"
+    - "Just file the bridge proposal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e06ce22797091c6f
+  resolved_at: 2026-06-04T18:34:57.740263Z
+  answer: "Your questions have been answered: \"Working-tree hygiene gap: 9 git stashes abandoned 3 days to 2 weeks ago by sessions that didn't return. Current working tree files are <3h old (peer in-flight). What disposition for THIS situation + the recurring mechanism?\"=\"Triage stashes now + file bridge for recurring mech\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1054
+  asked_at: 2026-06-04T18:34:57.740263Z
+  question: "stash@{0} (3d ago, 'concurrent-WIP-verdict-commit-s382'): 6 files (INDEX + inventory + pending-owner-decisions + bridge gtkb-gov-proposal-standards-slice1-027.md + verifier-017.md). Slice1-* files ARE in HEAD now (committed); verifier-* files are NOT (abandoned)."
+  options:
+    - "Drop"
+    - "Pop + inspect verifier"
+    - "Keep (don't touch)"
+    - "Inspect each file"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fe216e41b8609456
+  resolved_at: 2026-06-04T18:34:57.740263Z
+  answer: "Your questions have been answered: \"stash@{0} (3d ago, 'concurrent-WIP-verdict-commit-s382'): 6 files (INDEX + inventory + pending-owner-decisions + bridge gtkb-gov-proposal-standards-slice1-027.md + verifier-017.md). Slice1-* files ARE in HEAD now (committed); verifier-* files are NOT (abandoned).\"=\"Pop + inspect verifier\", \"stash@{1} (3d ago, 'concurrent-WIP-slice2-r7b-s382'): includes .claude/settings.json + .codex/hooks.json edits + 3 verifier-* bridge files (-014, -015, -016) + test edit. Verifier files NOT in HEAD.\"=\"Pop + inspect\", \"stash@{2} (3d ago, 'concurrent-WIP-during-slice1-impl-commit-s382'): MASSIVE .agent/skills/ deletes (skill consolidation refactor). Today's working tree shows the consolidation IS in progress via different paths.\"=\"Pop + inspect\", \"stash@{3} (3d ago, 'temp-local-mods'): INDEX + MEMORY + pending-owner-decisions edits. Generic 'temp-' label suggests transient work-in-progress.\"=\"Pop + inspect\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1055
+  asked_at: 2026-06-04T18:34:57.740263Z
+  question: "stash@{1} (3d ago, 'concurrent-WIP-slice2-r7b-s382'): includes .claude/settings.json + .codex/hooks.json edits + 3 verifier-* bridge files (-014, -015, -016) + test edit. Verifier files NOT in HEAD."
+  options:
+    - "Drop"
+    - "Pop + inspect"
+    - "Keep"
+    - "Inspect first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0e0a300eb15fe18a
+  resolved_at: 2026-06-04T18:34:57.740263Z
+  answer: "Your questions have been answered: \"stash@{0} (3d ago, 'concurrent-WIP-verdict-commit-s382'): 6 files (INDEX + inventory + pending-owner-decisions + bridge gtkb-gov-proposal-standards-slice1-027.md + verifier-017.md). Slice1-* files ARE in HEAD now (committed); verifier-* files are NOT (abandoned).\"=\"Pop + inspect verifier\", \"stash@{1} (3d ago, 'concurrent-WIP-slice2-r7b-s382'): includes .claude/settings.json + .codex/hooks.json edits + 3 verifier-* bridge files (-014, -015, -016) + test edit. Verifier files NOT in HEAD.\"=\"Pop + inspect\", \"stash@{2} (3d ago, 'concurrent-WIP-during-slice1-impl-commit-s382'): MASSIVE .agent/skills/ deletes (skill consolidation refactor). Today's working tree shows the consolidation IS in progress via different paths.\"=\"Pop + inspect\", \"stash@{3} (3d ago, 'temp-local-mods'): INDEX + MEMORY + pending-owner-decisions edits. Generic 'temp-' label suggests transient work-in-progress.\"=\"Pop + inspect\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1056
+  asked_at: 2026-06-04T18:34:57.740263Z
+  question: "stash@{2} (3d ago, 'concurrent-WIP-during-slice1-impl-commit-s382'): MASSIVE .agent/skills/ deletes (skill consolidation refactor). Today's working tree shows the consolidation IS in progress via different paths."
+  options:
+    - "Drop"
+    - "Pop + inspect"
+    - "Keep"
+    - "Inspect first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 57a08331d31495e5
+  resolved_at: 2026-06-04T18:34:57.740263Z
+  answer: "Your questions have been answered: \"stash@{0} (3d ago, 'concurrent-WIP-verdict-commit-s382'): 6 files (INDEX + inventory + pending-owner-decisions + bridge gtkb-gov-proposal-standards-slice1-027.md + verifier-017.md). Slice1-* files ARE in HEAD now (committed); verifier-* files are NOT (abandoned).\"=\"Pop + inspect verifier\", \"stash@{1} (3d ago, 'concurrent-WIP-slice2-r7b-s382'): includes .claude/settings.json + .codex/hooks.json edits + 3 verifier-* bridge files (-014, -015, -016) + test edit. Verifier files NOT in HEAD.\"=\"Pop + inspect\", \"stash@{2} (3d ago, 'concurrent-WIP-during-slice1-impl-commit-s382'): MASSIVE .agent/skills/ deletes (skill consolidation refactor). Today's working tree shows the consolidation IS in progress via different paths.\"=\"Pop + inspect\", \"stash@{3} (3d ago, 'temp-local-mods'): INDEX + MEMORY + pending-owner-decisions edits. Generic 'temp-' label suggests transient work-in-progress.\"=\"Pop + inspect\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1057
+  asked_at: 2026-06-04T18:34:57.740263Z
+  question: "stash@{3} (3d ago, 'temp-local-mods'): INDEX + MEMORY + pending-owner-decisions edits. Generic 'temp-' label suggests transient work-in-progress."
+  options:
+    - "Drop"
+    - "Pop + inspect"
+    - "Keep"
+    - "Inspect first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1d4b2daaff6b718a
+  resolved_at: 2026-06-04T18:34:57.740263Z
+  answer: "Your questions have been answered: \"stash@{0} (3d ago, 'concurrent-WIP-verdict-commit-s382'): 6 files (INDEX + inventory + pending-owner-decisions + bridge gtkb-gov-proposal-standards-slice1-027.md + verifier-017.md). Slice1-* files ARE in HEAD now (committed); verifier-* files are NOT (abandoned).\"=\"Pop + inspect verifier\", \"stash@{1} (3d ago, 'concurrent-WIP-slice2-r7b-s382'): includes .claude/settings.json + .codex/hooks.json edits + 3 verifier-* bridge files (-014, -015, -016) + test edit. Verifier files NOT in HEAD.\"=\"Pop + inspect\", \"stash@{2} (3d ago, 'concurrent-WIP-during-slice1-impl-commit-s382'): MASSIVE .agent/skills/ deletes (skill consolidation refactor). Today's working tree shows the consolidation IS in progress via different paths.\"=\"Pop + inspect\", \"stash@{3} (3d ago, 'temp-local-mods'): INDEX + MEMORY + pending-owner-decisions edits. Generic 'temp-' label suggests transient work-in-progress.\"=\"Pop + inspect\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1058
+  asked_at: 2026-06-04T18:34:57.740263Z
+  question: "Comprehensive inspection complete: every file in all 9 stashes is either (a) already in HEAD with identical content (byte-diff=0), (b) superseded by newer HEAD content, or (c) auto-regenerating runtime cache. Zero recoverable unique work. Proceed with batch drop?"
+  options:
+    - "Drop all 9 stashes"
+    - "Keep all (don't drop)"
+    - "Drop 0-6 only; keep 7+8"
+    - "Inspect each in detail first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f9cdc04e9605cd0a
+  resolved_at: 2026-06-04T18:34:57.740263Z
+  answer: "Your questions have been answered: \"Comprehensive inspection complete: every file in all 9 stashes is either (a) already in HEAD with identical content (byte-diff=0), (b) superseded by newer HEAD content, or (c) auto-regenerating runtime cache. Zero recoverable unique work. Proceed with batch drop?\"=\"Drop all 9 stashes\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1059
+  asked_at: 2026-06-04T18:39:15.988458Z
+  question: "How should agent-sot-read-discipline reconcile with the peer's platform umbrella?"
+  options:
+    - "Retire mine; peer's umbrella covers it (Slice 1 registry + Slice 6 MEMORY; add new slice for Read-tool hook)"
+    - "Reframe mine as Slice 8 of platform umbrella (keep but integrate)"
+    - "Continue mine as sibling that depends on peer's umbrella; build on top"
+    - "Pause both and AUQ owner on broader strategy"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 55b56531e80fe661
+  resolved_at: 2026-06-04T18:39:15.988458Z
+  answer: "Your questions have been answered: \"How should agent-sot-read-discipline reconcile with the peer's platform umbrella?\"=\"Pause both and AUQ owner on broader strategy\", \"MEMORY.md cadence reconciliation (mine vs peer's)?\"=\"Owner picks new shape — strip-now was based on AUQ#15 of my project; revisit with peer's context\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1060
+  asked_at: 2026-06-04T18:39:15.988458Z
+  question: "MEMORY.md cadence reconciliation (mine vs peer's)?"
+  options:
+    - "Adopt peer's gentler cadence (archive + 60-day retention + index-length check)"
+    - "Keep my strict cadence; treat peer's as Phase 0, mine as Phase 1"
+    - "Owner picks new shape — strip-now was based on AUQ#15 of my project; revisit with peer's context"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cb81a7b90d6edaf0
+  resolved_at: 2026-06-04T18:39:15.988458Z
+  answer: "Your questions have been answered: \"How should agent-sot-read-discipline reconcile with the peer's platform umbrella?\"=\"Pause both and AUQ owner on broader strategy\", \"MEMORY.md cadence reconciliation (mine vs peer's)?\"=\"Owner picks new shape — strip-now was based on AUQ#15 of my project; revisit with peer's context\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1061
+  asked_at: 2026-06-04T18:39:15.988458Z
+  question: "Top-level structure for SoT-consolidation going forward?"
+  options:
+    - "One canonical platform umbrella — peer's; mine folds into it"
+    - "Coordinated siblings — keep both umbrellas; explicit depends-on linkage"
+    - "Merge into single owner-authored umbrella — owner directly defines canonical shape"
+    - "Different shape — you'll specify"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 62e6de9fa5bece89
+  resolved_at: 2026-06-04T18:39:15.988458Z
+  answer: "Your questions have been answered: \"Top-level structure for SoT-consolidation going forward?\"=\"One canonical platform umbrella — peer's; mine folds into it\", \"SoT registry shape going forward?\"=\"Peer's broad 22-class registry; my forbidden-substitute pairs as added metadata column\", \"Anti-recurrence mechanism (prevent future parallel-session project fragmentation)?\"=\"Mechanical — PreToolUse hook on bridge file Writes that blocks NEW filings without recent 'gt projects list' query in session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1062
+  asked_at: 2026-06-04T18:39:15.988458Z
+  question: "SoT registry shape going forward?"
+  options:
+    - "Peer's broad 22-class registry; my forbidden-substitute pairs as added metadata column"
+    - "Two registries — peer's broad inventory + mine's narrow read-discipline-focused"
+    - "One merged registry at a new location — owner directs path/shape"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bbfa71dac5b7b11b
+  resolved_at: 2026-06-04T18:39:15.988458Z
+  answer: "Your questions have been answered: \"Top-level structure for SoT-consolidation going forward?\"=\"One canonical platform umbrella — peer's; mine folds into it\", \"SoT registry shape going forward?\"=\"Peer's broad 22-class registry; my forbidden-substitute pairs as added metadata column\", \"Anti-recurrence mechanism (prevent future parallel-session project fragmentation)?\"=\"Mechanical — PreToolUse hook on bridge file Writes that blocks NEW filings without recent 'gt projects list' query in session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1063
+  asked_at: 2026-06-04T18:39:15.988458Z
+  question: "Anti-recurrence mechanism (prevent future parallel-session project fragmentation)?"
+  options:
+    - "Mandatory pre-filing check — 'gt projects list active' + 'grep bridge/INDEX.md for in-flight umbrellas' before any project creation"
+    - "Mechanical — PreToolUse hook on bridge file Writes that blocks NEW filings without recent 'gt projects list' query in session"
+    - "Doctor check for overlapping active projects"
+    - "Owner-mediated only — no mechanical enforcement; rely on session-start project briefing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8e174389c1badef6
+  resolved_at: 2026-06-04T18:39:15.988458Z
+  answer: "Your questions have been answered: \"Top-level structure for SoT-consolidation going forward?\"=\"One canonical platform umbrella — peer's; mine folds into it\", \"SoT registry shape going forward?\"=\"Peer's broad 22-class registry; my forbidden-substitute pairs as added metadata column\", \"Anti-recurrence mechanism (prevent future parallel-session project fragmentation)?\"=\"Mechanical — PreToolUse hook on bridge file Writes that blocks NEW filings without recent 'gt projects list' query in session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1065
+  asked_at: 2026-06-04T18:55:13.011072Z
+  question: "How should I handle the final 4 P1 WIs (V1 release strategy trio + D3+D4 fix)?"
+  options:
+    - "Mint V1 release strategy PAUTH; I draft 3 scopings (Recommended)"
+    - "Defer all 4 P1s — session wrap"
+    - "Mint PAUTH + scope WI-3443 too"
+    - "Owner picks one P1 to focus on"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9a721158b9c646fc
+  resolved_at: 2026-06-04T18:55:13.011072Z
+  answer: "Your questions have been answered: \"How should I handle the final 4 P1 WIs (V1 release strategy trio + D3+D4 fix)?\"=\"Mint V1 release strategy PAUTH; I draft 3 scopings (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1066
+  asked_at: 2026-06-04T18:56:36.544383Z
+  question: "My -005 revision is claim-locked by an auto-dispatched peer (TTL expires shortly). What should I do next?"
+  options:
+    - "Wait out -005 auto-dispatch"
+    - "Triage other Prime GOs"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b1ce88f49b931473
+  resolved_at: 2026-06-04T18:56:36.544383Z
+  answer: "Your questions have been answered: \"My -005 revision is claim-locked by an auto-dispatched peer (TTL expires shortly). What should I do next?\"=\"Triage other Prime GOs\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
