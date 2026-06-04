@@ -100,14 +100,14 @@ def _normalize_candidate(project_root: Path, path_text: str) -> str:
     """Normalize candidate paths to repo-relative POSIX form.
 
     Reuses normalize_relative_path() when the path resolves under project_root;
-    otherwise falls back to forward-slash normalization with ``./`` stripping.
-    The fallback path supports synthetic test inputs and explicit candidate
-    strings that may not exist on disk yet.
+    otherwise preserves the explicit candidate syntax in forward-slash form.
+    This keeps root-escape paths visibly out of scope instead of normalizing
+    them into an approved repo-relative target.
     """
     try:
         return normalize_relative_path(project_root, path_text)
     except (AuthorizationError, ValueError, OSError):
-        return path_text.replace("\\", "/").lstrip("./")
+        return path_text.replace("\\", "/")
 
 
 def _collect_from_git_diff(project_root: Path) -> list[str]:
@@ -184,6 +184,14 @@ def _match_against_targets(candidate: str, target_paths: list[str]) -> bool:
     (fnmatch + /**-suffix shortcut) match the implementation-start
     authorization gate byte-for-byte.
     """
+    normalized_candidate = candidate.replace("\\", "/")
+    if (
+        normalized_candidate == ".."
+        or normalized_candidate.startswith("../")
+        or "/../" in normalized_candidate
+        or normalized_candidate.endswith("/..")
+    ):
+        return False
     return path_authorized({"target_path_globs": target_paths}, candidate)
 
 

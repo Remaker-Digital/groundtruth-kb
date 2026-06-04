@@ -185,6 +185,64 @@ def test_mixed_in_and_out_of_scope_returns_exit_drift(fixture_project: Path) -> 
 
 
 # ---------------------------------------------------------------------------
+# T3a: root-boundary candidates stay out of scope
+# ---------------------------------------------------------------------------
+
+
+def test_root_escape_candidate_does_not_normalize_to_in_scope(fixture_project: Path) -> None:
+    _write_bridge_thread(
+        fixture_project,
+        "gtkb-fixture-thread",
+        target_paths=["scripts/impl_start_target_paths_preflight.py"],
+    )
+    result, exit_code = preflight.run_preflight(
+        fixture_project,
+        "gtkb-fixture-thread",
+        explicit_candidates=["../scripts/impl_start_target_paths_preflight.py"],
+        use_git_diff=False,
+    )
+    assert exit_code == preflight.EXIT_SCOPE_DRIFT
+    assert result[preflight.KEY_IN_SCOPE] == []
+    assert result[preflight.KEY_OUT_OF_SCOPE] == ["../scripts/impl_start_target_paths_preflight.py"]
+
+
+def test_absolute_outside_root_candidate_is_out_of_scope(fixture_project: Path) -> None:
+    _write_bridge_thread(
+        fixture_project,
+        "gtkb-fixture-thread",
+        target_paths=["scripts/impl_start_target_paths_preflight.py"],
+    )
+    outside_path = fixture_project.parent / "outside" / "scripts" / "impl_start_target_paths_preflight.py"
+    expected_display = str(outside_path).replace("\\", "/")
+    result, exit_code = preflight.run_preflight(
+        fixture_project,
+        "gtkb-fixture-thread",
+        explicit_candidates=[str(outside_path)],
+        use_git_diff=False,
+    )
+    assert exit_code == preflight.EXIT_SCOPE_DRIFT
+    assert result[preflight.KEY_IN_SCOPE] == []
+    assert result[preflight.KEY_OUT_OF_SCOPE] == [expected_display]
+
+
+def test_in_root_non_existing_relative_path_still_normalizes(fixture_project: Path) -> None:
+    _write_bridge_thread(
+        fixture_project,
+        "gtkb-fixture-thread",
+        target_paths=["scripts/new_tool.py"],
+    )
+    result, exit_code = preflight.run_preflight(
+        fixture_project,
+        "gtkb-fixture-thread",
+        explicit_candidates=["scripts/new_tool.py"],
+        use_git_diff=False,
+    )
+    assert exit_code == preflight.EXIT_OK
+    assert result[preflight.KEY_IN_SCOPE] == ["scripts/new_tool.py"]
+    assert result[preflight.KEY_OUT_OF_SCOPE] == []
+
+
+# ---------------------------------------------------------------------------
 # T4: glob patterns like groundtruth-kb/src/**/*.py
 # ---------------------------------------------------------------------------
 
