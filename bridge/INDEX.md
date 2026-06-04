@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-harness-state-sot-consolidation-phase-1
+GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-001.md
@@ -25,6 +26,7 @@ NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
 NEW: bridge/gtkb-document-author-provenance-contract-001.md
 
 Document: gtkb-impl-start-target-paths-preflight
+VERIFIED: bridge/gtkb-impl-start-target-paths-preflight-009.md
 REVISED: bridge/gtkb-impl-start-target-paths-preflight-008.md
 NO-GO: bridge/gtkb-impl-start-target-paths-preflight-007.md
 NEW: bridge/gtkb-impl-start-target-paths-preflight-006.md
