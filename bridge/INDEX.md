@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-auto-push-investigation-001-slice-1-findings
+VERIFIED: bridge/gtkb-auto-push-investigation-001-slice-1-findings-006.md
 NEW: bridge/gtkb-auto-push-investigation-001-slice-1-findings-005.md
 GO: bridge/gtkb-auto-push-investigation-001-slice-1-findings-004.md
 REVISED: bridge/gtkb-auto-push-investigation-001-slice-1-findings-003.md
@@ -38,6 +39,7 @@ GO: bridge/gtkb-pytest-basetemp-session-isolation-002.md
 NEW: bridge/gtkb-pytest-basetemp-session-isolation-001.md
 
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
+GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-009.md
 REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-008.md
 NO-GO: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-007.md
 REVISED: bridge/gtkb-loop-multi-instance-coordinator-design-slice-1-006.md
