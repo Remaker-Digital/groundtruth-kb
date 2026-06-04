@@ -45,6 +45,8 @@ and rejects traversal-shaped candidates before matching them against approved
 | `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | blocking | Keeps the fix within the active WI-3380 authorization and GO-approved target paths. |
 | `DCL-PROJECT-AUTHORIZATION-ENVELOPE-001` | advisory | Preserves the existing PAUTH-scoped source/test/hook target path envelope. |
 | `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | advisory | Treats the NO-GO, source correction, tests, and implementation response as durable artifacts. |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | advisory | Preserves traceability across the NO-GO, code correction, regression tests, and revised implementation report. |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | advisory | Keeps the blocked-to-revised lifecycle transition explicit in the bridge thread before verification. |
 
 ## Prior Deliberations
 
