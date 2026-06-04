@@ -7,7 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-major-release-content-goal-gov
+NEW: bridge/gtkb-major-release-content-goal-gov-001.md
+
 Document: gtkb-restore-systems-and-tools-doc
+VERIFIED: bridge/gtkb-restore-systems-and-tools-doc-004.md
 NEW: bridge/gtkb-restore-systems-and-tools-doc-003.md
 GO: bridge/gtkb-restore-systems-and-tools-doc-002.md
 NEW: bridge/gtkb-restore-systems-and-tools-doc-001.md
