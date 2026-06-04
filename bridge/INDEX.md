@@ -13,6 +13,7 @@ NO-GO: bridge/gtkb-session-wrap-procedure-001-002.md
 NEW: bridge/gtkb-session-wrap-procedure-001-001.md
 
 Document: gtkb-work-envelope-router-slice-1-001
+REVISED: bridge/gtkb-work-envelope-router-slice-1-001-003.md
 NO-GO: bridge/gtkb-work-envelope-router-slice-1-001-002.md
 NEW: bridge/gtkb-work-envelope-router-slice-1-001-001.md
 
