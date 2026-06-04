@@ -21,6 +21,7 @@ Document: gtkb-canonical-wrap-keyword-syntax-001
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
 
 Document: gtkb-envelope-init-keyword-amendment-slice-1
+NEW: bridge/gtkb-envelope-init-keyword-amendment-slice-1-003.md
 GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-002.md
 NEW: bridge/gtkb-envelope-init-keyword-amendment-slice-1-001.md
 
