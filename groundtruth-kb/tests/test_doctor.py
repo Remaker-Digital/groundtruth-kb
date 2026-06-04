@@ -303,7 +303,7 @@ _DISPATCH_STATE_REL = Path(".gtkb-state/bridge-poller/dispatch-state.json")
 
 
 def _agent_to_role(agent: str) -> str:
-    return {"claude": "prime", "codex": "codex"}.get(agent, agent)
+    return {"claude": "prime-builder", "codex": "loyal-opposition"}.get(agent, agent)
 
 
 def _make_status_file(
@@ -322,7 +322,7 @@ def _make_status_file(
     is exercised.
     """
     role = _agent_to_role(agent)
-    other_role = "codex" if role == "prime" else "prime"
+    other_role = "loyal-opposition" if role == "prime-builder" else "prime-builder"
     state_path = tmp_path / _DISPATCH_STATE_REL
     state_path.parent.mkdir(parents=True, exist_ok=True)
     fresh_iso = _utc_now_minus_seconds(0)
@@ -409,8 +409,8 @@ def test_bridge_poller_missing_updated_at_field_alarm(tmp_path: Path) -> None:
             {
                 "schema_version": 1,
                 "recipients": {
-                    "prime": {"last_result": "no_pending", "pending_count": 0},
-                    "codex": {"last_result": "no_pending", "pending_count": 0},
+                    "prime-builder": {"last_result": "no_pending", "pending_count": 0},
+                    "loyal-opposition": {"last_result": "no_pending", "pending_count": 0},
                 },
             }
         ),
