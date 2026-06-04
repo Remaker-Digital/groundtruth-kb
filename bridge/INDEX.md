@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-work-envelope-router-slice-2-per-type-specs
+NEW: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-001.md
+
 Document: gtkb-manual-bridge-scan-terminal-go-filter
 NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-001.md
 
