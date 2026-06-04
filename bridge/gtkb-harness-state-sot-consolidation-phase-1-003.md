@@ -96,17 +96,26 @@ SoT boundary, retired-path inventory, and explicit Phase 1 exclusions from
 
 ## Pre-Filing Preflight Subsection
 
-Candidate preflights must pass before live filing:
+Observed commands:
 
 ```text
-python scripts/bridge_applicability_preflight.py --bridge-id gtkb-harness-state-sot-consolidation-phase-1 --content-file <candidate>
-python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-harness-state-sot-consolidation-phase-1 --content-file <candidate>
+python scripts\bridge_applicability_preflight.py --bridge-id gtkb-harness-state-sot-consolidation-phase-1
+python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-harness-state-sot-consolidation-phase-1
 ```
 
-Expected result: no missing required specs and no blocking clause gaps.
+Observed result:
 
-Live filing will write `bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md`
-and insert `REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md`
+- Applicability preflight PASS.
+- Packet hash: `sha256:df5d1a2a7c3f118e78b1425188d94e87ef6f1f6e1d5b20b2f11eaace87d73337`.
+- Missing required specs: none.
+- Missing advisory specs: none.
+- Clause preflight PASS.
+- Clauses evaluated: 5.
+- Must-apply clauses: 3.
+- Blocking gaps: 0.
+
+Live filing wrote `bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md`
+and inserted `REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md`
 at the top of the existing `Document: gtkb-harness-state-sot-consolidation-phase-1`
 entry in `bridge/INDEX.md`. Prior versions `-001` and `-002` remain append-only
 and unchanged.
