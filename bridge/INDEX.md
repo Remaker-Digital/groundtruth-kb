@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-v1-docker-isolation-validator-scoping
+GO: bridge/gtkb-v1-docker-isolation-validator-scoping-004.md
 REVISED: bridge/gtkb-v1-docker-isolation-validator-scoping-003.md
 NO-GO: bridge/gtkb-v1-docker-isolation-validator-scoping-002.md
 NEW: bridge/gtkb-v1-docker-isolation-validator-scoping-001.md
