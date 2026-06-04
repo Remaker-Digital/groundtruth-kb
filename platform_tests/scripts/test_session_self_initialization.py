@@ -152,7 +152,7 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert "Strict GOV enforcement" in model["governance_stance"][0]
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
     assert model["skills"]["count"] > 0
-    assert "role-assignments.json" in model["role"]["role_mapping_source"]
+    assert "harness-registry.json" in model["role"]["role_mapping_source"]
     assert "formal-artifact-approval-gate.py" in model["directives"]["hook_files"]
     assert model["workstream_focus"]["default_label"] == "GT-KB Infrastructure Focus"
     assert model["workstream_focus"]["current_label"] == "GT-KB Infrastructure Focus"
@@ -363,7 +363,7 @@ def test_startup_model_discovers_durable_operating_role() -> None:
 
     assert model["role_profile"] == discovered_role
     assert model["role"]["assumed_role"] == module.ROLE_PROFILES[discovered_role]["assumed_role"]
-    assert "role-assignments.json" in model["role"]["role_mapping_source"]
+    assert "harness-registry.json" in model["role"]["role_mapping_source"]
     if discovered_role == "loyal-opposition":
         assert "## Loyal Opposition Startup Task" not in report
         assert "## Session Startup" not in report
@@ -574,15 +574,12 @@ def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() ->
     assert module.DEFAULT_USER_STARTUP_PREFERENCES_PATH.is_relative_to(expected_root)
 
     # Behavior-level invariant: operating_role_path() with --harness-name resolves
-    # to the in-root role assignment map (not the legacy guidance file
-    # repo fallback). prefer_local=False forces the function to gate on
-    # local_path.is_file(), which requires the authority files to be tracked
-    # (Commit 1 in this thread). If this assertion fails with the repo-fallback
-    # path, the migration is incomplete (likely Commit 1 missing).
+    # to the in-root harness registry when it exists, leaving the legacy mirror
+    # as a compatibility fallback for older roots.
     for harness_name in ("codex", "claude"):
         role_path = module.operating_role_path(REPO_ROOT, harness_name=harness_name, prefer_local=False)
-        assert role_path == expected_root / "role-assignments.json", (
-            f"--harness-name {harness_name} must resolve to the single role map, got {role_path}"
+        assert role_path == expected_root / "harness-registry.json", (
+            f"--harness-name {harness_name} must resolve to the harness registry, got {role_path}"
         )
 
 
@@ -853,7 +850,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
     assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
-    assert model["role"]["role_mapping_source"] == "harness-state/role-assignments.json"
+    assert model["role"]["role_mapping_source"] == "harness-state/harness-registry.json"
     assert model["role"]["harness_id"] == "B"
     assert "## Loyal Opposition Startup Task" not in report
     assert "## Session Startup" not in report
@@ -1687,7 +1684,7 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     assert "Do NOT create new bridge automations" in context
     assert "scripts/cross_harness_bridge_trigger.py" in context
     assert "retired smart poller and OS poller remain archived" in context
-    assert "Role mapping source: harness-state/role-assignments.json" in context
+    assert "Role mapping source: harness-state/harness-registry.json" in context
     assert "Harness self-identification: B" in context
     assert "Harness identity source: harness-state/harness-identities.json" in context
     if discovered_role == "loyal-opposition":

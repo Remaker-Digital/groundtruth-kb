@@ -132,6 +132,7 @@ except ImportError:  # pragma: no cover - direct script execution path
     )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+HARNESS_REGISTRY_RELATIVE_PATH = Path("harness-state") / "harness-registry.json"
 # Harness-local role, lifecycle guard, and startup preference records belong to
 # GT-KB itself. Agent Red is an adopter/demo and must not own active harness
 # state unless Mike explicitly switches the session to Agent Red work.
@@ -263,6 +264,10 @@ def _repo_operating_role_path(project_root: Path) -> Path:
     return role_assignments_path(project_root)
 
 
+def harness_registry_path(project_root: Path) -> Path:
+    return project_root.resolve() / HARNESS_REGISTRY_RELATIVE_PATH
+
+
 def operating_role_path(
     project_root: Path,
     *,
@@ -273,7 +278,12 @@ def operating_role_path(
 ) -> Path:
     if role_record_path is not None:
         return _normalized_path(role_record_path)
+    if os.environ.get("GTKB_ROLE_ASSIGNMENTS_PATH"):
+        return role_assignments_path(project_root)
     _ = harness_name, harness_id, prefer_local
+    registry_path = harness_registry_path(project_root)
+    if registry_path.is_file():
+        return registry_path
     return role_assignments_path(project_root)
 
 
@@ -291,6 +301,8 @@ def _display_role_mapping_source(
         role_record_path=role_record_path,
         prefer_local=False,
     )
+    if role_record_path is not None or os.environ.get("GTKB_ROLE_ASSIGNMENTS_PATH"):
+        return str(path)
     try:
         return path.relative_to(project_root).as_posix()
     except ValueError:
@@ -6288,7 +6300,7 @@ def _source_file_signature(path: Path, *, source: str, required: bool = True) ->
 
 
 def _startup_freshness_input_signatures(project_root: Path) -> dict[str, Any]:
-    role_path = role_assignments_path(project_root)
+    role_path = operating_role_path(project_root, prefer_local=False)
     role_source = (
         str(role_path.relative_to(project_root)).replace("\\", "/")
         if role_path.is_relative_to(project_root)
