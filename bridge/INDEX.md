@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-auto-push-investigation-001-slice-1-findings
+NEW: bridge/gtkb-auto-push-investigation-001-slice-1-findings-005.md
 GO: bridge/gtkb-auto-push-investigation-001-slice-1-findings-004.md
 REVISED: bridge/gtkb-auto-push-investigation-001-slice-1-findings-003.md
 NO-GO: bridge/gtkb-auto-push-investigation-001-slice-1-findings-002.md
