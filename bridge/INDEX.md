@@ -42,6 +42,7 @@ NO-GO: bridge/gtkb-canonical-wrap-keyword-syntax-001-002.md
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
 
 Document: gtkb-envelope-init-keyword-amendment-slice-1
+REVISED: bridge/gtkb-envelope-init-keyword-amendment-slice-1-005.md
 NO-GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-004.md
 NEW: bridge/gtkb-envelope-init-keyword-amendment-slice-1-003.md
 GO: bridge/gtkb-envelope-init-keyword-amendment-slice-1-002.md
