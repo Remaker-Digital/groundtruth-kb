@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-session-wrap-procedure-001
+NO-GO: bridge/gtkb-session-wrap-procedure-001-002.md
 NEW: bridge/gtkb-session-wrap-procedure-001-001.md
 
 Document: gtkb-work-envelope-router-slice-1-001
