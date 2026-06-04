@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-work-envelope-router-slice-1-001
+NEW: bridge/gtkb-work-envelope-router-slice-1-001-001.md
+
 Document: gtkb-project-completion-drive-payload-001
 GO: bridge/gtkb-project-completion-drive-payload-001-002.md
 NEW: bridge/gtkb-project-completion-drive-payload-001-001.md
@@ -16,6 +19,8 @@ GO: bridge/gtkb-envelope-dispatch-element-001-002.md
 NEW: bridge/gtkb-envelope-dispatch-element-001-001.md
 
 Document: gtkb-session-envelope-durability-001
+GO: bridge/gtkb-session-envelope-durability-001-006.md
+REVISED: bridge/gtkb-session-envelope-durability-001-005.md
 NO-GO: bridge/gtkb-session-envelope-durability-001-004.md
 REVISED: bridge/gtkb-session-envelope-durability-001-003.md
 NO-GO: bridge/gtkb-session-envelope-durability-001-002.md
