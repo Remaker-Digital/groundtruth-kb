@@ -7,6 +7,18 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-work-tree-hygiene-mechanism-scoping
+NEW: bridge/gtkb-work-tree-hygiene-mechanism-scoping-001.md
+
+Document: gtkb-mode-switch-validator-hook-matcher-shape-fix
+NEW: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-001.md
+
+Document: gtkb-agent-sot-read-discipline-phase-1
+NEW: bridge/gtkb-agent-sot-read-discipline-phase-1-001.md
+
+Document: gtkb-platform-sot-consolidation-umbrella
+NEW: bridge/gtkb-platform-sot-consolidation-umbrella-001.md
+
 Document: gtkb-harness-state-sot-consolidation-phase-1
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md
