@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-session-envelope-durability-001
+NEW: bridge/gtkb-session-envelope-durability-001-001.md
+
 Document: gtkb-canonical-wrap-keyword-syntax-001
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
 
@@ -67,18 +70,6 @@ GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-004.md
 REVISED: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-003.md
 NO-GO: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-002.md
 NEW: bridge/gtkb-wi-4225-scaffold-golden-fixture-regen-001.md
-
-Document: gtkb-understand-anything-evaluation-install
-VERIFIED: bridge/gtkb-understand-anything-evaluation-install-010.md
-NEW: bridge/gtkb-understand-anything-evaluation-install-009.md
-GO: bridge/gtkb-understand-anything-evaluation-install-008.md
-REVISED: bridge/gtkb-understand-anything-evaluation-install-007.md
-NO-GO: bridge/gtkb-understand-anything-evaluation-install-006.md
-REVISED: bridge/gtkb-understand-anything-evaluation-install-005.md
-NO-GO: bridge/gtkb-understand-anything-evaluation-install-004.md
-REVISED: bridge/gtkb-understand-anything-evaluation-install-003.md
-NO-GO: bridge/gtkb-understand-anything-evaluation-install-002.md
-NEW: bridge/gtkb-understand-anything-evaluation-install-001.md
 
 Document: gtkb-wrap-scan-report-relocation-slice-1
 VERIFIED: bridge/gtkb-wrap-scan-report-relocation-slice-1-004.md
@@ -203,12 +194,6 @@ VERIFIED: bridge/gtkb-startup-refractor-scoping-004.md
 NEW: bridge/gtkb-startup-refractor-scoping-003.md
 GO: bridge/gtkb-startup-refractor-scoping-002.md
 NEW: bridge/gtkb-startup-refractor-scoping-001.md
-
-Document: gtkb-proposal-standards-propose-scaffold-skill
-VERIFIED: bridge/gtkb-proposal-standards-propose-scaffold-skill-004.md
-NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-003.md
-GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
-NEW: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 VERIFIED: bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-014.md
@@ -400,14 +385,6 @@ NEW: bridge/gtkb-cli-list-subset-filters-003.md
 GO: bridge/gtkb-cli-list-subset-filters-002.md
 NEW: bridge/gtkb-cli-list-subset-filters-001.md
 
-Document: gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli
-VERIFIED: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-006.md
-NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-005.md
-GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-004.md
-REVISED: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-003.md
-GO: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-002.md
-NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-001.md
-
 Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
 VERIFIED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-008.md
 REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-007.md
@@ -417,24 +394,6 @@ GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-004.md
 REVISED: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-003.md
 NO-GO: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-002.md
 NEW: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-001.md
-
-Document: gtkb-index-agent-edit-serialization-scoping
-VERIFIED: bridge/gtkb-index-agent-edit-serialization-scoping-009.md
-NEW: bridge/gtkb-index-agent-edit-serialization-scoping-008.md
-GO: bridge/gtkb-index-agent-edit-serialization-scoping-007.md
-REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-006.md
-NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-005.md
-REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-004.md
-NO-GO: bridge/gtkb-index-agent-edit-serialization-scoping-003.md
-REVISED: bridge/gtkb-index-agent-edit-serialization-scoping-002.md
-NEW: bridge/gtkb-index-agent-edit-serialization-scoping-001.md
-Document: gtkb-gov-proposal-standards-slice1
-VERIFIED: bridge/gtkb-gov-proposal-standards-slice1-027.md
-NEW: bridge/gtkb-gov-proposal-standards-slice1-026.md
-GO: bridge/gtkb-gov-proposal-standards-slice1-025.md
-REVISED: bridge/gtkb-gov-proposal-standards-slice1-024.md
-GO: bridge/gtkb-gov-proposal-standards-slice1-023.md
-NEW: bridge/gtkb-gov-proposal-standards-slice1-022.md
 
 Document: gtkb-membase-effective-use-audit-test-restoration
 WITHDRAWN: bridge/gtkb-membase-effective-use-audit-test-restoration-003.md
