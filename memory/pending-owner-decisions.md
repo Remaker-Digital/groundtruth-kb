@@ -7722,6 +7722,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-04T13:39:26.860922Z
   answer: "Your questions have been answered: \"Which item should I take next?\"=\"Commit WI-4301 capstone (Item 1)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1011
+  asked_at: 2026-06-04T14:07:06.967237Z
+  question: "Recent sessions converged on \"envelope blocked + bridge front drained.\" How should I scope this autonomous run?"
+  options:
+    - "Parallel triage now, then escalate"
+    - "Triage + draft bridge proposals"
+    - "Direct focus on the P0 (WI-3248)"
+    - "Prepare envelope approval packets, then stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 01f78e255b8a239a
+  resolved_at: 2026-06-04T14:07:06.967237Z
+  answer: "Your questions have been answered: \"Recent sessions converged on \"envelope blocked + bridge front drained.\" How should I scope this autonomous run?\"=\"Triage + draft bridge proposals\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1012
+  asked_at: 2026-06-04T14:21:43.315343Z
+  question: "How should I unblock the 16+ envelope-program artifacts pending MemBase insertion (all at Codex GO)?"
+  options:
+    - "Scoped batch approval (Recommended)"
+    - "Foundational tier first"
+    - "Per-thread AUQ"
+    - "Build WI-3279 CLI first, then bulk-generate"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3b377eb6e0f3599d
+  resolved_at: 2026-06-04T14:21:43.315343Z
+  answer: "Your questions have been answered: \"How should I unblock the 16+ envelope-program artifacts pending MemBase insertion (all at Codex GO)?\"=\"Scoped batch approval (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
