@@ -141,7 +141,9 @@ def main() -> int:
             "new governed Markdown document is missing document-author provenance metadata: "
             f"{candidate.rel_path}; gaps: {', '.join(result.gaps)}. "
             "Required fields: author_identity, author_harness_id, author_session_context_id, "
-            "author_model, author_model_version, author_model_configuration."
+            "author_model, author_model_version, author_model_configuration. "
+            "Use document_author_provenance_waiver: DELIB-... <reason> only when a durable "
+            "owner decision or governance artifact explicitly authorizes the exception."
         )
     return _emit_pass()
 

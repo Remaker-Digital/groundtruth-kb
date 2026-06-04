@@ -18,6 +18,8 @@ from scripts.document_author_metadata import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "document_author_provenance_gate.py"
+CODEX_HOOK = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "document_author_provenance_gate.py"
+CODEX_HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
 AUTHOR_METADATA = {
     "author_identity": "Codex Prime Builder",
@@ -59,6 +61,13 @@ def test_placeholder_author_metadata_is_rejected() -> None:
 
     assert not result.is_valid
     assert result.invalid_fields == ("author_model (placeholder/invalid)",)
+
+
+def test_governance_waiver_is_accepted() -> None:
+    result = validate_author_metadata("document_author_provenance_waiver: DELIB-1234 - approved exception\n")
+
+    assert result.is_valid
+    assert result.waiver == "DELIB-1234 - approved exception"
 
 
 def test_governed_document_surface_matching() -> None:
@@ -139,6 +148,34 @@ def test_hook_blocks_add_file_patch_without_metadata() -> None:
 
     assert result.returncode == 2
     assert "docs/new-contract.md" in json.loads(result.stdout)["reason"]
+
+
+def test_codex_wrapper_blocks_add_file_patch_without_metadata() -> None:
+    payload = {
+        "tool_name": "apply_patch",
+        "cwd": str(PROJECT_ROOT),
+        "tool_input": {
+            "patch": "*** Begin Patch\n*** Add File: docs/new-codex-contract.md\n+# Missing provenance\n*** End Patch\n"
+        },
+    }
+
+    result = _run_hook(CODEX_HOOK, payload)
+
+    assert result.returncode == 2
+    assert "docs/new-codex-contract.md" in json.loads(result.stdout)["reason"]
+
+
+def test_codex_apply_patch_registration_present() -> None:
+    hooks = json.loads(CODEX_HOOKS_JSON.read_text(encoding="utf-8"))
+    registrations = [
+        entry
+        for entry in hooks["hooks"]["PreToolUse"]
+        if entry.get("matcher") == "apply_patch"
+        for hook in entry.get("hooks", [])
+        if "document_author_provenance_gate.py" in hook.get("command", "")
+    ]
+
+    assert registrations
 
 
 def test_hook_allows_existing_file_edits_without_metadata(tmp_path: Path) -> None:

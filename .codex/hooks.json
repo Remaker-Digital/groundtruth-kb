@@ -181,6 +181,17 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\document_author_provenance_gate.py",
+            "statusMessage": "Checking document author provenance",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [
