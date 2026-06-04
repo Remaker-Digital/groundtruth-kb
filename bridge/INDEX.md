@@ -8,12 +8,15 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-envelope-disclosure-ui-redesign
+GO: bridge/gtkb-envelope-disclosure-ui-redesign-002.md
 NEW: bridge/gtkb-envelope-disclosure-ui-redesign-001.md
 
 Document: gtkb-handoff-prompt-deterministic-service
+GO: bridge/gtkb-handoff-prompt-deterministic-service-002.md
 NEW: bridge/gtkb-handoff-prompt-deterministic-service-001.md
 
 Document: gtkb-envelope-glossary-and-gov-lifecycle-amendment
+GO: bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-002.md
 NEW: bridge/gtkb-envelope-glossary-and-gov-lifecycle-amendment-001.md
 
 Document: gtkb-work-envelope-router-slice-2-per-type-specs
@@ -21,6 +24,7 @@ GO: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-002.md
 NEW: bridge/gtkb-work-envelope-router-slice-2-per-type-specs-001.md
 
 Document: gtkb-manual-bridge-scan-terminal-go-filter
+VERIFIED: bridge/gtkb-manual-bridge-scan-terminal-go-filter-004.md
 NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-003.md
 GO: bridge/gtkb-manual-bridge-scan-terminal-go-filter-002.md
 NEW: bridge/gtkb-manual-bridge-scan-terminal-go-filter-001.md
