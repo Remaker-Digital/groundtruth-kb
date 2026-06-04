@@ -8,11 +8,13 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-session-wrap-procedure-001
+GO: bridge/gtkb-session-wrap-procedure-001-004.md
 REVISED: bridge/gtkb-session-wrap-procedure-001-003.md
 NO-GO: bridge/gtkb-session-wrap-procedure-001-002.md
 NEW: bridge/gtkb-session-wrap-procedure-001-001.md
 
 Document: gtkb-work-envelope-router-slice-1-001
+GO: bridge/gtkb-work-envelope-router-slice-1-001-004.md
 REVISED: bridge/gtkb-work-envelope-router-slice-1-001-003.md
 NO-GO: bridge/gtkb-work-envelope-router-slice-1-001-002.md
 NEW: bridge/gtkb-work-envelope-router-slice-1-001-001.md
@@ -34,6 +36,7 @@ NO-GO: bridge/gtkb-session-envelope-durability-001-002.md
 NEW: bridge/gtkb-session-envelope-durability-001-001.md
 
 Document: gtkb-canonical-wrap-keyword-syntax-001
+GO: bridge/gtkb-canonical-wrap-keyword-syntax-001-004.md
 REVISED: bridge/gtkb-canonical-wrap-keyword-syntax-001-003.md
 NO-GO: bridge/gtkb-canonical-wrap-keyword-syntax-001-002.md
 NEW: bridge/gtkb-canonical-wrap-keyword-syntax-001-001.md
