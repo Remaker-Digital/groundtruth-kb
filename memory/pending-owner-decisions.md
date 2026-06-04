@@ -6,16 +6,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+(none)
+
+## Resolved
+
 - id: DECISION-1019
   asked_at: 2026-06-04T16:26:10.153306Z
   question: "Want me to investigate the substrate=none decision in the deliberation archive / recent bridge threads to figure out ..."
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: dbf2f37cbfaf3d04
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-
-## Resolved
-
+  resolved_at: 2026-06-04T18:10:05Z
+  resolved_in_session: 2026-06-04 /loop ff01ba72 (AUQ conversion per owner directive)
+  answer: "Owner selected 'Restore substrate to cross_harness_trigger' via AskUserQuestion. Action: ran `gt mode set-bridge-substrate --substrate cross_harness_trigger --defer-to-next-session`; transaction queued at .gtkb-state/mode-switches/pending/20260604T181005Z-55543364.json (applies at next SessionStart). Deferred path used because the validator at groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py lines 213-241 has a bug walking the .claude/settings.json hook structure: it iterates data['hooks'].values() but each value is a {matcher, hooks:[]} wrapper, not a command dict — so the cross_harness_bridge_trigger.py substring search at line 218 misses commands nested under the inner 'hooks' field. The cross_harness_bridge_trigger.py IS registered in both .claude/settings.json (lines 107, 127, 163) and .codex/hooks.json (lines 225, 248, 278); the validator just can't see them with its current shallow walk."
+  notes: "Resolved by AUQ conversion per owner directive 2026-06-04. Validator bug flagged as a hygiene candidate for future session (spawn_task chip)."
 - id: DECISION-0987
   asked_at: 2026-06-03T23:58:59.211775Z
   question: ""
@@ -7853,6 +7857,423 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: ab5262a9af0d99c7
   resolved_at: 2026-06-04T16:26:44.804816Z
   answer: "Your questions have been answered: \"How should I route the 3 P1 LO advisories awaiting Prime classification?\"=\"Adopt all 3 with new PAUTH minting\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1021
+  asked_at: 2026-06-04T16:32:14.137639Z
+  question: "Should I investigate the substrate=none state and propose flipping it back to cross_harness_trigger?"
+  options:
+    - "Investigate + draft flip proposal"
+    - "Investigate only — report findings, no proposal"
+    - "Leave it alone — manual invocation is the current operational mode"
+    - "Do something else first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0f8e33fc6520e9de
+  resolved_at: 2026-06-04T16:32:14.137639Z
+  answer: "Your questions have been answered: \"Should I investigate the substrate=none state and propose flipping it back to cross_harness_trigger?\"=\"Investigate + draft flip proposal\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1022
+  asked_at: 2026-06-04T16:32:14.137639Z
+  question: "Given DELIB-20260602 records substrate=none as intentional + owner-affirmed (state-only logging chosen), how should I proceed?"
+  options:
+    - "Still draft flip proposal — premise has changed"
+    - "Leave substrate=none in place — it's governed state"
+    - "File a deliberation-capture asking whether substrate=none should be revisited"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 57fbe92f623e1958
+  resolved_at: 2026-06-04T16:32:14.137639Z
+  answer: "Your questions have been answered: \"Given DELIB-20260602 records substrate=none as intentional + owner-affirmed (state-only logging chosen), how should I proceed?\"=\"File a deliberation-capture asking whether substrate=none should be revisited\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1023
+  asked_at: 2026-06-04T16:47:55.080258Z
+  question: "How should the `gtkb-document-author-provenance-contract` NO-GO -002 be unblocked? (Scope is 500-800 LOC: new GOV-DOCUMENT-AUTHOR-PROVENANCE-001 spec + helpers + hooks + MemBase mutation. Cited fast-lane PAUTH doesn't cover this scope per NO-GO findings F1+F2.)"
+  options:
+    - "Authorize new project-scoped PAUTH (Recommended)"
+    - "Split per NO-GO option 2"
+    - "Withdraw the proposal"
+    - "Different"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4b6d49c9bc07ccfd
+  resolved_at: 2026-06-04T16:47:55.080258Z
+  answer: "Your questions have been answered: \"How should the `gtkb-document-author-provenance-contract` NO-GO -002 be unblocked? (Scope is 500-800 LOC: new GOV-DOCUMENT-AUTHOR-PROVENANCE-001 spec + helpers + hooks + MemBase mutation. Cited fast-lane PAUTH doesn't cover this scope per NO-GO findings F1+F2.)\"=\"Authorize new project-scoped PAUTH (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1024
+  asked_at: 2026-06-04T16:47:55.080258Z
+  question: "Which project should the new feature-scope PAUTH attach to?"
+  options:
+    - "Mint new PROJECT-GTKB-DOCUMENT-AUTHOR-PROVENANCE (Recommended)"
+    - "Reuse PROJECT-GTKB-RELIABILITY-FIXES with new broader PAUTH"
+    - "Attach to PROJECT-GTKB-IN-SOURCE-PROVENANCE-ANCHORS-001"
+    - "Different"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 122bcdd801e5f67e
+  resolved_at: 2026-06-04T16:47:55.080258Z
+  answer: "Your questions have been answered: \"Which project should the new feature-scope PAUTH attach to?\"=\"Mint new PROJECT-GTKB-DOCUMENT-AUTHOR-PROVENANCE (Recommended)\", \"What mutation-class scope should the new PAUTH grant? (For the proposed work: GOV-DOCUMENT-AUTHOR-PROVENANCE-001 spec + helpers/checker/hook + config + tests + MemBase mutation)\"=\"Feature-full (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1025
+  asked_at: 2026-06-04T16:47:55.080258Z
+  question: "What mutation-class scope should the new PAUTH grant? (For the proposed work: GOV-DOCUMENT-AUTHOR-PROVENANCE-001 spec + helpers/checker/hook + config + tests + MemBase mutation)"
+  options:
+    - "Feature-full (Recommended)"
+    - "Minimal + per-artifact owner packets"
+    - "Custom scope"
+    - "Different"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 89679e161b4c69ba
+  resolved_at: 2026-06-04T16:47:55.080258Z
+  answer: "Your questions have been answered: \"Which project should the new feature-scope PAUTH attach to?\"=\"Mint new PROJECT-GTKB-DOCUMENT-AUTHOR-PROVENANCE (Recommended)\", \"What mutation-class scope should the new PAUTH grant? (For the proposed work: GOV-DOCUMENT-AUTHOR-PROVENANCE-001 spec + helpers/checker/hook + config + tests + MemBase mutation)\"=\"Feature-full (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1026
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "What's the right shape for this cleanup work?"
+  options:
+    - "Full project: PROJECT-GTKB-HARNESS-STATE-SOT-CONSOLIDATION"
+    - "Surgical: retire role-assignments.json + minimal repoint"
+    - "Two-phase: phase 1 = stale-mirror evidence + retirement spec; phase 2 = referencer sweep"
+    - "Scope-clarifying first — don't propose yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7780db6a1bbb7795
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What's the right shape for this cleanup work?\"=\"Full project: PROJECT-GTKB-HARNESS-STATE-SOT-CONSOLIDATION\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1027
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "What scope width should the project cover?"
+  options:
+    - "Roles only — retire role-assignments.json + repoint readers"
+    - "Roles + identities + capabilities"
+    - "All four — add bridge-substrate.json"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4285781cb3e635f9
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What scope width should the project cover?\"=\"Roles + identities + capabilities\", \"How should the SoT contract enforce read access?\"=\"Mechanical — single entrypoint (gt CLI or harness_projection_reader)\", \"What happens to harness-state/role-assignments.json itself?\"=\"Delete entirely — clean cut\", \"Governance depth for the project?\"=\"Heavy — new GOV + 2 DCLs + retire spec\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1028
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "How should the SoT contract enforce read access?"
+  options:
+    - "Mechanical — single entrypoint (gt CLI or harness_projection_reader)"
+    - "Policy — cite the SoT, file reads OK"
+    - "Hybrid — rule files cite policy + assertion catches new direct-file readers in committed code"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 995ca96e68c3a3cb
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What scope width should the project cover?\"=\"Roles + identities + capabilities\", \"How should the SoT contract enforce read access?\"=\"Mechanical — single entrypoint (gt CLI or harness_projection_reader)\", \"What happens to harness-state/role-assignments.json itself?\"=\"Delete entirely — clean cut\", \"Governance depth for the project?\"=\"Heavy — new GOV + 2 DCLs + retire spec\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1029
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "What happens to harness-state/role-assignments.json itself?"
+  options:
+    - "Delete entirely — clean cut"
+    - "Replace with generated read-only mirror (autoregen from registry)"
+    - "Mark deprecated with header warning; defer deletion to a future cycle"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9b11dd6404cfa746
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What scope width should the project cover?\"=\"Roles + identities + capabilities\", \"How should the SoT contract enforce read access?\"=\"Mechanical — single entrypoint (gt CLI or harness_projection_reader)\", \"What happens to harness-state/role-assignments.json itself?\"=\"Delete entirely — clean cut\", \"Governance depth for the project?\"=\"Heavy — new GOV + 2 DCLs + retire spec\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1030
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "Governance depth for the project?"
+  options:
+    - "Heavy — new GOV + 2 DCLs + retire spec"
+    - "Light — single SPEC under existing GOV-SOURCE-OF-TRUTH-FRESHNESS-001"
+    - "Medium — 1 DCL + retire-spec, no new GOV"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ab1ccca0c53ab316
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What scope width should the project cover?\"=\"Roles + identities + capabilities\", \"How should the SoT contract enforce read access?\"=\"Mechanical — single entrypoint (gt CLI or harness_projection_reader)\", \"What happens to harness-state/role-assignments.json itself?\"=\"Delete entirely — clean cut\", \"Governance depth for the project?\"=\"Heavy — new GOV + 2 DCLs + retire spec\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1031
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "What about the harness-state/{claude,codex}/operating-role.md overlay rule files?"
+  options:
+    - "Retire them — they duplicate role state in prose"
+    - "Keep but make them programmatically generated"
+    - "Out of scope — separate project"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a1982ce3f611cd2f
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What about the harness-state/{claude,codex}/operating-role.md overlay rule files?\"=\"Retire them — they duplicate role state in prose\", \"PAUTH approach for this project?\"=\"One project PAUTH now (like ollama umbrella)\", \"Implementation cadence?\"=\"Sliced — governance scaffold first, then per-domain children (rules / scripts / source / config) in sequence\", \"Should I capture the stale-mirror drift incident (dual-role vs single-role finding) as a separate DA record?\"=\"Yes — file as session_harvest DELIB cited by the umbrella\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1032
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "PAUTH approach for this project?"
+  options:
+    - "One project PAUTH now (like ollama umbrella)"
+    - "AUQ per implementation proposal (per child bridge)"
+    - "AUQ per WI"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c3c8a5abf6fdf774
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What about the harness-state/{claude,codex}/operating-role.md overlay rule files?\"=\"Retire them — they duplicate role state in prose\", \"PAUTH approach for this project?\"=\"One project PAUTH now (like ollama umbrella)\", \"Implementation cadence?\"=\"Sliced — governance scaffold first, then per-domain children (rules / scripts / source / config) in sequence\", \"Should I capture the stale-mirror drift incident (dual-role vs single-role finding) as a separate DA record?\"=\"Yes — file as session_harvest DELIB cited by the umbrella\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1033
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "Implementation cadence?"
+  options:
+    - "Sliced — governance scaffold first, then per-domain children (rules / scripts / source / config) in sequence"
+    - "All-at-once — one impl proposal touching everything"
+    - "Two-phase — phase 1 lands SoT contract + entrypoint + spec inserts, phase 2 sweeps referencers"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 353a5cef95a3659b
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What about the harness-state/{claude,codex}/operating-role.md overlay rule files?\"=\"Retire them — they duplicate role state in prose\", \"PAUTH approach for this project?\"=\"One project PAUTH now (like ollama umbrella)\", \"Implementation cadence?\"=\"Sliced — governance scaffold first, then per-domain children (rules / scripts / source / config) in sequence\", \"Should I capture the stale-mirror drift incident (dual-role vs single-role finding) as a separate DA record?\"=\"Yes — file as session_harvest DELIB cited by the umbrella\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1034
+  asked_at: 2026-06-04T16:51:09.443647Z
+  question: "Should I capture the stale-mirror drift incident (dual-role vs single-role finding) as a separate DA record?"
+  options:
+    - "Yes — file as session_harvest DELIB cited by the umbrella"
+    - "Mention in the umbrella body, no separate DELIB"
+    - "No reference — the registry is canonical going forward; drift is implicit motivation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 25a246c0d60b1c82
+  resolved_at: 2026-06-04T16:51:09.443647Z
+  answer: "Your questions have been answered: \"What about the harness-state/{claude,codex}/operating-role.md overlay rule files?\"=\"Retire them — they duplicate role state in prose\", \"PAUTH approach for this project?\"=\"One project PAUTH now (like ollama umbrella)\", \"Implementation cadence?\"=\"Sliced — governance scaffold first, then per-domain children (rules / scripts / source / config) in sequence\", \"Should I capture the stale-mirror drift incident (dual-role vs single-role finding) as a separate DA record?\"=\"Yes — file as session_harvest DELIB cited by the umbrella\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1035
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "What scope of 'non-SoT files used as alternatives' should this project address?"
+  options:
+    - "MEMORY.md + memory/*.md topic files only (narrowest)"
+    - "All operational notepads + rule-file state-prose (medium)"
+    - "Universal: any non-SoT path used for SoT-domain reads (broadest)"
+    - "Don't commit yet — survey what agents actually reach for first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f90410258e30e118
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What scope of 'non-SoT files used as alternatives' should this project address?\"=\"Don't commit yet — survey what agents actually reach for first\", \"What's the primary enforcement mechanism?\"=\"Layered — all three above\", \"Sibling or extension of PROJECT-GTKB-HARNESS-STATE-SOT-CONSOLIDATION?\"=\"Sibling — new project PROJECT-GTKB-SOT-READ-DISCIPLINE\", \"How should I proceed right now?\"=\"Grill me more on design — you don't have enough yet\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1036
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "What's the primary enforcement mechanism?"
+  options:
+    - "Mechanical — Read-tool hook emits SoT-redirect reminder"
+    - "Structural — strip canonical-state from MEMORY.md + topic files"
+    - "Behavioral — extend interrogative-default + rule + assertion"
+    - "Layered — all three above"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8f762264613ac987
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What scope of 'non-SoT files used as alternatives' should this project address?\"=\"Don't commit yet — survey what agents actually reach for first\", \"What's the primary enforcement mechanism?\"=\"Layered — all three above\", \"Sibling or extension of PROJECT-GTKB-HARNESS-STATE-SOT-CONSOLIDATION?\"=\"Sibling — new project PROJECT-GTKB-SOT-READ-DISCIPLINE\", \"How should I proceed right now?\"=\"Grill me more on design — you don't have enough yet\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1037
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "Sibling or extension of PROJECT-GTKB-HARNESS-STATE-SOT-CONSOLIDATION?"
+  options:
+    - "Sibling — new project PROJECT-GTKB-SOT-READ-DISCIPLINE"
+    - "Extension — fold into SoT-consolidation as Phase 2"
+    - "Umbrella program with the existing project nested"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b3a43411be68ce59
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What scope of 'non-SoT files used as alternatives' should this project address?\"=\"Don't commit yet — survey what agents actually reach for first\", \"What's the primary enforcement mechanism?\"=\"Layered — all three above\", \"Sibling or extension of PROJECT-GTKB-HARNESS-STATE-SOT-CONSOLIDATION?\"=\"Sibling — new project PROJECT-GTKB-SOT-READ-DISCIPLINE\", \"How should I proceed right now?\"=\"Grill me more on design — you don't have enough yet\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1038
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "How should I proceed right now?"
+  options:
+    - "Grill me more on design — you don't have enough yet"
+    - "Set up the project structure now (project + WIs + DELIB + PAUTH + umbrella), grill on spec content during draft"
+    - "Survey transcripts first — produce a findings report before any project"
+    - "Pause — too much in flight; defer to next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 72d73885834c98f2
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What scope of 'non-SoT files used as alternatives' should this project address?\"=\"Don't commit yet — survey what agents actually reach for first\", \"What's the primary enforcement mechanism?\"=\"Layered — all three above\", \"Sibling or extension of PROJECT-GTKB-HARNESS-STATE-SOT-CONSOLIDATION?\"=\"Sibling — new project PROJECT-GTKB-SOT-READ-DISCIPLINE\", \"How should I proceed right now?\"=\"Grill me more on design — you don't have enough yet\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1039
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "What's the SoT registry shape?"
+  options:
+    - "Declarative TOML/JSON file (e.g., config/governance/sot-registry.toml)"
+    - "MemBase table with versioned rows"
+    - "Hybrid — TOML source-of-truth + MemBase projection"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 24102d1a84ddfebf
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What's the SoT registry shape?\"=\"Hybrid — TOML source-of-truth + MemBase projection\", \"How should the Read-tool hook decide when to emit the SoT-redirect reminder?\"=\"Deterministic path-match — hook fires when Read targets a path in forbidden_substitutes\", \"What should MEMORY.md look like after restructure?\"=\"Index-only — MEMORY.md becomes a 1-page session-index pointing to where canonical state lives\", \"How should the empirical survey work?\"=\"Manual triage: I survey high-confidence cases from this session's transcript directly\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1040
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "How should the Read-tool hook decide when to emit the SoT-redirect reminder?"
+  options:
+    - "Deterministic path-match — hook fires when Read targets a path in forbidden_substitutes"
+    - "Heuristic content-match — hook examines current prompt/context for the artifact-type the agent is investigating"
+    - "Per-path allowlist — some paths NEVER emit reminders; others always do"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6b55ab95a30e110b
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What's the SoT registry shape?\"=\"Hybrid — TOML source-of-truth + MemBase projection\", \"How should the Read-tool hook decide when to emit the SoT-redirect reminder?\"=\"Deterministic path-match — hook fires when Read targets a path in forbidden_substitutes\", \"What should MEMORY.md look like after restructure?\"=\"Index-only — MEMORY.md becomes a 1-page session-index pointing to where canonical state lives\", \"How should the empirical survey work?\"=\"Manual triage: I survey high-confidence cases from this session's transcript directly\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1041
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "What should MEMORY.md look like after restructure?"
+  options:
+    - "Operational-context-only — current session focus, handoff context, no project state"
+    - "Strict-template — only headed sections explicitly allowed by template"
+    - "Index-only — MEMORY.md becomes a 1-page session-index pointing to where canonical state lives"
+    - "Keep current shape but add SoT-citation requirement"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8012af5b74b95a81
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What's the SoT registry shape?\"=\"Hybrid — TOML source-of-truth + MemBase projection\", \"How should the Read-tool hook decide when to emit the SoT-redirect reminder?\"=\"Deterministic path-match — hook fires when Read targets a path in forbidden_substitutes\", \"What should MEMORY.md look like after restructure?\"=\"Index-only — MEMORY.md becomes a 1-page session-index pointing to where canonical state lives\", \"How should the empirical survey work?\"=\"Manual triage: I survey high-confidence cases from this session's transcript directly\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1042
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "How should the empirical survey work?"
+  options:
+    - "Hook-logged: instrument Read tool now, accumulate data for N sessions, then analyze"
+    - "Transcript-mined: analyze existing transcript files for past Read calls"
+    - "Both — historical mine + forward-logging hook"
+    - "Manual triage: I survey high-confidence cases from this session's transcript directly"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2ed825036976d390
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"What's the SoT registry shape?\"=\"Hybrid — TOML source-of-truth + MemBase projection\", \"How should the Read-tool hook decide when to emit the SoT-redirect reminder?\"=\"Deterministic path-match — hook fires when Read targets a path in forbidden_substitutes\", \"What should MEMORY.md look like after restructure?\"=\"Index-only — MEMORY.md becomes a 1-page session-index pointing to where canonical state lives\", \"How should the empirical survey work?\"=\"Manual triage: I survey high-confidence cases from this session's transcript directly\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1043
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "How should memory/*.md topic files (auto-memory) be treated?"
+  options:
+    - "Same treatment as MEMORY.md — index-only"
+    - "Feedback + patterns OK; project/state forbidden"
+    - "Retire memory/*.md topic files entirely; everything in MEMORY.md"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 56956f5c32e58470
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"How should memory/*.md topic files (auto-memory) be treated?\"=\"Feedback + patterns OK; project/state forbidden\", \"Where should the behavioral SoT-read-discipline rule live?\"=\"Both — standalone rule + interrogative-default extension cross-cite\", \"Governance shape for the new project?\"=\"Extend existing GOV-SOURCE-OF-TRUTH-FRESHNESS-001 with read-discipline clauses + 1-2 DCLs\", \"When is the manual-triage survey 'done enough' to scope the project?\"=\"Survey + scope across this turn and next, with one more grilling batch\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1044
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "Where should the behavioral SoT-read-discipline rule live?"
+  options:
+    - "New .claude/rules/sot-read-discipline.md"
+    - "Extend .claude/rules/prime-builder-role.md interrogative-default section"
+    - "Both — standalone rule + interrogative-default extension cross-cite"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4fa7321d950cf5a1
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"How should memory/*.md topic files (auto-memory) be treated?\"=\"Feedback + patterns OK; project/state forbidden\", \"Where should the behavioral SoT-read-discipline rule live?\"=\"Both — standalone rule + interrogative-default extension cross-cite\", \"Governance shape for the new project?\"=\"Extend existing GOV-SOURCE-OF-TRUTH-FRESHNESS-001 with read-discipline clauses + 1-2 DCLs\", \"When is the manual-triage survey 'done enough' to scope the project?\"=\"Survey + scope across this turn and next, with one more grilling batch\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1045
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "Governance shape for the new project?"
+  options:
+    - "New GOV-SOT-READ-DISCIPLINE-001 + DCL for SoT registry schema + DCL for hook contract + DCL for MEMORY.md template"
+    - "Extend existing GOV-SOURCE-OF-TRUTH-FRESHNESS-001 with read-discipline clauses + 1-2 DCLs"
+    - "Just spec drafts + assertion file; no new GOV/DCL"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1eab7f806a0f3fac
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"How should memory/*.md topic files (auto-memory) be treated?\"=\"Feedback + patterns OK; project/state forbidden\", \"Where should the behavioral SoT-read-discipline rule live?\"=\"Both — standalone rule + interrogative-default extension cross-cite\", \"Governance shape for the new project?\"=\"Extend existing GOV-SOURCE-OF-TRUTH-FRESHNESS-001 with read-discipline clauses + 1-2 DCLs\", \"When is the manual-triage survey 'done enough' to scope the project?\"=\"Survey + scope across this turn and next, with one more grilling batch\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1046
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "When is the manual-triage survey 'done enough' to scope the project?"
+  options:
+    - "I produce the survey this turn, then we scope the project next turn"
+    - "Survey this turn, scope this turn"
+    - "Survey + scope across this turn and next, with one more grilling batch"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 569e38b182e2072d
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"How should memory/*.md topic files (auto-memory) be treated?\"=\"Feedback + patterns OK; project/state forbidden\", \"Where should the behavioral SoT-read-discipline rule live?\"=\"Both — standalone rule + interrogative-default extension cross-cite\", \"Governance shape for the new project?\"=\"Extend existing GOV-SOURCE-OF-TRUTH-FRESHNESS-001 with read-discipline clauses + 1-2 DCLs\", \"When is the manual-triage survey 'done enough' to scope the project?\"=\"Survey + scope across this turn and next, with one more grilling batch\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1047
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "Phase 1 scope of forbidden-substitute registry entries?"
+  options:
+    - "All 8 survey-identified candidates"
+    - "Top 4 highest-impact: harness state + bridge substrate + project state + cached SessionStart"
+    - "Just 2 — harness state + project state — minimum viable enforcement"
+    - "Survey-extensible — start with 2 (project state + cached SessionStart); registry rows added via DELIB"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 19da1e06504a0b86
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"Phase 1 scope of forbidden-substitute registry entries?\"=\"All 8 survey-identified candidates\", \"Hook silencer mechanism for legitimate audit reads?\"=\"Per-call intent marker — system-reminder mentions silencer pattern; agent includes audit-read: in surrounding context\", \"MEMORY.md restructure cadence?\"=\"Strip now, destructive — single commit retires current content; index-only template applied\", \"Project-scope confirmation + naming\"=\"Different name — propose alternative\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1048
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "Hook silencer mechanism for legitimate audit reads?"
+  options:
+    - "Per-call intent marker — system-reminder mentions silencer pattern; agent includes audit-read: in surrounding context"
+    - "Per-session toggle — env var GTKB_SOT_AUDIT_MODE=1 silences the hook entirely"
+    - "Path-pattern silencer — reads paired with specific other paths (e.g., reading both registry AND mirror in one turn) are auto-silenced"
+    - "No silencer in Phase 1 — hook always fires; agent learns to live with reminders or invokes a future silencer"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cd0653e88355bcd5
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"Phase 1 scope of forbidden-substitute registry entries?\"=\"All 8 survey-identified candidates\", \"Hook silencer mechanism for legitimate audit reads?\"=\"Per-call intent marker — system-reminder mentions silencer pattern; agent includes audit-read: in surrounding context\", \"MEMORY.md restructure cadence?\"=\"Strip now, destructive — single commit retires current content; index-only template applied\", \"Project-scope confirmation + naming\"=\"Different name — propose alternative\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1049
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "MEMORY.md restructure cadence?"
+  options:
+    - "Strip now, destructive — single commit retires current content; index-only template applied"
+    - "Migrate-then-strip — ensure every state mention is in MemBase, then strip"
+    - "Grandfather + template — existing content stays as historical; new entries follow index-only template"
+    - "Don't restructure MEMORY.md in Phase 1 — only build the hook + registry; restructure as Phase 2"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 243fe1a9225ffb24
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"Phase 1 scope of forbidden-substitute registry entries?\"=\"All 8 survey-identified candidates\", \"Hook silencer mechanism for legitimate audit reads?\"=\"Per-call intent marker — system-reminder mentions silencer pattern; agent includes audit-read: in surrounding context\", \"MEMORY.md restructure cadence?\"=\"Strip now, destructive — single commit retires current content; index-only template applied\", \"Project-scope confirmation + naming\"=\"Different name — propose alternative\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1050
+  asked_at: 2026-06-04T17:56:15.074034Z
+  question: "Project-scope confirmation + naming"
+  options:
+    - "PROJECT-GTKB-SOT-READ-DISCIPLINE — Phase 1 covers SoT registry + Read-tool hook + behavioral rule + 1-2 DCLs; MEMORY.md restructure scope depends on AUQ#3 above"
+    - "Same name but include MEMORY.md restructure in Phase 1 regardless of AUQ#3"
+    - "Different name — propose alternative"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e92b5e2d9d767f91
+  resolved_at: 2026-06-04T17:56:15.074034Z
+  answer: "Your questions have been answered: \"Phase 1 scope of forbidden-substitute registry entries?\"=\"All 8 survey-identified candidates\", \"Hook silencer mechanism for legitimate audit reads?\"=\"Per-call intent marker — system-reminder mentions silencer pattern; agent includes audit-read: in surrounding context\", \"MEMORY.md restructure cadence?\"=\"Strip now, destructive — single commit retires current content; index-only template applied\", \"Project-scope confirmation + naming\"=\"Different name — propose alternative\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1051
+  asked_at: 2026-06-04T18:13:02.661742Z
+  question: "DECISION-1019: substrate=none was set on 2026-06-01T18:08 by harness A (Codex) and disables cross-harness auto-dispatch (every trigger fire records substrate_mismatch_inert). The original prose question proposed investigating the rationale. How should I proceed?"
+  options:
+    - "Investigate DA + bridge threads"
+    - "Restore substrate to cross_harness_trigger"
+    - "Confirm intentional; clear pending"
+    - "Defer until envelope program ships"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0fb513c4a3f12359
+  resolved_at: 2026-06-04T18:13:02.661742Z
+  answer: "Your questions have been answered: \"DECISION-1019: substrate=none was set on 2026-06-01T18:08 by harness A (Codex) and disables cross-harness auto-dispatch (every trigger fire records substrate_mismatch_inert). The original prose question proposed investigating the rationale. How should I proceed?\"=\"Restore substrate to cross_harness_trigger\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
