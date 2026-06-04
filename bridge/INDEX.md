@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-integration-phase-1
+NEW: bridge/gtkb-ollama-integration-phase-1-001.md
+
 Document: gtkb-document-author-provenance-contract
 NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
 NEW: bridge/gtkb-document-author-provenance-contract-001.md
@@ -22,6 +25,8 @@ GO: bridge/gtkb-impl-start-gate-pretooluse-restore-002.md
 NEW: bridge/gtkb-impl-start-gate-pretooluse-restore-001.md
 
 Document: gtkb-impl-start-target-paths-preflight
+NEW: bridge/gtkb-impl-start-target-paths-preflight-006.md
+NEW: bridge/gtkb-impl-start-target-paths-preflight-006.md
 GO: bridge/gtkb-impl-start-target-paths-preflight-005.md
 REVISED: bridge/gtkb-impl-start-target-paths-preflight-004.md
 NO-GO: bridge/gtkb-impl-start-target-paths-preflight-003.md

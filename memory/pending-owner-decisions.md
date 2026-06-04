@@ -6,7 +6,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-1019
+  asked_at: 2026-06-04T16:26:10.153306Z
+  question: "Want me to investigate the substrate=none decision in the deliberation archive / recent bridge threads to figure out ..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: dbf2f37cbfaf3d04
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -7763,6 +7769,90 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 3da1b46ee39cee4b
   resolved_at: 2026-06-04T14:48:12.212795Z
   answer: "Your questions have been answered: \"How should I handle the 4 TBD-ID threads + WI-4291 v3 update (next envelope-program scope)?\"=\"Approve all 4 in extended batch (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1014
+  asked_at: 2026-06-04T15:37:29.879631Z
+  question: "What would you like me to work on next? Bridge is genuinely saturated for autonomous Prime work after this session's 3 drains."
+  options:
+    - "Schedule + stand down"
+    - "Draft envelope sub-WI A proposal"
+    - "Triage WI-3479 Slice 9 NO-GO"
+    - "AUQ-grill WI-3399 advisory"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dc5cd48975e32337
+  resolved_at: 2026-06-04T15:37:29.879631Z
+  answer: "Your questions have been answered: \"What would you like me to work on next? Bridge is genuinely saturated for autonomous Prime work after this session's 3 drains.\"=\"AUQ-grill WI-3399 advisory\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1015
+  asked_at: 2026-06-04T15:37:29.879631Z
+  question: "WI-3399 / Document-artifact author-provenance advisory — Q1: SCOPE — which markdown surfaces should the provenance contract govern? (The advisory measured 4134 bridge/ files, 19 .claude/rules/, 1519 IPA/, 138 memory/, 8 docs/; only 136 bridge/ files have complete six-field metadata today.)"
+  options:
+    - "All 5 surfaces (advisory's list)"
+    - "High-trust subset: bridge/ + .claude/rules/"
+    - "Bridge/ only (formalize existing)"
+    - "Just bridge/ + memory/"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1935298af8bafcfa
+  resolved_at: 2026-06-04T15:37:29.879631Z
+  answer: "Your questions have been answered: \"WI-3399 / Document-artifact author-provenance advisory — Q1: SCOPE — which markdown surfaces should the provenance contract govern? (The advisory measured 4134 bridge/ files, 19 .claude/rules/, 1519 IPA/, 138 memory/, 8 docs/; only 136 bridge/ files have complete six-field metadata today.)\"=\"All 5 surfaces (advisory's list)\", \"Q2: BACKFILL — what's the posture for existing files without complete six-field provenance?\"=\"Out of scope (forward-only)\", \"Q3: RULE HOME / AUTHORITY — where should the new policy live?\"=\"New GOV-DOCUMENT-AUTHOR-PROVENANCE-001\", \"Q4: DISPOSITION — given the above answers, what's the disposition for the advisory?\"=\"Adopt — file impl proposal with captured scope\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1016
+  asked_at: 2026-06-04T15:37:29.879631Z
+  question: "Q2: BACKFILL — what's the posture for existing files without complete six-field provenance?"
+  options:
+    - "Out of scope (forward-only)"
+    - "Report-only audit"
+    - "Separate migration slice"
+    - "Defer to impl proposal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ca756a2e72560dae
+  resolved_at: 2026-06-04T15:37:29.879631Z
+  answer: "Your questions have been answered: \"WI-3399 / Document-artifact author-provenance advisory — Q1: SCOPE — which markdown surfaces should the provenance contract govern? (The advisory measured 4134 bridge/ files, 19 .claude/rules/, 1519 IPA/, 138 memory/, 8 docs/; only 136 bridge/ files have complete six-field metadata today.)\"=\"All 5 surfaces (advisory's list)\", \"Q2: BACKFILL — what's the posture for existing files without complete six-field provenance?\"=\"Out of scope (forward-only)\", \"Q3: RULE HOME / AUTHORITY — where should the new policy live?\"=\"New GOV-DOCUMENT-AUTHOR-PROVENANCE-001\", \"Q4: DISPOSITION — given the above answers, what's the disposition for the advisory?\"=\"Adopt — file impl proposal with captured scope\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1017
+  asked_at: 2026-06-04T15:37:29.879631Z
+  question: "Q3: RULE HOME / AUTHORITY — where should the new policy live?"
+  options:
+    - "New GOV-DOCUMENT-AUTHOR-PROVENANCE-001"
+    - "Extend GOV-ARTIFACT-APPROVAL-001"
+    - "New DCL under GOV-ARTIFACT-ORIENTED-GOVERNANCE-001"
+    - "Pair: new GOV + new DCL"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 44f296e88a49c811
+  resolved_at: 2026-06-04T15:37:29.879631Z
+  answer: "Your questions have been answered: \"WI-3399 / Document-artifact author-provenance advisory — Q1: SCOPE — which markdown surfaces should the provenance contract govern? (The advisory measured 4134 bridge/ files, 19 .claude/rules/, 1519 IPA/, 138 memory/, 8 docs/; only 136 bridge/ files have complete six-field metadata today.)\"=\"All 5 surfaces (advisory's list)\", \"Q2: BACKFILL — what's the posture for existing files without complete six-field provenance?\"=\"Out of scope (forward-only)\", \"Q3: RULE HOME / AUTHORITY — where should the new policy live?\"=\"New GOV-DOCUMENT-AUTHOR-PROVENANCE-001\", \"Q4: DISPOSITION — given the above answers, what's the disposition for the advisory?\"=\"Adopt — file impl proposal with captured scope\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1018
+  asked_at: 2026-06-04T15:37:29.879631Z
+  question: "Q4: DISPOSITION — given the above answers, what's the disposition for the advisory?"
+  options:
+    - "Adopt — file impl proposal with captured scope"
+    - "Adapt — write up scope-adjustments before propose"
+    - "Defer — clear trigger condition"
+    - "Reject — won't implement"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 83d945263bf4d5a1
+  resolved_at: 2026-06-04T15:37:29.879631Z
+  answer: "Your questions have been answered: \"WI-3399 / Document-artifact author-provenance advisory — Q1: SCOPE — which markdown surfaces should the provenance contract govern? (The advisory measured 4134 bridge/ files, 19 .claude/rules/, 1519 IPA/, 138 memory/, 8 docs/; only 136 bridge/ files have complete six-field metadata today.)\"=\"All 5 surfaces (advisory's list)\", \"Q2: BACKFILL — what's the posture for existing files without complete six-field provenance?\"=\"Out of scope (forward-only)\", \"Q3: RULE HOME / AUTHORITY — where should the new policy live?\"=\"New GOV-DOCUMENT-AUTHOR-PROVENANCE-001\", \"Q4: DISPOSITION — given the above answers, what's the disposition for the advisory?\"=\"Adopt — file impl proposal with captured scope\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1020
+  asked_at: 2026-06-04T16:26:44.804816Z
+  question: "How should I route the 3 P1 LO advisories awaiting Prime classification?"
+  options:
+    - "Adopt #1 only; monitor #2/#3 (Recommended)"
+    - "Adopt all 3 with new PAUTH minting"
+    - "Adopt #1; adapt #2/#3 with scoped PAUTH"
+    - "Monitor all 3 — record DA only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ab5262a9af0d99c7
+  resolved_at: 2026-06-04T16:26:44.804816Z
+  answer: "Your questions have been answered: \"How should I route the 3 P1 LO advisories awaiting Prime classification?\"=\"Adopt all 3 with new PAUTH minting\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
