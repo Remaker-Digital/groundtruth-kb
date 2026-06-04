@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "GOV-DOCUMENT-AUTHOR-PROVENANCE-001",
+  "artifact_type": "governance",
+  "change_reason": "Create GOV-DOCUMENT-AUTHOR-PROVENANCE-001 per bridge gtkb-document-author-provenance-contract GO and DELIB-20260666",
+  "changed_by": "prime-builder/codex/A",
+  "explicit_change_request": "AUQ DELIB-20260666: Owner authorized document author provenance contract adoption and project-scoped implementation; all five governed surfaces; forward-only posture; new GOV home.",
+  "full_content": "## Purpose\n\nGroundTruth-KB document artifacts must carry enough author provenance for\ncross-harness auditability when new governed Markdown artifacts are created.\n\n## Contract\n\nNew Markdown files created in the governed surfaces must include these six\nnon-placeholder fields:\n\n- `author_identity`\n- `author_harness_id`\n- `author_session_context_id`\n- `author_model`\n- `author_model_version`\n- `author_model_configuration`\n\nThe governed surfaces are:\n\n- `bridge/**/*.md`\n- `.claude/rules/**/*.md`\n- `independent-progress-assessments/**/*.md`\n- `memory/**/*.md`\n- `docs/**/*.md`\n\nThe contract is forward-only. Existing files at implementation time are\ngrandfathered and are not required to be backfilled by this specification.\n\n## Exclusions And Waivers\n\nHistorical archives, generated worktree mirrors, and explicitly superseded\nartifact folders may be excluded by\n`config/governance/document-author-provenance.toml`.\n\nA new governed document may carry a\n`document_author_provenance_waiver: <DELIB-ID> - <reason>` line only when a\ndurable owner decision or governance artifact explicitly authorizes the\nexception.\n\n## Enforcement\n\nThe enforcement implementation is deterministic:\n\n- `scripts/document_author_metadata.py` defines the required field set,\n  placeholder detection, governed-surface matching, and hook decision logic.\n- `scripts/check_document_author_metadata.py` audits governed documents and can\n  restrict checks to newly-added git paths.\n- `.claude/hooks/document_author_provenance_gate.py` enforces the contract for\n  Claude Write operations.\n- `.codex/gtkb-hooks/document_author_provenance_gate.py` is the intended Codex\n  parity wrapper for apply_patch and shell-mediated document creation where the\n  Codex hook surface is writable.\n\n## Verification\n\nVerification must include focused helper/checker/hook tests, ruff lint and\nformat checks for the implementation files, hook-registration evidence, and\nreadback evidence that this governance specification exists in MemBase.\n",
+  "full_content_sha256": "05d6d7b2a52e38d47f3aecd2cb95a069d5ebb24fe432edea288eb97b4d20f0bd",
+  "presented_to_user": true,
+  "source_ref": "GOV-DOCUMENT-AUTHOR-PROVENANCE-001",
+  "transcript_captured": true
+}
