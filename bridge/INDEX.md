@@ -14,6 +14,7 @@ NO-GO: bridge/gtkb-ollama-integration-phase-1-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-001.md
 
 Document: gtkb-document-author-provenance-contract
+GO: bridge/gtkb-document-author-provenance-contract-004.md
 REVISED: bridge/gtkb-document-author-provenance-contract-003.md
 NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
 NEW: bridge/gtkb-document-author-provenance-contract-001.md
