@@ -7,6 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-restore-systems-and-tools-doc
+NEW: bridge/gtkb-restore-systems-and-tools-doc-003.md
+GO: bridge/gtkb-restore-systems-and-tools-doc-002.md
+NEW: bridge/gtkb-restore-systems-and-tools-doc-001.md
+
 Document: gtkb-bash-hook-destructive-substring-false-positive
 VERIFIED: bridge/gtkb-bash-hook-destructive-substring-false-positive-004.md
 NEW: bridge/gtkb-bash-hook-destructive-substring-false-positive-003.md

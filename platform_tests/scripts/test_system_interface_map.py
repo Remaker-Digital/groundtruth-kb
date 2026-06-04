@@ -78,6 +78,33 @@ def test_human_companion_declares_map_is_not_authority() -> None:
     assert "bridge/INDEX.md is bridge queue state, not the backlog" in text
 
 
+def test_human_companion_path_declared_in_map_exists_in_root() -> None:
+    """Displacement guard (WI-3487).
+
+    The ``human_companion`` path declared in
+    ``config/agent-control/system-interface-map.toml`` must resolve to an
+    existing file under the repo root. This is a named, self-documenting check
+    so that a future relocation of the platform doc out of its in-root home
+    (as happened in isolation-018 Slice 18.C, which renamed it into
+    ``applications/Agent_Red/docs/``) fails here explicitly, rather than only
+    surfacing as a ``FileNotFoundError`` in the not-an-authority assertion or a
+    ``human_companion_exists: False`` in the operating-state probe. The correct
+    fix for a failure is to restore the doc in-root, NOT to repoint the map at
+    an ``applications/`` copy (ADR-ISOLATION-APPLICATION-PLACEMENT-001).
+    """
+    module = _load_module()
+    system_map = module.load_map()
+    declared = system_map["human_companion"]
+
+    assert declared == "docs/gtkb-systems-and-tools.md"
+    companion = REPO_ROOT / declared
+    assert companion.is_file(), (
+        f"human_companion declared in system-interface-map.toml ({declared}) is "
+        f"missing from its in-root platform home. Restore the doc in-root; do not "
+        f"repoint the map at an applications/ copy."
+    )
+
+
 def test_compact_status_is_startup_safe() -> None:
     module = _load_module()
 
