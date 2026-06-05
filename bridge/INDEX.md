@@ -14,12 +14,14 @@ NO-GO: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-002.md
 NEW: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-001.md
 
 Document: gtkb-startup-payload-profiler-compact-context
+REVISED: bridge/gtkb-startup-payload-profiler-compact-context-005.md
 NO-GO: bridge/gtkb-startup-payload-profiler-compact-context-004.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-003.md
 GO: bridge/gtkb-startup-payload-profiler-compact-context-002.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-001.md
 
 Document: gtkb-ollama-integration-phase-1-foundation
+NEW: bridge/gtkb-ollama-integration-phase-1-foundation-011.md
 GO: bridge/gtkb-ollama-integration-phase-1-foundation-010.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-009.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-008.md
@@ -30,18 +32,6 @@ NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-foundation-001.md
-
-Document: gtkb-cross-harness-trigger-no-go-dispatch-fix
-VERIFIED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-010.md
-REVISED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-009.md
-NO-GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-008.md
-NEW: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-007.md
-GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-006.md
-REVISED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-005.md
-NO-GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-004.md
-REVISED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-003.md
-NO-GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-002.md
-NEW: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-001.md
 
 Document: gtkb-isolation-018-agent-red-cutover
 NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-006.md
