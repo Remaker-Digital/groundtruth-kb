@@ -31,6 +31,12 @@ This copyright applies to Agent Red application code. GT-KB platform code carrie
 
 ---
 
+### Operator Path Note (ISOLATION-018)
+
+Shopify CLI commands (`shopify app deploy`, `shopify app dev`, `npm run shopify`) must now run from `applications/Agent_Red/` working directory; `shopify.app.toml`, `package.json`, and `package-lock.json` live there as of ISOLATION-018 cutover.
+
+---
+
 ## Adding Commercial Features
 
 When the work subject is Agent Red:
