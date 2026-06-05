@@ -11,6 +11,7 @@ Document: gtkb-harness-state-sot-consolidation-phase-1-foundation
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 
 Document: gtkb-ollama-integration-phase-1-shim
+NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-shim-001.md
 
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
