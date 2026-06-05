@@ -24,6 +24,7 @@ NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 
 Document: gtkb-ollama-integration-phase-1-shim
+NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-006.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-shim-005.md
 GO: bridge/gtkb-ollama-integration-phase-1-shim-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-shim-003.md
@@ -59,6 +60,7 @@ NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-foundation-001.md
 
 Document: gtkb-isolation-018-agent-red-cutover
+REVISED: bridge/gtkb-isolation-018-agent-red-cutover-007.md
 NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-006.md
 REVISED: bridge/gtkb-isolation-018-agent-red-cutover-005.md
 NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-004.md
