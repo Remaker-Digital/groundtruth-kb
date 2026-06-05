@@ -193,16 +193,258 @@ def _paths_from_apply_patch(root: Path, text: str) -> list[str]:
     return [rel for raw in paths if (rel := _normalize(root, raw))]
 
 
+def _extract_git_rm(tokens: list[str]) -> list[str]:
+    return [t for t in tokens[2:] if not t.startswith("-")]
+
+
+def _extract_git_restore(tokens: list[str]) -> list[str]:
+    args = tokens[2:]
+    if "--staged" not in args:
+        return []
+    sep_idx = args.index("--staged")
+    return [t for t in args[sep_idx + 1 :] if not t.startswith("-")]
+
+
+def _extract_git_add(tokens: list[str]) -> list[str]:
+    flags_no_paths = {"-A", "--all", "-u", "--update", "-p", "--patch", "-n", "--dry-run"}
+    return [t for t in tokens[2:] if not t.startswith("-") and t not in flags_no_paths]
+
+
+def _extract_git_mv(tokens: list[str]) -> list[str]:
+    return [t for t in tokens[2:] if not t.startswith("-")]
+
+
+def _extract_git_checkout(tokens: list[str]) -> list[str]:
+    args = tokens[2:]
+    if "--" in args:
+        idx = args.index("--")
+        return [t for t in args[idx + 1 :] if not t.startswith("-")]
+    path_shaped = [t for t in args if "/" in t or "\\" in t]
+    if path_shaped:
+        return [t for t in args if not t.startswith("-")]
+    return []
+
+
+def _extract_git_reset(tokens: list[str]) -> list[str]:
+    args = tokens[2:]
+    if any(f in args for f in ("--hard", "--mixed", "--soft", "--keep", "--merge")):
+        return []
+    return [t for t in args if not t.startswith("-")]
+
+
+def _extract_none(tokens: list[str]) -> list[str]:
+    return []
+
+
+def _extract_powershell_path_arg(tokens: list[str]) -> list[str]:
+    """First positional arg OR -Path/-FilePath/-LiteralPath flag value.
+
+    Once any of those sources supplies a path, subsequent non-flag tokens are
+    not treated as positional paths -- they are values of other named flags
+    like -Value, -Force, -Confirm, etc.
+    """
+    paths: list[str] = []
+    path_captured = False
+    i = 1
+    while i < len(tokens):
+        t = tokens[i]
+        if t.lower() in ("-path", "-filepath", "-literalpath"):
+            if i + 1 < len(tokens):
+                paths.append(tokens[i + 1])
+                path_captured = True
+                i += 2
+                continue
+        elif t.startswith("-"):
+            # Skip the named flag's value (PowerShell convention: flag + value)
+            if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+                i += 2
+                continue
+        elif not path_captured:
+            paths.append(t)
+            path_captured = True
+        i += 1
+    return paths
+
+
+def _extract_powershell_both_paths(tokens: list[str]) -> list[str]:
+    flag_paths: list[str] = []
+    positional: list[str] = []
+    i = 1
+    while i < len(tokens):
+        t = tokens[i]
+        if t.lower() in ("-path", "-literalpath", "-destination"):
+            if i + 1 < len(tokens):
+                flag_paths.append(tokens[i + 1])
+                i += 2
+                continue
+        elif not t.startswith("-") and len(positional) < 2:
+            positional.append(t)
+        i += 1
+    return flag_paths + positional
+
+
+_GIT_NON_MUTATING_SUBCOMMANDS = frozenset(
+    {
+        "commit",
+        "merge",
+        "rebase",
+        "tag",
+        "push",
+        "log",
+        "diff",
+        "status",
+        "show",
+        "branch",
+        "fetch",
+        "pull",
+        "remote",
+        "stash",
+        "config",
+        "describe",
+        "rev-parse",
+        "rev-list",
+        "ls-files",
+        "ls-tree",
+        "ls-remote",
+        "blame",
+        "bisect",
+        "cherry",
+        "reflog",
+        "shortlog",
+        "submodule",
+        "worktree",
+        "notes",
+        "clean",
+    }
+)
+
+_GIT_MUTATING_EXTRACTORS = {
+    "rm": _extract_git_rm,
+    "restore": _extract_git_restore,
+    "add": _extract_git_add,
+    "mv": _extract_git_mv,
+    "checkout": _extract_git_checkout,
+    "reset": _extract_git_reset,
+}
+
+_POWERSHELL_PATH_ARG_VERBS = frozenset(
+    {
+        "set-content",
+        "out-file",
+        "new-item",
+        "remove-item",
+        "add-content",
+        "clear-content",
+    }
+)
+
+_POWERSHELL_BOTH_PATHS_VERBS = frozenset(
+    {
+        "move-item",
+        "copy-item",
+        "rename-item",
+    }
+)
+
+
+MUTATING_VERB_TABLE = {
+    "git_mutating": tuple(_GIT_MUTATING_EXTRACTORS),
+    "git_non_mutating": tuple(_GIT_NON_MUTATING_SUBCOMMANDS),
+    "powershell_path_arg": tuple(_POWERSHELL_PATH_ARG_VERBS),
+    "powershell_both_paths": tuple(_POWERSHELL_BOTH_PATHS_VERBS),
+}
+
+
+def _classify_command_verb(tokens: list[str]):
+    if not tokens:
+        return None
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if "=" in tok and not tok.startswith("-") and "/" not in tok and "\\" not in tok:
+            i += 1
+            continue
+        break
+    if i >= len(tokens):
+        return None
+    relevant = tokens[i:]
+    verb = relevant[0].lower()
+
+    if verb == "git" and len(relevant) >= 2:
+        sub = relevant[1].lower()
+        extractor = _GIT_MUTATING_EXTRACTORS.get(sub)
+        if extractor is not None:
+            return extractor, relevant
+        if sub in _GIT_NON_MUTATING_SUBCOMMANDS:
+            return _extract_none, relevant
+        return None
+
+    if verb in _POWERSHELL_PATH_ARG_VERBS:
+        return _extract_powershell_path_arg, relevant
+    if verb in _POWERSHELL_BOTH_PATHS_VERBS:
+        return _extract_powershell_both_paths, relevant
+
+    return None
+
+
+def _split_pipeline_stages(command: str) -> list[str]:
+    if not command:
+        return []
+    masked = _mask_quoted_spans(command, mask_double=False)
+    stages: list[str] = []
+    start = 0
+    i = 0
+    while i < len(masked):
+        ch = masked[i]
+        nxt = masked[i + 1] if i + 1 < len(masked) else ""
+        if ch == ";":
+            stages.append(command[start:i])
+            start = i + 1
+            i += 1
+            continue
+        if ch == "|" and nxt == "|":
+            stages.append(command[start:i])
+            start = i + 2
+            i += 2
+            continue
+        if ch == "|":
+            stages.append(command[start:i])
+            start = i + 1
+            i += 1
+            continue
+        if ch == "&" and nxt == "&":
+            stages.append(command[start:i])
+            start = i + 2
+            i += 2
+            continue
+        i += 1
+    stages.append(command[start:])
+    return [s.strip() for s in stages if s.strip()]
+
+
 def _paths_from_shell(root: Path, command: str) -> list[str]:
-    paths = [rel for raw in PATH_TOKEN_RE.findall(command or "") if (rel := _normalize(root, raw))]
-    try:
-        tokens = shlex.split(command, posix=False)
-    except ValueError:
-        tokens = []
-    for token in tokens:
-        if any(marker in token for marker in ("/", "\\")) or token in PROTECTED_EXACT:
-            rel = _normalize(root, token)
-            if rel and (is_protected_path(rel) or rel.startswith(ALLOWED_WRITE_PREFIXES)):
+    """Verb-aware path extraction per DCL-IMPL-START-GATE-VERB-AWARE-PATH-EXTRACTION-001.
+
+    Tokenize via shlex.split(posix=False), identify the verb (first non-env-prefix
+    token), and extract paths ONLY from argument positions semantically meaningful
+    to that verb. For pipelines, each stage is tokenized independently. For
+    commands NOT matching any verb in the table, returns an empty list; the
+    caller's `_has_mutating_signal` check produces the `<unknown-mutating-target>`
+    fallback when appropriate.
+    """
+    paths: list[str] = []
+    for stage in _split_pipeline_stages(command or ""):
+        try:
+            tokens = shlex.split(stage, posix=False)
+        except ValueError:
+            continue
+        classification = _classify_command_verb(tokens)
+        if classification is None:
+            continue
+        extractor, relevant = classification
+        for raw in extractor(relevant):
+            rel = _normalize(root, raw)
+            if rel:
                 paths.append(rel)
     return sorted(set(paths))
 

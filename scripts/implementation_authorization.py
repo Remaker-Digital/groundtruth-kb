@@ -454,6 +454,56 @@ def _bullet_has_citation(text: str) -> bool:
     return _SPEC_ID_RE.search(text) is not None
 
 
+_TABLE_SEPARATOR_RE = re.compile(r"^\s*\|[\s\-:|]+\|\s*$")
+
+
+def _extract_spec_links_from_table(body: str) -> list[str]:
+    """Parse markdown-table-format Specification Links section.
+
+    Recognizes pipe-delimited rows where the first non-empty cell contains a
+    backtick-quoted token matching ``_SPEC_ID_RE``. Header rows (the first
+    pipe-row preceding a separator row) and separator rows are filtered.
+    Per-row placeholder check applies identically to bullet-format parity.
+
+    Per DCL-IMPL-AUTH-EXTRACT-SPEC-LINKS-TABLE-FORMAT-001.
+    """
+    lines = body.splitlines()
+    links: list[str] = []
+    in_data_section = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        # Non-table line: exit data section if currently inside one.
+        if not (stripped.startswith("|") and stripped.count("|") >= 2):
+            in_data_section = False
+            i += 1
+            continue
+        # Separator row: opens the data section.
+        if _TABLE_SEPARATOR_RE.match(line):
+            in_data_section = True
+            i += 1
+            continue
+        # Data row inside a table block.
+        if in_data_section:
+            if not _bullet_has_citation(stripped) and PLACEHOLDER_RE.search(stripped):
+                raise AuthorizationError("Approved proposal has placeholder text in Specification Links")
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            cells = [c for c in cells if c]
+            if cells:
+                ticks = re.findall(r"`([^`]+)`", cells[0])
+                links.extend(ticks)
+            i += 1
+            continue
+        # Pipe row not yet in data section: header iff next line is separator.
+        if i + 1 < len(lines) and _TABLE_SEPARATOR_RE.match(lines[i + 1]):
+            i += 1
+            continue
+        # Pipe row with no following separator: not a valid table; skip.
+        i += 1
+    return [link for link in links if link]
+
+
 def extract_spec_links(markdown: str) -> list[str]:
     body = section_body(markdown, "Specification Links")
     if not body:
@@ -472,6 +522,11 @@ def extract_spec_links(markdown: str) -> list[str]:
         ticks = re.findall(r"`([^`]+)`", stripped)
         links.extend(ticks or [stripped.lstrip("-* ").strip()])
     links = [link for link in links if link]
+    # Additive fallback: markdown-table format recognized when bullet branch
+    # returns zero links (per DCL-IMPL-AUTH-EXTRACT-SPEC-LINKS-TABLE-FORMAT-001).
+    # Bullet branch has precedence; table fallback dormant whenever bullets exist.
+    if not links:
+        links = _extract_spec_links_from_table(body)
     if not links:
         raise AuthorizationError("Approved proposal has no concrete specification links")
     return links
