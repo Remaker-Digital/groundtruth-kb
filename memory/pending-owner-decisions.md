@@ -6,16 +6,29 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-1095
-  asked_at: 2026-06-05T21:28:00.112529Z
-  question: "owner decision: \"which scope expansion + writer disposition?"
-  detected_via: prose:your_decision_q
-  status: pending
-  question_hash: 19c53d03f8fecb32
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-
 ## Resolved
 
+- id: DECISION-1101
+  asked_at: 2026-06-05T22:07:00.790670Z
+  question: ""
+  detected_via: prose:your_decision_q
+  status: resolved
+  question_hash: 9a8b67b59a57ee07
+  resolved_at: 2026-06-05T22:15:00Z
+  resolved_in_session: S421 wrap-up (context-overflow continuation)
+  answer: "False positive — S421 wrap context discussed DECISION-1095 status; hook pattern matched a prose fragment referencing the prior decision. No new owner decision pending. DECISION-1095 is already resolved (full sweep + remove writer path). The contradicting REVISED@-005 (DCL amendment only) received NO-GO@-006; next REVISED must follow DECISION-1095 resolution: full sweep + delete writer path per live owner AUQ evidence."
+  notes: "False positive resolved at S421 wrap."
+
+- id: DECISION-1095
+  asked_at: 2026-06-05T21:28:00.112529Z
+  question: ""
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 19c53d03f8fecb32
+  resolved_at: 2026-06-05T22:01:00Z
+  resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
+  answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
+  notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
 - id: DECISION-1078
   asked_at: 2026-06-04T20:48:49.719274Z
   question: ""
@@ -8838,6 +8851,71 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-05T19:11:32.224852Z
   answer: "owner cleared without specific answer"
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1096
+  asked_at: 2026-06-05T22:05:08.282789Z
+  question: "Mirror-retirement (deleting harness-state/role-assignments.json) is NO-GO@-004: the live specs require ZERO 'role-assignments' references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md (~116 occurrences in 50 files), but the proposal only tested 'no live reads.' Which scope should the retirement take?"
+  options:
+    - "Full cleanup sweep"
+    - "Spec amendment / waiver"
+    - "Split + explicit waiver"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7162753e1dec30ee
+  resolved_at: 2026-06-05T22:05:08.282789Z
+  answer: "Your questions have been answered: \"Mirror-retirement (deleting harness-state/role-assignments.json) is NO-GO@-004: the live specs require ZERO 'role-assignments' references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md (~116 occurrences in 50 files), but the proposal only tested 'no live reads.' Which scope should the retirement take?\"=\"Full cleanup sweep\", \"Compatibility writer-path code in scripts/harness_roles.py (write_role_assignments + ROLE_ASSIGNMENTS_RELATIVE_PATH, L81/L260-266) would RECREATE the deleted mirror on the next role write. What should happen to it?\"=\"Remove writer path\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1097
+  asked_at: 2026-06-05T22:05:08.282789Z
+  question: "Compatibility writer-path code in scripts/harness_roles.py (write_role_assignments + ROLE_ASSIGNMENTS_RELATIVE_PATH, L81/L260-266) would RECREATE the deleted mirror on the next role write. What should happen to it?"
+  options:
+    - "Remove writer path"
+    - "No-op the writer"
+    - "Retain + narrow spec"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4cbd227ed51c38bc
+  resolved_at: 2026-06-05T22:05:08.282789Z
+  answer: "Your questions have been answered: \"Mirror-retirement (deleting harness-state/role-assignments.json) is NO-GO@-004: the live specs require ZERO 'role-assignments' references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md (~116 occurrences in 50 files), but the proposal only tested 'no live reads.' Which scope should the retirement take?\"=\"Full cleanup sweep\", \"Compatibility writer-path code in scripts/harness_roles.py (write_role_assignments + ROLE_ASSIGNMENTS_RELATIVE_PATH, L81/L260-266) would RECREATE the deleted mirror on the next role write. What should happen to it?\"=\"Remove writer path\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1098
+  asked_at: 2026-06-05T22:07:00.790670Z
+  question: "Codex NO-GO'd the mirror deletion (-004): the LIVE specs DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 require ZERO 'role-assignments' references across scripts/, src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md — but ~21-26 legitimate residuals remain (orphan-marking citations incl 2 protected-narrative rule files, the doctor checker's OWN token definition, packet-payload strings, IP-5 comments). A backlog item (WI-4372) is NOT a waiver. Note: a pure literal cleanup is actually impossible — doctor.py MUST contain the token to grep for it. How should I satisfy the blocking specs to land the deletion?"
+  options:
+    - "Amend the specs (recommended)"
+    - "Full literal cleanup"
+    - "Split + governed waiver"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f003fa79c2f67d6b
+  resolved_at: 2026-06-05T22:07:00.790670Z
+  answer: "Your questions have been answered: \"Codex NO-GO'd the mirror deletion (-004): the LIVE specs DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 require ZERO 'role-assignments' references across scripts/, src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md — but ~21-26 legitimate residuals remain (orphan-marking citations incl 2 protected-narrative rule files, the doctor checker's OWN token definition, packet-payload strings, IP-5 comments). A backlog item (WI-4372) is NOT a waiver. Note: a pure literal cleanup is actually impossible — doctor.py MUST contain the token to grep for it. How should I satisfy the blocking specs to land the deletion?\"=\"Amend the specs (recommended)\", \"scripts/harness_roles.py carries compatibility code for the mirror path: write_role_assignments() writes to role-assignments.json (I verified it is DEAD CODE — zero callers), plus ROLE_ASSIGNMENTS_RELATIVE_PATH / role_assignments_path() which ARE still used by live existence-guard callers. What should happen to this code when the mirror file is deleted?\"=\"Remove dead writer, keep resolver (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1099
+  asked_at: 2026-06-05T22:07:00.790670Z
+  question: "scripts/harness_roles.py carries compatibility code for the mirror path: write_role_assignments() writes to role-assignments.json (I verified it is DEAD CODE — zero callers), plus ROLE_ASSIGNMENTS_RELATIVE_PATH / role_assignments_path() which ARE still used by live existence-guard callers. What should happen to this code when the mirror file is deleted?"
+  options:
+    - "Remove dead writer, keep resolver (recommended)"
+    - "Remove all compat code"
+    - "Keep all as compat"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3fdf895917bcf43f
+  resolved_at: 2026-06-05T22:07:00.790670Z
+  answer: "Your questions have been answered: \"Codex NO-GO'd the mirror deletion (-004): the LIVE specs DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 require ZERO 'role-assignments' references across scripts/, src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md — but ~21-26 legitimate residuals remain (orphan-marking citations incl 2 protected-narrative rule files, the doctor checker's OWN token definition, packet-payload strings, IP-5 comments). A backlog item (WI-4372) is NOT a waiver. Note: a pure literal cleanup is actually impossible — doctor.py MUST contain the token to grep for it. How should I satisfy the blocking specs to land the deletion?\"=\"Amend the specs (recommended)\", \"scripts/harness_roles.py carries compatibility code for the mirror path: write_role_assignments() writes to role-assignments.json (I verified it is DEAD CODE — zero callers), plus ROLE_ASSIGNMENTS_RELATIVE_PATH / role_assignments_path() which ARE still used by live existence-guard callers. What should happen to this code when the mirror file is deleted?\"=\"Remove dead writer, keep resolver (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1100
+  asked_at: 2026-06-05T22:07:00.790670Z
+  question: "I've confirmed a SECOND active harness-B Prime /loop session (lineage 56a13045) is concurrently driving the exact same mirror-retirement thread. While I worked this session: it filed -005 (DCL-only amend), Codex NO-GO'd it at -006, and the working tree/INDEX/pending-decisions files changed in real time between my reads. The bridge claim mechanism is correctly serializing us (no corruption), but we've collided all session and my drafting keeps being redundant. I've already: confirmed the AMEND path via your AUQ, durably recorded it as DELIB-MIRROR-RETIREMENT-AMEND-PATH-2026-06-05 (which closes the -006 F2 'no durable decision evidence' gap and notes BOTH specs must be amended per -006 F1), and released my claim so the parallel session is unblocked. How should I proceed?"
+  options:
+    - "Stand down this session (recommended)"
+    - "Take over; stop the parallel session"
+    - "Keep both running"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b2ffd9a73ee29037
+  resolved_at: 2026-06-05T22:07:00.790670Z
+  answer: "Your questions have been answered: \"I've confirmed a SECOND active harness-B Prime /loop session (lineage 56a13045) is concurrently driving the exact same mirror-retirement thread. While I worked this session: it filed -005 (DCL-only amend), Codex NO-GO'd it at -006, and the working tree/INDEX/pending-decisions files changed in real time between my reads. The bridge claim mechanism is correctly serializing us (no corruption), but we've collided all session and my drafting keeps being redundant. I've already: confirmed the AMEND path via your AUQ, durably recorded it as DELIB-MIRROR-RETIREMENT-AMEND-PATH-2026-06-05 (which closes the -006 F2 'no durable decision evidence' gap and notes BOTH specs must be amended per -006 F1), and released my claim so the parallel session is unblocked. How should I proceed?\"=\"Stand down this session (recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
