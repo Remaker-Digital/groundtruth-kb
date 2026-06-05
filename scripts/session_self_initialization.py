@@ -1145,11 +1145,13 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
     }
 
 
-def _backlog_items_from_membase(project_root: Path) -> list[dict[str, str]]:
+def _backlog_items_from_membase(project_root: Path) -> list[dict[str, Any]]:
     """Query MemBase work_items via ``gt backlog list --json`` (canonical backlog surface).
 
-    Returns a list of dicts with at least ``id``, ``title``, and ``body`` keys
-    so callers get the same shape as the retired ``_parse_active_work_items``.
+    Returns a list of dicts with ``id``, ``title``, ``body``, ``approval_state``,
+    ``resolution_status``, and ``priority`` keys. The approval_state /
+    resolution_status / priority fields are required by the top-3 priority
+    selection in ``_backlog_metrics`` per SPEC-ENVELOPE-DISCLOSURE-UI-001.
 
     Per DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION, the canonical
     backlog is MemBase ``work_items``; the legacy markdown backlog view is retired.
@@ -1167,13 +1169,16 @@ def _backlog_items_from_membase(project_root: Path) -> list[dict[str, str]]:
         raw_items: list[dict[str, Any]] = json.loads(result.stdout)
     except Exception:
         return []
-    items: list[dict[str, str]] = []
+    items: list[dict[str, Any]] = []
     for row in raw_items:
         items.append(
             {
                 "id": str(row.get("id", "")),
                 "title": str(row.get("title", "")),
                 "body": str(row.get("description") or row.get("status_detail") or ""),
+                "approval_state": str(row.get("approval_state") or ""),
+                "resolution_status": str(row.get("resolution_status") or ""),
+                "priority": row.get("priority"),
             }
         )
     return items
@@ -1211,7 +1216,21 @@ def _residual_override_present(body: str) -> bool:
     return bool(_RESIDUAL_OVERRIDE_RE.search(body or ""))
 
 
-def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
+_PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3, "P4": 4}
+
+
+def _top_priority_sort_key(item: dict[str, Any]) -> tuple[int, str]:
+    """Order top-3 by priority (P0 highest, none lowest) then by stable WI id.
+
+    Per SPEC-ENVELOPE-DISCLOSURE-UI-001: highest-priority (P0 > P1 > P2 > P3 >
+    P4 > none); within same priority, lowest WI id (stable order).
+    """
+
+    priority = str(item.get("priority") or "").upper().strip()
+    return (_PRIORITY_RANK.get(priority, 5), str(item.get("id") or ""))
+
+
+def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     items = _backlog_items_from_membase(project_root)
     bridge_status = _bridge_index_latest_status(project_root)
     classified = []
@@ -1237,16 +1256,40 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
             continue
         eligible.append(item)
 
+    # Top-3 selection per SPEC-ENVELOPE-DISCLOSURE-UI-001:
+    # Operates on ALL classified items (bypasses the agent_red scope filter so
+    # GT-KB infrastructure WIs appear in the session-startup priority surface).
+    # Applies: VERIFIED bridge filter, stale priority filter,
+    # approval_state='implementation_authorized', resolution_status open/in_progress/blocked.
+    # Computed once; reused at both consumption sites (dict field and tuple return).
+    top_eligible: list[dict[str, Any]] = []
+    for _item in classified:
+        _wi_id = _item.get("id", "")
+        _body = _item.get("body", "")
+        _mapped = _work_item_id_to_bridge_document(_wi_id)
+        _latest = bridge_status.get(_mapped)
+        if _latest == "VERIFIED" and not _residual_override_present(_body):
+            continue
+        if _STALE_PRIORITY_RE.search(_body):
+            continue
+        if _item.get("approval_state") == "implementation_authorized" and _item.get("resolution_status") in (
+            "open",
+            "in_progress",
+            "blocked",
+        ):
+            top_eligible.append(_item)
+    top_eligible.sort(key=_top_priority_sort_key)
+    top_priority = top_eligible[:3]
     return {
         "active_item_count": len(eligible),
         "raw_active_item_count": len(items),
-        "top_priority_actions": eligible[:3],
+        "top_priority_actions": top_priority,
         "source": "MemBase work_items",
         "scope_counts": dict(sorted(Counter(item["scope"] for item in classified).items())),
         "scope_confidence": "gtkb_current_heuristic",
         "filtered_verified_ids": filtered_verified_ids,
         "filtered_stale_ids": filtered_stale_ids,
-    }, eligible[:3]
+    }, top_priority
 
 
 def _bridge_metrics(project_root: Path) -> dict[str, Any]:
@@ -2236,7 +2279,9 @@ def _result_color(result: str) -> str:
     return "yellow"
 
 
-def _delivery_timeline(project_root: Path, infrastructure: dict[str, Any]) -> dict[str, Any]:
+def _delivery_timeline(
+    project_root: Path, infrastructure: dict[str, Any], *, fast_hook: bool = False
+) -> dict[str, Any]:
     workflows = _workflow_inventory(project_root)
     workflow_name_to_file = {str(details.get("name")): filename for filename, details in workflows.items()}
     github = infrastructure.get("testing_service_integrations", {}).get("github", {})
@@ -2244,24 +2289,25 @@ def _delivery_timeline(project_root: Path, infrastructure: dict[str, Any]) -> di
     version_manifest = _current_version_manifest(project_root)
     rows: list[dict[str, Any]] = []
 
-    for commit in _recent_git_commits(project_root):
-        rows.append(
-            {
-                "timestamp": commit["committed_at"],
-                "stage": "commit",
-                "stage_label": _stage_label("commit"),
-                "event": commit["subject"],
-                "version": commit["version"],
-                "commit": commit["short_sha"],
-                "branch": "",
-                "result": "recorded",
-                "result_color": "green",
-                "test_results": "Correlate with workflow rows sharing this commit.",
-                "source": "git log",
-                "url": "",
-                "notes": commit["author"],
-            }
-        )
+    if not fast_hook:
+        for commit in _recent_git_commits(project_root):
+            rows.append(
+                {
+                    "timestamp": commit["committed_at"],
+                    "stage": "commit",
+                    "stage_label": _stage_label("commit"),
+                    "event": commit["subject"],
+                    "version": commit["version"],
+                    "commit": commit["short_sha"],
+                    "branch": "",
+                    "result": "recorded",
+                    "result_color": "green",
+                    "test_results": "Correlate with workflow rows sharing this commit.",
+                    "source": "git log",
+                    "url": "",
+                    "notes": commit["author"],
+                }
+            )
 
     for run in runs[:80]:
         workflow_name = str(run.get("workflowName") or run.get("name") or "Workflow")
@@ -3274,7 +3320,7 @@ def build_startup_model(
         "testing_service_integrations": _testing_service_integrations(project_root, plugins, fast_hook=fast_hook),
         "dashboard_reachability": _dashboard_reachability_probes(),
     }
-    infrastructure["delivery_timeline"] = _delivery_timeline(project_root, infrastructure)
+    infrastructure["delivery_timeline"] = _delivery_timeline(project_root, infrastructure, fast_hook=fast_hook)
     dashboard_intelligence = _dashboard_intelligence(
         project_root=project_root,
         generated_at=generated_at,
@@ -4053,6 +4099,28 @@ def _compact_top_action_summary(actions: list[dict[str, Any]]) -> str:
     return "; ".join(f"{item.get('id')}: {item.get('title')}" for item in actions[:3])
 
 
+def _render_top_priority_actions_section(model: dict[str, Any]) -> str:
+    """Render the canonical top-3 priorities surface for the open disclosure.
+
+    Per SPEC-ENVELOPE-DISCLOSURE-UI-001 the open disclosure must keep a
+    top-3 priorities surface; the actions are already filtered + ordered
+    deterministically by `_backlog_metrics`. Universal: shown in both Prime
+    and Loyal Opposition open disclosures.
+    """
+
+    actions = model.get("top_priority_actions") or []
+    lines = ["### Top Priority Actions", ""]
+    if not actions:
+        lines.append("- No implementation-authorized work items currently surface as top-3 priorities.")
+        return "\n".join(lines)
+    for index, action in enumerate(actions, start=1):
+        title = action.get("title") or "(no title)"
+        identifier = action.get("id") or "(no id)"
+        priority = str(action.get("priority") or "none").strip() or "none"
+        lines.append(f"{index}. **{identifier}**: {title} (priority: {priority})")
+    return "\n".join(lines)
+
+
 def _render_session_startup_briefing(model: dict[str, Any]) -> str:
     role = model.get("role", {})
     metrics = model.get("metrics", {})
@@ -4060,28 +4128,14 @@ def _render_session_startup_briefing(model: dict[str, Any]) -> str:
     intelligence = model.get("dashboard_intelligence", {})
     workstream = model.get("workstream_focus") or {}
     dashboard_opening = model.get("dashboard_opening", {})
-    contention = metrics.get("contention", {})
-    raw_status_counts = contention.get("raw_latest_status_counts", {})
     release = intelligence.get("release_readiness", {})
     quality = intelligence.get("quality_rollup", {})
     dev_inventory = infrastructure.get("dev_environment_inventory", {})
     harness_parity = infrastructure.get("harness_parity", {})
     upgrade_posture = infrastructure.get("gtkb_upgrade_posture", {})
-    rollup = metrics.get("membase", {}).get("project_state_rollup") or {}
-    first_project = (rollup.get("projects") or [{}])[0]
-    first_action = (intelligence.get("action_center") or [{}])[0]
     dashboard_open_requested = "enabled" if dashboard_opening.get("startup_open_requested") else "disabled"
     dashboard_open_mode = dashboard_opening.get("mode") or DASHBOARD_OPEN_MODE_HARNESS
-    prime_response_count = _protocol_prime_response_queue_count(contention)
-    review_queue_count = _protocol_review_queue_count(contention)
     active_subject = _active_subject_label(model)
-
-    project_summary = (
-        f"{rollup.get('active_project_count', 0)} active group(s), "
-        f"{rollup.get('non_terminal_work_items', 0)} non-terminal item(s)"
-    )
-    if first_project:
-        project_summary = f"{project_summary}; top: {_format_project_top_item(first_project)}"
 
     return "\n".join(
         [
@@ -4115,22 +4169,6 @@ def _render_session_startup_briefing(model: dict[str, Any]) -> str:
             f"- Dev environment inventory: {_dev_inventory_compact_text(dev_inventory)}",
             f"- Harness parity: {_harness_parity_compact_text(harness_parity)}",
             f"- Data freshness: {intelligence.get('data_freshness', {}).get('generated_at', model.get('generated_at'))}.",
-            "",
-            "### Work State",
-            (
-                f"- File bridge: generated-time latest NEW/REVISED={review_queue_count}; "
-                f"latest GO/NO-GO for Prime={prime_response_count}; "
-                f"latest ADVISORY={raw_status_counts.get('ADVISORY', 0) or 0}. "
-                "Live `bridge/INDEX.md` remains authoritative after generation."
-            ),
-            f"- MemBase project rollup: {project_summary}.",
-            f"- Standing backlog top priorities: {_compact_top_action_summary(model.get('top_priority_actions') or [])}.",
-            f"- Drift changed paths: {metrics.get('drift', {}).get('changed_path_count')}.",
-            (
-                "- Action center first signal: "
-                f"{first_action.get('action', 'none visible')}"
-                f"{' - ' + str(first_action.get('why')) if first_action.get('why') else ''}."
-            ),
         ]
     )
 
@@ -4758,19 +4796,11 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "",
         ]
     else:
-        session_focus_options = _session_focus_options(model)
         startup_task_section = [
             "## Session Startup",
             "",
             _render_session_startup_briefing(model),
             "",
-            "### Recommended Session Focus",
-            "",
-            "Reply with A, B, C, D, or an exact label from the full focus list. Each recommendation is generated from current startup evidence.",
-            "",
-            _render_session_focus_options(session_focus_options, model),
-            "",
-            "Or provide a prompt for something else.",
         ]
         project_state_rollup_section = []
 
@@ -4795,8 +4825,6 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
             "",
             _markdown_list(model["governance_stance"]),
-            "",
-            _render_startup_glossary_section(project_root),
             "",
             "### Live Project Dashboard",
             "",
@@ -4826,9 +4854,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "",
             *_render_smart_poller_section(project_root, role),
             *pending_decisions_section,
-            "### Wrap-Up Trigger Commands",
-            "",
-            _render_wrapup_trigger_commands(),
+            _render_top_priority_actions_section(model),
             "",
             *startup_task_section,
         ]

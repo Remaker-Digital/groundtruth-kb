@@ -370,9 +370,9 @@ def test_startup_model_discovers_durable_operating_role() -> None:
     else:
         assert "## Loyal Opposition Startup Task" not in report
         assert "## Session Startup" in report
-        assert "### Recommended Session Focus" in report
-        assert "D. **Full Focus List**" in report
-        assert "   - Continue Last Session" in report
+        # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: Recommended Session Focus section
+        # is dropped from the open disclosure.
+        assert "### Recommended Session Focus" not in report
 
 
 def test_fast_hook_startup_model_skips_optional_live_network_probes(monkeypatch) -> None:
@@ -1191,12 +1191,15 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "`work subject application`" in report_text
     assert "`work subject GT-KB`" in report_text
     assert "`GT-KB mode`" in report_text
-    assert "Wrap-Up Trigger Commands" in report_text
-    assert "Accepted wrap-up commands:" in report_text
-    assert "`wrap up`" in report_text
-    assert "`start a new session`" in report_text
-    assert "`begin fresh`" in report_text
-    assert "Optional leading or trailing `please`" in report_text
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: open disclosure drops Wrap-Up Trigger
+    # Commands, Recommended Session Focus, Work State, and the inline glossary.
+    # The wrap-trigger constant + helper are preserved in source for capstone reuse;
+    # they are exercised by test_session_self_initialization_disclosure_shape.py.
+    assert "### Wrap-Up Trigger Commands" not in report_text
+    assert "### Recommended Session Focus" not in report_text
+    assert "### Work State" not in report_text
+    assert "### Glossary" not in report_text
+    assert "Reply with A, B, C, D" not in report_text
     assert "### File Bridge Scan" not in report_text
     assert "### Startup Pruning" not in report_text
     assert "Token Consumption Reduction Options" not in report_text
@@ -1204,32 +1207,14 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Three Top Priority Actions" not in report_text
     assert "Would you like to proceed with established priority actions? (Y/N)" not in report_text
     assert "Session Startup" in report_text
-    assert "Recommended Session Focus" in report_text
-    assert "Reply with A, B, C, D" in report_text
-    assert "Optimize Startup Token Consumption" in report_text
-    assert "Top Priority Actions" in report_text
     assert "GTKB-GOV-006" not in report_text
     assert "GTKB-GOV-007" not in report_text
     top_action_ids = [item["id"] for item in dashboard_data["model"]["top_priority_actions"]]
-    assert top_action_ids
-    for action_id in top_action_ids:
-        assert action_id in report_text
-    assert "Evidence:" in report_text
-    assert "Expected work:" in report_text
-    assert "Resolve Release Blockers" in report_text
-    assert "Repair Testing/Tool Integrations" in report_text
-    assert "Remediate Known Risks" in report_text
-    assert "Clear Stage/Test Release Path" in report_text
-    assert "Continue Last Session" in report_text
-    assert "Clean For Internal Review" in report_text
-    assert "Pick From Standing Backlog" in report_text
-    assert "D. **Full Focus List**" in report_text
-    assert "   - Commit and push to GitHub" in report_text
-    assert "   - Merge to main, build and push to the staging environment" in report_text
-    assert "   - Execute end-to-end tests in the staging environment" in report_text
-    assert "   - Push staged-and-tested build to production, then smoke test" in report_text
-    assert "   - Continue Last Session" in report_text
-    assert "Or provide a prompt for something else." in report_text
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires
+    # approval_state='implementation_authorized' AND a non-terminal resolution
+    # status. The list can legitimately be empty when no authorized agent_red
+    # items exist in MemBase at test-run time; assert structure, not population.
+    assert isinstance(top_action_ids, list)
     assert "Startup Focus Input Gate" not in report_text
     assert "Skills, Plug-ins, Directives, And Hooks" not in report_text
     assert report_text.index("## Startup Disclosure") < report_text.index("## Session Startup")
@@ -1357,31 +1342,20 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "`work subject GT-KB`" in context
     assert "`application mode`" in context
     assert "`GT-KB mode`" in context
-    assert "### Wrap-Up Trigger Commands" in context
-    assert "Accepted wrap-up commands:" in context
-    assert "`wrap up`" in context
-    assert "`start a new session`" in context
-    assert "`begin fresh`" in context
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: open disclosure drops Wrap-Up Trigger
+    # Commands, Recommended Session Focus, Work State, and the inline glossary.
+    assert "### Wrap-Up Trigger Commands" not in context
+    assert "### Recommended Session Focus" not in context
+    assert "### Work State" not in context
+    assert "### Glossary" not in context
     assert "### Startup Pruning" not in context
     assert "## Token Consumption Reduction Options" not in context
     assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in context
     assert "## Three Top Priority Actions" not in context
     assert "Would you like to proceed with established priority actions? (Y/N)" not in context
     assert "## Session Startup" in context
-    assert "### Recommended Session Focus" in context
-    assert "Optimize Startup Token Consumption" in context
-    assert "Top Priority Actions" in context
     assert "GTKB-GOV-006" not in context
     assert "GTKB-GOV-007" not in context
-    assert "Evidence:" in context
-    assert "Expected work:" in context
-    assert "Resolve Release Blockers" in context
-    assert "Continue Last Session" in context
-    assert "D. **Full Focus List**" in context
-    assert "   - Commit and push to GitHub" in context
-    assert "   - Push staged-and-tested build to production, then smoke test" in context
-    assert "   - Continue Last Session" in context
-    assert "Or provide a prompt for something else." in context
     assert "## Startup Focus Input Gate" not in context
     assert "## Skills, Plug-ins, Directives, And Hooks" not in context
     assert context.index("## Startup Disclosure") < context.index("## Session Startup")
@@ -1449,8 +1423,9 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "## User-Visible Startup Message" in context
     assert "## Startup Disclosure" in context
     assert "## Session Startup" in context
-    assert "D. **Full Focus List**" in context
-    assert "   - Continue Last Session" in context
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: focus picker is dropped from the open
+    # disclosure; the full focus list is no longer emitted in the report.
+    assert "D. **Full Focus List**" not in context
     assert "Startup First-Response Directive" not in context
     assert "Mandatory Direct Live Bridge Index Read" not in context
     assert "SHA-256:" not in context
@@ -1703,8 +1678,10 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     else:
         assert "## Loyal Opposition Startup Task" not in context
         assert "## Session Startup" in context
-        assert "   - Commit and push to GitHub" in context
-        assert "   - Continue Last Session" in context
+        # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: focus picker (including the full
+        # focus list with "Commit and push to GitHub" and "Continue Last Session")
+        # is dropped from the open disclosure.
+        assert "   - Commit and push to GitHub" not in context
         assert guard_path.exists()
         guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
         assert guard_state["discard_next_user_prompt"] is True
@@ -1863,26 +1840,24 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     assert "## Startup Disclosure" in context
     assert "### Active Work Subject" in context
     assert "Default work subject: GT-KB Infrastructure Focus" in context
-    assert "### Wrap-Up Trigger Commands" in context
-    assert "Accepted wrap-up commands:" in context
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001 (bridge gtkb-envelope-disclosure-ui-impl
+    # GO at -009): open disclosure drops Wrap-Up Trigger Commands, Recommended
+    # Session Focus, Work State, and the inline glossary. The wrap-trigger
+    # constant + helper remain importable; see
+    # test_session_self_initialization_disclosure_shape.py.
+    assert "### Wrap-Up Trigger Commands" not in context
+    assert "### Recommended Session Focus" not in context
+    assert "### Work State" not in context
+    assert "### Glossary" not in context
     assert "### File Bridge Scan" not in context
     assert "## Token Consumption Reduction Options" not in context
     assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in context
     assert "## Three Top Priority Actions" not in context
     assert "Would you like to proceed with established priority actions? (Y/N)" not in context
     assert "## Session Startup" in context
-    assert "Optimize Startup Token Consumption" in context
     assert "Top Priority Actions" in context
     assert "GTKB-GOV-006" not in context
     assert "GTKB-GOV-007" not in context
-    assert "Evidence:" in context
-    assert "Expected work:" in context
-    assert "Continue Last Session" in context
-    assert "D. **Full Focus List**" in context
-    assert "   - Commit and push to GitHub" in context
-    assert "   - Push staged-and-tested build to production, then smoke test" in context
-    assert "   - Continue Last Session" in context
-    assert "Or provide a prompt for something else." in context
     assert "## Startup Focus Input Gate" not in context
     assert "## Skills, Plug-ins, Directives, And Hooks" not in context
     assert context.index("## Startup Disclosure") < context.index("## Session Startup")
@@ -2550,10 +2525,33 @@ def _make_recommender_fixture(tmp_path, backlog_items: list[dict[str, str]], ind
 def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, monkeypatch) -> None:
     """T-recommender-1: items whose mapped bridge thread is VERIFIED are filtered."""
     module = _load_module()
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires implementation_authorized
+    # + open/in_progress/blocked resolution status.
     backlog_items = [
-        {"id": "GTKB-SHIPPED-ITEM-001", "title": "Already shipped", "body": "Body of done item."},
-        {"id": "GTKB-ACTIVE-ITEM-002", "title": "Still in flight", "body": "Body of active item."},
-        {"id": "GTKB-ACTIVE-ITEM-003", "title": "Also in flight", "body": "Body of third item."},
+        {
+            "id": "GTKB-SHIPPED-ITEM-001",
+            "title": "Already shipped",
+            "body": "Body of done item.",
+            "approval_state": "implementation_authorized",
+            "resolution_status": "open",
+            "priority": "P1",
+        },
+        {
+            "id": "GTKB-ACTIVE-ITEM-002",
+            "title": "Still in flight",
+            "body": "Body of active item.",
+            "approval_state": "implementation_authorized",
+            "resolution_status": "open",
+            "priority": "P1",
+        },
+        {
+            "id": "GTKB-ACTIVE-ITEM-003",
+            "title": "Also in flight",
+            "body": "Body of third item.",
+            "approval_state": "implementation_authorized",
+            "resolution_status": "open",
+            "priority": "P1",
+        },
     ]
     index = (
         "Document: gtkb-shipped-item-001\n"
@@ -2590,7 +2588,14 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatc
     """T-recommender-3: items with no matching bridge Document remain eligible."""
     module = _load_module()
     backlog_items = [
-        {"id": "GTKB-NO-BRIDGE-001", "title": "Item without a bridge thread", "body": "Body."},
+        {
+            "id": "GTKB-NO-BRIDGE-001",
+            "title": "Item without a bridge thread",
+            "body": "Body.",
+            "approval_state": "implementation_authorized",
+            "resolution_status": "open",
+            "priority": "P1",
+        },
     ]
     index = "Document: gtkb-other-thread\nGO: bridge/gtkb-other-thread-002.md\n"
     root = _make_recommender_fixture(tmp_path, backlog_items, index)
@@ -2612,6 +2617,9 @@ def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, mo
             "id": "GTKB-VERIFIED-WITH-RESIDUAL-001",
             "title": "Verified but residual work",
             "body": "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\nBody explaining the residual work.",
+            "approval_state": "implementation_authorized",
+            "resolution_status": "open",
+            "priority": "P1",
         },
     ]
     index = "Document: gtkb-verified-with-residual-001\nVERIFIED: bridge/gtkb-verified-with-residual-001-004.md\n"
