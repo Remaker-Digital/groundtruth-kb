@@ -227,6 +227,7 @@ NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-001.md
 
 Document: gtkb-ollama-integration-phase-1
+NO-GO: bridge/gtkb-ollama-integration-phase-1-006.md
 NEW: bridge/gtkb-ollama-integration-phase-1-005.md
 GO: bridge/gtkb-ollama-integration-phase-1-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-003.md
