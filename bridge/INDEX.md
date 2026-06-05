@@ -7,6 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-envelope-runtime-capstone-impl
+NEW: bridge/gtkb-envelope-runtime-capstone-impl-003.md
+GO: bridge/gtkb-envelope-runtime-capstone-impl-002.md
+NEW: bridge/gtkb-envelope-runtime-capstone-impl-001.md
+
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
 VERIFIED: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-010.md
 REVISED: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-009.md
