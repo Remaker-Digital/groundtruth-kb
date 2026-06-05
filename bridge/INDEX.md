@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-integration-phase-1-shim
+NEW: bridge/gtkb-ollama-integration-phase-1-shim-001.md
+
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
 GO: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-004.md
 REVISED: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-003.md
@@ -21,6 +24,7 @@ GO: bridge/gtkb-startup-payload-profiler-compact-context-002.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-001.md
 
 Document: gtkb-ollama-integration-phase-1-foundation
+VERIFIED: bridge/gtkb-ollama-integration-phase-1-foundation-012.md
 NEW: bridge/gtkb-ollama-integration-phase-1-foundation-011.md
 GO: bridge/gtkb-ollama-integration-phase-1-foundation-010.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-009.md
