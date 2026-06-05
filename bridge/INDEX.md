@@ -13,25 +13,31 @@ REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-001.md
 
+Document: gtkb-handoff-prompt-terminology-clarification
+VERIFIED: bridge/gtkb-handoff-prompt-terminology-clarification-004.md
+NEW: bridge/gtkb-handoff-prompt-terminology-clarification-003.md
+GO: bridge/gtkb-handoff-prompt-terminology-clarification-002.md
+NEW: bridge/gtkb-handoff-prompt-terminology-clarification-001.md
+
 Document: gtkb-lo-file-safety-gate-envelope-role-resolution
+REVISED: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-005.md
 GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-004.md
 REVISED: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-003.md
 NO-GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-002.md
 NEW: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-001.md
 
 Document: gtkb-ollama-integration-phase-1-verification
+GO: bridge/gtkb-ollama-integration-phase-1-verification-006.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-verification-005.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-verification-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-verification-001.md
 
-Document: gtkb-handoff-prompt-terminology-clarification
-NEW: bridge/gtkb-handoff-prompt-terminology-clarification-003.md
-GO: bridge/gtkb-handoff-prompt-terminology-clarification-002.md
-NEW: bridge/gtkb-handoff-prompt-terminology-clarification-001.md
-
 Document: gtkb-harness-state-sot-consolidation-phase-1-scripts-source
+VERIFIED: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-010.md
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-009.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-008.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-007.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-006.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-005.md
