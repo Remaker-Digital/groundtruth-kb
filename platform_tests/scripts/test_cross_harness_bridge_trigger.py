@@ -776,6 +776,184 @@ def test_prime_spawn_fails_closed_when_dispatch_authorization_fails(
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# WI-4358: cross-harness trigger filter NO-GO items before authorization
+#
+# The bug: _issue_dispatch_authorization_for_selected built bridge_ids from
+# ALL selected items regardless of top_status, so an all-NO-GO selected batch
+# (revision tasks) tripped create_authorization_packet's GO-only guard and
+# raised AuthorizationError pre-spawn. The 621 confirmed silent dispatch
+# failures in .gtkb-state/bridge-poller/dispatch-failures.jsonl trace back
+# here.
+#
+# The fix: filter selected to GO-only before building bridge_ids; return
+# ok=True with empty context when no GO items remain (NO-GO items are still
+# visible in the dispatch prompt text via Prime's prompt-context render).
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _no_go_fake_item(doc: str, status: str) -> object:
+    """Build a minimal FakeItem fixture with document_name + top_status (WI-4358)."""
+    return type(
+        "FakeItem",
+        (),
+        {
+            "document_name": doc,
+            "top_status": status,
+            "top_file": f"bridge/{doc}-002.md",
+            "dispatchable": True,
+        },
+    )()
+
+
+def test_issue_dispatch_auth_skips_no_go_items(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-4358: all-NO-GO selected batch returns ok=True with empty context
+    and never calls issue_dispatch_authorization_packets.
+    """
+    root = _make_synthetic_project(tmp_path)
+    trigger = _load_trigger()
+
+    def _fake_issue(*_args, **_kwargs):
+        raise AssertionError("issue_dispatch_authorization_packets must not be called for all-NO-GO batch")
+
+    monkeypatch.setattr(trigger, "issue_dispatch_authorization_packets", _fake_issue)
+
+    result = trigger._issue_dispatch_authorization_for_selected(
+        [
+            _no_go_fake_item("revise-thread-a", "NO-GO"),
+            _no_go_fake_item("revise-thread-b", "NO-GO"),
+        ],
+        project_root=root,
+        state_dir=tmp_path / "state",
+        recipient="prime-builder",
+        dispatch_id="dispatch-no-go-only",
+    )
+
+    assert result == {"ok": True, "reason": None, "context": {}}
+
+
+def test_issue_dispatch_auth_uses_go_items_from_mixed_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-4358: mixed GO+NO-GO selected batch produces an issue call with only
+    the GO items' document_name(s).
+    """
+    root = _make_synthetic_project(tmp_path)
+    trigger = _load_trigger()
+    captured_bridge_ids: list[list[str]] = []
+
+    def _fake_issue(_root, bridge_ids, *, dispatch_id):  # noqa: ARG001 (signature mirrors prod)
+        captured_bridge_ids.append(list(bridge_ids))
+        return {"go-thread": {"some": "context"}}
+
+    monkeypatch.setattr(trigger, "issue_dispatch_authorization_packets", _fake_issue)
+
+    result = trigger._issue_dispatch_authorization_for_selected(
+        [
+            _no_go_fake_item("go-thread", "GO"),
+            _no_go_fake_item("revise-thread", "NO-GO"),
+        ],
+        project_root=root,
+        state_dir=tmp_path / "state",
+        recipient="prime-builder",
+        dispatch_id="dispatch-mixed",
+    )
+
+    assert result["ok"] is True
+    assert captured_bridge_ids == [["go-thread"]], (
+        "Only the GO item's document_name should reach issue_dispatch_authorization_packets"
+    )
+
+
+def test_spawn_harness_dispatches_no_go_only_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-4358 spawn-level regression: _spawn_harness must launch Prime Builder
+    even when the entire selected batch is NO-GO (revision tasks).
+
+    Asserts:
+    - subprocess.Popen is called exactly once (harness launch proceeds);
+    - the dispatch prompt text passed to the child includes the NO-GO item's
+      document name (revision task is visible to the spawned session);
+    - no implementation-authorization packet file is created;
+    - no GTKB_IMPLEMENTATION_AUTH_* env vars are set in the child environment.
+    """
+    root = _make_synthetic_project(tmp_path)
+    doc = "revise-no-go-thread"
+    _write_bridge_file(root, f"{doc}-001.md", "bridge_kind: implementation_proposal\n")
+    _write_bridge_file(root, f"{doc}-002.md", "NO-GO\n\nFixture NO-GO.\n")
+    _write_index(
+        root,
+        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
+    )
+
+    state_dir = tmp_path / "state"
+    trigger = _load_trigger()
+    captured_envs: list[dict[str, str]] = []
+    captured_argv: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 99999
+
+    def _fake_popen(args, *_args, env=None, **_kwargs):
+        captured_argv.append(list(args))
+        captured_envs.append(dict(env) if env is not None else {})
+        return _FakeProcess()
+
+    import subprocess as _subprocess
+
+    monkeypatch.setattr(_subprocess, "Popen", _fake_popen)
+
+    no_go_item = _no_go_fake_item(doc, "NO-GO")
+    prime_target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+
+    meta = trigger._spawn_harness(
+        target=prime_target,
+        items=[no_go_item],
+        project_root=root,
+        state_dir=state_dir,
+        max_items=2,
+        dry_run=False,
+        dispatch_id="dispatch-no-go-only",
+    )
+
+    assert meta["launched"] is True, (
+        "Spawn must succeed for all-NO-GO selected batch (revision tasks still need a worker)"
+    )
+    assert len(captured_argv) == 1, "Popen must be called exactly once"
+
+    # The NO-GO document name MUST appear in the dispatch prompt text so the
+    # spawned worker can act on the revision task.
+    prompt_text = " ".join(captured_argv[0])
+    assert doc in prompt_text, f"Dispatch prompt must include NO-GO thread {doc}"
+
+    # No implementation-authorization packet file should exist for an all-NO-GO
+    # batch (no GO items means no packet creation occurred).
+    auth_current = root / ".gtkb-state" / "implementation-authorizations" / "current.json"
+    assert not auth_current.exists(), "No impl-auth packet should be created for all-NO-GO batch"
+
+    # The proposal -005 explicitly admits two env-contract options for the
+    # empty-GO branch: (a) no GTKB_IMPLEMENTATION_AUTH_* env vars at all, or
+    # (b) the env contract is documented and asserted. The current spawn code
+    # implements option (b): DISPATCH_ID echoes the dispatch_id; BRIDGE_IDS,
+    # CURRENT_BRIDGE_ID, and PACKET_HASHES are present but empty. The empty
+    # values are the load-bearing guarantee: a spawned worker cannot believe
+    # it holds a real impl-auth packet because there is no bridge id to cite
+    # and no packet hash to validate against.
+    child_env = captured_envs[0]
+    assert child_env.get("GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS", None) == "", (
+        "BRIDGE_IDS must be empty for all-NO-GO batch (no fake bridge id leaks to worker)"
+    )
+    assert child_env.get("GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID", None) == "", (
+        "CURRENT_BRIDGE_ID must be empty for all-NO-GO batch"
+    )
+    assert child_env.get("GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES", None) == "", (
+        "PACKET_HASHES must be empty for all-NO-GO batch"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # WI-3353 IP-6/IP-7: worktree-aware canonical-root resolution (transitive)
 # ──────────────────────────────────────────────────────────────────────────
 
