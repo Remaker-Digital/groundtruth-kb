@@ -17,6 +17,7 @@ NO-GO: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-002.md
 NEW: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-001.md
 
 Document: gtkb-startup-payload-profiler-compact-context
+VERIFIED: bridge/gtkb-startup-payload-profiler-compact-context-006.md
 REVISED: bridge/gtkb-startup-payload-profiler-compact-context-005.md
 NO-GO: bridge/gtkb-startup-payload-profiler-compact-context-004.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-003.md
