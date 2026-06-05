@@ -15,7 +15,50 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
 PROJECT_SKILLS_RELATIVE_PATH = Path(".claude") / "skills"
-KNOWN_HARNESSES = ("claude", "codex")
+
+# Guarded import — direct script execution may not have repo root on sys.path.
+# Pattern mirrored from scripts/harness_identity.py:14-16 + scripts/harness_roles.py:47-49.
+try:
+    from scripts.harness_projection_reader import load_harness_projection
+except ModuleNotFoundError:
+    from harness_projection_reader import load_harness_projection  # type: ignore[no-redef]
+
+_FALLBACK_KNOWN_HARNESSES = ("claude", "codex")
+
+# Capability-floor required fields per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3
+# (forward-referenced; spec inserted by Child 4 of PROJECT-GTKB-OLLAMA-INTEGRATION).
+# Evaluated for registered/no-active-role harnesses by _evaluate_capability_floor().
+CAPABILITY_FLOOR_REQUIRED_FIELDS = (
+    "bridge_compliance_gate_respect",
+    "root_boundary_respect",
+    "author_metadata_env_var_setting",
+    "destructive_gate_delegation",
+    "advertised_tool_subset",
+    "tool_guard_adapter_fail_closed",
+)
+CANONICAL_TOOL_SUBSET = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
+
+
+def _load_known_harnesses_from_projection() -> tuple[str, ...]:
+    """Derive KNOWN_HARNESSES from registry projection per REQ-HARNESS-REGISTRY-001 FR5.
+
+    Uses scripts.harness_projection_reader (stdlib-only, fail-safe) to satisfy
+    the active reader-migration invariant; direct reads of harness-identities.json
+    are forbidden under the planted-detector fixture in
+    platform_tests/scripts/test_harness_registry_reader_migration.py.
+    """
+    projection = load_harness_projection(PROJECT_ROOT)
+    names = tuple(
+        sorted(
+            str(record.get("harness_name"))
+            for record in projection.get("harnesses", [])
+            if isinstance(record, dict) and record.get("harness_name")
+        )
+    )
+    return names if names else _FALLBACK_KNOWN_HARNESSES
+
+
+KNOWN_HARNESSES = _load_known_harnesses_from_projection()
 VALID_STATES = {
     "PASS",
     "DEGRADED",
@@ -393,6 +436,76 @@ def _overall_status(results: list[CapabilityResult], extras: list[ExtraResult], 
     return "PASS"
 
 
+def _harness_lifecycle_class(harness_name: str, project_root: Path = PROJECT_ROOT) -> str | None:
+    """Return 'active' | 'registered_no_role' | 'other' | None from the registry projection.
+
+    Used by check_harness_parity() to route registered/no-active-role harnesses (status=registered
+    AND role=[]) through the capability-floor evaluation path instead of per-capability checks.
+    """
+    projection = load_harness_projection(project_root)
+    for record in projection.get("harnesses", []):
+        if not isinstance(record, dict) or record.get("harness_name") != harness_name:
+            continue
+        status = record.get("status")
+        role = record.get("role") or []
+        if status == "registered" and role == []:
+            return "registered_no_role"
+        if status == "active":
+            return "active"
+        return "other"
+    return None
+
+
+def _evaluate_capability_floor(harness_name: str, registry_data: dict[str, Any]) -> list[CapabilityResult]:
+    """For registered/no-active-role harnesses, evaluate the top-level [harnesses.<name>] floor.
+
+    Returns a list of CapabilityResult rows (NOT ExtraResult) so the existing _overall_status()
+    MISSING-fails-required-parity semantic applies. Per F8 fix (Codex NO-GO -008): modeling
+    floor checks as CapabilityResult with parity_class='required' makes missing/incomplete
+    floor data mechanically force overall_status='FAIL' and CLI exit code 1.
+    """
+    floor = registry_data.get("harnesses", {}).get(harness_name, {}) if isinstance(registry_data, dict) else {}
+    results: list[CapabilityResult] = []
+    for field in CAPABILITY_FLOOR_REQUIRED_FIELDS:
+        present = isinstance(floor, dict) and field in floor
+        results.append(
+            CapabilityResult(
+                harness=harness_name,
+                capability_id=f"capability_floor.{field}",
+                capability_name=f"Capability floor: {field}",
+                parity_class="required",
+                required_for_roles=["registered_no_role"],
+                configured_status="declared" if present else "missing",
+                state="PASS" if present else "MISSING",
+                evidence=f"config/agent-control/harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
+                note=("" if present else f"Required capability-floor field '{field}' not declared"),
+            )
+        )
+    # Advertised-tool-subset extra-tools check: non-canonical entries also MISSING (FAIL).
+    if isinstance(floor, dict):
+        advertised = floor.get("advertised_tool_subset", [])
+        if advertised:
+            try:
+                extras = set(advertised) - CANONICAL_TOOL_SUBSET
+            except TypeError:
+                extras = {"<unhashable>"}
+            if extras:
+                results.append(
+                    CapabilityResult(
+                        harness=harness_name,
+                        capability_id="capability_floor.advertised_tool_subset.canonical",
+                        capability_name="Capability floor: advertised_tool_subset is subset of canonical 6-tuple",
+                        parity_class="required",
+                        required_for_roles=["registered_no_role"],
+                        configured_status="extra_tools",
+                        state="MISSING",
+                        evidence=f"[harnesses.{harness_name}].advertised_tool_subset",
+                        note=f"Non-canonical tools in advertised_tool_subset: {sorted(extras)}",
+                    )
+                )
+    return results
+
+
 def check_harness_parity(
     project_root: Path = PROJECT_ROOT,
     *,
@@ -423,12 +536,27 @@ def check_harness_parity(
     if registry and not capabilities:
         errors.append("registry has no capability entries")
 
+    # Split selected harnesses by lifecycle class so registered/no-active-role harnesses
+    # are evaluated against the top-level [harnesses.<name>] capability floor rather than
+    # the per-capability per-harness subtable matrix (which only applies to active harnesses
+    # with role assignments). Per Codex GO at gtkb-ollama-integration-phase-1-foundation-010.
+    active_harnesses: list[str] = []
+    registered_floor_harnesses: list[str] = []
+    for selected_harness in selected_harnesses:
+        lifecycle = _harness_lifecycle_class(selected_harness, project_root)
+        if lifecycle == "registered_no_role":
+            registered_floor_harnesses.append(selected_harness)
+        else:
+            active_harnesses.append(selected_harness)
+
     results: list[CapabilityResult] = []
     for capability in capabilities:
         if not _role_applies(capability, selected_role, include_all):
             continue
-        for selected_harness in selected_harnesses:
+        for selected_harness in active_harnesses:
             results.append(_status_for_surface(project_root, capability, selected_harness))
+    for floor_harness in registered_floor_harnesses:
+        results.extend(_evaluate_capability_floor(floor_harness, registry))
 
     extras = _extra_project_skills(project_root, capabilities) if not errors else []
     counts = _count_states(results, extras, errors)

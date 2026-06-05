@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -261,3 +262,182 @@ def test_repository_registry_covers_project_skills() -> None:
     assert not report.errors
     assert not report.extras
     assert report.overall_status == "PASS"
+
+
+# WI-4317 / WI-4318 capability-floor mode tests (Child 1 foundation per
+# bridge/gtkb-ollama-integration-phase-1-foundation-010.md GO).
+
+
+def _write_projection(project_root: Path, harnesses_list: list[dict]) -> None:
+    """Helper: write a harness-state/harness-registry.json projection fixture."""
+    hs_dir = project_root / "harness-state"
+    hs_dir.mkdir(parents=True, exist_ok=True)
+    doc = {
+        "description": "test fixture projection",
+        "generated_at": "2026-06-05T00:00:00Z",
+        "harnesses": harnesses_list,
+        "schema_version": 1,
+        "source_of_truth": "test fixture",
+    }
+    (hs_dir / "harness-registry.json").write_text(json.dumps(doc, indent=2), encoding="utf-8")
+
+
+def test_known_harnesses_data_driven_from_projection(monkeypatch, tmp_path: Path) -> None:
+    """KNOWN_HARNESSES loader sources from harness-state/harness-registry.json projection.
+
+    F4 fix (per Codex NO-GO at gtkb-ollama-integration-phase-1-foundation-004.md):
+    uses scripts.harness_projection_reader, not a direct harness-identities.json read.
+    """
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            },
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder"],
+                "version": 1,
+            },
+            {
+                "id": "C",
+                "harness_name": "antigravity",
+                "harness_type": "antigravity",
+                "status": "registered",
+                "role": ["prime-builder"],
+                "version": 1,
+            },
+            {
+                "id": "D",
+                "harness_name": "ollama",
+                "harness_type": "ollama",
+                "status": "registered",
+                "role": [],
+                "version": 1,
+            },
+        ],
+    )
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    result = module._load_known_harnesses_from_projection()
+    assert result == ("antigravity", "claude", "codex", "ollama")
+
+
+def test_known_harnesses_fallback_on_empty_projection(monkeypatch, tmp_path: Path) -> None:
+    """Empty harnesses array → falls back to baseline tuple."""
+    module = _load_module()
+    _write_projection(tmp_path, [])
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    result = module._load_known_harnesses_from_projection()
+    assert result == ("claude", "codex")
+
+
+def test_known_harnesses_fallback_on_missing_projection(monkeypatch, tmp_path: Path) -> None:
+    """Missing projection file → fail-safe loader returns empty doc → fallback to baseline."""
+    module = _load_module()
+    (tmp_path / "harness-state").mkdir()  # parent exists, file absent
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    result = module._load_known_harnesses_from_projection()
+    assert result == ("claude", "codex")
+
+
+def test_capability_floor_for_registered_no_role_harness(monkeypatch, tmp_path: Path) -> None:
+    """Registered/no-active-role harness with full floor → 6 PASS CapabilityResults."""
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "D",
+                "harness_name": "ollama",
+                "harness_type": "ollama",
+                "status": "registered",
+                "role": [],
+                "version": 1,
+            }
+        ],
+    )
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    assert module._harness_lifecycle_class("ollama", tmp_path) == "registered_no_role"
+    registry = {
+        "harnesses": {
+            "ollama": {
+                "bridge_compliance_gate_respect": True,
+                "root_boundary_respect": True,
+                "author_metadata_env_var_setting": True,
+                "destructive_gate_delegation": True,
+                "advertised_tool_subset": ["Read", "Write", "Edit", "Grep", "Glob", "Bash"],
+                "tool_guard_adapter_fail_closed": True,
+            }
+        }
+    }
+    results = module._evaluate_capability_floor("ollama", registry)
+    assert len(results) == 6
+    assert all(r.state == "PASS" for r in results)
+    assert all(r.parity_class == "required" for r in results)
+    assert {r.capability_id for r in results} == {
+        "capability_floor.bridge_compliance_gate_respect",
+        "capability_floor.root_boundary_respect",
+        "capability_floor.author_metadata_env_var_setting",
+        "capability_floor.destructive_gate_delegation",
+        "capability_floor.advertised_tool_subset",
+        "capability_floor.tool_guard_adapter_fail_closed",
+    }
+
+
+def test_capability_floor_missing_floor_returns_MISSING(tmp_path: Path) -> None:
+    """Registered harness without [harnesses.<name>] block → 6 MISSING CapabilityResults."""
+    module = _load_module()
+    registry = {"harnesses": {}}  # No ollama floor
+    results = module._evaluate_capability_floor("ollama", registry)
+    assert len(results) == 6
+    assert all(r.state == "MISSING" for r in results)
+    assert all(r.parity_class == "required" for r in results)
+    for r in results:
+        assert "not declared" in r.note
+
+
+def test_cli_exits_nonzero_when_capability_floor_missing(monkeypatch, tmp_path: Path) -> None:
+    """F8 spec-derivation: registered/no-role harness without floor → CLI exit code 1.
+
+    Per Codex NO-GO at gtkb-ollama-integration-phase-1-foundation-008.md, the capability-floor
+    enforcement must reach the CLI exit path. CapabilityResult(parity_class='required', state='MISSING')
+    triggers _overall_status() FAIL, which check_harness_parity.py:541 maps to exit code 1.
+    """
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "D",
+                "harness_name": "ollama",
+                "harness_type": "ollama",
+                "status": "registered",
+                "role": [],
+                "version": 1,
+            }
+        ],
+    )
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    # Write a capability registry WITHOUT [harnesses.ollama] block
+    reg_dir = tmp_path / "config" / "agent-control"
+    reg_dir.mkdir(parents=True, exist_ok=True)
+    (reg_dir / "harness-capability-registry.toml").write_text(
+        'schema_version = 1\nregistry_id = "test"\npurpose = "test"\nlast_updated = "2026-06-05"\n',
+        encoding="utf-8",
+    )
+    report = module.check_harness_parity(tmp_path, harness="ollama")
+    assert report.overall_status == "FAIL"
+    # 6 MISSING required CapabilityResults for the absent floor
+    missing_required = [
+        r for r in report.results if r.state == "MISSING" and r.parity_class == "required" and r.harness == "ollama"
+    ]
+    assert len(missing_required) == 6
