@@ -8,6 +8,8 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-003.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-001.md
 
 Document: gtkb-work-tree-hygiene-slice-a-detector

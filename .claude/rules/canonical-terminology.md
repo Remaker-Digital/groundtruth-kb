@@ -1645,6 +1645,64 @@ above intact):
 <!-- Add your project-specific terms below. Use the same structure:
 Term, definition, not-to-be-confused-with, source, implementation pointer. -->
 
+### ollama
+
+**Definition:** The fourth GT-KB coding harness (identity `D`), adopted in
+Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. Locally hosts open-weight models
+via the Ollama platform CLI/server at `http://localhost:11434`. Integrated
+through `scripts/ollama_harness.py` (a framework-free Python tool-calling shim)
+and `.ollama/routing.toml` (static routing). Phase-1 state: `registered` with an
+empty role-set (no active Prime Builder or Loyal Opposition role, no bridge
+dispatch routing).
+
+**Canonical alias:** ollama harness.
+
+**Not to be confused with:** the upstream Ollama platform CLI/server; the Ollama
+Python SDK; cross-harness dispatch (the trigger that spawns counterpart
+harnesses).
+
+**Source:** `ADR-OLLAMA-HARNESS-ADOPTION-001`; `DELIB-20260663`;
+`bridge/gtkb-ollama-integration-phase-1-001.md` and the VERIFIED child chain
+(`-foundation-012`, `-shim-012`, `-verification-012`).
+
+**Implementation pointer:** `scripts/ollama_harness.py`; `.ollama/routing.toml`;
+`harness-state/harness-identities.json` (id `D`); `config/agent-control/harness-capability-registry.toml`
+(`[harnesses.ollama]`); doctor `_check_ollama_harness`.
+
+### routing.toml
+
+**Definition:** The static TOML routing config at `.ollama/routing.toml`. Maps
+Ollama-served local models to dispatch contexts within the single Ollama
+harness's model pool. Schema per `DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001`
+(`schema_version`, at least one `[models.<key>]` table, a `[routing]` table with
+`default_model`).
+
+**Not to be confused with:** the Ollama server's own model cache; bridge
+dispatch state (`.gtkb-state/bridge-poller/`).
+
+**Source:** `DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001`; `DELIB-20260663` (AUQ#2,
+static routing).
+
+**Implementation pointer:** `.ollama/routing.toml`;
+`scripts/ollama_harness.py::load_routing_config`.
+
+### task-to-model routing
+
+**Definition:** The GT-KB pattern binding skill/task contexts to specific models
+within a single harness's model pool. In Phase 1 this is expressed via
+`.ollama/routing.toml` (`[routing].default_model`, with optional
+`[routing.skills]` overrides reserved for Phase 2+).
+
+**Not to be confused with:** cross-harness dispatch
+(`cross_harness_bridge_trigger.py`, which routes work between harnesses);
+destructive-action routing (the destructive-gate path).
+
+**Source:** `ADR-OLLAMA-HARNESS-ADOPTION-001`; `DELIB-20260663` (AUQ#2).
+
+**Implementation pointer:** `.ollama/routing.toml` (`[routing]`);
+`scripts/ollama_harness.py` model-resolution path.
+
+
 ---
 
 ## Doctor Contract

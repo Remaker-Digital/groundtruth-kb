@@ -101,6 +101,7 @@ This artifact describes the operating model the platform is designed to embody. 
 - Bridge-compliance-gate hook hard-blocking non-compliant proposals/VERIFIED reports.
 - MemBase-only standing backlog (canonical `work_items` table surfaced via `gt backlog list`); the transitional markdown view was retired at migration conclusion (per `GOV-STANDING-BACKLOG-001`, `DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`, and owner clarification, 2026-05-06).
 - CLI surfaces for `gt deliberations`, project initialization, doctor health checks.
+- Ollama harness (identity D, registered with an empty role-set / no active role) per `ADR-OLLAMA-HARNESS-ADOPTION-001`; Phase-1 surfaces: a framework-free Python shim (`scripts/ollama_harness.py`) exposing the canonical full-parity tool set dispatched through a fail-closed local guard adapter (`DCL-OLLAMA-TOOL-PARITY-GATE-001`); static `.ollama/routing.toml` routing with a single Phase-1 model (Qwen 2.5 Coder 14B); author-metadata env-var injection (`DCL-OLLAMA-AUTHOR-METADATA-INJECTION-001`); the harness-onboarding capability floor (`GOV-HARNESS-ONBOARDING-CONTRACT-001`); and doctor `_check_ollama_harness`. No active Prime Builder or Loyal Opposition role, no bridge dispatch routing, and no role promotion until a later approved bridge.
 
 **Intended-but-partial (as of 2026-04-30):**
 - Dashboard surfaces (per `GTKB-DASHBOARD-002` slice progress; some surfaces are integrated, others are parked).
@@ -109,6 +110,7 @@ This artifact describes the operating model the platform is designed to embody. 
 - Comprehensive release manifest + two-stage release validation (per `GOV-RELEASE-PLATFORM-INVENTORY-TWO-STAGE-001` and `GOV-RELEASE-MANIFEST-README-001` candidate specs awaiting follow-on impl bridges).
 - Recurring hygiene automation (Slice 5 of `GTKB-OPERATING-MODEL-ALIGNMENT-REMEDIATION` deferred per Slice 0 evidence).
 - Cross-harness enforcement of bridge protocol (per `DCL-CROSS-HARNESS-ENFORCEMENT-001` — Claude Code Write/Edit covered; other paths tracked as gap or blocked).
+- Ollama harness Phase 2+ (per `PROJECT-GTKB-OLLAMA-INTEGRATION`) — multi-model routing, `.ollama/skills/` adapter generation, dispatch-substrate wiring, and harness-D role promotion. Not implemented in Phase 1.
 
 When a future capability changes implementation state, this section is updated as part of the relevant implementation thread's post-impl report.
 
