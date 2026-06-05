@@ -45,6 +45,17 @@ except Exception:  # pragma: no cover - fail-open fallback for partial installs
     load_role_assignments = None  # type: ignore[assignment]
     resolved_harness_id = None  # type: ignore[assignment]
 
+try:
+    from scripts.session_role_resolution import resolve_interactive_session_role
+except Exception:  # pragma: no cover - fail-open fallback
+    resolve_interactive_session_role = None  # type: ignore[assignment]
+
+try:
+    from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id
+except Exception:  # pragma: no cover - fail-open fallback
+    resolve_session_id = None  # type: ignore[assignment]
+    MARKER_CONTINUITY_ORDER = None  # type: ignore[assignment]
+
 
 CONFIG_RELATIVE_PATH = Path("config") / "governance" / "lo-file-safety.toml"
 APPROVAL_ENV_VAR = "GTKB_LO_FILE_SAFETY_APPROVAL_PACKET"
@@ -219,12 +230,13 @@ def _normalize_rel_path(file_path: str, root: Path) -> tuple[str, Path] | None:
     return rel, resolved
 
 
-def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
-    """Return True only when durable role state resolves to LO without Prime.
-
-    Missing/malformed role state is fail-open by design so startup repairs and
-    fresh clones are not hard-blocked by an unavailable projection.
-    """
+def _is_durable_lo_enforced(
+    root: Path,
+    *,
+    harness_name: str | None,
+    harness_id: str | None,
+) -> bool:
+    """Return the original durable-role gate decision with fail-open behavior."""
     if (
         load_role_assignments is None
         or resolved_harness_id is None
@@ -232,17 +244,6 @@ def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
         or is_loyal_opposition is None
     ):
         return False
-    harness_id = (
-        os.environ.get("GTKB_ACTIVE_HARNESS_ID")
-        or os.environ.get("GTKB_HARNESS_ID")
-        or payload.get("harness_id")
-        or payload.get("active_harness_id")
-    )
-    harness_name = os.environ.get("GTKB_HARNESS_NAME") or payload.get("harness_name")
-    if not harness_name and os.environ.get("CLAUDE_PROJECT_DIR"):
-        harness_name = "claude"
-    if not harness_name and not harness_id:
-        harness_name = "codex"
     try:
         resolved_id = resolved_harness_id(
             root,
@@ -261,6 +262,63 @@ def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
     if is_prime_builder(record):
         return False
     return bool(is_loyal_opposition(record))
+
+
+def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
+    """Return True when the resolved session role is Loyal Opposition.
+
+    Resolution order (per DCL-SESSION-ROLE-RESOLUTION-001):
+    1. Session-role marker (if present, valid, and session-id verified) -> marker role.
+    2. Durable role assignment (harness-state/harness-registry.json) as fallback.
+
+    Missing/malformed role state is fail-open by design so startup repairs and
+    fresh clones are not hard-blocked by an unavailable projection.
+    """
+    # --- Resolve harness_name (same heuristic as the prior durable-only path) ---
+    harness_name = os.environ.get("GTKB_HARNESS_NAME") or payload.get("harness_name")
+    if not harness_name and os.environ.get("CLAUDE_PROJECT_DIR"):
+        harness_name = "claude"
+    harness_id = (
+        os.environ.get("GTKB_ACTIVE_HARNESS_ID")
+        or os.environ.get("GTKB_HARNESS_ID")
+        or payload.get("harness_id")
+        or payload.get("active_harness_id")
+    )
+    if not harness_name and not harness_id:
+        harness_name = "codex"
+
+    # --- Preferred path: session role resolver (marker > durable) ---
+    if resolve_interactive_session_role is not None and resolve_session_id is not None:
+        try:
+            payload_session_id = payload.get("session_id") or payload.get("active_session_id")
+            current_session_id = (
+                resolve_session_id(
+                    payload_session_id,
+                    order=MARKER_CONTINUITY_ORDER or (),
+                )
+                or None
+            )
+            resolved_role, _outcome = resolve_interactive_session_role(
+                root,
+                harness_name=str(harness_name) if harness_name else "claude",
+                current_session_id=current_session_id,
+            )
+            if str(_outcome).startswith("durable_"):
+                return _is_durable_lo_enforced(
+                    root,
+                    harness_name=str(harness_name) if harness_name else None,
+                    harness_id=str(harness_id) if harness_id else None,
+                )
+            return resolved_role == "loyal-opposition"
+        except Exception:  # noqa: BLE001 - fail-open on any resolver error
+            pass
+
+    # --- Fallback: durable-only resolution (original behavior) ---
+    return _is_durable_lo_enforced(
+        root,
+        harness_name=str(harness_name) if harness_name else None,
+        harness_id=str(harness_id) if harness_id else None,
+    )
 
 
 def _matches_any(patterns: list[str], rel_path: str) -> bool:
