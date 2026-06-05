@@ -525,6 +525,57 @@ def test_startup_relay_cache_written_with_consistent_metadata(tmp_path: Path, mo
     assert meta["harness_name"] == "claude"
 
 
+def test_normal_startup_relay_cache_uses_startup_disclosure_field(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """New-shape startup-service payloads cache startupDisclosure, not compact context."""
+    module = _load_claude_hook_isolated("relay_cache_startup_disclosure")
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "B")
+    monkeypatch.setattr(module, "_now_iso", lambda: "2026-06-05T04:00:00Z")
+    monkeypatch.setattr(module, "_render_role_startup_report", lambda role_profile: None)
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
+
+    context = "# GroundTruth-KB Programmatic Startup Payload\n\ncompact routing only"
+    disclosure = (
+        "# GroundTruth-KB Fresh Session Startup\n\n"
+        "## Startup Disclosure\n\n"
+        "- Role being assumed: Prime Builder\n\n"
+        "full owner-visible disclosure"
+    )
+    service_payload = {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": context,
+            "startupDisclosure": disclosure,
+            "startupFreshness": {
+                "contract_version": module.STARTUP_FRESHNESS_CONTRACT_VERSION,
+                "request_started_at": "2026-06-05T04:00:00Z",
+                "report_origin": "in_memory_model_render",
+                "generated_at": "2026-06-05T04:00:00Z",
+                "payload_emitted_at": "2026-06-05T04:00:00Z",
+                "validation": {"startup_payload_fresh": True, "status": "fresh"},
+            },
+        }
+    }
+    process = module.subprocess.CompletedProcess(
+        args=[],
+        returncode=0,
+        stdout=json.dumps(service_payload),
+        stderr="",
+    )
+    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: process)
+
+    assert module.main() == 0
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["hookSpecificOutput"]["additionalContext"] == context
+    assert "full owner-visible disclosure" not in emitted["hookSpecificOutput"]["additionalContext"]
+    assert (tmp_path / "last-user-visible-startup.md").read_text(encoding="utf-8") == disclosure
+
+
 def test_startup_relay_cache_not_written_by_bridge_dispatch_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

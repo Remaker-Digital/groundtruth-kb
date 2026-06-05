@@ -154,6 +154,8 @@ DASHBOARD_SCOPE_NOTE = "GroundTruth-KB project dashboard."
 DEFAULT_RELEASE_BRANCH = "main"
 STARTUP_SERVICE_CONTRACT_VERSION = "gtkb-startup-service-v2"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
+STARTUP_PAYLOAD_PROFILE_CONTRACT_VERSION = "gtkb-startup-payload-profile-v1"
+STARTUP_PAYLOAD_PROFILE_DIR = Path(".gtkb-state") / "startup-payload-profiles"
 OPERATING_ROLE_RELATIVE_PATH = ROLE_ASSIGNMENTS_RELATIVE_PATH
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
@@ -318,6 +320,9 @@ def _role_metadata(
     role_record_path: Path | None = None,
 ) -> dict[str, str]:
     metadata = dict(ROLE_PROFILES[role_profile])
+    resolved_name = _resolved_harness_name(harness_name)
+    if resolved_name:
+        metadata["harness_name"] = resolved_name
     mapping_source = _display_role_mapping_source(
         project_root,
         harness_name=harness_name,
@@ -6471,9 +6476,19 @@ def _startup_freshness_metadata(
 
 
 def _startup_service_context(result: dict[str, Any]) -> str:
-    report_text = str(result["report_text"])
     model = result["model"]
+    project_root = Path(result["project_root"])
+    profile_path = _startup_payload_profile_path(result)
+    profile_rel = _display_path(project_root, profile_path)
+    report_path = _display_path(project_root, Path(result["report_path"]))
+    wrapup_path = _display_path(project_root, Path(result["wrapup_path"]))
+    data_path = _display_path(project_root, Path(result["data_path"]))
+    dashboard_path = _display_path(project_root, Path(result["dashboard_path"]))
+    role = model.get("role") or {}
+    tokens = (model.get("metrics") or {}).get("tokens") or {}
     focus_option_count = len(_session_focus_options(model))
+    relay_cache_lines = _startup_relay_cache_lines(project_root, _harness_name_for_payload(result))
+    top_priority_lines = _compact_top_priority_lines(model)
     startup_instruction_context = [
         "",
         "## Session Startup Instructions",
@@ -6527,12 +6542,14 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             "# GroundTruth-KB Programmatic Startup Payload",
             "",
             f"- Contract: {STARTUP_SERVICE_CONTRACT_VERSION}",
+            f"- Payload profile contract: {STARTUP_PAYLOAD_PROFILE_CONTRACT_VERSION}",
             "- Source: `scripts/session_self_initialization.py`",
             f"- Generated: {model['generated_at']}",
-            "- User-visible startup content below was generated programmatically by the startup service and cached for lazy injection.",
+            "- Context mode: compact SessionStart routing summary.",
+            "- User-visible startup disclosure is generated in `hookSpecificOutput.startupDisclosure`; it is intentionally not embedded in `additionalContext`.",
             startup_relay_instruction,
-            "- Do not summarize, paraphrase, shorten, reorder, or omit any startup section or any Session Startup focus-selector detail.",
-            "- Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label exactly as written.",
+            "- Do not summarize, paraphrase, shorten, reorder, or omit cached startup-disclosure content when an init-keyword path relays it.",
+            "- Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label exactly as written in `startupDisclosure`.",
             (
                 f"- Prime Builder focus-menu preservation rule: when the startup message contains a session-focus menu, "
                 f"the A/B/C recommendations and D full focus list must remain present; the full focus list must include all {focus_option_count} labels in order."
@@ -6541,14 +6558,135 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             "- Only an init-keyword match relays startup disclosure; a non-matching first owner message is ordinary task input and may be mapped normally.",
             "- When the init-keyword path renders cached startup content, do not replace the startup message with a shorter final answer after rendering it.",
             "- The AI harness is not responsible for composing role, mode, bridge, process, or focus content during startup.",
+            "",
+            "## Compact Startup Routing Facts",
+            "",
+            f"- Role being assumed: {role.get('assumed_role', 'unidentified')}",
+            f"- Role mapping source: {role.get('role_mapping_source', 'unidentified')}; legacy compatibility surface: harness-state/role-assignments.json.",
+            f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
+            f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
+            f"- Work subject: {model.get('current_work_subject') or 'gtkb_infrastructure/default'}",
+            f"- Dashboard URL: {result['dashboard_url']}",
+            f"- Dashboard data: `{data_path}`",
+            f"- Dashboard JSON: `{dashboard_path}`",
+            f"- Startup report path: `{report_path}`",
+            f"- Wrap-up report path: `{wrapup_path}`",
+            f"- Payload profile path: `{profile_rel}`",
+            f"- Token measurement status: {tokens.get('measurement_status', 'unknown')}; reducing startup token consumption now uses compact `additionalContext` plus demand-loaded expansion paths.",
+            "",
+            "### Top Priority Actions",
+            "",
+            *top_priority_lines,
+            "",
+            "### Startup Disclosure Cache Paths",
+            "",
+            *relay_cache_lines,
             *startup_instruction_context,
             *loyal_opposition_context,
-            "",
-            "## User-Visible Startup Message",
-            "",
-            report_text,
         ]
     )
+
+
+def _startup_disclosure(result: dict[str, Any]) -> str:
+    return str(result["report_text"])
+
+
+def _display_path(project_root: Path, path: Path) -> str:
+    try:
+        return path.relative_to(project_root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _harness_name_for_payload(result: dict[str, Any]) -> str:
+    role = (result.get("model") or {}).get("role") or {}
+    harness_name = _normalize_harness_name(str(role.get("harness_name") or ""))
+    if harness_name:
+        return harness_name
+    harness_id = str(role.get("harness_id") or "").strip()
+    for name, expected_id in DEFAULT_HARNESS_IDS.items():
+        if harness_id == expected_id:
+            return name
+    return _resolved_harness_name(None) or "claude"
+
+
+def _startup_payload_profile_path(result: dict[str, Any]) -> Path:
+    project_root = Path(result["project_root"])
+    harness = re.sub(r"[^a-z0-9_-]+", "-", _harness_name_for_payload(result).lower()).strip("-") or "unknown"
+    return project_root / STARTUP_PAYLOAD_PROFILE_DIR / f"last-{harness}.json"
+
+
+def _startup_relay_cache_lines(project_root: Path, harness_name: str) -> list[str]:
+    if harness_name == "codex":
+        out_dir = project_root / ".codex" / "gtkb-hooks"
+    elif harness_name == "claude":
+        out_dir = project_root / ".claude" / "hooks"
+    else:
+        out_dir = project_root / "harness-state" / harness_name
+    return [
+        f"- Default cache: `{_display_path(project_root, out_dir / 'last-user-visible-startup.md')}`",
+        f"- Prime Builder cache: `{_display_path(project_root, out_dir / 'last-user-visible-startup-pb.md')}`",
+        f"- Loyal Opposition cache: `{_display_path(project_root, out_dir / 'last-user-visible-startup-lo.md')}`",
+    ]
+
+
+def _compact_top_priority_lines(model: dict[str, Any]) -> list[str]:
+    actions = model.get("top_priority_actions") or []
+    if not actions:
+        return ["- None surfaced by the current startup model."]
+    lines: list[str] = []
+    for action in actions[:3]:
+        identifier = str(action.get("id") or "unknown")
+        title = str(action.get("title") or "untitled")
+        priority = str(action.get("priority") or "none")
+        lines.append(f"- {identifier}: {title} (priority: {priority})")
+    return lines
+
+
+def _text_payload_metrics(text: str) -> dict[str, Any]:
+    encoded = text.encode("utf-8")
+    return {
+        "utf8_bytes": len(encoded),
+        "line_count": 0 if text == "" else text.count("\n") + 1,
+        "character_count": len(text),
+        "rough_token_estimate": 0 if text == "" else (len(text) + 3) // 4,
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+
+
+def _startup_payload_profile(
+    result: dict[str, Any],
+    *,
+    payload_emitted_at: str,
+    additional_context: str,
+    startup_disclosure: str,
+) -> dict[str, Any]:
+    project_root = Path(result["project_root"])
+    profile_path = _startup_payload_profile_path(result)
+    model = result["model"]
+    role = model.get("role") or {}
+    return {
+        "contract_version": STARTUP_PAYLOAD_PROFILE_CONTRACT_VERSION,
+        "generated_at": model.get("generated_at"),
+        "payload_emitted_at": payload_emitted_at,
+        "harness_name": _harness_name_for_payload(result),
+        "harness_id": role.get("harness_id"),
+        "role_profile": model.get("role_profile"),
+        "profile_path": _display_path(project_root, profile_path),
+        "sections": {
+            "additionalContext": _text_payload_metrics(additional_context),
+            "startupDisclosure": _text_payload_metrics(startup_disclosure),
+        },
+    }
+
+
+def _write_startup_payload_profile(result: dict[str, Any], profile: dict[str, Any]) -> None:
+    path = _startup_payload_profile_path(result)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write_text(path, json.dumps(profile, ensure_ascii=True, indent=2, sort_keys=True) + "\n")
+    except OSError:
+        pass
 
 
 def _emit_startup_service_payload(
@@ -6571,13 +6709,26 @@ def _emit_startup_service_payload(
     _write_session_start_json(
         project_root=Path(result["project_root"]),
         request_started_at=request_started_at,
-        harness=_resolved_harness_name(None) or "claude",
+        harness=_harness_name_for_payload(result),
     )
+    additional_context = _startup_service_context(result)
+    startup_disclosure = _startup_disclosure(result)
+    payload_profile = _startup_payload_profile(
+        result,
+        payload_emitted_at=payload_emitted_at,
+        additional_context=additional_context,
+        startup_disclosure=startup_disclosure,
+    )
+    # Fail-soft profile write (writer swallows OSError); on-disk profile is the
+    # generated runtime evidence, the in-payload profile is the authoritative copy.
+    _write_startup_payload_profile(result, payload_profile)
     payload = {
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
-            "additionalContext": _startup_service_context(result),
+            "additionalContext": additional_context,
+            "startupDisclosure": startup_disclosure,
             "startupFreshness": startup_freshness,
+            "startupPayloadProfile": payload_profile,
         }
     }
     payload_text = json.dumps(payload, ensure_ascii=False)

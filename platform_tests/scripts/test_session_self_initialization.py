@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -50,6 +51,24 @@ def _load_module(*, live_dashboard_probes: bool = False):
             },
         ]
     return module
+
+
+def _startup_service_result(module, model: dict, report_text: str) -> dict:
+    dashboard_dir = REPO_ROOT / "docs" / "gtkb-dashboard"
+    return {
+        "project_root": REPO_ROOT,
+        "model": model,
+        "history": [],
+        "dashboard_path": REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json",
+        "dashboard_url": module.GRAFANA_DASHBOARD_URL,
+        "pdf_path": dashboard_dir / module.PDF_EXPORT_FILENAME,
+        "pdf_export": {"available": False, "path": str(dashboard_dir / module.PDF_EXPORT_FILENAME), "error": ""},
+        "data_path": dashboard_dir / "dashboard-data.json",
+        "report_path": dashboard_dir / "session-startup-report.md",
+        "report_text": report_text,
+        "wrapup_path": dashboard_dir / "session-wrapup-report.md",
+        "wrapup_text": "",
+    }
 
 
 def _make_synthetic_doctor_check(status: str = "pass", message: str = "synthetic"):
@@ -730,22 +749,24 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "do not interpret it as a focus choice, task prompt, approval, answer" not in prime_report
     assert "wait for Mike's next message before choosing or mapping session work" not in prime_report
 
-    prime_context = module._startup_service_context({"report_text": prime_report, "model": prime_model})
+    prime_result = _startup_service_result(module, prime_model, prime_report)
+    prime_context = module._startup_service_context(prime_result)
     assert "## Session Startup Instructions" in prime_context
     assert "### Fresh-Session Input Semantics" in prime_context
     assert "### Codex Operating Resource Map" in prime_context
+    assert "## Compact Startup Routing Facts" in prime_context
+    assert "hookSpecificOutput.startupDisclosure" in prime_context
     assert "role records may be list-valued role sets" in prime_context
     assert "read `bridge/INDEX.md` directly before bridge queue claims" in prime_context
     assert "routes the first owner message through the init-keyword matcher" in prime_context
     assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in prime_context
     assert "on no-match, process the prompt as normal task content" in prime_context
     assert "wait for Mike's next message before choosing or mapping session work" in prime_context
-    assert prime_context.index("## Session Startup Instructions") < prime_context.index(
-        "## User-Visible Startup Message"
-    )
-    prime_user_visible = prime_context.split("## User-Visible Startup Message", 1)[1]
-    assert "### Fresh-Session Input Semantics" not in prime_user_visible
-    assert "The first owner message in a fresh session is a session-start stimulus only" not in prime_user_visible
+    assert "## User-Visible Startup Message" not in prime_context
+    prime_disclosure = module._startup_disclosure(prime_result)
+    assert prime_disclosure == prime_report
+    assert "### Fresh-Session Input Semantics" not in prime_disclosure
+    assert "The first owner message in a fresh session is a session-start stimulus only" not in prime_disclosure
 
     loyal_model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
     loyal_report = module.render_report(
@@ -759,18 +780,19 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" not in loyal_report
     assert "wait for Mike's next message before choosing or mapping session work" not in loyal_report
 
-    loyal_context = module._startup_service_context({"report_text": loyal_report, "model": loyal_model})
+    loyal_result = _startup_service_result(module, loyal_model, loyal_report)
+    loyal_context = module._startup_service_context(loyal_result)
     assert "## Session Startup Instructions" in loyal_context
     assert "### Fresh-Session Input Semantics" in loyal_context
     assert "routes the first owner message through the init-keyword matcher" in loyal_context
     assert "DCL-SESSION-START-INIT-KEYWORD-MATCHING-001" in loyal_context
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" in loyal_context
-    loyal_user_visible = loyal_context.split("## User-Visible Startup Message", 1)[1]
-    assert "### Fresh-Session Input Semantics" not in loyal_user_visible
-    assert "The first owner message in a fresh session is a session-start stimulus only" not in loyal_user_visible
-    assert (
-        "execute the harness-only Loyal Opposition startup action before ordinary task work" not in loyal_user_visible
-    )
+    assert "## User-Visible Startup Message" not in loyal_context
+    loyal_disclosure = module._startup_disclosure(loyal_result)
+    assert loyal_disclosure == loyal_report
+    assert "### Fresh-Session Input Semantics" not in loyal_disclosure
+    assert "The first owner message in a fresh session is a session-start stimulus only" not in loyal_disclosure
+    assert "execute the harness-only Loyal Opposition startup action before ordinary task work" not in loyal_disclosure
 
 
 def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(tmp_path, monkeypatch) -> None:
@@ -794,18 +816,17 @@ def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(tmp
     assert "non-authoritative by construction" not in report
     assert "no current session overlay" not in report
 
-    context = module._startup_service_context({"report_text": report, "model": model})
+    context = module._startup_service_context(_startup_service_result(module, model, report))
     assert "## Session Startup Instructions" in context
     assert "### Session Overlay Status (Non-Authoritative)" in context
     assert "non-authoritative by construction" in context
     assert context.index("### Session Overlay Status (Non-Authoritative)") < context.index(
         "### Fresh-Session Input Semantics"
     )
-    assert context.index("## Session Startup Instructions") < context.index("## User-Visible Startup Message")
-    user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
-    assert "### Session Overlay Status (Non-Authoritative)" not in user_visible_context
-    assert "non-authoritative by construction" not in user_visible_context
-    assert "no current session overlay" not in user_visible_context
+    assert "## User-Visible Startup Message" not in context
+    assert "### Session Overlay Status (Non-Authoritative)" not in report
+    assert "non-authoritative by construction" not in report
+    assert "no current session overlay" not in report
 
 
 def test_workflow_run_can_prefer_release_branch_over_newer_pr_run() -> None:
@@ -887,7 +908,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         "report the live scan result and ask Mike whether to begin processing reviews and verifications" not in report
     )
 
-    context = module._startup_service_context({"report_text": report, "model": model})
+    context = module._startup_service_context(_startup_service_result(module, model, report))
     assert "## Harness-Only Loyal Opposition Startup Action" in context
     assert "Do not relay this section to Mike as user-visible startup content." in context
     assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." in context
@@ -896,21 +917,15 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         in context
     )
     assert "Project-state startup rule: include a compact current-state report" in context
-    assert context.index("## Harness-Only Loyal Opposition Startup Action") < context.index(
-        "## User-Visible Startup Message"
-    )
+    assert "## User-Visible Startup Message" not in context
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in context
     assert "DISPATCHABLE WORK" in context
     assert "NON-DISPATCHABLE WORK" in context
     assert "Both axes are required" in context
     assert "Do NOT create new bridge automations" in context
-    user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
-    assert "## Loyal Opposition Startup Task" not in user_visible_context
-    assert "### Project State Rollup" in user_visible_context
-    assert (
-        "Default session purpose: process Prime Builder reviews and verifications on the file bridge."
-        not in user_visible_context
-    )
+    assert "## Loyal Opposition Startup Task" not in report
+    assert "### Project State Rollup" in report
+    assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." not in report
 
 
 def test_project_state_rollup_groups_active_membase_projects() -> None:
@@ -1395,16 +1410,18 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     payload = json.loads(capsys.readouterr().out)
     hook_output = payload["hookSpecificOutput"]
     context = hook_output["additionalContext"]
+    disclosure = hook_output["startupDisclosure"]
     freshness = hook_output["startupFreshness"]
+    profile = hook_output["startupPayloadProfile"]
     assert hook_output["hookEventName"] == "SessionStart"
     assert "Programmatic Startup Payload" in context
     assert "gtkb-startup-service-v2" in context
-    assert (
-        "User-visible startup content below was generated programmatically by the startup service and cached for lazy injection."
-        in context
-    )
+    assert "gtkb-startup-payload-profile-v1" in context
+    assert "## Compact Startup Routing Facts" in context
+    assert "### Startup Disclosure Cache Paths" in context
+    assert "User-visible startup disclosure is generated in `hookSpecificOutput.startupDisclosure`" in context
     assert "relay the generated startup message verbatim as the first durable assistant answer" not in context
-    assert "Do not summarize, paraphrase, shorten, reorder, or omit any startup section" in context
+    assert "Do not summarize, paraphrase, shorten, reorder, or omit cached startup-disclosure content" in context
     assert (
         "Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label"
         in context
@@ -1420,15 +1437,30 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "When the init-keyword path renders cached startup content" in context
     assert "do not replace the startup message with a shorter final answer" in context
     assert "The AI harness is not responsible for composing role, mode, bridge, process, or focus content" in context
-    assert "## User-Visible Startup Message" in context
-    assert "## Startup Disclosure" in context
-    assert "## Session Startup" in context
+    assert "## User-Visible Startup Message" not in context
+    # WI-4361: anchor the h2-section check so it does not match the h3 subsection
+    # "### Startup Disclosure Cache Paths" which is correctly present in compact
+    # context (line 1426). The full-disclosure h2 header must not appear here.
+    assert "\n## Startup Disclosure\n" not in context
+    assert "\n## Session Startup\n" not in context
+    assert "\n## Startup Disclosure\n" in disclosure
+    assert "\n## Session Startup\n" in disclosure
+    assert "Programmatic Startup Payload" not in disclosure
     # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: focus picker is dropped from the open
     # disclosure; the full focus list is no longer emitted in the report.
-    assert "D. **Full Focus List**" not in context
+    assert "D. **Full Focus List**" not in disclosure
     assert "Startup First-Response Directive" not in context
     assert "Mandatory Direct Live Bridge Index Read" not in context
     assert "SHA-256:" not in context
+    assert profile["contract_version"] == "gtkb-startup-payload-profile-v1"
+    assert profile["sections"]["additionalContext"]["utf8_bytes"] == len(context.encode("utf-8"))
+    assert profile["sections"]["additionalContext"]["sha256"] == hashlib.sha256(context.encode("utf-8")).hexdigest()
+    assert profile["sections"]["startupDisclosure"]["utf8_bytes"] == len(disclosure.encode("utf-8"))
+    assert profile["sections"]["startupDisclosure"]["sha256"] == hashlib.sha256(disclosure.encode("utf-8")).hexdigest()
+    profile_path = REPO_ROOT / profile["profile_path"]
+    assert profile_path.is_file()
+    written_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    assert written_profile == profile
     assert freshness["contract_version"] == "gtkb-startup-freshness-v1"
     assert freshness["request_started_at"] == "2026-04-23T13:20:00Z"
     assert freshness["report_origin"] == "in_memory_model_render"

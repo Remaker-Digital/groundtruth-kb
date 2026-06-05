@@ -641,9 +641,21 @@ def main() -> int:
         stderr_path.write_text(process.stderr, encoding="utf-8")
         if process.returncode == 0 and _valid_session_start_payload(process.stdout, request_started_at):
             payload = json.loads(process.stdout)
-            startup_context = payload["hookSpecificOutput"]["additionalContext"]
-            _write_startup_relay_cache(startup_context)
-            _write_role_scoped_startup_relay_caches(startup_context)
+            hook_output = payload["hookSpecificOutput"]
+            startup_context = hook_output["additionalContext"]
+            # WI-4361: prefer hookSpecificOutput.startupDisclosure for relay-cache
+            # writing when the startup service emits a new-shape payload (compact
+            # additionalContext + complete startupDisclosure). Legacy payloads
+            # without startupDisclosure fall back to the marker-split path inside
+            # _write_startup_relay_cache, which finds the embedded
+            # "## User-Visible Startup Message" body in additionalContext.
+            startup_disclosure = hook_output.get("startupDisclosure")
+            if isinstance(startup_disclosure, str) and startup_disclosure.strip():
+                relay_body = startup_disclosure
+            else:
+                relay_body = startup_context
+            _write_startup_relay_cache(relay_body)
+            _write_role_scoped_startup_relay_caches(relay_body)
             print(_dump_payload(_session_start_payload(startup_context)))
             return 0
         reason = f"startup service returned exit {process.returncode}"
