@@ -5,7 +5,7 @@
     "script_hash": "sha256:e1edf438c92dec07b069904bf62c78ff23ba067734c0b3686906745409cf2ce8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-05T05:45:10Z",
+  "generated_at": "2026-06-05T07:57:06Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -127,7 +127,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 28,
+      "count": 29,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -153,6 +153,7 @@
         ".claude/hooks/scanner-safe-writer.py",
         ".claude/hooks/scheduler.py",
         ".claude/hooks/session_start_dispatch.py",
+        ".claude/hooks/sot-read-discipline.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/hooks/spec-event-surfacer.py",
         ".claude/hooks/turn-marker.py",
@@ -161,7 +162,7 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 21,
+      "count": 22,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
@@ -172,6 +173,7 @@
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
+        ".codex/gtkb-hooks/sot-read-discipline-bash-adapter.py",
         ".codex/gtkb-hooks/wi-id-collision-gate-bash-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-audit.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
@@ -231,7 +233,7 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 36,
+      "count": 37,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
@@ -267,6 +269,7 @@
         ".claude/rules/report-depth-prime-builder-context.md",
         ".claude/rules/report-depth.md",
         ".claude/rules/session-start-prompt.md",
+        ".claude/rules/sot-read-discipline.md",
         ".claude/rules/template-code-review.md",
         ".claude/rules/template-decision-memo.md"
       ]
@@ -686,7 +689,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -700,7 +703,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {

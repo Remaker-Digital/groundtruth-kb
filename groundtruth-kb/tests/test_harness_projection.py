@@ -270,3 +270,79 @@ def test_read_roles_non_object_top_level_raises_harness_state_error(tmp_path: Pa
     registry_path.write_text("[1, 2, 3]", encoding="utf-8")
     with pytest.raises(HarnessStateError, match="expected a JSON object"):
         read_roles(project_root=tmp_path)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# WI-4327 NO-GO -008 F1 regression: gt harness reader subcommands must NOT
+# be shadowed by the existing registry-lifecycle harness group.
+#
+# The prior implementation registered a second @main.group("harness") early
+# in cli.py which was silently shadowed by the canonical registry group
+# later in the same module. Click only keeps the last registration, so the
+# 3 reader subcommands (roles, identity, capabilities) were unreachable
+# through the live CLI. The fix moves the reader subcommands under the
+# existing harness_group at the registry-group registration site so both
+# surfaces coexist on a single click group.
+#
+# These CliRunner-based tests assert the live command table directly.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_gt_harness_roles_is_reachable_and_emits_json() -> None:
+    """``gt harness roles`` exits 0 and emits JSON parseable as a mapping."""
+    from click.testing import CliRunner  # noqa: PLC0415
+
+    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
+
+    result = CliRunner().invoke(gt_main, ["harness", "roles"])
+    assert result.exit_code == 0, f"stderr: {result.output}"
+    data = json.loads(result.output)
+    assert isinstance(data, dict)
+    assert "harnesses" in data
+
+
+def test_gt_harness_identity_is_reachable_and_emits_json() -> None:
+    """``gt harness identity`` exits 0 and emits JSON parseable as a mapping."""
+    from click.testing import CliRunner  # noqa: PLC0415
+
+    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
+
+    result = CliRunner().invoke(gt_main, ["harness", "identity"])
+    assert result.exit_code == 0, f"stderr: {result.output}"
+    data = json.loads(result.output)
+    assert isinstance(data, dict)
+
+
+def test_gt_harness_capabilities_is_reachable_and_emits_json() -> None:
+    """``gt harness capabilities`` exits 0 and emits JSON parseable as a mapping."""
+    from click.testing import CliRunner  # noqa: PLC0415
+
+    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
+
+    result = CliRunner().invoke(gt_main, ["harness", "capabilities"])
+    assert result.exit_code == 0, f"stderr: {result.output}"
+    data = json.loads(result.output)
+    assert isinstance(data, dict)
+
+
+def test_gt_harness_help_lists_reader_and_registry_commands() -> None:
+    """``gt harness --help`` lists BOTH reader and registry commands.
+
+    Anti-regression assertion against Codex NO-GO -008 F1: the Phase-4 reader
+    surface MUST coexist with the pre-existing registry surface on a single
+    ``harness`` click group rather than being shadowed by a duplicate group
+    registration.
+    """
+    from click.testing import CliRunner  # noqa: PLC0415
+
+    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
+
+    result = CliRunner().invoke(gt_main, ["harness", "--help"])
+    assert result.exit_code == 0
+    # Phase-4 canonical reader commands MUST be listed:
+    assert "roles" in result.output
+    assert "identity" in result.output
+    assert "capabilities" in result.output
+    # Pre-existing registry commands MUST still be listed (not shadowed):
+    assert "list" in result.output
+    assert "register" in result.output

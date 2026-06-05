@@ -223,75 +223,6 @@ def authority_status_cmd(ctx: click.Context, json_output: bool) -> None:
         raise SystemExit(1)
 
 
-@main.group("harness")
-def harness_group() -> None:
-    """Read harness-state Sources of Truth via the canonical entrypoints.
-
-    Per WI-4327 / WI-4328 the 3 canonical reader entrypoints in
-    ``groundtruth_kb.harness_projection`` (``read_roles``,
-    ``read_identity``, ``read_capabilities``) are exposed here as CLI
-    subcommands so adopter scripts and owner inspection can use the
-    governed reader contract instead of opening the SoT files directly.
-    """
-
-
-@harness_group.command("roles")
-@click.option("--json", "json_output", is_flag=True, default=True, help="Emit machine-readable JSON (default).")
-@click.pass_context
-def harness_roles_cmd(ctx: click.Context, json_output: bool) -> None:
-    """Print the harness-state ``harness-registry.json`` content."""
-    from groundtruth_kb.harness_projection import HarnessStateError, read_roles  # noqa: PLC0415
-
-    config = _resolve_config(ctx)
-    try:
-        data = read_roles(project_root=Path(config.project_root))
-    except HarnessStateError as exc:
-        click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
-        raise SystemExit(1) from exc
-    if json_output:
-        click.echo(json.dumps(data, indent=2, sort_keys=True))
-    else:
-        click.echo(json.dumps(data, indent=2, sort_keys=True))
-
-
-@harness_group.command("identity")
-@click.option("--json", "json_output", is_flag=True, default=True, help="Emit machine-readable JSON (default).")
-@click.pass_context
-def harness_identity_cmd(ctx: click.Context, json_output: bool) -> None:
-    """Print the harness-state ``harness-identities.json`` content."""
-    from groundtruth_kb.harness_projection import HarnessStateError, read_identity  # noqa: PLC0415
-
-    config = _resolve_config(ctx)
-    try:
-        data = read_identity(project_root=Path(config.project_root))
-    except HarnessStateError as exc:
-        click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
-        raise SystemExit(1) from exc
-    if json_output:
-        click.echo(json.dumps(data, indent=2, sort_keys=True))
-    else:
-        click.echo(json.dumps(data, indent=2, sort_keys=True))
-
-
-@harness_group.command("capabilities")
-@click.option("--json", "json_output", is_flag=True, default=True, help="Emit machine-readable JSON (default).")
-@click.pass_context
-def harness_capabilities_cmd(ctx: click.Context, json_output: bool) -> None:
-    """Print the harness-state ``harness-capability-registry.toml`` content as JSON."""
-    from groundtruth_kb.harness_projection import HarnessStateError, read_capabilities  # noqa: PLC0415
-
-    config = _resolve_config(ctx)
-    try:
-        data = read_capabilities(project_root=Path(config.project_root))
-    except HarnessStateError as exc:
-        click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
-        raise SystemExit(1) from exc
-    if json_output:
-        click.echo(json.dumps(data, indent=2, sort_keys=True))
-    else:
-        click.echo(json.dumps(data, indent=2, sort_keys=True))
-
-
 @click.group("reconcile")
 def bridge_reconcile_group() -> None:
     """Bridge/backlog reconciliation audit commands."""
@@ -5547,7 +5478,58 @@ _HARNESS_CLI_ACTOR = "gt-harness-cli"
 
 @main.group("harness")
 def harness_group() -> None:
-    """Harness registry: registration, lifecycle, role, and precedence (FR3)."""
+    """Harness registry: registration, lifecycle, role, and precedence (FR3).
+
+    WI-4327 Phase-1 Foundation also exposes the 3 canonical reader subcommands
+    `roles`, `identity`, and `capabilities` under this same group. They
+    delegate to `groundtruth_kb.harness_projection.{read_roles, read_identity,
+    read_capabilities}` per DCL-HARNESS-STATE-SOT-READER-CONTRACT-001.
+    """
+
+
+@harness_group.command("roles")
+@click.pass_context
+def harness_roles_cmd(ctx: click.Context) -> None:
+    """Print the harness-state ``harness-registry.json`` content (WI-4327)."""
+    from groundtruth_kb.harness_projection import HarnessStateError, read_roles  # noqa: PLC0415
+
+    config = _resolve_config(ctx)
+    try:
+        data = read_roles(project_root=Path(config.project_root))
+    except HarnessStateError as exc:
+        click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
+        raise SystemExit(1) from exc
+    click.echo(json.dumps(data, indent=2, sort_keys=True))
+
+
+@harness_group.command("identity")
+@click.pass_context
+def harness_identity_cmd(ctx: click.Context) -> None:
+    """Print the harness-state ``harness-identities.json`` content (WI-4327)."""
+    from groundtruth_kb.harness_projection import HarnessStateError, read_identity  # noqa: PLC0415
+
+    config = _resolve_config(ctx)
+    try:
+        data = read_identity(project_root=Path(config.project_root))
+    except HarnessStateError as exc:
+        click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
+        raise SystemExit(1) from exc
+    click.echo(json.dumps(data, indent=2, sort_keys=True))
+
+
+@harness_group.command("capabilities")
+@click.pass_context
+def harness_capabilities_cmd(ctx: click.Context) -> None:
+    """Print the harness-state ``harness-capability-registry.toml`` as JSON (WI-4327)."""
+    from groundtruth_kb.harness_projection import HarnessStateError, read_capabilities  # noqa: PLC0415
+
+    config = _resolve_config(ctx)
+    try:
+        data = read_capabilities(project_root=Path(config.project_root))
+    except HarnessStateError as exc:
+        click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
+        raise SystemExit(1) from exc
+    click.echo(json.dumps(data, indent=2, sort_keys=True))
 
 
 def _harness_emit(record: object) -> None:
