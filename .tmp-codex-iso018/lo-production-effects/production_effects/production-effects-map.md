@@ -1,0 +1,674 @@
+# Production Effects Map
+
+Generated: 2026-06-05T16:05:33Z
+Source: GTKB-ISOLATION-016 Phase 8 rehearsal `_production_effects.py` (Slice 9).
+
+## Summary
+
+- Total surfaces probed: 601
+- MOVE: 42
+- KEEP: 156
+- DO_NOT_MOVE: 14
+- OWNER_DECISION_REQUIRED: 389
+- deploy-blocking: 44
+- deploy-safe-after-review: 511
+
+## DO_NOT_MOVE (Phase 8 plan §4 explicit immovables + secret-adjacent)
+
+- `.env.local` present — signal: `secret_material_per_phase8_plan_section_4` — content_read: `False`
+- `.env` absent — signal: `secret_material_per_phase8_plan_section_4` — content_read: `False`
+- `secrets` absent — signal: `secret_material_per_phase8_plan_section_4` — content_read: `False`
+- `groundtruth-artifacts/secrets` absent — signal: `secret_material_per_phase8_plan_section_4` — content_read: `False`
+- `scripts/deploy/_prod_env_vars.txt` present — signal: `production_env_vars_secret_adjacent_per_codex_s9_004` — content_read: `False`
+- `scripts/deploy/_prod_env_vars_clean.txt` present — signal: `production_env_vars_secret_adjacent_per_codex_s9_004` — content_read: `False`
+- `infrastructure/terraform/production.tfvars` present — signal: `terraform_variable_potentially_sensitive` — content_read: `False`
+- `infrastructure/terraform/staging.tfvars` present — signal: `terraform_variable_potentially_sensitive` — content_read: `False`
+- `groundtruth.db` present — signal: `phase_8_plan_section_4_explicit_immovable` — content_read: `False`
+- `groundtruth.db-shm` absent — signal: `sqlite_wal_companion` — content_read: `False`
+- `groundtruth.db-wal` absent — signal: `sqlite_wal_companion` — content_read: `False`
+- `infrastructure/terraform/terraform.tfstate` present — signal: `terraform_state_immovable_per_phase8_section_4` — content_read: `False`
+- `infrastructure/terraform/terraform.tfstate.1774985892.backup` present — signal: `terraform_state_immovable_per_phase8_section_4` — content_read: `False`
+- `infrastructure/terraform/terraform.tfstate.backup` present — signal: `terraform_state_immovable_per_phase8_section_4` — content_read: `False`
+
+## MOVE (relocate to applications/Agent_Red/<path>)
+
+- `docker-compose.yml` → `applications/Agent_Red/docker-compose.yml` — signal: `adopter_container_orchestration`
+- `.shopify/deploy-bundle` → `applications/Agent_Red/.shopify/deploy-bundle` — signal: `adopter_shopify_deployment_artifact`
+- `.shopify/deploy-bundle.br` → `applications/Agent_Red/.shopify/deploy-bundle.br` — signal: `adopter_shopify_deployment_artifact_compressed`
+- `.groundtruth/por-16d-phase1-snapshot.json` → `applications/Agent_Red/.groundtruth/por-16d-phase1-snapshot.json` — signal: `adopter_production_operations_record`
+- `.groundtruth/por-16d-phase2-classification.json` → `applications/Agent_Red/.groundtruth/por-16d-phase2-classification.json` — signal: `adopter_production_operations_record`
+- `.groundtruth/por-16d-phase2-snapshot.json` → `applications/Agent_Red/.groundtruth/por-16d-phase2-snapshot.json` — signal: `adopter_production_operations_record`
+- `Dockerfile` → `applications/Agent_Red/Dockerfile` — signal: `adopter_container_definition`
+- `Dockerfile.ui` → `applications/Agent_Red/Dockerfile.ui` — signal: `adopter_container_definition_ui_variant`
+- `Dockerfile.test` → `applications/Agent_Red/Dockerfile.test` — signal: `adopter_container_definition_test_variant`
+- `.dockerignore` → `applications/Agent_Red/.dockerignore` — signal: `adopter_container_build_context_filter`
+- `.shopifyignore` → `applications/Agent_Red/.shopifyignore` — signal: `adopter_shopify_deploy_filter`
+- `shopify.app.toml` → `applications/Agent_Red/shopify.app.toml` — signal: `adopter_shopify_app_config`
+- `scripts/deploy.py` → `applications/Agent_Red/scripts/deploy.py` — signal: `adopter_deploy_orchestrator`
+- `scripts/deploy_agent_containers.py` → `applications/Agent_Red/scripts/deploy_agent_containers.py` — signal: `adopter_deploy_containers`
+- `scripts/deploy_config.py` → `applications/Agent_Red/scripts/deploy_config.py` — signal: `adopter_deploy_config_loader`
+- `scripts/deploy_orchestrator.py` → `applications/Agent_Red/scripts/deploy_orchestrator.py` — signal: `adopter_deploy_orchestrator_v2`
+- `scripts/deploy_pipeline.py` → `applications/Agent_Red/scripts/deploy_pipeline.py` — signal: `adopter_deploy_pipeline`
+- `scripts/deploy_ui.py` → `applications/Agent_Red/scripts/deploy_ui.py` — signal: `adopter_deploy_ui`
+- `scripts/deploy/build-and-deploy-staging.ps1` → `applications/Agent_Red/scripts/deploy/build-and-deploy-staging.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/build-context.ps1` → `applications/Agent_Red/scripts/deploy/build-context.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/cosmos-pitr-restore.ps1` → `applications/Agent_Red/scripts/deploy/cosmos-pitr-restore.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/create-build-context.ps1` → `applications/Agent_Red/scripts/deploy/create-build-context.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/restore-api-gateway.ps1` → `applications/Agent_Red/scripts/deploy/restore-api-gateway.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/restore-production-gateway.ps1` → `applications/Agent_Red/scripts/deploy/restore-production-gateway.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/rollback.ps1` → `applications/Agent_Red/scripts/deploy/rollback.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/upgrade.ps1` → `applications/Agent_Red/scripts/deploy/upgrade.ps1` — signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/PRODUCTION-ENV-CHANGES.md` → `applications/Agent_Red/scripts/deploy/PRODUCTION-ENV-CHANGES.md` — signal: `adopter_deploy_documentation`
+- `scripts/deploy/api-gateway-restore.yaml` → `applications/Agent_Red/scripts/deploy/api-gateway-restore.yaml` — signal: `adopter_deploy_restore_manifest`
+- `infrastructure/terraform/dr_security.tf` → `applications/Agent_Red/infrastructure/terraform/dr_security.tf` — signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/keyvault_diagnostics.tf` → `applications/Agent_Red/infrastructure/terraform/keyvault_diagnostics.tf` — signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/langfuse.tf` → `applications/Agent_Red/infrastructure/terraform/langfuse.tf` — signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/main.tf` → `applications/Agent_Red/infrastructure/terraform/main.tf` — signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/monitoring.tf` → `applications/Agent_Red/infrastructure/terraform/monitoring.tf` — signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/scaling_profiles.tf` → `applications/Agent_Red/infrastructure/terraform/scaling_profiles.tf` — signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/variables.tf` → `applications/Agent_Red/infrastructure/terraform/variables.tf` — signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/.terraform.lock.hcl` → `applications/Agent_Red/infrastructure/terraform/.terraform.lock.hcl` — signal: `terraform_provider_lock`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-release-path-directive.json` → `applications/Agent_Red/.groundtruth/formal-artifact-approvals/2026-05-02-release-path-directive.json` — signal: `adopter_deliberation_approval_packet`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-agent-red-migration-pending-waiver.json` → `applications/Agent_Red/.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-agent-red-migration-pending-waiver.json` — signal: `adopter_deliberation_approval_packet`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-agent-red-nested-in-applications-rule.json` → `applications/Agent_Red/.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-agent-red-nested-in-applications-rule.json` — signal: `adopter_deliberation_approval_packet`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-slice-8-6-phase-4-canonical-agent-red-repo-migration-prerequisite.json` → `applications/Agent_Red/.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-slice-8-6-phase-4-canonical-agent-red-repo-migration-prerequisite.json` — signal: `adopter_deliberation_approval_packet`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S365-ENV-SOT-AGENT-RED-DEFERRAL.json` → `applications/Agent_Red/.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S365-ENV-SOT-AGENT-RED-DEFERRAL.json` — signal: `adopter_deliberation_approval_packet`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2511.json` → `applications/Agent_Red/.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2511.json` — signal: `adopter_deliberation_approval_packet`
+
+## KEEP (stays at GT-KB root post-cutover)
+
+- `groundtruth.toml` — signal: `framework_config_per_classify_tree`
+- `tools/knowledge-db/groundtruth.toml` — signal: `framework_config_per_classify_tree`
+- `CLAUDE.md` — signal: `framework_root_directive_file`
+- `CLAUDE-ARCHITECTURE.md` — signal: `framework_root_directive_file`
+- `CLAUDE-REFERENCE.md` — signal: `framework_root_directive_file`
+- `CLAUDE_ARCHIVE.md` — signal: `framework_root_directive_file`
+- `AGENTS.md` — signal: `framework_root_directive_file`
+- `.claude/rules/acting-prime-builder.md` — signal: `framework_rule_file`
+- `.claude/rules/active-workspace.md` — signal: `framework_rule_file`
+- `.claude/rules/backlog-approval-state.md` — signal: `framework_rule_file`
+- `.claude/rules/bridge-essential.md` — signal: `framework_rule_file`
+- `.claude/rules/bridge-permanent-operations-runbook.md` — signal: `framework_rule_file`
+- `.claude/rules/bridge-poller-canonical.md` — signal: `framework_rule_file`
+- `.claude/rules/canonical-terminology.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-dead-ends-and-false-positives.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-decision-ledger.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-knowledge-base-index.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-loyal-opposition-runbook.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-review-checklists.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-review-gate.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-review-operating-contract.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-session-bootstrap.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-standing-priorities.md` — signal: `framework_rule_file`
+- `.claude/rules/codex-way-of-working.md` — signal: `framework_rule_file`
+- `.claude/rules/deliberation-protocol.md` — signal: `framework_rule_file`
+- `.claude/rules/exec-summary-report-guide.md` — signal: `framework_rule_file`
+- `.claude/rules/file-bridge-protocol.md` — signal: `framework_rule_file`
+- `.claude/rules/groundtruth-kb-vision.md` — signal: `framework_rule_file`
+- `.claude/rules/loyal-opposition.md` — signal: `framework_rule_file`
+- `.claude/rules/operating-model.md` — signal: `framework_rule_file`
+- `.claude/rules/operating-role.md` — signal: `framework_rule_file`
+- `.claude/rules/peer-solution-advisory-loop.md` — signal: `framework_rule_file`
+- `.claude/rules/prime-bridge-collaboration-protocol.md` — signal: `framework_rule_file`
+- `.claude/rules/prime-builder-role.md` — signal: `framework_rule_file`
+- `.claude/rules/prime-builder.md` — signal: `framework_rule_file`
+- `.claude/rules/project-progress-dashboard-runbook.md` — signal: `framework_rule_file`
+- `.claude/rules/project-root-boundary.md` — signal: `framework_rule_file`
+- `.claude/rules/prompt-organize-reports-in-dropbox.md` — signal: `framework_rule_file`
+- `.claude/rules/report-depth-prime-builder-context.md` — signal: `framework_rule_file`
+- `.claude/rules/report-depth.md` — signal: `framework_rule_file`
+- `.claude/rules/session-start-prompt.md` — signal: `framework_rule_file`
+- `.claude/rules/sot-read-discipline.md` — signal: `framework_rule_file`
+- `.claude/rules/template-code-review.md` — signal: `framework_rule_file`
+- `.claude/rules/template-decision-memo.md` — signal: `framework_rule_file`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-gtkb-gov-011-implementation-verification.json` — signal: `framework_approval_packet_gtkb_prefix`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-session-formalization-audit-batch.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-session-lifecycle-engagement-principle.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-session-self-initialization-directive.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-standing-backlog-formalization.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-strict-gov-enforcement-verified.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-artifact-oriented-governance.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-core-spec-intake-phase0.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-23-bridge-authority.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-04-26-adr-isolation-application-placement.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-30-operating-model-canonical-artifact.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-backlog-slice1-adr.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-backlog-slice1-dcl.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-backlog-slice1-gov-update.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-dcl-agent-red-nested-in-applications-check-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-dcl-cross-cutting-requirements-registry-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-dcl-requirements-collection-hook-contract-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-dcl-requirements-collection-hook-contract-amendment.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-gov-agent-red-nested-in-applications-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-gov-cross-cutting-requirements-mechanical-enforcement-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-gov-requirements-collection-hook-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-gov-requirements-collection-hook-amendment.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-gov-spec-capture-transparency-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-gov-env-local-authority.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-wi-3247-early-requirements-quality-audit.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-wi-3248-agent-red-preservation-gate.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-ADR-ARTIFACT-FORMALIZATION-GATE-001-V3.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-ADR-DA-READ-SURFACE-PLACEMENT-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-ADR-STANDING-BACKLOG-DB-AUTHORITY-001-V2.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-DCL-ARTIFACT-APPROVAL-HOOK-001-V3.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-DCL-CONCEPT-ON-CONTACT-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-DCL-GLOSSARY-DA-CITATION-COMPLETENESS-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-DCL-STANDING-BACKLOG-DB-SCHEMA-001-V2.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-GOV-ARTIFACT-APPROVAL-001-V3.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-GOV-GLOSSARY-AS-DA-READ-SURFACE-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-GOV-STANDING-BACKLOG-001-V3.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-ADR-CODEX-HOOK-PARITY-FALLBACK-001-V2.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-DCL-OWNER-DECISION-TRACKER-QUESTION-EXTRACTION-BOUNDS-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-adr-peer-solution-workflow-contract-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-dcl-advisory-routing-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-dcl-peer-solution-owner-gate-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-adr-single-harness-operating-mode-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-dcl-init-keyword-consistent-assertion-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-dcl-single-harness-dispatcher-desktop-task-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-DCL-PROJECT-AUTHORIZATION-ENVELOPE-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001.json` — signal: `framework_approval_packet_artifact_type_protected_behavior`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-spec-project-wi-bridge-enforcement-batch.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-wi-3387-hook-strictness-p1-p2-remediation.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-15-gov-reliability-fast-lane.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-17-GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001-v2.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-17-pauth-antigravity-spec-amendment.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-ADR-SINGLE-HARNESS-OPERATING-MODE-001-v2.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-GOV-AGENT-RED-GTKB-CONFORMANCE-001-v2.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-GOV-GTKB-ADOPTION-ENFORCEMENT-001-v2.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001-v3.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-GOV-RELEASE-READINESS-GOVERNED-TESTING-001-v2.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-GOV-REQUIREMENTS-COLLECTION-HOOK-001-v4.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-19-ADR-CODEX-HOOK-PARITY-FALLBACK-001-v3.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-ADR-ENV-SOT-TOPOLOGY-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DCL-ENV-CLI-ENFORCEMENT-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-GOV-ENV-LOCAL-AUTHORITY-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-pauth-bridge-protocol-reliability-amendment-work-intent.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001-v2.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DCL-SESSION-ROLE-RESOLUTION-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001-v4.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-GOV-SESSION-ROLE-AUTHORITY-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-PAUTH-GTKB-CLAUDE-MD-SCOPE-CORRECTION-SLICE-3-V3.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-ADR-0001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-ADR-ROLE-STATUS-ORTHOGONALITY-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-ADR-SINGLE-HARNESS-OPERATING-MODE-001-v3.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-DCL-REPORTING-SURFACE-FRESH-READ-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-GOV-SOURCE-OF-TRUTH-FRESHNESS-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-ADR-ROLE-STATUS-ORTHOGONALITY-001-v2.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001-v2.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-GOV-V1-ACCEPTANCE-CRITERIA-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-ADR-DISPATCH-ENVELOPE-ARCHITECTURE-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-ADR-ENVELOPE-META-MODEL-001.json` — signal: `framework_approval_packet_artifact_type_architecture_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-BRIDGE-VERDICT-AUQ-CLASS-MARKER-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-DISPATCH-ENVELOPE-RULES-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-DISPATCH-ENVELOPE-SCHEMA-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-ENVELOPE-META-MODEL-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001-v3.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-MAJOR-RELEASE-CONTENT-GATE-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-SESSION-ENVELOPE-DURABILITY-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-SESSION-ROLE-RESOLUTION-001-v2.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-SOT-REGISTRY-PROJECTION-PARITY-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-SOT-REGISTRY-RECORD-SCHEMA-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DCL-TOPIC-ENVELOPE-ROUTING-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-GOV-DOCUMENT-AUTHOR-PROVENANCE-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-GOV-MAJOR-RELEASE-CONTENT-GOAL-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-GOV-PLATFORM-SOT-REGISTRY-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001-v2.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-PAUTH-envelope-v2.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-PAUTH-isolation-018-agent-red-cutover.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DCL-HARNESS-STATE-SOT-ASSERTION-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DCL-HARNESS-STATE-SOT-READER-CONTRACT-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DCL-IMPL-AUTH-EXTRACT-SPEC-LINKS-TABLE-FORMAT-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DCL-IMPL-START-GATE-VERB-AWARE-PATH-EXTRACTION-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DCL-SOT-READ-HOOK-CONTRACT-001.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DCL-SOT-REGISTRY-RECORD-SCHEMA-001-v2.json` — signal: `framework_approval_packet_artifact_type_design_constraint`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-GOV-HARNESS-STATE-SOT-CONSOLIDATION-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-GOV-SOURCE-OF-TRUTH-FRESHNESS-001-v2.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-PAUTH-platform-sot-consolidation-slice-2a-read-discipline.json` — signal: `framework_approval_packet_artifact_type_governance`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001.json` — signal: `framework_approval_packet_artifact_type_governance`
+
+## OWNER_DECISION_REQUIRED
+
+- `.env.example` — signal: `adopter_environment_template_with_framework_reference_owner_decision`
+- `.env.integration.example` — signal: `adopter_environment_template_with_framework_reference_owner_decision`
+- `logs/deploy-*.log` — signal: `adopter_deployment_history`
+- `.groundtruth/wrap-scan` — signal: `mixed_scope_session_evidence`
+- `.groundtruth/session` — signal: `per_session_state_not_per_scope`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-codex-hook-parity-decision.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-20-standing-backlog-harvest.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-21-s303-session-wrap-harvest.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-app-isolation-control-plane-update.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-app-isolation-environment-phase-update.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-app-isolation-harness-topology-update.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-app-isolation-industry-critique-update.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-app-isolation-minimal-projection-update.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-app-isolation-phased-planning.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-app-isolation-policy-projection-update.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-isolation-001-authority-matrix-plan.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-gtkb-isolation-002-root-topology-plan.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-22-session-work-subject-investigation.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-26-delib-harvest-batch-s311.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-26-delib-role-definition-assessment.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-27-delib-harvest-batch-s312.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-27-delib-s312-deterministic-services-principle.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-27-delib-s312-role-contract-effectiveness-update.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-28-s319-deliberation-archive-batch.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-28-s319-membase-effective-use-assessment-da.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s319-smart-poller-objective-clarification.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-deliberation-dcl-spec-origin-deliberation-support-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase2-adr-spec-coverage-architecture-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase2-dcl-cross-harness-enforcement-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase2-dcl-spec-relevance-closure-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase2-dcl-verified-bridge-history-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase3-dcl-agent-red-conformant-contained-app-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase3-dcl-gtkb-independent-test-suite-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase3-dcl-retroactive-linkage-obligation-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase3-dcl-spec-test-impl-triad-completeness-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase3-gov-triad-completeness-audit-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-dcl-spec-da-citation-mandatory-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-audit_artifacts_for_ambiguity.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-da_citation_mandatory.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-default_workspace_gtkb.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-impl_proposal_spec_linkage.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-platform_app_non_specific.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-platform_failure_diagnosis.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-smart_poller_auto_trigger.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-spec_creation_standing_auth.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-strict_mechanical_enforcement.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-triad_completeness.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-phase4-delib-verified_spec_derived_testing.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-adr-default-gt-kb-exception-hosted-app-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-adr-smart-poller-owner-out-of-loop-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-default-workspace-is-gt-kb-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-implementation-proposal-spec-linkage-mandatory-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-mechanical-enforcement-mandatory-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-platform-application-non-specificity-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-smart-poller-auto-trigger-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-verified-spec-derived-testing-mandatory-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-workspace-exception-interrogation-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-dcl-workspace-inference-prohibited-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-gov-artifact-ambiguity-audit-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-gov-spec-creation-standing-authorization-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-pb-incident-s321-daemon-dispatch-disabled-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-spec-pb-incident-s321-proposal-without-spec-linkage-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-triad-dcl-adopter-spec-reclassification-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-triad-dcl-gtkb-independent-test-suite-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-29-s321-triad-dcl-retroactive-triad-completeness-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-04-30-candidate-spec-intake-six-decision-delibs.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-30-candidate-spec-statements-backlog-advisory-da.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-04-30-om-delta-batch-decision-delibs.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-01-s325-wave3-owner-decisions.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-disambiguation-slice1-delib.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-disambiguation-slice1.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-isolation-017-slice4-decisions.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-primer-slice1-delib.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-primer-slice1.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-02-role-intent-sentinel-delib.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-isolation-017-slice-8-5-python-tests-waiver.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-isolation-017-slice5-overlay-scope.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-isolation-017-slice8-b2-ruff-scope.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-isolation-017-slice8-disposition.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-isolation-017-slice8-install-ux-limitation-ack.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-isolation-017-slice8-pytest-fix-scope.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-rc1-ci-red-pause-slice-8-6-disposition.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-slice-8-6-row-18-memory-md-trim-choice.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-slice-8-6-row-42-pip-cve-choice.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-03-slice-8-6-row-43-docker-scout-waiver.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-cross-cutting-requirements-mechanical-enforcement.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-requirements-collection-hook-with-3-option-clarification.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-delib-s330-spec-capture-transparency.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-ipr-requirements-collection-hook-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-action-classes-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-adapter-pattern-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-approval-receipt-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-cli-surface-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-family-batch.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-no-llm-classifier-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-policy-engine-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-auq-scope-model-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-container-build-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-evidence-freshness-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-family-batch.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-frontend-bundles-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-maintain-enhance-path-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-rc-gate-python-3-12-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-source-build-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-deploy-workflow-inputs-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-blocked-outcome-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-ci-gate-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-commit-gate-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-doctor-check-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-family-batch.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-invariant-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-trace-ref-format-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-dsi-waiver-path-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-allowlist-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-ci-coverage-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-family-batch.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-github-posture-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-hook-portability-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-scan-provider-coverage-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-scan-redaction-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-04-spec-sec-scanner-cli-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-codex-harness-parity-spec-bundle.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-delib-codex-harness-parity-spec-bundle.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-spec-codex-harness-governance-parity-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-spec-codex-pending-spec-block-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-spec-codex-spec-proposal-gate-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-05-spec-codex-startup-input-gate-trigger-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-07-DELIB-S332-LIFT-FEATURE-FREEZE.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-07-delib-s333-codex-prime-period-kb-attribution-defect.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-07-delib-s333-isolation-017-citation-backfill-audit.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-CANONICAL-TERMINOLOGY-MD-BACKLOG-ENDPOINT.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-DELIB-CODEX-HOOKS-WINDOWS-RETEST.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-DELIB-WORK-LIST-DELETION-ENDPOINT.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-OPERATING-MODEL-MD-BACKLOG-ENDPOINT.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-WORK-LIST-MD-BACKLOG-ENDPOINT.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-08-WORK-LIST-MD-BACKLOG-ROW-46.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-ACTING-PRIME-BUILDER-MD-HOOK-PARITY-REFRESH.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-adr-smart-poller-owner-out-of-loop-001-v2.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-agents-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-claude-rules-bridge-essential-md-second-edit.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-claude-rules-bridge-essential-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-claude-rules-canonical-terminology-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-claude-rules-codex-review-gate-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-claude-rules-loyal-opposition-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-dcl-smart-poller-auto-trigger-001-v2.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-dcl-spawned-harness-role-defer-durable-record-001-v2.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-DELIB-CODEX-HOOK-PARITY-STANCE-REFRESH.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-delib-s337-smart-poller-retirement.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-09-pb-incident-s321-daemon-dispatch-disabled-001-v2.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-agents-md-self-improvement-directive.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-agents-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-md-self-improvement-directive.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-acting-prime-builder-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-bridge-essential-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-bridge-poller-canonical-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-canonical-terminology-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-file-bridge-protocol-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-operating-role-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-peer-solution-advisory-loop-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-prime-bridge-collaboration-protocol-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-prime-builder-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-prime-builder-role-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-claude-rules-report-depth-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-da-harvest-catchup.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-DELIB-S344-SPEC-EXPRESSIONS-TRIANGULATION-001.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-memory-work-list-md-friction-observations.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-memory-work-list-md-gov-010-followup-item1-path-fix.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-memory-work-list-md-gtkb-bridge-protocol-guide-amend-concurrent-commit-entry.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-memory-work-list-md-gtkb-gov-010-followup-observations-s342-item1.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-memory-work-list-md-gtkb-gov-010-followup.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-memory-work-list-md-gtkb-session-friction-observations-s343.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-spec-advisory-dashboard-counters-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-11-spec-advisory-report-template-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-canonical-terminology-canonical-init-keyword-entry.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-canonical-terminology-md-single-harness-entries.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-claude-rules-bridge-essential-md-single-harness-dispatcher-substrate.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-claude-rules-operating-role-md-slice-1-role-set-schema.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-spec-canonical-init-keyword-syntax-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-12-spec-single-harness-bridge-dispatcher-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-agents-md-init-keyword-and-lo-auto-process-contract.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-canonical-terminology-advisory-router-entry.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-canonical-terminology-assertion-category-entries.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-canonical-terminology-benchmark-terms.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-canonical-terminology-project-authorization.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-claude-rules-bridge-essential-md-activation-manager.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-claude-rules-codex-review-gate-md-implementation-start-gate.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-claude-rules-file-bridge-protocol-md-implementation-start-gate.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-codex-review-gate-project-authorization.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-file-bridge-protocol-project-authorization.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-SPEC-AUTO-BACKLOG-FOR-IMPLEMENTATION-BEARING-SPECS-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-13-SPEC-PROJECT-FIT-AUTO-ATTACHMENT-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-batch2-three-project-authorizations.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-batch3-deterministic-services-authorization.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-batch4-four-project-authorizations.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-batch5-eight-project-authorizations.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-claude-rules-active-workspace-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-claude-rules-backlog-approval-state-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-delib-2077-advisory-monitor-disposition.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-DELIB-2078.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-delib-s351-hook-import-latency-authorization.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-early-project-requirements-audit-da-record.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-operating-role-md-mode-switch-section.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-project-setup-spec-project-wi-bridge-enforcement.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-wi-3297-disposition-monitor.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-wi-3298-disposition-monitor.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-14-wi-3303-disposition-adapt.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-15-batch6-p0p1-amendments.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-15-batch7-gt-bridge-propose-cli.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-15-INVESTIGATION-AUTO-PUSH-report.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-15-SPEC-LO-OPPORTUNITY-RADAR-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-16-DELIB-2079.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-16-DELIB-2080.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-16-REQ-HARNESS-REGISTRY-001-v2.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-16-REQ-HARNESS-REGISTRY-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-16-wi-3353-dedicated-project-authorization.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-17-DELIB-2081.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-17-delib-s358-governance-correction-project-authorization.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-claude-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-claude-rules-bridge-essential-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-claude-rules-canonical-terminology-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-DELIB-2182.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-18-delib-s358-s350-manufactured-variant-provenance.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-20-DELIB-2208-spa-cluster-closure-S350.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-20-work-list-md-gov-010-path-correction.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-27-DELIB-2234.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-27-DELIB-2238.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-27-DELIB-2239.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-claude-rules-file-bridge-protocol-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-2499.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S365-ENV-SOT-FORMALIZATION-TRACK.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S365-ENV-SOT-PROJECT-AUTHORIZATION-PATH.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S365-ENV-SOT-SINGLE-PER-APPLICATION-BINDING.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-delib-s365-layer-a-hygiene-coherence-authorization.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-delib-s365-wi-3418-obsoleted.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S366-ENV-SOT-COVERAGE-WAIVER.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S366-GEMINI-SUBSTRATE-PATH-ENRICHMENT.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-28-DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-applications-agent-red-claude-architecture-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-applications-agent-red-claude-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-applications-agent-red-claude-reference-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-canonical-terminology-md-app-scope-extension.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-claude-architecture-md-root-delete.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-claude-md-platform-split.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-claude-reference-md-root-delete.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-claude-rules-peer-solution-advisory-loop-owner-grilling-gate.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-claude-rules-project-root-boundary-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2500.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2501.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2502.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2503.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2504.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2505.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2506.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2507.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2508.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2509.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-DELIB-2510.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-29-SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001-v2.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-claude-rules-file-bridge-protocol-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2512.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2513.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2514-v2.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2514.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2515-v2.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2515.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2516-v2.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2516.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2517-v2.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2517.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2518-v2.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2518.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2519-v2.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2519.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2520-v2.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2520.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-slice-2a-closure-adr-v4.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-slice-2a-closure-dcl-v4.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-30-slice-2a-closure-gov-v5.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-AGENTS-MD-ANTIGRAVITY-EXCEPTION-RETRACTION.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-DELIB-2521.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-DELIB-2522.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-s7p-acting-prime-builder-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-s7p-canonical-terminology-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-s7p-claude-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-s7p-operating-model-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-s7p-peer-solution-advisory-loop-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-s7p-work-list-md-deletion.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-slice9-agents-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-slice9-canonical-terminology-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-slice9-claude-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-slice9-operating-role-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-05-31-slice9-prime-builder-role-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-01-DELIB-2546.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-01-DELIB-2547.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-01-DELIB-2548.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-01-DELIB-2737.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-01-DELIB-2777.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-01-file-bridge-protocol-body-status-token-rule.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-01-operating-role-bridge-substrate.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-claude-rules-bridge-essential-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-claude-rules-canonical-terminology-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-claude-rules-file-bridge-protocol-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-claude-rules-operating-model-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-DELIB-2799.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-DELIB-2804.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-DELIB-2813.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-02-REQ-HARNESS-REGISTRY-001-v3.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-agents-md-root-mirror-retirement.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-AGENTS-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-md-root-mirror-retirement.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-CLAUDE-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-acting-prime-builder-md-agent-red-reference-adopter-residual-fix.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-acting-prime-builder-md-agent-red-reference-adopter.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-acting-prime-builder-md-mirror-retirement.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-bridge-essential-md-mirror-retirement.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-canonical-terminology-md-agent-red-reference-adopter.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-canonical-terminology-md-mirror-retirement.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-canonical-terminology-md-role-assignment-orthogonality.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-canonical-terminology-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-file-bridge-protocol-md-agent-red-reference-adopter.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-loyal-opposition-md-agent-red-reference-adopter.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-operating-model-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-operating-role-md-mirror-retirement.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-operating-role-md-orthogonality-cleanup.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-prime-builder-role-md-mirror-retirement.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-prime-builder-role-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-claude-rules-project-root-boundary-md-agent-red-reference-adopter.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260621.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260622.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260623.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260624.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260625.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260626.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260627.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260628.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260629.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260630.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260631.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260632.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260633.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-03-DELIB-20260634.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260635.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260636.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260637.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260638.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260648.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260658.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260663.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260664.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260665.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260666.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260668.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260669.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260670.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260671.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260672.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260673.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260674.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260867.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260868.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260872.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260875.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-DELIB-20260876.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001-v3.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-CANONICAL-WRAP-KEYWORD-SYNTAX-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-CENTRALIZED-DISPATCH-SERVICE-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-DISPATCH-ENVELOPE-ELEMENT-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-ENVELOPE-DISCLOSURE-UI-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-PRIME-PROJECT-COMPLETION-ENVELOPE-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-PROJECT-COMPLETION-DRIVE-PAYLOAD-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-SESSION-HANDOFF-PROMPT-SERVICE-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-SESSION-WRAP-PROCEDURE-DETERMINISTIC-TRIGGER-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-TOPIC-BUILD-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-TOPIC-DELIBERATION-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-TOPIC-ENVELOPE-ROUTER-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-TOPIC-PROJECT-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-TOPIC-SPEC-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-04-SPEC-TOPIC-TEST-001.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-applications-Agent_Red-CLAUDE-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-claude-rules-sot-read-discipline-md.json` — signal: `approval_packet_unclassified_owner_decision`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DELIB-20260879.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DELIB-20260880.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-DELIB-20260882.json` — signal: `deliberation_approval_packet_subject_ambiguous`
+- `.groundtruth/formal-artifact-approvals/2026-06-05-RULE-sot-read-discipline.json` — signal: `approval_packet_unclassified_owner_decision`
+
+## Deploy-Blocking Surfaces (require pre-cutover verification)
+
+- `.env.local` — disposition: `DO_NOT_MOVE`; signal: `secret_material_per_phase8_plan_section_4`
+- `.env` — disposition: `DO_NOT_MOVE`; signal: `secret_material_per_phase8_plan_section_4`
+- `secrets` — disposition: `DO_NOT_MOVE`; signal: `secret_material_per_phase8_plan_section_4`
+- `groundtruth-artifacts/secrets` — disposition: `DO_NOT_MOVE`; signal: `secret_material_per_phase8_plan_section_4`
+- `scripts/deploy/_prod_env_vars.txt` — disposition: `DO_NOT_MOVE`; signal: `production_env_vars_secret_adjacent_per_codex_s9_004`
+- `scripts/deploy/_prod_env_vars_clean.txt` — disposition: `DO_NOT_MOVE`; signal: `production_env_vars_secret_adjacent_per_codex_s9_004`
+- `infrastructure/terraform/production.tfvars` — disposition: `DO_NOT_MOVE`; signal: `terraform_variable_potentially_sensitive`
+- `infrastructure/terraform/staging.tfvars` — disposition: `DO_NOT_MOVE`; signal: `terraform_variable_potentially_sensitive`
+- `docker-compose.yml` — disposition: `MOVE`; signal: `adopter_container_orchestration`
+- `.shopify/deploy-bundle` — disposition: `MOVE`; signal: `adopter_shopify_deployment_artifact`
+- `.shopify/deploy-bundle.br` — disposition: `MOVE`; signal: `adopter_shopify_deployment_artifact_compressed`
+- `groundtruth.db` — disposition: `DO_NOT_MOVE`; signal: `phase_8_plan_section_4_explicit_immovable`
+- `groundtruth.db-shm` — disposition: `DO_NOT_MOVE`; signal: `sqlite_wal_companion`
+- `groundtruth.db-wal` — disposition: `DO_NOT_MOVE`; signal: `sqlite_wal_companion`
+- `Dockerfile` — disposition: `MOVE`; signal: `adopter_container_definition`
+- `Dockerfile.ui` — disposition: `MOVE`; signal: `adopter_container_definition_ui_variant`
+- `.dockerignore` — disposition: `MOVE`; signal: `adopter_container_build_context_filter`
+- `.shopifyignore` — disposition: `MOVE`; signal: `adopter_shopify_deploy_filter`
+- `shopify.app.toml` — disposition: `MOVE`; signal: `adopter_shopify_app_config`
+- `scripts/deploy.py` — disposition: `MOVE`; signal: `adopter_deploy_orchestrator`
+- `scripts/deploy_agent_containers.py` — disposition: `MOVE`; signal: `adopter_deploy_containers`
+- `scripts/deploy_config.py` — disposition: `MOVE`; signal: `adopter_deploy_config_loader`
+- `scripts/deploy_orchestrator.py` — disposition: `MOVE`; signal: `adopter_deploy_orchestrator_v2`
+- `scripts/deploy_pipeline.py` — disposition: `MOVE`; signal: `adopter_deploy_pipeline`
+- `scripts/deploy_ui.py` — disposition: `MOVE`; signal: `adopter_deploy_ui`
+- `scripts/deploy/build-and-deploy-staging.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/build-context.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/cosmos-pitr-restore.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/create-build-context.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/restore-api-gateway.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/restore-production-gateway.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/rollback.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/upgrade.ps1` — disposition: `MOVE`; signal: `adopter_deploy_powershell_scripts`
+- `scripts/deploy/api-gateway-restore.yaml` — disposition: `MOVE`; signal: `adopter_deploy_restore_manifest`
+- `infrastructure/terraform/dr_security.tf` — disposition: `MOVE`; signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/keyvault_diagnostics.tf` — disposition: `MOVE`; signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/langfuse.tf` — disposition: `MOVE`; signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/main.tf` — disposition: `MOVE`; signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/monitoring.tf` — disposition: `MOVE`; signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/scaling_profiles.tf` — disposition: `MOVE`; signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/variables.tf` — disposition: `MOVE`; signal: `adopter_terraform_definitions`
+- `infrastructure/terraform/terraform.tfstate` — disposition: `DO_NOT_MOVE`; signal: `terraform_state_immovable_per_phase8_section_4`
+- `infrastructure/terraform/terraform.tfstate.1774985892.backup` — disposition: `DO_NOT_MOVE`; signal: `terraform_state_immovable_per_phase8_section_4`
+- `infrastructure/terraform/terraform.tfstate.backup` — disposition: `DO_NOT_MOVE`; signal: `terraform_state_immovable_per_phase8_section_4`
