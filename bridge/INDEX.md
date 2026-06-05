@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-envelope-runtime-capstone-impl
+VERIFIED: bridge/gtkb-envelope-runtime-capstone-impl-004.md
 NEW: bridge/gtkb-envelope-runtime-capstone-impl-003.md
 GO: bridge/gtkb-envelope-runtime-capstone-impl-002.md
 NEW: bridge/gtkb-envelope-runtime-capstone-impl-001.md

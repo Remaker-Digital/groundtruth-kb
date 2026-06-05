@@ -10,6 +10,28 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+from groundtruth_kb.session.envelope import (
+    EnvelopeError,
+    close_session,
+    close_topic,
+    ensure_current,
+    load_current,
+    open_session,
+    open_topic,
+)
 from groundtruth_kb.session.handoff import HandoffError, generate
+from groundtruth_kb.session.wrap import is_canonical_wrap_trigger, run_wrap
 
-__all__ = ["HandoffError", "generate"]
+__all__ = [
+    "EnvelopeError",
+    "HandoffError",
+    "close_session",
+    "close_topic",
+    "ensure_current",
+    "generate",
+    "is_canonical_wrap_trigger",
+    "load_current",
+    "open_session",
+    "open_topic",
+    "run_wrap",
+]

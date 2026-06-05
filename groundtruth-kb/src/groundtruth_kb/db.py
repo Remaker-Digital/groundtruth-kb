@@ -200,6 +200,28 @@ CREATE TABLE IF NOT EXISTS session_prompts (
     context TEXT
 );
 
+CREATE TABLE IF NOT EXISTS dispatch_events (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    rule_id TEXT NOT NULL,
+    target_kind TEXT NOT NULL,
+    target_value TEXT NOT NULL,
+    trigger_at TEXT NOT NULL,
+    gate_result TEXT NOT NULL,
+    payload_template_id TEXT,
+    spawn_outcome TEXT NOT NULL,
+    spawn_pid INTEGER,
+    spawn_exit_status INTEGER,
+    activity_gate TEXT NOT NULL,
+    dry_run INTEGER NOT NULL DEFAULT 1,
+    payload TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS environment_config (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -608,6 +630,7 @@ CREATE INDEX IF NOT EXISTS idx_test_procs_id_version ON test_procedures(id, vers
 CREATE INDEX IF NOT EXISTS idx_op_procs_id_version ON operational_procedures(id, version);
 CREATE INDEX IF NOT EXISTS idx_assertion_runs_spec ON assertion_runs(spec_id, rowid);
 CREATE INDEX IF NOT EXISTS idx_session_prompts_session ON session_prompts(session_id, rowid);
+CREATE INDEX IF NOT EXISTS idx_dispatch_events_rule ON dispatch_events(rule_id, rowid);
 CREATE INDEX IF NOT EXISTS idx_env_config_id_version ON environment_config(id, version);
 CREATE INDEX IF NOT EXISTS idx_env_config_env_cat ON environment_config(environment, category);
 CREATE INDEX IF NOT EXISTS idx_docs_id_version ON documents(id, version);
@@ -4995,6 +5018,86 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
+    # Dispatch Events
+    # ------------------------------------------------------------------
+
+    def _next_dispatch_event_version(self, event_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute(
+                "SELECT MAX(version) FROM dispatch_events WHERE id = ?",
+                (event_id,),
+            )
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_dispatch_event(
+        self,
+        *,
+        event_id: str,
+        rule_id: str,
+        target_kind: str = "rule_target",
+        target_value: str | None = None,
+        trigger_at: str | None = None,
+        gate_result: str | None = None,
+        payload_template_id: str | None = None,
+        spawn_outcome: str | None = None,
+        spawn_pid: int | None = None,
+        spawn_exit_status: int | None = None,
+        target: str | None = None,
+        trigger: str | None = None,
+        activity_gate: str,
+        gate_passed: bool | None = None,
+        dry_run: bool = True,
+        payload: dict[str, Any] | None = None,
+        changed_by: str = "dispatch-envelope-scheduler",
+        change_reason: str = "dispatch-envelope event recorded",
+    ) -> dict[str, Any] | None:
+        resolved_target = target_value or target
+        if not resolved_target:
+            raise ValueError("target_value or target is required")
+        resolved_gate = gate_result or ("pass" if gate_passed else "skip")
+        resolved_spawn_outcome = spawn_outcome or (
+            "dry_run" if dry_run else ("eligible" if resolved_gate == "pass" else "gate_skip")
+        )
+        now = _now()
+        version = self._next_dispatch_event_version(event_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO dispatch_events
+               (id, version, rule_id, target_kind, target_value, trigger_at, gate_result, payload_template_id,
+                spawn_outcome, spawn_pid, spawn_exit_status, activity_gate, dry_run, payload,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                event_id,
+                version,
+                rule_id,
+                target_kind,
+                resolved_target,
+                trigger_at or now,
+                resolved_gate,
+                payload_template_id or trigger,
+                resolved_spawn_outcome,
+                spawn_pid,
+                spawn_exit_status,
+                activity_gate,
+                1 if dry_run else 0,
+                json.dumps(payload) if payload else None,
+                changed_by,
+                now,
+                change_reason,
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM dispatch_events WHERE id = ? AND version = ?",
+            (event_id, version),
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    # ------------------------------------------------------------------
     # Audit Cadence
     # ------------------------------------------------------------------
 
@@ -5181,6 +5284,7 @@ class KnowledgeDB:
             "operational_procedures",
             "assertion_runs",
             "session_prompts",
+            "dispatch_events",
             "environment_config",
             "documents",
             "test_coverage",

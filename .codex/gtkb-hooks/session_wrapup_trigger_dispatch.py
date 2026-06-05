@@ -14,6 +14,15 @@ HARNESS_NAME = "codex"
 # Parity marker: prime-builder role is discovered by session_self_initialization.py.
 
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
+from groundtruth_kb.session.envelope import EnvelopeError  # noqa: E402
+from groundtruth_kb.session.topic_router import (  # noqa: E402
+    handle_topic_command,
+    parse_topic_command,
+    render_topic_context,
+)
+from groundtruth_kb.session.wrap import is_canonical_wrap_trigger, run_wrap  # noqa: E402
+
 from scripts.harness_identity import resolved_harness_id  # noqa: E402
 
 ACCEPTED_TRIGGER_PHRASES = {
@@ -85,6 +94,8 @@ def _extract_prompt(raw_input: str) -> str:
 
 
 def _is_wrapup_trigger(prompt: str) -> bool:
+    if is_canonical_wrap_trigger(prompt):
+        return True
     normalized = " ".join(prompt.strip().split()).lower()
     normalized = normalized.replace("wrap-up", "wrap up")
     normalized = re.sub(r"[.!?]+$", "", normalized).strip()
@@ -137,9 +148,56 @@ def main() -> int:
         _emit_no_context()
         return 0
 
+    topic_command = parse_topic_command(prompt)
+    if topic_command is not None:
+        try:
+            result = handle_topic_command(
+                PROJECT_ROOT,
+                topic_command,
+                harness_name=HARNESS_NAME,
+                harness_id=_persistent_harness_id(),
+            )
+            (OUT_DIR / "last-topic-envelope-command.json").write_text(
+                json.dumps(result, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            print(_dump_payload(_hook_payload(render_topic_context(result))))
+        except EnvelopeError as exc:
+            context = (
+                "# GroundTruth-KB Topic Envelope Command Failed\n\n"
+                f"`{topic_command.raw}` matched the strict topic-envelope command grammar, "
+                f"but the envelope runtime rejected it: {exc}"
+            )
+            print(_dump_payload(_hook_payload(context)))
+        return 0
+
     if not _is_wrapup_trigger(prompt):
         _emit_no_context()
         return 0
+
+    runtime_context = ""
+    if is_canonical_wrap_trigger(prompt):
+        try:
+            wrap_result = run_wrap(
+                PROJECT_ROOT,
+                harness_name=HARNESS_NAME,
+                harness_id=_persistent_harness_id(),
+                wrap_outcome="canonical_wrap",
+            )
+            (OUT_DIR / "last-session-envelope-wrap.json").write_text(
+                json.dumps(
+                    {
+                        "archive_path": str(wrap_result["archive_path"]),
+                        "session_id": wrap_result["session_id"],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            runtime_context = str(wrap_result["summary"])
+        except EnvelopeError as exc:
+            runtime_context = f"# GroundTruth-KB Session Envelope Wrap Failed\n\n{exc}"
 
     result = subprocess.run(
         [
@@ -182,7 +240,8 @@ def main() -> int:
         "Mike used an explicit phrase indicating intent to begin a new session. "
         "Before normal task work, present the wrap-up report below and ask whether to proceed into fresh-session startup."
     )
-    print(_dump_payload(_hook_payload(f"{directive}\n\n{context}")))
+    full_context = "\n\n".join(part for part in (directive, runtime_context, context) if part)
+    print(_dump_payload(_hook_payload(full_context)))
     return 0
 
 

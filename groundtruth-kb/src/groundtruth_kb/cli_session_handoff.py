@@ -37,6 +37,147 @@ def handoff_group() -> None:
     """Generate and inspect deterministic handoff prompts."""
 
 
+@session_group.group("envelope")
+def envelope_group() -> None:
+    """Open and inspect per-harness session envelopes."""
+
+
+@envelope_group.command("open")
+@click.option("--harness-name", default="codex", show_default=True)
+@click.option("--harness-id", default=None)
+@click.option("--init-keyword", default=None)
+@click.option("--subject", default=None)
+@click.option("--role", default=None)
+@click.option("--active-work-item-id", default=None)
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def envelope_open_cmd(
+    ctx: click.Context,
+    harness_name: str,
+    harness_id: str | None,
+    init_keyword: str | None,
+    subject: str | None,
+    role: str | None,
+    active_work_item_id: str | None,
+    json_output: bool,
+) -> None:
+    """Open a current per-harness session-envelope file."""
+    from groundtruth_kb.session.envelope import open_session
+
+    config = _resolve_config(ctx)
+    envelope = open_session(
+        Path(config.project_root),
+        harness_name=harness_name,
+        harness_id=harness_id,
+        init_keyword=init_keyword,
+        subject=subject,
+        role=role,
+        active_work_item_id=active_work_item_id,
+    )
+    if json_output:
+        click.echo(json.dumps(envelope, indent=2, sort_keys=True))
+    else:
+        click.echo(envelope["session_id"])
+
+
+@envelope_group.command("show")
+@click.option("--harness-name", default="codex", show_default=True)
+@click.pass_context
+def envelope_show_cmd(ctx: click.Context, harness_name: str) -> None:
+    """Print the current per-harness session envelope as JSON."""
+    from groundtruth_kb.session.envelope import load_current
+
+    config = _resolve_config(ctx)
+    envelope = load_current(Path(config.project_root), harness_name)
+    if envelope is None:
+        raise click.ClickException(f"No current session envelope for harness {harness_name!r}.")
+    click.echo(json.dumps(envelope, indent=2, sort_keys=True))
+
+
+@session_group.group("topic")
+def topic_group() -> None:
+    """Open and close topic envelopes."""
+
+
+@topic_group.command("open")
+@click.argument("topic_type", type=click.Choice(["spec", "build", "test", "deliberation", "project"]))
+@click.option("--harness-name", default="codex", show_default=True)
+@click.option("--harness-id", default=None)
+@click.pass_context
+def topic_open_cmd(ctx: click.Context, topic_type: str, harness_name: str, harness_id: str | None) -> None:
+    """Open one topic envelope for the given type."""
+    from groundtruth_kb.session.envelope import open_topic
+
+    config = _resolve_config(ctx)
+    topic = open_topic(Path(config.project_root), topic_type, harness_name=harness_name, harness_id=harness_id)
+    click.echo(json.dumps(topic, indent=2, sort_keys=True))
+
+
+@topic_group.command("close")
+@click.argument("topic_type", type=click.Choice(["spec", "build", "test", "deliberation", "project"]))
+@click.option("--harness-name", default="codex", show_default=True)
+@click.option("--harness-id", default=None)
+@click.pass_context
+def topic_close_cmd(ctx: click.Context, topic_type: str, harness_name: str, harness_id: str | None) -> None:
+    """Close one open topic envelope for the given type."""
+    from groundtruth_kb.session.envelope import close_topic
+
+    config = _resolve_config(ctx)
+    topic = close_topic(Path(config.project_root), topic_type, harness_name=harness_name, harness_id=harness_id)
+    click.echo(json.dumps(topic, indent=2, sort_keys=True))
+
+
+@session_group.command("wrap")
+@click.option("--harness-name", default="codex", show_default=True)
+@click.option("--harness-id", default=None)
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def wrap_cmd(ctx: click.Context, harness_name: str, harness_id: str | None, json_output: bool) -> None:
+    """Run the deterministic wrap service used by the canonical ::wrap trigger."""
+    from groundtruth_kb.session.wrap import run_wrap
+
+    config = _resolve_config(ctx)
+    result = run_wrap(Path(config.project_root), harness_name=harness_name, harness_id=harness_id)
+    if json_output:
+        payload = {**result, "archive_path": str(result["archive_path"])}
+        click.echo(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    else:
+        click.echo(result["summary"])
+
+
+@session_group.group("dispatcher")
+def dispatcher_group() -> None:
+    """Validate and tick dispatch-envelope rules."""
+
+
+@dispatcher_group.command("validate")
+@click.option("--rules-path", type=click.Path(path_type=Path), default=None)
+@click.pass_context
+def dispatcher_validate_cmd(ctx: click.Context, rules_path: Path | None) -> None:
+    """Load dispatch-envelope rules and fail on schema errors."""
+    from groundtruth_kb.dispatcher.rules_loader import default_rules_path, load_rules
+
+    config = _resolve_config(ctx)
+    path = rules_path or default_rules_path(Path(config.project_root))
+    rules = load_rules(path)
+    click.echo(json.dumps({"rules_path": str(path), "rule_count": len(rules)}, indent=2, sort_keys=True))
+
+
+@dispatcher_group.command("tick")
+@click.option("--rules-path", type=click.Path(path_type=Path), default=None)
+@click.option("--execute", is_flag=True, default=False, help="Disable dry-run mode.")
+@click.pass_context
+def dispatcher_tick_cmd(ctx: click.Context, rules_path: Path | None, execute: bool) -> None:
+    """Evaluate dispatch-envelope activity gates and persist scheduler state."""
+    from groundtruth_kb.dispatcher.rules_loader import default_rules_path
+    from groundtruth_kb.dispatcher.scheduler import tick
+
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root)
+    state = tick(project_root, rules_path=rules_path or default_rules_path(project_root), dry_run=not execute)
+    click.echo(json.dumps(state, indent=2, sort_keys=True))
+
+
 @handoff_group.command("generate")
 @click.option(
     "--session-id",

@@ -1,0 +1,7 @@
+# Dispatch-envelope registry.
+#
+# This is the declarative registry for dispatch-envelope rules. It starts empty
+# until a bridge-approved rule is added.
+
+rules = []
+
