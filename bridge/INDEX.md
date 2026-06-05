@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
+GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-001.md
@@ -25,10 +26,12 @@ NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-verification-001.md
 
 Document: gtkb-handoff-prompt-terminology-clarification
+NEW: bridge/gtkb-handoff-prompt-terminology-clarification-003.md
 GO: bridge/gtkb-handoff-prompt-terminology-clarification-002.md
 NEW: bridge/gtkb-handoff-prompt-terminology-clarification-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-scripts-source
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-007.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-006.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-005.md
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-004.md

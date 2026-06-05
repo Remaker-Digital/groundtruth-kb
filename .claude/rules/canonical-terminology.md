@@ -701,6 +701,34 @@ role attached to the harness).
 `python scripts/harness_identity.py set --harness-name <name>
 --harness-id <id> --owner-requested`.
 
+### handoff prompt
+
+**Definition:** The deterministic-service OUTPUT generated at session close
+(canonical ``::wrap``) by the handoff-prompt generator
+(``SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001``). A handoff prompt is the
+structured content that carries forward session context, continuation scope,
+and next-step direction to the next session. It is *generated content*,
+distinct from its *persisted record*.
+
+**Canonical alias:** none. Do NOT use "continuation prompt" — that label is
+explicitly rejected (per ``DELIB-20260883``) as a redundant third term for the
+same concept.
+
+**Not to be confused with:** ``Session Prompt`` — the PERSISTED RECORD of a
+handoff prompt (the ``session_prompts`` MemBase row; see Supporting Records). A
+handoff prompt is the generator output; a Session Prompt is that output stored
+as a governed record. Two views of one thing: the handoff prompt is what
+``::wrap`` produces; the Session Prompt is what persists it for the next session
+to consume.
+
+**Source:** ``SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001`` (the generator);
+``DELIB-20260883`` (owner terminology decision: generated-vs-stored model;
+"continuation prompt" rejected); WI-4363 (``GTKB-SYSTEMS-TERMINOLOGY-MAP-001``).
+
+**Implementation pointer:** ``groundtruth_kb.session.wrap`` / the handoff-prompt
+deterministic service invoked at canonical ``::wrap``; persisted as a
+``session_prompts`` row (the Session Prompt record).
+
 ### role assignment
 
 **Definition:** The binding of an AI coding harness to a role (Prime Builder
@@ -1572,7 +1600,7 @@ adopting GT-KB inherit them.
 | Term | Table | Summary |
 |------|-------|---------|
 | Assertion Run | `assertion_runs` | Historical assertion execution record |
-| Session Prompt | `session_prompts` | Structured handoff message for next session |
+| Session Prompt | `session_prompts` | Structured handoff message for next session (the persisted record of a handoff prompt — see "handoff prompt") |
 
 ### Concepts (not tables)
 
