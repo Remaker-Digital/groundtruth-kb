@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-integration-phase-1-governance-impl
+NEW: bridge/gtkb-ollama-integration-phase-1-governance-impl-001.md
+
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-003.md
