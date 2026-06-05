@@ -332,3 +332,45 @@ def test_tokenization_failure_returns_empty(root: Path) -> None:
     result = _paths_from_shell(root, cmd)
     # shlex.split raises ValueError; stage produces no paths
     assert result == []
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# NO-GO -006 F1 regression: _is_mutating_command MUST return True for the
+# protected git verbs (`add`, `rm`, `restore`). Per Codex finding F1, the
+# prior implementation extracted paths via _paths_from_shell but did not
+# flag these commands as mutating in _is_mutating_command, so gate_decision
+# allowed them without an impl-auth packet.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_is_mutating_git_add_returns_true() -> None:
+    """`git add` MUST trigger the mutating-command predicate (NO-GO -006 F1)."""
+    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+
+    assert _is_mutating_command("git add scripts/protected.py") is True
+    assert _is_mutating_command("git add -A") is True
+    assert _is_mutating_command("git add .") is True
+
+
+def test_is_mutating_git_rm_returns_true() -> None:
+    """`git rm` MUST trigger the mutating-command predicate (NO-GO -006 F1)."""
+    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+
+    assert _is_mutating_command("git rm scripts/dead.py") is True
+    assert _is_mutating_command("git rm --cached scripts/x.py") is True
+
+
+def test_is_mutating_git_restore_returns_true() -> None:
+    """`git restore` (with or without --staged) MUST trigger the predicate."""
+    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+
+    assert _is_mutating_command("git restore --staged scripts/x.py") is True
+    assert _is_mutating_command("git restore scripts/x.py") is True
+
+
+def test_is_mutating_git_status_remains_false() -> None:
+    """`git status` MUST remain a safe read command (no-regression guard)."""
+    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+
+    assert _is_mutating_command("git status") is False
+    assert _is_mutating_command("git status --short") is False

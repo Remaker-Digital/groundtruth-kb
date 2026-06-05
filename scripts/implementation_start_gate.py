@@ -80,7 +80,11 @@ GIT_FINALIZATION_DENIED_FLAGS = {"-f", "--force", "--force-with-lease"}
 MUTATING_COMMAND_RE = re.compile(
     r"\b("
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
-    r"apply_patch|git\s+(?:commit|reset|checkout|merge|rebase|tag|push)|"
+    # WI-IMPL-START-GATE: verb-aware path extraction. Include `git add`,
+    # `git rm`, and `git restore` so protected-path staging commands also
+    # trip the gate. (Per Codex NO-GO -006: extracting the path without
+    # firing `_is_mutating_command` left those commands silently allowed.)
+    r"apply_patch|git\s+(?:add|rm|restore|commit|reset|checkout|merge|rebase|tag|push)|"
     r"python\s+.*(?:write_text|open\(.+,\s*['\"]w|sqlite3|insert_|update_|delete_)"
     r")\b",
     re.IGNORECASE,
