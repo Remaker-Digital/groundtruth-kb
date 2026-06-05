@@ -5,7 +5,7 @@
     "script_hash": "sha256:e1edf438c92dec07b069904bf62c78ff23ba067734c0b3686906745409cf2ce8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-05T00:18:54Z",
+  "generated_at": "2026-06-05T05:45:10Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -44,6 +44,10 @@
       "codex": {
         "id": "A",
         "status": "verified"
+      },
+      "ollama": {
+        "id": "D",
+        "status": "verified"
       }
     },
     "identity_source": {
@@ -79,6 +83,11 @@
           "prime-builder"
         ],
         "status": "verified"
+      },
+      "D": {
+        "harness_type": "ollama",
+        "role": [],
+        "status": "unknown"
       }
     }
   },
@@ -112,7 +121,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 3,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -677,7 +686,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -691,7 +700,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.12"
     }
   },
   "verification": {
