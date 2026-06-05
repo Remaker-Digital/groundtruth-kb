@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
+GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-004.md
 REVISED: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-003.md
 NO-GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-002.md
 NEW: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-001.md
@@ -26,6 +27,7 @@ NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 
 Document: gtkb-ollama-integration-phase-1-shim
+GO: bridge/gtkb-ollama-integration-phase-1-shim-008.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-shim-007.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-006.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-shim-005.md
@@ -73,6 +75,7 @@ NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-002.md
 NEW: bridge/gtkb-isolation-018-agent-red-cutover-001.md
 
 Document: gtkb-protected-artifact-rollup-governance-umbrella
+REVISED: bridge/gtkb-protected-artifact-rollup-governance-umbrella-003.md
 NO-GO: bridge/gtkb-protected-artifact-rollup-governance-umbrella-002.md
 NEW: bridge/gtkb-protected-artifact-rollup-governance-umbrella-001.md
 
