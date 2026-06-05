@@ -1,0 +1,22 @@
+{
+  "acknowledged_by": "owner",
+  "action": "insert",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "DCL-HARNESS-STATE-SOT-ASSERTION-001",
+  "artifact_type": "design_constraint",
+  "change_reason": "WI-4327 Phase-1 Foundation: insert DCL-HARNESS-STATE-SOT-ASSERTION-001 per owner AUQ approval.",
+  "changed_by": "prime-builder/claude/B",
+  "covered_artifacts": [
+    {
+      "id": "DCL-HARNESS-STATE-SOT-ASSERTION-001",
+      "type": "design_constraint"
+    }
+  ],
+  "explicit_change_request": "Owner AskUserQuestion (Phase-1 batch this session): 'Approve DCL-ASSERTION-001 v1 as drafted'.",
+  "full_content": "DCL-HARNESS-STATE-SOT-ASSERTION-001 v1 - Machine-checkable consistency assertions.\n\nConstraint: 5 assertions MUST evaluate against the live repo state and MUST PASS:\n1. No retired-path references in code: grep across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md for 'role-assignments' returns 0 matches.\n2. No out-of-entrypoint direct reads: grep for json.load.*harness-state/ and tomllib.load.*harness-capability-registry.toml outside groundtruth_kb.harness_projection returns 0 matches.\n3. Canonical entrypoint exists and exports read_roles/read_identity/read_capabilities.\n4. Retired paths are physically absent post-WI-4336.\n5. 3 SoT files parse + pass schema validation.\n\nEnforcement: Assertions field evaluated by gt assert; doctor _check_harness_state_sot_consistency rolls them up. Severity: blocking. Affected by: GOV-HARNESS-STATE-SOT-CONSOLIDATION-001.\n\nOwner AUQ approval captured this session (Phase-1 batch AUQ 3 of 4).\n",
+  "full_content_sha256": "e16edec0fffe5a9e95e068f08970561a84a2653decdc9e5d83407c865cc2f444",
+  "presented_to_user": true,
+  "source_ref": "owner_conversation:2026-06-05-S544b584c-wi4327-phase1-auq-batch",
+  "transcript_captured": true
+}

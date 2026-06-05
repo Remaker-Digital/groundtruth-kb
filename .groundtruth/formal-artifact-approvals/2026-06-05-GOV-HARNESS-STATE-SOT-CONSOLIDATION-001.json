@@ -1,0 +1,22 @@
+{
+  "acknowledged_by": "owner",
+  "action": "insert",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "GOV-HARNESS-STATE-SOT-CONSOLIDATION-001",
+  "artifact_type": "governance",
+  "change_reason": "WI-4327 Phase-1 Foundation: insert GOV-HARNESS-STATE-SOT-CONSOLIDATION-001 per owner AUQ approval.",
+  "changed_by": "prime-builder/claude/B",
+  "covered_artifacts": [
+    {
+      "id": "GOV-HARNESS-STATE-SOT-CONSOLIDATION-001",
+      "type": "governance"
+    }
+  ],
+  "explicit_change_request": "Owner AskUserQuestion (Phase-1 batch this session): 'Approve GOV-HARNESS-STATE-SOT-CONSOLIDATION-001 v1 as drafted'.",
+  "full_content": "GOV-HARNESS-STATE-SOT-CONSOLIDATION-001 v1 - Harness State Source-of-Truth Consolidation.\n\nContract: GroundTruth-KB harness state is exclusively governed by three SoT files:\n1. Roles SoT: harness-state/harness-registry.json - MemBase projection per REQ-HARNESS-REGISTRY-001.\n2. Identities SoT: harness-state/harness-identities.json.\n3. Capabilities SoT: config/agent-control/harness-capability-registry.toml.\n\nAll readers MUST access these SoTs through one canonical entrypoint:\n- Python: groundtruth_kb.harness_projection.{read_roles, read_identity, read_capabilities}.\n- Shell: gt harness {roles, identity, capabilities} subcommands.\n\nDirect file reads of the three SoTs in committed code are FORBIDDEN except inside the canonical entrypoint module.\n\nRetired paths: harness-state/role-assignments.json is retired; harness-state/{claude,codex}/operating-role.md overlays retired.\n\nExtends: GOV-SOURCE-OF-TRUTH-FRESHNESS-001. Severity: blocking.\n\nOwner AUQ approval captured this session (Phase-1 batch AUQ 1 of 4).\n",
+  "full_content_sha256": "18574c8491ad7237e7d8fa2856ac529718d666946c4322379e1cf5131bc530f2",
+  "presented_to_user": true,
+  "source_ref": "owner_conversation:2026-06-05-S544b584c-wi4327-phase1-auq-batch",
+  "transcript_captured": true
+}

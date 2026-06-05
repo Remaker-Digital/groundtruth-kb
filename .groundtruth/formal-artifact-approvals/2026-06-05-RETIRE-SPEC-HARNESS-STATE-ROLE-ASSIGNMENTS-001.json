@@ -1,0 +1,22 @@
+{
+  "acknowledged_by": "owner",
+  "action": "insert",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001",
+  "artifact_type": "governance",
+  "change_reason": "WI-4327 Phase-1 Foundation: insert RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 per owner AUQ approval.",
+  "changed_by": "prime-builder/claude/B",
+  "covered_artifacts": [
+    {
+      "id": "RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001",
+      "type": "governance"
+    }
+  ],
+  "explicit_change_request": "Owner AskUserQuestion (Phase-1 batch this session): 'Approve RETIRE-SPEC-ROLE-ASSIGNMENTS-001 v1 as drafted'.",
+  "full_content": "RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 v1 - Retire harness-state/role-assignments.json.\n\nDecision: harness-state/role-assignments.json is retired. Deletion follows referencer migration (WI-4330 through WI-4339; final deletion under WI-4336).\n\nRationale: Live drift evidence captured in DELIB-20260669 (registry vs mirror divergence on Antigravity harness A). No preservation path per AUQ#3 clean-delete decision.\n\nAuthorization: Retire-spec authorizes deletion under WI-4336 after migration. Prior to that WI, referencer migration MUST be complete (PAUTH forbid: delete_active_referencer_without_migration).\n\nSuccessor: All read access flows through groundtruth_kb.harness_projection reading from harness-state/harness-registry.json.\n\nAssertions: (a) file-absent: role-assignments.json does not exist post-WI-4336; (b) grep_absent: no live code references the retired path (outside whitelisted bridge/audit/packet contexts).\n\nRelated: GOV-HARNESS-STATE-SOT-CONSOLIDATION-001 (parent), DELIB-20260669.\n\nOwner AUQ approval captured this session (Phase-1 batch AUQ 4 of 4).\n",
+  "full_content_sha256": "4893b67f2ba02cbb9bb198b2c7fd41b37922efe49b3a0d2bdb246d8895104c6a",
+  "presented_to_user": true,
+  "source_ref": "owner_conversation:2026-06-05-S544b584c-wi4327-phase1-auq-batch",
+  "transcript_captured": true
+}

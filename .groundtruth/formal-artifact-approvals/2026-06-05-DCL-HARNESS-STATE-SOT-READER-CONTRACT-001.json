@@ -1,0 +1,22 @@
+{
+  "acknowledged_by": "owner",
+  "action": "insert",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "DCL-HARNESS-STATE-SOT-READER-CONTRACT-001",
+  "artifact_type": "design_constraint",
+  "change_reason": "WI-4327 Phase-1 Foundation: insert DCL-HARNESS-STATE-SOT-READER-CONTRACT-001 per owner AUQ approval.",
+  "changed_by": "prime-builder/claude/B",
+  "covered_artifacts": [
+    {
+      "id": "DCL-HARNESS-STATE-SOT-READER-CONTRACT-001",
+      "type": "design_constraint"
+    }
+  ],
+  "explicit_change_request": "Owner AskUserQuestion (Phase-1 batch this session): 'Approve DCL-READER-CONTRACT-001 v1 as drafted'.",
+  "full_content": "DCL-HARNESS-STATE-SOT-READER-CONTRACT-001 v1 - Mechanical reader-entrypoint discipline.\n\nConstraint: Every reader of harness-state roles, identities, or capabilities MUST go through the canonical entrypoint:\n- Python imports: from groundtruth_kb.harness_projection import read_roles, read_identity, read_capabilities\n- Shell: gt harness {roles, identity, capabilities}.\n- Direct json.load / tomllib.load reads of the 3 SoTs are FORBIDDEN outside the entrypoint module.\n\nEnforcement: Static-grep assertion + doctor _check_harness_state_sot_consistency (3-layer check committed in commit 0ee3d567).\n\nSeverity: blocking. Affected by: GOV-HARNESS-STATE-SOT-CONSOLIDATION-001.\n\nOwner AUQ approval captured this session (Phase-1 batch AUQ 2 of 4).\n",
+  "full_content_sha256": "d7f0503ea4dcff155b85b3dcafad8feccad2b8f0f529b6e59ee2623ba82eac14",
+  "presented_to_user": true,
+  "source_ref": "owner_conversation:2026-06-05-S544b584c-wi4327-phase1-auq-batch",
+  "transcript_captured": true
+}
