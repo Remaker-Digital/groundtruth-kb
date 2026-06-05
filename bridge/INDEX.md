@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-integration-phase-1-foundation
+NEW: bridge/gtkb-ollama-integration-phase-1-foundation-001.md
+
 Document: gtkb-cross-harness-trigger-no-go-dispatch-fix
 GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-006.md
 REVISED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-005.md
