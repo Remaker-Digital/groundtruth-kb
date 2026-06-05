@@ -8,9 +8,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-ollama-integration-phase-2
+NO-GO: bridge/gtkb-ollama-integration-phase-2-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-001.md
 
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
+REVISED: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-003.md
 NO-GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-002.md
 NEW: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-001.md
 
