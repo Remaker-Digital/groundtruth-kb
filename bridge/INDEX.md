@@ -75,6 +75,7 @@ NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-002.md
 NEW: bridge/gtkb-isolation-018-agent-red-cutover-001.md
 
 Document: gtkb-protected-artifact-rollup-governance-umbrella
+NO-GO: bridge/gtkb-protected-artifact-rollup-governance-umbrella-004.md
 REVISED: bridge/gtkb-protected-artifact-rollup-governance-umbrella-003.md
 NO-GO: bridge/gtkb-protected-artifact-rollup-governance-umbrella-002.md
 NEW: bridge/gtkb-protected-artifact-rollup-governance-umbrella-001.md
