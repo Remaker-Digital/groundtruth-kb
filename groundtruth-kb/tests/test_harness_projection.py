@@ -16,10 +16,19 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest  # noqa: E402
+
 from groundtruth_kb.harness_projection import (
+    HARNESS_CAPABILITIES_RELATIVE_PATH,
+    HARNESS_IDENTITIES_RELATIVE_PATH,
+    HARNESS_REGISTRY_RELATIVE_PATH,
     PROJECTION_SCHEMA_VERSION,
+    HarnessStateError,
     build_projection,
     generate_harness_projection,
+    read_capabilities,
+    read_identity,
+    read_roles,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -92,9 +101,7 @@ class TestBuildProjection:
         }
 
     def test_build_projection_null_invocation_surfaces(self, db: Any) -> None:
-        _insert_harness(
-            db, id="A", harness_name="codex", harness_type="codex", role=["loyal-opposition"]
-        )
+        _insert_harness(db, id="A", harness_name="codex", harness_type="codex", role=["loyal-opposition"])
         record = build_projection(db.list_harnesses())["harnesses"][0]
         assert record["invocation_surfaces"] is None
         assert record["reviewer_precedence"] is None
@@ -122,12 +129,19 @@ class TestGenerateHarnessProjection:
 
     def test_generate_reflects_current_versions(self, db: Any, tmp_path: Path) -> None:
         _insert_harness(
-            db, id="C", harness_name="antigravity", harness_type="antigravity",
+            db,
+            id="C",
+            harness_name="antigravity",
+            harness_type="antigravity",
             role=["loyal-opposition"],
         )
         _insert_harness(
-            db, id="C", harness_name="antigravity", harness_type="antigravity",
-            role=["loyal-opposition"], status="active",
+            db,
+            id="C",
+            harness_name="antigravity",
+            harness_type="antigravity",
+            role=["loyal-opposition"],
+            status="active",
         )
         proj_path = tmp_path / "harness-registry.json"
         generate_harness_projection(db, tmp_path, projection_path=proj_path)
@@ -156,8 +170,12 @@ class TestGeneratorReaderRoundTrip:
 
     def test_generate_then_load_roundtrip(self, db: Any, tmp_path: Path) -> None:
         _insert_harness(
-            db, id="B", harness_name="claude", harness_type="claude",
-            role=["prime-builder"], invocation_surfaces={"headless": "claude -p"},
+            db,
+            id="B",
+            harness_name="claude",
+            harness_type="claude",
+            role=["prime-builder"],
+            invocation_surfaces={"headless": "claude -p"},
         )
         proj_path = tmp_path / "harness-state" / "harness-registry.json"
         generate_harness_projection(db, tmp_path, projection_path=proj_path)
@@ -167,3 +185,88 @@ class TestGeneratorReaderRoundTrip:
         assert loaded["harnesses"][0]["id"] == "B"
         assert loaded["harnesses"][0]["role"] == ["prime-builder"]
         assert loaded["harnesses"][0]["invocation_surfaces"] == {"headless": "claude -p"}
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# WI-4327 / WI-4328: canonical reader entrypoint tests
+#
+# Verifies that read_roles(), read_identity(), and read_capabilities() are
+# the canonical reader entrypoints for the 3 harness-state SoT surfaces and
+# that they raise HarnessStateError on missing / malformed inputs.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _write_harness_state_fixtures(root: Path) -> None:
+    """Create canonical 3-SoT-file fixture set under ``root``."""
+    (root / HARNESS_REGISTRY_RELATIVE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (root / HARNESS_REGISTRY_RELATIVE_PATH).write_text(
+        json.dumps({"schema_version": 1, "harnesses": [{"id": "B", "harness_name": "claude"}]}),
+        encoding="utf-8",
+    )
+    (root / HARNESS_IDENTITIES_RELATIVE_PATH).write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"claude": {"id": "B"}}}),
+        encoding="utf-8",
+    )
+    (root / HARNESS_CAPABILITIES_RELATIVE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (root / HARNESS_CAPABILITIES_RELATIVE_PATH).write_text(
+        '[[harness]]\nname = "claude"\ntype = "claude"\n',
+        encoding="utf-8",
+    )
+
+
+def test_read_roles_returns_parsed_registry(tmp_path: Path) -> None:
+    """read_roles() reads the canonical harness-registry.json SoT."""
+    _write_harness_state_fixtures(tmp_path)
+    data = read_roles(project_root=tmp_path)
+    assert isinstance(data, dict)
+    assert data["schema_version"] == 1
+    assert data["harnesses"][0]["id"] == "B"
+
+
+def test_read_identity_returns_parsed_identities(tmp_path: Path) -> None:
+    """read_identity() reads the canonical harness-identities.json SoT."""
+    _write_harness_state_fixtures(tmp_path)
+    data = read_identity(project_root=tmp_path)
+    assert isinstance(data, dict)
+    assert data["harnesses"]["claude"]["id"] == "B"
+
+
+def test_read_capabilities_returns_parsed_toml(tmp_path: Path) -> None:
+    """read_capabilities() reads the canonical harness-capability-registry.toml SoT."""
+    _write_harness_state_fixtures(tmp_path)
+    data = read_capabilities(project_root=tmp_path)
+    assert isinstance(data, dict)
+    assert data["harness"][0]["name"] == "claude"
+
+
+def test_read_roles_missing_file_raises_harness_state_error(tmp_path: Path) -> None:
+    """Missing harness-registry.json raises HarnessStateError, not FileNotFoundError."""
+    # No fixtures written; SoT file absent.
+    with pytest.raises(HarnessStateError, match="missing"):
+        read_roles(project_root=tmp_path)
+
+
+def test_read_identity_malformed_json_raises_harness_state_error(tmp_path: Path) -> None:
+    """Malformed JSON in identities file raises HarnessStateError."""
+    (tmp_path / HARNESS_IDENTITIES_RELATIVE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / HARNESS_IDENTITIES_RELATIVE_PATH).write_text("{not valid json", encoding="utf-8")
+    with pytest.raises(HarnessStateError, match="malformed JSON"):
+        read_identity(project_root=tmp_path)
+
+
+def test_read_capabilities_malformed_toml_raises_harness_state_error(tmp_path: Path) -> None:
+    """Malformed TOML in capabilities file raises HarnessStateError."""
+    cap_path = tmp_path / HARNESS_CAPABILITIES_RELATIVE_PATH
+    cap_path.parent.mkdir(parents=True, exist_ok=True)
+    cap_path.write_text("[[harness\nname = oops missing-bracket", encoding="utf-8")
+    with pytest.raises(HarnessStateError, match="malformed TOML"):
+        read_capabilities(project_root=tmp_path)
+
+
+def test_read_roles_non_object_top_level_raises_harness_state_error(tmp_path: Path) -> None:
+    """Top-level non-object (e.g. JSON array) raises HarnessStateError."""
+    registry_path = tmp_path / HARNESS_REGISTRY_RELATIVE_PATH
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("[1, 2, 3]", encoding="utf-8")
+    with pytest.raises(HarnessStateError, match="expected a JSON object"):
+        read_roles(project_root=tmp_path)
