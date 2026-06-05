@@ -6,13 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-1094
-  asked_at: 2026-06-05T16:19:32.665833Z
-  question: "Want me to wait it out and complete automatically, or leave it queued here for the next session to file?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: ab4ba2e99df27506
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -8829,6 +8823,15 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-05T16:19:32.665833Z
   answer: "Your questions have been answered: \"WI-4371: how should the LO file-safety write-gate resolve role, given your envelope-authoritative model? (Fix is load-bearing — it'll go through a bridge proposal + LO review + tests either way.)\"=\"Migrate to resolver (recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1094
+  asked_at: 2026-06-05T16:19:32.665833Z
+  question: "Want me to wait it out and complete automatically, or leave it queued here for the next session to file?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: ab4ba2e99df27506
+  resolved_at: 2026-06-05T19:11:32.224852Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 
