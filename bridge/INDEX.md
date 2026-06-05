@@ -13,6 +13,7 @@ NO-GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-002.md
 NEW: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-001.md
 
 Document: gtkb-workspace-orphan-cleanup-2026-06-05
+WITHDRAWN: bridge/gtkb-workspace-orphan-cleanup-2026-06-05-003.md
 NO-GO: bridge/gtkb-workspace-orphan-cleanup-2026-06-05-002.md
 NEW: bridge/gtkb-workspace-orphan-cleanup-2026-06-05-001.md
 
