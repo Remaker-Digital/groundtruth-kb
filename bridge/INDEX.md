@@ -12,6 +12,7 @@ NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-foundation-001.md
 
 Document: gtkb-cross-harness-trigger-no-go-dispatch-fix
+NEW: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-007.md
 GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-006.md
 REVISED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-005.md
 NO-GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-004.md
