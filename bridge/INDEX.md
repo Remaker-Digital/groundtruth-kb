@@ -16,6 +16,8 @@ NO-GO: bridge/gtkb-protected-artifact-rollup-governance-umbrella-002.md
 NEW: bridge/gtkb-protected-artifact-rollup-governance-umbrella-001.md
 
 Document: gtkb-platform-sot-consolidation-slice-1-governance-foundation
+NO-GO: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-007.md
+NEW: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-006.md
 GO: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-005.md
 REVISED: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-004.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-003.md
@@ -28,6 +30,7 @@ NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-002.md
 NEW: bridge/gtkb-handoff-prompt-deterministic-service-impl-001.md
 
 Document: gtkb-envelope-disclosure-ui-impl
+NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-007.md
 REVISED: bridge/gtkb-envelope-disclosure-ui-impl-006.md
 NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-005.md
 NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-004.md
