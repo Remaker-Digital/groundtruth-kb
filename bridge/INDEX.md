@@ -20,6 +20,7 @@ NO-GO: bridge/gtkb-workspace-orphan-cleanup-2026-06-05-002.md
 NEW: bridge/gtkb-workspace-orphan-cleanup-2026-06-05-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-foundation
+NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-007.md
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-006.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-005.md
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-004.md
