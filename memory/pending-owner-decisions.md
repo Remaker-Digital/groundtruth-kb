@@ -6,7 +6,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-1095
+  asked_at: 2026-06-05T21:28:00.112529Z
+  question: "owner decision: \"which scope expansion + writer disposition?"
+  detected_via: prose:your_decision_q
+  status: pending
+  question_hash: 19c53d03f8fecb32
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
