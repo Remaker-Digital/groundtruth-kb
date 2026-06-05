@@ -584,7 +584,11 @@ def _issue_dispatch_authorization_for_selected(
     dispatch_id: str,
 ) -> dict[str, Any]:
     """Create implementation-start packets for a selected Prime dispatch batch."""
-    bridge_ids = [str(item.document_name) for item in selected]
+    go_items = [item for item in selected if getattr(item, "top_status", "").upper() == "GO"]
+    bridge_ids = [str(item.document_name) for item in go_items]
+    if not bridge_ids:
+        # All selected items are NO-GO revision tasks; no impl-auth packet needed.
+        return {"ok": True, "reason": None, "context": {}}
     try:
         context = issue_dispatch_authorization_packets(project_root, bridge_ids, dispatch_id=dispatch_id)
     except AuthorizationError as exc:
