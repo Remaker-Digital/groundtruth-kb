@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
+NO-GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-002.md
 NEW: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-001.md
 
 Document: gtkb-workspace-orphan-cleanup-2026-06-05
@@ -15,12 +16,16 @@ NO-GO: bridge/gtkb-workspace-orphan-cleanup-2026-06-05-002.md
 NEW: bridge/gtkb-workspace-orphan-cleanup-2026-06-05-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-foundation
+GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-006.md
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-005.md
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 
 Document: gtkb-ollama-integration-phase-1-shim
+REVISED: bridge/gtkb-ollama-integration-phase-1-shim-005.md
+GO: bridge/gtkb-ollama-integration-phase-1-shim-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-shim-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-shim-001.md
