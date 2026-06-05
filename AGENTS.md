@@ -49,7 +49,8 @@ behavior. Current host-local identities:
 Startup resolves the harness ID from `harness-state/harness-identities.json`,
 then resolves the role by reading that harness ID entry in
 `harness-state/harness-registry.json` through
-`groundtruth_kb.harness_projection.read_roles` or `gt harness role`.
+`groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under
+`gt harness`.
 A persisted harness ID must be unique on
 the workstation and must not change after initial assignment except through an
 explicit owner-requested identity change operation. A startup-supplied
@@ -239,7 +240,8 @@ item, and release blockers or release-target constraints when present.
 7. Resolve the active harness's durable installation ID from
    `harness-state/harness-identities.json`, then read
    `harness-state/harness-registry.json` through
-   `groundtruth_kb.harness_projection.read_roles` or `gt harness role`
+   `groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand
+   under `gt harness`
    before applying any role-specific permissions or
    restrictions. If the role map records no Prime Builder, the starting
    harness assumes Prime Builder and updates the role map via `gt mode

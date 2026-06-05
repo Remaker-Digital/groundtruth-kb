@@ -142,7 +142,8 @@ They are **mutually exclusive at runtime**:
 
 Substrate applicability is determined by the role-set topology in
 ``harness-state/harness-registry.json`` through
-``groundtruth_kb.harness_projection.read_roles`` or ``gt harness role``. The doctor's
+``groundtruth_kb.harness_projection.read_roles`` or the ``roles`` subcommand
+under ``gt harness``. The doctor's
 ``_check_role_set_topology_consistency`` (Slice 1) validates wire form;
 ``_check_single_harness_dispatcher_when_required`` (Slice 1 + Slice 2
 upgrade) reports applicability and registration health. Per

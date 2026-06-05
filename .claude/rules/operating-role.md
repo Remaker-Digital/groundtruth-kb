@@ -85,7 +85,8 @@ transient session.
 `harness-state/harness-registry.json` is the canonical SOT recording each
 harness ID's durable role as a JSON list (the wire representation of a role
 set). Runtime role reads should use
-`groundtruth_kb.harness_projection.read_roles` or the `gt harness role` CLI
+`groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under
+the `gt harness` CLI
 when code needs canonical state semantics. The role-set schema is the
 **active runtime schema**, not a future-design framing
 (per `ADR-SINGLE-HARNESS-OPERATING-MODE-001` Path 2 atomic migration).

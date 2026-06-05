@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,6 +28,9 @@ LIVE_GUIDANCE_TARGETS = (
 
 MIRROR = "role-assignments.json"
 CANONICAL_READER = "groundtruth_kb.harness_projection.read_roles"
+CANONICAL_READER_CLI_GROUP = "gt harness"
+CANONICAL_READER_CLI_SUBCOMMAND = "roles"
+SINGULAR_READER_COMMAND = re.compile(r"gt harness " + r"role(?!s)\b")
 OVERLAY_POINTERS = (
     "harness-state/claude/operating-role.md",
     "harness-state/codex/operating-role.md",
@@ -40,6 +46,16 @@ OPERATING_ROLE_ALLOWED_MIRROR_SNIPPETS = (
 
 def _read(relpath: str) -> str:
     return (ROOT / relpath).read_text(encoding="utf-8")
+
+
+def _gt_command() -> str:
+    for candidate in (
+        ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "gt.exe",
+        ROOT / "groundtruth-kb" / ".venv" / "bin" / "gt",
+    ):
+        if candidate.exists():
+            return str(candidate)
+    return "gt"
 
 
 def test_rule_files_have_no_live_role_assignments_mirror_authority() -> None:
@@ -58,7 +74,31 @@ def test_rule_files_have_no_live_role_assignments_mirror_authority() -> None:
 def test_rule_files_cite_canonical_role_reader_entrypoint() -> None:
     """Each protected role surface points live role reads at the canonical reader."""
     for relpath in PROTECTED_TARGETS:
-        assert CANONICAL_READER in _read(relpath), f"{relpath} does not cite {CANONICAL_READER}"
+        text = _read(relpath)
+        assert CANONICAL_READER in text, f"{relpath} does not cite {CANONICAL_READER}"
+        assert CANONICAL_READER_CLI_GROUP in text, f"{relpath} does not cite {CANONICAL_READER_CLI_GROUP}"
+        assert CANONICAL_READER_CLI_SUBCOMMAND in text, f"{relpath} does not cite {CANONICAL_READER_CLI_SUBCOMMAND}"
+
+
+def test_rule_files_do_not_cite_singular_harness_role_command() -> None:
+    """The deprecated singular CLI spelling must not remain in live guidance."""
+    for relpath in PROTECTED_TARGETS:
+        assert SINGULAR_READER_COMMAND.search(_read(relpath)) is None, (
+            f"{relpath} still cites singular harness-role reader command"
+        )
+
+
+def test_canonical_reader_cli_subcommand_is_live() -> None:
+    """The documented CLI reader subcommand should execute and emit the projection."""
+    result = subprocess.run(
+        [_gt_command(), "harness", CANONICAL_READER_CLI_SUBCOMMAND],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    assert "harnesses" in payload
 
 
 def test_legacy_overlay_pointer_files_are_deleted() -> None:

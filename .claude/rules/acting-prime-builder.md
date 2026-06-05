@@ -23,7 +23,8 @@ SET operations: `scripts/harness_roles.py` REJECTS `acting-prime-builder`
 as a target role; only `prime-builder` and `loyal-opposition` are valid
 SET targets. READ operations load role values from the canonical role registry
 at `harness-state/harness-registry.json` through
-`groundtruth_kb.harness_projection.read_roles` or `gt harness role`; any
+`groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under
+`gt harness`; any
 legacy `acting-prime-builder` value encountered there continues to load
 without error for compatibility/provenance.
 

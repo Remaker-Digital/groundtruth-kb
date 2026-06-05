@@ -13,7 +13,8 @@ this workspace and reads `AGENTS.md`:
 - Fresh-session startup discovers the harness's durable ID from
   `harness-state/harness-identities.json`, then discovers the assigned
   operating role from `harness-state/harness-registry.json` through
-  `groundtruth_kb.harness_projection.read_roles` or `gt harness role`.
+  `groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand
+  under `gt harness`.
 - A persisted harness ID is workstation-unique and must not change after it is
   set except through an explicit owner-requested identity change operation.
 - The explicit identity change operation is
@@ -154,7 +155,8 @@ Use this at the start of a new session if needed:
 Resolve this harness's persistent ID from
 `harness-state/harness-identities.json`, then start in the GroundTruth-KB role
 recorded for that harness ID in `harness-state/harness-registry.json`, read
-through `groundtruth_kb.harness_projection.read_roles` or `gt harness role`.
+through `groundtruth_kb.harness_projection.read_roles` or the `roles`
+subcommand under `gt harness`.
 Load AGENTS.md, the harness identity map, the role assignment map,
 .claude/rules/canonical-terminology.md,
 .claude/rules/codex-session-bootstrap.md,

@@ -7,11 +7,18 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-work-tree-hygiene-slice-a-detector
+GO: bridge/gtkb-work-tree-hygiene-slice-a-detector-002.md
+NEW: bridge/gtkb-work-tree-hygiene-slice-a-detector-001.md
+
 Document: gtkb-ollama-integration-phase-1-governance-impl
 GO: bridge/gtkb-ollama-integration-phase-1-governance-impl-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-governance-impl-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-009.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-008.md
+NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-007.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-006.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-005.md
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-004.md

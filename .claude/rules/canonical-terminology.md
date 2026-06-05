@@ -773,7 +773,8 @@ model, vendor name, or transient session.
 configuration).
 
 **Implementation pointer:** `harness-state/harness-registry.json`;
-`groundtruth_kb.harness_projection.read_roles`; `gt harness role`;
+`groundtruth_kb.harness_projection.read_roles`; the `roles` subcommand under
+`gt harness`;
 `.claude/rules/operating-role.md`; `.claude/rules/prime-builder-role.md`;
 `.claude/rules/loyal-opposition.md`.
 
@@ -1019,7 +1020,7 @@ bridge `gtkb-role-session-lifecycle-simplification-003` REVISED-1 GO at -004.
 
 **Implementation pointer:** `harness-state/harness-registry.json` is the
 canonical durable record; `groundtruth_kb.harness_projection.read_roles` and
-`gt harness role` are canonical reader entrypoints;
+the `roles` subcommand under `gt harness` are canonical reader entrypoints;
 `.claude/rules/operating-role.md` is human-readable startup guidance (not a
 role record); `scripts/harness_roles.py` enforces the SET/READ contract.
 
