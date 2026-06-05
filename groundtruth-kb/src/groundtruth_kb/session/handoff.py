@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.harness_projection import HarnessStateError, read_identity
 
 # Canonical status tokens we surface in the handoff prompt. Latest-only per
 # Document; matches the bridge file-bridge protocol § Statuses.
@@ -204,9 +205,10 @@ def _resolve_active_harness_name(project_root: Path) -> str:
        before ``claude`` / ``codex``).
     """
     identities_path = project_root / "harness-state" / "harness-identities.json"
-    if not identities_path.exists():
-        raise HandoffError(f"Harness identities missing: {identities_path}")
-    data = json.loads(identities_path.read_text(encoding="utf-8"))
+    try:
+        data = read_identity(project_root)
+    except HarnessStateError as exc:
+        raise HandoffError(f"Harness identities missing or unreadable: {identities_path}") from exc
     harnesses = data.get("harnesses", {}) or data.get("identities", {}) or {}
     if not harnesses:
         raise HandoffError(

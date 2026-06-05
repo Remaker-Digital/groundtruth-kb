@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.harness_projection import HarnessStateError, read_identity, read_roles
+
 ENVELOPE_SCHEMA_VERSION = 1
 TOPIC_TYPES = ("spec", "build", "test", "deliberation", "project")
 
@@ -93,7 +95,10 @@ def resolve_harness_identity(
     harness_id: str | None = None,
 ) -> tuple[str, str]:
     name = (harness_name or "codex").strip().lower()
-    identity_data = _read_json(project_root / "harness-state" / "harness-identities.json", {})
+    try:
+        identity_data = read_identity(project_root)
+    except HarnessStateError:
+        identity_data = {}
     harnesses = identity_data.get("harnesses") if isinstance(identity_data, dict) else None
     if isinstance(harnesses, dict):
         record = harnesses.get(name)
@@ -109,7 +114,10 @@ def resolve_harness_identity(
 
 
 def _resolve_role(project_root: Path, harness_id: str) -> str | None:
-    registry = _read_json(project_root / "harness-state" / "harness-registry.json", {})
+    try:
+        registry = read_roles(project_root)
+    except HarnessStateError:
+        registry = {}
     rows = registry.get("harnesses") if isinstance(registry, dict) else None
     if not isinstance(rows, list):
         return None

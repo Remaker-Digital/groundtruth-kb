@@ -20,6 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.cross_harness_bridge_trigger import DispatchTarget, _harness_command  # noqa: E402
+from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 DEFAULT_EVIDENCE_ROOT = PROJECT_ROOT / ".gtkb-state" / "antigravity-onboarding" / "dispatch-verification"
 CREDENTIAL_PATTERNS = (
@@ -48,13 +49,7 @@ def sanitize_capture(text: str) -> str:
 def load_harness_record(project_root: Path, recipient: str) -> dict[str, Any]:
     """Load one harness record from the generated registry projection."""
 
-    registry_path = project_root / "harness-state" / "harness-registry.json"
-    try:
-        registry = json.loads(registry_path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise VerificationError(f"harness registry not found: {registry_path}") from exc
-    except json.JSONDecodeError as exc:
-        raise VerificationError(f"harness registry is invalid JSON: {registry_path}: {exc}") from exc
+    registry = load_harness_projection(project_root)
     for record in registry.get("harnesses", []):
         if isinstance(record, dict) and str(record.get("id")) == recipient:
             return record

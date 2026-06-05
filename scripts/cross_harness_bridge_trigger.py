@@ -69,6 +69,8 @@ _TRIGGER_DIR = str(Path(__file__).resolve().parent)
 if _TRIGGER_DIR not in sys.path:
     sys.path.insert(0, _TRIGGER_DIR)
 
+from harness_projection_reader import load_harness_projection  # noqa: E402
+
 # WI-3360: the lazy ``import groundtruth_kb`` calls in the dispatch/detection
 # paths require ``groundtruth-kb/src`` on sys.path. The PostToolUse/Stop hook
 # registrations run ``python scripts/cross_harness_bridge_trigger.py`` without
@@ -975,13 +977,7 @@ def _read_role_assignments(project_root: Path) -> dict[str, Any]:
     ``invocation_surfaces``, ...). Raises ValueError on a missing or unreadable
     projection, so callers fail closed.
     """
-    path = _harness_state_dir(project_root) / "harness-registry.json"
-    try:
-        projection = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"harness-registry.json not found at {path}") from exc
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"harness-registry.json unreadable at {path}: {exc}") from exc
+    projection = load_harness_projection(project_root)
     harnesses = {
         str(record["id"]): record
         for record in projection.get("harnesses", [])
@@ -1000,13 +996,7 @@ def _read_harness_identities(project_root: Path) -> dict[str, Any]:
     ``_invert_identities`` and the single-harness dispatcher keep working
     unchanged. Raises ValueError on a missing or unreadable projection.
     """
-    path = _harness_state_dir(project_root) / "harness-registry.json"
-    try:
-        projection = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"harness-registry.json not found at {path}") from exc
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"harness-registry.json unreadable at {path}: {exc}") from exc
+    projection = load_harness_projection(project_root)
     harnesses = {
         str(record["harness_name"]): {"id": record["id"]}
         for record in projection.get("harnesses", [])

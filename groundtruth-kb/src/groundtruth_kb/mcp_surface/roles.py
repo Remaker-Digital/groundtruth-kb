@@ -19,14 +19,15 @@ import json
 import os
 from pathlib import Path
 
+from groundtruth_kb.harness_projection import HarnessStateError, read_roles
 from groundtruth_kb.mcp_surface.boundary import resolve_safe_path
 
 CANONICAL_ROLES: frozenset[str] = frozenset({"prime-builder", "loyal-opposition"})
 COMPATIBILITY_ROLES: frozenset[str] = frozenset({"acting-prime-builder"})
 
-# WI-3342 IP-4: role and identity state both resolve from the DB-backed harness
-# registry projection. The legacy harness-state/role-assignments.json and
-# harness-state/harness-identities.json are no longer read in this module.
+# WI-3342 IP-4: role and identity state both resolve through the canonical
+# harness-projection reader entrypoint. The legacy harness-state/role-assignments.json
+# and harness-state/harness-identities.json are no longer read in this module.
 _HARNESS_REGISTRY_REL = Path("harness-state/harness-registry.json")
 
 
@@ -74,9 +75,8 @@ def _default_harness_id() -> str:
         return ""
 
     try:
-        registry_path = resolve_safe_path(_HARNESS_REGISTRY_REL)
-        data = json.loads(registry_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        data = read_roles(resolve_safe_path("."))
+    except HarnessStateError:
         return ""
 
     for record in data.get("harnesses", []):
@@ -155,8 +155,10 @@ def current_role(
 
     if harness_id is None:
         harness_id = _default_harness_id()
-    role_map_path = resolve_safe_path(_HARNESS_REGISTRY_REL) if role_map_path is None else Path(role_map_path)
-    data = json.loads(role_map_path.read_text(encoding="utf-8"))
+    if role_map_path is None:
+        data = read_roles(resolve_safe_path("."))
+    else:
+        data = json.loads(Path(role_map_path).read_text(encoding="utf-8"))
     for record in data.get("harnesses", []):
         if isinstance(record, dict) and record.get("id") == harness_id:
             return _canonical_role(record.get("role", "unknown"))
