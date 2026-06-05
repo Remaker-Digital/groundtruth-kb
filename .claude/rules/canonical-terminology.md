@@ -698,8 +698,26 @@ role attached to the harness).
 `DELIB-0831` (harness portability requires identity stability).
 
 **Implementation pointer:** `harness-state/harness-identities.json`;
+`groundtruth_kb.harness_projection.read_identity`;
 `python scripts/harness_identity.py set --harness-name <name>
 --harness-id <id> --owner-requested`.
+
+### canonical reader entrypoint
+
+**Definition:** The supported code or CLI interface that consumers use to read
+a canonical source-of-truth artifact without re-implementing path, schema,
+fallback, or lifecycle semantics.
+
+**Canonical alias:** reader entrypoint.
+
+**Not to be confused with:** the canonical artifact itself; direct file reads
+used only for governed audits or diagnostics.
+
+**Source:** `DCL-HARNESS-STATE-SOT-READER-CONTRACT-001`.
+
+**Implementation pointer:**
+`groundtruth_kb.harness_projection.{read_roles, read_identity, read_capabilities}`
+and the corresponding `gt harness ...` CLI surfaces.
 
 ### handoff prompt
 
@@ -754,7 +772,8 @@ model, vendor name, or transient session.
 (Prime/LO are portable); `DELIB-0832` (installation-time role
 configuration).
 
-**Implementation pointer:** `harness-state/harness-registry.json` (canonical role registry; legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement);
+**Implementation pointer:** `harness-state/harness-registry.json`;
+`groundtruth_kb.harness_projection.read_roles`; `gt harness role`;
 `.claude/rules/operating-role.md`; `.claude/rules/prime-builder-role.md`;
 `.claude/rules/loyal-opposition.md`.
 
@@ -983,7 +1002,7 @@ formal-artifact-approval packet.
 ### operating role
 
 **Definition:** The authority-bearing harness role recorded for an active
-harness ID in `harness-state/harness-registry.json` (canonical role registry; legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement). Canonical values are
+harness ID in `harness-state/harness-registry.json`. Canonical values are
 `prime-builder` (implementing authority) and `loyal-opposition` (reviewing
 authority). The legacy value `acting-prime-builder` is READ-accepted for
 backward compatibility but SET-rejected (cannot be assigned as a new role)
@@ -999,9 +1018,10 @@ see below); session focus (owner-facing startup selection); work subject
 bridge `gtkb-role-session-lifecycle-simplification-003` REVISED-1 GO at -004.
 
 **Implementation pointer:** `harness-state/harness-registry.json` is the
-canonical durable record (legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement); `.claude/rules/operating-role.md` is human-readable startup
-guidance (not a role record); `scripts/harness_roles.py` enforces the SET/
-READ contract.
+canonical durable record; `groundtruth_kb.harness_projection.read_roles` and
+`gt harness role` are canonical reader entrypoints;
+`.claude/rules/operating-role.md` is human-readable startup guidance (not a
+role record); `scripts/harness_roles.py` enforces the SET/READ contract.
 
 ### session lane
 
@@ -1076,7 +1096,7 @@ resume.
 **Canonical alias:** interactive session role; session-scoped role.
 
 **Not to be confused with:** `operating role` (the durable, cross-session role
-in `harness-state/harness-registry.json` — canonical role registry; legacy `harness-state/role-assignments.json` mirror is orphan per Slice 1 retirement; session-stated role overrides it only
+in `harness-state/harness-registry.json`; session-stated role overrides it only
 for interactive in-session surfaces, never for headless dispatch routing);
 `session lane` (a non-authority work classification); `session focus` (the
 owner-facing startup focus selection); `work subject` (the active subject area;
@@ -1170,9 +1190,7 @@ in `groundtruth-kb/src/groundtruth_kb/project/doctor.py` (health checks).
 **Canonical alias:** role-set; durable role set.
 
 **Definition:** The wire form of a harness's durable operating-role
-assignment recorded in ``harness-state/harness-registry.json`` (canonical role
-registry; legacy ``harness-state/role-assignments.json`` mirror is orphan per
-Slice 1 retirement). The role set
+assignment recorded in ``harness-state/harness-registry.json``. The role set
 is a JSON list of role tokens drawn from ``{prime-builder, loyal-opposition}``.
 Singleton lists represent the multi-harness case (one role per harness ID);
 multi-element lists represent the single-harness case (one harness ID holds
@@ -1222,7 +1240,7 @@ prepare capable harnesses for either role regardless of topology);
 
 **Implementation pointer:** Topology is determined at runtime by inspecting
 the active harness's role-set cardinality in
-``harness-state/harness-registry.json`` (canonical role registry; legacy ``harness-state/role-assignments.json`` mirror is orphan per Slice 1 retirement). Multi-element role set ->
+``harness-state/harness-registry.json``. Multi-element role set ->
 single-harness mode applicable. Doctor check
 ``_check_single_harness_dispatcher_when_required`` warns when applicable but
 the scheduled task is absent.

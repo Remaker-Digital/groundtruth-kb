@@ -34,10 +34,9 @@ As of 2026-05-05, Mike designates:
   host-local harness installation IDs.
 - `harness-state/harness-registry.json` as the canonical role registry — the
   single source-of-truth operating-role record for those harness IDs per Slice 1
-  retirement. The legacy `harness-state/role-assignments.json` mirror is an
-  orphan compatibility surface and is not authoritative. No markdown rule file
-  can override this durable assignment map; rule files are behavior contracts
-  describing how each role operates, not records of which role is active.
+  retirement. No markdown rule file can override this durable assignment map;
+  rule files are behavior contracts describing how each role operates, not
+  records of which role is active.
 
 Session startup must identify the active harness by its durable installation ID
 before applying role-specific startup text, permissions, restrictions, or hook
@@ -49,9 +48,9 @@ behavior. Current host-local identities:
 
 Startup resolves the harness ID from `harness-state/harness-identities.json`,
 then resolves the role by reading that harness ID entry in
-`harness-state/harness-registry.json` (canonical role registry; legacy
-`harness-state/role-assignments.json` mirror is orphan/compat per Slice 1
-retirement). A persisted harness ID must be unique on
+`harness-state/harness-registry.json` through
+`groundtruth_kb.harness_projection.read_roles` or `gt harness role`.
+A persisted harness ID must be unique on
 the workstation and must not change after initial assignment except through an
 explicit owner-requested identity change operation. A startup-supplied
 `--harness-id` is only a consistency assertion; it must not silently replace the
@@ -239,9 +238,9 @@ item, and release blockers or release-target constraints when present.
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 7. Resolve the active harness's durable installation ID from
    `harness-state/harness-identities.json`, then read
-   `harness-state/harness-registry.json` (canonical role registry per Slice 1
-   retirement; legacy `harness-state/role-assignments.json` mirror is
-   orphan/compat) before applying any role-specific permissions or
+   `harness-state/harness-registry.json` through
+   `groundtruth_kb.harness_projection.read_roles` or `gt harness role`
+   before applying any role-specific permissions or
    restrictions. If the role map records no Prime Builder, the starting
    harness assumes Prime Builder and updates the role map via `gt mode
    set-role` (the canonical writer).

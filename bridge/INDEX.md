@@ -12,6 +12,7 @@ GO: bridge/gtkb-ollama-integration-phase-1-governance-impl-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-governance-impl-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
+NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-005.md
 GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-002.md

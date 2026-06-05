@@ -12,7 +12,8 @@ this workspace and reads `AGENTS.md`:
   restrictions are applied.
 - Fresh-session startup discovers the harness's durable ID from
   `harness-state/harness-identities.json`, then discovers the assigned
-  operating role from `harness-state/role-assignments.json`.
+  operating role from `harness-state/harness-registry.json` through
+  `groundtruth_kb.harness_projection.read_roles` or `gt harness role`.
 - A persisted harness ID is workstation-unique and must not change after it is
   set except through an explicit owner-requested identity change operation.
 - The explicit identity change operation is
@@ -76,8 +77,9 @@ this workspace and reads `AGENTS.md`:
   MemBase `current_work_items` status counts, every active `project_name`
   group, and release blockers or release-target constraints.
 
-These changes now activate automatically when `harness-state/role-assignments.json`
-assigns the current harness ID to Loyal Opposition mode:
+These changes now activate automatically when `harness-state/harness-registry.json`,
+read through the canonical role reader, assigns the current harness ID to Loyal
+Opposition mode:
 
 - non-mutating review-mode hook behavior
 
@@ -116,12 +118,12 @@ Optional local environment overrides remain available:
 8. Start the assigned AI harness in this workspace:
    `E:\GT-KB`
 9. Review-mode hooks should auto-activate from `harness-state/harness-identities.json`
-   plus `harness-state/role-assignments.json`.
+   plus canonical role state in `harness-state/harness-registry.json`.
    Only set an environment flag if you need to force or override the detected mode.
 10. Confirm the assigned AI harness loads:
    - `AGENTS.md`
    - `harness-state/harness-identities.json`
-   - `harness-state/role-assignments.json`
+   - `harness-state/harness-registry.json`
    - `.claude/rules/operating-role.md` guidance
    - `.claude/rules/canonical-terminology.md`
    - `.claude/rules/codex-standing-priorities.md`
@@ -151,7 +153,8 @@ Use this at the start of a new session if needed:
 ```text
 Resolve this harness's persistent ID from
 `harness-state/harness-identities.json`, then start in the GroundTruth-KB role
-recorded for that harness ID in `harness-state/role-assignments.json`.
+recorded for that harness ID in `harness-state/harness-registry.json`, read
+through `groundtruth_kb.harness_projection.read_roles` or `gt harness role`.
 Load AGENTS.md, the harness identity map, the role assignment map,
 .claude/rules/canonical-terminology.md,
 .claude/rules/codex-session-bootstrap.md,

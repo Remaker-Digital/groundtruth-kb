@@ -10,8 +10,6 @@ The single source-of-truth role artifact is:
 
 `harness-state/harness-registry.json`
 
-(legacy mirror at `harness-state/role-assignments.json` is an orphan compatibility surface per Slice 1 retirement; not authoritative).
-
 This rule file is not a role record and must not contain an `active_role:`
 assignment. It exists only as human-readable startup guidance for the role
 assignment system. No markdown rule file can override the durable role
@@ -86,8 +84,9 @@ transient session.
 
 `harness-state/harness-registry.json` is the canonical SOT recording each
 harness ID's durable role as a JSON list (the wire representation of a role
-set). The registry is a MemBase projection per `REQ-HARNESS-REGISTRY-001`;
-legacy mirror at `harness-state/role-assignments.json` is an orphan compatibility surface per Slice 1 retirement; not authoritative. The role-set schema is the
+set). Runtime role reads should use
+`groundtruth_kb.harness_projection.read_roles` or the `gt harness role` CLI
+when code needs canonical state semantics. The role-set schema is the
 **active runtime schema**, not a future-design framing
 (per `ADR-SINGLE-HARNESS-OPERATING-MODE-001` Path 2 atomic migration).
 
