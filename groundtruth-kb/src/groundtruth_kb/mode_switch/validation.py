@@ -221,7 +221,7 @@ def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: 
             try:
                 data = json.loads(settings_path.read_text(encoding="utf-8"))
                 registered = _contains_bridge_trigger(data.get("hooks", {}))
-            except Exception:
+            except Exception:  # intentional-catch: quality gate waiver
                 pass
 
         # Check codex hooks.json
@@ -229,7 +229,7 @@ def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: 
             try:
                 data = json.loads(codex_hooks_path.read_text(encoding="utf-8"))
                 registered = _contains_bridge_trigger(data.get("hooks", {}))
-            except Exception:
+            except Exception:  # intentional-catch: quality gate waiver
                 pass
 
         if not registered:
@@ -257,7 +257,7 @@ def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: 
                         axis,
                         "GTKB-SingleHarnessBridgeDispatcher scheduled task is not registered in Windows",
                     )
-            except Exception as exc:
+            except Exception as exc:  # intentional-catch: quality gate waiver
                 return _fail(
                     axis,
                     f"Failed to check GTKB-SingleHarnessBridgeDispatcher scheduled task: {exc}",

@@ -126,7 +126,7 @@ def build_server() -> Server:
 
     server: Server = Server(SERVER_NAME)
 
-    @server.list_tools()
+    @server.list_tools()  # type: ignore[no-untyped-call,untyped-decorator]
     async def list_tools() -> list[types.Tool]:
         return [
             types.Tool(
@@ -141,7 +141,7 @@ def build_server() -> Server:
             ),
         ]
 
-    @server.call_tool()
+    @server.call_tool()  # type: ignore[untyped-decorator]
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
         if name != "gt_status_summary":
             raise ValueError(f"Unknown tool: {name}")

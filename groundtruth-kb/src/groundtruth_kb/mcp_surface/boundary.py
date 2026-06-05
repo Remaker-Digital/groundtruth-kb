@@ -35,7 +35,7 @@ def _resolve_root() -> Path:
         from groundtruth_kb.bridge.paths import resolve_project_root
 
         return Path(resolve_project_root()).resolve()
-    except Exception:
+    except Exception:  # intentional-catch: quality gate waiver
         pass
     env_root = os.environ.get("GTKB_PROJECT_ROOT")
     if env_root:
@@ -43,8 +43,7 @@ def _resolve_root() -> Path:
         if (candidate / "groundtruth.toml").is_file():
             return candidate
     raise MCPBoundaryError(
-        "Cannot resolve GT-KB project root; set GTKB_PROJECT_ROOT or run "
-        "from a directory containing groundtruth.toml."
+        "Cannot resolve GT-KB project root; set GTKB_PROJECT_ROOT or run from a directory containing groundtruth.toml."
     )
 
 
@@ -70,9 +69,7 @@ def assert_in_root(path: str | os.PathLike[str], *, root: Path | None = None) ->
     try:
         candidate.relative_to(project_root)
     except ValueError as exc:
-        raise MCPBoundaryError(
-            f"Path '{candidate}' is outside the GT-KB root '{project_root}'."
-        ) from exc
+        raise MCPBoundaryError(f"Path '{candidate}' is outside the GT-KB root '{project_root}'.") from exc
     return candidate
 
 

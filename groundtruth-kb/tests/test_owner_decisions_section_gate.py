@@ -125,18 +125,35 @@ sufficient.
 """
 
 
-def test_hook_blocks_proposal_claiming_approval_without_section():
+def _write_claim(tmp_path: Path, thread_slug: str, session_id: str = "test-slice-c") -> None:
+    intent_dir = tmp_path / ".gtkb-state" / "work-intent"
+    intent_dir.mkdir(parents=True, exist_ok=True)
+    import datetime
+
+    now = datetime.datetime.now(datetime.UTC)
+    expiry = now + datetime.timedelta(seconds=60)
+    record = {
+        "session_id": session_id,
+        "acquired_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ttl_expires_at": expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    (intent_dir / f"{thread_slug}.json").write_text(json.dumps(record), encoding="utf-8")
+
+
+def test_hook_blocks_proposal_claiming_approval_without_section(tmp_path):
     """T-hook-blocks-missing: proposal claims owner approval but lacks section -> deny."""
-    out = _run_hook("bridge/test-fixture-001.md", PROPOSAL_CLAIMS_NO_SECTION)
+    _write_claim(tmp_path, "test-fixture")
+    out = _run_hook("bridge/test-fixture-001.md", PROPOSAL_CLAIMS_NO_SECTION, cwd=str(tmp_path))
     decision = out.get("hookSpecificOutput", {}).get("permissionDecision")
     reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
     assert decision == "deny", f"Expected deny; got {decision!r} (reason: {reason[:200]!r})"
     assert "Owner Decisions" in reason, f"Expected reason to mention Owner Decisions; got: {reason[:300]!r}"
 
 
-def test_hook_allows_proposal_claiming_approval_with_section():
+def test_hook_allows_proposal_claiming_approval_with_section(tmp_path):
     """T-hook-allows-present: proposal claims approval AND has substantive section -> not blocked on this check."""
-    out = _run_hook("bridge/test-fixture-002.md", PROPOSAL_CLAIMS_WITH_SECTION)
+    _write_claim(tmp_path, "test-fixture")
+    out = _run_hook("bridge/test-fixture-002.md", PROPOSAL_CLAIMS_WITH_SECTION, cwd=str(tmp_path))
     decision = out.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
     reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
     if decision == "deny":
@@ -145,9 +162,10 @@ def test_hook_allows_proposal_claiming_approval_with_section():
         )
 
 
-def test_hook_allows_substantive_owner_decisions_section_with_none_status():
+def test_hook_allows_substantive_owner_decisions_section_with_none_status(tmp_path):
     """A substantive section remains valid when it also says no current input is needed."""
-    out = _run_hook("bridge/test-fixture-002b.md", PROPOSAL_CLAIMS_WITH_SECTION_AND_NONE_STATUS)
+    _write_claim(tmp_path, "test-fixture")
+    out = _run_hook("bridge/test-fixture-002b.md", PROPOSAL_CLAIMS_WITH_SECTION_AND_NONE_STATUS, cwd=str(tmp_path))
     decision = out.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
     reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
     if decision == "deny":
@@ -156,9 +174,10 @@ def test_hook_allows_substantive_owner_decisions_section_with_none_status():
         )
 
 
-def test_hook_does_not_fire_on_non_claiming_proposal():
+def test_hook_does_not_fire_on_non_claiming_proposal(tmp_path):
     """T-hook-skips-non-claiming: routine proposal -> Owner Decisions check inactive."""
-    out = _run_hook("bridge/test-fixture-003.md", PROPOSAL_NO_CLAIM)
+    _write_claim(tmp_path, "test-fixture")
+    out = _run_hook("bridge/test-fixture-003.md", PROPOSAL_NO_CLAIM, cwd=str(tmp_path))
     decision = out.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
     reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
     if decision == "deny":
@@ -167,9 +186,10 @@ def test_hook_does_not_fire_on_non_claiming_proposal():
         )
 
 
-def test_hook_skips_verdict_files_per_codex_minus_004_condition():
+def test_hook_skips_verdict_files_per_codex_minus_004_condition(tmp_path):
     """Per Codex -004 condition: verdict files (GO/NO-GO/VERIFIED) excluded from gate even when discussing AUQ."""
-    out = _run_hook("bridge/test-fixture-004.md", VERDICT_GO_DISCUSSING_AUQ)
+    _write_claim(tmp_path, "test-fixture")
+    out = _run_hook("bridge/test-fixture-004.md", VERDICT_GO_DISCUSSING_AUQ, cwd=str(tmp_path))
     decision = out.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
     reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
     if decision == "deny":

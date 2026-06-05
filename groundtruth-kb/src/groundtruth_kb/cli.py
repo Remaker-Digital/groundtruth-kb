@@ -41,6 +41,7 @@ from groundtruth_kb.cli_deliberations_record import (
     DeliberationRecordRequest,
     record_deliberation,
 )
+from groundtruth_kb.cli_session_handoff import session_group
 from groundtruth_kb.cli_spec_record import SPEC_RECORD_TYPES, SpecRecordError, SpecRecordRequest, record_spec
 from groundtruth_kb.cli_spec_update import SpecUpdateError, SpecUpdateRequest, update_spec
 from groundtruth_kb.coherence import (
@@ -74,6 +75,17 @@ from groundtruth_kb.project.lifecycle import (
     ProjectAuthorizationSpecLinkageError,
     ProjectLifecycleError,
     ProjectLifecycleService,
+)
+from groundtruth_kb.project.sot_registry import (
+    InvalidSoTRecord,
+    UnknownDomain,
+    default_registry_path,
+    load_projection,
+    sync_projection,
+    validate_projection_parity,
+)
+from groundtruth_kb.project.sot_registry import (
+    load_toml as load_sot_toml,
 )
 
 if TYPE_CHECKING:
@@ -162,6 +174,7 @@ def main(ctx: click.Context, config_path: str | None) -> None:
 
 bridge_group.add_command(bridge_index_group)
 main.add_command(bridge_group)
+main.add_command(session_group)
 
 
 @main.group("authority")
@@ -1418,6 +1431,16 @@ def backlog_status(
 @click.option("--priority", default=None, type=click.Choice(["P0", "P1", "P2", "P3"]), help="New priority.")
 @click.option("--related-bridge-threads", default=None, help="JSON array of related bridge file paths.")
 @click.option("--status-detail", default=None, help="New status detail.")
+@click.option(
+    "--title",
+    default=None,
+    help="New title. Subject to the disjunctive text-edit gate (WI-4357).",
+)
+@click.option(
+    "--description",
+    default=None,
+    help="New description. Subject to the disjunctive text-edit gate (WI-4357).",
+)
 @click.option("--owner-approved", is_flag=True, help="Flag proving owner approval.")
 @click.option("--change-reason", required=True, help="History reason for the update.")
 @click.option("--dry-run", is_flag=True, help="Validate and report would-be changes without writing.")
@@ -1431,6 +1454,8 @@ def backlog_update(
     priority: str | None,
     related_bridge_threads: str | None,
     status_detail: str | None,
+    title: str | None,
+    description: str | None,
     owner_approved: bool,
     change_reason: str,
     dry_run: bool,
@@ -1448,6 +1473,8 @@ def backlog_update(
         owner_approved=owner_approved,
         change_reason=change_reason,
         dry_run=dry_run,
+        title=title,
+        description=description,
     )
     try:
         result = update_backlog_item(config, request)
@@ -1507,6 +1534,158 @@ def backlog_resolve(
 
     action = "Would resolve" if result["dry_run"] else "Resolved"
     click.echo(f"{action} work item {result['work_item_id']}.")
+
+
+# ---------------------------------------------------------------------------
+# gt registry
+# ---------------------------------------------------------------------------
+
+
+@main.group(name="registry")
+def registry_cmd() -> None:
+    """SoT artifact registry commands (GOV-PLATFORM-SOT-REGISTRY-001)."""
+
+
+def _registry_paths(ctx: click.Context) -> tuple[Path, Path]:
+    config = _resolve_config(ctx)
+    return default_registry_path(config.project_root), config.db_path
+
+
+def _record_to_dict(rec: Any) -> dict[str, Any]:
+    return {
+        "id": rec.id,
+        "domain": rec.domain,
+        "lifecycle": rec.lifecycle,
+        "storage_path": rec.storage_path,
+        "authority_spec_id": rec.authority_spec_id,
+        "mutation_api": rec.mutation_api,
+        "versioning_policy": rec.versioning_policy,
+        "backup_policy": rec.backup_policy,
+        "health_check_function": rec.health_check_function,
+        "owner_role": rec.owner_role,
+        "depends_on": list(rec.depends_on),
+        "forbidden_substitutes": list(rec.forbidden_substitutes),
+        "notes": rec.notes,
+    }
+
+
+@registry_cmd.command("list")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--domain", default=None, help="Filter by domain value.")
+@click.option("--lifecycle", default=None, help="Filter by lifecycle value.")
+@click.pass_context
+def registry_list(ctx: click.Context, json_output: bool, domain: str | None, lifecycle: str | None) -> None:
+    """List all SoT artifact records from the TOML registry."""
+    toml_path, _db = _registry_paths(ctx)
+    try:
+        records = load_sot_toml(toml_path)
+    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    if domain:
+        records = [r for r in records if r.domain == domain]
+    if lifecycle:
+        records = [r for r in records if r.lifecycle == lifecycle]
+    if json_output:
+        click.echo(json.dumps([_record_to_dict(r) for r in records], indent=2))
+        return
+    for rec in records:
+        click.echo(f"{rec.id}  [{rec.domain}]  {rec.lifecycle}  {rec.storage_path}")
+
+
+@registry_cmd.command("show")
+@click.argument("entry_id")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def registry_show(ctx: click.Context, entry_id: str, json_output: bool) -> None:
+    """Show details of a single SoT artifact record by id."""
+    toml_path, _db = _registry_paths(ctx)
+    try:
+        records = load_sot_toml(toml_path)
+    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    for rec in records:
+        if rec.id == entry_id:
+            if json_output:
+                click.echo(json.dumps(_record_to_dict(rec), indent=2))
+            else:
+                for key, val in _record_to_dict(rec).items():
+                    click.echo(f"{key}: {val}")
+            return
+    raise click.ClickException(f"No registry entry with id={entry_id!r}")
+
+
+@registry_cmd.command("validate")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def registry_validate(ctx: click.Context, json_output: bool) -> None:
+    """Check parity between TOML registry and MemBase projection."""
+    toml_path, db_path = _registry_paths(ctx)
+    try:
+        toml_records = load_sot_toml(toml_path)
+    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    proj_records = load_projection(db_path)
+    report = validate_projection_parity(toml_records, proj_records)
+    result: dict[str, Any] = {
+        "in_sync": report.in_sync,
+        "toml_count": report.toml_count,
+        "projection_count": report.projection_count,
+        "missing_in_projection": list(report.missing_in_projection),
+        "missing_in_toml": list(report.missing_in_toml),
+        "field_divergences": [[pair[0], pair[1]] for pair in report.field_divergences],
+    }
+    if json_output:
+        click.echo(json.dumps(result, indent=2))
+        return
+    status = "IN SYNC" if report.in_sync else "OUT OF SYNC"
+    click.echo(f"Registry parity: {status}")
+    click.echo(f"  TOML records:       {report.toml_count}")
+    click.echo(f"  Projection records: {report.projection_count}")
+    if report.missing_in_projection:
+        click.echo(f"  Missing in projection: {', '.join(report.missing_in_projection)}")
+    if report.missing_in_toml:
+        click.echo(f"  Missing in TOML:       {', '.join(report.missing_in_toml)}")
+    if report.field_divergences:
+        click.echo(f"  Field divergences ({len(report.field_divergences)}):")
+        for rec_id, field in report.field_divergences:
+            click.echo(f"    {rec_id}.{field}")
+    if not report.in_sync:
+        raise SystemExit(1)
+
+
+@registry_cmd.command("sync")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--changed-by", default="gt-registry-sync", show_default=True)
+@click.option("--change-reason", default="gt registry sync", show_default=True)
+@click.pass_context
+def registry_sync(ctx: click.Context, json_output: bool, changed_by: str, change_reason: str) -> None:
+    """Sync MemBase sot_artifacts projection from the TOML registry."""
+    toml_path, db_path = _registry_paths(ctx)
+    try:
+        toml_records = load_sot_toml(toml_path)
+    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    report = sync_projection(toml_records, db_path, changed_by=changed_by, change_reason=change_reason)
+    result: dict[str, Any] = {
+        "inserted": list(report.inserted),
+        "updated": list(report.updated),
+        "unchanged": list(report.unchanged),
+    }
+    if json_output:
+        click.echo(json.dumps(result, indent=2))
+        return
+    click.echo(
+        f"Registry sync: {len(report.inserted)} inserted, "
+        f"{len(report.updated)} updated, {len(report.unchanged)} unchanged."
+    )
+
+
+@registry_cmd.command("diff")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def registry_diff(ctx: click.Context, json_output: bool) -> None:
+    """Show diff between TOML and MemBase projection (non-mutating validate)."""
+    ctx.invoke(registry_validate, json_output=json_output)
 
 
 # ---------------------------------------------------------------------------

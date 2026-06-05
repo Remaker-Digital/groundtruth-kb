@@ -36,7 +36,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
@@ -94,9 +94,9 @@ def _resolve_changed_by() -> str:
     resolved. The caller MUST surface this as a non-zero exit BEFORE any
     work-item/test/phase write.
     """
-    from scripts._kb_attribution import resolve_changed_by
+    from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
-    return resolve_changed_by()
+    return cast(str, resolve_changed_by())
 
 
 def _coerce_test_ids(raw: Any) -> list[str]:

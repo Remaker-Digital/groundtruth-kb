@@ -6,8 +6,6 @@ import inspect
 import json
 from pathlib import Path
 
-from groundtruth_kb.bridge.status_driver import collect_bridge_status
-
 
 def _write_bridge_file(root: Path, name: str, version: int, content: str) -> None:
     (root / "bridge" / f"{name}-{version:03d}.md").write_text(content, encoding="utf-8")
@@ -66,6 +64,8 @@ def test_bridge_status_driver_reports_role_actionability_without_verified(projec
     _write_bridge_file(project_dir, "withdrawn", 2, "WITHDRAWN\n")
     _write_bridge_file(project_dir, "advisory", 1, "bridge_kind: advisory_report\n")
 
+    from groundtruth_kb.bridge.status_driver import collect_bridge_status
+
     snapshot = collect_bridge_status(project_dir)
     queue = snapshot.queue
 
@@ -107,6 +107,8 @@ def test_bridge_status_driver_accepts_multiline_index_header_comments(project_di
     ]
     (bridge_dir / "INDEX.md").write_text("\n".join(index_lines), encoding="utf-8")
     _write_bridge_file(project_dir, "review-new", 1, "bridge_kind: implementation_proposal\n")
+
+    from groundtruth_kb.bridge.status_driver import collect_bridge_status
 
     queue = collect_bridge_status(project_dir).queue
 
@@ -167,6 +169,8 @@ def test_bridge_status_driver_reports_local_automation_health(project_dir: Path)
         ),
         encoding="utf-8",
     )
+
+    from groundtruth_kb.bridge.status_driver import collect_bridge_status
 
     automation = collect_bridge_status(project_dir).automation
 

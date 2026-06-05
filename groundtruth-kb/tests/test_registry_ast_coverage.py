@@ -81,10 +81,13 @@ _OWNER_APPROVED_SLICE3_DEFERRAL: frozenset[str] = frozenset(
         "project/env.example",
         "project/settings.local.json",
         # Codex bootstrap docs (4 files; Slice 3 dual-agent scope).
-        "project/codex-bootstrap/CODEX-REVIEW-OPERATING-CONTRACT.md",
-        "project/codex-bootstrap/CODEX-SESSION-BOOTSTRAP.md",
-        "project/codex-bootstrap/CODEX-WAY-OF-WORKING.md",
-        "project/codex-bootstrap/LOYAL-OPPOSITION-LOG.md",
+        "project/codex-bootstrap/codex-review-operating-contract.md",
+        "project/codex-bootstrap/codex-session-bootstrap.md",
+        "project/codex-bootstrap/codex-way-of-working.md",
+        "project/codex-bootstrap/loyal-opposition-log.md",
+        # Release candidate gate managed skill templates.
+        "skills/release-candidate-gate/SKILL.md",
+        "skills/release-candidate-gate/scripts/release_candidate_gate.py",
     }
 )
 

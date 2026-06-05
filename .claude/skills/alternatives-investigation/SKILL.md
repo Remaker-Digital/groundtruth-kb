@@ -1,4 +1,4 @@
-﻿---
+---
 name: alternatives-investigation
 description: Investigate technical alternatives and recommend the least-regret option with evidence, tradeoffs, reversibility, and implementation impact. Use for architecture choices, tool selection, and solution comparison.
 argument-hint: [decision]
@@ -17,7 +17,7 @@ Investigate distinct solution paths and recommend the best option under the real
 
 ## Default Deliverable
 
-Use `independent-progress-assessments/TEMPLATE-DECISION-MEMO.md`.
+Use `.claude/rules/template-decision-memo.md`.
 
 ## Required Comparison Dimensions
 

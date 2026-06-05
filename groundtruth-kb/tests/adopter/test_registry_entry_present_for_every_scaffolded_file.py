@@ -44,10 +44,10 @@ _REGISTRY_EXEMPT_FILES: frozenset[str] = frozenset(
         "bridge-os-poller-setup-prompt.md",
         "bridge/INDEX.md",
         # Codex bootstrap docs (per `_copy_dual_agent_templates` codex_src loop)
-        "independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md",
-        "independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md",
-        "independent-progress-assessments/CODEX-WAY-OF-WORKING.md",
-        "independent-progress-assessments/LOYAL-OPPOSITION-LOG.md",
+        ".claude/rules/codex-review-operating-contract.md",
+        ".claude/rules/codex-session-bootstrap.md",
+        ".claude/rules/codex-way-of-working.md",
+        "independent-progress-assessments/loyal-opposition-log.md",
         # Settings synthesized from settings-hook-registration rows (the rows are
         # in the registry but the file itself is the implicit aggregation target)
         ".claude/settings.json",

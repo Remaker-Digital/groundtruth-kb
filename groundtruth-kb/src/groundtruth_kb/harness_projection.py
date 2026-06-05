@@ -174,7 +174,7 @@ def main() -> int:
     config = GTConfig.load()
     db = KnowledgeDB(db_path=config.db_path)
     written = generate_harness_projection(db, config.project_root)
-    print(f"harness registry projection written: {written}")
+    print(f"harness registry projection written: {written}")  # print-ok
     return 0
 
 

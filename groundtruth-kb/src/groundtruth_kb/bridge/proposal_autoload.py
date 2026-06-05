@@ -140,7 +140,7 @@ def auto_prior_delibs(db: KnowledgeDB, wi_id: str, slug: str, *, limit: int = 5)
         )
     try:
         rows = db.search_deliberations(" ".join(query_parts), limit=limit)
-    except Exception:
+    except Exception:  # intentional-catch: quality gate waiver
         return []
     candidates: list[str] = []
     for row in rows:

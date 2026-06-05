@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -84,7 +85,7 @@ def set_status_cmd(
     _emit_result("updated", result, json_output=json_output)
 
 
-def _emit_result(action: str, result, *, json_output: bool) -> None:
+def _emit_result(action: str, result: Any, *, json_output: bool) -> None:
     if json_output:
         click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
         return

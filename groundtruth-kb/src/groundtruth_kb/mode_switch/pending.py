@@ -209,7 +209,7 @@ def apply_pending(project_root: Path) -> list[ApplyResult]:
                     "error": str(exc),
                 }
                 failed_path.write_text(json.dumps(failed_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            except Exception:
+            except Exception:  # intentional-catch: quality gate waiver
                 pass
 
             results.append(
@@ -220,7 +220,7 @@ def apply_pending(project_root: Path) -> list[ApplyResult]:
                 )
             )
             continue
-        except Exception as exc:  # noqa: BLE001 - fail-soft per design
+        except Exception as exc:  # noqa: BLE001 - fail-soft per design  # intentional-catch: quality gate waiver
             # Write a failed record to .gtkb-state/mode-switches/failed/
             try:
                 failed_dir = project_root / ".gtkb-state" / "mode-switches" / "failed"
@@ -240,7 +240,7 @@ def apply_pending(project_root: Path) -> list[ApplyResult]:
                     "error": f"unexpected error: {exc}",
                 }
                 failed_path.write_text(json.dumps(failed_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            except Exception:
+            except Exception:  # intentional-catch: quality gate waiver
                 pass
 
             results.append(

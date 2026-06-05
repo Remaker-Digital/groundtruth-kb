@@ -326,7 +326,7 @@ def _sentence_triples(text: str) -> list[tuple[str, str, str]]:
     sentences = [_normalize_text(part) for part in SENTENCE_RE.split(text) if _normalize_text(part)]
     if len(sentences) < 3:
         return []
-    return [tuple(sentences[index : index + 3]) for index in range(len(sentences) - 2)]
+    return [(sentences[index], sentences[index + 1], sentences[index + 2]) for index in range(len(sentences) - 2)]
 
 
 def _normalize_text(text: str) -> str:

@@ -17,14 +17,12 @@ import pytest
 
 from groundtruth_kb.project.sot_registry import (
     InvalidSoTRecord,
-    ParityReport,
     SoTArtifact,
     UnknownDomain,
     default_registry_path,
     load_toml,
     validate_projection_parity,
 )
-
 
 # ---------------------------------------------------------------------------
 # Bootstrap inventory acceptance (GOV-PLATFORM-SOT-REGISTRY-001)
@@ -38,7 +36,10 @@ def test_bootstrap_inventory_loads() -> None:
 
 
 def test_bootstrap_row1_is_self_reference() -> None:
-    """Row 1 of the registry MUST be the registry itself (DCL-SOT-REGISTRY-PROJECTION-PARITY-001 bootstrap guarantee)."""
+    """Row 1 of the registry MUST be the registry itself.
+
+    Bootstrap guarantee per DCL-SOT-REGISTRY-PROJECTION-PARITY-001.
+    """
     records = load_toml(default_registry_path())
     row1 = records[0]
     assert row1.id == "sot-registry-toml"

@@ -17,9 +17,10 @@ import sqlite3
 import time
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+import sys
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 
@@ -219,7 +220,7 @@ def rotate_snapshots(
     keep.update(record["path"].resolve() for record in sorted_records[:retain_recent])
 
     cutoff = (now or _utc_now()).date() - timedelta(days=retain_daily_days)
-    daily: dict[datetime.date, dict[str, Any]] = {}
+    daily: dict[date, dict[str, Any]] = {}
     if retain_daily_days > 0:
         for record in sorted_records:
             created_date = record["created_at"].date()
@@ -363,7 +364,7 @@ def _read_manifest(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError):
         return {}
 
@@ -399,7 +400,7 @@ def _user_data_dir() -> Path:
             return Path(base)
     if os.name == "posix" and os.environ.get("XDG_DATA_HOME"):
         return Path(os.environ["XDG_DATA_HOME"])
-    if os.name == "posix" and os.uname().sysname == "Darwin":
+    if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support"
     return Path.home() / ".local" / "share"
 

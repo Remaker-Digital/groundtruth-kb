@@ -1,4 +1,4 @@
-﻿---
+---
 name: proposal-review
 description: Review proposals, plans, and technical approaches for correctness, missing assumptions, risk, and decision quality. Use for design reviews, plan critiques, and proposal stress tests.
 argument-hint: [topic]
@@ -17,7 +17,7 @@ Review the target proposal or plan with an evidence-first, decision-support post
 
 ## Default Deliverable
 
-Use `independent-progress-assessments/TEMPLATE-DECISION-MEMO.md` unless the owner asks for a different format.
+Use `.claude/rules/template-decision-memo.md` unless the owner asks for a different format.
 
 ## Required Review Pass
 

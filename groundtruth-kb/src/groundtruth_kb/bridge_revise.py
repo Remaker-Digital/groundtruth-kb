@@ -36,6 +36,7 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Callable
 
 # --- Fix-class taxonomy -----------------------------------------------------
 
@@ -92,7 +93,7 @@ def _discover_project_root(start: Path | None = None) -> Path:
     return here.parents[3]
 
 
-def _load_helpers(project_root: Path):
+def _load_helpers(project_root: Path) -> tuple[Any, Any]:
     """Import the reused write/index helpers via guarded sys.path.
 
     Returns a tuple ``(write_bridge_module, atomic_index_update)``. The same
@@ -107,14 +108,14 @@ def _load_helpers(project_root: Path):
             sys.path.insert(0, path)
     try:
         write_bridge = importlib.import_module("write_bridge")
-    except Exception as exc:  # noqa: BLE001 - surface a clear precondition error
+    except Exception as exc:  # noqa: BLE001 - surface a clear precondition error  # intentional-catch: quality gate waiver
         raise BridgeReviseError(
             "write_bridge helper unavailable; expected "
             ".claude/skills/bridge-propose/helpers/write_bridge.py importable."
         ) from exc
     try:
         index_writer = importlib.import_module("bridge_index_writer")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: quality gate waiver
         raise BridgeReviseError(
             "bridge_index_writer unavailable; expected scripts/bridge_index_writer.py importable."
         ) from exc
@@ -259,7 +260,7 @@ def _apply_target_paths_add(body: str, *, add_target_paths: Sequence[str], **_: 
     return _append_bullets_to_section(body, "## target_paths", bullets)
 
 
-_FIX_DISPATCH = {
+_FIX_DISPATCH: dict[str, Callable[..., str]] = {
     "content_carryforward_only": _apply_content_carryforward_only,
     "citation_add": _apply_citation_add,
     "target_paths_add": _apply_target_paths_add,
@@ -310,7 +311,7 @@ def _rerun_preflights(slug: str, project_root: Path) -> dict[str, str]:
             )
             picked = [ln.strip() for ln in proc.stdout.splitlines() if any(n in ln for n in needles)]
             summaries[name] = " | ".join(picked) if picked else f"(exit {proc.returncode}; no summary line)"
-        except Exception as exc:  # noqa: BLE001 - surface, don't crash the revise
+        except Exception as exc:  # noqa: BLE001 - surface, don't crash the revise  # intentional-catch: quality gate waiver
             summaries[name] = f"(preflight invocation error: {exc})"
     return summaries
 

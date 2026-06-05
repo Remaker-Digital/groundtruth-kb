@@ -69,7 +69,7 @@ def test_scaffold_dual_agent_id_set_matches_baseline() -> None:
     gtkb-da-governance-completeness-implementation-016.
     """
     ids = sorted(a.id for a in artifacts_for_scaffold("dual-agent"))
-    assert len(ids) == 60
+    assert len(ids) == 66
     # None are ownership-glob.
     for a in artifacts_for_scaffold("dual-agent"):
         assert isinstance(a, (FileArtifact, SettingsHookRegistration, GitignorePattern))

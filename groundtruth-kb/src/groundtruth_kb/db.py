@@ -784,6 +784,39 @@ SELECT
     SUM(CASE WHEN resolution_status IN ('open', 'new', 'unresolved', 'in_progress') THEN 1 ELSE 0 END) AS active_unresolved_items,
     SUM(CASE WHEN resolution_status IN ('completed', 'done', 'resolved', 'verified', 'fixed') THEN 1 ELSE 0 END) AS completed_items
 FROM current_work_items;
+
+-- Platform SoT Artifact Registry (GOV-PLATFORM-SOT-REGISTRY-001 + DCL-SOT-REGISTRY-PROJECTION-PARITY-001 + DCL-SOT-REGISTRY-RECORD-SCHEMA-001) -- MemBase projection of config/registry/sot-artifacts.toml; append-only versioned per UNIQUE(id, version).
+CREATE TABLE IF NOT EXISTS sot_artifacts (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    domain TEXT NOT NULL,
+    lifecycle TEXT NOT NULL,
+    storage_path TEXT NOT NULL,
+    authority_spec_id TEXT NOT NULL,
+    mutation_api TEXT NOT NULL,
+    versioning_policy TEXT NOT NULL,
+    backup_policy TEXT NOT NULL,
+    health_check_function TEXT,
+    owner_role TEXT NOT NULL,
+    depends_on TEXT,
+    forbidden_substitutes TEXT,
+    notes TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_artifacts_id ON sot_artifacts(id);
+CREATE INDEX IF NOT EXISTS idx_sot_artifacts_domain ON sot_artifacts(domain);
+CREATE INDEX IF NOT EXISTS idx_sot_artifacts_lifecycle ON sot_artifacts(lifecycle);
+
+CREATE VIEW IF NOT EXISTS current_sot_artifacts AS
+SELECT s.* FROM sot_artifacts s
+INNER JOIN (
+    SELECT id, MAX(version) AS max_version FROM sot_artifacts GROUP BY id
+) latest ON s.id = latest.id AND s.version = latest.max_version;
 """
 
 
@@ -3832,6 +3865,14 @@ class KnowledgeDB:
         return self.get_project(project_id)
 
     def get_project(self, project_id: str) -> dict[str, Any] | None:
+        """Retrieve a project by its identifier.
+
+        Args:
+            project_id: Unique string identifier for the project.
+
+        Returns:
+            The project row as a dictionary, or None if not found.
+        """
         row = self._get_conn().execute("SELECT * FROM current_projects WHERE id = ?", (project_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
@@ -3841,6 +3882,15 @@ class KnowledgeDB:
         status: str | None = None,
         include_terminal: bool = False,
     ) -> list[dict[str, Any]]:
+        """List current projects with optional status filtering.
+
+        Args:
+            status: Optional status string to filter projects.
+            include_terminal: If True, terminal/completed projects are included.
+
+        Returns:
+            A list of project dictionaries matching the criteria.
+        """
         query = "SELECT * FROM current_projects WHERE 1=1"
         params: list[Any] = []
         if status:
@@ -3898,6 +3948,14 @@ class KnowledgeDB:
         return self.get_project_work_item_membership(membership_id)
 
     def get_project_work_item_membership(self, membership_id: str) -> dict[str, Any] | None:
+        """Retrieve a project work item membership by ID.
+
+        Args:
+            membership_id: The membership identifier.
+
+        Returns:
+            The membership dictionary, or None if not found.
+        """
         row = (
             self._get_conn()
             .execute("SELECT * FROM current_project_work_item_memberships WHERE id = ?", (membership_id,))
@@ -3911,6 +3969,15 @@ class KnowledgeDB:
         *,
         include_inactive: bool = False,
     ) -> list[dict[str, Any]]:
+        """List work items linked to a given project.
+
+        Args:
+            project_id: The project identifier.
+            include_inactive: If True, inactive memberships are included.
+
+        Returns:
+            A list of work item dictionaries with membership details.
+        """
         query = """SELECT
                       m.id AS membership_id,
                       m.project_id AS project_id,
@@ -3954,6 +4021,23 @@ class KnowledgeDB:
         status: str = "active",
         id: str | None = None,
     ) -> dict[str, Any] | None:
+        """Record a dependency between two projects.
+
+        Args:
+            from_project_id: Project that has the dependency.
+            to_project_id: Project that is depended upon.
+            changed_by: Person or agent performing the change.
+            change_reason: Explanatory rationale for the change.
+            dependency_type: Type classification of the dependency.
+            rationale: Optional text rationale for the dependency.
+            blocking_status: The current block status.
+            related_work_item_id: Optional linked work item ID.
+            status: Dependency record lifecycle status.
+            id: Optional stable record identifier.
+
+        Returns:
+            The newly created project dependency record.
+        """
         if self.get_project(from_project_id) is None:
             raise ValueError(f"Project {from_project_id} not found")
         if self.get_project(to_project_id) is None:
@@ -3987,6 +4071,14 @@ class KnowledgeDB:
         return self.get_project_dependency(dependency_id)
 
     def get_project_dependency(self, dependency_id: str) -> dict[str, Any] | None:
+        """Retrieve a project dependency record by ID.
+
+        Args:
+            dependency_id: The dependency identifier.
+
+        Returns:
+            The dependency dictionary, or None if not found.
+        """
         row = (
             self._get_conn()
             .execute("SELECT * FROM current_project_dependencies WHERE id = ?", (dependency_id,))
@@ -4000,6 +4092,15 @@ class KnowledgeDB:
         *,
         include_inactive: bool = False,
     ) -> list[dict[str, Any]]:
+        """List dependencies where the given project is the source or target.
+
+        Args:
+            project_id: The project identifier.
+            include_inactive: If True, inactive records are included.
+
+        Returns:
+            A list of project dependency dictionaries.
+        """
         query = """SELECT * FROM current_project_dependencies
                    WHERE (from_project_id = ? OR to_project_id = ?)"""
         params: list[Any] = [project_id, project_id]
@@ -4022,6 +4123,22 @@ class KnowledgeDB:
         notes: str | None = None,
         id: str | None = None,
     ) -> dict[str, Any] | None:
+        """Create a link between a project and an artifact.
+
+        Args:
+            project_id: The project identifier.
+            artifact_type: The type of artifact (e.g. spec, ADR).
+            artifact_ref: Reference to the artifact.
+            changed_by: Person or agent performing the change.
+            change_reason: Explanatory rationale for the change.
+            relationship: The relationship type.
+            status: Lifecycle status of the link record.
+            notes: Optional descriptive notes.
+            id: Optional stable record identifier.
+
+        Returns:
+            The newly created project artifact link dictionary.
+        """
         if self.get_project(project_id) is None:
             raise ValueError(f"Project {project_id} not found")
         link_id = id or _stable_project_link_id("PAL", project_id, artifact_type, artifact_ref, relationship)
@@ -4050,6 +4167,14 @@ class KnowledgeDB:
         return self.get_project_artifact_link(link_id)
 
     def get_project_artifact_link(self, link_id: str) -> dict[str, Any] | None:
+        """Retrieve a project artifact link by its ID.
+
+        Args:
+            link_id: The link identifier.
+
+        Returns:
+            The artifact link dictionary, or None if not found.
+        """
         row = (
             self._get_conn().execute("SELECT * FROM current_project_artifact_links WHERE id = ?", (link_id,)).fetchone()
         )
@@ -4061,6 +4186,15 @@ class KnowledgeDB:
         *,
         include_inactive: bool = False,
     ) -> list[dict[str, Any]]:
+        """List all artifact links associated with a project.
+
+        Args:
+            project_id: The project identifier.
+            include_inactive: If True, inactive links are included.
+
+        Returns:
+            A list of project artifact link dictionaries.
+        """
         query = "SELECT * FROM current_project_artifact_links WHERE project_id = ?"
         params: list[Any] = [project_id]
         if not include_inactive:
@@ -4076,6 +4210,16 @@ class KnowledgeDB:
         *,
         include_inactive: bool = False,
     ) -> list[dict[str, Any]]:
+        """List all project links associated with a specific artifact.
+
+        Args:
+            artifact_type: The type of artifact.
+            artifact_ref: Reference to the artifact.
+            include_inactive: If True, inactive links are included.
+
+        Returns:
+            A list of project artifact link dictionaries.
+        """
         query = """SELECT * FROM current_project_artifact_links
                    WHERE artifact_type = ? AND artifact_ref = ?"""
         params: list[Any] = [artifact_type, artifact_ref]
@@ -4276,6 +4420,14 @@ class KnowledgeDB:
         return self.get_project_authorization(authorization_id)
 
     def get_project_authorization(self, authorization_id: str) -> dict[str, Any] | None:
+        """Retrieve a project authorization record by ID.
+
+        Args:
+            authorization_id: The authorization identifier.
+
+        Returns:
+            The authorization dictionary, or None if not found.
+        """
         row = (
             self._get_conn()
             .execute("SELECT * FROM current_project_authorizations WHERE id = ?", (authorization_id,))
@@ -4290,6 +4442,16 @@ class KnowledgeDB:
         status: str | None = None,
         include_terminal: bool = False,
     ) -> list[dict[str, Any]]:
+        """List project authorizations matching filters.
+
+        Args:
+            project_id: Optional project identifier to filter by.
+            status: Optional lifecycle status to filter by.
+            include_terminal: If True, terminal/expired records are included.
+
+        Returns:
+            A list of project authorization dictionaries.
+        """
         query = "SELECT * FROM current_project_authorizations WHERE 1=1"
         params: list[Any] = []
         if project_id:
@@ -4380,6 +4542,17 @@ class KnowledgeDB:
         change_reason: str,
         **fields: Any,
     ) -> dict[str, Any] | None:
+        """Update fields of an existing project authorization by inserting a new version.
+
+        Args:
+            authorization_id: The authorization identifier.
+            changed_by: Person or agent performing the change.
+            change_reason: Explanatory rationale for the change.
+            **fields: Keyword arguments of fields to update.
+
+        Returns:
+            The updated project authorization dictionary.
+        """
         current = self.get_project_authorization(authorization_id)
         if current is None:
             raise ValueError(f"Project authorization {authorization_id} not found")
@@ -4732,6 +4905,36 @@ class KnowledgeDB:
             .fetchone()
         )
         return _row_to_dict(row) if row else None
+
+    def get_session_prompt_by_idempotency_key(
+        self,
+        session_id: str,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        # Idempotency lookup for the deterministic handoff service
+        # (SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001). The key is stored
+        # inside the existing ``context`` JSON field, not a dedicated column.
+        rows = (
+            self._get_conn()
+            .execute(
+                """SELECT * FROM session_prompts
+                   WHERE session_id = ? AND context IS NOT NULL
+                   ORDER BY rowid DESC""",
+                (session_id,),
+            )
+            .fetchall()
+        )
+        for row in rows:
+            raw_context = row["context"]
+            if not raw_context:
+                continue
+            try:
+                ctx = json.loads(raw_context)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(ctx, dict) and ctx.get("idempotency_key") == idempotency_key:
+                return _row_to_dict(row)
+        return None
 
     def get_next_session_prompt(self) -> dict[str, Any] | None:
         """Get the latest unconsumed handoff prompt.

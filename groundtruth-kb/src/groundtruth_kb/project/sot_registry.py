@@ -27,7 +27,7 @@ Reference precedent: ``groundtruth_kb.project.managed_registry``.
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -202,47 +202,33 @@ def _coerce_str_tuple(value: Any, record_id: str, field_name: str) -> tuple[str,
     if value is None:
         return ()
     if isinstance(value, str):
-        raise InvalidSoTRecord(
-            f"record {record_id!r} field {field_name!r}: expected list of strings, got string"
-        )
+        raise InvalidSoTRecord(f"record {record_id!r} field {field_name!r}: expected list of strings, got string")
     if not isinstance(value, list):
-        raise InvalidSoTRecord(
-            f"record {record_id!r} field {field_name!r}: expected list, got {type(value).__name__}"
-        )
+        raise InvalidSoTRecord(f"record {record_id!r} field {field_name!r}: expected list, got {type(value).__name__}")
     for item in value:
         if not isinstance(item, str):
-            raise InvalidSoTRecord(
-                f"record {record_id!r} field {field_name!r}: list item not a string: {item!r}"
-            )
+            raise InvalidSoTRecord(f"record {record_id!r} field {field_name!r}: list item not a string: {item!r}")
     return tuple(value)
 
 
 def _validate_required(record: dict[str, Any], record_id: str) -> None:
     missing = _REQUIRED_FIELDS - set(record.keys())
     if missing:
-        raise InvalidSoTRecord(
-            f"record {record_id!r}: missing required field(s): {sorted(missing)}"
-        )
+        raise InvalidSoTRecord(f"record {record_id!r}: missing required field(s): {sorted(missing)}")
 
 
 def _validate_enum(record: dict[str, Any], field_name: str, valid_set: frozenset[str], record_id: str) -> None:
     value = record[field_name]
     if value not in valid_set:
         if field_name == "domain":
-            raise UnknownDomain(
-                f"record {record_id!r} field domain={value!r}: not in enum {sorted(valid_set)}"
-            )
-        raise InvalidSoTRecord(
-            f"record {record_id!r} field {field_name}={value!r}: not in enum {sorted(valid_set)}"
-        )
+            raise UnknownDomain(f"record {record_id!r} field domain={value!r}: not in enum {sorted(valid_set)}")
+        raise InvalidSoTRecord(f"record {record_id!r} field {field_name}={value!r}: not in enum {sorted(valid_set)}")
 
 
 def _validate_unknown_fields(record: dict[str, Any], record_id: str) -> None:
     unknown = set(record.keys()) - _ALL_KNOWN_FIELDS
     if unknown:
-        raise InvalidSoTRecord(
-            f"record {record_id!r}: unknown field(s): {sorted(unknown)}"
-        )
+        raise InvalidSoTRecord(f"record {record_id!r}: unknown field(s): {sorted(unknown)}")
 
 
 def _parse_record(record: dict[str, Any]) -> SoTArtifact:
@@ -258,9 +244,7 @@ def _parse_record(record: dict[str, Any]) -> SoTArtifact:
 
     health_check = record["health_check_function"]
     if health_check is not None and not isinstance(health_check, str):
-        raise InvalidSoTRecord(
-            f"record {record_id!r}: health_check_function must be string or null"
-        )
+        raise InvalidSoTRecord(f"record {record_id!r}: health_check_function must be string or null")
 
     if record["lifecycle"] == "generated":
         mutation_api = record["mutation_api"]
@@ -304,17 +288,13 @@ def load_toml(path: Path) -> list[SoTArtifact]:
 
     raw_records = data.get("artifacts", [])
     if not isinstance(raw_records, list):
-        raise InvalidSoTRecord(
-            f"top-level 'artifacts' must be a list of tables, got {type(raw_records).__name__}"
-        )
+        raise InvalidSoTRecord(f"top-level 'artifacts' must be a list of tables, got {type(raw_records).__name__}")
 
     records: list[SoTArtifact] = []
     seen_ids: set[str] = set()
     for raw in raw_records:
         if not isinstance(raw, dict):
-            raise InvalidSoTRecord(
-                f"each artifacts entry must be a table, got {type(raw).__name__}"
-            )
+            raise InvalidSoTRecord(f"each artifacts entry must be a table, got {type(raw).__name__}")
         record = _parse_record(raw)
         if record.id in seen_ids:
             raise InvalidSoTRecord(f"duplicate id: {record.id!r}")
@@ -474,10 +454,7 @@ def sync_projection(
             existing = proj_by_id.get(rec.id)
             if existing is not None:
                 # Compare all schema fields.
-                same = all(
-                    getattr(existing, f) == getattr(rec, f)
-                    for f in (_REQUIRED_FIELDS | _OPTIONAL_FIELDS)
-                )
+                same = all(getattr(existing, f) == getattr(rec, f) for f in (_REQUIRED_FIELDS | _OPTIONAL_FIELDS))
                 if same:
                     unchanged.append(rec.id)
                     continue
@@ -510,9 +487,7 @@ def sync_projection(
                     rec.health_check_function,
                     rec.owner_role,
                     json.dumps(list(rec.depends_on)) if rec.depends_on else None,
-                    json.dumps(list(rec.forbidden_substitutes))
-                    if rec.forbidden_substitutes
-                    else None,
+                    json.dumps(list(rec.forbidden_substitutes)) if rec.forbidden_substitutes else None,
                     rec.notes or None,
                     changed_by,
                     now,

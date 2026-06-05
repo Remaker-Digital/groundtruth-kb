@@ -36,16 +36,41 @@ FIXTURE_ROOT = REPO_ROOT / "groundtruth-kb" / "tests" / "fixtures" / "scaffold_g
 SKIP_NAMES = {"groundtruth.db", ".git"}
 
 
+def _rmtree(path: Path) -> None:
+    if not path.exists():
+        return
+    import stat
+    import os
+
+    for root, dirs, files in os.walk(path, topdown=False):
+        for name in files:
+            p = os.path.join(root, name)
+            try:
+                os.chmod(p, stat.S_IWRITE)
+                os.unlink(p)
+            except Exception:
+                pass
+        for name in dirs:
+            p = os.path.join(root, name)
+            try:
+                os.chmod(p, stat.S_IWRITE)
+                os.rmdir(p)
+            except Exception:
+                pass
+    try:
+        shutil.rmtree(path, ignore_errors=True)
+    except Exception:
+        pass
+
+
 def _capture(profile: str) -> None:
     sandbox_name = f"_test_golden_{profile.replace('-', '_')}"
     sandbox = _GT_KB_HOST_ROOT / "applications" / sandbox_name
     fixture_dir = FIXTURE_ROOT / profile
 
     # Idempotency: clean both sandbox + fixture target before capture.
-    if sandbox.exists():
-        shutil.rmtree(sandbox)
-    if fixture_dir.exists():
-        shutil.rmtree(fixture_dir)
+    _rmtree(sandbox)
+    _rmtree(fixture_dir)
 
     options = ScaffoldOptions(
         project_name=sandbox_name,
@@ -61,8 +86,7 @@ def _capture(profile: str) -> None:
         scaffold_project(options)
         _copy_tree(sandbox, fixture_dir)
     finally:
-        if sandbox.exists():
-            shutil.rmtree(sandbox, ignore_errors=True)
+        _rmtree(sandbox)
 
 
 def _copy_tree(src: Path, dst: Path) -> None:

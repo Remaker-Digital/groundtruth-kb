@@ -16,6 +16,7 @@ from pathlib import Path
 from re import IGNORECASE
 from re import compile as re_compile
 from types import ModuleType
+from typing import Any, Callable, cast
 
 from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
 
@@ -306,7 +307,7 @@ def _require_index_text(index_text: str) -> None:
         raise BridgeIndexMutationError("bridge INDEX is empty or missing")
 
 
-def _parse_documents_or_raise(index_text: str):
+def _parse_documents_or_raise(index_text: str) -> list[Any]:
     result = parse_index(index_text)
     if result.errors:
         first = result.errors[0]
@@ -316,7 +317,7 @@ def _parse_documents_or_raise(index_text: str):
     return result.documents
 
 
-def _raise_on_duplicate_documents(documents) -> None:
+def _raise_on_duplicate_documents(documents: list[Any]) -> None:
     counts = Counter(document.name for document in documents)
     duplicates = sorted(name for name, count in counts.items() if count > 1)
     if duplicates:
@@ -362,7 +363,7 @@ def _load_index_writer(project_root: Path) -> ModuleType:
     sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
-    except Exception as exc:  # noqa: BLE001 - surface load failure as CLI-safe error
+    except Exception as exc:  # noqa: BLE001 - surface load failure as CLI-safe error  # intentional-catch: quality gate waiver
         sys.modules.pop(module_name, None)
         raise BridgeIndexMutationError(f"cannot load serialized bridge INDEX writer: {exc}") from exc
     return module
@@ -372,18 +373,21 @@ def _atomic_index_update(
     writer: ModuleType,
     index_path: Path,
     project_root: Path,
-    mutate,
+    mutate: Callable[[str], str],
     timeout_seconds: float,
 ) -> str:
     state_dir = project_root / ".gtkb-state" / "bridge-index-writer"
     try:
-        return writer.atomic_index_update(
-            index_path,
-            mutate,
-            state_dir=state_dir,
-            timeout_seconds=timeout_seconds,
+        return cast(
+            str,
+            writer.atomic_index_update(
+                index_path,
+                mutate,
+                state_dir=state_dir,
+                timeout_seconds=timeout_seconds,
+            ),
         )
     except BridgeIndexMutationError:
         raise
-    except Exception as exc:  # noqa: BLE001 - normalize writer failures for CLI callers
+    except Exception as exc:  # noqa: BLE001 - normalize writer failures for CLI callers  # intentional-catch: quality gate waiver
         raise BridgeIndexMutationError(str(exc)) from exc

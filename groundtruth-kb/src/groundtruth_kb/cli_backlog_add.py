@@ -30,7 +30,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
@@ -129,9 +129,9 @@ def _resolve_changed_by() -> str:
     # Local import so a resolver-module signature change fails loud (at call
     # time) rather than at module import time, and to keep the attribution
     # surface explicit.
-    from scripts._kb_attribution import resolve_changed_by
+    from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
-    return resolve_changed_by()
+    return cast(str, resolve_changed_by())
 
 
 def _allocate_next_work_item_id(db: KnowledgeDB) -> str:

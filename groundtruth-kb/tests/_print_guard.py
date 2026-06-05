@@ -37,7 +37,7 @@ def scan_bare_prints(
         List of violation strings (empty = clean).
     """
     if src_root is None:
-        src_root = pathlib.Path("src/groundtruth_kb")
+        src_root = pathlib.Path(__file__).resolve().parent.parent / "src" / "groundtruth_kb"
 
     errors: list[str] = []
     for py in src_root.rglob("*.py"):

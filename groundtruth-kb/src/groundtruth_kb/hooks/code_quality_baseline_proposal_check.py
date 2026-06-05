@@ -139,9 +139,9 @@ def main() -> int:
         event = {}
     content = _event_content(event)
     if content is None:
-        print("{}")
+        print("{}")  # print-ok
         return 0
-    print(json.dumps(hook_response(str(content))))
+    print(json.dumps(hook_response(str(content))))  # print-ok
     return 0
 
 

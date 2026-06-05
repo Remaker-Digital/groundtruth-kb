@@ -123,7 +123,14 @@ class GTConfig:
                 stacklevel=2,
             )
 
-        return cls(**{k: v for k, v in merged.items() if k in cls.__dataclass_fields__})
+        config = cls(**{k: v for k, v in merged.items() if k in cls.__dataclass_fields__})
+        if not config.project_root.is_absolute():
+            config.project_root = anchor / config.project_root
+        if not config.db_path.is_absolute():
+            config.db_path = anchor / config.db_path
+        if config.chroma_path is not None and not config.chroma_path.is_absolute():
+            config.chroma_path = anchor / config.chroma_path
+        return config
 
 
 def _load_toml(config_path: Path | None) -> dict[str, Any]:
@@ -226,7 +233,12 @@ def _coerce_backup_config(value: object, *, anchor: Path) -> BackupConfig:
 
 
 def _anchor_path(value: object, *, anchor: Path) -> Path:
-    path = Path(value)
+    if isinstance(value, Path):
+        path = value
+    elif isinstance(value, str):
+        path = Path(value)
+    else:
+        path = Path(str(value))
     if not path.is_absolute():
         path = anchor / path
     return path

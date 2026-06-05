@@ -1,4 +1,4 @@
-﻿---
+---
 name: code-review-audit
 description: Review code and tests for bugs, regressions, unsafe assumptions, missing verification, and configuration drift. Use for PR review, change audit, and remediation re-audit.
 argument-hint: [target]
@@ -17,7 +17,7 @@ Review code with a bug-finding and regression-finding mindset.
 
 ## Default Deliverable
 
-Use `independent-progress-assessments/TEMPLATE-CODE-REVIEW.md` unless the owner asks for inline comments or a shorter note.
+Use `.claude/rules/template-code-review.md` unless the owner asks for inline comments or a shorter note.
 
 ## Required Review Order
 

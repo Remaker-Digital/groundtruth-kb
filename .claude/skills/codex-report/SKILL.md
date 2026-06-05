@@ -53,7 +53,7 @@ Generate timestamped file:
 independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-{YYYY}-{MM}-{DD}-{HH}-{mm}-{SLUG}.md
 ```
 
-Update `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md` if any Open items are affected.
+Update `independent-progress-assessments/loyal-opposition-log.md` if any Open items are affected.
 
 ## Severity Levels
 

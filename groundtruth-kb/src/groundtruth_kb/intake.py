@@ -237,6 +237,7 @@ def ensure_backlog_for_confirmed_spec(
 
     active_items = _active_work_items_for_spec(db, str(spec["id"]))
     created = False
+    work_item: dict[str, Any] | None = None
     if active_items:
         work_item = active_items[0]
         action = "linked_existing"
@@ -262,6 +263,9 @@ def ensure_backlog_for_confirmed_spec(
             raise RuntimeError(f"auto backlog: insert_work_item returned None for {spec['id']}")
         created = True
         action = "created"
+
+    if work_item is None:
+        raise RuntimeError(f"auto backlog: work_item is None for {spec['id']}")
 
     db.link_deliberation_work_item(deliberation_id, str(work_item["id"]), role="auto_backlog")
 

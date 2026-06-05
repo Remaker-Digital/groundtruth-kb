@@ -78,7 +78,7 @@ The envelope offers three mutually-exclusive options:
 - **Accept the failure as expected** — record acceptance; spec status unchanged.
 - **Keep and schedule repair** — flag for test-quality repair; no retirement.
 
-One assertion per call per `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
+One assertion per call per `.claude/rules/codex-way-of-working.md`
 §127-130 (one-at-a-time owner-action protocol).
 
 ### `apply-decision <assertion_id> --decision <retire|accept|keep> --packet <path>`

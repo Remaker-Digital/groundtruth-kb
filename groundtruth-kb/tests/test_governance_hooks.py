@@ -767,6 +767,21 @@ def test_bridge_compliance_go_over_nogo(tmp_path):
     assert json.loads(result.stdout) == {}
 
 
+def _write_claim(tmp_path: Path, thread_slug: str, session_id: str = "test") -> None:
+    intent_dir = tmp_path / ".gtkb-state" / "work-intent"
+    intent_dir.mkdir(parents=True, exist_ok=True)
+    import datetime
+
+    now = datetime.datetime.now(datetime.UTC)
+    expiry = now + datetime.timedelta(seconds=60)
+    record = {
+        "session_id": session_id,
+        "acquired_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ttl_expires_at": expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    (intent_dir / f"{thread_slug}.json").write_text(json.dumps(record), encoding="utf-8")
+
+
 def test_bridge_compliance_blocks_bridge_proposal_without_spec_links(tmp_path):
     """Direct bridge proposal writes require concrete Specification Links.
 
@@ -775,13 +790,14 @@ def test_bridge_compliance_blocks_bridge_proposal_without_spec_links(tmp_path):
     concrete Specification Links. Per owner directive 2026-04-29 (S321) +
     bridge/gov-process-spec-precondition-2026-04-29-005.md REVISED-2 GO at -006.
     """
+    _write_claim(tmp_path, "no-spec-links")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
             "tool_name": "Write",
             "tool_input": {
                 "file_path": "bridge/no-spec-links-001.md",
-                "content": "# Implementation Proposal\n\nChange source behavior.",
+                "content": "NEW\n\n# Implementation Proposal\n\nChange source behavior.",
             },
             "session_id": "test",
             "cwd": str(tmp_path),
@@ -800,6 +816,7 @@ def test_bridge_compliance_blocks_verified_without_spec_to_test_evidence(tmp_pat
     hard-block (emit_deny) VERIFIED bridge reports lacking spec-to-test
     mapping or executed-test evidence. Per owner directive 2026-04-29 (S321).
     """
+    _write_claim(tmp_path, "verify-without-tests")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",

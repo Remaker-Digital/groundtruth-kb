@@ -19,7 +19,7 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
@@ -95,11 +95,11 @@ def _parse_json_option(raw: str | None, option_name: str, expected_type: type) -
 
 
 def _parse_json_list(raw: str | None, option_name: str) -> list[Any] | None:
-    return _parse_json_option(raw, option_name, list)
+    return cast(list[Any] | None, _parse_json_option(raw, option_name, list))
 
 
 def _parse_json_dict(raw: str | None, option_name: str) -> dict[str, Any] | None:
-    return _parse_json_option(raw, option_name, dict)
+    return cast(dict[str, Any] | None, _parse_json_option(raw, option_name, dict))
 
 
 def _validate_request_evidence(request: SpecUpdateRequest) -> None:

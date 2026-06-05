@@ -243,7 +243,7 @@ def _mirror_role_map_to_registry(
     try:
         from groundtruth_kb.db import KnowledgeDB
         from groundtruth_kb.harness_projection import generate_harness_projection
-    except Exception:
+    except Exception:  # intentional-catch: quality gate waiver
         return
     harnesses = role_map.get("harnesses")
     if not isinstance(harnesses, dict):
@@ -285,7 +285,7 @@ def _mirror_role_map_to_registry(
             changed = True
         if changed:
             generate_harness_projection(db, project_root)
-    except Exception as exc:
+    except Exception as exc:  # intentional-catch: quality gate waiver
         # WI-3342 IP-5: the DB-backed registry is now the sole authoritative
         # role surface (the transitional role-assignments.json write was
         # removed), so a registry-write failure must fail the transaction

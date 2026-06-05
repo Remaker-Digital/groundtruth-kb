@@ -250,7 +250,7 @@ def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     assert len(ids) == 21
     # dual-agent scaffold: 60 rows post-Slice-1+3+4.
     ids_da = {a.id for a in artifacts_for_scaffold("dual-agent")}
-    assert len(ids_da) == 60
+    assert len(ids_da) == 66
     # None are ownership-glob.
     assert all("adopter-" not in i for i in ids_da), "ownership-glob leaked into scaffold"
 

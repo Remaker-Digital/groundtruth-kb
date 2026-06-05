@@ -6,10 +6,11 @@ Authority: bridge/gtkb-backlog-update-cli-slice-1-003.md (REVISED-1), Codex GO a
 
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
@@ -18,6 +19,12 @@ from groundtruth_kb.db import KnowledgeDB
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
+
+# Canonical authorization-token shapes for the disjunctive text-edit gate.
+# Authority: bridge/gtkb-backlog-update-title-desc-cli-001-003.md REVISED-1
+# GO at bridge/gtkb-backlog-update-title-desc-cli-001-004.md (WI-4357).
+_PAUTH_TOKEN_RE = re.compile(r"\bPAUTH-[A-Z0-9][A-Z0-9-]*\b")
+_DELIB_TOKEN_RE = re.compile(r"\bDELIB-[A-Z0-9][A-Z0-9-]*\b")
 
 
 class BacklogUpdateError(Exception):
@@ -37,13 +44,53 @@ class BacklogUpdateRequest:
     owner_approved: bool
     change_reason: str
     dry_run: bool
+    title: str | None = None
+    description: str | None = None
 
 
 def _resolve_changed_by() -> str:
     """Resolve ``changed_by`` via the MUTATING fail-closed resolver."""
-    from scripts._kb_attribution import resolve_changed_by
+    from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
-    return resolve_changed_by()
+    return cast(str, resolve_changed_by())
+
+
+def _verify_text_edit_gate(db: KnowledgeDB, current: dict[str, Any], request: BacklogUpdateRequest) -> None:
+    """Enforce the disjunctive text-edit gate for ``--title`` / ``--description``.
+
+    Raises ``BacklogUpdateError`` if none of the three disjunctive arms is
+    satisfied. The arms are:
+
+    1. ``current['approval_state'] == 'bridge_authorized'``
+    2. ``request.owner_approved`` is True
+    3. ``request.change_reason`` cites an active ``PAUTH-*`` token (verified
+       against ``current_project_authorizations`` with status active) OR an
+       existing ``DELIB-*`` token (verified against ``current_deliberations``).
+
+    Substring presence is not enough: each cited token is looked up in the DB
+    and rejected if the row is missing or, for PAUTH, not active.
+    """
+    if current.get("approval_state") == "bridge_authorized":
+        return
+    if request.owner_approved:
+        return
+
+    for token in _PAUTH_TOKEN_RE.findall(request.change_reason):
+        record = db.get_project_authorization(token)
+        if record and record.get("status") == "active":
+            return
+
+    for token in _DELIB_TOKEN_RE.findall(request.change_reason):
+        if db.get_deliberation(token):
+            return
+
+    raise BacklogUpdateError(
+        f"Cannot edit title or description of work item {request.work_item_id} "
+        f"without text-edit authorization. Satisfy one of: (1) the work item "
+        f"has approval_state=bridge_authorized; (2) pass --owner-approved; "
+        f"(3) cite an active PAUTH-* token or an existing DELIB-* token in "
+        f"--change-reason."
+    )
 
 
 def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict[str, Any]:
@@ -103,6 +150,16 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
             f"without explicit owner approval (--owner-approved required under GOV-15)."
         )
 
+    # Disjunctive text-edit gate: applies whenever --title or --description is
+    # provided. Satisfied if any of: WI.approval_state == bridge_authorized,
+    # --owner-approved is set, or --change-reason cites an existing active
+    # PAUTH-* token or an existing DELIB-* token. The gate composes
+    # independently with the GOV-15 terminal-resolution gate above and the
+    # stage-transition gate below (see Forbidden-Field-Combination Policy in
+    # bridge/gtkb-backlog-update-title-desc-cli-001-003.md).
+    if request.title is not None or request.description is not None:
+        _verify_text_edit_gate(db, current, request)
+
     fields: dict[str, Any] = {}
     if request.resolution_status is not None:
         fields["resolution_status"] = request.resolution_status
@@ -114,6 +171,10 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
         fields["related_bridge_threads"] = request.related_bridge_threads
     if request.status_detail is not None:
         fields["status_detail"] = request.status_detail
+    if request.title is not None:
+        fields["title"] = request.title
+    if request.description is not None:
+        fields["description"] = request.description
 
     # Test the stage transition against the database logic
     current_stage = current.get("stage", "created")

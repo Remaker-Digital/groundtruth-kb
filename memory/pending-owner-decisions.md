@@ -6,7 +6,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-1078
+  asked_at: 2026-06-04T20:48:49.719274Z
+  question: "Want me to wait and tail Codex's progress, or do you want to investigate a different symptom?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 768d3e7d753ab402
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1080
+  asked_at: 2026-06-04T22:33:54.629036Z
+  question: "Want me to draft the governance_review umbrella proposal, or investigate the baseline-accept command first?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: e8c3f069d9d4482d
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -8518,6 +8531,188 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 2cbb7ee515219ee4
   resolved_at: 2026-06-04T19:22:37.628172Z
   answer: "Your questions have been answered: \"How should I handle the gtkb-platform-sot-consolidation-umbrella NO-GO -004?\"=\"Spawn a chip for a dedicated session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1070
+  asked_at: 2026-06-04T19:28:26.378511Z
+  question: "WI-4341 (SoT registry hybrid TOML+MemBase) disposition?"
+  options:
+    - "Retire as subsumed by Slice 1 (Recommended)"
+    - "Convert to narrower Slice 2A WI"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 17a24de850af7beb
+  resolved_at: 2026-06-04T19:28:26.378511Z
+  answer: "Your questions have been answered: \"WI-4341 (SoT registry hybrid TOML+MemBase) disposition?\"=\"Retire as subsumed by Slice 1 (Recommended)\", \"WI-4352 (registry-extension process) disposition?\"=\"Retire as subsumed by Slice 1 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1071
+  asked_at: 2026-06-04T19:28:26.378511Z
+  question: "WI-4352 (registry-extension process) disposition?"
+  options:
+    - "Retire as subsumed by Slice 1 (Recommended)"
+    - "Convert to narrower Slice 2A WI"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9b82001cc5510a90
+  resolved_at: 2026-06-04T19:28:26.378511Z
+  answer: "Your questions have been answered: \"WI-4341 (SoT registry hybrid TOML+MemBase) disposition?\"=\"Retire as subsumed by Slice 1 (Recommended)\", \"WI-4352 (registry-extension process) disposition?\"=\"Retire as subsumed by Slice 1 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1073
+  asked_at: 2026-06-04T20:11:03.174257Z
+  question: "Want me to drill into a specific cluster, check a specific thread/WI, or stand down here?"
+  options:
+    - "Drill into V1 release prep"
+    - "Drill into envelope program"
+    - "Drill into ISOLATION closeout"
+    - "Drill into SoT consolidation theme"
+    - "Stand down here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7d4ec586b57bbead
+  resolved_at: 2026-06-04T20:11:03.174257Z
+  answer: "<tool_use_error>InputValidationError: [   {     \"origin\": \"array\",     \"code\": \"too_big\",     \"maximum\": 4,     \"inclusive\": true,     \"path\": [       \"questions\",       0,       \"options\"     ],     \"message\": \"Too big: expected array to have <=4 items\"   } ]</tool_use_error>"
+  notes: ""
+- id: DECISION-1074
+  asked_at: 2026-06-04T20:11:03.174257Z
+  question: "Want me to drill into a specific cluster, or stand down here?"
+  options:
+    - "Drill into V1 release prep"
+    - "Drill into envelope program OR ISOLATION closeout"
+    - "Drill into SoT consolidation + watch chip"
+    - "Stand down here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3396683fa2df8f89
+  resolved_at: 2026-06-04T20:11:03.174257Z
+  answer: "Your questions have been answered: \"Want me to drill into a specific cluster, or stand down here?\"=\"Drill into envelope program OR ISOLATION closeout\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1075
+  asked_at: 2026-06-04T20:11:03.174257Z
+  question: "Which cluster should I drill into?"
+  options:
+    - "Envelope program"
+    - "ISOLATION closeout"
+    - "Both — envelope first then ISOLATION"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a653b3fea0a50f5e
+  resolved_at: 2026-06-04T20:11:03.174257Z
+  answer: "Your questions have been answered: \"Which cluster should I drill into?\"=\"Envelope program\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1072
+  asked_at: 2026-06-04T19:29:33.680149Z
+  question: "Want me to drill into any specific cluster (V1 release prep, envelope program, ISOLATION closeout, SoT consolidation)..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 5b788563f943b6d5
+  resolved_at: 2026-06-04T20:44:27.119520Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1076
+  asked_at: 2026-06-04T20:46:19.964548Z
+  question: "How should the envelope-impl PAUTH be issued so WI-4298/4299/4301 can move?"
+  options:
+    - "Version-bump existing envelope PAUTH (Recommended)"
+    - "Mint a NEW impl-only PAUTH"
+    - "Defer — stand down on envelope unblock now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f00906cbe3252d64
+  resolved_at: 2026-06-04T20:46:19.964548Z
+  answer: "Your questions have been answered: \"How should the envelope-impl PAUTH be issued so WI-4298/4299/4301 can move?\"=\"Version-bump existing envelope PAUTH (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1077
+  asked_at: 2026-06-04T20:46:19.964548Z
+  question: "Approve minting v2 of the envelope PAUTH on exactly the terms shown above?"
+  options:
+    - "Approve as shown — mint v2 now"
+    - "Approve with amendments"
+    - "Cancel — don't mint v2"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b8688ae877f85baa
+  resolved_at: 2026-06-04T20:46:19.964548Z
+  answer: "Your questions have been answered: \"Approve minting v2 of the envelope PAUTH on exactly the terms shown above?\"=\"Approve as shown — mint v2 now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1079
+  asked_at: 2026-06-04T21:01:27.621158Z
+  question: "Auto-dispatch IS functioning — Codex started at 20:44:35Z and its session lock is actively refreshing (latest heartbeat 20:48:12Z, ~4 minutes ago). The umbrella thread's loyal-opposition dispatch signature was recorded successfully and one item is in Codex's queue. The complexity of -007 (6 DELIBs, 5 AUQ passes, 4 MemBase reads to verify) puts a verdict in the 5-10 minute range; we're well within that window. How would you like to proceed?"
+  options:
+    - "Wait for Codex verdict (Recommended)"
+    - "Investigate a different symptom"
+    - "Force a manual re-dispatch"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 030f3b92f44241b8
+  resolved_at: 2026-06-04T21:01:27.621158Z
+  answer: "Your questions have been answered: \"Auto-dispatch IS functioning — Codex started at 20:44:35Z and its session lock is actively refreshing (latest heartbeat 20:48:12Z, ~4 minutes ago). The umbrella thread's loyal-opposition dispatch signature was recorded successfully and one item is in Codex's queue. The complexity of -007 (6 DELIBs, 5 AUQ passes, 4 MemBase reads to verify) puts a verdict in the 5-10 minute range; we're well within that window. How would you like to proceed?\"=\"Wait for Codex verdict (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1081
+  asked_at: 2026-06-04T22:41:51.196473Z
+  question: "Authorize the Agent Red child-directory cutover (GTKB-ISOLATION-018)?"
+  options:
+    - "Authorize — mint PAUTH + schedule for next session"
+    - "Authorize but DEFER scheduling"
+    - "Not authorizing now — stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2efd2dd35b070d5f
+  resolved_at: 2026-06-04T22:41:51.196473Z
+  answer: "Your questions have been answered: \"Authorize the Agent Red child-directory cutover (GTKB-ISOLATION-018)?\"=\"Authorize — mint PAUTH + schedule for next session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1082
+  asked_at: 2026-06-04T22:43:28.521451Z
+  question: "Approve inserting SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001 into MemBase as a formal specification (status=specified, type=specification) under PAUTH v2's approval_packet_creation class? The spec body will be extracted from the GO'd design at bridge/gtkb-handoff-prompt-deterministic-service-001.md (Codex GO at -002), covering the deterministic handoff-prompt service contract (CLI + Python API, inputs, 3 output surfaces, determinism, WI-4294 wrap-procedure coupling, terminology lock to 'handoff prompt'). This is a formal-artifact-approval-packet operation; the same path that inserted SPEC-ENVELOPE-DISCLOSURE-UI-001 today. The packet's full_content + sha256 will be presented in the next turn before the actual insert command runs."
+  options:
+    - "Approve insertion (verbatim from bridge -001 body)"
+    - "Approve in principle but present the full body for owner review first"
+    - "Defer (don't insert this session)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 66edbcd2c4da5ae1
+  resolved_at: 2026-06-04T22:43:28.521451Z
+  answer: "Your questions have been answered: \"Approve inserting SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001 into MemBase as a formal specification (status=specified, type=specification) under PAUTH v2's approval_packet_creation class? The spec body will be extracted from the GO'd design at bridge/gtkb-handoff-prompt-deterministic-service-001.md (Codex GO at -002), covering the deterministic handoff-prompt service contract (CLI + Python API, inputs, 3 output surfaces, determinism, WI-4294 wrap-procedure coupling, terminology lock to 'handoff prompt'). This is a formal-artifact-approval-packet operation; the same path that inserted SPEC-ENVELOPE-DISCLOSURE-UI-001 today. The packet's full_content + sha256 will be presented in the next turn before the actual insert command runs.\"=\"Approve insertion (verbatim from bridge -001 body)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1083
+  asked_at: 2026-06-05T05:21:41.032975Z
+  question: "Wrap-scan W1 reported 43 ERROR-severity findings (all `snapshots_non_manifest` from prior sessions S385-S414 leaving wrap-scan reports inside the manifest-only snapshots dir) + 4444 WARN (mostly pre-existing uncommitted skill/rule markdown churn). W2 reported 4412 WARN orphan bridge files (legacy threads from agent-red-cto-cleanup, active-workspace-declaration, etc.). None of these are caused by session a1951945. How should I proceed with the wrap procedure?"
+  options:
+    - "Proceed with /kb-session-wrap full 5-phase (Recommended)"
+    - "Minimal wrap: MEMORY.md update + DA harvest only"
+    - "Stop without full wrap"
+    - "Defer wrap; first file a bridge to clean legacy snapshots_non_manifest + orphan-bridge findings"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2dc56a6f79132e1f
+  resolved_at: 2026-06-05T05:21:41.032975Z
+  answer: "Your questions have been answered: \"Wrap-scan W1 reported 43 ERROR-severity findings (all `snapshots_non_manifest` from prior sessions S385-S414 leaving wrap-scan reports inside the manifest-only snapshots dir) + 4444 WARN (mostly pre-existing uncommitted skill/rule markdown churn). W2 reported 4412 WARN orphan bridge files (legacy threads from agent-red-cto-cleanup, active-workspace-declaration, etc.). None of these are caused by session a1951945. How should I proceed with the wrap procedure?\"=\"Proceed with /kb-session-wrap full 5-phase (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1084
+  asked_at: 2026-06-05T05:45:53.967137Z
+  question: "How should I clean up the work tree and land REVISED-003? All paths preserve Group A (my REVISED + INDEX edit) and Group F (pre-session state — untouched)."
+  options:
+    - "C1: Two scoped commits — mine, then orphans (Recommended)"
+    - "C2: Single bundled commit — everything in one chore commit"
+    - "C3: Stash orphans, commit mine, drift re-blocks"
+    - "C4: Commit my Group A + bundle D (regen) only; stash B+C+E"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e93e32db014c5290
+  resolved_at: 2026-06-05T05:45:53.967137Z
+  answer: "Your questions have been answered: \"How should I clean up the work tree and land REVISED-003? All paths preserve Group A (my REVISED + INDEX edit) and Group F (pre-session state — untouched).\"=\"C1: Two scoped commits — mine, then orphans (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1085
+  asked_at: 2026-06-05T06:00:23.006642Z
+  question: "I just woke up — what should I commit? My session's work (WI-4358, WI-4361 cycles) is already in HEAD across 6 commits. The working tree has 120 uncommitted changes from concurrent sessions (skill manifests, rule files, test changes, deletions, new memory topics) that I didn't author."
+  options:
+    - "Status update only — no commit needed"
+    - "Sweep-commit all 120 outstanding changes"
+    - "Show me the working tree changes first"
+    - "Commit the Codex-rules relocation cluster"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bd6d82f76d447f29
+  resolved_at: 2026-06-05T06:00:23.006642Z
+  answer: "Your questions have been answered: \"I just woke up — what should I commit? My session's work (WI-4358, WI-4361 cycles) is already in HEAD across 6 commits. The working tree has 120 uncommitted changes from concurrent sessions (skill manifests, rule files, test changes, deletions, new memory topics) that I didn't author.\"=\"Sweep-commit all 120 outstanding changes\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

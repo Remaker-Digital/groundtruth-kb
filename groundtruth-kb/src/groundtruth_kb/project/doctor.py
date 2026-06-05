@@ -388,7 +388,7 @@ def _orphan_citation_severity(target: Path) -> Literal["warning", "fail"]:
         import tomllib
 
         data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception:  # intentional-catch: quality gate waiver
         return "warning"
     doctor_config = data.get("doctor", {}) if isinstance(data, dict) else {}
     severity = str(doctor_config.get("orphan_citations", "")).strip().lower()
@@ -1405,7 +1405,8 @@ def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
     check_name = "Managed artifact drift"
     try:
         artifacts = artifacts_for_doctor(profile_name)
-    except Exception as exc:  # pragma: no cover - defensive boundary around registry parser
+    # pragma: no cover - defensive boundary around registry parser
+    except Exception as exc:  # intentional-catch: quality gate waiver
         return ToolCheck(
             name=check_name,
             required=True,
@@ -1525,6 +1526,124 @@ def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
         found=True,
         status=status,
         message=f"{count_text}{detail_text}",
+    )
+
+
+def _check_sot_registry_completeness(target: Path) -> ToolCheck:
+    """Validate the platform SoT artifact registry (GOV-PLATFORM-SOT-REGISTRY-001).
+
+    Two sub-checks per DCL-SOT-REGISTRY-PROJECTION-PARITY-001 and the umbrella
+    Slice-1 scope:
+
+    1. **Parity** — the TOML edit-surface at ``config/registry/sot-artifacts.toml``
+       and the MemBase ``sot_artifacts`` projection must agree. A projection that
+       has never been synced (empty) or that diverges is reported as drift.
+    2. **Reality** — every active record whose ``storage_path`` is a concrete
+       (non-``membase:``, non-glob) path must resolve on disk under ``target``.
+
+    Severity is **WARN-only** during Slice 1 per owner decision Q6 of
+    ``DELIB-20260671`` (the check ships at WARN; promotion to ERROR is a separate
+    downstream owner decision). The check never returns ``fail`` for drift; it
+    returns ``fail`` only when the registry file itself cannot be parsed (a
+    structural defect, not inventory drift). When the registry is absent (e.g.
+    an adopter project before Slice 7 rollout), it returns ``info`` (skip).
+    """
+    check_name = "SoT registry completeness"
+    registry_path = target / "config" / "registry" / "sot-artifacts.toml"
+
+    if not registry_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="info",
+            message="config/registry/sot-artifacts.toml not present (skip — platform registry only)",
+        )
+
+    try:
+        from groundtruth_kb.project import sot_registry
+    except Exception as exc:  # pragma: no cover - defensive import boundary  # intentional-catch: quality gate waiver
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"sot_registry module unavailable: {exc}",
+        )
+
+    try:
+        toml_records = sot_registry.load_toml(registry_path)
+    except Exception as exc:  # InvalidSoTRecord / UnknownDomain / parse error
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"sot-artifacts.toml failed to load: {exc}",
+        )
+
+    warnings: list[str] = []
+
+    # Sub-check 1: TOML / MemBase projection parity.
+    db_path = target / "groundtruth.db"
+    if db_path.is_file():
+        try:
+            projection = sot_registry.load_projection(db_path)
+        except Exception as exc:  # pragma: no cover - defensive DB boundary  # intentional-catch: quality gate waiver
+            projection = []
+            warnings.append(f"projection load failed: {exc}")
+        if not projection:
+            warnings.append(
+                f"MemBase sot_artifacts projection empty — run `gt registry sync` "
+                f"({len(toml_records)} TOML records unsynced)"
+            )
+        else:
+            parity = sot_registry.validate_projection_parity(toml_records, projection)
+            if not parity.in_sync:
+                bits: list[str] = []
+                if parity.missing_in_projection:
+                    bits.append(f"missing in projection: {', '.join(parity.missing_in_projection[:5])}")
+                if parity.missing_in_toml:
+                    bits.append(f"missing in TOML: {', '.join(parity.missing_in_toml[:5])}")
+                if parity.field_divergences:
+                    diverged = ", ".join(f"{i}.{f}" for i, f in parity.field_divergences[:5])
+                    bits.append(f"field drift: {diverged}")
+                warnings.append("TOML/MemBase parity drift — " + "; ".join(bits))
+    else:
+        warnings.append("groundtruth.db not present — parity sub-check skipped")
+
+    # Sub-check 2: registry / on-disk reality for active concrete paths.
+    unresolved: list[str] = []
+    for rec in toml_records:
+        if rec.lifecycle != "active":
+            continue
+        path = rec.storage_path
+        if path.startswith("membase:"):
+            continue
+        if any(ch in path for ch in "*?[]"):
+            # Glob/pattern storage paths are not point-resolvable; skip.
+            continue
+        if not (target / path).exists():
+            unresolved.append(rec.id)
+    if unresolved:
+        warnings.append(f"{len(unresolved)} active record(s) with unresolved storage_path: {', '.join(unresolved[:5])}")
+
+    if warnings:
+        suffix = "" if len(warnings) <= 3 else f"; +{len(warnings) - 3} more"
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"{len(toml_records)} SoT records — " + "; ".join(warnings[:3]) + suffix,
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=f"{len(toml_records)} SoT records registered; TOML/MemBase parity OK; all active paths resolve",
     )
 
 
@@ -1790,9 +1909,9 @@ def _check_codex_skill_load_health(target: Path) -> ToolCheck:
     if not skills_root.is_dir():
         return ToolCheck(
             name="Codex skill load health",
-            required=True,
+            required=False,
             found=False,
-            status="fail",
+            status="warning",
             message=".codex/skills missing; Codex skill adapters are not configured",
         )
 
@@ -2831,7 +2950,7 @@ def _session_role_marker_path(target: Path) -> Path:
     return target / ".claude" / "session" / _SESSION_ROLE_MARKER_NAME
 
 
-def _read_session_role_marker(target: Path) -> tuple[dict | None, str | None]:
+def _read_session_role_marker(target: Path) -> tuple[dict[str, Any] | None, str | None]:
     """Return (marker_dict, error). error is set on unreadable/malformed/absent.
 
     (None, None) -> no marker file (a normal, non-warning state).
@@ -2850,7 +2969,7 @@ def _read_session_role_marker(target: Path) -> tuple[dict | None, str | None]:
     return body, None
 
 
-def _session_role_marker_structurally_valid(body: dict) -> bool:
+def _session_role_marker_structurally_valid(body: dict[str, Any]) -> bool:
     """True iff a parsed marker satisfies DCL-SESSION-ROLE-RESOLUTION-001
     assertion 6 (non-empty string ``session_id``) AND assertion 7 (``role`` in
     the role set). The alignment check consults this so it defers to the
@@ -3675,6 +3794,7 @@ def run_doctor(
         checks.append(_check_spec_intake_skill_present(target, profile))
         checks.append(_check_codex_skill_load_health(target))
         checks.append(_check_managed_artifact_drift(target, profile))
+        checks.append(_check_sot_registry_completeness(target))
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))

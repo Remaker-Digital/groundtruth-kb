@@ -17,7 +17,7 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 Status = Literal["PASS", "FAIL", "SKIP", "WARN"]
 
@@ -223,11 +223,11 @@ def _python_requirement(root: Path) -> str | None:
             return None
         project = data.get("project")
         if isinstance(project, dict) and isinstance(project.get("requires-python"), str):
-            return project["requires-python"]
+            return str(project["requires-python"])
         poetry = data.get("tool", {}).get("poetry", {}) if isinstance(data.get("tool"), dict) else {}
         dependencies = poetry.get("dependencies") if isinstance(poetry, dict) else None
         if isinstance(dependencies, dict) and isinstance(dependencies.get("python"), str):
-            return dependencies["python"]
+            return str(dependencies["python"])
 
     setup_cfg = root / "setup.cfg"
     if setup_cfg.is_file():
@@ -256,7 +256,7 @@ def _requirement_allows_python_312(requirement: str) -> bool:
         return normalized in {">=3.11", ">=3.10", ">=3.9"} or normalized.startswith(">=3.11")
     try:
         return Version("3.12.0") in SpecifierSet(normalized)
-    except Exception:
+    except Exception:  # intentional-catch: quality gate waiver
         return False
 
 
@@ -286,7 +286,13 @@ def _run(command: list[str], *, cwd: Path, timeout_seconds: int) -> subprocess.C
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        return subprocess.CompletedProcess(command, 124, stdout=exc.stdout or "", stderr=exc.stderr or "timeout")
+        stdout_str = (
+            exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        )
+        stderr_str = (
+            exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "timeout")
+        )
+        return subprocess.CompletedProcess(command, 124, stdout=stdout_str, stderr=stderr_str)
 
 
 def _combined_output(completed: subprocess.CompletedProcess[str]) -> str:

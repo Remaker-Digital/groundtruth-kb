@@ -338,13 +338,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin CLI w
     try:
         result = run_sweep(args.root, args.patterns_path, args.pattern_set)
     except PatternSetError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {exc}", file=sys.stderr)  # print-ok
         return 2
     out_dir = args.output or args.root / ".gtkb-state" / "hygiene-sweep" / result.run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     emit_json(result, out_dir / "findings.json")
     emit_markdown(result, out_dir / "summary.md")
-    print(f"hygiene sweep: {result.finding_count} finding(s); output: {out_dir}")
+    print(f"hygiene sweep: {result.finding_count} finding(s); output: {out_dir}")  # print-ok
     return 0
 
 

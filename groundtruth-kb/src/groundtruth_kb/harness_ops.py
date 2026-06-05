@@ -30,7 +30,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from groundtruth_kb import harness_lifecycle
 
@@ -237,17 +237,20 @@ def _append_version(
             fields[name] = overrides.pop(name)
     if overrides:
         raise HarnessOperationError(f"unexpected harness field override(s): {sorted(overrides)}")
-    return db.insert_harness(
-        id=current_row["id"],
-        harness_name=fields["harness_name"],
-        harness_type=fields["harness_type"],
-        role=role,
-        changed_by=changed_by,
-        change_reason=change_reason,
-        status=fields["status"],
-        reviewer_precedence=fields["reviewer_precedence"],
-        invocation_surfaces=invocation_surfaces,
-        capabilities_ref=fields["capabilities_ref"],
+    return cast(
+        dict[str, Any],
+        db.insert_harness(
+            id=current_row["id"],
+            harness_name=fields["harness_name"],
+            harness_type=fields["harness_type"],
+            role=role,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            status=fields["status"],
+            reviewer_precedence=fields["reviewer_precedence"],
+            invocation_surfaces=invocation_surfaces,
+            capabilities_ref=fields["capabilities_ref"],
+        ),
     )
 
 
@@ -323,17 +326,20 @@ def register_harness(
             f"{existing.get('status')!r}); use the lifecycle verbs to change it"
         )
     try:
-        return db.insert_harness(
-            id=id,
-            harness_name=harness_name,
-            harness_type=harness_type,
-            role=[],
-            changed_by=changed_by,
-            change_reason=change_reason,
-            status=harness_lifecycle.STATUS_REGISTERED,
-            reviewer_precedence=reviewer_precedence,
-            invocation_surfaces=invocation_surfaces,
-            capabilities_ref=capabilities_ref,
+        return cast(
+            dict[str, Any],
+            db.insert_harness(
+                id=id,
+                harness_name=harness_name,
+                harness_type=harness_type,
+                role=[],
+                changed_by=changed_by,
+                change_reason=change_reason,
+                status=harness_lifecycle.STATUS_REGISTERED,
+                reviewer_precedence=reviewer_precedence,
+                invocation_surfaces=invocation_surfaces,
+                capabilities_ref=capabilities_ref,
+            ),
         )
     except ValueError as exc:
         raise HarnessOperationError(str(exc)) from exc
@@ -413,7 +419,10 @@ def transition_harness(
             changed_by=changed_by,
             change_reason=f"{change_reason} [role invariant reconciliation]",
         )
-        return db.get_harness(harness_id)
+        row = db.get_harness(harness_id)
+        if row is None:
+            raise HarnessOperationError(f"Unexpected error: harness {harness_id!r} not found on readback.")
+        return cast(dict[str, Any], row)
     try:
         harness_lifecycle.validate_transition(current_status, target_status)
     except ValueError as exc:
@@ -433,7 +442,10 @@ def transition_harness(
         changed_by=changed_by,
         change_reason=f"{change_reason} [role invariant reconciliation]",
     )
-    return db.get_harness(harness_id)
+    row = db.get_harness(harness_id)
+    if row is None:
+        raise HarnessOperationError(f"Unexpected error: harness {harness_id!r} not found on readback.")
+    return cast(dict[str, Any], row)
 
 
 def set_harness_precedence(

@@ -331,7 +331,10 @@ def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none
         codex_src = templates_dir / "project" / "codex-bootstrap"
         if codex_src.exists():
             for src in codex_src.glob("*.md"):
-                paths.add(f"independent-progress-assessments/{src.name}")
+                if src.name == "loyal-opposition-log.md":
+                    paths.add(f"independent-progress-assessments/{src.name}")
+                else:
+                    paths.add(f".claude/rules/{src.name}")
 
     # Webapp-profile outputs (all profiles with ``includes_docker``)
     if profile.includes_docker:
@@ -685,14 +688,20 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
         shutil.copy2(src, dst)
 
     # Codex bootstrap documents
-    codex_dir = target / "independent-progress-assessments"
-    codex_dir.mkdir(parents=True, exist_ok=True)
-    (codex_dir / "CODEX-INSIGHT-DROPBOX").mkdir(exist_ok=True)
+    ipa_dir = target / "independent-progress-assessments"
+    ipa_dir.mkdir(parents=True, exist_ok=True)
+    (ipa_dir / "CODEX-INSIGHT-DROPBOX").mkdir(exist_ok=True)
+
+    rules_dir = target / ".claude" / "rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
 
     codex_src = templates / "project" / "codex-bootstrap"
     if codex_src.exists():
         for src in codex_src.glob("*.md"):
-            shutil.copy2(src, codex_dir / src.name)
+            if src.name == "loyal-opposition-log.md":
+                shutil.copy2(src, ipa_dir / src.name)
+            else:
+                shutil.copy2(src, rules_dir / src.name)
 
     # settings.local.json with bridge hooks
     settings_template = templates / "project" / "settings.local.json"

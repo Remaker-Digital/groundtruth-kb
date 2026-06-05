@@ -216,9 +216,8 @@ def authorize_implementation(config: GTConfig, request: AuthorizeImplementationR
 
     project_id = _resolve_project(db, request.work_item_id, request.project_id)
 
-    has_existing = bool(request.owner_decision and request.owner_decision.strip())
     deliberation_result: dict[str, Any] | None = None
-    if has_existing:
+    if request.owner_decision is not None and request.owner_decision.strip():
         owner_decision_id = _validate_owner_authority(db, request.owner_decision.strip())
     else:
         deliberation_result = _record_fresh_owner_decision(config, request)
