@@ -6,7 +6,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-1094
+  asked_at: 2026-06-05T16:19:32.665833Z
+  question: "Want me to wait it out and complete automatically, or leave it queued here for the next session to file?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: ab4ba2e99df27506
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -8809,6 +8815,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: bad29ca7756298ef
   resolved_at: 2026-06-05T08:14:20.122598Z
   answer: "Your questions have been answered: \"Gate blocks `git commit` while bridge -005 is NEW awaiting Codex LO review. The commit packages already-completed work (no new source mutation), but the gate can't distinguish. How should I proceed?\"=\"Authorize --no-verify for this single commit (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1093
+  asked_at: 2026-06-05T16:19:32.665833Z
+  question: "WI-4371: how should the LO file-safety write-gate resolve role, given your envelope-authoritative model? (Fix is load-bearing — it'll go through a bridge proposal + LO review + tests either way.)"
+  options:
+    - "Migrate to resolver (recommended)"
+    - "Keep durable for write-gate only"
+    - "Track only, don't fix now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5b30339f37dc9fd0
+  resolved_at: 2026-06-05T16:19:32.665833Z
+  answer: "Your questions have been answered: \"WI-4371: how should the LO file-safety write-gate resolve role, given your envelope-authoritative model? (Fix is load-bearing — it'll go through a bridge proposal + LO review + tests either way.)\"=\"Migrate to resolver (recommended)\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

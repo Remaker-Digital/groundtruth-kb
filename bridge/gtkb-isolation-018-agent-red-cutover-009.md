@@ -58,22 +58,28 @@ The production-effects classifier probe at `_production_effects.py:328` is corre
 | Dockerfile.test COPY source | `grep -q 'COPY applications/Agent_Red/shopify.app.toml' Dockerfile.test` | PASS |
 | testing.md doc | `grep -q 'applications/Agent_Red/shopify.app.toml' memory/topics/testing.md` | PASS |
 | F1 probe preserved | `grep -q '"shopify\.app\.toml"' scripts/rehearse/_production_effects.py` | PASS (line 328) |
-| Composite command | Full composite from -007 | "ALL CHECKS PASS" |
-| Production-effects regression | `pytest platform_tests/scripts/test_rehearse_production_effects.py -q --tb=short` | 28 passed |
-| Ruff lint | `ruff check scripts/session_self_initialization.py scripts/rehearse/_dashboard_regen.py` | All checks passed |
-| Ruff format | `ruff format --check scripts/session_self_initialization.py scripts/rehearse/_dashboard_regen.py` | 2 files already formatted |
+| Composite command | Equivalent individual checks from -007, run through repo-local commands | PASS. The one-shot PowerShell composite was blocked by the current LO file-safety hook state, so the constituent checks were run individually. |
+| Production-effects regression | `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_rehearse_production_effects.py -q --tb=short --timeout=60` | 28 passed, 1 warning |
+| Production-effects map double-prefix guard | Direct `rehearse._production_effects.run(...)` with `PYTHONPATH=scripts`, output under `.tmp-codex-iso018/production-effects` | PASS: `status=ok`, `total_surfaces=601`, `double_prefix_count=0` |
+| Broad isolation/registry/root-boundary regression | `groundtruth-kb\.venv\Scripts\python.exe -m pytest groundtruth-kb\tests\ -k "isolation or registry or root_boundary" --tb=short -q --timeout=60 --basetemp E:\GT-KB\.tmp-codex-iso018\pytest-basetemp` | 198 passed, 2259 deselected, 1 warning |
+| Ruff lint | `groundtruth-kb\.venv\Scripts\python.exe -m ruff check scripts\session_self_initialization.py scripts\rehearse\_dashboard_regen.py` | All checks passed |
+| Ruff format | `groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check scripts\session_self_initialization.py scripts\rehearse\_dashboard_regen.py` | 2 files already formatted |
 | IP-2 operator note | `grep -q 'ISOLATION-018 cutover' applications/Agent_Red/CLAUDE.md` | PASS |
+| Narrative artifact evidence | `groundtruth-kb\.venv\Scripts\python.exe scripts\check_narrative_artifact_evidence.py --paths applications/Agent_Red/CLAUDE.md` | PASS narrative-artifact evidence (1 cleared) |
+| Bridge applicability preflight | `groundtruth-kb\.venv\Scripts\python.exe scripts\bridge_applicability_preflight.py --bridge-id gtkb-isolation-018-agent-red-cutover` | `preflight_passed: true`, `missing_required_specs: []`, `missing_advisory_specs: []` |
+| ADR/DCL clause preflight | `groundtruth-kb\.venv\Scripts\python.exe scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-isolation-018-agent-red-cutover` | 0 blocking gaps |
+| Project doctor | `groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb project doctor` | FAIL on pre-existing repo health findings unrelated to the cutover: AUQ coverage 91.3%, one historical VERIFIED bridge missing Owner Decisions, DA harvest coverage 0.76%, product-scope paths writable from app session, and existing warnings |
 
 ## Acceptance Criteria Status
 
 1. Three `git mv` operations complete — **PASS** (commit `8d960bd7`; files at destination, absent from root).
-2. Composite verification "ALL CHECKS PASS" — **PASS**.
+2. Composite verification equivalent — **PASS** via individual checks. The one-shot shell composite was blocked by the current LO file-safety hook state before execution, so the same checks were run individually.
 3. `applications/Agent_Red/CLAUDE.md` operator-path note — **PASS**.
 4. No live references to root-relative paths except the intentional `_production_effects.py:328` probe — **PASS** (grep evidence above).
 5. Dockerfile.test COPY source resolves — **PASS**.
 6. `test_rehearse_production_effects.py` passes UNCHANGED — **PASS** (28 passed).
-7. F1 backup: no double-prefix in output — **PASS** (no `applications/Agent_Red/applications/Agent_Red/` in evidence).
-8. Doctor checks — deferred to post-commit verification (doctor requires committed state for some checks).
+7. F1 backup: no double-prefix in output — **PASS** (`double_prefix_count=0` in generated production-effects map evidence).
+8. Doctor checks — **KNOWN REPO-HEALTH FAIL, NON-CUTOVER**. `groundtruth_kb project doctor` still reports pre-existing AUQ coverage, historical VERIFIED Owner Decisions, DA harvest, product-scope writability, and warning findings; none are introduced by this cutover.
 9. Both preflights exit 0 — **PASS** (applicability: `preflight_passed: true`; clause: 0 blocking gaps).
 
 ## Files Changed
