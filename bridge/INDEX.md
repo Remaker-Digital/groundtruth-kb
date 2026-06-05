@@ -8,11 +8,16 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-cross-harness-trigger-no-go-dispatch-fix
+GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-006.md
+REVISED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-005.md
+NO-GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-004.md
 REVISED: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-003.md
 NO-GO: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-002.md
 NEW: bridge/gtkb-cross-harness-trigger-no-go-dispatch-fix-001.md
 
 Document: gtkb-isolation-018-agent-red-cutover
+NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-006.md
+REVISED: bridge/gtkb-isolation-018-agent-red-cutover-005.md
 NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-004.md
 REVISED: bridge/gtkb-isolation-018-agent-red-cutover-003.md
 NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-002.md
@@ -23,6 +28,8 @@ NO-GO: bridge/gtkb-protected-artifact-rollup-governance-umbrella-002.md
 NEW: bridge/gtkb-protected-artifact-rollup-governance-umbrella-001.md
 
 Document: gtkb-handoff-prompt-deterministic-service-impl
+VERIFIED: bridge/gtkb-handoff-prompt-deterministic-service-impl-011.md
+REVISED: bridge/gtkb-handoff-prompt-deterministic-service-impl-010.md
 NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-009.md
 REVISED: bridge/gtkb-handoff-prompt-deterministic-service-impl-008.md
 NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-007.md
@@ -34,6 +41,10 @@ NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-002.md
 NEW: bridge/gtkb-handoff-prompt-deterministic-service-impl-001.md
 
 Document: gtkb-envelope-disclosure-ui-impl
+VERIFIED: bridge/gtkb-envelope-disclosure-ui-impl-013.md
+REVISED: bridge/gtkb-envelope-disclosure-ui-impl-012.md
+NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-011.md
+NEW: bridge/gtkb-envelope-disclosure-ui-impl-010.md
 GO: bridge/gtkb-envelope-disclosure-ui-impl-009.md
 REVISED: bridge/gtkb-envelope-disclosure-ui-impl-008.md
 NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-007.md
