@@ -1,0 +1,254 @@
+"""Tests for the Ollama harness 4-store consistency doctor check (WI-4323).
+
+Spec-derived tests for ``_check_ollama_harness`` per the Phase-1 Child 3
+proposal (bridge/gtkb-ollama-integration-phase-1-verification-005.md) and
+the GO verdict (bridge/gtkb-ollama-integration-phase-1-verification-006.md).
+
+The check is 4-layer + cross-store consistency:
+
+- L1 — identity store: ``harness-state/harness-identities.json`` has ``ollama → D``.
+- L2 — registry store: ``harness-state/harness-registry.json`` has ``id=D`` with
+  ``harness_name=ollama``, ``harness_type=ollama``, ``status=registered``,
+  ``role=[]``.
+- L3 — capability registry: ``config/agent-control/harness-capability-registry.toml``
+  has ``[harnesses.ollama]`` with the four Phase-1 capability-floor keys.
+- L4 — routing TOML: ``.ollama/routing.toml`` parseable with at least one
+  ``tool_calling_supported=true`` model.
+- Cross-store drift: identities-vs-registry consistency.
+
+Layer 4b (advertised-model verification) is reachability-gated; tests neither
+require nor exercise a live Ollama daemon.
+
+Severity is ``warning`` per the Phase-1 rollout convention.
+
+Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
+All rights reserved.
+Licensed under AGPL-3.0-or-later.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from groundtruth_kb.project.doctor import _check_ollama_harness
+
+
+@pytest.fixture(autouse=True)
+def _skip_l4b_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Auto-skip the L4b advertised-model probe in unit tests.
+
+    Without this fixture, the doctor check probes the local
+    ``http://localhost:11434/api/tags`` endpoint when routing models are
+    present in the fixture. If the developer's machine happens to have
+    Ollama running with a different model set, the probe surfaces a
+    spurious advertised-model finding that has nothing to do with the
+    fixture's correctness.
+    """
+    monkeypatch.setenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", "1")
+
+
+def _write_clean_ollama_fixtures(root: Path) -> None:
+    """Create a 4-store fixture set with all stores consistent and clean."""
+    (root / "harness-state").mkdir(parents=True, exist_ok=True)
+    (root / "harness-state" / "harness-identities.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "ollama": {
+                        "id": "D",
+                        "assigned_at": "2026-06-05T05:11:00Z",
+                        "assigned_by": "fixture",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "harness-state" / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "D",
+                        "harness_name": "ollama",
+                        "harness_type": "ollama",
+                        "status": "registered",
+                        "role": [],
+                        "event_driven_hooks": False,
+                        "invocation_surfaces": {},
+                        "reviewer_precedence": None,
+                        "version": 1,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "config" / "agent-control").mkdir(parents=True, exist_ok=True)
+    (root / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
+        "[harnesses.ollama]\n"
+        "bridge_compliance_gate_respect = true\n"
+        "root_boundary_respect = true\n"
+        "author_metadata_env_var_setting = true\n"
+        "destructive_gate_delegation = true\n",
+        encoding="utf-8",
+    )
+    (root / ".ollama").mkdir(parents=True, exist_ok=True)
+    (root / ".ollama" / "routing.toml").write_text(
+        "schema_version = 1\n"
+        "\n"
+        "[models.qwen-coder-14b]\n"
+        'model_id = "qwen2.5-coder:14b-instruct-q4_K_M"\n'
+        'model_version = "q4_K_M"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "\n"
+        "[routing]\n"
+        'default_model = "qwen-coder-14b"\n',
+        encoding="utf-8",
+    )
+
+
+def test_clean_4_store_returns_pass(tmp_path: Path) -> None:
+    """All four stores present, consistent, and well-formed → PASS."""
+    _write_clean_ollama_fixtures(tmp_path)
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"
+    assert "clean" in result.message.lower()
+
+
+def test_missing_identity_returns_warning(tmp_path: Path) -> None:
+    """L1: missing identities file surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    (tmp_path / "harness-state" / "harness-identities.json").unlink()
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L1" in result.message
+
+
+def test_identity_wrong_id_returns_warning(tmp_path: Path) -> None:
+    """L1: identities store with wrong id (E instead of D) surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    (tmp_path / "harness-state" / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"ollama": {"id": "E"}}}),
+        encoding="utf-8",
+    )
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L1" in result.message
+
+
+def test_registry_status_drift_returns_warning(tmp_path: Path) -> None:
+    """L2: registry status drift (active instead of registered) surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    registry = json.loads((tmp_path / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
+    registry["harnesses"][0]["status"] = "active"
+    (tmp_path / "harness-state" / "harness-registry.json").write_text(json.dumps(registry), encoding="utf-8")
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L2" in result.message
+    assert "status" in result.message.lower()
+
+
+def test_registry_role_drift_returns_warning(tmp_path: Path) -> None:
+    """L2: registry role drift (non-empty role) surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    registry = json.loads((tmp_path / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
+    registry["harnesses"][0]["role"] = ["prime-builder"]
+    (tmp_path / "harness-state" / "harness-registry.json").write_text(json.dumps(registry), encoding="utf-8")
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L2" in result.message
+    assert "role" in result.message.lower()
+
+
+def test_capability_missing_section_returns_warning(tmp_path: Path) -> None:
+    """L3: capability registry missing [harnesses.ollama] surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
+        "[harnesses.claude]\nplaceholder = true\n", encoding="utf-8"
+    )
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L3" in result.message
+
+
+def test_capability_missing_keys_returns_warning(tmp_path: Path) -> None:
+    """L3: [harnesses.ollama] missing one or more floor keys surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
+        "[harnesses.ollama]\nbridge_compliance_gate_respect = true\n",
+        encoding="utf-8",
+    )
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L3" in result.message
+
+
+def test_routing_missing_returns_warning(tmp_path: Path) -> None:
+    """L4: routing TOML missing surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    (tmp_path / ".ollama" / "routing.toml").unlink()
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L4" in result.message
+
+
+def test_routing_no_tool_calling_returns_warning(tmp_path: Path) -> None:
+    """L4: routing TOML with no tool_calling_supported=true models surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    (tmp_path / ".ollama" / "routing.toml").write_text(
+        "schema_version = 1\n"
+        "\n"
+        "[models.demo]\n"
+        'model_id = "demo:latest"\n'
+        'model_version = "latest"\n'
+        "tool_calling_supported = false\n"
+        "allowed_tools = []\n"
+        "\n"
+        "[routing]\n"
+        'default_model = "demo"\n',
+        encoding="utf-8",
+    )
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L4" in result.message
+
+
+def test_cross_store_identity_vs_registry_drift(tmp_path: Path) -> None:
+    """Cross-store: identities has ollama→D but registry missing id=D."""
+    _write_clean_ollama_fixtures(tmp_path)
+    # Drop the registry entry for D
+    (tmp_path / "harness-state" / "harness-registry.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": []}),
+        encoding="utf-8",
+    )
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    # Either L2 (registry missing id=D) or Cross-store catches it.
+    assert "L2" in result.message or "Cross-store" in result.message
+
+
+def test_capability_unreadable_returns_warning(tmp_path: Path) -> None:
+    """L3: malformed TOML in capability registry surfaces as warning."""
+    _write_clean_ollama_fixtures(tmp_path)
+    (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
+        "this is = = not = valid TOML at all", encoding="utf-8"
+    )
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L3" in result.message
+
+
+def test_pass_message_mentions_all_four_layers(tmp_path: Path) -> None:
+    """The clean-pass message names the layers covered for diagnostic clarity."""
+    _write_clean_ollama_fixtures(tmp_path)
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "pass"
+    assert "L1" in result.message and "L2" in result.message
+    assert "L3" in result.message and "L4" in result.message

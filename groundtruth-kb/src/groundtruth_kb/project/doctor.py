@@ -542,6 +542,192 @@ def _check_harness_state_sot_consistency(target: Path) -> ToolCheck:
     )
 
 
+def _check_ollama_harness(target: Path) -> ToolCheck:
+    """WI-4323: four-store Ollama harness consistency check (Phase-1 Child 3).
+
+    Authorized by ``bridge/gtkb-ollama-integration-phase-1-verification-006.md``
+    (GO at -006). Verifies four registry stores agree about the Ollama harness
+    being registered at id ``D`` with type ``ollama``, status ``registered``,
+    and an empty role set. The four stores are:
+
+    1. ``harness-state/harness-identities.json`` — must contain ``ollama → D``.
+    2. ``harness-state/harness-registry.json`` — must contain ``id=D`` with
+       ``harness_name=ollama``, ``harness_type=ollama``, ``status=registered``,
+       ``role=[]``.
+    3. ``config/agent-control/harness-capability-registry.toml`` — must
+       contain ``[harnesses.ollama]`` with the four Phase-1 capability-floor
+       keys (``bridge_compliance_gate_respect``, ``root_boundary_respect``,
+       ``author_metadata_env_var_setting``, ``destructive_gate_delegation``).
+    4. ``.ollama/routing.toml`` — must be parseable and contain at least one
+       model whose ``tool_calling_supported`` is true.
+
+    A Layer 4 advertised-model check runs only when the local Ollama daemon
+    is reachable (``/api/tags``); models declared in routing TOML that are
+    absent from ``/api/tags`` surface as drift.
+
+    Severity is ``warning`` per the Phase-1 ``GOV-HARNESS-ONBOARDING-CONTRACT-001``
+    rollout convention: this check is diagnostic, not blocking, until role
+    promotion lands in Phase 2+.
+    """
+    import tomllib  # noqa: PLC0415 - py3.11+; defer import
+
+    findings: list[str] = []
+
+    # ── Layer 1 — identity store ─────────────────────────────────────
+    identities_path = target / "harness-state" / "harness-identities.json"
+    ollama_id: str | None = None
+    if not identities_path.is_file():
+        findings.append("L1: harness-state/harness-identities.json missing")
+    else:
+        try:
+            identities = json.loads(identities_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            findings.append(f"L1: identities JSON unreadable: {exc}")
+        else:
+            harness_block = identities.get("harnesses") if isinstance(identities, dict) else None
+            if not isinstance(harness_block, dict) or "ollama" not in harness_block:
+                findings.append("L1: identities store missing 'ollama' entry")
+            else:
+                ollama_id = harness_block["ollama"].get("id") if isinstance(harness_block["ollama"], dict) else None
+                if ollama_id != "D":
+                    findings.append(f"L1: identities ollama.id={ollama_id!r}; expected 'D'")
+
+    # ── Layer 2 — registry store ─────────────────────────────────────
+    registry_path = target / "harness-state" / "harness-registry.json"
+    registry_entry: dict[str, Any] | None = None
+    if not registry_path.is_file():
+        findings.append("L2: harness-state/harness-registry.json missing")
+    else:
+        try:
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            findings.append(f"L2: registry JSON unreadable: {exc}")
+        else:
+            harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
+            if isinstance(harnesses, list):
+                for entry in harnesses:
+                    if isinstance(entry, dict) and entry.get("id") == "D":
+                        registry_entry = entry
+                        break
+            if registry_entry is None:
+                findings.append("L2: registry has no entry for id=D")
+            else:
+                if registry_entry.get("harness_name") != "ollama":
+                    findings.append(
+                        f"L2: registry harness_name={registry_entry.get('harness_name')!r}; expected 'ollama'"
+                    )
+                if registry_entry.get("harness_type") != "ollama":
+                    findings.append(
+                        f"L2: registry harness_type={registry_entry.get('harness_type')!r}; expected 'ollama'"
+                    )
+                if registry_entry.get("status") != "registered":
+                    findings.append(f"L2: registry status={registry_entry.get('status')!r}; expected 'registered'")
+                role = registry_entry.get("role")
+                if role != []:
+                    findings.append(f"L2: registry role={role!r}; expected []")
+
+    # ── Layer 3 — capability registry ────────────────────────────────
+    capability_path = target / "config" / "agent-control" / "harness-capability-registry.toml"
+    if not capability_path.is_file():
+        findings.append("L3: config/agent-control/harness-capability-registry.toml missing")
+    else:
+        try:
+            cap_data = tomllib.loads(capability_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            findings.append(f"L3: capability registry unreadable: {exc}")
+        else:
+            ollama_caps = cap_data.get("harnesses", {}).get("ollama") if isinstance(cap_data, dict) else None
+            if not isinstance(ollama_caps, dict):
+                findings.append("L3: capability registry missing [harnesses.ollama]")
+            else:
+                required_keys = (
+                    "bridge_compliance_gate_respect",
+                    "root_boundary_respect",
+                    "author_metadata_env_var_setting",
+                    "destructive_gate_delegation",
+                )
+                missing_keys = [k for k in required_keys if k not in ollama_caps]
+                if missing_keys:
+                    findings.append(f"L3: capability registry missing keys: {missing_keys}")
+
+    # ── Layer 4 — routing TOML ──────────────────────────────────────
+    routing_path = target / ".ollama" / "routing.toml"
+    routing_models: list[str] = []
+    if not routing_path.is_file():
+        findings.append("L4: .ollama/routing.toml missing")
+    else:
+        try:
+            routing_data = tomllib.loads(routing_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            findings.append(f"L4: routing TOML unreadable: {exc}")
+        else:
+            models = routing_data.get("models") if isinstance(routing_data, dict) else None
+            if not isinstance(models, dict) or not models:
+                findings.append("L4: routing TOML has no [models.<key>] rows")
+            else:
+                any_tool_calling = False
+                for _key, row in models.items():
+                    if isinstance(row, dict):
+                        if row.get("tool_calling_supported") is True:
+                            any_tool_calling = True
+                        model_id = row.get("model_id")
+                        if isinstance(model_id, str) and model_id:
+                            routing_models.append(model_id)
+                if not any_tool_calling:
+                    findings.append("L4: routing TOML has no tool_calling_supported=true models")
+
+    # ── Cross-store consistency ──────────────────────────────────────
+    if ollama_id == "D" and registry_entry is None:
+        findings.append("Cross-store: identities has ollama→D but registry missing id=D")
+    if ollama_id is None and registry_entry is not None:
+        findings.append("Cross-store: registry has id=D but identities missing 'ollama'")
+
+    # ── Layer 4b — advertised-model verification (reachability-gated) ──
+    # Only runs when the local endpoint responds; absent endpoint is not a finding.
+    # Skipped entirely when GTKB_DOCTOR_OLLAMA_SKIP_PROBE is set (used by unit tests
+    # to keep the fixture-only checks hermetic with respect to whatever the local
+    # Ollama daemon happens to advertise).
+    if routing_models and not os.environ.get("GTKB_DOCTOR_OLLAMA_SKIP_PROBE"):
+        try:
+            import urllib.error  # noqa: PLC0415
+            import urllib.request  # noqa: PLC0415
+
+            with urllib.request.urlopen(  # noqa: S310 - localhost probe
+                "http://localhost:11434/api/tags", timeout=2.0
+            ) as response:
+                body = response.read().decode("utf-8", errors="replace")
+            try:
+                advertised = json.loads(body)
+            except json.JSONDecodeError:
+                advertised = {}
+            advertised_names = {m.get("name") for m in advertised.get("models", []) if isinstance(m, dict)}
+            for model_id in routing_models:
+                if not any(name and (name == model_id or name.startswith(model_id + ":")) for name in advertised_names):
+                    findings.append(f"L4b: routing model {model_id!r} not advertised by /api/tags")
+        except (urllib.error.URLError, TimeoutError, OSError):
+            # Endpoint unreachable — Layer 4b is reachability-gated and skipped.
+            pass
+
+    if not findings:
+        return ToolCheck(
+            name="Ollama harness consistency",
+            required=False,
+            found=True,
+            status="pass",
+            message="4-store Ollama harness consistency: clean (L1+L2+L3+L4)",
+        )
+
+    head = findings[0]
+    extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+    return ToolCheck(
+        name="Ollama harness consistency",
+        required=False,
+        found=True,
+        status="warning",
+        message=f"{len(findings)} findings; first: {head}{extra}",
+    )
+
+
 def _check_orphan_citations(target: Path) -> ToolCheck:
     script_path = _orphan_citation_audit_script(target)
     if not script_path.exists():
@@ -4125,6 +4311,12 @@ def run_doctor(
         # the proposal §Acceptance Criteria #8 — promoted to FAIL after WI-4336
         # (mirror retirement) lands.
         checks.append(_check_harness_state_sot_consistency(target))
+        # WI-4323: Ollama harness 4-store consistency. Verifies identities + registry +
+        # capability registry + routing TOML agree about ollama→D / status=registered /
+        # role=[] / tool_calling models. Authorized by
+        # bridge/gtkb-ollama-integration-phase-1-verification-006.md (GO at -006).
+        # Severity WARN per Phase-1 GOV-HARNESS-ONBOARDING-CONTRACT-001 rollout convention.
+        checks.append(_check_ollama_harness(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
     # Local import avoids a circular dependency: doctor_isolation imports

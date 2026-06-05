@@ -20,6 +20,7 @@ GO: bridge/gtkb-handoff-prompt-terminology-clarification-002.md
 NEW: bridge/gtkb-handoff-prompt-terminology-clarification-001.md
 
 Document: gtkb-lo-file-safety-gate-envelope-role-resolution
+GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-006.md
 REVISED: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-005.md
 GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-004.md
 REVISED: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-003.md
@@ -27,6 +28,7 @@ NO-GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-002.md
 NEW: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-001.md
 
 Document: gtkb-ollama-integration-phase-1-verification
+NEW: bridge/gtkb-ollama-integration-phase-1-verification-007.md
 GO: bridge/gtkb-ollama-integration-phase-1-verification-006.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-verification-005.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-004.md
