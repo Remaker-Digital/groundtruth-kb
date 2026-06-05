@@ -395,6 +395,153 @@ def _orphan_citation_severity(target: Path) -> Literal["warning", "fail"]:
     return "fail" if severity == "fail" else "warning"
 
 
+def _check_harness_state_sot_consistency(target: Path) -> ToolCheck:
+    """WI-4327 / WI-4329: harness-state Source-of-Truth consistency check.
+
+    3-layer doctor check per the Phase-1 Foundation proposal §Summary:
+
+    - Layer 1: the 3 SoT files parse cleanly through the canonical reader
+      entrypoints in ``groundtruth_kb.harness_projection`` (registry +
+      identities + capabilities). Parse failures raise ``HarnessStateError``
+      and surface as findings.
+    - Layer 2: grep_absent — no committed Python code outside
+      ``groundtruth_kb.harness_projection`` reads the 3 SoT surfaces
+      directly. Direct reads are doctor findings per
+      ``DCL-HARNESS-STATE-SOT-READER-CONTRACT-001``.
+    - Layer 3: grep_absent — no references to the retired
+      ``harness-state/role-assignments.json`` path outside whitelisted
+      contexts (bridge files, audit archives, formal-artifact-approval
+      packets, and ``harness_projection.py`` itself).
+
+    Initial severity is **warning** to allow rollout under the 3 sibling
+    children (rule-files, scripts-source, mirror-retirement); promotion to
+    ``fail`` happens once WI-4336 (mirror retirement) lands per the
+    proposal §Acceptance Criteria #8.
+    """
+    findings: list[str] = []
+
+    # ── Layer 1 — canonical entrypoints parse cleanly ─────────────────
+    try:
+        from groundtruth_kb.harness_projection import (  # noqa: PLC0415
+            HarnessStateError,
+            read_capabilities,
+            read_identity,
+            read_roles,
+        )
+    except ImportError as exc:
+        return ToolCheck(
+            name="harness-state SoT consistency",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"L1: canonical reader entrypoint module unimportable: {exc}",
+        )
+
+    for label, reader in (
+        ("registry (roles)", read_roles),
+        ("identities", read_identity),
+        ("capabilities", read_capabilities),
+    ):
+        try:
+            reader(project_root=target)
+        except HarnessStateError as exc:
+            findings.append(f"L1: {label} SoT parse failed: {exc}")
+        except Exception as exc:  # noqa: BLE001 - fail-soft per WARN severity
+            findings.append(f"L1: {label} SoT unexpected reader error: {type(exc).__name__}: {exc}")
+
+    # ── Layer 2 — grep_absent for direct SoT reads outside harness_projection ──
+    # Pattern: any committed Python file that string-matches the SoT relative
+    # paths AND calls json.load*/open(...,'r')/tomllib.load* on them counts as
+    # a direct-read finding. To avoid false-positives over reflective tests
+    # and bridge audit files, the scan is restricted to active source roots
+    # and whitelists harness_projection.py + a small fixed allowlist.
+    SOT_PATH_TOKENS = (
+        "harness-state/harness-registry.json",
+        "harness-state/harness-identities.json",
+        "harness-capability-registry.toml",
+    )
+    DIRECT_READ_TOKENS = ("json.load", "json.loads", "tomllib.load", "tomllib.loads")
+    L2_SCAN_ROOTS = (
+        target / "scripts",
+        target / "groundtruth-kb" / "src",
+    )
+    L2_WHITELIST_BASENAMES = frozenset(
+        {
+            "harness_projection.py",
+            "harness_projection_reader.py",  # DB-independent reader counterpart
+        }
+    )
+    for root in L2_SCAN_ROOTS:
+        if not root.is_dir():
+            continue
+        for py in root.rglob("*.py"):
+            if py.name in L2_WHITELIST_BASENAMES:
+                continue
+            try:
+                text = py.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if not any(token in text for token in SOT_PATH_TOKENS):
+                continue
+            if not any(rd in text for rd in DIRECT_READ_TOKENS):
+                continue
+            rel = py.relative_to(target).as_posix()
+            findings.append(f"L2: direct SoT read outside canonical entrypoint: {rel}")
+
+    # ── Layer 3 — grep_absent for retired role-assignments path ──────
+    RETIRED_PATH_TOKEN = "harness-state/role-assignments.json"
+    L3_WHITELIST_PREFIXES = (
+        "bridge/",
+        "independent-progress-assessments/",
+        "archive/",
+        ".groundtruth/formal-artifact-approvals/",
+    )
+    L3_WHITELIST_BASENAMES = frozenset({"harness_projection.py", "harness_projection_reader.py"})
+    L3_SCAN_ROOTS = (
+        target / "scripts",
+        target / "groundtruth-kb" / "src",
+        target / "config",
+        target / ".claude" / "rules",
+    )
+    for root in L3_SCAN_ROOTS:
+        if not root.is_dir():
+            continue
+        for py in root.rglob("*"):
+            if not py.is_file():
+                continue
+            if py.name in L3_WHITELIST_BASENAMES:
+                continue
+            rel = py.relative_to(target).as_posix()
+            if any(rel.startswith(prefix) for prefix in L3_WHITELIST_PREFIXES):
+                continue
+            try:
+                text = py.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if RETIRED_PATH_TOKEN in text:
+                findings.append(f"L3: retired path reference outside whitelist: {rel}")
+
+    if not findings:
+        return ToolCheck(
+            name="harness-state SoT consistency",
+            required=False,
+            found=True,
+            status="pass",
+            message="3-layer harness-state SoT consistency: clean (L1+L2+L3)",
+        )
+
+    # WARN severity initially per proposal §Acceptance Criteria #8.
+    head = findings[0]
+    extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+    return ToolCheck(
+        name="harness-state SoT consistency",
+        required=False,
+        found=True,
+        status="warning",
+        message=f"{len(findings)} findings; first: {head}{extra}",
+    )
+
+
 def _check_orphan_citations(target: Path) -> ToolCheck:
     script_path = _orphan_citation_audit_script(target)
     if not script_path.exists():
@@ -3814,6 +3961,16 @@ def run_doctor(
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
         checks.append(_check_orphan_citations(target))
+        # WI-4327 / WI-4329: harness-state SoT consistency. 3-layer check:
+        # (L1) 3 SoT files parse cleanly through the canonical reader entrypoints;
+        # (L2) grep_absent — no committed code outside groundtruth_kb.harness_projection
+        # reads harness-state/*.json or the harness-capability-registry.toml directly;
+        # (L3) grep_absent — no references to retired role-assignments path outside
+        # whitelisted contexts (bridge files, audit archives, formal-artifact-approval
+        # packets, and harness_projection.py itself). Severity WARN initially per
+        # the proposal §Acceptance Criteria #8 — promoted to FAIL after WI-4336
+        # (mirror retirement) lands.
+        checks.append(_check_harness_state_sot_consistency(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
     # Local import avoids a circular dependency: doctor_isolation imports
