@@ -7,7 +7,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-handoff-prompt-terminology-clarification
+NEW: bridge/gtkb-handoff-prompt-terminology-clarification-001.md
+
 Document: gtkb-harness-state-sot-consolidation-phase-1-scripts-source
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-003.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-001.md
 
 Document: gtkb-envelope-runtime-capstone-impl
@@ -48,6 +53,7 @@ NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 
 Document: gtkb-ollama-integration-phase-1-shim
+NEW: bridge/gtkb-ollama-integration-phase-1-shim-009.md
 GO: bridge/gtkb-ollama-integration-phase-1-shim-008.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-shim-007.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-006.md
