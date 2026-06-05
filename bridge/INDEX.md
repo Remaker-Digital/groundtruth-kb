@@ -24,6 +24,7 @@ NO-GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-002.md
 NEW: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-001.md
 
 Document: gtkb-ollama-integration-phase-1-verification
+VERIFIED: bridge/gtkb-ollama-integration-phase-1-verification-012.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-verification-011.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-010.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-verification-009.md
