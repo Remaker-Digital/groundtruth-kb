@@ -8797,6 +8797,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-05T06:34:03.965846Z
   answer: "Already filed by peer at bridge/gtkb-impl-start-gate-verb-aware-path-extraction-001.md"
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1092
+  asked_at: 2026-06-05T08:14:20.122598Z
+  question: "Gate blocks `git commit` while bridge -005 is NEW awaiting Codex LO review. The commit packages already-completed work (no new source mutation), but the gate can't distinguish. How should I proceed?"
+  options:
+    - "Authorize --no-verify for this single commit (Recommended)"
+    - "Wait for LO verdict on -005 then commit normally"
+    - "Investigate the gate's contract — maybe there's a legitimate path I'm missing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bad29ca7756298ef
+  resolved_at: 2026-06-05T08:14:20.122598Z
+  answer: "Your questions have been answered: \"Gate blocks `git commit` while bridge -005 is NEW awaiting Codex LO review. The commit packages already-completed work (no new source mutation), but the gate can't distinguish. How should I proceed?\"=\"Authorize --no-verify for this single commit (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
