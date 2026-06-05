@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
+NO-GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-008.md
 REVISED: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-007.md
 NO-GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-006.md
 NEW: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-005.md
@@ -46,6 +47,7 @@ NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-shim-001.md
 
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
+VERIFIED: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-009.md
 REVISED: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-008.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-007.md
 NO-GO: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-006.md
