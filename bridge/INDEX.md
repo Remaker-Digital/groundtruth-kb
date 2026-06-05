@@ -8,14 +8,18 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-003.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-001.md
 
 Document: gtkb-lo-file-safety-gate-envelope-role-resolution
+GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-004.md
 REVISED: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-003.md
 NO-GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-002.md
 NEW: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-001.md
 
 Document: gtkb-ollama-integration-phase-1-verification
+NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-verification-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-verification-001.md
