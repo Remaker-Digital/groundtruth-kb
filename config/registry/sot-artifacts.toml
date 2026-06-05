@@ -284,7 +284,8 @@ versioning_policy = "regenerated_from_source"
 backup_policy = "git_tracked"
 health_check_function = "_check_role_set_topology_consistency"
 owner_role = "owner_only"
-notes = "Canonical role registry; MemBase projection. Slice 1 retirement of role-assignments.json mirror."
+forbidden_substitutes = [".claude/rules/operating-role.md", "harness-state/role-assignments.json"]
+notes = "Canonical role registry; MemBase projection. forbidden_substitutes per DELIB-20260670 Instance 2/4: rule-file prose paraphrases role state; legacy mirror at role-assignments.json is the retired alias."
 
 [[artifacts]]
 id = "harness-bridge-substrate"
@@ -297,7 +298,8 @@ versioning_policy = "overwrite_single_writer"
 backup_policy = "git_tracked"
 health_check_function = "_check_cross_harness_trigger"
 owner_role = "owner_only"
-notes = "Bridge dispatch substrate selection (cross_harness_trigger / single_harness_dispatcher / none)."
+forbidden_substitutes = [".claude/rules/bridge-essential.md"]
+notes = "Bridge dispatch substrate selection. forbidden_substitutes per DELIB-20260670 Instance 1: rule-file prose describes design, not live substrate state."
 
 # =========================================================================
 # Control / capability registries

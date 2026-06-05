@@ -6,23 +6,30 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-1078
-  asked_at: 2026-06-04T20:48:49.719274Z
-  question: "Want me to wait and tail Codex's progress, or do you want to investigate a different symptom?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 768d3e7d753ab402
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-1080
-  asked_at: 2026-06-04T22:33:54.629036Z
-  question: "Want me to draft the governance_review umbrella proposal, or investigate the baseline-accept command first?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: e8c3f069d9d4482d
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
+- id: DECISION-1078
+  asked_at: 2026-06-04T20:48:49.719274Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 768d3e7d753ab402
+  resolved_at: 2026-06-05T06:15:00Z
+  resolved_in_session: 2026-06-05 /loop iter 4 (interactive PB 56a13045, AUQ conversion per owner directive)
+  answer: "Owner selected 'Dismiss as stale' via AskUserQuestion (2026-06-05). Source-symptom context not reachable in repo artifacts; Codex work from 2026-06-04T20:48 timeframe has long since landed via subsequent commits. Tracker false-positive on prose offering; no follow-on action."
+  notes: "Tracker false-positive: prose anti-pattern detected on a wait/investigate offering whose target symptom is no longer identifiable. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-1080
+  asked_at: 2026-06-04T22:33:54.629036Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: e8c3f069d9d4482d
+  resolved_at: 2026-06-05T06:15:00Z
+  resolved_in_session: 2026-06-05 /loop iter 4 (interactive PB 56a13045, AUQ conversion per owner directive)
+  answer: "Owner selected 'Dismiss as stale' via AskUserQuestion (2026-06-05). Note: original prose offering was effectively answered in the source session - owner chose 'Draft governance_review umbrella' per dispatch-run log evidence. The umbrella thread gtkb-push-gate-design-governance-review-001-010 was filed and commit 6d1cb6c3 (file governance_review scoping for work-tree hygiene mechanism, WI-4356) landed. Owner's 'Dismiss as stale' choice on the AUQ reflects that the pending entry itself is stale rather than the underlying work."
+  notes: "Tracker false-positive: prose anti-pattern detected ~19 min AFTER the owner already answered in the source session. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-1019
   asked_at: 2026-06-04T16:26:10.153306Z
   question: "Want me to investigate the substrate=none decision in the deliberation archive / recent bridge threads to figure out ..."
@@ -8728,6 +8735,68 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-05T06:07:49.870126Z
   answer: "Your questions have been answered: \"Working tree has 118 files of mixed-scope state from peer/dispatched sessions (NOT iter-2 work — that's in gitignored MemBase rows). What scope did 'Commit.' mean?\"=\"C. Everything (the full 118-file working tree)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1087
+  asked_at: 2026-06-05T06:14:20.814688Z
+  question: "The sweep-commit needs `--no-verify` to bypass the impl-start-gate (the active impl-auth packet was overwritten by a concurrent session to point at a now-terminal-VERIFIED ollama thread; no valid non-terminal packet covers a 111-file sweep). A separate hook hard-blocks `--no-verify` without explicit owner approval. Do you approve `--no-verify` for this sweep commit?"
+  options:
+    - "Approve --no-verify for the sweep"
+    - "Defer the sweep — continue /loop work"
+    - "Try per-cluster commits instead"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f8d01ed678765034
+  resolved_at: 2026-06-05T06:14:20.814688Z
+  answer: "Your questions have been answered: \"The sweep-commit needs `--no-verify` to bypass the impl-start-gate (the active impl-auth packet was overwritten by a concurrent session to point at a now-terminal-VERIFIED ollama thread; no valid non-terminal packet covers a 111-file sweep). A separate hook hard-blocks `--no-verify` without explicit owner approval. Do you approve `--no-verify` for this sweep commit?\"=\"Approve --no-verify for the sweep\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1088
+  asked_at: 2026-06-05T06:19:17.955408Z
+  question: "DECISION-1080 (asked 2026-06-04T22:33Z): 'Want me to draft the governance_review umbrella proposal, or investigate the baseline-accept command first?' Evidence suggests this was effectively answered in the original session — the `gtkb-push-gate-design-governance-review` umbrella thread exists at versions 001–010, and commit `6d1cb6c3 docs(bridge): file governance_review scoping for work-tree hygiene mechanism (WI-4356)` landed. How should I record this?"
+  options:
+    - "Mark resolved — 'Draft governance_review umbrella' (Recommended)"
+    - "Investigate baseline-accept command first"
+    - "Dismiss as stale — contexts have shifted"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ec2ab86e65591fd6
+  resolved_at: 2026-06-05T06:19:17.955408Z
+  answer: "Your questions have been answered: \"DECISION-1080 (asked 2026-06-04T22:33Z): 'Want me to draft the governance_review umbrella proposal, or investigate the baseline-accept command first?' Evidence suggests this was effectively answered in the original session — the `gtkb-push-gate-design-governance-review` umbrella thread exists at versions 001–010, and commit `6d1cb6c3 docs(bridge): file governance_review scoping for work-tree hygiene mechanism (WI-4356)` landed. How should I record this?\"=\"Dismiss as stale — contexts have shifted\", \"DECISION-1078 (asked 2026-06-04T20:48Z): 'Want me to wait and tail Codex's progress, or do you want to investigate a different symptom?' I cannot find traceable source-symptom context in repo artifacts; this was a prose anti-pattern from a session whose Codex work has long since landed. How should I record this?\"=\"Dismiss as stale (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1089
+  asked_at: 2026-06-05T06:19:17.955408Z
+  question: "DECISION-1078 (asked 2026-06-04T20:48Z): 'Want me to wait and tail Codex's progress, or do you want to investigate a different symptom?' I cannot find traceable source-symptom context in repo artifacts; this was a prose anti-pattern from a session whose Codex work has long since landed. How should I record this?"
+  options:
+    - "Dismiss as stale (Recommended)"
+    - "Investigate a different symptom — specify which"
+    - "Wait and tail Codex's progress"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 059dc1d1c9f18ca1
+  resolved_at: 2026-06-05T06:19:17.955408Z
+  answer: "Your questions have been answered: \"DECISION-1080 (asked 2026-06-04T22:33Z): 'Want me to draft the governance_review umbrella proposal, or investigate the baseline-accept command first?' Evidence suggests this was effectively answered in the original session — the `gtkb-push-gate-design-governance-review` umbrella thread exists at versions 001–010, and commit `6d1cb6c3 docs(bridge): file governance_review scoping for work-tree hygiene mechanism (WI-4356)` landed. How should I record this?\"=\"Dismiss as stale — contexts have shifted\", \"DECISION-1078 (asked 2026-06-04T20:48Z): 'Want me to wait and tail Codex's progress, or do you want to investigate a different symptom?' I cannot find traceable source-symptom context in repo artifacts; this was a prose anti-pattern from a session whose Codex work has long since landed. How should I record this?\"=\"Dismiss as stale (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1091
+  asked_at: 2026-06-05T06:31:12.051396Z
+  question: "Which prevention mechanism should I draft as the first bridge proposal? (Each is independently small and verifiable; the others can follow sequentially.)"
+  options:
+    - "P1: Verb-aware path extraction in impl-start-gate (Recommended)"
+    - "P2: INDEX.md merge-conflict guard hook"
+    - "P3: Audit-trail invariant + doctor check"
+    - "P4: Document owner-AUQ'd --no-verify governance pattern"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4eccf1c7d8ef5a39
+  resolved_at: 2026-06-05T06:31:12.051396Z
+  answer: "Your questions have been answered: \"Which prevention mechanism should I draft as the first bridge proposal? (Each is independently small and verifiable; the others can follow sequentially.)\"=\"P1: Verb-aware path extraction in impl-start-gate (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1090
+  asked_at: 2026-06-05T06:21:17.065783Z
+  question: "Want me to file `gtkb-impl-start-gate-verb-aware-path-extraction-001` as a NEW bridge proposal for #2a, or pick a dif..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 630e8dee61f10968
+  resolved_at: 2026-06-05T06:34:03.965846Z
+  answer: "Already filed by peer at bridge/gtkb-impl-start-gate-verb-aware-path-extraction-001.md"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 

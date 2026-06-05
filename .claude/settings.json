@@ -61,6 +61,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/sot-read-discipline.py\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [

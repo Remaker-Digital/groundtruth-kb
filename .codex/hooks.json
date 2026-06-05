@@ -192,6 +192,17 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\sot-read-discipline-bash-adapter.py",
+            "statusMessage": "Checking SoT read-discipline",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [

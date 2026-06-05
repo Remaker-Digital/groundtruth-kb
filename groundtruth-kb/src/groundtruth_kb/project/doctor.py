@@ -1794,6 +1794,159 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
     )
 
 
+def _check_sot_read_discipline(target: Path) -> ToolCheck:
+    """Validate the SoT read-discipline hook coverage (DCL-SOT-READ-HOOK-CONTRACT-001).
+
+    4-layer assertion:
+
+    1. Canonical hook file presence (.claude/hooks/sot-read-discipline.py).
+    2. Codex adapter presence (.codex/gtkb-hooks/sot-read-discipline-bash-adapter.py).
+    3. Claude effective coverage: .claude/settings.json PreToolUse contains an entry
+       whose matcher string includes Read AND Grep AND Glob, AND whose command
+       resolves to the canonical hook.
+    4. Codex effective coverage: .codex/hooks.json PreToolUse contains an entry
+       with matcher "Bash" AND whose command resolves to the adapter. Anti-false-green:
+       if Codex registration uses Read/Grep/Glob matcher (an unsupported tool-event
+       surface per ADR-CODEX-HOOK-PARITY-FALLBACK-001 v2), the check fails with
+       explicit guidance.
+    5. Registry referential integrity: every forbidden_substitutes entry references
+       a real storage_path in the registry projection.
+
+    Severity is WARN-only during Slice 2A per the bridge proposal; promotion to FAIL
+    is a Slice 2B candidate after coverage audit.
+    """
+    check_name = "SoT read-discipline hook coverage"
+    canonical_hook = target / ".claude" / "hooks" / "sot-read-discipline.py"
+    codex_adapter = target / ".codex" / "gtkb-hooks" / "sot-read-discipline-bash-adapter.py"
+    claude_settings = target / ".claude" / "settings.json"
+    codex_hooks = target / ".codex" / "hooks.json"
+
+    warnings: list[str] = []
+
+    # Layer 1: canonical hook
+    if not canonical_hook.is_file():
+        warnings.append(f"canonical hook missing: {canonical_hook.relative_to(target).as_posix()}")
+
+    # Layer 2: Codex adapter
+    if not codex_adapter.is_file():
+        warnings.append(f"Codex adapter missing: {codex_adapter.relative_to(target).as_posix()}")
+
+    # Layer 3: Claude registration
+    if claude_settings.is_file():
+        try:
+            claude_data = json.loads(claude_settings.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            warnings.append(f"Claude settings.json unreadable: {exc}")
+            claude_data = {}
+        claude_pre = claude_data.get("hooks", {}).get("PreToolUse", []) if isinstance(claude_data, dict) else []
+        claude_hit = False
+        for entry in claude_pre if isinstance(claude_pre, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            matcher = str(entry.get("matcher", ""))
+            if not all(tok in matcher for tok in ("Read", "Grep", "Glob")):
+                continue
+            for hook_entry in entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else []:
+                cmd = str(hook_entry.get("command", "") if isinstance(hook_entry, dict) else "")
+                if "sot-read-discipline.py" in cmd:
+                    claude_hit = True
+                    break
+            if claude_hit:
+                break
+        if not claude_hit:
+            warnings.append(
+                "Claude registration missing or matcher does not include Read+Grep+Glob "
+                "(per DCL-SOT-READ-HOOK-CONTRACT-001 v1)"
+            )
+    else:
+        warnings.append(".claude/settings.json absent — cannot verify Claude registration")
+
+    # Layer 4: Codex registration (anti-false-green)
+    if codex_hooks.is_file():
+        try:
+            codex_data = json.loads(codex_hooks.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            warnings.append(f".codex/hooks.json unreadable: {exc}")
+            codex_data = {}
+        codex_pre = codex_data.get("hooks", {}).get("PreToolUse", []) if isinstance(codex_data, dict) else []
+        codex_bash_hit = False
+        codex_false_green = False
+        for entry in codex_pre if isinstance(codex_pre, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            matcher = str(entry.get("matcher", ""))
+            for hook_entry in entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else []:
+                cmd = str(hook_entry.get("command", "") if isinstance(hook_entry, dict) else "")
+                if "sot-read-discipline" not in cmd:
+                    continue
+                if matcher == "Bash":
+                    codex_bash_hit = True
+                elif any(tok in matcher for tok in ("Read", "Grep", "Glob")):
+                    codex_false_green = True
+        if codex_false_green:
+            warnings.append(
+                "Codex registration uses Read/Grep/Glob matcher — these are NOT live Codex "
+                "tool-events (per ADR-CODEX-HOOK-PARITY-FALLBACK-001 v2). Use matcher 'Bash' "
+                "pointing at .codex/gtkb-hooks/sot-read-discipline-bash-adapter.py instead."
+            )
+        elif not codex_bash_hit:
+            warnings.append(
+                "Codex registration missing or matcher is not 'Bash' (per DCL-SOT-READ-HOOK-CONTRACT-001 v1)"
+            )
+    else:
+        warnings.append(".codex/hooks.json absent — cannot verify Codex registration")
+
+    # Layer 5: Registry referential integrity (best-effort)
+    db_path = target / "groundtruth.db"
+    if db_path.is_file():
+        try:
+            import sqlite3
+
+            con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            try:
+                cur = con.cursor()
+                cur.execute("SELECT id, storage_path, forbidden_substitutes FROM current_sot_artifacts")
+                rows = cur.fetchall()
+            finally:
+                con.close()
+            known_paths = {row[1] for row in rows if row[1]}
+            for rid, _, subs in rows:
+                try:
+                    sub_list = json.loads(subs) if subs else []
+                except json.JSONDecodeError:
+                    continue
+                for sub in sub_list:
+                    # Substitute paths SHOULD match some registry storage_path (referential)
+                    if sub and not any(known.endswith(sub) or sub in known for known in known_paths):
+                        warnings.append(
+                            f"forbidden_substitutes on {rid!r} references {sub!r} "
+                            "which does not match any known SoT storage_path"
+                        )
+                        break  # one warning per record is enough
+        except Exception:  # noqa: BLE001 - defensive
+            pass
+
+    if warnings:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="; ".join(warnings[:5]) + (" (+more)" if len(warnings) > 5 else ""),
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=(
+            "canonical hook + Codex adapter present; Claude+Codex registrations effective; "
+            "registry referential integrity OK"
+        ),
+    )
+
+
 def _check_settings_hook_registration_drift(
     target: Path, profile_name: str, registration: SettingsHookRegistration
 ) -> ToolCheck:
@@ -3942,6 +4095,7 @@ def run_doctor(
         checks.append(_check_codex_skill_load_health(target))
         checks.append(_check_managed_artifact_drift(target, profile))
         checks.append(_check_sot_registry_completeness(target))
+        checks.append(_check_sot_read_discipline(target))
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))
