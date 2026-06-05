@@ -251,13 +251,6 @@ Changes carried forward from `-003` vs `-001`:
   test (`test_spawn_harness_dispatches_no_go_only_batch`) that verifies `subprocess.Popen`
   fires even when the entire selected batch is NO-GO.
 
-## Files Expected To Change
-
-Added for `extract_target_paths()` fallback in `scripts/implementation_authorization.py`; mirrors the canonical `target_paths` declared in the Implementation Plan above. No scope change.
-
-- `scripts/cross_harness_bridge_trigger.py`
-- `platform_tests/scripts/test_cross_harness_bridge_trigger.py`
-
 ## Recommended Commit Type
 
 `fix:`
