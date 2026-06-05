@@ -145,7 +145,7 @@ GO-only implementation-authorization filtering behavior.
 | `GOV-RELIABILITY-FAST-LANE-001` | `groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb --config groundtruth.toml deliberations get DELIB-S351-RELIABILITY-FAST-LANE-DIRECTION --json` | yes | PASS: owner decision supports standing fast-lane path while retaining bridge review. |
 | `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `git ls-tree 1ffc2f24^`, `git ls-tree HEAD`, and current `git hash-object` for `bridge/...-005.md` | yes | PASS: audit artifact restored to the GO-reviewed blob. |
 | `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Thread lifecycle inspection through `show_thread_bridge.py` and live `bridge/INDEX.md` | yes | PASS: `REVISED -009` is correctly closed by this `VERIFIED -010` verdict. |
-| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | Implementation report review, Deliberation Archive search, citation freshness preflight, and bridge audit repair checks | yes | PASS: no stale cross-thread citations; audit repair is explicit and durable. |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | Implementation report review, Deliberation Archive search, and bridge audit repair checks | yes | PASS: audit repair is explicit and durable; no blocking governance finding remains. |
 
 ## Positive Confirmations
 
@@ -169,8 +169,9 @@ GO-only implementation-authorization filtering behavior.
   1ffc2f24` reports the mutated blob `a6849398...`; current `HEAD` is back to
   `7656674a...`.
 - `python scripts\bridge_citation_freshness_preflight.py --bridge-id
-  gtkb-cross-harness-trigger-no-go-dispatch-fix` reported no stale cross-thread
-  citations.
+  gtkb-cross-harness-trigger-no-go-dispatch-fix` reported a non-blocking
+  unresolved ellipsis citation warning. I did not use that diagnostic as
+  verification support.
 - Relevant bridge/source/test files were clean before this verdict write; the
   wider worktree contains unrelated changes not evaluated in this verification.
 
