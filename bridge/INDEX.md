@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-isolation-018-agent-red-cutover
+REVISED: bridge/gtkb-isolation-018-agent-red-cutover-003.md
 NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-002.md
 NEW: bridge/gtkb-isolation-018-agent-red-cutover-001.md
 
@@ -25,6 +26,7 @@ GO: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-002.md
 NEW: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-001.md
 
 Document: gtkb-handoff-prompt-deterministic-service-impl
+REVISED: bridge/gtkb-handoff-prompt-deterministic-service-impl-004.md
 NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-003.md
 NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-002.md
 NEW: bridge/gtkb-handoff-prompt-deterministic-service-impl-001.md
