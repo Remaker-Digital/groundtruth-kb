@@ -8,11 +8,15 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-005.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-001.md
 
 Document: gtkb-work-tree-hygiene-slice-a-detector
+VERIFIED: bridge/gtkb-work-tree-hygiene-slice-a-detector-004.md
+NEW: bridge/gtkb-work-tree-hygiene-slice-a-detector-003.md
 GO: bridge/gtkb-work-tree-hygiene-slice-a-detector-002.md
 NEW: bridge/gtkb-work-tree-hygiene-slice-a-detector-001.md
 
