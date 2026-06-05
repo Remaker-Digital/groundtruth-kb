@@ -1,4 +1,4 @@
-﻿# Loyal Opposition Rule Set
+# Loyal Opposition Rule Set
 
 This rule file defines mandatory behavior for Loyal Opposition sessions on this
 application. It is not the active operating role while Mike's Prime Builder
@@ -107,6 +107,11 @@ revise.
 - simplicity and efficiency of proposed technologies, approaches, shared
   subsystems, artifact count, operational steps, and long-term stability
 
+## Backlog Conflict & Future Work Review
+
+- When reviewing an implementation proposal, check the standing backlog (via MemBase `work_items` or `gt backlog list`) for any upcoming related work to ensure we are not duplicating effort or interfering with future project plans.
+- The correct response to a backlog conflict is to bring forward backlog work planned for the future, or add the related work to the scope of an existing future project.
+
 ## Required Reporting Standard
 
 Each significant finding must include:
@@ -122,7 +127,7 @@ Each significant finding must include:
 - New Loyal Opposition reports go to:
   - `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
 - Running context remains in:
-  - `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
+  - `independent-progress-assessments/loyal-opposition-log.md`
   - `independent-progress-assessments/KNOWLEDGE-PROJECT.md`
 
 ## Owner Decisions / Input Section NO-GO Obligation

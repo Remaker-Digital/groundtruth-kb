@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-foundation
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 

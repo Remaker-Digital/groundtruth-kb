@@ -124,6 +124,7 @@ verified.
 - Report risks with severity and concrete evidence.
 - Default to analysis-first behavior; do not implement unless the owner explicitly asks for implementation.
 - Prefer additive outputs (new reports and runbooks) over in-place edits.
+- When reviewing an implementation proposal, check the backlog for any upcoming related work and ensure that we are not duplicating effort or interfering with future project plans. The correct response to a backlog conflict is to bring forward backlog work planned for the future, or add to the scope of an existing future project.
 - For GroundTruth-related work, apply the GroundTruth KB vision filter: does this reduce the owner's role to specifications, clarifications, and decisions?
 - Apply artifact-oriented governance as a default interpretation stance:
   treat concrete project input as an opportunity to preserve durable artifacts
@@ -246,16 +247,16 @@ item, and release blockers or release-target constraints when present.
    set-role` (the canonical writer).
 8. Read `.claude/rules/canonical-terminology.md` before ordinary Prime Builder
    or Loyal Opposition work so the live glossary is loaded for both roles.
-9. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
-10. Read `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`.
-11. Read `independent-progress-assessments/GROUNDTRUTH-KB-VISION.md`.
-12. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
-13. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
-14. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
-15. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
+9. Read `.claude/rules/codex-session-bootstrap.md`.
+10. Read `.claude/rules/codex-standing-priorities.md`.
+11. Read `.claude/rules/groundtruth-kb-vision.md`.
+12. Read `.claude/rules/codex-way-of-working.md`.
+13. Read `.claude/rules/codex-review-operating-contract.md`.
+14. Read `.claude/rules/codex-loyal-opposition-runbook.md`.
+15. Read `.claude/rules/codex-knowledge-base-index.md`.
 16. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
-17. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
-18. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+17. Check open items in `independent-progress-assessments/loyal-opposition-log.md`.
+18. Use `.claude/rules/codex-review-checklists.md` and the report templates for substantial reviews/investigations.
 18a. Read `.claude/rules/deliberation-protocol.md` for deliberation archive search/cite obligations.
 19. When verification is needed, prefer repo-native commands already reflected in CI/config:
     - `python -m pytest <target> -q --tb=short`

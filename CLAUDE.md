@@ -182,7 +182,7 @@ Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
 - **DO NOT create new markdown files** to store canonical project knowledge or session memory outside approved exception paths.
-- **Permitted markdown:** CLAUDE.md (platform rules), `applications/<name>/CLAUDE.md` (application rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
+- **Permitted markdown:** CLAUDE.md (platform rules), `applications/<name>/CLAUDE.md` (application rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/logs, `.claude/rules/` local control rules/runbooks/checklists, external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
 
 ### Deliberation Archive Protocol
@@ -198,7 +198,7 @@ Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`
 ### Session Wrap-Up & Handoff
 
 - **Prime Builder sessions:** Execute `/kb-session-wrap <session-id>` for the full 5-phase procedure. Every 5th session is an **audit session** (extra hygiene steps included in the skill).
-- **Loyal Opposition sessions:** default wrap-up is an evidence-based report in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` plus unresolved-item updates in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`. Do not update KB, MEMORY.md, push, or deploy unless Mike explicitly asked for it.
+- **Loyal Opposition sessions:** default wrap-up is an evidence-based report in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` plus unresolved-item updates in `independent-progress-assessments/loyal-opposition-log.md`. Do not update KB, MEMORY.md, push, or deploy unless Mike explicitly asked for it.
 
 ### Session Scheduler
 

@@ -8714,6 +8714,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-05T06:00:23.006642Z
   answer: "Your questions have been answered: \"I just woke up — what should I commit? My session's work (WI-4358, WI-4361 cycles) is already in HEAD across 6 commits. The working tree has 120 uncommitted changes from concurrent sessions (skill manifests, rule files, test changes, deletions, new memory topics) that I didn't author.\"=\"Sweep-commit all 120 outstanding changes\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1086
+  asked_at: 2026-06-05T06:07:49.870126Z
+  question: "Working tree has 118 files of mixed-scope state from peer/dispatched sessions (NOT iter-2 work — that's in gitignored MemBase rows). What scope did 'Commit.' mean?"
+  options:
+    - "A. Just the Codex-LO NO-GO verdict + INDEX line (Recommended)"
+    - "B. CODEX-* rule-file relocation (11 deletions + 11 untracked counterparts)"
+    - "C. Everything (the full 118-file working tree)"
+    - "D. Don't commit — wait for the actual author session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 444836e5fdde584e
+  resolved_at: 2026-06-05T06:07:49.870126Z
+  answer: "Your questions have been answered: \"Working tree has 118 files of mixed-scope state from peer/dispatched sessions (NOT iter-2 work — that's in gitignored MemBase rows). What scope did 'Commit.' mean?\"=\"C. Everything (the full 118-file working tree)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
