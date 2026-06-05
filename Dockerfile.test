@@ -108,7 +108,7 @@ COPY config/ ./config/
 COPY tests/ ./tests/
 COPY scripts/ ./scripts/
 COPY pyproject.toml ./pyproject.toml
-COPY shopify.app.toml ./shopify.app.toml
+COPY applications/Agent_Red/shopify.app.toml ./shopify.app.toml
 COPY CLAUDE.md ./CLAUDE.md
 
 # --------------------------------------------------------------------------

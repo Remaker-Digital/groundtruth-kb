@@ -2189,10 +2189,10 @@ def _current_version_manifest(project_root: Path) -> dict[str, Any]:
     if api_match:
         versions["api_version"] = api_match.group(1)
     for label, relative_path in {
-        "root_package": "package.json",
-        "widget": "widget/package.json",
-        "admin": "admin/package.json",
-        "docs_site": "docs-site/package.json",
+        "root_package": "applications/Agent_Red/package.json",
+        "widget": "applications/Agent_Red/widget/package.json",
+        "admin": "applications/Agent_Red/admin/package.json",
+        "docs_site": "applications/Agent_Red/docs-site/package.json",
     }.items():
         package = _package_json(project_root, relative_path)
         if package.get("version"):
@@ -2482,9 +2482,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
     python_tests_text = _workflow_text(workflows, "python-tests.yml")
     lint_text = _workflow_text(workflows, "lint.yml")
     security_text = _workflow_text(workflows, "security-scan.yml")
-    widget_package = _package_json(project_root, "widget/package.json")
-    docs_package = _package_json(project_root, "docs-site/package.json")
-    admin_package = _package_json(project_root, "admin/package.json")
+    widget_package = _package_json(project_root, "applications/Agent_Red/widget/package.json")
+    docs_package = _package_json(project_root, "applications/Agent_Red/docs-site/package.json")
+    admin_package = _package_json(project_root, "applications/Agent_Red/admin/package.json")
     dependabot_ecosystems = sorted(set(re.findall(r'package-ecosystem:\s*["\']?([^"\'\n]+)', dependabot_text)))
     required_workflow_files = [
         "python-tests.yml",

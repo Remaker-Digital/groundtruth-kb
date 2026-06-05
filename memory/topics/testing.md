@@ -124,7 +124,7 @@ Chat pipeline must be initialized (201 not 503). Golden dataset expects KB data 
 ### Container File Availability
 Files available in test container (via Dockerfile.test COPY):
 - `src/`, `tests/`, `scripts/`, `config/`, `test_host/`
-- `pyproject.toml`, `shopify.app.toml`, `CLAUDE.md`
+- `pyproject.toml`, `shopify.app.toml` (sourced from `applications/Agent_Red/shopify.app.toml`), `CLAUDE.md`
 - `widget/dist/`, `widget/src/`, all `admin/*/` dirs
 - **NOT available:** `docs/`, `memory/`, `.claude/`, `.github/workflows/`
 

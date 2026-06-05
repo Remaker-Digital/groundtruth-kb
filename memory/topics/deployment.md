@@ -67,7 +67,7 @@ Always run `npm run build` in all 3 admin dirs before ACR build. Dockerfile `COP
 Verify bundle hash matches local build after deploy. Hard-refresh (Ctrl+Shift+R) to bypass browser cache.
 
 ## Shopify App Version Deployment (S125)
-KB procedure: `shopify-app-deploy`. Config file: `shopify.app.toml` (repo root). Deploy command: `shopify app deploy --force`. Creates a new versioned release in Shopify Partners Dashboard. **Critical:** All 5 URLs in the TOML must match the current production FQDN — check after any Azure environment migration. Verify in Dev Dashboard → Versions → newest Active version → "Privacy compliance webhook subscriptions". Three GDPR webhooks: `customers-data-request`, `customers-redact`, `shop-redact`.
+KB procedure: `shopify-app-deploy`. Config file: `applications/Agent_Red/shopify.app.toml` (moved from repo root in ISOLATION-018). Deploy command: `shopify app deploy --force`. Creates a new versioned release in Shopify Partners Dashboard. **Critical:** All 5 URLs in the TOML must match the current production FQDN — check after any Azure environment migration. Verify in Dev Dashboard → Versions → newest Active version → "Privacy compliance webhook subscriptions". Three GDPR webhooks: `customers-data-request`, `customers-redact`, `shop-redact`.
 
 ## Documentation Site Deployment — agentredcx.com (S171)
 KB procedure: `docs-site-deploy`. **CRITICAL: GitHub Pages uses `build_type=workflow`, source=main.** The `gh-pages` branch is NOT used.

@@ -80,7 +80,7 @@ _REQUIRED_SANDBOX_DIRS: tuple[str, ...] = (".github/workflows",)
 # Optional: lane warns if missing.
 _OPTIONAL_SANDBOX_INPUTS: tuple[str, ...] = (
     "src/api_versioning.py",
-    "package.json",
+    "applications/Agent_Red/package.json",
 )
 
 _OPTIONAL_SANDBOX_DIRS: tuple[str, ...] = (
