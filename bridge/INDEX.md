@@ -8,9 +8,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-startup-payload-profiler-compact-context
+GO: bridge/gtkb-startup-payload-profiler-compact-context-002.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-001.md
 
 Document: gtkb-ollama-integration-phase-1-foundation
+REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-007.md
+NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-006.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-005.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-003.md
