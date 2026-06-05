@@ -7,7 +7,45 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-bridge-work-intent-session-id-live-env-precedence
+VERIFIED: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-006.md
+REVISED: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-005.md
+NO-GO: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-004.md
+NEW: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-003.md
+GO: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-002.md
+NEW: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-001.md
+
+Document: gtkb-ollama-integration-phase-2-routing
+GO: bridge/gtkb-ollama-integration-phase-2-routing-004.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-routing-003.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-routing-002.md
+NEW: bridge/gtkb-ollama-integration-phase-2-routing-001.md
+
+Document: gtkb-ollama-integration-phase-2-adapters
+GO: bridge/gtkb-ollama-integration-phase-2-adapters-004.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-003.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-adapters-002.md
+NEW: bridge/gtkb-ollama-integration-phase-2-adapters-001.md
+
+Document: gtkb-ollama-integration-phase-2-dispatch
+GO: bridge/gtkb-ollama-integration-phase-2-dispatch-004.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-003.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-002.md
+NEW: bridge/gtkb-ollama-integration-phase-2-dispatch-001.md
+
+Document: gtkb-ollama-integration-phase-2-role-promotion
+GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-004.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-003.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-002.md
+NEW: bridge/gtkb-ollama-integration-phase-2-role-promotion-001.md
+
 Document: gtkb-ollama-integration-phase-2
+VERIFIED: bridge/gtkb-ollama-integration-phase-2-010.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-009.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-008.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-007.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-006.md
+NEW: bridge/gtkb-ollama-integration-phase-2-005.md
 GO: bridge/gtkb-ollama-integration-phase-2-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-002.md
