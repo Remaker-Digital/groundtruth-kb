@@ -7,6 +7,42 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-isolation-018-agent-red-cutover
+NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-002.md
+NEW: bridge/gtkb-isolation-018-agent-red-cutover-001.md
+
+Document: gtkb-protected-artifact-rollup-governance-umbrella
+NO-GO: bridge/gtkb-protected-artifact-rollup-governance-umbrella-002.md
+NEW: bridge/gtkb-protected-artifact-rollup-governance-umbrella-001.md
+
+Document: gtkb-platform-sot-consolidation-slice-1-governance-foundation
+GO: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-005.md
+REVISED: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-004.md
+NO-GO: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-003.md
+GO: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-002.md
+NEW: bridge/gtkb-platform-sot-consolidation-slice-1-governance-foundation-001.md
+
+Document: gtkb-handoff-prompt-deterministic-service-impl
+NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-003.md
+NO-GO: bridge/gtkb-handoff-prompt-deterministic-service-impl-002.md
+NEW: bridge/gtkb-handoff-prompt-deterministic-service-impl-001.md
+
+Document: gtkb-envelope-disclosure-ui-impl
+REVISED: bridge/gtkb-envelope-disclosure-ui-impl-006.md
+NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-005.md
+NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-004.md
+REVISED: bridge/gtkb-envelope-disclosure-ui-impl-003.md
+NO-GO: bridge/gtkb-envelope-disclosure-ui-impl-002.md
+NEW: bridge/gtkb-envelope-disclosure-ui-impl-001.md
+
+Document: gtkb-backlog-update-title-desc-cli-001
+VERIFIED: bridge/gtkb-backlog-update-title-desc-cli-001-006.md
+NEW: bridge/gtkb-backlog-update-title-desc-cli-001-005.md
+GO: bridge/gtkb-backlog-update-title-desc-cli-001-004.md
+REVISED: bridge/gtkb-backlog-update-title-desc-cli-001-003.md
+NO-GO: bridge/gtkb-backlog-update-title-desc-cli-001-002.md
+NEW: bridge/gtkb-backlog-update-title-desc-cli-001-001.md
+
 Document: gtkb-v1-docker-isolation-validator-scoping
 GO: bridge/gtkb-v1-docker-isolation-validator-scoping-004.md
 REVISED: bridge/gtkb-v1-docker-isolation-validator-scoping-003.md
@@ -21,23 +57,9 @@ Document: gtkb-v1-mechanical-enforcement-gate-scoping
 GO: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-002.md
 NEW: bridge/gtkb-v1-mechanical-enforcement-gate-scoping-001.md
 
-Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
-VERIFIED: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-004.md
-NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-003.md
-GO: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-002.md
-NEW: bridge/gtkb-impl-start-gate-path-token-memory-prefix-fix-001.md
-
 Document: gtkb-work-tree-hygiene-mechanism-scoping
 GO: bridge/gtkb-work-tree-hygiene-mechanism-scoping-002.md
 NEW: bridge/gtkb-work-tree-hygiene-mechanism-scoping-001.md
-
-Document: gtkb-mode-switch-validator-hook-matcher-shape-fix
-VERIFIED: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-006.md
-REVISED: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-005.md
-NO-GO: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-004.md
-NEW: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-003.md
-GO: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-002.md
-NEW: bridge/gtkb-mode-switch-validator-hook-matcher-shape-fix-001.md
 
 Document: gtkb-agent-sot-read-discipline-phase-1
 WITHDRAWN: bridge/gtkb-agent-sot-read-discipline-phase-1-002.md

@@ -5,7 +5,7 @@
     "script_hash": "sha256:e1edf438c92dec07b069904bf62c78ff23ba067734c0b3686906745409cf2ce8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-03T13:59:21Z",
+  "generated_at": "2026-06-05T00:18:54Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -118,7 +118,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 27,
+      "count": 28,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -130,6 +130,7 @@
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/delib-preflight-gate.py",
         ".claude/hooks/destructive-gate.py",
+        ".claude/hooks/document_author_provenance_gate.py",
         ".claude/hooks/formal-artifact-approval-gate.py",
         ".claude/hooks/glossary-expansion.py",
         ".claude/hooks/gov09-capture.py",
@@ -151,10 +152,11 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 20,
+      "count": 21,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
+        ".codex/gtkb-hooks/document_author_provenance_gate.py",
         ".codex/gtkb-hooks/glossary-expansion.py",
         ".codex/gtkb-hooks/lo-file-safety-gate-bash-adapter.py",
         ".codex/gtkb-hooks/project-completion-surface.py",
@@ -220,17 +222,29 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 19,
+      "count": 36,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
         ".claude/rules/backlog-approval-state.md",
         ".claude/rules/bridge-essential.md",
+        ".claude/rules/bridge-permanent-operations-runbook.md",
         ".claude/rules/bridge-poller-canonical.md",
         ".claude/rules/canonical-terminology.md",
+        ".claude/rules/codex-dead-ends-and-false-positives.md",
+        ".claude/rules/codex-decision-ledger.md",
+        ".claude/rules/codex-knowledge-base-index.md",
+        ".claude/rules/codex-loyal-opposition-runbook.md",
+        ".claude/rules/codex-review-checklists.md",
         ".claude/rules/codex-review-gate.md",
+        ".claude/rules/codex-review-operating-contract.md",
+        ".claude/rules/codex-session-bootstrap.md",
+        ".claude/rules/codex-standing-priorities.md",
+        ".claude/rules/codex-way-of-working.md",
         ".claude/rules/deliberation-protocol.md",
+        ".claude/rules/exec-summary-report-guide.md",
         ".claude/rules/file-bridge-protocol.md",
+        ".claude/rules/groundtruth-kb-vision.md",
         ".claude/rules/loyal-opposition.md",
         ".claude/rules/operating-model.md",
         ".claude/rules/operating-role.md",
@@ -238,9 +252,14 @@
         ".claude/rules/prime-bridge-collaboration-protocol.md",
         ".claude/rules/prime-builder-role.md",
         ".claude/rules/prime-builder.md",
+        ".claude/rules/project-progress-dashboard-runbook.md",
         ".claude/rules/project-root-boundary.md",
+        ".claude/rules/prompt-organize-reports-in-dropbox.md",
         ".claude/rules/report-depth-prime-builder-context.md",
-        ".claude/rules/report-depth.md"
+        ".claude/rules/report-depth.md",
+        ".claude/rules/session-start-prompt.md",
+        ".claude/rules/template-code-review.md",
+        ".claude/rules/template-decision-memo.md"
       ]
     },
     "skills": {
