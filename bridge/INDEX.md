@@ -7,10 +7,15 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-integration-phase-1-verification
+NEW: bridge/gtkb-ollama-integration-phase-1-verification-001.md
+
 Document: gtkb-handoff-prompt-terminology-clarification
+GO: bridge/gtkb-handoff-prompt-terminology-clarification-002.md
 NEW: bridge/gtkb-handoff-prompt-terminology-clarification-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-scripts-source
+GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-001.md
@@ -53,6 +58,9 @@ NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 
 Document: gtkb-ollama-integration-phase-1-shim
+VERIFIED: bridge/gtkb-ollama-integration-phase-1-shim-012.md
+REVISED: bridge/gtkb-ollama-integration-phase-1-shim-011.md
+NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-010.md
 NEW: bridge/gtkb-ollama-integration-phase-1-shim-009.md
 GO: bridge/gtkb-ollama-integration-phase-1-shim-008.md
 REVISED: bridge/gtkb-ollama-integration-phase-1-shim-007.md
@@ -97,6 +105,7 @@ NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-foundation-001.md
 
 Document: gtkb-isolation-018-agent-red-cutover
+VERIFIED: bridge/gtkb-isolation-018-agent-red-cutover-010.md
 NEW: bridge/gtkb-isolation-018-agent-red-cutover-009.md
 GO: bridge/gtkb-isolation-018-agent-red-cutover-008.md
 REVISED: bridge/gtkb-isolation-018-agent-red-cutover-007.md
