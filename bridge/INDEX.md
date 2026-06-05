@@ -7,6 +7,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-integration-phase-2
+NEW: bridge/gtkb-ollama-integration-phase-2-001.md
+
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
 NEW: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-001.md
 
