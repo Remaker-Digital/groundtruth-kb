@@ -374,3 +374,61 @@ def test_is_mutating_git_status_remains_false() -> None:
 
     assert _is_mutating_command("git status") is False
     assert _is_mutating_command("git status --short") is False
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# NO-GO -008 F2 regression: final `gate_decision` behavior MUST block
+# protected `git add` / `git rm` / `git restore --staged` payloads when no
+# impl-auth packet is present. Per Codex F2 (carried forward from -006): the
+# prior cycle's tests covered the `_is_mutating_command` predicate but did
+# NOT exercise the end-to-end gate_decision return value.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _no_auth_payload(tmp_path: Path, command: str) -> dict:
+    """Build a Bash-payload dict for gate_decision with no impl-auth setup."""
+    return {
+        "cwd": str(tmp_path),
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+    }
+
+
+def test_gate_decision_blocks_git_add_protected_path(tmp_path: Path) -> None:
+    """`gate_decision` MUST return decision=block for `git add scripts/protected.py`."""
+    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+
+    payload = _no_auth_payload(tmp_path, "git add scripts/protected.py")
+    result = gate_decision(payload)
+    assert result.get("decision") == "block", f"expected block, got {result}"
+    assert "scripts/" in result.get("reason", "")
+
+
+def test_gate_decision_blocks_git_rm_protected_path(tmp_path: Path) -> None:
+    """`gate_decision` MUST return decision=block for `git rm scripts/protected.py`."""
+    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+
+    payload = _no_auth_payload(tmp_path, "git rm scripts/protected.py")
+    result = gate_decision(payload)
+    assert result.get("decision") == "block", f"expected block, got {result}"
+    assert "scripts/" in result.get("reason", "")
+
+
+def test_gate_decision_blocks_git_restore_staged_protected_path(tmp_path: Path) -> None:
+    """`gate_decision` MUST block `git restore --staged scripts/protected.py`."""
+    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+
+    payload = _no_auth_payload(tmp_path, "git restore --staged scripts/protected.py")
+    result = gate_decision(payload)
+    assert result.get("decision") == "block", f"expected block, got {result}"
+    assert "scripts/" in result.get("reason", "")
+
+
+def test_gate_decision_allows_git_status(tmp_path: Path) -> None:
+    """`gate_decision` MUST allow `git status` (safe-read regression guard)."""
+    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+
+    payload = _no_auth_payload(tmp_path, "git status")
+    result = gate_decision(payload)
+    # Safe-read commands return empty dict (allow), not {"decision": "block"}.
+    assert result == {}, f"expected empty allow-dict, got {result}"
