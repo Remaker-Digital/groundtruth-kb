@@ -634,7 +634,7 @@ def run_tool_loop(
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
     for _turn in range(max_turns):
         payload = {"model": model_route.model_id, "messages": messages, "tools": schemas, "stream": False}
-        response = chat(endpoint.rstrip("/") + "/api/chat", payload, timeout)
+        response = chat(endpoint, payload, timeout)
         message = _message_from_response(response)
         tool_calls = message.get("tool_calls") or response.get("tool_calls") or []
         if not tool_calls:

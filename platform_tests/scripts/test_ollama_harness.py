@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -135,10 +136,34 @@ def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
 
     text = oh.run_tool_loop("read it", route(root), "http://ollama.test", 3, root, chat_func=chat)
     assert text == "final answer"
-    assert calls[0][0] == "http://ollama.test/api/chat"
+    assert calls[0][0] == "http://ollama.test"
     assert calls[0][1]["model"] == "qwen2.5-coder:14b-instruct-q4_K_M"
     assert calls[0][1]["stream"] is False
     assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == oh.CANONICAL_TOOLS
+
+
+def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    root = make_root(tmp_path)
+    urls: list[str] = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps({"message": {"content": "done"}}).encode("utf-8")
+
+    def fake_urlopen(request, timeout: float):
+        urls.append(request.full_url)
+        return Response()
+
+    monkeypatch.setattr(oh.urllib.request, "urlopen", fake_urlopen)
+    text = oh.run_tool_loop("hello", route(root), "http://ollama.test/", 1, root)
+    assert text == "done"
+    assert urls == ["http://ollama.test/api/chat"]
 
 
 def test_tool_loop_fail_closed_on_max_turns(tmp_path: Path):

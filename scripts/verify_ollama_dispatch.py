@@ -164,14 +164,28 @@ def _check_bridge_filing_via_dispatch(
     model_route: ModelRoute,
     endpoint: str,
     project_root: Path,
+    fixture_root: Path | None = None,
 ) -> bool:
-    """L3: exercise ``dispatch_tool_call("Write", ...)`` in a fixture workspace
-    to prove the guard pipeline accepts a valid bridge file write."""
-    fixture_root = Path(tempfile.mkdtemp(prefix="gtkb-ollama-verify-"))
+    """L3: exercise the full bridge filing semantic per
+    GOV-FILE-BRIDGE-AUTHORITY-001 — write a fixture bridge file via
+    ``dispatch_tool_call("Write", ...)`` AND insert a fixture
+    ``Document:``/``NEW:`` entry into the fixture INDEX. A bridge file
+    without an INDEX entry is not a filed bridge document.
+
+    The optional ``fixture_root`` parameter lets callers (notably tests)
+    inspect the resulting fixture state after the call. When omitted, the
+    function uses ``tempfile.mkdtemp`` and cleans up on exit.
+    """
+    cleanup_after = fixture_root is None
+    if fixture_root is None:
+        fixture_root = Path(tempfile.mkdtemp(prefix="gtkb-ollama-verify-"))
+    else:
+        fixture_root = Path(fixture_root)
+        fixture_root.mkdir(parents=True, exist_ok=True)
     try:
         # Set up fixture workspace with bridge/ dir and minimal INDEX
         bridge_dir = fixture_root / "bridge"
-        bridge_dir.mkdir(parents=True)
+        bridge_dir.mkdir(parents=True, exist_ok=True)
         index_path = bridge_dir / "INDEX.md"
         index_path.write_text("# Bridge Index (fixture)\n", encoding="utf-8")
 
@@ -236,18 +250,43 @@ def _check_bridge_filing_via_dispatch(
         else:
             first_line_ok = False
 
-        passed = file_exists and first_line_ok
+        # Insert fixture Document:/NEW: entry into the fixture INDEX. Under
+        # GOV-FILE-BRIDGE-AUTHORITY-001 a bridge file without an INDEX entry
+        # is not a filed bridge document, so the GO@-006 bridge filing proof
+        # requires both write actions: the bridge file and the INDEX entry.
+        if file_exists and first_line_ok:
+            existing_index = index_path.read_text(encoding="utf-8")
+            entry_block = f"\nDocument: gtkb-ollama-e2e-fixture\nNEW: bridge/{fixture_bridge_file.name}\n"
+            existing_lines = existing_index.splitlines(keepends=True)
+            if existing_lines and existing_lines[0].lstrip().startswith("#"):
+                new_index = existing_lines[0] + entry_block + "".join(existing_lines[1:])
+            else:
+                new_index = entry_block.lstrip("\n") + existing_index
+            index_path.write_text(new_index, encoding="utf-8")
+            verify_index = index_path.read_text(encoding="utf-8")
+            index_entry_ok = (
+                "Document: gtkb-ollama-e2e-fixture" in verify_index
+                and f"NEW: bridge/{fixture_bridge_file.name}" in verify_index
+            )
+        else:
+            index_entry_ok = False
+
+        passed = file_exists and first_line_ok and index_entry_ok
         _print_result(
             "L3 bridge filing via Write dispatch",
             passed,
-            f"file_created={file_exists}, first_line_is_NEW={first_line_ok}, result={result!r}",
+            (
+                f"file_created={file_exists}, first_line_is_NEW={first_line_ok}, "
+                f"index_entry_inserted={index_entry_ok}, result={result!r}"
+            ),
         )
         return passed
     except Exception as exc:
         _print_result("L3 bridge filing via Write dispatch", False, str(exc))
         return False
     finally:
-        shutil.rmtree(fixture_root, ignore_errors=True)
+        if cleanup_after:
+            shutil.rmtree(fixture_root, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------

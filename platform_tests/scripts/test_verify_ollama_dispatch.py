@@ -176,6 +176,44 @@ def test_bridge_filing_does_not_touch_production_index(verify_module, ollama_har
     assert before == after, "production bridge/INDEX.md was modified"
 
 
+def test_bridge_filing_inserts_fixture_index_entry(verify_module, ollama_harness_module, tmp_path) -> None:
+    """L3 / GO@-006 Constraint 2: fixture bridge filing must insert a
+    ``Document:``/``NEW:`` entry into the fixture INDEX.
+
+    Per ``GOV-FILE-BRIDGE-AUTHORITY-001`` a bridge document is filed when
+    BOTH the bridge file and its INDEX entry exist; a bridge file alone is
+    unindexed and does not count as a filed bridge document. The GO@-006
+    verification constraint required the fixture filing proof to exercise
+    that full semantic in a disposable root-contained workspace.
+    """
+    route = ollama_harness_module.ModelRoute(
+        key="route1",
+        model_id="my-model",
+        model_version="v1",
+        tool_calling_supported=True,
+        allowed_tools=("Write",),
+    )
+    fixture_root = tmp_path / "fixture"
+    ok = verify_module._check_bridge_filing_via_dispatch(
+        route,
+        "http://localhost:11434",
+        tmp_path,
+        fixture_root=fixture_root,
+    )
+    assert ok is True
+    fixture_index = fixture_root / "bridge" / "INDEX.md"
+    index_text = fixture_index.read_text(encoding="utf-8")
+    assert "Document: gtkb-ollama-e2e-fixture" in index_text, (
+        f"fixture INDEX missing Document: entry; contents:\n{index_text!r}"
+    )
+    assert "NEW: bridge/gtkb-ollama-e2e-fixture-001.md" in index_text, (
+        f"fixture INDEX missing NEW: entry; contents:\n{index_text!r}"
+    )
+    # The fixture bridge file must also exist (filing requires both).
+    fixture_bridge_file = fixture_root / "bridge" / "gtkb-ollama-e2e-fixture-001.md"
+    assert fixture_bridge_file.is_file(), "fixture bridge file missing after filing"
+
+
 # ── Guard-only: destructive Bash rejection ───────────────────────────────
 
 

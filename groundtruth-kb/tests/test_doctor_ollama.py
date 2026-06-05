@@ -252,3 +252,83 @@ def test_pass_message_mentions_all_four_layers(tmp_path: Path) -> None:
     assert result.status == "pass"
     assert "L1" in result.message and "L2" in result.message
     assert "L3" in result.message and "L4" in result.message
+
+
+# ── Layer 4b — advertised-model verification (hermetic, GO@-006 Constraint 4) ─
+
+
+class _FakeApiTagsResponse:
+    """Minimal context-manager response object for a mocked ``/api/tags`` GET.
+
+    Mirrors the shape ``urllib.request.urlopen`` returns: a context manager
+    whose ``read()`` returns the JSON body bytes. ``status`` is included for
+    parity with ``http.client.HTTPResponse``; the doctor check does not read
+    it but real responses carry it.
+    """
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+        self.status = 200
+
+    def __enter__(self) -> _FakeApiTagsResponse:
+        return self
+
+    def __exit__(self, *exc_info: object) -> bool:
+        return False
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_advertised_model_present_via_api_tags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """L4b: when the routing model appears in the mocked ``/api/tags`` response,
+    the check stays at ``pass`` (no L4b finding).
+
+    Hermetic test: monkeypatches ``urllib.request.urlopen`` so no live Ollama
+    daemon is required. The autouse ``_skip_l4b_probe`` fixture is overridden
+    via ``monkeypatch.delenv`` to re-enable the Layer 4b code path.
+    """
+    _write_clean_ollama_fixtures(tmp_path)
+    # Re-enable the L4b probe (override the autouse skip fixture).
+    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
+    body = json.dumps({"models": [{"name": "qwen2.5-coder:14b-instruct-q4_K_M"}]}).encode("utf-8")
+
+    def _fake_urlopen(_url: str, timeout: float = 2.0) -> _FakeApiTagsResponse:
+        return _FakeApiTagsResponse(body)
+
+    import urllib.request as _urlreq
+
+    monkeypatch.setattr(_urlreq, "urlopen", _fake_urlopen)
+
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "pass", (
+        f"expected pass with advertised model present; got {result.status}: {result.message}"
+    )
+    assert "L4b" not in result.message, f"unexpected L4b finding when model present: {result.message}"
+
+
+def test_advertised_model_absent_via_api_tags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """L4b: when the routing model is missing from the mocked ``/api/tags``
+    response, the check returns ``warning`` with an L4b finding.
+
+    Hermetic test: the mock advertises only an unrelated model so the routing
+    model is provably absent. The autouse ``_skip_l4b_probe`` fixture is
+    overridden via ``monkeypatch.delenv`` to re-enable the Layer 4b code path.
+    """
+    _write_clean_ollama_fixtures(tmp_path)
+    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
+    body = json.dumps({"models": [{"name": "unrelated-model:latest"}]}).encode("utf-8")
+
+    def _fake_urlopen(_url: str, timeout: float = 2.0) -> _FakeApiTagsResponse:
+        return _FakeApiTagsResponse(body)
+
+    import urllib.request as _urlreq
+
+    monkeypatch.setattr(_urlreq, "urlopen", _fake_urlopen)
+
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning", (
+        f"expected warning with advertised model absent; got {result.status}: {result.message}"
+    )
+    assert "L4b" in result.message, f"expected L4b finding when routing model absent; got: {result.message}"
+    assert "not advertised" in result.message.lower(), f"expected 'not advertised' diagnostic; got: {result.message}"
