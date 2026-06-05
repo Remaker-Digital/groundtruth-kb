@@ -17,6 +17,7 @@ GO: bridge/gtkb-work-tree-hygiene-slice-a-detector-002.md
 NEW: bridge/gtkb-work-tree-hygiene-slice-a-detector-001.md
 
 Document: gtkb-ollama-integration-phase-1-governance-impl
+VERIFIED: bridge/gtkb-ollama-integration-phase-1-governance-impl-004.md
 NEW: bridge/gtkb-ollama-integration-phase-1-governance-impl-003.md
 GO: bridge/gtkb-ollama-integration-phase-1-governance-impl-002.md
 NEW: bridge/gtkb-ollama-integration-phase-1-governance-impl-001.md
@@ -247,6 +248,8 @@ NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-001.md
 
 Document: gtkb-ollama-integration-phase-1
+VERIFIED: bridge/gtkb-ollama-integration-phase-1-008.md
+REVISED: bridge/gtkb-ollama-integration-phase-1-007.md
 NO-GO: bridge/gtkb-ollama-integration-phase-1-006.md
 NEW: bridge/gtkb-ollama-integration-phase-1-005.md
 GO: bridge/gtkb-ollama-integration-phase-1-004.md
