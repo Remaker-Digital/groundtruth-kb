@@ -1,0 +1,10 @@
+schema_version = 1
+
+[models.qwen-coder-14b]
+model_id = "qwen2.5-coder:14b-instruct-q4_K_M"
+model_version = "q4_K_M"
+tool_calling_supported = true
+allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+
+[routing]
+default_model = "qwen-coder-14b"
