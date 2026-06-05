@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
+NEW: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-005.md
 GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-004.md
 REVISED: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-003.md
 NO-GO: bridge/gtkb-impl-start-gate-verb-aware-path-extraction-002.md
