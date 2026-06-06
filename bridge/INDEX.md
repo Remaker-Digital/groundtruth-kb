@@ -8,16 +8,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-ollama-phase2-verified-staging-finalization-gate
+VERIFIED: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-004.md
+NEW: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-003.md
 GO: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-002.md
 NEW: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-001.md
-
-Document: gtkb-bridge-work-intent-session-id-live-env-precedence
-VERIFIED: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-006.md
-REVISED: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-005.md
-NO-GO: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-004.md
-NEW: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-003.md
-GO: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-002.md
-NEW: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-001.md
 
 Document: gtkb-ollama-integration-phase-2-routing
 VERIFIED: bridge/gtkb-ollama-integration-phase-2-routing-010.md
@@ -72,18 +66,6 @@ GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-role-promotion-001.md
-
-Document: gtkb-ollama-integration-phase-2
-VERIFIED: bridge/gtkb-ollama-integration-phase-2-010.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-009.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-006.md
-NEW: bridge/gtkb-ollama-integration-phase-2-005.md
-GO: bridge/gtkb-ollama-integration-phase-2-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-002.md
-NEW: bridge/gtkb-ollama-integration-phase-2-001.md
 
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
 GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-004.md
