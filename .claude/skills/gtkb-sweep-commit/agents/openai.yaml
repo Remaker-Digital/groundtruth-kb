@@ -1,0 +1,4 @@
+interface:
+  display_name: "GT-KB Sweep Commit"
+  short_description: "Commit the full GT-KB worktree safely"
+  default_prompt: "Use $gtkb-sweep-commit to sweep current GT-KB changes, verify gates, and create a local commit."
