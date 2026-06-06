@@ -26,7 +26,7 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "f11905ff9c935c622b4d37bc258997eb3153adb062c3984af2272f739b9bd3f0"
+      "source_sha256": "e8faa844e34da804d511531d9269af4e95242351e784853807526283c18b2ae8"
     },
     {
       "adapter_relative_path": ".codex/skills/bridge-propose/SKILL.md",
@@ -236,7 +236,7 @@
       "canonical_name": "gtkb-verify",
       "capability_id": "skill.verify",
       "source_relative_path": ".claude/skills/verify/SKILL.md",
-      "source_sha256": "0cb8669690d00770ee94ef1362700c6d0fbbacaddf0ac2f31a69a281d71e716c"
+      "source_sha256": "a8a39cd634d0797c8aa629b197bee5b66754ba6738d1dd3f7fa5ecb2578ff7aa"
     }
   ],
   "generated_by": "scripts/generate_codex_skill_adapters.py",

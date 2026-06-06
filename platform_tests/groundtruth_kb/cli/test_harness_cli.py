@@ -2,8 +2,8 @@
 
 Spec-derived tests for ``REQ-HARNESS-REGISTRY-001`` FR3 (the unified
 ``gt harness`` command group) and FR9 (the operational ``set-role`` verb).
-``set-role`` assigns one operating role to one active harness while preserving
-the active PB/LO invariant.
+``set-role`` updates one harness's default role metadata while preserving the
+active PB/LO invariant across the whole candidate configuration.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
 All rights reserved.
@@ -24,6 +24,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.cli import main  # noqa: E402
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.harness_projection import generate_harness_projection  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -56,9 +58,30 @@ def _invoke(config: Path, *args: str) -> object:
     return CliRunner().invoke(main, ["--config", str(config), "harness", *args])
 
 
+def _seed_harness_roles(root: Path, roles: dict[str, list[str]]) -> None:
+    db_path = root / "groundtruth.db"
+    db = KnowledgeDB(db_path=db_path)
+    for harness_id, role in roles.items():
+        current = _harness_current(db_path, harness_id)
+        assert current is not None
+        invocation_surfaces = json.loads(current["invocation_surfaces"]) if current["invocation_surfaces"] else None
+        db.insert_harness(
+            id=harness_id,
+            harness_name=current["harness_name"],
+            harness_type=current["harness_type"],
+            role=list(role),
+            changed_by="test",
+            change_reason="seed harness role metadata for CLI test",
+            status=current["status"],
+            reviewer_precedence=current["reviewer_precedence"],
+            invocation_surfaces=invocation_surfaces,
+            capabilities_ref=current["capabilities_ref"],
+        )
+    generate_harness_projection(db, root)
+
+
 def _register_active(config: Path, harness_id: str, harness_type: str, *, role: list[str] | None = None) -> None:
-    """Register a role-free harness and activate it."""
-    _ = role
+    """Register a harness, activate it, and optionally seed role metadata."""
     register_args = [
         "register",
         "--id",
@@ -72,13 +95,15 @@ def _register_active(config: Path, harness_id: str, harness_type: str, *, role: 
     assert reg.exit_code == 0, reg.output
     act = _invoke(config, "activate", "--harness", harness_id)
     assert act.exit_code == 0, act.output
+    if role is not None:
+        _seed_harness_roles(config.parent, {harness_id: role})
 
 
 def _seed_role_workspace(root: Path) -> None:
     """Seed the minimal ``bridge/INDEX.md`` the transaction validator needs.
 
     WI-3342 IP-6: ``apply_role_switch`` validates the role artifact (the
-    DB-backed registry projection — already produced by ``gt harness register``
+    DB-backed registry projection â€” already produced by ``gt harness register``
     / ``activate``), the bridge artifact, and (optionally) the session-state
     artifact before any write. The starting role map now comes from the DB via
     ``_register_active(..., role=[...])``, so this helper only seeds the bridge
@@ -171,10 +196,12 @@ def test_harness_suspend_preserves_role_metadata(tmp_path: Path) -> None:
     """WI-4213: suspended harnesses may retain role metadata."""
     root, config = _project(tmp_path)
     db_path = root / "groundtruth.db"
-    _register_active(config, "A", "codex-cli")
-    _register_active(config, "B", "claude-code")
+    _register_active(config, "A", "codex-cli", role=["loyal-opposition"])
+    _register_active(config, "B", "claude-code", role=["loyal-opposition"])
     _seed_role_workspace(root)
-    assert _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder").exit_code == 0
+    _seed_harness_roles(root, {"A": ["loyal-opposition"], "B": ["loyal-opposition"]})
+    result = _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder")
+    assert result.exit_code == 0, result.output
     assert json.loads(_harness_current(db_path, "B")["role"]) == ["prime-builder"]
 
     assert _invoke(config, "suspend", "--harness", "B").exit_code == 0
@@ -205,9 +232,10 @@ def test_harness_retire_preserves_role_metadata(tmp_path: Path) -> None:
     """WI-4213: retired harnesses keep their role-set history for orthogonality."""
     root, config = _project(tmp_path)
     db_path = root / "groundtruth.db"
-    _register_active(config, "A", "codex-cli")
-    _register_active(config, "B", "claude-code")
+    _register_active(config, "A", "codex-cli", role=["loyal-opposition"])
+    _register_active(config, "B", "claude-code", role=["loyal-opposition"])
     _seed_role_workspace(root)
+    _seed_harness_roles(root, {"A": ["loyal-opposition"], "B": ["loyal-opposition"]})
     assert _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder").exit_code == 0
 
     assert _invoke(config, "retire", "--harness", "B").exit_code == 0
@@ -264,59 +292,60 @@ def test_harness_set_precedence_cli(tmp_path: Path) -> None:
 # --- T-HC-7: set-role assigns one role and preserves active PB/LO invariant ---
 
 
-def test_harness_set_role_promotes_and_demotes(tmp_path: Path) -> None:
-    """FR9: assigning B to prime-builder leaves A as loyal-opposition."""
+def test_harness_set_role_updates_only_target_when_candidate_valid(tmp_path: Path) -> None:
+    """FR9: assigning B to prime-builder leaves A unchanged as loyal-opposition."""
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _register_active(config, "A", "codex-cli", role=["loyal-opposition"])
     _register_active(config, "B", "claude-code", role=["loyal-opposition"])
     _seed_role_workspace(root)
+    _seed_harness_roles(root, {"A": ["loyal-opposition"], "B": ["loyal-opposition"]})
     result = _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder")
     assert result.exit_code == 0, result.output
     role_map = _read_role_map(root)
-    assert role_map["B"]["role"] == ["prime-builder"]
     assert role_map["A"]["role"] == ["loyal-opposition"]
+    assert role_map["B"]["role"] == ["prime-builder"]
 
 
-def test_harness_set_role_reassigns_prime_builder(tmp_path: Path) -> None:
-    """GOV-HARNESS-ROLE-PORTABILITY-001: the role moves by durable harness id
-    irrespective of harness_type — A and B carry distinct types."""
+def test_harness_set_role_rejects_invalid_active_candidate(tmp_path: Path) -> None:
+    """A one-target update cannot synthesize the complementary holder."""
     root, config = _project(tmp_path)
     _register_active(config, "A", "codex-cli", role=["prime-builder"])
     _register_active(config, "B", "claude-code", role=["loyal-opposition"])
     _seed_role_workspace(root)
-    # Promote B (currently loyal-opposition) — prime-builder must move to it.
-    assert _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder").exit_code == 0
-    role_map = _read_role_map(root)
-    assert role_map["B"]["role"] == ["prime-builder"]
-    assert role_map["A"]["role"] == ["loyal-opposition"]
-    # And back to A — portability is symmetric and harness-type-independent.
-    assert _invoke(config, "set-role", "--harness", "A", "--role", "prime-builder").exit_code == 0
+    _seed_harness_roles(root, {"A": ["prime-builder"], "B": ["loyal-opposition"]})
+    result = _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder")
+    assert result.exit_code != 0, result.output
+    assert "exactly one prime-builder" in result.output
     role_map = _read_role_map(root)
     assert role_map["A"]["role"] == ["prime-builder"]
     assert role_map["B"]["role"] == ["loyal-opposition"]
 
 
-def test_harness_set_role_three_harness_demotes_all_non_targets(tmp_path: Path) -> None:
-    """With three active harnesses, assigning one PB preserves a single LO."""
+def test_harness_set_role_three_harness_rejects_without_suspending_non_targets(tmp_path: Path) -> None:
+    """Invalid candidates do not suspend unrelated active harnesses."""
     root, config = _project(tmp_path)
     _register_active(config, "A", "codex-cli", role=["prime-builder"])
     _register_active(config, "B", "claude-code", role=["loyal-opposition"])
-    # C starts with no role assignment.
-    _register_active(config, "C", "antigravity-cli", role=[])
+    _register_active(config, "C", "antigravity-cli", role=["loyal-opposition"])
     _seed_role_workspace(root)
+    _seed_harness_roles(
+        root,
+        {"A": ["prime-builder"], "B": ["loyal-opposition"], "C": ["loyal-opposition"]},
+    )
     result = _invoke(config, "set-role", "--harness", "C", "--role", "prime-builder")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code != 0, result.output
+    assert "exactly one prime-builder" in result.output
     role_map = _read_role_map(root)
-    assert role_map["C"]["role"] == ["prime-builder"]
-    assert role_map["A"]["role"] == []
+    assert role_map["A"]["role"] == ["prime-builder"]
     assert role_map["B"]["role"] == ["loyal-opposition"]
+    assert role_map["C"]["role"] == ["loyal-opposition"]
 
 
-def test_harness_set_role_rejects_non_active_harness(tmp_path: Path) -> None:
-    """FR9 active-harness eligibility gate: a registered or suspended harness is
-    rejected, and the role map is not mutated (fail closed before any write)."""
+def test_harness_set_role_allows_non_active_metadata_and_rejects_retired(tmp_path: Path) -> None:
+    """Registered/suspended metadata can change; retired remains terminal."""
     root, config = _project(tmp_path)
     _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _register_active(config, "C", "other-active-cli", role=["loyal-opposition"])
     # B is registered but never activated -> status 'registered'.
     assert (
         _invoke(
@@ -334,17 +363,31 @@ def test_harness_set_role_rejects_non_active_harness(tmp_path: Path) -> None:
     # D is registered, activated, then suspended -> status 'suspended'.
     _register_active(config, "D", "other-cli", role=["loyal-opposition"])
     assert _invoke(config, "suspend", "--harness", "D").exit_code == 0
+    _register_active(config, "E", "retired-cli", role=["loyal-opposition"])
+    assert _invoke(config, "retire", "--harness", "E").exit_code == 0
     _seed_role_workspace(root)
-    # WI-3342 IP-6: the role map is the DB-backed registry projection; the
-    # eligibility gate failing closed means the projection's role records are
-    # unchanged by the rejected set-role.
-    roles_before = {hid: rec.get("role") for hid, rec in _read_role_map(root).items()}
+    _seed_harness_roles(
+        root,
+        {
+            "A": ["prime-builder"],
+            "C": ["loyal-opposition"],
+            "D": ["loyal-opposition"],
+            "E": ["loyal-opposition"],
+        },
+    )
     for non_active in ("B", "D"):
         result = _invoke(config, "set-role", "--harness", non_active, "--role", "prime-builder")
-        assert result.exit_code != 0, result.output
-        assert "status" in result.output
-    # The eligibility gate fails closed: no role-map write occurred.
-    assert {hid: rec.get("role") for hid, rec in _read_role_map(root).items()} == roles_before
+        assert result.exit_code == 0, result.output
+    result = _invoke(config, "set-role", "--harness", "E", "--role", "prime-builder")
+    assert result.exit_code != 0
+    assert "retired" in result.output
+    role_map = _read_role_map(root)
+    assert role_map["B"]["role"] == ["prime-builder"]
+    assert role_map["B"]["status"] == "registered"
+    assert role_map["D"]["role"] == ["prime-builder"]
+    assert role_map["D"]["status"] == "suspended"
+    assert role_map["E"]["role"] == ["loyal-opposition"]
+    assert role_map["E"]["status"] == "retired"
 
 
 def test_harness_set_role_unknown_harness_rejected(tmp_path: Path) -> None:
@@ -358,9 +401,10 @@ def test_harness_set_role_unknown_harness_rejected(tmp_path: Path) -> None:
 
 def test_harness_set_role_emits_single_prime_builder(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
-    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    _register_active(config, "A", "codex-cli", role=["loyal-opposition"])
     _register_active(config, "B", "claude-code", role=["loyal-opposition"])
     _seed_role_workspace(root)
+    _seed_harness_roles(root, {"A": ["loyal-opposition"], "B": ["loyal-opposition"]})
     result = _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder")
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)

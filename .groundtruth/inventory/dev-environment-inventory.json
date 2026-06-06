@@ -2,10 +2,10 @@
   "collector": {
     "name": "GT-KB development environment inventory collector",
     "script": "scripts/collect_dev_environment_inventory.py",
-    "script_hash": "sha256:e1edf438c92dec07b069904bf62c78ff23ba067734c0b3686906745409cf2ce8",
+    "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-06T01:23:08Z",
+  "generated_at": "2026-06-06T20:14:10Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -72,8 +72,10 @@
       },
       "B": {
         "harness_type": "claude",
-        "role": [],
-        "status": "unknown"
+        "role": [
+          "prime-builder"
+        ],
+        "status": "verified"
       },
       "C": {
         "harness_type": "antigravity",
@@ -84,8 +86,10 @@
       },
       "D": {
         "harness_type": "ollama",
-        "role": [],
-        "status": "unknown"
+        "role": [
+          "loyal-opposition"
+        ],
+        "status": "verified"
       }
     }
   },
@@ -317,7 +321,7 @@
   "role_by_harness_compatibility": [
     {
       "assignment": {
-        "current_role": "unknown",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "prime-builder",
@@ -369,7 +373,7 @@
           "status": "configured"
         },
         "role_record_resolution": {
-          "evidence": "harness-state/role-assignments.json",
+          "evidence": "harness-state/harness-registry.json",
           "status": "verified"
         },
         "shell_runtime_behavior": {
@@ -446,7 +450,7 @@
           "status": "configured"
         },
         "role_record_resolution": {
-          "evidence": "harness-state/role-assignments.json",
+          "evidence": "harness-state/harness-registry.json",
           "status": "verified"
         },
         "shell_runtime_behavior": {
@@ -471,7 +475,7 @@
     },
     {
       "assignment": {
-        "current_role": "unknown",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "loyal-opposition",
@@ -523,7 +527,7 @@
           "status": "configured"
         },
         "role_record_resolution": {
-          "evidence": "harness-state/role-assignments.json",
+          "evidence": "harness-state/harness-registry.json",
           "status": "verified"
         },
         "shell_runtime_behavior": {
@@ -600,7 +604,7 @@
           "status": "configured"
         },
         "role_record_resolution": {
-          "evidence": "harness-state/role-assignments.json",
+          "evidence": "harness-state/harness-registry.json",
           "status": "verified"
         },
         "shell_runtime_behavior": {

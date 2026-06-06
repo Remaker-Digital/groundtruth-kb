@@ -105,6 +105,10 @@ def _read_role_map(root: Path) -> dict[str, Any]:
     }
 
 
+def _audit_records(root: Path) -> list[Path]:
+    return sorted((root / ".gtkb-state" / "mode-switches").glob("*.json"))
+
+
 @pytest.fixture
 def project_root(tmp_path: Path) -> Path:
     return tmp_path
@@ -116,9 +120,9 @@ def test_apply_role_switch_returns_transaction_result(project_root: Path) -> Non
     # reads the registry projection, whose records carry ``harness_name`` (not
     # the legacy ``name`` key), so harness-id targeting is the migration-stable
     # path; harness B is the claude harness.
-    result = apply_role_switch(project_root, "B", "loyal-opposition", change_reason="test")
+    result = apply_role_switch(project_root, "B", "prime-builder", change_reason="test")
     assert result.harness_id == "B"
-    assert result.new_role_set == ("loyal-opposition",)
+    assert result.new_role_set == ("prime-builder",)
     assert result.audit_record_path.exists()
 
 
@@ -189,8 +193,8 @@ def test_apply_role_switch_refuses_when_bridge_index_unparseable(project_root: P
         apply_role_switch(project_root, "A", "loyal-opposition", change_reason="t")
 
 
-def test_apply_role_switch_demotes_other_harness_to_opposite_role(project_root: Path) -> None:
-    """When B becomes prime-builder, A must be demoted to loyal-opposition."""
+def test_apply_role_switch_rejects_invalid_active_candidate_without_reassignment(project_root: Path) -> None:
+    """Changing only B to prime-builder would leave two active Prime Builders."""
     _seed_workspace(
         project_root,
         harnesses={
@@ -198,44 +202,48 @@ def test_apply_role_switch_demotes_other_harness_to_opposite_role(project_root: 
             "B": ("claude", ["loyal-opposition"]),
         },
     )
-    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
+    with pytest.raises(TransactionValidationError, match="exactly one prime-builder"):
+        apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
     updated = _read_role_map(project_root)
-    assert updated["B"] == ["prime-builder"]
-    assert updated["A"] == ["loyal-opposition"]
+    assert updated["A"] == ["prime-builder"]
+    assert updated["B"] == ["loyal-opposition"]
+    assert _audit_records(project_root) == []
 
 
 def test_audit_record_contains_required_fields(project_root: Path) -> None:
     """Acceptance criterion #3: who/what/when/effective-when evidence."""
     _seed_workspace(project_root)
     # WI-3342 IP-6: target harness B (claude) by its durable id.
-    result = apply_role_switch(project_root, "B", "loyal-opposition", change_reason="audit fields test")
+    result = apply_role_switch(project_root, "B", "prime-builder", change_reason="audit fields test")
     record = json.loads(result.audit_record_path.read_text(encoding="utf-8"))
     assert record["harness_id"] == "B"
-    assert record["requested_role"] == "loyal-opposition"
-    assert record["new_role_set"] == ["loyal-opposition"]
+    assert record["requested_role"] == "prime-builder"
+    assert record["new_role_set"] == ["prime-builder"]
     assert record["change_reason"] == "audit fields test"
     assert "requested_at" in record
     assert "effective_at" in record
     assert record["deferred"] is False
 
 
-def test_apply_role_switch_prime_builder_demotes_all_non_targets(
+def test_apply_role_switch_rejects_three_active_candidate_without_suspending_non_targets(
     project_root: Path,
 ) -> None:
-    """Assigning PB in a three-active topology leaves exactly one active LO."""
+    """Invalid candidates do not suspend unrelated active harnesses."""
     _seed_workspace(
         project_root,
         harnesses={
             "A": ("codex", ["prime-builder"]),
             "B": ("claude", ["loyal-opposition"]),
-            "C": ("antigravity", []),
+            "C": ("antigravity", ["loyal-opposition"]),
         },
     )
-    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
+    with pytest.raises(TransactionValidationError, match="exactly one prime-builder"):
+        apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
     updated = _read_role_map(project_root)
-    assert updated["B"] == ["prime-builder"]
-    assert updated["A"] == ["loyal-opposition"]
-    assert updated["C"] == []
+    assert updated["A"] == ["prime-builder"]
+    assert updated["B"] == ["loyal-opposition"]
+    assert updated["C"] == ["loyal-opposition"]
+    assert _audit_records(project_root) == []
 
 
 def test_apply_role_switch_preserves_non_active_retained_roles(project_root: Path) -> None:
@@ -248,8 +256,8 @@ def test_apply_role_switch_preserves_non_active_retained_roles(project_root: Pat
             "C": ("antigravity", ["prime-builder"], "registered"),
         },
     )
-    apply_role_switch(project_root, "B", "loyal-opposition", change_reason="preserve non-active role")
+    apply_role_switch(project_root, "C", "loyal-opposition", change_reason="preserve non-active role")
     updated = _read_role_map(project_root)
-    assert updated["A"] == ["prime-builder"]
-    assert updated["B"] == ["loyal-opposition"]
-    assert updated["C"] == ["prime-builder"]
+    assert updated["A"] == ["loyal-opposition"]
+    assert updated["B"] == ["prime-builder"]
+    assert updated["C"] == ["loyal-opposition"]

@@ -40,7 +40,7 @@ import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ROLE_ASSIGNMENTS_PATH = PROJECT_ROOT / "harness-state" / "role-assignments.json"
+ROLE_ASSIGNMENTS_PATH = PROJECT_ROOT / "harness-state" / "harness-registry.json"
 HARNESS_IDENTITIES_PATH = PROJECT_ROOT / "harness-state" / "harness-identities.json"
 ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
 
@@ -48,8 +48,8 @@ ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
 def _load_role_assignments() -> dict[str, dict[str, str]]:
     """Load harness role assignments from the registry projection (WI-3342 IP-4).
 
-    Migrated from a direct read of ``harness-state/role-assignments.json`` to
-    the DB-backed registry projection via the foundational loader
+    Migrated from a direct read of the retired standalone role mirror to the
+    DB-backed registry projection via the foundational loader
     ``scripts.harness_roles.load_role_assignments`` (itself projection-backed
     since IP-3). Returns the ``{harness_id: {...}}`` mapping; ``{}`` on absence.
     """
@@ -222,7 +222,7 @@ def resolve_changed_by(*, harness_name: str | None = None) -> str:
 
     Raises:
         RuntimeError: if no source resolves a harness, if the harness has
-            no role assignment in role-assignments.json, or if priority-3
+            no role assignment in the harness registry projection, or if priority-3
             finds zero or multiple Prime Builders.
     """
     resolved = _resolve_harness_name(harness_name)

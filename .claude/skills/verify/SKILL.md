@@ -73,14 +73,18 @@ Before writing the verdict file, the reviewer must:
 4. Run `python scripts/adr_dcl_clause_preflight.py --bridge-id <slug>` (no
    `--report-only`) and capture the full output. Treat exit `5` as a blocking
    gap unless an explicit owner-waiver line is present per blocking clause.
-5. Run a deliberation search per `.claude/rules/deliberation-protocol.md`
+5. Optionally run
+   `python scripts/adr_dcl_applicability_discovery.py --bridge-id <slug>` and
+   use the `Candidate Applicable ADR/DCLs` output as advisory review context.
+   It always exits 0 and does not replace the blocking clause preflight.
+6. Run a deliberation search per `.claude/rules/deliberation-protocol.md`
    (`gt deliberations search <topic>`) for prior reviews on the same
    spec/WI/component.
-6. Identify the linked specifications carried forward from the `GO`'d proposal
+7. Identify the linked specifications carried forward from the `GO`'d proposal
    — the verdict must mirror the proposal's `Specification Links`.
-7. Build the spec-to-test mapping table. In Slice 1 this is done manually;
+8. Build the spec-to-test mapping table. In Slice 1 this is done manually;
    Slice 2 will provide a helper that computes candidate test commands.
-8. Execute the spec-derived tests and capture the exact commands run and the
+9. Execute the spec-derived tests and capture the exact commands run and the
    observed results.
 
 ## Verdict file template

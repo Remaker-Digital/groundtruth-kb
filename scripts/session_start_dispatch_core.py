@@ -277,7 +277,7 @@ def _resolve_own_role_set(project_root: Path = PROJECT_ROOT) -> frozenset[str]:
     Authority (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause;
     WI-3342 IP-4): migrated from the two-step
     ``harness-state/harness-identities.json`` -> ``harness_id`` ->
-    ``harness-state/role-assignments.json`` -> ``role_label`` chain to a single
+    retired role-mirror ``role_label`` chain to a single
     lookup against the DB-backed registry projection
     (``harness-state/harness-registry.json``). The projection unifies identity
     and role in one record, so this resolves ``HARNESS_NAME`` to its registry

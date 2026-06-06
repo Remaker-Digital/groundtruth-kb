@@ -131,13 +131,13 @@ def test_doctor_role_set_topology_flags_invalid_token(tmp_path: Path) -> None:
     from groundtruth_kb.project.doctor import _check_role_set_topology_consistency
 
     (tmp_path / "harness-state").mkdir(parents=True)
-    (tmp_path / "harness-state" / "role-assignments.json").write_text(
+    (tmp_path / "harness-state" / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "A": {"role": ["prime-builder", "bogus-role"]},
-                },
+                "harnesses": [
+                    {"id": "A", "role": ["prime-builder", "bogus-role"], "status": "active"},
+                ],
             }
         ),
         encoding="utf-8",
@@ -152,13 +152,13 @@ def test_doctor_role_set_topology_flags_duplicate_tokens(tmp_path: Path) -> None
     from groundtruth_kb.project.doctor import _check_role_set_topology_consistency
 
     (tmp_path / "harness-state").mkdir(parents=True)
-    (tmp_path / "harness-state" / "role-assignments.json").write_text(
+    (tmp_path / "harness-state" / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "A": {"role": ["prime-builder", "prime-builder"]},
-                },
+                "harnesses": [
+                    {"id": "A", "role": ["prime-builder", "prime-builder"], "status": "active"},
+                ],
             }
         ),
         encoding="utf-8",
@@ -172,14 +172,24 @@ def test_doctor_single_harness_dispatcher_not_applicable_in_multi_harness(tmp_pa
     from groundtruth_kb.project.doctor import _check_single_harness_dispatcher_when_required
 
     (tmp_path / "harness-state").mkdir(parents=True)
-    (tmp_path / "harness-state" / "role-assignments.json").write_text(
+    (tmp_path / "harness-state" / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "A": {"role": ["prime-builder"]},
-                    "B": {"role": ["loyal-opposition"]},
-                },
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "role": ["prime-builder"],
+                        "status": "active",
+                        "event_driven_hooks": True,
+                    },
+                    {
+                        "id": "B",
+                        "role": ["loyal-opposition"],
+                        "status": "active",
+                        "event_driven_hooks": True,
+                    },
+                ],
             }
         ),
         encoding="utf-8",
@@ -194,13 +204,18 @@ def test_doctor_single_harness_dispatcher_warns_when_applicable_but_absent(tmp_p
     from groundtruth_kb.project.doctor import _check_single_harness_dispatcher_when_required
 
     (tmp_path / "harness-state").mkdir(parents=True)
-    (tmp_path / "harness-state" / "role-assignments.json").write_text(
+    (tmp_path / "harness-state" / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "B": {"role": ["prime-builder", "loyal-opposition"]},
-                },
+                "harnesses": [
+                    {
+                        "id": "B",
+                        "role": ["prime-builder", "loyal-opposition"],
+                        "status": "active",
+                        "event_driven_hooks": True,
+                    },
+                ],
             }
         ),
         encoding="utf-8",

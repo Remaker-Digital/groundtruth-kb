@@ -50,12 +50,13 @@ def _seed_workspace(root: Path) -> None:
     A real DB is required: ``apply_pending`` -> ``apply_role_switch`` persists
     the post-switch role map through the DB ``harnesses`` table and regenerates
     the projection — the surface post-write assertions read. Harness A (codex)
-    starts loyal-opposition, harness B (claude) prime-builder.
+    starts loyal-opposition, harness B (claude) loyal-opposition so a deferred
+    B -> prime-builder request creates a valid candidate without rewriting A.
     """
     db = KnowledgeDB(db_path=root / "groundtruth.db")
     for harness_id, harness_name, role_set in (
         ("A", "codex", ["loyal-opposition"]),
-        ("B", "claude", ["prime-builder"]),
+        ("B", "claude", ["loyal-opposition"]),
     ):
         db.insert_harness(
             id=harness_id,
@@ -90,11 +91,11 @@ def project_root(tmp_path: Path) -> Path:
 
 def test_defer_role_switch_writes_pending_file(project_root: Path) -> None:
     _seed_workspace(project_root)
-    path = defer_role_switch(project_root, "claude", "loyal-opposition", change_reason="defer test")
+    path = defer_role_switch(project_root, "claude", "prime-builder", change_reason="defer test")
     assert path.exists()
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["harness_id_or_name"] == "claude"
-    assert data["role"] == "loyal-opposition"
+    assert data["role"] == "prime-builder"
 
 
 def test_list_pending_returns_empty_when_no_queue(project_root: Path) -> None:
@@ -111,7 +112,7 @@ def test_apply_pending_drains_and_archives(project_root: Path) -> None:
     # WI-3342 IP-6: target harness B (claude) by its durable id — apply_role_switch
     # resolves the registry projection by harness id (records carry harness_name,
     # not the legacy ``name`` key).
-    pending_path = defer_role_switch(project_root, "B", "loyal-opposition", change_reason="drain test")
+    pending_path = defer_role_switch(project_root, "B", "prime-builder", change_reason="drain test")
     results = apply_pending(project_root)
     assert len(results) == 1
     assert results[0].applied is True
@@ -139,9 +140,9 @@ def test_next_session_initialization_applies_pending_and_state_matches_deferred_
     """Acceptance criterion #6: deferred request becomes effective at next session start."""
     _seed_workspace(project_root)
     # WI-3342 IP-6: target harness B (claude) by its durable id.
-    defer_role_switch(project_root, "B", "loyal-opposition", change_reason="next-session test")
+    defer_role_switch(project_root, "B", "prime-builder", change_reason="next-session test")
     apply_pending(project_root)
     # WI-3342 IP-6: the post-switch role surface is the regenerated registry
     # projection, not the retired role-assignments.json.
     role_map = _read_role_map(project_root)
-    assert role_map["B"] == ["loyal-opposition"]
+    assert role_map["B"] == ["prime-builder"]

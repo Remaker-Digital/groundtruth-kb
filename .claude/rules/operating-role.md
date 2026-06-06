@@ -29,8 +29,7 @@ identity artifact:
 Harness identity and operating role are separate concepts. Startup first reads
 `harness-state/harness-identities.json`, then uses the resolved harness ID to
 look up the role in `harness-state/harness-registry.json` (the canonical role
-registry; legacy `harness-state/role-assignments.json` mirror is orphan per
-Slice 1 retirement).
+registry).
 
 A persisted harness ID must be unique on the workstation and must not change
 after initial assignment except through an explicit owner-requested identity
@@ -49,18 +48,17 @@ change.
   represent the multi-harness case (one role per harness ID); multi-element
   lists represent the single-harness case (one harness ID holds both roles).
 - A role-switch command updates the role map through code as one operation.
-- **Active-harness role assignment:** role assignment via the canonical
-  `gt mode set-role` / `gt harness set-role` CLI updates the target ACTIVE
-  harness's role set. The complementary role's active assignment is preserved
-  on its current holder or atomically reassigned to a different active
-  harness, maintaining the single-ACTIVE-per-role invariant (per
-  `DELIB-S378-ROLE-STATUS-ORTHOGONALITY-DISPATCH` and FR9 of
-  `GOV-HARNESS-ROLE-PORTABILITY-001`). **Inactive harnesses (registered or
-  suspended) retain their existing role sets unchanged** — role and status
-  are orthogonal axes (per the S384 owner clarification and
-  `ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3). The CLI gates the target on
-  `status == "active"`; run `gt harness activate --harness <id>` first if
-  needed.
+- **Default-role metadata assignment:** role assignment via the canonical
+  `gt mode set-role` / `gt harness set-role` CLI updates only the requested
+  harness's default role metadata in candidate state, then validates the whole
+  active dispatcher partition before any durable write. The CLI does not
+  select a complementary holder, pick a topic, or rewrite unrelated harnesses
+  to make a requested update valid. Active dispatch target selection comes
+  from dispatch availability plus the role and subject carried in the session
+  envelope and first topic envelope. **Inactive harnesses (registered or
+  suspended) may receive or retain default role metadata without becoming
+  dispatchable**; role and status are orthogonal axes. Retired harnesses are
+  terminal and cannot receive role metadata updates.
 - **Single-harness topology assignment:** when only one harness identity is
   recorded, its role set is `["prime-builder", "loyal-opposition"]`
   (multi-element) so the single harness can fulfill both roles via the
@@ -68,14 +66,14 @@ change.
   `ADR-SINGLE-HARNESS-OPERATING-MODE-001` +
   `SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001` +
   `DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`).
-- When a harness is assigned Loyal Opposition explicitly, only that harness's
-  role set changes; if this leaves no Prime Builder, the next harness startup
-  self-corrects.
+- When a requested role metadata update would leave the active dispatcher
+  partition without exactly one active Prime Builder and exactly one active
+  Loyal Opposition, the command fails closed and no audit or registry write is
+  made.
 - If startup finds no harness recorded as Prime Builder (no role set contains
   `prime-builder`), the starting harness assumes Prime Builder and updates
   the registry (via `gt mode set-role`) with the appropriate role set for the
-  topology. (Legacy `harness-state/role-assignments.json` mirror is orphan per
-  Slice 1 retirement and no longer authoritative.)
+  topology.
 
 The role assignment attaches to the harness ID, not to a model, vendor name, or
 transient session.
@@ -120,7 +118,7 @@ scalar reads during the transition window.
 
 The legacy **compatibility/provenance value** `acting-prime-builder` is
 accepted on READ (per `GOV-ACTING-PRIME-BUILDER-001` +
-`.claude/rules/acting-prime-builder.md` § Compatibility/Provenance
+`.claude/rules/acting-prime-builder.md` section Compatibility/Provenance
 Classification) but rejected on SET; only `prime-builder` and
 `loyal-opposition` are valid SET targets via `scripts/harness_roles.py`.
 
@@ -131,7 +129,7 @@ into a multi-role harness).
 
 ## Mode-Switch Transaction Component (Slice 1 of gtkb-operating-mode-transaction-001)
 
-Agents MUST use the deterministic mode-switch transaction component for role/topology changes rather than ad-hoc direct edits to `harness-state/harness-registry.json` (canonical role registry) or its legacy compat mirror `harness-state/role-assignments.json` (orphan per Slice 1 retirement; no live writer). The CLI surface is `gt mode set-role --harness <id|name> --role <prime-builder|loyal-opposition> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to the registry or the mirror are still possible but bypass the validators (role/bridge/session-state artifact validation) and the audit-trail record; the transaction component is the supported path.
+Agents MUST use the deterministic mode-switch transaction component for role/topology changes rather than ad-hoc direct edits to `harness-state/harness-registry.json` (canonical role registry). The CLI surface is `gt mode set-role --harness <id|name> --role <prime-builder|loyal-opposition> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to the registry are still possible but bypass the validators (role/bridge/session-state artifact validation) and the audit-trail record; the transaction component is the supported path.
 
 ## Bridge Substrate Transaction Component (Slice 1 of gtkb-bridge-mode-config-transactions-slice-1)
 
@@ -140,8 +138,7 @@ Agents MUST use the deterministic bridge-substrate transaction component for bri
 ## Interactive Session Role Override
 
 The durable role assignment recorded in `harness-state/harness-registry.json`
-(canonical role registry; legacy `harness-state/role-assignments.json` is an
-orphan compat mirror) is the authority for **headless dispatch routing**: the cross-harness
+(canonical role registry) is the authority for **headless dispatch routing**: the cross-harness
 event-driven trigger (`scripts/cross_harness_bridge_trigger.py`) consults the
 durable role to choose the recipient harness and compose the dispatched init
 keyword, and the receiver-side `STRICT_DROP` gate enforces durable set

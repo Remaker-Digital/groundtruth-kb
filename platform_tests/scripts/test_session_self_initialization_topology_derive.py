@@ -26,8 +26,8 @@ def project_root(tmp_path: Path) -> Path:
 def test_topology_derives_multi_harness_for_two_singleton_role_sets() -> None:
     role_map = {
         "harnesses": {
-            "A": {"role": ["loyal-opposition"]},
-            "B": {"role": ["prime-builder"]},
+            "A": {"role": ["loyal-opposition"], "status": "active", "event_driven_hooks": True},
+            "B": {"role": ["prime-builder"], "status": "active", "event_driven_hooks": True},
         }
     }
     assert topology_from_role_map(role_map) == "multi_harness"
@@ -36,7 +36,7 @@ def test_topology_derives_multi_harness_for_two_singleton_role_sets() -> None:
 def test_topology_derives_single_harness_for_one_multi_role_set() -> None:
     role_map = {
         "harnesses": {
-            "A": {"role": ["prime-builder", "loyal-opposition"]},
+            "A": {"role": ["prime-builder", "loyal-opposition"], "status": "active", "event_driven_hooks": True},
         }
     }
     assert topology_from_role_map(role_map) == "single_harness"
@@ -48,7 +48,7 @@ def test_topology_multi_harness_for_empty_map() -> None:
 
 
 def test_topology_handles_legacy_scalar_role() -> None:
-    role_map = {"harnesses": {"A": {"role": "prime-builder"}}}
+    role_map = {"harnesses": {"A": {"role": "prime-builder", "status": "active", "event_driven_hooks": True}}}
     # Single harness with only one role token -> multi_harness (needs BOTH).
     assert topology_from_role_map(role_map) == "multi_harness"
 
@@ -57,7 +57,7 @@ def test_topology_handles_acting_prime_builder_as_prime() -> None:
     """GOV-ACTING-PRIME-BUILDER-001 READ-accepts the legacy value as prime."""
     role_map = {
         "harnesses": {
-            "A": {"role": ["acting-prime-builder", "loyal-opposition"]},
+            "A": {"role": ["acting-prime-builder", "loyal-opposition"], "status": "active", "event_driven_hooks": True},
         }
     }
     assert topology_from_role_map(role_map) == "single_harness"
@@ -100,12 +100,17 @@ def test_workstream_focus_save_state_writes_derived_topology(project_root: Path)
         sys.path.pop(0)
 
     _write(
-        project_root / "harness-state" / "role-assignments.json",
+        project_root / "harness-state" / "harness-registry.json",
         json.dumps(
             {
-                "harnesses": {
-                    "A": {"role": ["prime-builder", "loyal-opposition"]},
-                }
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "role": ["prime-builder", "loyal-opposition"],
+                        "status": "active",
+                        "event_driven_hooks": True,
+                    },
+                ]
             }
         ),
     )

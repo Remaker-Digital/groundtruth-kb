@@ -6,6 +6,8 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+(none)
+
 ## Resolved
 
 - id: DECISION-1101
@@ -18,7 +20,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S421 wrap-up (context-overflow continuation)
   answer: "False positive — S421 wrap context discussed DECISION-1095 status; hook pattern matched a prose fragment referencing the prior decision. No new owner decision pending. DECISION-1095 is already resolved (full sweep + remove writer path). The contradicting REVISED@-005 (DCL amendment only) received NO-GO@-006; next REVISED must follow DECISION-1095 resolution: full sweep + delete writer path per live owner AUQ evidence."
   notes: "False positive resolved at S421 wrap."
-
 - id: DECISION-1095
   asked_at: 2026-06-05T21:28:00.112529Z
   question: ""
@@ -202,361 +203,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S331
   answer: "Resolved via AskUserQuestion in the same turn the prose anti-pattern was detected; owner selected 'Continue drafting Phases 1-3'. Phase 1, 2, and 3 drafts subsequently written to memory/phase-{1,2,3}-*-draft.md as operational state."
   notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0435
-  asked_at: 2026-05-07T02:06:23.479326Z
-  question: ""
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 1aefa5c1b120b430
-  resolved_at: 2026-05-07T03:10:00.000000Z
-  resolved_in_session: S334
-  answer: "Recursive false-positive class — the original prose ask was a benign session-wrap status update from a prior turn. The startup payload's verbatim re-render of this entry triggered the Stop hook again at S334 startup. Owner selected 'Clear pending (Recommended)' via AskUserQuestion at S334 startup; closing as resolved."
-  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0433
-  asked_at: 2026-05-07T02:03:31.445813Z
-  question: ""
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 410a09d26b853188
-  resolved_at: 2026-05-07T03:10:00.000000Z
-  resolved_in_session: S334
-  answer: "Recursive false-positive class — the original prose ask was a benign session-wrap status update from a prior turn. The startup payload's verbatim re-render of this entry triggered the Stop hook again at S334 startup. Owner selected 'Clear pending (Recommended)' via AskUserQuestion at S334 startup; closing as resolved."
-  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0432
-  asked_at: 2026-05-07T02:00:28.518632Z
-  question: ""
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 950891a19d2aebeb
-  resolved_at: 2026-05-07T03:00:00.000000Z
-  resolved_in_session: S333
-  answer: "Same prose-detected false-positive class as DECISION-0419/0420 from this session. Substantive question was converted to AskUserQuestion (header 'Next-pass plan'); owner answered 'Items 1 + 2 this session, 3 + 4 next (Recommended)' and that choice was implemented (item 1 = gtkb-isolation-017-citation-backfill post-impl REPORT filed at -005; item 2 = gtkb-kb-attribution-harness-aware post-impl REPORT filed at -005). Closing as resolved."
-  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0420
-  asked_at: 2026-05-06T23:56:15.229032Z
-  question: ""
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 09be2e17614c26a2
-  resolved_at: 2026-05-07T00:30:00.000000Z
-  resolved_in_session: S333
-  answer: "Duplicate of DECISION-0419 — same prose pattern detected twice across two turns. Substantive question was converted to AskUserQuestion (header 'Proceed how'); owner answered 'Full autonomy under prior pre-approval (Recommended)' and that choice was implemented via post-impl REVISED-1, governance-hygiene-bundle implementation, and 4 NO-GO REVISED-1 filings during the same S333 turn-set."
-  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0419
-  asked_at: 2026-05-06T23:27:02.948675Z
-  question: ""
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: e505441708526865
-  resolved_at: 2026-05-07T00:30:00.000000Z
-  resolved_in_session: S333
-  answer: "Substantive question was converted to AskUserQuestion (header 'Proceed how'); owner answered 'Full autonomy under prior pre-approval (Recommended)' and that choice was implemented via post-impl REVISED-1, governance-hygiene-bundle implementation, and 4 NO-GO REVISED-1 filings during the same S333 turn-set."
-  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0417
-  asked_at: 2026-05-06T22:28:22.517317Z
-  question: "How broadly should I audit the work done since 2026-05-03? (Volume: ~70+ commits, 146 bridge files touched, plus the just-pushed batch in 721f7c69. Scope choice drives review depth and timeline.)"
-  options:
-    - "Bridges + their changes (Recommended)"
-    - "Bridge files only"
-    - "Targeted umbrella audit"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: cb57d864cfb6cb63
-  resolved_at: 2026-05-06T22:28:22.517317Z
-  answer: "User has answered your questions: \"How broadly should I audit the work done since 2026-05-03? (Volume: ~70+ commits, 146 bridge files touched, plus the just-pushed batch in 721f7c69. Scope choice drives review depth and timeline.)\"=\"Bridges + their changes (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0418
-  asked_at: 2026-05-06T22:28:22.517317Z
-  question: "When I find errors or omissions during the review, what's the deliverable shape you want?"
-  options:
-    - "Chat summary first, then triage (Recommended)"
-    - "Single retrospective bridge thread"
-    - "Per-finding bridge proposals as I go"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6d59bee5575b6858
-  resolved_at: 2026-05-06T22:28:22.517317Z
-  answer: "User has answered your questions: \"When I find errors or omissions during the review, what's the deliverable shape you want?\"=\"Chat summary first, then triage (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0421
-  asked_at: 2026-05-06T23:57:13.373244Z
-  question: "How would you like to start this session?"
-  options:
-    - "Resolve DECISION-0419"
-    - "Pick focus 1-13"
-    - "Defer pending, fresh focus"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 73af575d11379a52
-  resolved_at: 2026-05-06T23:57:13.373244Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0422
-  asked_at: 2026-05-06T23:59:07.606377Z
-  question: "How should I proceed given the Codex review results (1 GO, 5 NO-GO)?"
-  options:
-    - "Full autonomy under prior pre-approval (Recommended)"
-    - "Implement GO only; pause NO-GO revisions"
-    - "Revise NO-GOs first, then implement bundle"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c4eda1e524030442
-  resolved_at: 2026-05-06T23:59:07.606377Z
-  answer: "User has answered your questions: \"How should I proceed given the Codex review results (1 GO, 5 NO-GO)?\"=\"Full autonomy under prior pre-approval (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0423
-  asked_at: 2026-05-06T23:59:07.606377Z
-  question: "Approve `git rm` of the two stale duplicate files (Change A of the GO'd governance-hygiene-bundle)?"
-  options:
-    - "Approve (Recommended)"
-    - "Skip Change A only"
-    - "Pause whole bundle implementation"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 16e9eb83702ca2df
-  resolved_at: 2026-05-06T23:59:07.606377Z
-  answer: "User has answered your questions: \"Approve `git rm` of the two stale duplicate files (Change A of the GO'd governance-hygiene-bundle)?\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0424
-  asked_at: 2026-05-07T00:01:44.315482Z
-  question: "How should I handle the two stale pending owner decisions surfaced at startup?"
-  options:
-    - "Clear pending"
-    - "Defer all"
-    - "Wait for focus pick"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 1c9a7fea3babc22c
-  resolved_at: 2026-05-07T00:01:44.315482Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0425
-  asked_at: 2026-05-07T00:09:46.449207Z
-  question: "Agent Red isolation — what's the next move?"
-  options:
-    - "Action the GO'd threads"
-    - "Revise the NO-GO'd citation-backfill"
-    - "File a re-scoping proposal"
-    - "Accept as v0.7.0-rc release scope"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 583b4005159e9725
-  resolved_at: 2026-05-07T00:09:46.449207Z
-  answer: "User has answered your questions: \"Agent Red isolation — what's the next move?\"=\"I fully approve of making whatever changes are required to complete this isolation work. We will not be able to release anything until it is done. The only reason to defer any part of this project is a blocking technical dependency.\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0426
-  asked_at: 2026-05-07T00:42:09.644577Z
-  question: "Sub-slice 18.D — how to handle the inventory drift found during live probe?"
-  options:
-    - "Tight scope (recommended)"
-    - "Strict umbrella -005 scope"
-    - "Re-scope umbrella first"
-    - "Skip 18.D; jump to 18.E"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ad3041c6c3434fa9
-  resolved_at: 2026-05-07T00:42:09.644577Z
-  answer: "User has answered your questions: \"Sub-slice 18.D — how to handle the inventory drift found during live probe?\"=\"Re-scope umbrella first\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0427
-  asked_at: 2026-05-07T01:06:10.518069Z
-  question: "Push is blocked by a deeper problem than a normal upstream-moved scenario. Local develop and origin/develop have 1389/1386 different commits respectively — the entire history was force-pushed/rebased. Plus my failed rebase attempt left .git/rebase-merge stuck, and the destructive-gate (correctly) blocks me from removing that directory without your approval. How should I proceed?"
-  options:
-    - "Approve cleanup + cherry-pick to feature branch (Recommended)"
-    - "Approve cleanup + reset develop to match origin"
-    - "Investigate the divergence first; pause push"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 847f0d52265c19c5
-  resolved_at: 2026-05-07T01:06:10.518069Z
-  answer: "User has answered your questions: \"Push is blocked by a deeper problem than a normal upstream-moved scenario. Local develop and origin/develop have 1389/1386 different commits respectively — the entire history was force-pushed/rebased. Plus my failed rebase attempt left .git/rebase-merge stuck, and the destructive-gate (correctly) blocks me from removing that directory without your approval. How should I proceed?\"=\"Approve cleanup + cherry-pick to feature branch (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0428
-  asked_at: 2026-05-07T01:06:10.518069Z
-  question: "Pre-push hook fails for new branches because its merge-base auto-detection doesn't resolve when the upstream-tracking ref pattern (`refs/heads/X@{upstream}`) hits the new-branch case. The hook itself asks me to run a manual scan; I ran the exact equivalent (`secrets scan --range origin/develop..HEAD --redacted --fail-on verified-provider`) and it reports 0 findings across 35 paths. May I push with `--no-verify` for this one push?"
-  options:
-    - "Approve --no-verify for this push (Recommended)"
-    - "File bridge proposal to fix the pre-push hook first"
-    - "Push to a different branch name structure that the hook accepts"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 3b550820d3c42350
-  resolved_at: 2026-05-07T01:06:10.518069Z
-  answer: "User has answered your questions: \"Pre-push hook fails for new branches because its merge-base auto-detection doesn't resolve when the upstream-tracking ref pattern (`refs/heads/X@{upstream}`) hits the new-branch case. The hook itself asks me to run a manual scan; I ran the exact equivalent (`secrets scan --range origin/develop..HEAD --redacted --fail-on verified-provider`) and it reports 0 findings across 35 paths. May I push with `--no-verify` for this one push?\"=\"Approve --no-verify for this push (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0429
-  asked_at: 2026-05-07T02:00:28.518632Z
-  question: "Which implementation order for the 3 GO'd items + 1 NO-GO revision?"
-  options:
-    - "Items 1 + 2 this session, 3 + 4 next (Recommended)"
-    - "All 4 items this session, accept rougher quality"
-    - "Just item 1 (smallest) this session, plan rest"
-    - "Pause; you choose individual items"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 829a4edf649bbb50
-  resolved_at: 2026-05-07T02:00:28.518632Z
-  answer: "User has answered your questions: \"Which implementation order for the 3 GO'd items + 1 NO-GO revision?\"=\"Items 1 + 2 this session, 3 + 4 next (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0430
-  asked_at: 2026-05-07T02:00:28.518632Z
-  question: "Approve the DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the audit-capture DELIB authorized by the gtkb-isolation-017-citation-backfill-004 GO.)"
-  options:
-    - "Approve (Recommended)"
-    - "Modify content first, then approve"
-    - "Reject; do not insert"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 40cd7ea6bbe1efe3
-  resolved_at: 2026-05-07T02:00:28.518632Z
-  answer: "User has answered your questions: \"Approve the DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the audit-capture DELIB authorized by the gtkb-isolation-017-citation-backfill-004 GO.)\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0431
-  asked_at: 2026-05-07T02:00:28.518632Z
-  question: "Approve the DELIB-S333-CODEX-PRIME-PERIOD-KB-ATTRIBUTION-DEFECT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the historical-capture DELIB authorized by the gtkb-kb-attribution-harness-aware-004 GO.)"
-  options:
-    - "Approve (Recommended)"
-    - "Modify content first"
-    - "Reject; do not insert"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ca8c0a5b7e7f39fb
-  resolved_at: 2026-05-07T02:00:28.518632Z
-  answer: "User has answered your questions: \"Approve the DELIB-S333-CODEX-PRIME-PERIOD-KB-ATTRIBUTION-DEFECT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the historical-capture DELIB authorized by the gtkb-kb-attribution-harness-aware-004 GO.)\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0434
-  asked_at: 2026-05-07T02:03:58.865561Z
-  question: "Approve insertion of DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT as displayed above?"
-  options:
-    - "Approve as displayed (Recommended)"
-    - "Revise body before approval"
-    - "Reject — do not insert"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 15114f1ee8e2a648
-  resolved_at: 2026-05-07T02:03:58.865561Z
-  answer: "User has answered your questions: \"Approve insertion of DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT as displayed above?\"=\"Approve as displayed (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0436
-  asked_at: 2026-05-07T02:07:04.372305Z
-  question: "DECISION-0433 in the pending-decisions tracker is a malformed fragment (\"roposal yet filed...\") captured from a prior session and surfaced again at this session's startup. How should I dispose of it?"
-  options:
-    - "clear pending (Recommended)"
-    - "defer all"
-    - "Leave it; pick session focus first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e0ffbd017cc84d5b
-  resolved_at: 2026-05-07T02:07:04.372305Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0437
-  asked_at: 2026-05-07T03:45:56.215082Z
-  question: "Local develop is at commit fef42fe1 with origin/develop as a strict ancestor. Pushing will be a clean fast-forward of 7 commits. Push now?"
-  options:
-    - "Push develop to origin (Recommended)"
-    - "Hold the push; I'll review locally first"
-    - "Push and also clean up the leftover Agent_Red directories"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d0f901db4a829e6f
-  resolved_at: 2026-05-07T03:45:56.215082Z
-  answer: "User has answered your questions: \"Local develop is at commit fef42fe1 with origin/develop as a strict ancestor. Pushing will be a clean fast-forward of 7 commits. Push now?\"=\"Push develop to origin (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0438
-  asked_at: 2026-05-07T04:49:02.832001Z
-  question: "Wrap-scan flagged 12 pre-existing ERRORs (10 recursive snapshot-rule violations + 2 INDEX entries pointing at missing isolation-018-slice-d files from prior sessions). None are S334-introduced. The skill contract requires explicit owner override to proceed with mutating /kb-session-wrap. Override and wrap?"
-  options:
-    - "Override and run /kb-session-wrap S334 (Recommended)"
-    - "Triage the 2 INDEX-points-at-missing-file errors first"
-    - "Wrap manually; you handle it"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7dd829540f279bef
-  resolved_at: 2026-05-07T04:49:02.832001Z
-  answer: "User has answered your questions: \"Wrap-scan flagged 12 pre-existing ERRORs (10 recursive snapshot-rule violations + 2 INDEX entries pointing at missing isolation-018-slice-d files from prior sessions). None are S334-introduced. The skill contract requires explicit owner override to proceed with mutating /kb-session-wrap. Override and wrap?\"=\"Override and run /kb-session-wrap S334 (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0439
-  asked_at: 2026-05-07T05:28:01.870807Z
-  question: "Which categories of FREEZE/HOLD/DEFER state should I lift?"
-  options:
-    - "A + B + C only (Recommended)"
-    - "A + B + C + H"
-    - "Everything except G"
-    - "Truly all (including G)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 782d803e732fef5c
-  resolved_at: 2026-05-07T05:28:01.870807Z
-  answer: "User has answered your questions: \"Which categories of FREEZE/HOLD/DEFER state should I lift?\"=\"A + B + C + H\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0440
-  asked_at: 2026-05-07T05:28:01.870807Z
-  question: "Approve DELIB-S332 as drafted and authorize me to file the bridge proposal?"
-  options:
-    - "Approve as drafted (Recommended)"
-    - "Approve, but also lift S327 release-path goal entirely"
-    - "Revise drafts before filing"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ec6405be6c86a9c6
-  resolved_at: 2026-05-07T05:28:01.870807Z
-  answer: "User has answered your questions: \"Approve DELIB-S332 as drafted and authorize me to file the bridge proposal?\"=\"Approve, but also lift S327 release-path goal entirely\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0441
-  asked_at: 2026-05-07T05:55:18.523885Z
-  question: "18.C NO-GO at -007. The 6 working-directory directives you previously rolled back are now Codex's NO-GO blocker. How to resolve?"
-  options:
-    - "Add the 6 working-directory edits + fix the count (Recommended)"
-    - "File 18.C as accepted-with-known-gap (request override)"
-    - "Defer 18.C entirely; file follow-up bridge thread later"
-    - "Pause; pick up next session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b069041166f95e43
-  resolved_at: 2026-05-07T05:55:18.523885Z
-  answer: "User has answered your questions: \"18.C NO-GO at -007. The 6 working-directory directives you previously rolled back are now Codex's NO-GO blocker. How to resolve?\"=\"Add the 6 working-directory edits + fix the count (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0442
-  asked_at: 2026-05-07T08:24:52.504182Z
-  question: "18.E structure — single atomic slice or sub-split into reviewable sub-sub-slices?"
-  options:
-    - "Sub-split: 18.E.1 + 18.E.2 + 18.E.3 (Recommended)"
-    - "Single atomic 18.E commit per umbrella -005 plan"
-    - "Probe more before deciding"
-    - "Pause; pick up next session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 78efb5329715f4bc
-  resolved_at: 2026-05-07T08:24:52.504182Z
-  answer: "User has answered your questions: \"18.E structure — single atomic slice or sub-split into reviewable sub-sub-slices?\"=\"Sub-split: 18.E.1 + 18.E.2 + 18.E.3 (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0444
-  asked_at: 2026-05-07T12:43:19.864631Z
-  question: "18.E scoping NO-GO at -002 — file the corrected -003 now or pause?"
-  options:
-    - "File -003 corrections now"
-    - "File -003 with Option B as new default"
-    - "Pause; pick up next session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: aac3011d0547ef04
-  resolved_at: 2026-05-07T12:43:19.864631Z
-  answer: "User has answered your questions: \"18.E scoping NO-GO at -002 — file the corrected -003 now or pause?\"=\"File -003 corrections now\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0446
-  asked_at: 2026-05-07T12:54:45.515846Z
-  question: "How should this session begin?"
-  options:
-    - "Top Priority Actions"
-    - "Pick From Standing Backlog"
-    - "Continue Last Session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 4c22fd3d1c3bced8
-  resolved_at: 2026-05-07T12:54:45.515846Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0447
   asked_at: 2026-05-07T22:42:51.296296Z
   question: "How do you want to scope the response to the documentation-quality NO-GO?"
@@ -13795,4 +13441,359 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 51cf00728293c283
   resolved_at: 2026-05-04T20:26:08.961864Z
   answer: "User has answered your questions: \"Remote develop was force-pushed by another agent/session and now shares NO history with my local 37 commits. My local has this session's work (Sub-slices A/D VERIFIED, Sub-slice E proposal cycle GO'd) + prior-session work (Slices A/B/C of AUQ enforcement stack, ISOLATION-018 setup). Remote has docs overhaul, CHANGELOG, mkdocs-material, Makefile, pre-commit, scaffold templates. How should I reconcile?\"=\"Force-push my local (overwrites remote work)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0435
+  asked_at: 2026-05-07T02:06:23.479326Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 1aefa5c1b120b430
+  resolved_at: 2026-05-07T03:10:00.000000Z
+  resolved_in_session: S334
+  answer: "Recursive false-positive class — the original prose ask was a benign session-wrap status update from a prior turn. The startup payload's verbatim re-render of this entry triggered the Stop hook again at S334 startup. Owner selected 'Clear pending (Recommended)' via AskUserQuestion at S334 startup; closing as resolved."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0433
+  asked_at: 2026-05-07T02:03:31.445813Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 410a09d26b853188
+  resolved_at: 2026-05-07T03:10:00.000000Z
+  resolved_in_session: S334
+  answer: "Recursive false-positive class — the original prose ask was a benign session-wrap status update from a prior turn. The startup payload's verbatim re-render of this entry triggered the Stop hook again at S334 startup. Owner selected 'Clear pending (Recommended)' via AskUserQuestion at S334 startup; closing as resolved."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0432
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 950891a19d2aebeb
+  resolved_at: 2026-05-07T03:00:00.000000Z
+  resolved_in_session: S333
+  answer: "Same prose-detected false-positive class as DECISION-0419/0420 from this session. Substantive question was converted to AskUserQuestion (header 'Next-pass plan'); owner answered 'Items 1 + 2 this session, 3 + 4 next (Recommended)' and that choice was implemented (item 1 = gtkb-isolation-017-citation-backfill post-impl REPORT filed at -005; item 2 = gtkb-kb-attribution-harness-aware post-impl REPORT filed at -005). Closing as resolved."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0420
+  asked_at: 2026-05-06T23:56:15.229032Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 09be2e17614c26a2
+  resolved_at: 2026-05-07T00:30:00.000000Z
+  resolved_in_session: S333
+  answer: "Duplicate of DECISION-0419 — same prose pattern detected twice across two turns. Substantive question was converted to AskUserQuestion (header 'Proceed how'); owner answered 'Full autonomy under prior pre-approval (Recommended)' and that choice was implemented via post-impl REVISED-1, governance-hygiene-bundle implementation, and 4 NO-GO REVISED-1 filings during the same S333 turn-set."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0419
+  asked_at: 2026-05-06T23:27:02.948675Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: e505441708526865
+  resolved_at: 2026-05-07T00:30:00.000000Z
+  resolved_in_session: S333
+  answer: "Substantive question was converted to AskUserQuestion (header 'Proceed how'); owner answered 'Full autonomy under prior pre-approval (Recommended)' and that choice was implemented via post-impl REVISED-1, governance-hygiene-bundle implementation, and 4 NO-GO REVISED-1 filings during the same S333 turn-set."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0417
+  asked_at: 2026-05-06T22:28:22.517317Z
+  question: "How broadly should I audit the work done since 2026-05-03? (Volume: ~70+ commits, 146 bridge files touched, plus the just-pushed batch in 721f7c69. Scope choice drives review depth and timeline.)"
+  options:
+    - "Bridges + their changes (Recommended)"
+    - "Bridge files only"
+    - "Targeted umbrella audit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cb57d864cfb6cb63
+  resolved_at: 2026-05-06T22:28:22.517317Z
+  answer: "User has answered your questions: \"How broadly should I audit the work done since 2026-05-03? (Volume: ~70+ commits, 146 bridge files touched, plus the just-pushed batch in 721f7c69. Scope choice drives review depth and timeline.)\"=\"Bridges + their changes (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0418
+  asked_at: 2026-05-06T22:28:22.517317Z
+  question: "When I find errors or omissions during the review, what's the deliverable shape you want?"
+  options:
+    - "Chat summary first, then triage (Recommended)"
+    - "Single retrospective bridge thread"
+    - "Per-finding bridge proposals as I go"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6d59bee5575b6858
+  resolved_at: 2026-05-06T22:28:22.517317Z
+  answer: "User has answered your questions: \"When I find errors or omissions during the review, what's the deliverable shape you want?\"=\"Chat summary first, then triage (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0421
+  asked_at: 2026-05-06T23:57:13.373244Z
+  question: "How would you like to start this session?"
+  options:
+    - "Resolve DECISION-0419"
+    - "Pick focus 1-13"
+    - "Defer pending, fresh focus"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 73af575d11379a52
+  resolved_at: 2026-05-06T23:57:13.373244Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0422
+  asked_at: 2026-05-06T23:59:07.606377Z
+  question: "How should I proceed given the Codex review results (1 GO, 5 NO-GO)?"
+  options:
+    - "Full autonomy under prior pre-approval (Recommended)"
+    - "Implement GO only; pause NO-GO revisions"
+    - "Revise NO-GOs first, then implement bundle"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c4eda1e524030442
+  resolved_at: 2026-05-06T23:59:07.606377Z
+  answer: "User has answered your questions: \"How should I proceed given the Codex review results (1 GO, 5 NO-GO)?\"=\"Full autonomy under prior pre-approval (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0423
+  asked_at: 2026-05-06T23:59:07.606377Z
+  question: "Approve `git rm` of the two stale duplicate files (Change A of the GO'd governance-hygiene-bundle)?"
+  options:
+    - "Approve (Recommended)"
+    - "Skip Change A only"
+    - "Pause whole bundle implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 16e9eb83702ca2df
+  resolved_at: 2026-05-06T23:59:07.606377Z
+  answer: "User has answered your questions: \"Approve `git rm` of the two stale duplicate files (Change A of the GO'd governance-hygiene-bundle)?\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0424
+  asked_at: 2026-05-07T00:01:44.315482Z
+  question: "How should I handle the two stale pending owner decisions surfaced at startup?"
+  options:
+    - "Clear pending"
+    - "Defer all"
+    - "Wait for focus pick"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1c9a7fea3babc22c
+  resolved_at: 2026-05-07T00:01:44.315482Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0425
+  asked_at: 2026-05-07T00:09:46.449207Z
+  question: "Agent Red isolation — what's the next move?"
+  options:
+    - "Action the GO'd threads"
+    - "Revise the NO-GO'd citation-backfill"
+    - "File a re-scoping proposal"
+    - "Accept as v0.7.0-rc release scope"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 583b4005159e9725
+  resolved_at: 2026-05-07T00:09:46.449207Z
+  answer: "User has answered your questions: \"Agent Red isolation — what's the next move?\"=\"I fully approve of making whatever changes are required to complete this isolation work. We will not be able to release anything until it is done. The only reason to defer any part of this project is a blocking technical dependency.\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0426
+  asked_at: 2026-05-07T00:42:09.644577Z
+  question: "Sub-slice 18.D — how to handle the inventory drift found during live probe?"
+  options:
+    - "Tight scope (recommended)"
+    - "Strict umbrella -005 scope"
+    - "Re-scope umbrella first"
+    - "Skip 18.D; jump to 18.E"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ad3041c6c3434fa9
+  resolved_at: 2026-05-07T00:42:09.644577Z
+  answer: "User has answered your questions: \"Sub-slice 18.D — how to handle the inventory drift found during live probe?\"=\"Re-scope umbrella first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0427
+  asked_at: 2026-05-07T01:06:10.518069Z
+  question: "Push is blocked by a deeper problem than a normal upstream-moved scenario. Local develop and origin/develop have 1389/1386 different commits respectively — the entire history was force-pushed/rebased. Plus my failed rebase attempt left .git/rebase-merge stuck, and the destructive-gate (correctly) blocks me from removing that directory without your approval. How should I proceed?"
+  options:
+    - "Approve cleanup + cherry-pick to feature branch (Recommended)"
+    - "Approve cleanup + reset develop to match origin"
+    - "Investigate the divergence first; pause push"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 847f0d52265c19c5
+  resolved_at: 2026-05-07T01:06:10.518069Z
+  answer: "User has answered your questions: \"Push is blocked by a deeper problem than a normal upstream-moved scenario. Local develop and origin/develop have 1389/1386 different commits respectively — the entire history was force-pushed/rebased. Plus my failed rebase attempt left .git/rebase-merge stuck, and the destructive-gate (correctly) blocks me from removing that directory without your approval. How should I proceed?\"=\"Approve cleanup + cherry-pick to feature branch (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0428
+  asked_at: 2026-05-07T01:06:10.518069Z
+  question: "Pre-push hook fails for new branches because its merge-base auto-detection doesn't resolve when the upstream-tracking ref pattern (`refs/heads/X@{upstream}`) hits the new-branch case. The hook itself asks me to run a manual scan; I ran the exact equivalent (`secrets scan --range origin/develop..HEAD --redacted --fail-on verified-provider`) and it reports 0 findings across 35 paths. May I push with `--no-verify` for this one push?"
+  options:
+    - "Approve --no-verify for this push (Recommended)"
+    - "File bridge proposal to fix the pre-push hook first"
+    - "Push to a different branch name structure that the hook accepts"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3b550820d3c42350
+  resolved_at: 2026-05-07T01:06:10.518069Z
+  answer: "User has answered your questions: \"Pre-push hook fails for new branches because its merge-base auto-detection doesn't resolve when the upstream-tracking ref pattern (`refs/heads/X@{upstream}`) hits the new-branch case. The hook itself asks me to run a manual scan; I ran the exact equivalent (`secrets scan --range origin/develop..HEAD --redacted --fail-on verified-provider`) and it reports 0 findings across 35 paths. May I push with `--no-verify` for this one push?\"=\"Approve --no-verify for this push (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0429
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: "Which implementation order for the 3 GO'd items + 1 NO-GO revision?"
+  options:
+    - "Items 1 + 2 this session, 3 + 4 next (Recommended)"
+    - "All 4 items this session, accept rougher quality"
+    - "Just item 1 (smallest) this session, plan rest"
+    - "Pause; you choose individual items"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 829a4edf649bbb50
+  resolved_at: 2026-05-07T02:00:28.518632Z
+  answer: "User has answered your questions: \"Which implementation order for the 3 GO'd items + 1 NO-GO revision?\"=\"Items 1 + 2 this session, 3 + 4 next (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0430
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: "Approve the DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the audit-capture DELIB authorized by the gtkb-isolation-017-citation-backfill-004 GO.)"
+  options:
+    - "Approve (Recommended)"
+    - "Modify content first, then approve"
+    - "Reject; do not insert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 40cd7ea6bbe1efe3
+  resolved_at: 2026-05-07T02:00:28.518632Z
+  answer: "User has answered your questions: \"Approve the DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the audit-capture DELIB authorized by the gtkb-isolation-017-citation-backfill-004 GO.)\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0431
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: "Approve the DELIB-S333-CODEX-PRIME-PERIOD-KB-ATTRIBUTION-DEFECT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the historical-capture DELIB authorized by the gtkb-kb-attribution-harness-aware-004 GO.)"
+  options:
+    - "Approve (Recommended)"
+    - "Modify content first"
+    - "Reject; do not insert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ca8c0a5b7e7f39fb
+  resolved_at: 2026-05-07T02:00:28.518632Z
+  answer: "User has answered your questions: \"Approve the DELIB-S333-CODEX-PRIME-PERIOD-KB-ATTRIBUTION-DEFECT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the historical-capture DELIB authorized by the gtkb-kb-attribution-harness-aware-004 GO.)\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0434
+  asked_at: 2026-05-07T02:03:58.865561Z
+  question: "Approve insertion of DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT as displayed above?"
+  options:
+    - "Approve as displayed (Recommended)"
+    - "Revise body before approval"
+    - "Reject — do not insert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 15114f1ee8e2a648
+  resolved_at: 2026-05-07T02:03:58.865561Z
+  answer: "User has answered your questions: \"Approve insertion of DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT as displayed above?\"=\"Approve as displayed (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0436
+  asked_at: 2026-05-07T02:07:04.372305Z
+  question: "DECISION-0433 in the pending-decisions tracker is a malformed fragment (\"roposal yet filed...\") captured from a prior session and surfaced again at this session's startup. How should I dispose of it?"
+  options:
+    - "clear pending (Recommended)"
+    - "defer all"
+    - "Leave it; pick session focus first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e0ffbd017cc84d5b
+  resolved_at: 2026-05-07T02:07:04.372305Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0437
+  asked_at: 2026-05-07T03:45:56.215082Z
+  question: "Local develop is at commit fef42fe1 with origin/develop as a strict ancestor. Pushing will be a clean fast-forward of 7 commits. Push now?"
+  options:
+    - "Push develop to origin (Recommended)"
+    - "Hold the push; I'll review locally first"
+    - "Push and also clean up the leftover Agent_Red directories"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d0f901db4a829e6f
+  resolved_at: 2026-05-07T03:45:56.215082Z
+  answer: "User has answered your questions: \"Local develop is at commit fef42fe1 with origin/develop as a strict ancestor. Pushing will be a clean fast-forward of 7 commits. Push now?\"=\"Push develop to origin (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0438
+  asked_at: 2026-05-07T04:49:02.832001Z
+  question: "Wrap-scan flagged 12 pre-existing ERRORs (10 recursive snapshot-rule violations + 2 INDEX entries pointing at missing isolation-018-slice-d files from prior sessions). None are S334-introduced. The skill contract requires explicit owner override to proceed with mutating /kb-session-wrap. Override and wrap?"
+  options:
+    - "Override and run /kb-session-wrap S334 (Recommended)"
+    - "Triage the 2 INDEX-points-at-missing-file errors first"
+    - "Wrap manually; you handle it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7dd829540f279bef
+  resolved_at: 2026-05-07T04:49:02.832001Z
+  answer: "User has answered your questions: \"Wrap-scan flagged 12 pre-existing ERRORs (10 recursive snapshot-rule violations + 2 INDEX entries pointing at missing isolation-018-slice-d files from prior sessions). None are S334-introduced. The skill contract requires explicit owner override to proceed with mutating /kb-session-wrap. Override and wrap?\"=\"Override and run /kb-session-wrap S334 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0439
+  asked_at: 2026-05-07T05:28:01.870807Z
+  question: "Which categories of FREEZE/HOLD/DEFER state should I lift?"
+  options:
+    - "A + B + C only (Recommended)"
+    - "A + B + C + H"
+    - "Everything except G"
+    - "Truly all (including G)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 782d803e732fef5c
+  resolved_at: 2026-05-07T05:28:01.870807Z
+  answer: "User has answered your questions: \"Which categories of FREEZE/HOLD/DEFER state should I lift?\"=\"A + B + C + H\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0440
+  asked_at: 2026-05-07T05:28:01.870807Z
+  question: "Approve DELIB-S332 as drafted and authorize me to file the bridge proposal?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve, but also lift S327 release-path goal entirely"
+    - "Revise drafts before filing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ec6405be6c86a9c6
+  resolved_at: 2026-05-07T05:28:01.870807Z
+  answer: "User has answered your questions: \"Approve DELIB-S332 as drafted and authorize me to file the bridge proposal?\"=\"Approve, but also lift S327 release-path goal entirely\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0441
+  asked_at: 2026-05-07T05:55:18.523885Z
+  question: "18.C NO-GO at -007. The 6 working-directory directives you previously rolled back are now Codex's NO-GO blocker. How to resolve?"
+  options:
+    - "Add the 6 working-directory edits + fix the count (Recommended)"
+    - "File 18.C as accepted-with-known-gap (request override)"
+    - "Defer 18.C entirely; file follow-up bridge thread later"
+    - "Pause; pick up next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b069041166f95e43
+  resolved_at: 2026-05-07T05:55:18.523885Z
+  answer: "User has answered your questions: \"18.C NO-GO at -007. The 6 working-directory directives you previously rolled back are now Codex's NO-GO blocker. How to resolve?\"=\"Add the 6 working-directory edits + fix the count (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0442
+  asked_at: 2026-05-07T08:24:52.504182Z
+  question: "18.E structure — single atomic slice or sub-split into reviewable sub-sub-slices?"
+  options:
+    - "Sub-split: 18.E.1 + 18.E.2 + 18.E.3 (Recommended)"
+    - "Single atomic 18.E commit per umbrella -005 plan"
+    - "Probe more before deciding"
+    - "Pause; pick up next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 78efb5329715f4bc
+  resolved_at: 2026-05-07T08:24:52.504182Z
+  answer: "User has answered your questions: \"18.E structure — single atomic slice or sub-split into reviewable sub-sub-slices?\"=\"Sub-split: 18.E.1 + 18.E.2 + 18.E.3 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0444
+  asked_at: 2026-05-07T12:43:19.864631Z
+  question: "18.E scoping NO-GO at -002 — file the corrected -003 now or pause?"
+  options:
+    - "File -003 corrections now"
+    - "File -003 with Option B as new default"
+    - "Pause; pick up next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: aac3011d0547ef04
+  resolved_at: 2026-05-07T12:43:19.864631Z
+  answer: "User has answered your questions: \"18.E scoping NO-GO at -002 — file the corrected -003 now or pause?\"=\"File -003 corrections now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0446
+  asked_at: 2026-05-07T12:54:45.515846Z
+  question: "How should this session begin?"
+  options:
+    - "Top Priority Actions"
+    - "Pick From Standing Backlog"
+    - "Continue Last Session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c22fd3d1c3bced8
+  resolved_at: 2026-05-07T12:54:45.515846Z
+  answer: "Answer questions?"
   notes: ""

@@ -284,8 +284,8 @@ versioning_policy = "regenerated_from_source"
 backup_policy = "git_tracked"
 health_check_function = "_check_role_set_topology_consistency"
 owner_role = "owner_only"
-forbidden_substitutes = [".claude/rules/operating-role.md", "harness-state/role-assignments.json"]
-notes = "Canonical role registry; MemBase projection. forbidden_substitutes per DELIB-20260670 Instance 2/4: rule-file prose paraphrases role state; legacy mirror at role-assignments.json is the retired alias."
+forbidden_substitutes = [".claude/rules/operating-role.md"]
+notes = "Canonical role registry; MemBase projection. forbidden_substitutes per DELIB-20260670 Instance 2/4: rule-file prose paraphrases role state."
 
 [[artifacts]]
 id = "harness-bridge-substrate"

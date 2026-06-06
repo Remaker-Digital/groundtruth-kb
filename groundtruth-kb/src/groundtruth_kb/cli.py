@@ -5715,14 +5715,14 @@ def harness_set_precedence(ctx: click.Context, harness_id: str, precedence: int,
     "--harness",
     "harness_id",
     required=True,
-    help="Durable active harness id receiving the role",
+    help="Durable harness id receiving default role metadata",
 )
 @click.option(
     "--role",
     "role",
     required=True,
     type=click.Choice(["prime-builder", "loyal-opposition"]),
-    help="Operating role to assign to the active harness",
+    help="Default operating role metadata to assign",
 )
 @click.option(
     "--reason",
@@ -5732,12 +5732,12 @@ def harness_set_precedence(ctx: click.Context, harness_id: str, precedence: int,
 )
 @click.pass_context
 def harness_set_role(ctx: click.Context, harness_id: str, role: str, reason: str) -> None:
-    """Assign one operating role to one registered and active harness.
+    """Assign one default operating-role metadata value to one harness.
 
-    REQ-HARNESS-REGISTRY-001 FR9. The target must be an 'active' harness in the
-    registry. The resulting role map has exactly one active Prime Builder and
-    exactly one active Loyal Opposition; they are distinct when more than one
-    active harness exists.
+    REQ-HARNESS-REGISTRY-001 FR9. The target must be a known, non-retired
+    harness in the registry. The candidate role map must leave exactly one
+    active Prime Builder and exactly one active Loyal Opposition; they are
+    distinct when more than one active harness exists.
     """
     import json as _json
     from pathlib import Path
@@ -5753,17 +5753,14 @@ def harness_set_role(ctx: click.Context, harness_id: str, role: str, reason: str
 
     config = _resolve_config(ctx)
     db = _open_db(config)
-    # FR9 active-harness eligibility gate: the target must be an active harness
-    # in the DB-backed registry (seeded by WI-3342 Slice A).
     record = db.get_harness(harness_id)
     if record is None:
         raise click.ClickException(f"unknown harness {harness_id!r}; no such harness in the registry")
     status = record.get("status")
-    if status != "active":
+    if status == "retired":
         raise click.ClickException(
             f"harness {harness_id!r} has status {status!r}; gt harness set-role "
-            f"can assign only an active harness - use 'gt harness activate' to "
-            f"bring it active first"
+            "cannot update retired harness role metadata"
         )
     root = Path(config.project_root)
     try:

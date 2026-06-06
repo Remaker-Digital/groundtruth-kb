@@ -70,7 +70,7 @@ _REQUIRED_SANDBOX_INPUTS: tuple[str, ...] = (
     "groundtruth.db",
     "bridge/INDEX.md",
     "harness-state/harness-identities.json",
-    "harness-state/role-assignments.json",
+    "harness-state/harness-registry.json",
     "memory/release-readiness.md",
     "pyproject.toml",
 )
@@ -348,7 +348,7 @@ def _build_generator_argv(sandbox_root: Path) -> list[str]:
         "--history-path",
         str(sandbox_root / "memory" / "gtkb-dashboard-history.json"),
         "--role-assignment-path",
-        str(sandbox_root / "harness-state" / "role-assignments.json"),
+        str(sandbox_root / "harness-state" / "harness-registry.json"),
         "--lifecycle-guard-path",
         str(sandbox_root / ".claude" / "session" / "lifecycle-guard.json"),
         "--user-preferences-path",

@@ -22,9 +22,7 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 
 1. **Role record** — resolve the durable operating role from the canonical
    MemBase harness registry projection `harness-state/harness-registry.json`
-   (per `REQ-HARNESS-REGISTRY-001`); the legacy
-   `harness-state/role-assignments.json` mirror is an orphan compatibility
-   surface, **not** the source. Honor any interactive session-stated override
+   (per `REQ-HARNESS-REGISTRY-001`). Honor any interactive session-stated override
    (`::init gtkb pb|lo`) per `DCL-SESSION-ROLE-RESOLUTION-001`.
 2. **Role overlay** — load the role-specific overlay:
    `config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md` or

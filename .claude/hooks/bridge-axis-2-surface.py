@@ -88,8 +88,8 @@ try:
     from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER as WORK_INTENT_SESSION_ENV_VARS
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
     WORK_INTENT_SESSION_ENV_VARS = (
-        "CLAUDE_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_SESSION_ID",
         "GTKB_INHERITED_SESSION_ID",
         "CODEX_SESSION_ID",
         "CODEX_THREAD_ID",
@@ -224,13 +224,13 @@ def _resolve_session_id(payload: dict[str, Any]) -> str:
 
 
 def _resolve_work_intent_session_id(payload: dict[str, Any]) -> str:
-    sid = str(payload.get("session_id") or "").strip()
-    if sid:
-        return sid
     for env_var in WORK_INTENT_SESSION_ENV_VARS:
         env_value = os.environ.get(env_var, "").strip()
         if env_value:
             return env_value
+    sid = str(payload.get("session_id") or "").strip()
+    if sid:
+        return sid
     return ""
 
 

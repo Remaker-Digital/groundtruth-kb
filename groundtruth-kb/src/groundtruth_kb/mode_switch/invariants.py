@@ -92,33 +92,26 @@ def loyal_opposition_ids(role_document: dict[str, Any]) -> list[str]:
     )
 
 
-def verify_active_role_partition(project_root: Path, *, role_path: Path | None = None) -> RolePartitionSummary:
-    """Verify the role map satisfies the active-harness PB/LO invariant.
+def _harnesses_by_id(raw_harnesses: Any, *, source: str) -> dict[str, Any]:
+    if isinstance(raw_harnesses, dict):
+        return raw_harnesses
+    if isinstance(raw_harnesses, list):
+        return {str(rec["id"]): rec for rec in raw_harnesses if isinstance(rec, dict) and rec.get("id")}
+    raise RolePartitionViolation(f"{source} has no 'harnesses' map or list")
 
-    Loads the harness registry projection under ``project_root`` (or the
-    explicit ``role_path`` override) and raises ``RolePartitionViolation``
-    unless exactly one active harness holds a prime-builder-class role and
-    exactly one active harness holds loyal-opposition. With multiple active
-    harnesses, the two role holders must be different. Registered, inactive,
-    suspended, and retired harnesses may retain roles but are ignored by the
-    active partition.
 
-    WI-3342 IP-5: migrated from the retired
-    ``harness-state/role-assignments.json`` to the DB-backed registry
-    projection ``harness-state/harness-registry.json``. The projection stores
-    ``harnesses`` as a LIST of unified records; it is converted here to the
-    ``{harness_id: record}`` document shape that ``prime_builder_ids`` and the
-    partition check consume.
+def verify_role_document_partition(role_document: dict[str, Any]) -> RolePartitionSummary:
+    """Verify an in-memory role document's active PB/LO partition.
+
+    This is the candidate-state validator used by write paths before durable
+    audit or registry mutation. It accepts the canonical dict-keyed document
+    shape and the registry projection's list shape for callers that already
+    loaded ``harness-state/harness-registry.json``.
     """
-    from groundtruth_kb.harness_projection import harness_registry_path
-
-    path = role_path if role_path is not None else harness_registry_path(project_root)
-    projection = json.loads(Path(path).read_text(encoding="utf-8"))
-    projection_harnesses = projection.get("harnesses", []) if isinstance(projection, dict) else None
-    if not isinstance(projection_harnesses, list):
-        raise RolePartitionViolation(f"harness registry projection at {path} has no 'harnesses' list")
-    harnesses = {str(rec["id"]): rec for rec in projection_harnesses if isinstance(rec, dict) and rec.get("id")}
-    role_document = {"harnesses": harnesses}
+    if not isinstance(role_document, dict):
+        raise RolePartitionViolation("role document must be a JSON object")
+    harnesses = _harnesses_by_id(role_document.get("harnesses"), source="role document")
+    normalized_document = {"harnesses": harnesses}
     active_ids = tuple(
         sorted(
             harness_id
@@ -140,14 +133,14 @@ def verify_active_role_partition(project_root: Path, *, role_path: Path | None =
             "active harnesses must carry operating roles; violations: " + ", ".join(sorted(active_roleless))
         )
 
-    primes = prime_builder_ids(role_document)
+    primes = prime_builder_ids(normalized_document)
     if len(primes) != 1:
         raise RolePartitionViolation(
             f"active role map must hold exactly one prime-builder; found {len(primes)}: {primes if primes else '[]'}"
         )
     prime_id = primes[0]
 
-    los = loyal_opposition_ids(role_document)
+    los = loyal_opposition_ids(normalized_document)
     if len(los) != 1:
         raise RolePartitionViolation(
             f"active role map must hold exactly one loyal-opposition; found {len(los)}: {los if los else '[]'}"
@@ -163,6 +156,33 @@ def verify_active_role_partition(project_root: Path, *, role_path: Path | None =
         loyal_opposition_id=lo_id,
         active_harness_ids=active_ids,
     )
+
+
+def verify_active_role_partition(project_root: Path, *, role_path: Path | None = None) -> RolePartitionSummary:
+    """Verify the role map satisfies the active-harness PB/LO invariant.
+
+    Loads the harness registry projection under ``project_root`` (or the
+    explicit ``role_path`` override) and raises ``RolePartitionViolation``
+    unless exactly one active harness holds a prime-builder-class role and
+    exactly one active harness holds loyal-opposition. With multiple active
+    harnesses, the two role holders must be different. Registered, inactive,
+    suspended, and retired harnesses may retain roles but are ignored by the
+    active partition.
+
+    WI-3342 IP-5: migrated from the retired role mirror to the DB-backed registry
+    projection ``harness-state/harness-registry.json``. The projection stores
+    ``harnesses`` as a LIST of unified records; it is converted here to the
+    ``{harness_id: record}`` document shape that ``prime_builder_ids`` and the
+    partition check consume.
+    """
+    from groundtruth_kb.harness_projection import harness_registry_path
+
+    path = role_path if role_path is not None else harness_registry_path(project_root)
+    projection = json.loads(Path(path).read_text(encoding="utf-8"))
+    projection_harnesses = projection.get("harnesses", []) if isinstance(projection, dict) else None
+    if not isinstance(projection_harnesses, list):
+        raise RolePartitionViolation(f"harness registry projection at {path} has no 'harnesses' list")
+    return verify_role_document_partition({"harnesses": projection_harnesses})
 
 
 def verify_role_partition(project_root: Path, *, role_path: Path | None = None) -> str:

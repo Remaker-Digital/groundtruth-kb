@@ -19,15 +19,15 @@ The persistent harness identity artifact is:
 
 `harness-state/harness-identities.json`
 
-The single source-of-truth role artifact is:
+The single source-of-truth role registry projection is:
 
-`harness-state/role-assignments.json`
+`harness-state/harness-registry.json`
 
 This rule file is not a role record and must not contain an `active_role:`
 assignment. It exists only as human-readable startup guidance for the role
 assignment system. No markdown rule file can override the durable role
-assignment map at `harness-state/role-assignments.json` (the single source of
-truth).
+registry projection at `harness-state/harness-registry.json` (the single
+source of truth).
 
 ## Harness Identity
 
@@ -40,7 +40,7 @@ identity artifact:
 
 Harness identity and operating role are separate concepts. Startup first reads
 `harness-state/harness-identities.json`, then uses the resolved harness ID to
-look up the role in `harness-state/role-assignments.json`.
+look up the role in `harness-state/harness-registry.json`.
 
 A persisted harness ID must be unique on the workstation and must not change
 after initial assignment except through an explicit owner-requested identity
@@ -75,7 +75,7 @@ change.
   self-corrects.
 - If startup finds no harness recorded as Prime Builder (no role set contains
   `prime-builder`), the starting harness assumes Prime Builder and updates
-  `harness-state/role-assignments.json` with the appropriate role set for the
+  `harness-state/harness-registry.json` with the appropriate role set for the
   topology.
 
 The role assignment attaches to the harness ID, not to a model, vendor name, or
@@ -83,8 +83,8 @@ transient session.
 
 ## Role Set Schema (Active Authority)
 
-`harness-state/role-assignments.json` records each harness ID's durable role as
-a JSON list (the wire representation of a role set). The role-set schema is the
+`harness-state/harness-registry.json` records each harness ID's durable role as
+a JSON list on the harness record. The role-set schema is the
 **active runtime schema**, not a future-design framing
 (per `ADR-SINGLE-HARNESS-OPERATING-MODE-001` Path 2 atomic migration).
 
@@ -160,7 +160,9 @@ PACKET = {
 
 
 def main() -> None:
-    out_path = Path(".groundtruth/formal-artifact-approvals/2026-05-12-claude-rules-operating-role-md-slice-1-role-set-schema.json")
+    out_path = Path(
+        ".groundtruth/formal-artifact-approvals/2026-05-12-claude-rules-operating-role-md-slice-1-role-set-schema.json"
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(PACKET, indent=2), encoding="utf-8")
     print(f"wrote packet: {out_path}")

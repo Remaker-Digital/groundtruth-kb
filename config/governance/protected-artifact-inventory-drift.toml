@@ -41,7 +41,6 @@ volatile_inventory_paths = [
 id = "harness-identity-and-role-state"
 patterns = [
   "harness-state/harness-identities.json",
-  "harness-state/role-assignments.json",
 ]
 severity = "governance_review"
 route = "governance_review"

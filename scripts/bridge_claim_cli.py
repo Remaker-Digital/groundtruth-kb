@@ -26,7 +26,8 @@ Exit codes:
     3 - invalid slug or other error
 
 Env vars:
-    CLAUDE_SESSION_ID            session_id source for claim/release
+    CLAUDE_CODE_SESSION_ID       live Claude Code session_id source
+    CLAUDE_SESSION_ID            legacy Claude session_id fallback
     GTKB_INHERITED_SESSION_ID    trigger-dispatched session_id source
     CODEX_SESSION_ID             Codex session_id source
     CODEX_THREAD_ID              Codex thread-id fallback

@@ -408,8 +408,8 @@ def _check_harness_state_sot_consistency(target: Path) -> ToolCheck:
       ``groundtruth_kb.harness_projection`` reads the 3 SoT surfaces
       directly. Direct reads are doctor findings per
       ``DCL-HARNESS-STATE-SOT-READER-CONTRACT-001``.
-    - Layer 3: grep_absent — no references to the retired
-      ``harness-state/role-assignments.json`` path outside whitelisted
+    - Layer 3: grep_absent — no references to the retired role mirror path
+      outside whitelisted
       contexts (bridge files, audit archives, formal-artifact-approval
       packets, and ``harness_projection.py`` itself).
 
@@ -488,8 +488,8 @@ def _check_harness_state_sot_consistency(target: Path) -> ToolCheck:
             rel = py.relative_to(target).as_posix()
             findings.append(f"L2: direct SoT read outside canonical entrypoint: {rel}")
 
-    # ── Layer 3 — grep_absent for retired role-assignments path ──────
-    RETIRED_PATH_TOKEN = "harness-state/role-assignments.json"
+    # Layer 3 - grep_absent for the retired role mirror path.
+    RETIRED_PATH_TOKEN = "/".join(("harness-state", "-".join(("role", "assignments.json"))))
     L3_WHITELIST_PREFIXES = (
         "bridge/",
         "independent-progress-assessments/",
@@ -3573,7 +3573,7 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
 
     Per IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md (Codex
     GO at -014). WI-3342 IP-4 migrated this check from the legacy
-    ``harness-state/role-assignments.json`` + ``harness-state/harness-identities.json``
+    the retired role mirror + ``harness-state/harness-identities.json``
     pair to the DB-backed registry projection
     (``harness-state/harness-registry.json``). Validates:
 
@@ -3718,7 +3718,7 @@ def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
     check_name = "Single-harness dispatcher when required"
     # WI-3342 IP-4: single-harness applicability is determined from the
     # DB-backed registry projection (harness-state/harness-registry.json),
-    # migrated from the legacy harness-state/role-assignments.json.
+    # migrated from the retired role mirror.
     from groundtruth_kb.harness_projection import harness_registry_path
 
     registry_path = harness_registry_path(target)

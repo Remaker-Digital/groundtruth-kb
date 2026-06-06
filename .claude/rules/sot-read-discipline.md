@@ -61,7 +61,7 @@ The bypass surface MUST NOT be used to subvert the discipline for routine work. 
 
 The discipline arose from two strands of evidence:
 
-- `DELIB-20260673` — parallel-session fragmentation evidence: multiple AI sessions independently consulted different aliases of the same SoT (e.g., one read `harness-state/role-assignments.json` directly while another read the legacy mirror), producing divergent state claims that the operator had to reconcile by hand.
+- `DELIB-20260673` — parallel-session fragmentation evidence: multiple AI sessions independently consulted different aliases of the same SoT, including a retired role mirror and another legacy alias, producing divergent state claims that the operator had to reconcile by hand.
 - `DELIB-20260670` — manual-triage survey identifying 8 forbidden-substitute candidates AND the always-loaded / shell-readable falsifying class of substitutes: paths that get loaded automatically at session start (where caching would be invisible) AND paths that are shell-readable via Bash/PowerShell verbs (where agent-side self-discipline fails because the read happens before any GT-KB-aware logic runs).
 
 The two-surface harness-specific contract directly addresses the falsifying class: by intercepting at PreToolUse and parsing both Claude tool-events AND Codex Bash command verbs, the discipline catches the read at the earliest point any harness can be intercepted. The mechanical floor (the `forbidden_substitutes` registry column) ensures the discipline is owner-controlled and not relying on agent memory.

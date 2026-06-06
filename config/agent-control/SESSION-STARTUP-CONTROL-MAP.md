@@ -64,7 +64,6 @@ placeholder the Slice C proposal will populate.
 | Surface | Path | Classification | Notes |
 |---|---|---|---|
 | Harness registry projection | `harness-state/harness-registry.json` | generated | DB-projected hot-path role/identity surface; regenerate via `groundtruth_kb.harness_projection`. |
-| Legacy role-assignments mirror | `harness-state/role-assignments.json` | deprecated | Orphaned legacy mirror (WI-4214 retiring it); readers migrated to the projection. |
 | Cached startup payload | `.gtkb-state/startup/*` | generated | SessionStart-cached disclosure for lazy init-keyword rendering. |
 | Generated dashboard surfaces | `docs/gtkb-dashboard/` | generated | Rendered dashboard artifacts; not authoritative state. |
 <!-- /inventory -->

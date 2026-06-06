@@ -58,8 +58,8 @@ def validate_role_artifact(project_root: Path) -> ValidationResult:
     either a list of tokens or a legacy scalar; tokens are from
     ``{prime-builder, loyal-opposition, acting-prime-builder}`` per
     ``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` and
-    ``GOV-ACTING-PRIME-BUILDER-001``). Migrated from the retired
-    ``harness-state/role-assignments.json`` role artifact.
+    ``GOV-ACTING-PRIME-BUILDER-001``). Migrated from the retired role
+    artifact.
     """
     axis = "role"
     from groundtruth_kb.harness_projection import harness_registry_path

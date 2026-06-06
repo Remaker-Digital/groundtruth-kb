@@ -20,7 +20,9 @@ import json
 from pathlib import Path
 
 TARGET = Path(".claude/rules/bridge-essential.md")
-PACKET_PATH = Path(".groundtruth/formal-artifact-approvals/2026-05-12-claude-rules-bridge-essential-md-single-harness-dispatcher-substrate.json")
+PACKET_PATH = Path(
+    ".groundtruth/formal-artifact-approvals/2026-05-12-claude-rules-bridge-essential-md-single-harness-dispatcher-substrate.json"
+)
 
 # Insertion marker — the new subsection goes immediately BEFORE this line.
 INSERT_BEFORE_MARKER = "## Two-Axis Bridge Automation Model\n"
@@ -64,7 +66,7 @@ They are **mutually exclusive at runtime**:
   performs in-process dispatch.
 
 Substrate applicability is determined by the role-set topology in
-``harness-state/role-assignments.json``. The doctor's
+``harness-state/harness-registry.json``. The doctor's
 ``_check_role_set_topology_consistency`` (Slice 1) validates wire form;
 ``_check_single_harness_dispatcher_when_required`` (Slice 1 + Slice 2
 upgrade) reports applicability and registration health. Per

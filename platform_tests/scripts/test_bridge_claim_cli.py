@@ -82,9 +82,8 @@ def test_resolve_session_id_uses_claude_code_session_id(monkeypatch) -> None:
     assert cli._resolve_session_id(None) == "claude-code-session-probe"
 
 
-def test_resolve_session_id_claude_session_id_precedence(monkeypatch) -> None:
-    """When both CLAUDE_SESSION_ID and CLAUDE_CODE_SESSION_ID are set,
-    CLAUDE_SESSION_ID wins (preserves the operator workaround)."""
+def test_resolve_session_id_live_claude_code_precedence(monkeypatch) -> None:
+    """When both Claude env vars are set, live CLAUDE_CODE_SESSION_ID wins."""
     cli = _load_cli()
     for name in (
         "GTKB_INHERITED_SESSION_ID",
@@ -97,18 +96,32 @@ def test_resolve_session_id_claude_session_id_precedence(monkeypatch) -> None:
     monkeypatch.setenv("CLAUDE_SESSION_ID", "explicit-override")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
 
-    assert cli._resolve_session_id(None) == "explicit-override"
+    assert cli._resolve_session_id(None) == "claude-code-session-probe"
 
 
-def test_session_env_vars_tuple_orders_claude_code_after_claude_session() -> None:
+def test_session_env_vars_tuple_orders_claude_code_before_claude_session() -> None:
     """The SESSION_ENV_VARS tuple ordering is the precedence contract;
-    CLAUDE_CODE_SESSION_ID must come immediately after CLAUDE_SESSION_ID."""
+    CLAUDE_CODE_SESSION_ID must immediately precede CLAUDE_SESSION_ID."""
     cli = _load_cli()
     tuple_ = cli.SESSION_ENV_VARS
     assert "CLAUDE_CODE_SESSION_ID" in tuple_
     claude_index = tuple_.index("CLAUDE_SESSION_ID")
     claude_code_index = tuple_.index("CLAUDE_CODE_SESSION_ID")
-    assert claude_code_index == claude_index + 1
+    assert claude_code_index + 1 == claude_index
+
+
+def test_claim_session_id_flag_beats_env(tmp_path: Path) -> None:
+    """The explicit CLI flag still wins over all harness env candidates."""
+    claim = _run_cli(
+        tmp_path,
+        "claim",
+        "gtkb-explicit-thread",
+        "--session-id",
+        "explicit-session",
+        env={"CLAUDE_CODE_SESSION_ID": "claude-code-live"},
+    )
+    assert claim.returncode == 0, claim.stderr
+    assert json.loads(claim.stdout)["session_id"] == "explicit-session"
 
 
 def test_claim_release_status_round_trip_with_codex_env(tmp_path: Path) -> None:

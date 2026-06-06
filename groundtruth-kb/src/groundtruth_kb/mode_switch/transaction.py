@@ -24,6 +24,7 @@ from typing import Any
 
 from groundtruth_kb.mode_switch.audit import write_transaction_record
 from groundtruth_kb.mode_switch.derive import topology_from_role_map
+from groundtruth_kb.mode_switch.invariants import RolePartitionViolation, verify_role_document_partition
 from groundtruth_kb.mode_switch.validation import (
     validate_bridge_artifact,
     validate_role_artifact,
@@ -33,7 +34,7 @@ from groundtruth_kb.mode_switch.validation import (
 VALID_ROLES_FOR_WRITE = frozenset({"prime-builder", "loyal-opposition"})
 ROLE_PRIME_BUILDER = "prime-builder"
 ROLE_LOYAL_OPPOSITION = "loyal-opposition"
-STATUS_ACTIVE = "active"
+STATUS_RETIRED = "retired"
 
 
 class TransactionValidationError(RuntimeError):
@@ -116,103 +117,32 @@ def _role_tokens(raw: Any) -> list[str]:
     return sorted({str(token).strip() for token in raw if str(token).strip() in VALID_ROLES_FOR_WRITE})
 
 
-def _sort_harness_ids(harnesses: dict[str, Any]) -> list[str]:
-    def key(harness_id: str) -> tuple[int, int, str]:
-        record = harnesses.get(harness_id)
-        precedence = record.get("reviewer_precedence") if isinstance(record, dict) else None
-        if isinstance(precedence, int):
-            return (0, precedence, harness_id)
-        return (1, 0, harness_id)
-
-    return sorted(harnesses, key=key)
-
-
-def _active_ids(harnesses: dict[str, Any]) -> list[str]:
-    return [
-        harness_id
-        for harness_id in _sort_harness_ids(harnesses)
-        if isinstance(harnesses.get(harness_id), dict) and harnesses[harness_id].get("status") == STATUS_ACTIVE
-    ]
-
-
-def _existing_holder(
-    harnesses: dict[str, Any],
-    active_ids: list[str],
-    role: str,
-    *,
-    exclude_id: str | None = None,
-) -> str | None:
-    for harness_id in active_ids:
-        if harness_id == exclude_id:
-            continue
-        record = harnesses.get(harness_id)
-        if isinstance(record, dict) and role in _role_tokens(record.get("role")):
-            return harness_id
-    return None
-
-
-def _first_active(active_ids: list[str], *, exclude_id: str | None = None) -> str | None:
-    for harness_id in active_ids:
-        if harness_id != exclude_id:
-            return harness_id
-    return None
-
-
 def _apply_active_role_assignment(
     harnesses: dict[str, Any],
     *,
     target_id: str,
     requested_role: str,
 ) -> tuple[str, ...]:
-    """Mutate ``harnesses`` to the clarified active-role invariant."""
+    """Apply one target role update and validate the whole candidate map."""
     record = harnesses.get(target_id)
     if not isinstance(record, dict):
         raise TransactionValidationError(f"unknown harness id: {target_id!r}", axis="role")
-    if record.get("status") != STATUS_ACTIVE:
+    if record.get("status") == STATUS_RETIRED:
         raise TransactionValidationError(
             f"harness {target_id!r} has status {record.get('status')!r}; "
-            "role assignment requires a registered and active harness",
+            "retired harnesses cannot receive role metadata updates",
             axis="role",
         )
-    active_ids = _active_ids(harnesses)
-    if not active_ids:
-        raise TransactionValidationError("role assignment requires at least one active harness", axis="role")
-
-    if len(active_ids) == 1:
-        prime_id = lo_id = active_ids[0]
-    elif requested_role == ROLE_PRIME_BUILDER:
-        prime_id = target_id
-        lo_id = _existing_holder(harnesses, active_ids, ROLE_LOYAL_OPPOSITION, exclude_id=prime_id)
-        if lo_id is None:
-            lo_id = _first_active(active_ids, exclude_id=prime_id)
-    else:
-        lo_id = target_id
-        prime_id = _existing_holder(harnesses, active_ids, ROLE_PRIME_BUILDER, exclude_id=lo_id)
-        if prime_id is None:
-            prime_id = _first_active(active_ids, exclude_id=lo_id)
-
-    if not prime_id or not lo_id:
-        raise TransactionValidationError("could not derive PB/LO assignment from active harness set", axis="role")
-    if len(active_ids) > 1 and prime_id == lo_id:
+    record["role"] = [requested_role]
+    try:
+        verify_role_document_partition({"harnesses": harnesses})
+    except RolePartitionViolation as exc:
         raise TransactionValidationError(
-            "PB and LO must be assigned to different active harnesses when more than one active harness exists",
+            str(exc),
             axis="role",
-        )
-
-    for harness_id, item in harnesses.items():
-        if not isinstance(item, dict):
-            continue
-        if item.get("status") != STATUS_ACTIVE:
-            continue
-        roles: list[str] = []
-        if harness_id == lo_id:
-            roles.append(ROLE_LOYAL_OPPOSITION)
-        if harness_id == prime_id:
-            roles.append(ROLE_PRIME_BUILDER)
-        if not roles:
-            item["status"] = "suspended"
-        item["role"] = roles
-    return tuple(harnesses[target_id].get("role") or [])
+            errors=(str(exc),),
+        ) from exc
+    return tuple(_role_tokens(record.get("role")))
 
 
 def _mirror_role_map_to_registry(
@@ -224,7 +154,7 @@ def _mirror_role_map_to_registry(
     and regenerate the hot-path projection.
 
     WI-3342 IP-5: this is now the AUTHORITATIVE role write for the role-switch
-    transaction — the transitional ``role-assignments.json`` write was removed,
+    transaction — the transitional legacy-JSON role write was removed,
     so the DB-backed registry and its projection are the sole authoritative
     role surface.
 
@@ -287,7 +217,7 @@ def _mirror_role_map_to_registry(
             generate_harness_projection(db, project_root)
     except Exception as exc:  # intentional-catch: quality gate waiver
         # WI-3342 IP-5: the DB-backed registry is now the sole authoritative
-        # role surface (the transitional role-assignments.json write was
+        # role surface (the transitional legacy-JSON role write was
         # removed), so a registry-write failure must fail the transaction
         # rather than silently lose the role switch.
         raise RuntimeError(f"harness registry write failed during role-switch transaction: {exc}") from exc
@@ -311,13 +241,12 @@ def apply_role_switch(
     4. Validate role token against ``VALID_ROLES_FOR_WRITE`` (SET-rejects
        ``acting-prime-builder``).
     5. Resolve harness id-or-name to harness id.
-    6. Read the role map from the DB-backed registry projection; compute the
-       new active-role assignments. Non-active harness role sets are preserved;
-       one active harness carries PB+LO in single-active mode; PB and LO are
-       distinct in multi-active mode.
+    6. Read the role map from the DB-backed registry projection; apply only
+       the requested harness role metadata update in candidate state; validate
+       the whole active role partition before any durable write.
     7. Write audit-trail record FIRST (per failure-leaves-no-state-mutation
        invariant).
-    8. WI-3342 IP-5: the transitional ``role-assignments.json`` write is
+    8. WI-3342 IP-5: the transitional legacy-JSON role write is
        removed — the DB registry and projection (Step 10) are the sole
        authoritative role surface.
     9. Atomically write work-subject.json with derived topology if file
@@ -350,8 +279,8 @@ def apply_role_switch(
 
     # Step 5-6: Resolve harness, compute new role set.
     # WI-3342 IP-5: the current role map is read from the DB-backed registry
-    # projection (harness-state/harness-registry.json), not the retired
-    # harness-state/role-assignments.json. The projection stores harnesses as a
+    # projection (harness-state/harness-registry.json), not the retired role
+    # mirror. The projection stores harnesses as a
     # LIST; convert to the {harness_id: record} dict shape the role-switch
     # logic below mutates.
     from groundtruth_kb.harness_projection import harness_registry_path
@@ -373,11 +302,9 @@ def apply_role_switch(
     else:
         previous_role_set = ()
 
-    # Active-harness assignment: the target receives the requested role, the
-    # complementary role is preserved or assigned to a different active harness
-    # when possible. Non-active harness role sets are preserved because
-    # role/status/capability are orthogonal; an active harness demoted out of
-    # the active assignment is suspended and cleared intentionally.
+    # Candidate role update: mutate only the requested harness record, then
+    # validate the whole active partition. No complementary holder selection or
+    # unrelated active-harness suspension happens here.
     new_role_set = _apply_active_role_assignment(
         harnesses,
         target_id=harness_id,
@@ -401,8 +328,8 @@ def apply_role_switch(
         deferred=False,
     )
 
-    # Step 8: WI-3342 IP-5 — the transitional legacy-JSON write of
-    # harness-state/role-assignments.json is removed. The DB-backed registry
+    # Step 8: WI-3342 IP-5 — the transitional legacy-JSON role write is
+    # removed. The DB-backed registry
     # and its projection (written authoritatively by Step 10) are now the sole
     # authoritative role surface.
 

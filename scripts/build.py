@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Build — single command for the entire build pipeline.
+"""Build - single command for the local build pipeline.
 
 Usage:
-    python scripts/build.py v1.95.9
+    python scripts/build.py v1.95.9 [--push]
 
 This is the ONE build command. It handles ALL artifacts autonomously:
   0. Bump PRODUCT_VERSION in source
   1. Build all frontend bundles (provider, standalone, shopify, widget)
-  2. Commit version bump + frontend dist artifacts, push to remote
-  3. Trigger GitHub Actions workflows (api-gateway + test-host)
-  4. Poll workflows until completion
-  5. Verify ACR image tags exist
+  2. Commit version bump + frontend dist artifacts locally
+
+Remote mutation is opt-in:
+  3. With --push, push to remote
+  4. With --push, trigger GitHub Actions workflows (api-gateway + test-host)
+  5. With --push, poll workflows until completion
+  6. With --push, verify ACR image tags exist
 
 Exit codes:
     0 - All builds succeeded and images verified
@@ -18,6 +21,7 @@ Exit codes:
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -77,7 +81,7 @@ def _init_log() -> None:
     log_dir = Path(__file__).resolve().parent.parent / "logs"
     log_dir.mkdir(exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    _log_file = open(log_dir / f"build-{ts}.log", "w", encoding="utf-8")
+    _log_file = open(log_dir / f"build-{ts}.log", "w", encoding="utf-8")  # noqa: SIM115
 
 
 def _safe_print(msg: str) -> None:
@@ -207,10 +211,7 @@ def trigger_workflow(workflow_file: str, tag: str) -> bool:
 
 def find_run_id(workflow_file: str) -> int | None:
     """Find the most recent run ID for a workflow."""
-    cmd = (
-        f"gh run list --workflow={workflow_file} --limit=1 "
-        f"--json databaseId,status --jq .[0].databaseId"
-    )
+    cmd = f"gh run list --workflow={workflow_file} --limit=1 --json databaseId,status --jq .[0].databaseId"
     code, output = _run(cmd)
     if code != 0 or not output:
         return None
@@ -258,14 +259,11 @@ def poll_run(run_id: int, label: str) -> bool:
 
 def verify_acr_tag(repo: str, tag: str) -> bool:
     """Verify a tag exists in ACR."""
-    cmd = (
-        f'az acr repository show-tags --name {ACR_NAME} '
-        f'--repository {repo} --query "[?@==\'{tag}\']" -o tsv'
-    )
+    cmd = f"az acr repository show-tags --name {ACR_NAME} --repository {repo} --query \"[?@=='{tag}']\" -o tsv"
     code, output = _run(cmd, timeout=30)
     if code != 0:
         log(f"  WARNING: Could not verify ACR tag for {repo}:{tag}")
-        log(f"    (az CLI may not be authenticated)")
+        log("    (az CLI may not be authenticated)")
         return True  # non-fatal — GH Actions succeeded
     return tag in output
 
@@ -278,6 +276,11 @@ def verify_acr_tag(repo: str, tag: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build container images via GitHub Actions.")
     parser.add_argument("tag", help="Image tag (e.g., v1.95.6)")
+    parser.add_argument(
+        "--push",
+        action="store_true",
+        help="Push committed artifacts and run remote workflow/ACR verification.",
+    )
     args = parser.parse_args()
 
     if not re.match(r"^v\d+\.\d+\.\d+$", args.tag):
@@ -300,7 +303,7 @@ def main() -> int:
     # 0. Bump PRODUCT_VERSION in source
     version = args.tag.lstrip("v")  # v1.95.9 → 1.95.9
     ver_file = PROJECT_ROOT / "src" / "multi_tenant" / "api_versioning.py"
-    log(f"Step 0: Setting PRODUCT_VERSION = \"{version}\"...")
+    log(f'Step 0: Setting PRODUCT_VERSION = "{version}"...')
     content = ver_file.read_text(encoding="utf-8")
     new_content = re.sub(
         r'PRODUCT_VERSION\s*=\s*"[^"]*"',
@@ -323,30 +326,45 @@ def main() -> int:
         return 1
     log("")
 
-    # 2. Commit version + dist artifacts and push
-    log("Step 2: Committing and pushing...")
+    # 2. Commit version + dist artifacts locally. Remote push is opt-in.
+    log("Step 2: Committing local artifacts...")
     # Stage version file + all dist directories (use forward slashes for git)
     # dist/ is in .gitignore so we need --force for the frontend bundles.
     _run('git add "src/multi_tenant/api_versioning.py"', timeout=15)
     for project in FRONTEND_PROJECTS:
         _run(f'git add --force "{project}/dist"', timeout=15)
 
-    # Only commit+push if there are staged changes
+    # Only commit if there are staged changes
     code, _ = _run("git diff --cached --quiet", timeout=10)
     if code != 0:
-        # There are staged changes — commit and push
+        # There are staged changes - commit locally first.
         code, _ = _run(
-            f'git commit -m "bump: v{version} + build.py auto-bumps PRODUCT_VERSION from tag" && git push',
+            f'git commit -m "bump: v{version} + build.py auto-bumps PRODUCT_VERSION from tag"',
             timeout=60,
         )
         if code != 0:
-            log("  ERROR: Failed to commit/push.")
+            log("  ERROR: Failed to commit.")
             _close_log()
             return 1
-        log("  Committed and pushed.")
+        log("  Committed locally.")
     else:
-        log("  No changes to commit — already up to date.")
+        log("  No changes to commit - already up to date.")
+
+    if args.push:
+        code, _ = _run("git push", timeout=60)
+        if code != 0:
+            log("  ERROR: Failed to push.")
+            _close_log()
+            return 1
+        log("  Pushed to remote.")
+    else:
+        log("  Remote push skipped; pass --push to update the remote branch.")
     log("")
+
+    if not args.push:
+        log("Remote workflow dispatch and ACR verification skipped; pass --push to run them.")
+        _close_log()
+        return 0
 
     # 3. Trigger GitHub Actions workflows
     log("Step 3: Triggering GitHub Actions builds...")
@@ -395,9 +413,12 @@ def main() -> int:
     # Results are keyed by workflow name, but REPOS is keyed by individual repo.
     _WORKFLOW_TO_REPOS = {
         "agent-containers": [
-            "agent-intent-classifier", "agent-knowledge-retrieval",
-            "agent-response-generator", "agent-escalation-handler",
-            "agent-analytics-collector", "agent-critic-supervisor",
+            "agent-intent-classifier",
+            "agent-knowledge-retrieval",
+            "agent-response-generator",
+            "agent-escalation-handler",
+            "agent-analytics-collector",
+            "agent-critic-supervisor",
         ],
         "slim-gateway": ["slim-gateway"],
     }

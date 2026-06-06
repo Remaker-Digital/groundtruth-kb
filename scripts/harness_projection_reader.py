@@ -95,7 +95,7 @@ def load_harness_projection(
 # --- Keyed accessors (WI-3342 Slice B, IP-1) -------------------------------
 #
 # ``load_harness_projection`` returns a ``harnesses`` LIST, while the legacy
-# JSON readers being migrated (``harness-state/role-assignments.json`` keyed by
+# JSON readers being migrated (the retired role mirror keyed by
 # harness id, ``harness-state/harness-identities.json`` keyed by harness name)
 # expect dict-shaped lookups. These accessors provide the list-to-keyed
 # adaptation once, so each migrating reader queries the projection without

@@ -2,8 +2,8 @@
 
 Reads the harness registry hot-path projection
 ``harness-state/harness-registry.json`` to determine the operating role of the
-active harness (WI-3342 IP-4: migrated from the legacy
-``harness-state/role-assignments.json`` / ``harness-state/harness-identities.json``). Per
+active harness (WI-3342 IP-4: migrated from the legacy role mirror /
+``harness-state/harness-identities.json``). Per
 ``bridge/gtkb-role-session-lifecycle-simplification-003.md`` (REVISED-1 GO at
 -004), the canonical role set is ``prime-builder`` and ``loyal-opposition``;
 ``acting-prime-builder`` is READ-accepted as compatibility/provenance but is
@@ -26,8 +26,8 @@ CANONICAL_ROLES: frozenset[str] = frozenset({"prime-builder", "loyal-opposition"
 COMPATIBILITY_ROLES: frozenset[str] = frozenset({"acting-prime-builder"})
 
 # WI-3342 IP-4: role and identity state both resolve through the canonical
-# harness-projection reader entrypoint. The legacy harness-state/role-assignments.json
-# and harness-state/harness-identities.json are no longer read in this module.
+# harness-projection reader entrypoint. The retired role mirror and
+# harness-state/harness-identities.json are no longer read in this module.
 _HARNESS_REGISTRY_REL = Path("harness-state/harness-registry.json")
 
 

@@ -13,7 +13,7 @@ from pathlib import Path
 SPEC_BODY = (
     "SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 - Canonical Init-Keyword Syntax for GroundTruth-KB Session Activation\n"
     "\n"
-    "Purpose: Establish \"::init gtkb <mode>\" as the canonical first-line activator syntax for machine-emitted "
+    'Purpose: Establish "::init gtkb <mode>" as the canonical first-line activator syntax for machine-emitted '
     "GroundTruth-KB session prompts. The keyword tells a receiving harness which durable role's auto-process "
     "content to render at SessionStart, and is the single source of truth for cross-harness dispatch and "
     "future single-harness dispatchers.\n"
@@ -41,8 +41,8 @@ SPEC_BODY = (
     "VERIFIED).\n"
     "\n"
     "The keyword MUST be derived from the durable role record per "
-    "DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 (two-step lookup: role-assignments.json -> harness ID -> "
-    "harness-identities.json -> command handle -> canonical mode), never hardcoded.\n"
+    "DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 (registry lookup -> harness invocation surface -> "
+    "canonical mode), never hardcoded.\n"
     "\n"
     "Reception Surface:\n"
     "\n"
@@ -89,7 +89,7 @@ PACKET = {
     "changed_by": "prime-builder/claude-opus",
     "change_reason": (
         "IP-1 of canonical-init-keyword-syntax-001 (Codex GO at -008). Establishes "
-        "\"::init gtkb <mode>\" as the canonical first-line activator syntax with closed vocabulary {pb, lo}, "
+        '"::init gtkb <mode>" as the canonical first-line activator syntax with closed vocabulary {pb, lo}, '
         "regex-strict parse, no synonyms. Prerequisite for Slice 2 of "
         "gtkb-single-harness-bridge-dispatcher-001."
     ),

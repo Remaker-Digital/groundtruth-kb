@@ -110,11 +110,16 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 1. Read the full thread version chain.
 2. Run the mandatory applicability preflight: `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>`. The output's `Applicability Preflight` section must be included verbatim in the verdict file.
 3. Run the mandatory clause preflight: `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` (no `--report-only`). Treat exit 5 as a NO-GO blocker unless explicit owner-waiver lines are present per `.claude/rules/file-bridge-protocol.md` "Clause-Test Preflight (Mandatory; Slice 2)".
-4. Run a deliberation search: `db.search_deliberations(...)` per `.claude/rules/deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
-5. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
-6. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
-7. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
-8. Update `bridge/INDEX.md`: insert the verdict line at the top of the document version list.
+4. Optionally run the advisory ADR/DCL discovery helper:
+   `python scripts/adr_dcl_applicability_discovery.py --bridge-id <topic-slug>`.
+   Its `Candidate Applicable ADR/DCLs` output is review context only. It always
+   exits 0 and must not be treated as a blocking gate; the registered clause
+   preflight remains authoritative.
+5. Run a deliberation search: `db.search_deliberations(...)` per `.claude/rules/deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
+6. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
+7. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
+8. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
+9. Update `bridge/INDEX.md`: insert the verdict line at the top of the document version list.
 
 **Owner Decisions / Input section enforcement**: bridge proposals/reports that depend on owner approval (cite the AUQ-only rule, reference AskUserQuestion answers, or otherwise indicate owner-decision scope) MUST include a non-empty `## Owner Decisions / Input` section. Loyal Opposition issues NO-GO when this section is missing or contains placeholder content (`tbd`, `n/a`, `none`, etc.).
 

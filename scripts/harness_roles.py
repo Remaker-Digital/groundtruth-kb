@@ -2,7 +2,7 @@
 
 IP-8 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md (Codex GO at
 -014) migrates this module from scalar role-string semantics to role-set
-semantics. The wire form of ``harness-state/role-assignments.json`` is now a
+semantics. The role wire form in ``harness-state/harness-registry.json`` is a
 JSON list of role tokens (the wire representation of a role set); the
 in-process form is ``frozenset[str]``. Legacy scalar values are accepted on
 READ and upgraded to list form on first WRITE.
@@ -58,7 +58,7 @@ ROLE_LOYAL_OPPOSITION = "loyal-opposition"
 ROLE_ACTING_PRIME_BUILDER = "acting-prime-builder"
 
 # READ vocabulary includes the legacy compatibility/provenance value so older
-# role-assignments.json records continue to load without error.
+# registry projection records continue to load without error.
 VALID_ROLES_FOR_READ = frozenset(
     {
         ROLE_PRIME_BUILDER,
@@ -78,7 +78,7 @@ VALID_ROLES_FOR_WRITE = frozenset({ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION})
 # ``VALID_ROLES_FOR_READ`` or ``VALID_ROLES_FOR_WRITE`` explicitly.
 VALID_ROLES = VALID_ROLES_FOR_READ
 
-ROLE_ASSIGNMENTS_RELATIVE_PATH = Path("harness-state") / "role-assignments.json"
+ROLE_ASSIGNMENTS_RELATIVE_PATH = Path("harness-state") / "harness-registry.json"
 DEFAULT_HARNESS_IDS = _DEFAULT_HARNESS_IDS
 OLLAMA_HARNESS_ID = "D"
 OLLAMA_ROLE_PROMOTION_PREREQUISITE_BRIDGES = (
@@ -214,7 +214,7 @@ def _empty_document(project_root: Path) -> dict[str, Any]:
         "source_of_truth": "GT-KB harness role assignments",
         "description": (
             "Maps durable harness installation IDs to operating roles. "
-            "Harness IDs are defined by harness-state/harness-identities.json. "
+            "Harness records are projected from harness-state/harness-registry.json. "
             "Role field is a JSON list (the wire representation of a role set) "
             "drawn from {prime-builder, loyal-opposition}. Legacy scalar values "
             "are accepted on READ and upgraded to list form on first WRITE."
@@ -250,15 +250,14 @@ def _normalize_document(raw: Any, project_root: Path) -> dict[str, Any]:
 def load_role_assignments(project_root: Path, assignment_path: Path | None = None) -> dict[str, Any]:
     """Load harness role assignments from the registry projection (WI-3342 IP-3).
 
-    Migrated from reading ``harness-state/role-assignments.json`` directly to
+    Migrated from reading the retired standalone role mirror directly to
     reading the DB-backed registry projection
     (``harness-state/harness-registry.json``) via
     ``scripts/harness_projection_reader.load_harness_projection``. The
     ``assignment_path`` parameter is retained for signature compatibility
-    (positional callers such as ``scripts/workstream_focus.py``) and for the
-    writer path (``write_role_assignments``); readers resolve role state from
-    the projection. Fail-soft: a missing or malformed projection yields an
-    empty document, never an exception.
+    (positional callers such as ``scripts/workstream_focus.py``); readers
+    resolve role state from the projection. Fail-soft: a missing or malformed
+    projection yields an empty document, never an exception.
     """
     _ = assignment_path  # retained for signature + writer-path compatibility
     document = _empty_document(project_root)
@@ -275,17 +274,16 @@ def load_role_assignments(project_root: Path, assignment_path: Path | None = Non
         role_set = _normalize_role_field(record.get("role"))
         if not role_set:
             continue
-        harnesses[harness_id] = {"role": _role_set_to_json(role_set)}
+        normalized_record = dict(record)
+        normalized_record["role"] = _role_set_to_json(role_set)
+        harnesses[harness_id] = normalized_record
     document["harnesses"] = harnesses
     return document
 
 
 def write_role_assignments(project_root: Path, document: dict[str, Any], assignment_path: Path | None = None) -> Path:
     path = role_assignments_path(project_root, assignment_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
-    tmp.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    _mirror_role_assignments_to_registry(project_root, document)
     return path
 
 
@@ -309,9 +307,9 @@ def _mirror_role_assignments_to_registry(project_root: Path, document: dict[str,
     """Write the role assignments to the DB ``harnesses`` registry table and
     regenerate the hot-path projection.
 
-    WI-3342 IP-5: this is the AUTHORITATIVE role write — the transitional
-    ``role-assignments.json`` write was removed, so the DB-backed registry and
-    its projection are the sole authoritative role surface.
+    WI-3342 IP-5: this is the AUTHORITATIVE role write. The transitional
+    standalone mirror write was removed, so the DB-backed registry and its
+    projection are the sole authoritative role surface.
 
     For each harness whose role set differs from its current DB row, an
     append-only ``insert_harness`` version carries the new role (every other
@@ -365,9 +363,8 @@ def _mirror_role_assignments_to_registry(project_root: Path, document: dict[str,
             generate_harness_projection(db, project_root)
     except Exception as exc:
         # WI-3342 IP-5: the DB-backed registry is the sole authoritative role
-        # surface (the transitional role-assignments.json write was removed),
-        # so a registry-write failure must surface rather than silently lose
-        # the role write.
+        # surface, so a registry-write failure must surface rather than
+        # silently lose the role write.
         raise RuntimeError(f"harness registry role write failed: {exc}") from exc
 
 
@@ -1025,8 +1022,8 @@ def role_for_harness(
     primary = primary_role(record)
     if changed or (ensure_prime_on_startup and not path.is_file()):
         document["updated_at"] = _now_iso()
-        # WI-3342 IP-5: the transitional role-assignments.json write is
-        # removed; the registry mirror is the authoritative role write.
+        # WI-3342 IP-5: the transitional standalone mirror write is removed;
+        # the registry projection is the authoritative role write.
         _mirror_role_assignments_to_registry(project_root, document)
     return primary, document, path
 
@@ -1058,6 +1055,11 @@ def set_harness_role(
     assignment_path: Path | None = None,
 ) -> tuple[str, dict[str, Any], Path]:
     requested_role = _set_role_validate(role)
+    try:
+        from groundtruth_kb.mode_switch.invariants import RolePartitionViolation, verify_role_document_partition
+    except Exception as exc:  # pragma: no cover - import environment guard
+        raise RuntimeError(f"cannot import canonical role partition validator: {exc}") from exc
+
     resolved_id = resolved_harness_id(project_root, harness_id=harness_id, harness_name=harness_name)
     if resolved_id is None:
         raise ValueError("Cannot set harness role without a durable harness ID.")
@@ -1068,79 +1070,29 @@ def set_harness_role(
         for record in projection.get("harnesses", [])
         if isinstance(record, dict) and normalize_harness_id(str(record.get("id") or ""))
     ]
-    active_ids = sorted(
-        normalize_harness_id(str(record.get("id") or ""))
-        for record in projection_records
-        if record.get("status") == "active"
-    )
-    if resolved_id not in active_ids:
-        raise ValueError(
-            f"Cannot assign {requested_role!r} to harness {resolved_id!r}; "
-            "role assignment requires a registered and active harness."
-        )
-
     document = _empty_document(project_root)
     document["harnesses"] = {
-        normalize_harness_id(str(record.get("id") or "")): {"role": []} for record in projection_records
+        normalize_harness_id(str(record.get("id") or "")): dict(record) for record in projection_records
     }
-    if len(active_ids) == 1:
-        prime_id = lo_id = active_ids[0]
-    elif requested_role == ROLE_PRIME_BUILDER:
-        prime_id = resolved_id
-        lo_id = next(
-            (
-                hid
-                for hid in active_ids
-                if hid != prime_id
-                and ROLE_LOYAL_OPPOSITION
-                in _normalize_role_field(
-                    next(
-                        (
-                            rec.get("role")
-                            for rec in projection_records
-                            if normalize_harness_id(str(rec.get("id") or "")) == hid
-                        ),
-                        [],
-                    )
-                )
-            ),
-            next(hid for hid in active_ids if hid != prime_id),
-        )
-    else:
-        lo_id = resolved_id
-        prime_id = next(
-            (
-                hid
-                for hid in active_ids
-                if hid != lo_id
-                and ROLE_PRIME_BUILDER
-                in _normalize_role_field(
-                    next(
-                        (
-                            rec.get("role")
-                            for rec in projection_records
-                            if normalize_harness_id(str(rec.get("id") or "")) == hid
-                        ),
-                        [],
-                    )
-                )
-            ),
-            next(hid for hid in active_ids if hid != lo_id),
+    record = document["harnesses"].get(resolved_id)
+    if not isinstance(record, dict):
+        raise ValueError(f"Cannot set harness role for unknown harness {resolved_id!r}.")
+    if record.get("status") == "retired":
+        raise ValueError(
+            f"Cannot assign {requested_role!r} to harness {resolved_id!r}; "
+            "retired harnesses cannot receive role metadata updates."
         )
 
-    for hid, record in document["harnesses"].items():
-        roles: set[str] = set()
-        if hid == prime_id:
-            roles.add(ROLE_PRIME_BUILDER)
-        if hid == lo_id:
-            roles.add(ROLE_LOYAL_OPPOSITION)
-        record["role"] = _role_set_to_json(roles)
+    record["role"] = _role_set_to_json({requested_role})
+    try:
+        verify_role_document_partition(document)
+    except RolePartitionViolation as exc:
+        raise ValueError(str(exc)) from exc
 
-    record = document["harnesses"][resolved_id]
     record["assigned_at"] = _now_iso()
     record["assigned_by"] = "harness-role-command"
     document["updated_at"] = _now_iso()
-    # WI-3342 IP-5: the transitional role-assignments.json write is removed;
+    # WI-3342 IP-5: the transitional standalone mirror write is removed;
     # _mirror_role_assignments_to_registry below is the authoritative role
     # write. ``path`` is resolved (not written) to preserve the return contract.
     path = role_assignments_path(project_root, assignment_path)

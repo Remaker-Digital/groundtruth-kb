@@ -2,8 +2,9 @@
 
 Spec-derived tests for the REQ-HARNESS-REGISTRY-001 FR9 role-partition
 postcondition: ``prime_builder_ids`` and ``verify_role_partition``. A valid
-FR9 partition holds exactly one prime-builder and every other harness exactly
-``["loyal-opposition"]``.
+FR9 active dispatch partition holds exactly one active prime-builder and
+exactly one active loyal-opposition. Non-active harness role metadata is
+retained but ignored by the active partition.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights reserved.
 """
@@ -17,6 +18,7 @@ import pytest
 from groundtruth_kb.mode_switch.invariants import (
     RolePartitionViolation,
     prime_builder_ids,
+    verify_role_document_partition,
     verify_role_partition,
 )
 
@@ -86,6 +88,33 @@ def test_verify_role_partition_allows_non_active_role_retention(tmp_path: Path) 
         },
     )
     assert verify_role_partition(tmp_path) == "A"
+
+
+def test_verify_role_document_partition_accepts_candidate_document() -> None:
+    summary = verify_role_document_partition(
+        {
+            "harnesses": {
+                "A": {"role": ["prime-builder"], "status": "active"},
+                "B": {"role": ["loyal-opposition"], "status": "active"},
+                "C": {"role": ["prime-builder"], "status": "registered"},
+            }
+        }
+    )
+    assert summary.prime_builder_id == "A"
+    assert summary.loyal_opposition_id == "B"
+    assert summary.active_harness_ids == ("A", "B")
+
+
+def test_verify_role_document_partition_rejects_invalid_candidate_document() -> None:
+    candidate = {
+        "harnesses": {
+            "A": {"role": ["prime-builder"], "status": "active"},
+            "B": {"role": ["prime-builder"], "status": "active"},
+            "C": {"role": ["loyal-opposition"], "status": "registered"},
+        }
+    }
+    with pytest.raises(RolePartitionViolation, match="exactly one prime-builder"):
+        verify_role_document_partition(candidate)
 
 
 def test_verify_role_partition_rejects_zero_prime_builder(tmp_path: Path) -> None:

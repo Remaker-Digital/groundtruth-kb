@@ -16,7 +16,7 @@ deliberate precedence.
 
 Two intentional precedence policies:
 
-- ``BRIDGE_WORK_INTENT_ORDER`` (live-harness-first): the bridge work-intent
+- ``BRIDGE_WORK_INTENT_ORDER`` (live-Claude-Code-first): the bridge work-intent
   surfaces -- ``scripts/bridge_claim_cli.py``,
   ``.claude/hooks/bridge-compliance-gate.py``,
   ``.claude/hooks/bridge-axis-2-surface.py``, and the
@@ -63,11 +63,12 @@ SESSION_ID_ENV_VARS: frozenset[str] = frozenset(
     }
 )
 
-# Bridge work-intent surfaces: live-harness-first. Exactly the post-ea2040a5
-# bridge order. A full permutation of SESSION_ID_ENV_VARS (drift-lock T2).
+# Bridge work-intent surfaces: live Claude Code first so stale legacy
+# CLAUDE_SESSION_ID values cannot beat the active Claude Code session.
+# A full permutation of SESSION_ID_ENV_VARS (drift-lock T2).
 BRIDGE_WORK_INTENT_ORDER: tuple[str, ...] = (
-    "CLAUDE_SESSION_ID",
     "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
     "GTKB_INHERITED_SESSION_ID",
     "CODEX_SESSION_ID",
     "CODEX_THREAD_ID",

@@ -975,8 +975,8 @@ def _harness_state_dir(project_root: Path) -> Path:
 def _read_role_assignments(project_root: Path) -> dict[str, Any]:
     """Return the harness role map sourced from the registry projection.
 
-    WI-3342 IP-4: migrated from a direct read of
-    ``harness-state/role-assignments.json`` to the DB-backed registry
+    WI-3342 IP-4: migrated from a direct read of the retired role mirror to
+    the DB-backed registry
     projection ``harness-state/harness-registry.json``. The projection stores
     ``harnesses`` as a LIST; this function returns the legacy document shape
     ``{"harnesses": {harness_id: record}}`` so every consumer

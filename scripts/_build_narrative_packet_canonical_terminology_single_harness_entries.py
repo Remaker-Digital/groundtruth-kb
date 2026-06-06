@@ -34,7 +34,7 @@ NEW_ENTRIES = """### role set
 **Canonical alias:** role-set; durable role set.
 
 **Definition:** The wire form of a harness's durable operating-role
-assignment recorded in ``harness-state/role-assignments.json``. The role set
+assignment recorded in ``harness-state/harness-registry.json``. The role set
 is a JSON list of role tokens drawn from ``{prime-builder, loyal-opposition}``.
 Singleton lists represent the multi-harness case (one role per harness ID);
 multi-element lists represent the single-harness case (one harness ID holds
@@ -84,7 +84,7 @@ prepare capable harnesses for either role regardless of topology);
 
 **Implementation pointer:** Topology is determined at runtime by inspecting
 the active harness's role-set cardinality in
-``harness-state/role-assignments.json``. Multi-element role set ->
+``harness-state/harness-registry.json``. Multi-element role set ->
 single-harness mode applicable. Doctor check
 ``_check_single_harness_dispatcher_when_required`` warns when applicable but
 the scheduled task is absent.
@@ -138,7 +138,9 @@ def build_new_content() -> str:
 
 def main() -> None:
     new_content = build_new_content()
-    out_path = Path(".groundtruth/formal-artifact-approvals/2026-05-12-canonical-terminology-md-single-harness-entries.json")
+    out_path = Path(
+        ".groundtruth/formal-artifact-approvals/2026-05-12-canonical-terminology-md-single-harness-entries.json"
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     packet = {
         "artifact_type": "narrative_artifact",

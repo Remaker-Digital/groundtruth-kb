@@ -4,7 +4,7 @@ Slice 1 only: this script maintains a non-authoritative checksum mirror in
 ``bridge/INDEX.md``. Durable role authority is ``harness-state/harness-registry.json``
 (canonical role registry per Slice 1 retirement) plus
 ``harness-state/harness-identities.json``. The legacy
-``harness-state/role-assignments.json`` mirror is orphan/compat and is not
+retired role mirror is orphan/compat and is not
 authoritative.
 """
 
@@ -328,9 +328,9 @@ def _role_doc_from_registry(registry_doc: dict) -> dict:
     that ``build_role_intent_state()`` consumes.
 
     ``harness-state/harness-registry.json`` is the canonical role registry per
-    Slice 1 retirement of the orphan ``role-assignments.json`` mirror. Its
+    Slice 1 retirement of the orphan role mirror. Its
     ``harnesses`` field is a list of dicts (one per harness id). The legacy
-    ``role-assignments.json`` format was a flat dict keyed by harness id, which
+    role-mirror format was a flat dict keyed by harness id, which
     ``build_role_intent_state()`` expects. This adapter bridges the two without
     requiring an API change to the existing builder.
     """

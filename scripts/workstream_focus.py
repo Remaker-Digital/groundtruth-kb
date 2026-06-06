@@ -515,7 +515,7 @@ def save_state(
         root = project_root if project_root is not None else _project_root_from_env()
         # WI-3342 IP-4: topology resolves from the harness registry projection
         # via the IP-3 foundational loader (load_role_assignments now reads the
-        # projection); the legacy role-assignments.json is no longer read here.
+        # projection); the retired role mirror is no longer read here.
         role_map = load_role_assignments(root)
         if role_map.get("harnesses"):
             state["topology_mode"] = topology_from_role_map(role_map)
@@ -865,7 +865,7 @@ def _harness_state_records_for_project(
         "codex": state_root / "codex" / "session-lifecycle-guard.json",
         "claude": state_root / "claude" / "session-lifecycle-guard.json",
     }
-    return state_root / "role-assignments.json", lifecycle_guards
+    return state_root / "harness-registry.json", lifecycle_guards
 
 
 def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]:

@@ -7,8 +7,8 @@ and per-surface resolution order.
 Coverage:
 
 - T1: ``resolve_session_id`` precedence per ``order`` (explicit wins;
-  CLAUDE_CODE_SESSION_ID resolves when sole; CLAUDE_SESSION_ID beats
-  CLAUDE_CODE_SESSION_ID in bridge order; GTKB_SESSION_ID beats all in marker
+  CLAUDE_CODE_SESSION_ID resolves when sole and beats stale CLAUDE_SESSION_ID
+  in bridge order; GTKB_SESSION_ID beats all in marker
   order; "" when nothing is set).
 - T2 (drift-lock recurrence guard): the two per-surface orders are checked
   against the canonical membership SET so the membership cannot silently
@@ -53,11 +53,11 @@ def test_claude_code_session_id_resolves_when_sole() -> None:
     assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "cc-sole"
 
 
-def test_claude_session_id_beats_claude_code_in_bridge_order() -> None:
-    """In the bridge live-harness-first order, CLAUDE_SESSION_ID precedes
-    CLAUDE_CODE_SESSION_ID (the documented operator workaround is preserved)."""
+def test_claude_code_session_id_beats_legacy_claude_session_in_bridge_order() -> None:
+    """In the bridge work-intent order, the live Claude Code session id wins
+    over stale legacy CLAUDE_SESSION_ID."""
     env = {"CLAUDE_SESSION_ID": "cs", "CLAUDE_CODE_SESSION_ID": "cc"}
-    assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "cs"
+    assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "cc"
 
 
 def test_gtkb_session_id_beats_all_in_marker_order() -> None:

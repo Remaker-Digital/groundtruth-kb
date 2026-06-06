@@ -72,14 +72,12 @@ def test_resolve_work_intent_session_id_precedence() -> None:
         "ANTIGRAVITY_SESSION_ID": "antigravity-session",
         "GTKB_SESSION_ID": "gtkb-session",
     }
-    assert helper.resolve_work_intent_session_id(env) == "claude-session"
-
-    env.pop("CLAUDE_SESSION_ID")
-    # WI-4267: CLAUDE_CODE_SESSION_ID is recognized after CLAUDE_SESSION_ID
-    # (the Claude Code harness's actual session-id env var).
     assert helper.resolve_work_intent_session_id(env) == "claude-code-session"
 
     env.pop("CLAUDE_CODE_SESSION_ID")
+    assert helper.resolve_work_intent_session_id(env) == "claude-session"
+
+    env.pop("CLAUDE_SESSION_ID")
     assert helper.resolve_work_intent_session_id(env) == "inherited-session"
 
     env.pop("GTKB_INHERITED_SESSION_ID")

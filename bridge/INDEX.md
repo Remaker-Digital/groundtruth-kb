@@ -7,42 +7,84 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
-Document: gtkb-ollama-routing-model-version-fixture-cleanup
-VERIFIED: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-004.md
-NEW: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-003.md
-GO: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-002.md
-NEW: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-001.md
+Document: gtkb-dispatcher-config-cli-whole-candidate-validation
+VERIFIED: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-006.md
+NEW: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-005.md
+GO: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-004.md
+REVISED: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-003.md
+NO-GO: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-002.md
+NEW: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-001.md
 
-Document: gtkb-ollama-routing-single-sot-cleanup
-VERIFIED: bridge/gtkb-ollama-routing-single-sot-cleanup-004.md
-NEW: bridge/gtkb-ollama-routing-single-sot-cleanup-003.md
-GO: bridge/gtkb-ollama-routing-single-sot-cleanup-002.md
-NEW: bridge/gtkb-ollama-routing-single-sot-cleanup-001.md
+Document: gtkb-core-spec-intake-current-root-phase3a-cli
+GO: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-002.md
+NEW: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-001.md
 
-Document: gtkb-ollama-qwen-full-lo-dispatch-test-update
-VERIFIED: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-004.md
-NEW: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-003.md
-GO: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-002.md
-NEW: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-001.md
+Document: gtkb-wi3326-project-rehome
+GO: bridge/gtkb-wi3326-project-rehome-004.md
+REVISED: bridge/gtkb-wi3326-project-rehome-003.md
+REVISED: bridge/gtkb-wi3326-project-rehome-002.md
+NEW: bridge/gtkb-wi3326-project-rehome-001.md
 
-Document: gtkb-ollama-qwen-full-lo-route-gate-compliant
-VERIFIED: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-004.md
-NEW: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-003.md
-GO: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-002.md
-NEW: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-001.md
+Document: gtkb-hygiene-cli-utf8-portability-slice-2-guidance
+GO: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-003.md
+REVISED: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-002.md
+NEW: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-001.md
+
+Document: gtkb-startup-control-vocabulary-map
+GO: bridge/gtkb-startup-control-vocabulary-map-002.md
+NEW: bridge/gtkb-startup-control-vocabulary-map-001.md
+
+Document: gtkb-role-enhancement
+GO: bridge/gtkb-role-enhancement-004.md
+REVISED: bridge/gtkb-role-enhancement-003.md
+NO-GO: bridge/gtkb-role-enhancement-002.md
+NEW: bridge/gtkb-role-enhancement-001.md
+
+Document: gtkb-project-completion-plan-incomplete-guard
+GO: bridge/gtkb-project-completion-plan-incomplete-guard-002.md
+NEW: bridge/gtkb-project-completion-plan-incomplete-guard-001.md
+
+Document: gtkb-auto-push-investigation-slice-2
+VERIFIED: bridge/gtkb-auto-push-investigation-slice-2-005.md
+NEW: bridge/gtkb-auto-push-investigation-slice-2-004.md
+GO: bridge/gtkb-auto-push-investigation-slice-2-003.md
+REVISED: bridge/gtkb-auto-push-investigation-slice-2-002.md
+NEW: bridge/gtkb-auto-push-investigation-slice-2-001.md
 
 Document: gtkb-ollama-qwen-full-lo-route
 WITHDRAWN: bridge/gtkb-ollama-qwen-full-lo-route-003.md
 GO: bridge/gtkb-ollama-qwen-full-lo-route-002.md
 NEW: bridge/gtkb-ollama-qwen-full-lo-route-001.md
 
+Document: gtkb-mirror-retirement-target-path-scope-correction
+NO-GO: bridge/gtkb-mirror-retirement-target-path-scope-correction-006.md
+REVISED: bridge/gtkb-mirror-retirement-target-path-scope-correction-005.md
+NO-GO: bridge/gtkb-mirror-retirement-target-path-scope-correction-004.md
+NEW: bridge/gtkb-mirror-retirement-target-path-scope-correction-003.md
+GO: bridge/gtkb-mirror-retirement-target-path-scope-correction-002.md
+NEW: bridge/gtkb-mirror-retirement-target-path-scope-correction-001.md
+
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
+VERIFIED: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-008.md
+REVISED: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-007.md
+NO-GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-006.md
+NEW: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-005.md
 GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-004.md
 REVISED: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-003.md
 NO-GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-002.md
 NEW: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-016.md
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-015.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-014.md
+NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-013.md
+GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-012.md
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-011.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-010.md
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-009.md
+NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-008.md
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-007.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-006.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-005.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-004.md
@@ -146,18 +188,6 @@ NEW: bridge/gtkb-startup-payload-profiler-compact-context-003.md
 GO: bridge/gtkb-startup-payload-profiler-compact-context-002.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-001.md
 
-Document: gtkb-isolation-018-agent-red-cutover
-VERIFIED: bridge/gtkb-isolation-018-agent-red-cutover-010.md
-NEW: bridge/gtkb-isolation-018-agent-red-cutover-009.md
-GO: bridge/gtkb-isolation-018-agent-red-cutover-008.md
-REVISED: bridge/gtkb-isolation-018-agent-red-cutover-007.md
-NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-006.md
-REVISED: bridge/gtkb-isolation-018-agent-red-cutover-005.md
-NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-004.md
-REVISED: bridge/gtkb-isolation-018-agent-red-cutover-003.md
-NO-GO: bridge/gtkb-isolation-018-agent-red-cutover-002.md
-NEW: bridge/gtkb-isolation-018-agent-red-cutover-001.md
-
 Document: gtkb-protected-artifact-rollup-governance-umbrella
 WITHDRAWN: bridge/gtkb-protected-artifact-rollup-governance-umbrella-005.md
 NO-GO: bridge/gtkb-protected-artifact-rollup-governance-umbrella-004.md
@@ -238,14 +268,6 @@ GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-001.md
-
-Document: gtkb-document-author-provenance-contract
-VERIFIED: bridge/gtkb-document-author-provenance-contract-006.md
-NEW: bridge/gtkb-document-author-provenance-contract-005.md
-GO: bridge/gtkb-document-author-provenance-contract-004.md
-REVISED: bridge/gtkb-document-author-provenance-contract-003.md
-NO-GO: bridge/gtkb-document-author-provenance-contract-002.md
-NEW: bridge/gtkb-document-author-provenance-contract-001.md
 
 Document: gtkb-impl-start-target-paths-preflight
 VERIFIED: bridge/gtkb-impl-start-target-paths-preflight-009.md

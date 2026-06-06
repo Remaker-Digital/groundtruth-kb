@@ -69,8 +69,8 @@ def test_render_surface_includes_claim_footer_and_claimed_annotation() -> None:
 # ---------------------------------------------------------------------------
 
 _AXIS2_TUPLE_ENV_VARS = (
-    "CLAUDE_SESSION_ID",
     "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
     "GTKB_INHERITED_SESSION_ID",
     "CODEX_SESSION_ID",
     "CODEX_THREAD_ID",
@@ -90,26 +90,45 @@ def test_axis2_resolve_work_intent_session_id_uses_claude_code_session_id(monkey
     assert mod._resolve_work_intent_session_id({}) == "claude-code-session-probe"
 
 
-def test_axis2_claude_session_id_takes_precedence_over_claude_code(monkeypatch) -> None:
-    """Explicit CLAUDE_SESSION_ID still wins when both are set."""
+def test_axis2_live_claude_code_takes_precedence_over_legacy_claude(monkeypatch) -> None:
+    """Live CLAUDE_CODE_SESSION_ID wins when both Claude vars are set."""
     mod = _load_module()
     for name in _AXIS2_TUPLE_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("CLAUDE_SESSION_ID", "explicit-session-override")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
 
-    assert mod._resolve_work_intent_session_id({}) == "explicit-session-override"
+    assert mod._resolve_work_intent_session_id({}) == "claude-code-session-probe"
 
 
-def test_axis2_work_intent_tuple_orders_claude_code_after_claude_session() -> None:
-    """Precedence contract: CLAUDE_CODE_SESSION_ID must immediately follow
+def test_axis2_work_intent_tuple_orders_claude_code_before_claude_session() -> None:
+    """Precedence contract: CLAUDE_CODE_SESSION_ID must immediately precede
     CLAUDE_SESSION_ID in the tuple."""
     mod = _load_module()
     tuple_ = mod.WORK_INTENT_SESSION_ENV_VARS
     assert "CLAUDE_CODE_SESSION_ID" in tuple_
     claude_index = tuple_.index("CLAUDE_SESSION_ID")
     claude_code_index = tuple_.index("CLAUDE_CODE_SESSION_ID")
-    assert claude_code_index == claude_index + 1
+    assert claude_code_index + 1 == claude_index
+
+
+def test_axis2_live_env_beats_payload_session_id(monkeypatch) -> None:
+    """WI-4377: AXIS 2 work-intent filtering uses live env before payload."""
+    mod = _load_module()
+    for name in _AXIS2_TUPLE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "from-env")
+
+    assert mod._resolve_work_intent_session_id({"session_id": "from-payload"}) == "from-env"
+
+
+def test_axis2_payload_session_id_remains_fallback(monkeypatch) -> None:
+    """Payload session_id is still used when no live env exists."""
+    mod = _load_module()
+    for name in _AXIS2_TUPLE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+    assert mod._resolve_work_intent_session_id({"session_id": "from-payload"}) == "from-payload"
 
 
 # ---------------------------------------------------------------------------

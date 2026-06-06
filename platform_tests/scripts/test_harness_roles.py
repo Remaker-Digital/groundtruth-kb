@@ -16,6 +16,7 @@ from groundtruth_kb.harness_projection import (  # noqa: E402
     generate_harness_projection,
 )
 
+from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 from scripts.harness_roles import (  # noqa: E402
     ROLE_ACTING_PRIME_BUILDER,
     ROLE_LOYAL_OPPOSITION,
@@ -39,13 +40,18 @@ from scripts.harness_roles import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> None:
+HarnessSeed = tuple[str, list[str]] | tuple[str, list[str], str]
+
+
+def _seed_registry(root: Path, harnesses: dict[str, HarnessSeed]) -> None:
     """Seed a groundtruth.db ``harnesses`` table + generated projection.
 
     ``harnesses`` maps each durable harness id to ``(harness_name, role_set)``.
     """
     db = KnowledgeDB(db_path=root / "groundtruth.db")
-    for harness_id, (harness_name, role_set) in harnesses.items():
+    for harness_id, seed in harnesses.items():
+        harness_name, role_set = seed[0], seed[1]
+        status = seed[2] if len(seed) > 2 else "active"
         db.insert_harness(
             id=harness_id,
             harness_name=harness_name,
@@ -53,7 +59,7 @@ def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> N
             role=list(role_set),
             changed_by="test",
             change_reason="WI-3342 IP-6 harness_roles fixture",
-            status="active",
+            status=status,
         )
     generate_harness_projection(db, root)
 
@@ -67,6 +73,14 @@ def _role_of(root: Path, harness_id: str) -> Any:
     """
     document = load_role_assignments(root)
     return document["harnesses"][harness_id]["role"]
+
+
+def _projection_record(root: Path, harness_id: str) -> dict[str, Any]:
+    projection = load_harness_projection(root)
+    for record in projection.get("harnesses", []):
+        if isinstance(record, dict) and record.get("id") == harness_id:
+            return record
+    raise AssertionError(f"missing harness projection record {harness_id!r}")
 
 
 def test_missing_role_map_self_assigns_starting_harness_prime(tmp_path: Path) -> None:
@@ -112,13 +126,13 @@ def test_startup_self_corrects_when_no_prime_is_recorded(tmp_path: Path) -> None
     assert _role_of(tmp_path, "A") == [ROLE_LOYAL_OPPOSITION]
 
 
-def test_setting_prime_demotes_other_recorded_harnesses(tmp_path: Path) -> None:
+def test_setting_prime_updates_only_target_when_candidate_valid(tmp_path: Path) -> None:
     _seed_registry(
         tmp_path,
         {
             "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-            "C": ("third", [ROLE_LOYAL_OPPOSITION]),
+            "B": ("claude", [ROLE_LOYAL_OPPOSITION]),
+            "C": ("third", [ROLE_PRIME_BUILDER], "registered"),
         },
     )
 
@@ -132,10 +146,11 @@ def test_setting_prime_demotes_other_recorded_harnesses(tmp_path: Path) -> None:
     assert role == ROLE_PRIME_BUILDER
     assert _role_of(tmp_path, "A") == [ROLE_PRIME_BUILDER]
     assert _role_of(tmp_path, "B") == [ROLE_LOYAL_OPPOSITION]
-    assert _role_of(tmp_path, "C") == [ROLE_LOYAL_OPPOSITION]
+    document = load_role_assignments(tmp_path)
+    assert "C" not in document["harnesses"]
 
 
-def test_setting_loyal_can_leave_no_prime_until_next_startup(tmp_path: Path) -> None:
+def test_setting_loyal_rejects_candidate_without_prime(tmp_path: Path) -> None:
     _seed_registry(
         tmp_path,
         {
@@ -144,26 +159,40 @@ def test_setting_loyal_can_leave_no_prime_until_next_startup(tmp_path: Path) -> 
         },
     )
 
-    set_harness_role(
-        tmp_path,
-        ROLE_LOYAL_OPPOSITION,
-        harness_id="A",
-        harness_name="codex",
-    )
-    document = load_role_assignments(tmp_path)
-    # No harness's role-set contains prime-builder after the set-LO update.
-    assert all(ROLE_PRIME_BUILDER not in record.get("role", []) for record in document["harnesses"].values())
+    with pytest.raises(ValueError, match="exactly one prime-builder"):
+        set_harness_role(
+            tmp_path,
+            ROLE_LOYAL_OPPOSITION,
+            harness_id="A",
+            harness_name="codex",
+        )
 
-    role, _document, _path = role_for_harness(
+    assert _role_of(tmp_path, "A") == [ROLE_PRIME_BUILDER]
+    assert _role_of(tmp_path, "B") == [ROLE_LOYAL_OPPOSITION]
+
+
+def test_set_harness_role_allows_registered_metadata_update(tmp_path: Path) -> None:
+    _seed_registry(
         tmp_path,
-        harness_id="B",
-        harness_name="claude",
-        ensure_prime_on_startup=True,
+        {
+            "A": ("codex", [ROLE_PRIME_BUILDER]),
+            "B": ("claude", [ROLE_LOYAL_OPPOSITION]),
+            "C": ("third", [ROLE_LOYAL_OPPOSITION], "registered"),
+        },
+    )
+
+    role, _document, _path = set_harness_role(
+        tmp_path,
+        ROLE_PRIME_BUILDER,
+        harness_id="C",
+        harness_name="third",
     )
 
     assert role == ROLE_PRIME_BUILDER
-    assert _role_of(tmp_path, "A") == [ROLE_LOYAL_OPPOSITION]
-    assert _role_of(tmp_path, "B") == [ROLE_PRIME_BUILDER]
+    assert _projection_record(tmp_path, "C")["role"] == [ROLE_PRIME_BUILDER]
+    assert _projection_record(tmp_path, "C")["status"] == "registered"
+    assert _role_of(tmp_path, "A") == [ROLE_PRIME_BUILDER]
+    assert _role_of(tmp_path, "B") == [ROLE_LOYAL_OPPOSITION]
 
 
 # ---------------------------------------------------------------------------

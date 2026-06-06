@@ -354,8 +354,8 @@ def _toolchain_inventory() -> tuple[dict[str, Any], dict[str, Any]]:
 def _harness_inventory(project_root: Path) -> dict[str, Any]:
     # WI-3342 IP-4: harness identity + role state both resolve from the
     # DB-backed registry projection (harness-state/harness-registry.json). The
-    # legacy harness-identities.json / role-assignments.json files are no
-    # longer read here. The projection's ``harnesses`` is a LIST of unified
+    # legacy standalone harness-state files are no longer read here. The
+    # projection's ``harnesses`` is a LIST of unified
     # records ({id, harness_name, harness_type, role, status, ...}); this
     # collector needs ``harness_type``, which the IP-3 foundational loaders
     # strip, so it reads the projection directly via load_harness_projection
@@ -494,7 +494,7 @@ def _compatibility_matrix(
                     ),
                     "role_record_resolution": _capability(
                         "verified" if harnesses.get("role_assignment_source", {}).get("present") else "unknown",
-                        "harness-state/role-assignments.json",
+                        "harness-state/harness-registry.json",
                     ),
                     "file_bridge_read_write": _capability(
                         "verified" if bridge_present else "unknown", "bridge/INDEX.md"
