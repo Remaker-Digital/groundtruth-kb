@@ -16,19 +16,22 @@ deliberate precedence.
 
 Two intentional precedence policies:
 
-- ``BRIDGE_WORK_INTENT_ORDER`` (live-Claude-Code-first): the bridge work-intent
+- ``BRIDGE_WORK_INTENT_ORDER`` (dispatch-run-first): the bridge work-intent
   surfaces -- ``scripts/bridge_claim_cli.py``,
   ``.claude/hooks/bridge-compliance-gate.py``,
   ``.claude/hooks/bridge-axis-2-surface.py``, and the
-  ``bridge-propose`` ``write_bridge`` helper. A full permutation of
-  ``SESSION_ID_ENV_VARS``.
+  ``bridge-propose`` ``write_bridge`` helper. Headless bridge dispatch workers
+  resolve ``GTKB_BRIDGE_POLLER_RUN_ID`` before any ambient parent harness
+  session; remaining order preserves the live-Claude-Code-first behavior. A
+  full permutation of ``SESSION_ID_ENV_VARS``.
 - ``MARKER_CONTINUITY_ORDER`` (``GTKB_SESSION_ID``-first): the session-role
   marker surfaces -- ``scripts/workstream_focus.py`` (marker writer) and
   ``groundtruth-kb/src/groundtruth_kb/project/doctor.py`` (doctor marker
   resolver) -- so an inherited/dispatched GT-KB session id wins over ambient
   harness env. A documented SUBSET of ``SESSION_ID_ENV_VARS`` (intentionally
-  excludes ``GTKB_INHERITED_SESSION_ID`` and ``ANTIGRAVITY_SESSION_ID`` to
-  preserve the current marker-continuity behavior).
+  excludes ``GTKB_BRIDGE_POLLER_RUN_ID``, ``GTKB_INHERITED_SESSION_ID`` and
+  ``ANTIGRAVITY_SESSION_ID`` to preserve the current marker-continuity
+  behavior).
 
 Hook-safe contract: stdlib-only, no third-party or repo-internal imports and no
 import-time side effects, so PreToolUse/UserPromptSubmit hooks can import this
@@ -55,6 +58,7 @@ SESSION_ID_ENV_VARS: frozenset[str] = frozenset(
     {
         "CLAUDE_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
+        "GTKB_BRIDGE_POLLER_RUN_ID",
         "GTKB_INHERITED_SESSION_ID",
         "CODEX_SESSION_ID",
         "CODEX_THREAD_ID",
@@ -63,10 +67,13 @@ SESSION_ID_ENV_VARS: frozenset[str] = frozenset(
     }
 )
 
-# Bridge work-intent surfaces: live Claude Code first so stale legacy
-# CLAUDE_SESSION_ID values cannot beat the active Claude Code session.
-# A full permutation of SESSION_ID_ENV_VARS (drift-lock T2).
+# Bridge work-intent surfaces: headless dispatch run id first so parent harness
+# session ids cannot override a spawned worker's bridge work-intent identity.
+# Live Claude Code remains ahead of stale legacy CLAUDE_SESSION_ID for ordinary
+# interactive bridge writes. A full permutation of SESSION_ID_ENV_VARS
+# (drift-lock T2).
 BRIDGE_WORK_INTENT_ORDER: tuple[str, ...] = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
     "CLAUDE_CODE_SESSION_ID",
     "CLAUDE_SESSION_ID",
     "GTKB_INHERITED_SESSION_ID",

@@ -651,6 +651,9 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
     assert child_env["GTKB_BRIDGE_POLLER_RUN_ID"] == meta["dispatch_id"], (
         "GTKB_BRIDGE_POLLER_RUN_ID must equal the dispatch_id"
     )
+    assert child_env["GTKB_INHERITED_SESSION_ID"] == meta["dispatch_id"], (
+        "GTKB_INHERITED_SESSION_ID must mirror dispatch_id for compatibility work-intent surfaces"
+    )
     assert "GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS" not in child_env
 
 
@@ -712,6 +715,7 @@ def test_prime_spawn_creates_dispatch_authorization_packet_and_env(
     assert (root / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{doc}.json").is_file()
     child_env = captured_envs[0]
     assert child_env["GTKB_IMPLEMENTATION_AUTH_DISPATCH_ID"] == "dispatch-prime"
+    assert child_env["GTKB_INHERITED_SESSION_ID"] == "dispatch-prime"
     assert child_env["GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS"] == doc
     assert child_env["GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID"] == doc
     assert child_env["GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES"] == current["packet_hash"]

@@ -135,6 +135,45 @@ def test_author_metadata_check_passes_when_model_id_matches(verify_module, ollam
     assert verify_module._check_author_metadata(route, "http://localhost:11434") is True
 
 
+def test_ollama_session_resolver_prefers_dispatch_run_id(ollama_harness_module) -> None:
+    env = {
+        "GTKB_BRIDGE_POLLER_RUN_ID": "dispatch-run",
+        "CODEX_THREAD_ID": "parent-codex-thread",
+        "GTKB_SESSION_ID": "parent-gtkb",
+    }
+
+    assert ollama_harness_module.resolve_ollama_session_id(env) == "dispatch-run"
+
+
+def test_ollama_guard_payload_uses_dispatch_run_id(ollama_harness_module, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
+    monkeypatch.setenv("CODEX_THREAD_ID", "parent-codex-thread")
+    guard_path = tmp_path / "guard.py"
+    guard_path.write_text("# fixture guard\n", encoding="utf-8")
+    captured: list[dict[str, object]] = []
+
+    def guard_runner(path, payload, env, timeout):  # noqa: ANN001, ARG001
+        captured.append(dict(payload))
+        return ollama_harness_module.GuardExecutionResult(0, "{}")
+
+    metadata = ollama_harness_module.ModelMetadata(
+        model_id="qwen3-coder-next:cloud",
+        model_version="cloud",
+        endpoint="http://localhost:11434",
+        route_key="qwen3-coder-next-cloud",
+    )
+    ollama_harness_module.invoke_guard_adapter(
+        "Write",
+        {"path": str(tmp_path / "bridge" / "gtkb-fixture-001.md"), "content": "NEW\n"},
+        metadata,
+        tmp_path,
+        guard_runner=guard_runner,
+        guard_paths=(guard_path,),
+    )
+
+    assert captured[0]["session_id"] == "dispatch-run"
+
+
 # ── Live-mode: bridge filing via dispatch ────────────────────────────────
 
 

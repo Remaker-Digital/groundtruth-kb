@@ -28,6 +28,7 @@ def _load_cli():
 def _run_cli(tmp_path: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     run_env = os.environ.copy()
     for key in (
+        "GTKB_BRIDGE_POLLER_RUN_ID",
         "CLAUDE_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "GTKB_INHERITED_SESSION_ID",
@@ -55,6 +56,7 @@ def test_resolve_session_id_uses_harness_neutral_fallbacks(monkeypatch) -> None:
     # must stay in sync with cli.SESSION_ENV_VARS (entries above CODEX_THREAD_ID).
     monkeypatch.delenv("CLAUDE_SESSION_ID", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     monkeypatch.delenv("GTKB_INHERITED_SESSION_ID", raising=False)
     monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
     monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
@@ -69,6 +71,7 @@ def test_resolve_session_id_uses_claude_code_session_id(monkeypatch) -> None:
     the docs-aligned CLAUDE_SESSION_ID name."""
     cli = _load_cli()
     for name in (
+        "GTKB_BRIDGE_POLLER_RUN_ID",
         "CLAUDE_SESSION_ID",
         "GTKB_INHERITED_SESSION_ID",
         "CODEX_SESSION_ID",
@@ -86,6 +89,7 @@ def test_resolve_session_id_live_claude_code_precedence(monkeypatch) -> None:
     """When both Claude env vars are set, live CLAUDE_CODE_SESSION_ID wins."""
     cli = _load_cli()
     for name in (
+        "GTKB_BRIDGE_POLLER_RUN_ID",
         "GTKB_INHERITED_SESSION_ID",
         "CODEX_SESSION_ID",
         "CODEX_THREAD_ID",
@@ -122,6 +126,21 @@ def test_claim_session_id_flag_beats_env(tmp_path: Path) -> None:
     )
     assert claim.returncode == 0, claim.stderr
     assert json.loads(claim.stdout)["session_id"] == "explicit-session"
+
+
+def test_claim_resolves_dispatch_run_id_before_parent_session(tmp_path: Path) -> None:
+    claim = _run_cli(
+        tmp_path,
+        "claim",
+        "gtkb-dispatch-thread",
+        env={
+            "GTKB_BRIDGE_POLLER_RUN_ID": "dispatch-run",
+            "CLAUDE_CODE_SESSION_ID": "parent-claude",
+            "CODEX_THREAD_ID": "parent-codex-thread",
+        },
+    )
+    assert claim.returncode == 0, claim.stderr
+    assert json.loads(claim.stdout)["session_id"] == "dispatch-run"
 
 
 def test_claim_release_status_round_trip_with_codex_env(tmp_path: Path) -> None:

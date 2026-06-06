@@ -1475,6 +1475,11 @@ def _spawn_harness(
     # The env-var name is reused (cosmetic rename to GTKB_BRIDGE_TRIGGER_RUN_ID
     # is tracked as Open Follow-On 6 of slice-4 retirement).
     env["GTKB_BRIDGE_POLLER_RUN_ID"] = dispatch_id
+    # Compatibility for bridge work-intent surfaces that predate the poller-run
+    # variable. The shared resolver now prefers GTKB_BRIDGE_POLLER_RUN_ID, but
+    # keeping the inherited session aligned prevents older worker surfaces from
+    # claiming under a different id.
+    env["GTKB_INHERITED_SESSION_ID"] = dispatch_id
     if packet_context is not None:
         packet_bridge_ids = [str(item) for item in packet_context.get("bridge_ids", [])]
         packet_hashes = [

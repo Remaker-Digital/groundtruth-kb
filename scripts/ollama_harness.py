@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
 try:
     import tomllib
 except ImportError:  # pragma: no cover - Python <3.11 fallback is not expected in CI.
@@ -410,6 +412,11 @@ def set_author_metadata_env(
     return updated
 
 
+def resolve_ollama_session_id(environ: Mapping[str, str] | None = None) -> str:
+    """Resolve the bridge work-intent session id used by guarded Ollama tools."""
+    return resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=environ)
+
+
 def _default_guard_runner(
     guard_path: Path,
     payload: dict[str, Any],
@@ -506,7 +513,7 @@ def invoke_guard_adapter(
         "tool_input": tool_input,
         "cwd": str(project_root),
         "project_root": str(project_root),
-        "session_id": os.environ.get("GTKB_SESSION_ID") or os.environ.get("CODEX_SESSION_ID") or "ollama-harness-d",
+        "session_id": resolve_ollama_session_id(os.environ) or "ollama-harness-d",
     }
     for relative_guard_path in paths:
         guard_path = relative_guard_path if relative_guard_path.is_absolute() else project_root / relative_guard_path

@@ -69,6 +69,7 @@ def test_render_surface_includes_claim_footer_and_claimed_annotation() -> None:
 # ---------------------------------------------------------------------------
 
 _AXIS2_TUPLE_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
     "CLAUDE_CODE_SESSION_ID",
     "CLAUDE_SESSION_ID",
     "GTKB_INHERITED_SESSION_ID",
@@ -88,6 +89,16 @@ def test_axis2_resolve_work_intent_session_id_uses_claude_code_session_id(monkey
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
 
     assert mod._resolve_work_intent_session_id({}) == "claude-code-session-probe"
+
+
+def test_axis2_resolve_work_intent_session_id_prefers_dispatch_run_id(monkeypatch) -> None:
+    mod = _load_module()
+    for name in _AXIS2_TUPLE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
+    monkeypatch.setenv("CODEX_THREAD_ID", "parent-codex-thread")
+
+    assert mod._resolve_work_intent_session_id({"session_id": "from-payload"}) == "dispatch-run"
 
 
 def test_axis2_live_claude_code_takes_precedence_over_legacy_claude(monkeypatch) -> None:

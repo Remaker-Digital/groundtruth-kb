@@ -7,6 +7,16 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-lo-dispatch-session-propagation
+VERIFIED: bridge/gtkb-ollama-lo-dispatch-session-propagation-008.md
+NEW: bridge/gtkb-ollama-lo-dispatch-session-propagation-007.md
+GO: bridge/gtkb-ollama-lo-dispatch-session-propagation-006.md
+REVISED: bridge/gtkb-ollama-lo-dispatch-session-propagation-005.md
+GO: bridge/gtkb-ollama-lo-dispatch-session-propagation-004.md
+REVISED: bridge/gtkb-ollama-lo-dispatch-session-propagation-003.md
+GO: bridge/gtkb-ollama-lo-dispatch-session-propagation-002.md
+NEW: bridge/gtkb-ollama-lo-dispatch-session-propagation-001.md
+
 Document: gtkb-sweep-commit-skill-parity-registration
 VERIFIED: bridge/gtkb-sweep-commit-skill-parity-registration-009.md
 NEW: bridge/gtkb-sweep-commit-skill-parity-registration-008.md

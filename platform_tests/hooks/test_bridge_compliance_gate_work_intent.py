@@ -90,6 +90,7 @@ def test_matching_session_claim_allows_write(gate: ModuleType, tmp_path: Path, m
 # ---------------------------------------------------------------------------
 
 _WORK_INTENT_TUPLE_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
     "CLAUDE_CODE_SESSION_ID",
     "CLAUDE_SESSION_ID",
     "GTKB_INHERITED_SESSION_ID",
@@ -114,6 +115,16 @@ def test_resolve_work_intent_session_id_uses_claude_code_session_id(
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-code-session-probe")
 
     assert gate._resolve_work_intent_session_id({}) == "claude-code-session-probe"
+
+
+def test_resolve_work_intent_session_id_prefers_dispatch_run_id(
+    gate: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_session_env(monkeypatch)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
+    monkeypatch.setenv("CODEX_THREAD_ID", "parent-codex-thread")
+
+    assert gate._resolve_work_intent_session_id({"session_id": "from-payload"}) == "dispatch-run"
 
 
 def test_resolve_work_intent_session_id_live_claude_code_takes_precedence(

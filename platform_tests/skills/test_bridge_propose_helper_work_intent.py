@@ -64,6 +64,7 @@ def test_resolve_work_intent_session_id_precedence() -> None:
     helper = _load_helper()
 
     env = {
+        "GTKB_BRIDGE_POLLER_RUN_ID": "dispatch-session",
         "CLAUDE_SESSION_ID": " claude-session ",
         "CLAUDE_CODE_SESSION_ID": "claude-code-session",
         "GTKB_INHERITED_SESSION_ID": "inherited-session",
@@ -72,6 +73,9 @@ def test_resolve_work_intent_session_id_precedence() -> None:
         "ANTIGRAVITY_SESSION_ID": "antigravity-session",
         "GTKB_SESSION_ID": "gtkb-session",
     }
+    assert helper.resolve_work_intent_session_id(env) == "dispatch-session"
+
+    env.pop("GTKB_BRIDGE_POLLER_RUN_ID")
     assert helper.resolve_work_intent_session_id(env) == "claude-code-session"
 
     env.pop("CLAUDE_CODE_SESSION_ID")

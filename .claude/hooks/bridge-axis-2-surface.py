@@ -88,6 +88,7 @@ try:
     from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER as WORK_INTENT_SESSION_ENV_VARS
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
     WORK_INTENT_SESSION_ENV_VARS = (
+        "GTKB_BRIDGE_POLLER_RUN_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CLAUDE_SESSION_ID",
         "GTKB_INHERITED_SESSION_ID",

@@ -60,6 +60,17 @@ def test_claude_code_session_id_beats_legacy_claude_session_in_bridge_order() ->
     assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "cc"
 
 
+def test_dispatch_run_id_beats_parent_harness_env_in_bridge_order() -> None:
+    """A spawned bridge worker's dispatch id must outrank parent harness env."""
+    env = {
+        "GTKB_BRIDGE_POLLER_RUN_ID": "dispatch-run",
+        "CLAUDE_CODE_SESSION_ID": "parent-claude",
+        "CODEX_THREAD_ID": "parent-codex-thread",
+        "GTKB_SESSION_ID": "parent-gtkb",
+    }
+    assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "dispatch-run"
+
+
 def test_gtkb_session_id_beats_all_in_marker_order() -> None:
     """In the marker-continuity order, GTKB_SESSION_ID wins over harness vars."""
     env = {
@@ -123,3 +134,9 @@ def test_claude_code_session_id_locked_into_all_surfaces() -> None:
     assert "CLAUDE_CODE_SESSION_ID" in SESSION_ID_ENV_VARS
     assert "CLAUDE_CODE_SESSION_ID" in BRIDGE_WORK_INTENT_ORDER
     assert "CLAUDE_CODE_SESSION_ID" in MARKER_CONTINUITY_ORDER
+
+
+def test_dispatch_run_id_is_bridge_only_marker_excluded() -> None:
+    assert "GTKB_BRIDGE_POLLER_RUN_ID" in SESSION_ID_ENV_VARS
+    assert BRIDGE_WORK_INTENT_ORDER[0] == "GTKB_BRIDGE_POLLER_RUN_ID"
+    assert "GTKB_BRIDGE_POLLER_RUN_ID" not in MARKER_CONTINUITY_ORDER

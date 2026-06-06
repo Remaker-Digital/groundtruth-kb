@@ -645,6 +645,7 @@ def test_template_helper_exposes_work_intent_session_resolution() -> None:
     helper = _load_helper()
 
     env = {
+        "GTKB_BRIDGE_POLLER_RUN_ID": "dispatch-session",
         "CLAUDE_SESSION_ID": "claude-session",
         "GTKB_INHERITED_SESSION_ID": "inherited-session",
         "CODEX_SESSION_ID": "codex-session",
@@ -652,6 +653,9 @@ def test_template_helper_exposes_work_intent_session_resolution() -> None:
         "ANTIGRAVITY_SESSION_ID": "antigravity-session",
         "GTKB_SESSION_ID": "gtkb-session",
     }
+    assert helper.resolve_work_intent_session_id(env) == "dispatch-session"
+
+    env.pop("GTKB_BRIDGE_POLLER_RUN_ID")
     assert helper.resolve_work_intent_session_id(env) == "claude-session"
 
     env.pop("CLAUDE_SESSION_ID")
