@@ -958,6 +958,15 @@ _LABEL_TO_CANONICAL_MODE = {
     "loyal-opposition": "lo",
 }
 
+OLLAMA_HARNESS_TYPE = "ollama"
+
+
+def _evaluate_ollama_dispatch_readiness(project_root: Path) -> dict[str, Any]:
+    """Evaluate the Ollama-specific dispatch substrate, fail-closed on import errors."""
+    from verify_ollama_dispatch import evaluate_dispatch_readiness  # noqa: PLC0415
+
+    return evaluate_dispatch_readiness(project_root)
+
 
 def _harness_state_dir(project_root: Path) -> Path:
     return project_root / "harness-state"
@@ -1197,7 +1206,45 @@ def _resolve_dispatch_target(
     # event-driven bridge dispatch also requires bridge-event reception
     # capability. Missing, false, or unknown capability is fail-closed.
     def _is_event_capable(h_info: dict[str, object]) -> bool:
-        return h_info.get("event_driven_hooks") is True
+        if h_info.get("event_driven_hooks") is True:
+            return True
+        return str(h_info.get("harness_type") or "").strip().lower() == OLLAMA_HARNESS_TYPE
+
+    def _is_dispatch_ready(h_id: str, h_info: dict[str, object]) -> bool:
+        if str(h_info.get("harness_type") or "").strip().lower() != OLLAMA_HARNESS_TYPE:
+            return True
+        try:
+            result = _evaluate_ollama_dispatch_readiness(project_root)
+        except Exception as exc:  # noqa: BLE001 - trigger must fail closed but never crash the hook
+            if state_dir is not None:
+                _record_dispatch_failure(
+                    state_dir,
+                    {
+                        "dispatch_id": _now_iso() + "-ollama-dispatch-readiness",
+                        "recipient": needed_role_label,
+                        "harness_id": h_id,
+                        "launched": False,
+                        "reason": "ollama_dispatch_not_ready",
+                        "error_type": type(exc).__name__,
+                        "error_message": str(exc),
+                    },
+                )
+            return False
+        if result.get("ready") is True:
+            return True
+        if state_dir is not None:
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "dispatch_id": _now_iso() + "-ollama-dispatch-readiness",
+                    "recipient": needed_role_label,
+                    "harness_id": h_id,
+                    "launched": False,
+                    "reason": "ollama_dispatch_not_ready",
+                    "readiness": result,
+                },
+            )
+        return False
 
     role_matching = [
         (h_id, h_info)
@@ -1205,7 +1252,9 @@ def _resolve_dispatch_target(
         if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
     ]
     active_matching = [
-        (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info) and _is_event_capable(h_info)
+        (h_id, h_info)
+        for h_id, h_info in role_matching
+        if _is_active(h_info) and _is_event_capable(h_info) and _is_dispatch_ready(h_id, h_info)
     ]
 
     if not active_matching:
@@ -1216,7 +1265,9 @@ def _resolve_dispatch_target(
         if state_dir is not None:
             inactive_ids = sorted(h_id for h_id, _ in role_matching)
             note = (
-                f" (role-set members exist but none active and event-capable: {inactive_ids})" if inactive_ids else ""
+                f" (role-set members exist but none active and event-capable and dispatch-ready: {inactive_ids})"
+                if inactive_ids
+                else ""
             )
             _record_dispatch_failure(
                 state_dir,

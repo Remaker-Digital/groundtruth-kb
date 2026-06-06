@@ -40,6 +40,10 @@ NO-GO: bridge/gtkb-ollama-integration-phase-2-adapters-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-adapters-001.md
 
 Document: gtkb-ollama-integration-phase-2-dispatch
+VERIFIED: bridge/gtkb-ollama-integration-phase-2-dispatch-012.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-011.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-010.md
+NEW: bridge/gtkb-ollama-integration-phase-2-dispatch-009.md
 GO: bridge/gtkb-ollama-integration-phase-2-dispatch-008.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-007.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-006.md

@@ -50,6 +50,11 @@ Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-
 - ``VERIFIED`` / ``ADVISORY`` / ``DEFERRED`` / ``WITHDRAWN`` top status →
   not actionable for either.
 
+Phase-2 Ollama dispatch wiring keeps this module role-actionability-only.
+Harness-local readiness (Ollama shim, daemon, route/tool subset) is applied
+downstream by ``scripts/cross_harness_bridge_trigger.py`` when a role-actionable
+entry resolves to harness D.
+
 Schema v3 (bumped from v2 per kind-aware-routing slice): ``pending_actions[]``
 entries now carry ``dispatchable`` (bool) + ``classification`` (str:
 "dispatchable"/"terminal"/"ambiguous") fields in addition to the v2 fields.

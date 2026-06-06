@@ -35,16 +35,30 @@ _PROJECT_ROOT = _SCRIPT_DIR.parent if (_SCRIPT_DIR.parent / "groundtruth.toml").
 
 sys.path.insert(0, str(_PROJECT_ROOT / "scripts"))
 
+from harness_projection_reader import load_harness_projection  # noqa: E402
 from ollama_harness import (  # noqa: E402
     DEFAULT_ENDPOINT,
+    DEFAULT_TIMEOUT_SECONDS,
     ModelMetadata,
     ModelRoute,
     OllamaHarnessError,
+    call_ollama_tags,
     dispatch_tool_call,
     load_routing_config,
     resolve_model,
     run_tool_loop,
 )
+
+OLLAMA_HARNESS_ID = "D"
+OLLAMA_HARNESS_NAME = "ollama"
+OLLAMA_DISPATCH_SKILL = "bridge-review"
+OLLAMA_DISPATCH_REQUIRED_TOOLS = ("Read", "Grep", "Glob")
+OLLAMA_SHIM_RELATIVE = Path("scripts") / "ollama_harness.py"
+
+
+class VerificationError(RuntimeError):
+    """Raised when Ollama dispatch readiness cannot be verified."""
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -65,6 +79,166 @@ def _print_result(label: str, passed: bool, detail: str = "") -> None:
     status = "PASS" if passed else "FAIL"
     suffix = f" — {detail}" if detail else ""
     print(f"  [{status}] {label}{suffix}")
+
+
+def load_harness_record(project_root: Path, recipient: str = OLLAMA_HARNESS_ID) -> dict[str, Any]:
+    """Load the Ollama harness record from the generated registry projection."""
+    registry = load_harness_projection(project_root)
+    for record in registry.get("harnesses", []):
+        if isinstance(record, dict) and str(record.get("id")) == recipient:
+            return record
+    raise VerificationError(f"recipient harness not found in registry: {recipient}")
+
+
+def _render_argv_template(argv_template: list[Any], prompt: str, project_root: Path) -> list[str]:
+    if not argv_template or any(not isinstance(item, str) for item in argv_template):
+        raise VerificationError("headless argv template must be a non-empty string list")
+    command: list[str] = []
+    for element in argv_template:
+        if element == "{{PROMPT}}":
+            command.append(prompt)
+        elif element == "{{PROJECT_ROOT}}":
+            command.append(str(project_root))
+        else:
+            command.append(element)
+    return command
+
+
+def build_dispatch_command(
+    project_root: Path,
+    prompt: str,
+    *,
+    recipient: str = OLLAMA_HARNESS_ID,
+) -> list[str]:
+    """Render the registry-projected headless argv for the Ollama harness."""
+    record = load_harness_record(project_root, recipient)
+    if record.get("harness_name") != OLLAMA_HARNESS_NAME or record.get("harness_type") != OLLAMA_HARNESS_NAME:
+        raise VerificationError(
+            f"recipient {recipient} is not ollama: "
+            f"name={record.get('harness_name')!r}, type={record.get('harness_type')!r}"
+        )
+    status = record.get("status")
+    if status not in {"registered", "active"}:
+        raise VerificationError(f"recipient {recipient} has unsupported status: {status!r}")
+    surfaces = record.get("invocation_surfaces")
+    if not isinstance(surfaces, dict):
+        raise VerificationError(f"recipient {recipient} has no invocation_surfaces object")
+    headless = surfaces.get("headless")
+    if not isinstance(headless, dict):
+        raise VerificationError(f"recipient {recipient} has no headless invocation surface")
+    argv_template = headless.get("argv")
+    if not isinstance(argv_template, list):
+        raise VerificationError(f"recipient {recipient} headless surface has no argv list")
+    command = _render_argv_template(argv_template, prompt, project_root)
+    normalized = [part.replace("\\", "/") for part in command]
+    if OLLAMA_SHIM_RELATIVE.as_posix() not in normalized:
+        raise VerificationError(
+            f"recipient {recipient} headless argv does not invoke {OLLAMA_SHIM_RELATIVE.as_posix()}"
+        )
+    if "--skill" not in command or OLLAMA_DISPATCH_SKILL not in command:
+        raise VerificationError(f"recipient {recipient} headless argv must select skill {OLLAMA_DISPATCH_SKILL!r}")
+    return command
+
+
+def _model_advertised(model_id: str, advertised_model_ids: set[str]) -> bool:
+    return any(name == model_id or name.startswith(model_id + ":") for name in advertised_model_ids)
+
+
+def evaluate_dispatch_readiness(
+    project_root: Path,
+    *,
+    endpoint: str = DEFAULT_ENDPOINT,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    recipient: str = OLLAMA_HARNESS_ID,
+    prompt: str = "::init gtkb lo\nDispatch readiness probe.\n",
+    require_daemon: bool = True,
+) -> dict[str, Any]:
+    """Return a fail-closed Ollama dispatch-readiness result.
+
+    This verifies substrate readiness only. Role assignment and active status
+    remain owned by the harness registry resolver.
+    """
+    checks: list[dict[str, Any]] = []
+
+    def add_check(name: str, passed: bool, detail: str = "") -> None:
+        checks.append({"name": name, "passed": passed, "detail": detail})
+
+    try:
+        command = build_dispatch_command(project_root, prompt, recipient=recipient)
+        add_check("registry headless argv", True, " ".join(command[:3]))
+    except VerificationError as exc:
+        add_check("registry headless argv", False, str(exc))
+        return {"ready": False, "checks": checks, "recipient": recipient}
+
+    shim_path = project_root / OLLAMA_SHIM_RELATIVE
+    shim_ok = shim_path.is_file()
+    add_check("shim present", shim_ok, OLLAMA_SHIM_RELATIVE.as_posix())
+    if not shim_ok:
+        return {"ready": False, "checks": checks, "recipient": recipient, "argv": command}
+
+    try:
+        config = load_routing_config(project_root)
+        model_route = resolve_model(config, None, skill=OLLAMA_DISPATCH_SKILL)
+    except OllamaHarnessError as exc:
+        add_check("routing skill route", False, str(exc))
+        return {"ready": False, "checks": checks, "recipient": recipient, "argv": command}
+
+    required = set(OLLAMA_DISPATCH_REQUIRED_TOOLS)
+    allowed = set(model_route.allowed_tools)
+    missing_tools = sorted(required - allowed)
+    route_ok = model_route.tool_calling_supported and not missing_tools
+    add_check(
+        "routing skill route",
+        route_ok,
+        (
+            f"{OLLAMA_DISPATCH_SKILL}->{model_route.key}; "
+            f"tool_calling={model_route.tool_calling_supported}; missing_tools={missing_tools}"
+        ),
+    )
+    if not route_ok:
+        return {
+            "ready": False,
+            "checks": checks,
+            "recipient": recipient,
+            "argv": command,
+            "model_id": model_route.model_id,
+            "route_key": model_route.key,
+        }
+
+    if require_daemon:
+        try:
+            advertised = call_ollama_tags(endpoint, timeout)
+        except OllamaHarnessError as exc:
+            add_check("ollama /api/tags", False, str(exc))
+            return {
+                "ready": False,
+                "checks": checks,
+                "recipient": recipient,
+                "argv": command,
+                "model_id": model_route.model_id,
+                "route_key": model_route.key,
+            }
+        advertised_ok = _model_advertised(model_route.model_id, set(advertised))
+        add_check("ollama /api/tags", advertised_ok, f"model_id={model_route.model_id}")
+        if not advertised_ok:
+            return {
+                "ready": False,
+                "checks": checks,
+                "recipient": recipient,
+                "argv": command,
+                "model_id": model_route.model_id,
+                "route_key": model_route.key,
+            }
+
+    return {
+        "ready": True,
+        "checks": checks,
+        "recipient": recipient,
+        "argv": command,
+        "model_id": model_route.model_id,
+        "route_key": model_route.key,
+        "required_tools": list(OLLAMA_DISPATCH_REQUIRED_TOOLS),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -386,9 +560,42 @@ def _check_guard_out_of_root(project_root: Path, model_route: ModelRoute, endpoi
 # ---------------------------------------------------------------------------
 
 
-def main() -> int:
-    endpoint = os.environ.get("OLLAMA_ENDPOINT", DEFAULT_ENDPOINT)
-    project_root = _PROJECT_ROOT
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--readiness-only", action="store_true", help="Only verify Ollama bridge dispatch readiness.")
+    parser.add_argument("--project-root", type=Path, default=_PROJECT_ROOT)
+    parser.add_argument("--recipient", default=OLLAMA_HARNESS_ID)
+    parser.add_argument("--endpoint", default=os.environ.get("OLLAMA_ENDPOINT", DEFAULT_ENDPOINT))
+    parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument(
+        "--skip-daemon",
+        action="store_true",
+        help="Skip the /api/tags readiness probe; structural checks still run.",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON for readiness-only mode.")
+    args = parser.parse_args(argv)
+
+    endpoint = args.endpoint
+    project_root = args.project_root.resolve()
+
+    if args.readiness_only:
+        result = evaluate_dispatch_readiness(
+            project_root,
+            endpoint=endpoint,
+            timeout=args.timeout,
+            recipient=args.recipient,
+            require_daemon=not args.skip_daemon,
+        )
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            status = "READY" if result["ready"] else "NOT READY"
+            print(f"Ollama dispatch readiness: {status}")
+            for check in result["checks"]:
+                _print_result(check["name"], bool(check["passed"]), str(check.get("detail") or ""))
+        return 0 if result["ready"] else 1
 
     print(f"Ollama dispatch verification — project root: {project_root}")
     print(f"Endpoint: {endpoint}")
