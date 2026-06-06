@@ -16,24 +16,40 @@ GO: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-002.md
 NEW: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-001.md
 
 Document: gtkb-ollama-integration-phase-2-routing
+GO: bridge/gtkb-ollama-integration-phase-2-routing-008.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-routing-007.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-routing-006.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-routing-005.md
 GO: bridge/gtkb-ollama-integration-phase-2-routing-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-routing-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-routing-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-routing-001.md
 
 Document: gtkb-ollama-integration-phase-2-adapters
+GO: bridge/gtkb-ollama-integration-phase-2-adapters-008.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-007.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-adapters-006.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-005.md
 GO: bridge/gtkb-ollama-integration-phase-2-adapters-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-adapters-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-adapters-001.md
 
 Document: gtkb-ollama-integration-phase-2-dispatch
+GO: bridge/gtkb-ollama-integration-phase-2-dispatch-008.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-007.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-006.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-005.md
 GO: bridge/gtkb-ollama-integration-phase-2-dispatch-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-dispatch-001.md
 
 Document: gtkb-ollama-integration-phase-2-role-promotion
+GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-008.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-007.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-006.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-005.md
 GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-004.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-003.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-002.md
