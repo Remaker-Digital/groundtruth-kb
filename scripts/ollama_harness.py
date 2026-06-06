@@ -30,6 +30,7 @@ ROUTING_CONFIG_PATH = Path(".ollama") / "routing.toml"
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
+LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
 AUTHOR_IDENTITY = "Ollama D"
@@ -124,6 +125,13 @@ def _as_non_empty_string(value: Any, *, field: str) -> str:
     return value
 
 
+def infer_model_version(model_id: str) -> str:
+    """Return the Ollama tag portion from a model id such as ``name:tag``."""
+    if ":" not in model_id:
+        return "unversioned"
+    return model_id.rsplit(":", 1)[1] or "unversioned"
+
+
 def _parse_skill_routes(routing: Mapping[str, Any], models: Mapping[str, ModelRoute]) -> dict[str, str]:
     skills_raw = routing.get("skills") or {}
     if not isinstance(skills_raw, dict):
@@ -204,7 +212,7 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
         if not isinstance(key, str) or not key or not isinstance(row, dict):
             raise OllamaHarnessError("model rows must be named TOML tables")
         model_id = _as_non_empty_string(row.get("model_id"), field=f"models.{key}.model_id")
-        model_version = _as_non_empty_string(row.get("model_version"), field=f"models.{key}.model_version")
+        model_version = infer_model_version(model_id)
         allowed_tools = tuple(_as_list(row.get("allowed_tools"), field=f"models.{key}.allowed_tools"))
         if row.get("tool_calling_supported") is not True:
             raise OllamaHarnessError(f"models.{key}.tool_calling_supported must be true")
@@ -238,6 +246,38 @@ def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str
         return config.models[route_key]
     except KeyError as exc:
         raise OllamaHarnessError(f"unknown model route: {route_key}") from exc
+
+
+def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | None:
+    """Return role context for Ollama skill routes that need GT-KB bridge behavior."""
+    if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
+        return None
+    allowed_tools = ", ".join(model_route.allowed_tools)
+    return f"""You are Ollama harness D operating as Loyal Opposition for GT-KB.
+
+Use the GT-KB file bridge as the authoritative workflow surface. Read bridge/INDEX.md before
+acting, read the full version chain for the target document, and respond to latest NEW or
+REVISED bridge entries by writing the next numbered bridge verdict file and updating
+bridge/INDEX.md. Do not stop with prose when a bridge verdict is required.
+
+Before writing or editing a bridge verdict, acquire the bridge work-intent claim for the document
+slug with Bash: python scripts\\bridge_claim_cli.py claim <document-slug>
+
+For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
+NO-GO. Run the mandatory preflights and include their observed output in the verdict:
+python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
+python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
+
+Bridge verdict author metadata to include:
+author_identity: Ollama Loyal Opposition
+author_harness_id: D
+author_session_context_id: ollama-harness-d
+author_model: {model_route.model_id}
+author_model_version: {model_route.model_version}
+author_model_configuration: Ollama harness shim; route {model_route.key}; skill {skill}; guarded tools {allowed_tools}
+
+Stay within E:\\GT-KB. Preserve guard decisions exactly; if a guarded tool is denied, report the
+denial and do not invent a successful bridge action."""
 
 
 def _schema(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -694,6 +734,7 @@ def run_tool_loop(
     max_turns: int,
     project_root: Path,
     *,
+    system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
     command_runner: CommandRunner | None = None,
@@ -701,7 +742,10 @@ def run_tool_loop(
 ) -> str:
     if max_turns < 1:
         raise OllamaHarnessError("max_turns must be at least 1")
-    messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+    messages: list[dict[str, Any]] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
     schemas = build_tool_schemas(model_route.allowed_tools)
     chat = chat_func or call_ollama_chat
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
@@ -759,8 +803,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         advertised_model_ids = call_ollama_tags(args.endpoint, args.timeout)
         validate_advertised_models(config, advertised_model_ids)
         model_route = resolve_model(config, args.model, skill=args.skill)
+        system_prompt = build_system_prompt(args.skill, model_route)
         text = run_tool_loop(
-            args.prompt, model_route, args.endpoint, args.max_turns, project_root, timeout=args.timeout
+            args.prompt,
+            model_route,
+            args.endpoint,
+            args.max_turns,
+            project_root,
+            system_prompt=system_prompt,
+            timeout=args.timeout,
         )
     except OllamaHarnessError as exc:
         print(f"ollama_harness: {exc}", file=sys.stderr)

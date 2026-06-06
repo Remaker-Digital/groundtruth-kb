@@ -52,7 +52,7 @@ from ollama_harness import (  # noqa: E402
 OLLAMA_HARNESS_ID = "D"
 OLLAMA_HARNESS_NAME = "ollama"
 OLLAMA_DISPATCH_SKILL = "bridge-review"
-OLLAMA_DISPATCH_REQUIRED_TOOLS = ("Read", "Grep", "Glob")
+OLLAMA_DISPATCH_REQUIRED_TOOLS = ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 OLLAMA_SHIM_RELATIVE = Path("scripts") / "ollama_harness.py"
 
 
@@ -282,11 +282,11 @@ def _check_tool_loop_round_trip(
                     ],
                 }
             }
-        # Second call: model returns final text incorporating the file content
+        # Second call: model returns final text incorporating the selected route key.
         return {
             "message": {
                 "role": "assistant",
-                "content": "File content: qwen-coder-14b routing confirmed.",
+                "content": f"File content: {model_route.key} routing confirmed.",
             }
         }
 
@@ -300,13 +300,14 @@ def _check_tool_loop_round_trip(
             chat_func=_mock_chat,
         )
         # Verify the result contains evidence of successful round-trip
-        ok = "qwen-coder-14b" in result and call_count == 2
+        content_match = model_route.key in result
+        ok = content_match and call_count == 2
         # Verify tool schemas were sent in the payload
         schemas_present = bool(captured_payload.get("tools"))
         _print_result(
             "L1 tool-loop round-trip",
             ok and schemas_present,
-            f"calls={call_count}, schemas={schemas_present}, content_match={'qwen-coder-14b' in result}",
+            f"calls={call_count}, schemas={schemas_present}, content_match={content_match}",
         )
         return ok and schemas_present
     except Exception as exc:
@@ -603,8 +604,8 @@ def main(argv: list[str] | None = None) -> int:
     # Load routing config
     try:
         config = load_routing_config(project_root)
-        model_route = resolve_model(config, None)
-        print(f"Routing: default model = {model_route.key} ({model_route.model_id})")
+        model_route = resolve_model(config, None, skill=OLLAMA_DISPATCH_SKILL)
+        print(f"Routing: {OLLAMA_DISPATCH_SKILL} model = {model_route.key} ({model_route.model_id})")
     except OllamaHarnessError as exc:
         print(f"FAIL: cannot load routing config — {exc}")
         return 1

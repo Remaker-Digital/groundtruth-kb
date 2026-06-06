@@ -9,6 +9,9 @@ import pytest
 
 from scripts import ollama_harness as oh
 
+FIXTURE_MODEL_ID = "fixture-model:fixture-version"
+FIXTURE_MODEL_VERSION = oh.infer_model_version(FIXTURE_MODEL_ID)
+
 
 def make_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
@@ -25,14 +28,13 @@ def make_root(tmp_path: Path) -> Path:
         """
 schema_version = 1
 
-[models.qwen-coder-14b]
-model_id = "qwen2.5-coder:14b-instruct-q4_K_M"
-model_version = "q4_K_M"
+[models.fixture-full]
+model_id = "fixture-model:fixture-version"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [routing]
-default_model = "qwen-coder-14b"
+default_model = "fixture-full"
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -46,10 +48,10 @@ def route(root: Path) -> oh.ModelRoute:
 
 def metadata() -> oh.ModelMetadata:
     return oh.ModelMetadata(
-        model_id="qwen2.5-coder:14b-instruct-q4_K_M",
-        model_version="q4_K_M",
+        model_id=FIXTURE_MODEL_ID,
+        model_version=FIXTURE_MODEL_VERSION,
         endpoint="http://localhost:11434",
-        route_key="qwen-coder-14b",
+        route_key="fixture-full",
     )
 
 
@@ -71,12 +73,13 @@ def deny_runner(records: list[tuple[str, dict, dict]], needle: str = "implementa
     return run_guard
 
 
-def test_load_routing_config_parses_qwen_model(tmp_path: Path):
+def test_load_routing_config_parses_selected_model(tmp_path: Path):
     root = make_root(tmp_path)
     config = oh.load_routing_config(root)
     selected = oh.resolve_model(config, None)
-    assert selected.key == "qwen-coder-14b"
-    assert selected.model_id == "qwen2.5-coder:14b-instruct-q4_K_M"
+    assert selected.key == "fixture-full"
+    assert selected.model_id == FIXTURE_MODEL_ID
+    assert selected.model_version == FIXTURE_MODEL_VERSION
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
@@ -87,7 +90,6 @@ def test_routing_rejects_noncanonical_tool(tmp_path: Path):
 schema_version = 1
 [models.bad]
 model_id = "bad"
-model_version = "v"
 tool_calling_supported = true
 allowed_tools = ["Read", "Delete"]
 [routing]
@@ -106,7 +108,7 @@ def test_cli_parser_accepts_required_flags():
             "-p",
             "hello",
             "--model",
-            "qwen-coder-14b",
+            "selected-route",
             "--skill",
             "bridge-review",
             "--endpoint",
@@ -116,7 +118,7 @@ def test_cli_parser_accepts_required_flags():
         ]
     )
     assert args.prompt == "hello"
-    assert args.model == "qwen-coder-14b"
+    assert args.model == "selected-route"
     assert args.skill == "bridge-review"
     assert args.endpoint == "http://x"
     assert args.max_turns == 2
@@ -151,9 +153,48 @@ def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     text = oh.run_tool_loop("read it", route(root), "http://ollama.test", 3, root, chat_func=chat)
     assert text == "final answer"
     assert calls[0][0] == "http://ollama.test"
-    assert calls[0][1]["model"] == "qwen2.5-coder:14b-instruct-q4_K_M"
+    assert calls[0][1]["model"] == FIXTURE_MODEL_ID
     assert calls[0][1]["stream"] is False
     assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == oh.CANONICAL_TOOLS
+
+
+def test_bridge_review_system_prompt_uses_selected_route_metadata(tmp_path: Path):
+    root = make_root(tmp_path)
+    calls: list[dict] = []
+    prompt = oh.build_system_prompt("bridge-review", route(root))
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        calls.append(payload)
+        return {"message": {"content": "done"}}
+
+    text = oh.run_tool_loop(
+        "review bridge item",
+        route(root),
+        "http://ollama.test",
+        1,
+        root,
+        system_prompt=prompt,
+        chat_func=chat,
+    )
+
+    assert text == "done"
+    system_message = calls[0]["messages"][0]
+    assert system_message["role"] == "system"
+    assert calls[0]["messages"][1] == {"role": "user", "content": "review bridge item"}
+    assert "Loyal Opposition" in system_message["content"]
+    assert "bridge/INDEX.md" in system_message["content"]
+    assert "bridge_claim_cli.py claim <document-slug>" in system_message["content"]
+    assert f"author_model: {FIXTURE_MODEL_ID}" in system_message["content"]
+    assert f"author_model_version: {FIXTURE_MODEL_VERSION}" in system_message["content"]
+
+
+def test_system_prompt_is_only_for_lo_bridge_skills(tmp_path: Path):
+    root = make_root(tmp_path)
+
+    assert oh.build_system_prompt("bridge-review", route(root)) is not None
+    assert oh.build_system_prompt("verification", route(root)) is not None
+    assert oh.build_system_prompt("implementation", route(root)) is None
+    assert oh.build_system_prompt(None, route(root)) is None
 
 
 def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -446,8 +487,8 @@ def test_author_metadata_env_is_passed_to_every_guard(tmp_path: Path):
     for _, _, env in records:
         assert env["GTKB_AUTHOR_IDENTITY"] == "Ollama D"
         assert env["GTKB_AUTHOR_HARNESS_ID"] == "D"
-        assert env["GTKB_AUTHOR_MODEL"] == "qwen2.5-coder:14b-instruct-q4_K_M"
-        assert env["GTKB_AUTHOR_MODEL_VERSION"] == "q4_K_M"
+        assert env["GTKB_AUTHOR_MODEL"] == FIXTURE_MODEL_ID
+        assert env["GTKB_AUTHOR_MODEL_VERSION"] == FIXTURE_MODEL_VERSION
         assert "endpoint=http://localhost:11434" in env["GTKB_AUTHOR_MODEL_CONFIGURATION"]
 
 

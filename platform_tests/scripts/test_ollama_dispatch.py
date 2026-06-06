@@ -8,7 +8,7 @@ import pytest
 from scripts import cross_harness_bridge_trigger as trigger
 from scripts import verify_ollama_dispatch as verify
 
-OLLAMA_MODEL_ID = "qwen2.5-coder:14b-instruct-q4_K_M"
+OLLAMA_MODEL_ID = "fixture-review:current"
 OLLAMA_SURFACES = {
     "headless": {
         "argv": [
@@ -52,23 +52,22 @@ def _ollama_record(
 
 def _write_routing(root: Path, *, allowed_tools: list[str] | None = None) -> None:
     if allowed_tools is None:
-        allowed_tools = ["Read", "Grep", "Glob"]
+        allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
     (root / ".ollama").mkdir(parents=True, exist_ok=True)
     tools_literal = json.dumps(allowed_tools)
     (root / ".ollama" / "routing.toml").write_text(
         "schema_version = 1\n"
         "\n"
-        "[models.qwen-coder-14b-review]\n"
+        "[models.review-route]\n"
         f'model_id = "{OLLAMA_MODEL_ID}"\n'
-        'model_version = "q4_K_M"\n'
         "tool_calling_supported = true\n"
         f"allowed_tools = {tools_literal}\n"
         "\n"
         "[routing]\n"
-        'default_model = "qwen-coder-14b-review"\n'
+        'default_model = "review-route"\n'
         "\n"
         "[routing.skills]\n"
-        'bridge-review = "qwen-coder-14b-review"\n',
+        'bridge-review = "review-route"\n',
         encoding="utf-8",
     )
 
@@ -100,7 +99,7 @@ def test_readiness_passes_with_mocked_tags(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setattr(verify, "call_ollama_tags", lambda endpoint, timeout: {OLLAMA_MODEL_ID})
     result = verify.evaluate_dispatch_readiness(root)
     assert result["ready"] is True
-    assert result["route_key"] == "qwen-coder-14b-review"
+    assert result["route_key"] == "review-route"
 
 
 def test_readiness_fails_closed_when_daemon_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,7 +119,9 @@ def test_readiness_fails_when_required_review_tool_missing(tmp_path: Path) -> No
     root = _write_project(tmp_path, allowed_tools=["Read", "Glob"])
     result = verify.evaluate_dispatch_readiness(root, require_daemon=False)
     assert result["ready"] is False
-    assert "missing_tools=['Grep']" in result["checks"][-1]["detail"]
+    detail = result["checks"][-1]["detail"]
+    for tool in ("Bash", "Edit", "Grep", "Write"):
+        assert tool in detail
 
 
 def test_trigger_resolves_active_ollama_only_when_readiness_passes(

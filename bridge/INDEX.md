@@ -7,65 +7,34 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
-Document: gtkb-ollama-phase2-verified-staging-finalization-gate
-VERIFIED: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-004.md
-NEW: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-003.md
-GO: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-002.md
-NEW: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-001.md
+Document: gtkb-ollama-routing-model-version-fixture-cleanup
+VERIFIED: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-004.md
+NEW: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-003.md
+GO: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-002.md
+NEW: bridge/gtkb-ollama-routing-model-version-fixture-cleanup-001.md
 
-Document: gtkb-ollama-integration-phase-2-routing
-VERIFIED: bridge/gtkb-ollama-integration-phase-2-routing-010.md
-NEW: bridge/gtkb-ollama-integration-phase-2-routing-009.md
-GO: bridge/gtkb-ollama-integration-phase-2-routing-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-routing-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-routing-006.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-routing-005.md
-GO: bridge/gtkb-ollama-integration-phase-2-routing-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-routing-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-routing-002.md
-NEW: bridge/gtkb-ollama-integration-phase-2-routing-001.md
+Document: gtkb-ollama-routing-single-sot-cleanup
+VERIFIED: bridge/gtkb-ollama-routing-single-sot-cleanup-004.md
+NEW: bridge/gtkb-ollama-routing-single-sot-cleanup-003.md
+GO: bridge/gtkb-ollama-routing-single-sot-cleanup-002.md
+NEW: bridge/gtkb-ollama-routing-single-sot-cleanup-001.md
 
-Document: gtkb-ollama-integration-phase-2-adapters
-VERIFIED: bridge/gtkb-ollama-integration-phase-2-adapters-010.md
-NEW: bridge/gtkb-ollama-integration-phase-2-adapters-009.md
-GO: bridge/gtkb-ollama-integration-phase-2-adapters-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-adapters-006.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-005.md
-GO: bridge/gtkb-ollama-integration-phase-2-adapters-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-adapters-002.md
-NEW: bridge/gtkb-ollama-integration-phase-2-adapters-001.md
+Document: gtkb-ollama-qwen-full-lo-dispatch-test-update
+VERIFIED: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-004.md
+NEW: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-003.md
+GO: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-002.md
+NEW: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-001.md
 
-Document: gtkb-ollama-integration-phase-2-dispatch
-VERIFIED: bridge/gtkb-ollama-integration-phase-2-dispatch-012.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-011.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-010.md
-NEW: bridge/gtkb-ollama-integration-phase-2-dispatch-009.md
-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-006.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-005.md
-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-dispatch-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-002.md
-NEW: bridge/gtkb-ollama-integration-phase-2-dispatch-001.md
+Document: gtkb-ollama-qwen-full-lo-route-gate-compliant
+VERIFIED: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-004.md
+NEW: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-003.md
+GO: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-002.md
+NEW: bridge/gtkb-ollama-qwen-full-lo-route-gate-compliant-001.md
 
-Document: gtkb-ollama-integration-phase-2-role-promotion
-VERIFIED: bridge/gtkb-ollama-integration-phase-2-role-promotion-014.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-013.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-012.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-011.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-010.md
-NEW: bridge/gtkb-ollama-integration-phase-2-role-promotion-009.md
-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-006.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-005.md
-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-002.md
-NEW: bridge/gtkb-ollama-integration-phase-2-role-promotion-001.md
+Document: gtkb-ollama-qwen-full-lo-route
+WITHDRAWN: bridge/gtkb-ollama-qwen-full-lo-route-003.md
+GO: bridge/gtkb-ollama-qwen-full-lo-route-002.md
+NEW: bridge/gtkb-ollama-qwen-full-lo-route-001.md
 
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
 GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-004.md
@@ -86,12 +55,6 @@ VERIFIED: bridge/gtkb-work-tree-hygiene-slice-a-detector-004.md
 NEW: bridge/gtkb-work-tree-hygiene-slice-a-detector-003.md
 GO: bridge/gtkb-work-tree-hygiene-slice-a-detector-002.md
 NEW: bridge/gtkb-work-tree-hygiene-slice-a-detector-001.md
-
-Document: gtkb-ollama-integration-phase-1-governance-impl
-VERIFIED: bridge/gtkb-ollama-integration-phase-1-governance-impl-004.md
-NEW: bridge/gtkb-ollama-integration-phase-1-governance-impl-003.md
-GO: bridge/gtkb-ollama-integration-phase-1-governance-impl-002.md
-NEW: bridge/gtkb-ollama-integration-phase-1-governance-impl-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
 VERIFIED: bridge/gtkb-harness-state-sot-consolidation-phase-1-rule-files-010.md
@@ -114,20 +77,6 @@ GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-004.md
 REVISED: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-003.md
 NO-GO: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-002.md
 NEW: bridge/gtkb-lo-file-safety-gate-envelope-role-resolution-001.md
-
-Document: gtkb-ollama-integration-phase-1-verification
-VERIFIED: bridge/gtkb-ollama-integration-phase-1-verification-012.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-verification-011.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-010.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-verification-009.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-008.md
-NEW: bridge/gtkb-ollama-integration-phase-1-verification-007.md
-GO: bridge/gtkb-ollama-integration-phase-1-verification-006.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-verification-005.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-verification-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-verification-002.md
-NEW: bridge/gtkb-ollama-integration-phase-1-verification-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-scripts-source
 VERIFIED: bridge/gtkb-harness-state-sot-consolidation-phase-1-scripts-source-010.md
@@ -178,20 +127,6 @@ REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-foundation-001.md
 
-Document: gtkb-ollama-integration-phase-1-shim
-VERIFIED: bridge/gtkb-ollama-integration-phase-1-shim-012.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-shim-011.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-010.md
-NEW: bridge/gtkb-ollama-integration-phase-1-shim-009.md
-GO: bridge/gtkb-ollama-integration-phase-1-shim-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-shim-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-006.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-shim-005.md
-GO: bridge/gtkb-ollama-integration-phase-1-shim-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-shim-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-shim-002.md
-NEW: bridge/gtkb-ollama-integration-phase-1-shim-001.md
-
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
 VERIFIED: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-009.md
 REVISED: bridge/gtkb-platform-sot-consolidation-slice-2a-read-discipline-008.md
@@ -210,20 +145,6 @@ NO-GO: bridge/gtkb-startup-payload-profiler-compact-context-004.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-003.md
 GO: bridge/gtkb-startup-payload-profiler-compact-context-002.md
 NEW: bridge/gtkb-startup-payload-profiler-compact-context-001.md
-
-Document: gtkb-ollama-integration-phase-1-foundation
-VERIFIED: bridge/gtkb-ollama-integration-phase-1-foundation-012.md
-NEW: bridge/gtkb-ollama-integration-phase-1-foundation-011.md
-GO: bridge/gtkb-ollama-integration-phase-1-foundation-010.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-009.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-006.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-005.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-foundation-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-foundation-002.md
-NEW: bridge/gtkb-ollama-integration-phase-1-foundation-001.md
 
 Document: gtkb-isolation-018-agent-red-cutover
 VERIFIED: bridge/gtkb-isolation-018-agent-red-cutover-010.md
@@ -317,16 +238,6 @@ GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-004.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-003.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-002.md
 NEW: bridge/gtkb-harness-state-sot-consolidation-phase-1-001.md
-
-Document: gtkb-ollama-integration-phase-1
-VERIFIED: bridge/gtkb-ollama-integration-phase-1-008.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-007.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-006.md
-NEW: bridge/gtkb-ollama-integration-phase-1-005.md
-GO: bridge/gtkb-ollama-integration-phase-1-004.md
-REVISED: bridge/gtkb-ollama-integration-phase-1-003.md
-NO-GO: bridge/gtkb-ollama-integration-phase-1-002.md
-NEW: bridge/gtkb-ollama-integration-phase-1-001.md
 
 Document: gtkb-document-author-provenance-contract
 VERIFIED: bridge/gtkb-document-author-provenance-contract-006.md

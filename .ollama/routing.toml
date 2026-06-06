@@ -2,13 +2,11 @@ schema_version = 1
 
 [models.qwen3-coder-next-cloud]
 model_id = "qwen3-coder-next:cloud"
-model_version = "cloud"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [models.kimi-k2-6-cloud-review]
 model_id = "kimi-k2.6:cloud"
-model_version = "cloud"
 tool_calling_supported = true
 allowed_tools = ["Read", "Grep", "Glob"]
 
@@ -16,6 +14,6 @@ allowed_tools = ["Read", "Grep", "Glob"]
 default_model = "qwen3-coder-next-cloud"
 
 [routing.skills]
-bridge-review = "kimi-k2-6-cloud-review"
-verification = "kimi-k2-6-cloud-review"
+bridge-review = "qwen3-coder-next-cloud"
+verification = "qwen3-coder-next-cloud"
 implementation = "qwen3-coder-next-cloud"
