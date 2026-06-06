@@ -28,6 +28,8 @@ NO-GO: bridge/gtkb-ollama-integration-phase-2-routing-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-routing-001.md
 
 Document: gtkb-ollama-integration-phase-2-adapters
+VERIFIED: bridge/gtkb-ollama-integration-phase-2-adapters-010.md
+NEW: bridge/gtkb-ollama-integration-phase-2-adapters-009.md
 GO: bridge/gtkb-ollama-integration-phase-2-adapters-008.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-adapters-007.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-adapters-006.md
