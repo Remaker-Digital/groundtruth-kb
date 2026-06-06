@@ -6,5 +6,16 @@ model_version = "q4_K_M"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
+[models.qwen-coder-14b-review]
+model_id = "qwen2.5-coder:14b-instruct-q4_K_M"
+model_version = "q4_K_M"
+tool_calling_supported = true
+allowed_tools = ["Read", "Grep", "Glob"]
+
 [routing]
 default_model = "qwen-coder-14b"
+
+[routing.skills]
+bridge-review = "qwen-coder-14b-review"
+verification = "qwen-coder-14b-review"
+implementation = "qwen-coder-14b"

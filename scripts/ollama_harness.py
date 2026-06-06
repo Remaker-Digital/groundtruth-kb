@@ -80,6 +80,7 @@ class RoutingConfig:
     schema_version: int
     models: dict[str, ModelRoute]
     default_model: str
+    skill_routes: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -117,7 +118,73 @@ def _as_list(value: Any, *, field: str) -> list[str]:
     return value
 
 
-def load_routing_config(project_root: Path) -> RoutingConfig:
+def _as_non_empty_string(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise OllamaHarnessError(f"{field} must be a non-empty string")
+    return value
+
+
+def _parse_skill_routes(routing: Mapping[str, Any], models: Mapping[str, ModelRoute]) -> dict[str, str]:
+    skills_raw = routing.get("skills") or {}
+    if not isinstance(skills_raw, dict):
+        raise OllamaHarnessError("routing.skills must be a table when present")
+    skill_routes: dict[str, str] = {}
+    for skill_name, route_spec in skills_raw.items():
+        if not isinstance(skill_name, str) or not skill_name:
+            raise OllamaHarnessError("routing.skills entries must use non-empty skill names")
+        if isinstance(route_spec, str):
+            route_key = route_spec
+        elif isinstance(route_spec, dict):
+            route_key = route_spec.get("model")
+        else:
+            raise OllamaHarnessError(f"routing.skills.{skill_name} must name a configured model")
+        if not isinstance(route_key, str) or route_key not in models:
+            raise OllamaHarnessError(f"routing.skills.{skill_name} must name a configured model")
+        skill_routes[skill_name] = route_key
+    return skill_routes
+
+
+def validate_advertised_models(config: RoutingConfig, advertised_model_ids: Iterable[str]) -> None:
+    advertised: set[str] = set()
+    for model_id in advertised_model_ids:
+        if not isinstance(model_id, str) or not model_id:
+            raise OllamaHarnessError("advertised model inventory must contain non-empty strings")
+        advertised.add(model_id)
+    configured = {route.model_id for route in config.models.values()}
+    missing = sorted(configured - advertised)
+    if missing:
+        raise OllamaHarnessError(f"configured model_id values are not advertised locally: {missing}")
+
+
+def call_ollama_tags(endpoint: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> tuple[str, ...]:
+    url = endpoint.rstrip("/") + "/api/tags"
+    request = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+            data = response.read().decode("utf-8")
+    except urllib.error.URLError as exc:
+        raise OllamaHarnessError(f"Ollama model inventory request failed: {exc}") from exc
+    try:
+        parsed = json.loads(data)
+    except json.JSONDecodeError as exc:
+        raise OllamaHarnessError(f"Ollama model inventory response was not JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise OllamaHarnessError("Ollama model inventory response must be a JSON object")
+    models = parsed.get("models")
+    if not isinstance(models, list):
+        raise OllamaHarnessError("Ollama model inventory response missing models list")
+    model_ids: list[str] = []
+    for index, row in enumerate(models):
+        if not isinstance(row, dict):
+            raise OllamaHarnessError("Ollama model inventory entries must be JSON objects")
+        model_id = row.get("name") or row.get("model")
+        if not isinstance(model_id, str) or not model_id:
+            raise OllamaHarnessError(f"Ollama model inventory entry {index} is missing name/model")
+        model_ids.append(model_id)
+    return tuple(model_ids)
+
+
+def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] | None = None) -> RoutingConfig:
     config_path = project_root / ROUTING_CONFIG_PATH
     try:
         raw = tomllib.loads(config_path.read_text(encoding="utf-8"))
@@ -136,13 +203,9 @@ def load_routing_config(project_root: Path) -> RoutingConfig:
     for key, row in models_raw.items():
         if not isinstance(key, str) or not key or not isinstance(row, dict):
             raise OllamaHarnessError("model rows must be named TOML tables")
-        model_id = row.get("model_id")
-        model_version = row.get("model_version")
+        model_id = _as_non_empty_string(row.get("model_id"), field=f"models.{key}.model_id")
+        model_version = _as_non_empty_string(row.get("model_version"), field=f"models.{key}.model_version")
         allowed_tools = tuple(_as_list(row.get("allowed_tools"), field=f"models.{key}.allowed_tools"))
-        if not isinstance(model_id, str) or not model_id:
-            raise OllamaHarnessError(f"models.{key}.model_id must be a non-empty string")
-        if not isinstance(model_version, str) or not model_version:
-            raise OllamaHarnessError(f"models.{key}.model_version must be a non-empty string")
         if row.get("tool_calling_supported") is not True:
             raise OllamaHarnessError(f"models.{key}.tool_calling_supported must be true")
         unknown_tools = sorted(set(allowed_tools) - CANONICAL_TOOLS)
@@ -156,11 +219,21 @@ def load_routing_config(project_root: Path) -> RoutingConfig:
     default_model = routing.get("default_model")
     if not isinstance(default_model, str) or default_model not in models:
         raise OllamaHarnessError("routing.default_model must name a configured model")
-    return RoutingConfig(schema_version=1, models=models, default_model=default_model)
+    config = RoutingConfig(
+        schema_version=1,
+        models=models,
+        default_model=default_model,
+        skill_routes=_parse_skill_routes(routing, models),
+    )
+    if advertised_model_ids is not None:
+        validate_advertised_models(config, advertised_model_ids)
+    return config
 
 
-def resolve_model(config: RoutingConfig, requested_model: str | None) -> ModelRoute:
-    route_key = requested_model or config.default_model
+def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str | None = None) -> ModelRoute:
+    if skill is not None and not skill:
+        raise OllamaHarnessError("skill route key must be a non-empty string")
+    route_key = requested_model or (config.skill_routes.get(skill) if skill else None) or config.default_model
     try:
         return config.models[route_key]
     except KeyError as exc:
@@ -667,9 +740,10 @@ def run_tool_loop(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the GT-KB Phase 1 Ollama harness shim.")
+    parser = argparse.ArgumentParser(description="Run the GT-KB Ollama harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to Ollama.")
     parser.add_argument("--model", help="Routing model key from .ollama/routing.toml.")
+    parser.add_argument("--skill", help="Skill or task route key from .ollama/routing.toml.")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="Ollama endpoint; default is localhost.")
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, help="Maximum tool loop turns.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP/guard/subprocess timeout.")
@@ -682,7 +756,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     project_root = resolve_project_root(Path.cwd())
     try:
         config = load_routing_config(project_root)
-        model_route = resolve_model(config, args.model)
+        advertised_model_ids = call_ollama_tags(args.endpoint, args.timeout)
+        validate_advertised_models(config, advertised_model_ids)
+        model_route = resolve_model(config, args.model, skill=args.skill)
         text = run_tool_loop(
             args.prompt, model_route, args.endpoint, args.max_turns, project_root, timeout=args.timeout
         )

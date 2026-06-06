@@ -101,9 +101,23 @@ default_model = "bad"
 
 def test_cli_parser_accepts_required_flags():
     parser = oh.build_arg_parser()
-    args = parser.parse_args(["-p", "hello", "--model", "qwen-coder-14b", "--endpoint", "http://x", "--max-turns", "2"])
+    args = parser.parse_args(
+        [
+            "-p",
+            "hello",
+            "--model",
+            "qwen-coder-14b",
+            "--skill",
+            "bridge-review",
+            "--endpoint",
+            "http://x",
+            "--max-turns",
+            "2",
+        ]
+    )
     assert args.prompt == "hello"
     assert args.model == "qwen-coder-14b"
+    assert args.skill == "bridge-review"
     assert args.endpoint == "http://x"
     assert args.max_turns == 2
 

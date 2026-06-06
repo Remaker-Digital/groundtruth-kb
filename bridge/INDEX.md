@@ -16,6 +16,8 @@ GO: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-002.md
 NEW: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-001.md
 
 Document: gtkb-ollama-integration-phase-2-routing
+VERIFIED: bridge/gtkb-ollama-integration-phase-2-routing-010.md
+NEW: bridge/gtkb-ollama-integration-phase-2-routing-009.md
 GO: bridge/gtkb-ollama-integration-phase-2-routing-008.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-routing-007.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-routing-006.md
