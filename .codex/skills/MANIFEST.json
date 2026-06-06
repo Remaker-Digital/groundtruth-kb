@@ -225,6 +225,13 @@
       "source_sha256": "a42ff667894e02ecef74f3b96e3ba77789d7af060f2877f052b6a6df7fcb0bbe"
     },
     {
+      "adapter_relative_path": ".codex/skills/gtkb-sweep-commit/SKILL.md",
+      "canonical_name": "gtkb-sweep-commit",
+      "capability_id": "skill.gtkb-sweep-commit",
+      "source_relative_path": ".claude/skills/gtkb-sweep-commit/SKILL.md",
+      "source_sha256": "2b816bb22269b98641a9d30c019f2d62888a37cf2b3062c9adf2b266e67d9c5b"
+    },
+    {
       "adapter_relative_path": ".codex/skills/loyal-opposition-hygiene-assessment/SKILL.md",
       "canonical_name": "loyal-opposition-hygiene-assessment",
       "capability_id": "skill.loyal-opposition-hygiene-assessment",

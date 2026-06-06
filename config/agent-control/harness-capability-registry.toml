@@ -757,6 +757,29 @@ status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
 source_sha256 = "a42ff667894e02ecef74f3b96e3ba77789d7af060f2877f052b6a6df7fcb0bbe"
 [[capabilities]]
+id = "skill.gtkb-sweep-commit"
+kind = "skill"
+canonical_name = "gtkb-sweep-commit"
+canonical_purpose = "Sweep and locally commit all current non-ignored GroundTruth-KB worktree changes after owner authorization, satisfying repo governance hooks and verification before committing."
+canonical_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/gtkb-sweep-commit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+source_sha256 = "2b816bb22269b98641a9d30c019f2d62888a37cf2b3062c9adf2b266e67d9c5b"
+[capabilities.antigravity]
+surface = ".agent/skills/gtkb-sweep-commit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+source_sha256 = "2b816bb22269b98641a9d30c019f2d62888a37cf2b3062c9adf2b266e67d9c5b"
+[[capabilities]]
 id = "skill.loyal-opposition-hygiene-assessment"
 kind = "skill"
 canonical_name = "loyal-opposition-hygiene-assessment"

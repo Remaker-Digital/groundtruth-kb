@@ -7,13 +7,16 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
-Document: gtkb-dispatcher-config-cli-whole-candidate-validation
-VERIFIED: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-006.md
-NEW: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-005.md
-GO: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-004.md
-REVISED: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-003.md
-NO-GO: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-002.md
-NEW: bridge/gtkb-dispatcher-config-cli-whole-candidate-validation-001.md
+Document: gtkb-sweep-commit-skill-parity-registration
+VERIFIED: bridge/gtkb-sweep-commit-skill-parity-registration-009.md
+NEW: bridge/gtkb-sweep-commit-skill-parity-registration-008.md
+GO: bridge/gtkb-sweep-commit-skill-parity-registration-007.md
+REVISED: bridge/gtkb-sweep-commit-skill-parity-registration-006.md
+NO-GO: bridge/gtkb-sweep-commit-skill-parity-registration-005.md
+GO: bridge/gtkb-sweep-commit-skill-parity-registration-004.md
+REVISED: bridge/gtkb-sweep-commit-skill-parity-registration-003.md
+NO-GO: bridge/gtkb-sweep-commit-skill-parity-registration-002.md
+NEW: bridge/gtkb-sweep-commit-skill-parity-registration-001.md
 
 Document: gtkb-core-spec-intake-current-root-phase3a-cli
 GO: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-002.md
