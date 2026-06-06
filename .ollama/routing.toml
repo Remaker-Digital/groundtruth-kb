@@ -1,21 +1,21 @@
 schema_version = 1
 
-[models.qwen-coder-14b]
-model_id = "qwen2.5-coder:14b-instruct-q4_K_M"
-model_version = "q4_K_M"
+[models.qwen3-coder-next-cloud]
+model_id = "qwen3-coder-next:cloud"
+model_version = "cloud"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
-[models.qwen-coder-14b-review]
-model_id = "qwen2.5-coder:14b-instruct-q4_K_M"
-model_version = "q4_K_M"
+[models.kimi-k2-6-cloud-review]
+model_id = "kimi-k2.6:cloud"
+model_version = "cloud"
 tool_calling_supported = true
 allowed_tools = ["Read", "Grep", "Glob"]
 
 [routing]
-default_model = "qwen-coder-14b"
+default_model = "qwen3-coder-next-cloud"
 
 [routing.skills]
-bridge-review = "qwen-coder-14b-review"
-verification = "qwen-coder-14b-review"
-implementation = "qwen-coder-14b"
+bridge-review = "kimi-k2-6-cloud-review"
+verification = "kimi-k2-6-cloud-review"
+implementation = "qwen3-coder-next-cloud"
