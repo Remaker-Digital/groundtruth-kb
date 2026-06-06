@@ -7,6 +7,10 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-phase2-verified-staging-finalization-gate
+GO: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-002.md
+NEW: bridge/gtkb-ollama-phase2-verified-staging-finalization-gate-001.md
+
 Document: gtkb-bridge-work-intent-session-id-live-env-precedence
 VERIFIED: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-006.md
 REVISED: bridge/gtkb-bridge-work-intent-session-id-live-env-precedence-005.md
@@ -54,6 +58,12 @@ NO-GO: bridge/gtkb-ollama-integration-phase-2-dispatch-002.md
 NEW: bridge/gtkb-ollama-integration-phase-2-dispatch-001.md
 
 Document: gtkb-ollama-integration-phase-2-role-promotion
+VERIFIED: bridge/gtkb-ollama-integration-phase-2-role-promotion-014.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-013.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-012.md
+REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-011.md
+NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-010.md
+NEW: bridge/gtkb-ollama-integration-phase-2-role-promotion-009.md
 GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-008.md
 REVISED: bridge/gtkb-ollama-integration-phase-2-role-promotion-007.md
 NO-GO: bridge/gtkb-ollama-integration-phase-2-role-promotion-006.md

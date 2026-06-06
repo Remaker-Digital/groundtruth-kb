@@ -80,6 +80,29 @@ VALID_ROLES = VALID_ROLES_FOR_READ
 
 ROLE_ASSIGNMENTS_RELATIVE_PATH = Path("harness-state") / "role-assignments.json"
 DEFAULT_HARNESS_IDS = _DEFAULT_HARNESS_IDS
+OLLAMA_HARNESS_ID = "D"
+OLLAMA_ROLE_PROMOTION_PREREQUISITE_BRIDGES = (
+    "gtkb-ollama-integration-phase-2-routing",
+    "gtkb-ollama-integration-phase-2-adapters",
+    "gtkb-ollama-integration-phase-2-dispatch",
+)
+BRIDGE_VERIFIED_STATUS = "VERIFIED"
+OLLAMA_PHASE2_PROJECT_ID = "PROJECT-GTKB-OLLAMA-INTEGRATION"
+OLLAMA_PHASE2_AUTHORIZATION_ID = "PAUTH-PROJECT-GTKB-OLLAMA-INTEGRATION-OLLAMA-INTEGRATION-PHASE-2-PLUS-COMPLETION"
+OLLAMA_PHASE2_CLOSURE_WORK_ITEMS = ("WI-4379", "WI-4380", "WI-4381", "WI-4382")
+OLLAMA_PHASE2_MEMORY_MARKER = "<!-- OLLAMA-PHASE-2-CLOSURE -->"
+OLLAMA_PHASE2_COMPLETION_EVIDENCE = (
+    "Ollama Phase 2+ closure after VERIFIED routing, adapter, and dispatch child bridges "
+    "plus successful harness D role promotion."
+)
+WORK_ITEM_TERMINAL_RESOLUTION_STATUSES = {
+    "verified",
+    "resolved",
+    "retired",
+    "wont_fix",
+    "not_a_defect",
+}
+PROJECT_TERMINAL_STATUSES = {"completed", "retired", "cancelled"}
 
 
 def _now_iso() -> str:
@@ -373,6 +396,588 @@ def current_prime_ids(document: dict[str, Any]) -> list[str]:
         for harness_id, record in harnesses.items()
         if isinstance(record, dict) and is_prime_builder(record)
     ]
+
+
+def _bridge_latest_statuses(project_root: Path, bridge_ids: Iterable[str]) -> dict[str, dict[str, str | None]]:
+    wanted = {str(bridge_id) for bridge_id in bridge_ids}
+    statuses: dict[str, dict[str, str | None]] = {
+        bridge_id: {"status": None, "file": None} for bridge_id in sorted(wanted)
+    }
+    index_path = project_root / "bridge" / "INDEX.md"
+    try:
+        lines = index_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return statuses
+
+    current: str | None = None
+    for raw_line in lines:
+        line = raw_line.strip()
+        if line.startswith("Document: "):
+            current = line.removeprefix("Document: ").strip()
+            continue
+        if current not in wanted or statuses[current]["status"] is not None:
+            continue
+        if ":" not in line:
+            continue
+        status, path = line.split(":", 1)
+        if path.strip().startswith("bridge/"):
+            statuses[current] = {"status": status.strip(), "file": path.strip()}
+    return statuses
+
+
+def ollama_role_promotion_prerequisites(project_root: Path) -> dict[str, Any]:
+    """Return the bridge-evidence gate for Ollama role promotion.
+
+    Harness D may only be promoted after the routing, adapter, and dispatch
+    child threads independently reach VERIFIED. This helper reads the live
+    bridge index and returns a report-friendly structure without mutating
+    state.
+    """
+
+    statuses = _bridge_latest_statuses(project_root, OLLAMA_ROLE_PROMOTION_PREREQUISITE_BRIDGES)
+    missing = [bridge_id for bridge_id, row in statuses.items() if row.get("status") != BRIDGE_VERIFIED_STATUS]
+    return {
+        "all_verified": not missing,
+        "required": list(OLLAMA_ROLE_PROMOTION_PREREQUISITE_BRIDGES),
+        "latest": statuses,
+        "missing_verified": missing,
+    }
+
+
+def _evaluate_ollama_dispatch_readiness(
+    project_root: Path,
+    *,
+    require_daemon: bool,
+) -> dict[str, Any]:
+    try:
+        from scripts.verify_ollama_dispatch import evaluate_dispatch_readiness
+    except ImportError:  # pragma: no cover - direct script execution path
+        from verify_ollama_dispatch import evaluate_dispatch_readiness  # type: ignore[no-redef]
+
+    return evaluate_dispatch_readiness(
+        project_root,
+        recipient=OLLAMA_HARNESS_ID,
+        require_daemon=require_daemon,
+    )
+
+
+def evaluate_ollama_role_promotion(
+    project_root: Path,
+    *,
+    require_daemon: bool = True,
+    readiness_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Evaluate whether harness D is eligible for durable role promotion.
+
+    The gate is intentionally stricter than bridge evidence alone: VERIFIED
+    child threads prove the implementation slices landed, while dispatch
+    readiness proves the local harness can actually receive headless work.
+    Missing readiness therefore refuses promotion before any registry write.
+    """
+
+    root = project_root.resolve()
+    prerequisites = ollama_role_promotion_prerequisites(root)
+    readiness = (
+        readiness_result
+        if readiness_result is not None
+        else _evaluate_ollama_dispatch_readiness(root, require_daemon=require_daemon)
+    )
+    projection = load_harness_projection(root)
+    ollama_record = next(
+        (
+            record
+            for record in projection.get("harnesses", [])
+            if isinstance(record, dict) and str(record.get("id") or "") == OLLAMA_HARNESS_ID
+        ),
+        None,
+    )
+    registry_ready = bool(
+        ollama_record
+        and ollama_record.get("harness_name") == "ollama"
+        and ollama_record.get("harness_type") == "ollama"
+        and ollama_record.get("status") in {"registered", "suspended", "active"}
+    )
+    blocking_reasons: list[str] = []
+    if not prerequisites["all_verified"]:
+        blocking_reasons.append("missing_verified_child_bridge")
+    if not registry_ready:
+        blocking_reasons.append("ollama_registry_record_not_promotable")
+    if not bool(readiness.get("ready")):
+        blocking_reasons.append("ollama_dispatch_not_ready")
+    return {
+        "ready": not blocking_reasons,
+        "blocking_reasons": blocking_reasons,
+        "prerequisites": prerequisites,
+        "dispatch_readiness": readiness,
+        "registry_record": ollama_record,
+    }
+
+
+def _ollama_role_promotion_rollback_commands(role: str) -> list[str]:
+    return [
+        "gt harness set-role --harness <previous-active-harness> --role <previous-role> --reason <rollback-reason>",
+        f"gt harness suspend --harness {OLLAMA_HARNESS_ID} --cause non-operating-detected --reason <rollback-reason>",
+        f"gt harness set-role --harness <active-counterpart> --role {role} --reason <rollback-reason>",
+    ]
+
+
+def _validate_role_switch_preconditions(project_root: Path, requested_role: str) -> None:
+    """Run canonical role-switch validators before any Ollama activation write."""
+
+    try:
+        from groundtruth_kb.mode_switch.transaction import TransactionValidationError
+        from groundtruth_kb.mode_switch.validation import (
+            validate_bridge_artifact,
+            validate_role_artifact,
+            validate_session_state_artifact,
+        )
+    except Exception as exc:  # pragma: no cover - import environment guard
+        raise RuntimeError(f"cannot import canonical role-switch validators: {exc}") from exc
+
+    for validation_result in (
+        validate_role_artifact(project_root),
+        validate_bridge_artifact(project_root),
+        validate_session_state_artifact(project_root),
+    ):
+        if not validation_result.is_valid:
+            raise TransactionValidationError(
+                f"{validation_result.axis} artifact validation failed: {'; '.join(validation_result.errors)}",
+                axis=validation_result.axis,
+                errors=validation_result.errors,
+            )
+    if requested_role not in VALID_ROLES_FOR_WRITE:
+        raise TransactionValidationError(
+            f"requested role {requested_role!r} not in {sorted(VALID_ROLES_FOR_WRITE)}",
+            axis="role",
+        )
+
+
+def _restore_ollama_harness_record(
+    db: Any,
+    project_root: Path,
+    prior_record: dict[str, Any],
+    *,
+    changed_by: str,
+    change_reason: str,
+    generate_harness_projection: Any,
+) -> None:
+    prior_role = _decode_harness_json_field(prior_record.get("role"))
+    retained_role = prior_role if isinstance(prior_role, list) else []
+    db.insert_harness(
+        id=OLLAMA_HARNESS_ID,
+        harness_name=str(prior_record.get("harness_name") or "ollama"),
+        harness_type=str(prior_record.get("harness_type") or "ollama"),
+        role=retained_role,
+        changed_by=changed_by,
+        change_reason=f"{change_reason} [restore after failed promotion]",
+        status=str(prior_record.get("status") or "registered"),
+        reviewer_precedence=prior_record.get("reviewer_precedence"),
+        invocation_surfaces=_decode_harness_json_field(prior_record.get("invocation_surfaces")),
+        capabilities_ref=prior_record.get("capabilities_ref"),
+    )
+    generate_harness_projection(db, project_root)
+
+
+def apply_ollama_role_promotion(
+    project_root: Path,
+    role: str = ROLE_LOYAL_OPPOSITION,
+    *,
+    dry_run: bool = True,
+    require_daemon: bool = True,
+    readiness_result: dict[str, Any] | None = None,
+    changed_by: str = "codex-prime-builder",
+    change_reason: str = "WI-4382 governed Ollama role promotion",
+) -> dict[str, Any]:
+    """Promote harness D only after child bridge and readiness gates pass.
+
+    ``dry_run=True`` is report-friendly and mutation-free. ``dry_run=False``
+    activates harness D when needed, then delegates the role assignment to the
+    canonical mode-switch transaction so durable role authority remains the
+    DB-backed harness registry and generated projection.
+    """
+
+    requested_role = _set_role_validate(role)
+    evaluation = evaluate_ollama_role_promotion(
+        project_root,
+        require_daemon=require_daemon,
+        readiness_result=readiness_result,
+    )
+    result: dict[str, Any] = {
+        "applied": False,
+        "would_apply": bool(evaluation["ready"]),
+        "dry_run": dry_run,
+        "requested_role": requested_role,
+        "evaluation": evaluation,
+        "rollback_commands": _ollama_role_promotion_rollback_commands(requested_role),
+    }
+    if not evaluation["ready"]:
+        result["reason"] = "promotion gates failed"
+        return result
+    if dry_run:
+        result["reason"] = "dry run"
+        return result
+
+    try:
+        from groundtruth_kb import harness_ops
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.harness_projection import generate_harness_projection
+        from groundtruth_kb.mode_switch.invariants import verify_active_role_partition
+        from groundtruth_kb.mode_switch.transaction import apply_role_switch
+    except Exception as exc:  # pragma: no cover - import environment guard
+        raise RuntimeError(f"cannot import canonical harness promotion writers: {exc}") from exc
+
+    root = project_root.resolve()
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    current = db.get_harness(OLLAMA_HARNESS_ID)
+    if current is None:
+        result["reason"] = "unknown Ollama harness"
+        result["would_apply"] = False
+        return result
+
+    prior_status = str(current.get("status") or "")
+    _validate_role_switch_preconditions(root, requested_role)
+    activation_applied = False
+    try:
+        if prior_status != "active":
+            harness_ops.transition_harness(
+                db,
+                OLLAMA_HARNESS_ID,
+                "active",
+                changed_by=changed_by,
+                change_reason=f"{change_reason} [activate harness D]",
+            )
+            activation_applied = True
+            generate_harness_projection(db, root)
+
+        transaction = apply_role_switch(
+            root,
+            OLLAMA_HARNESS_ID,
+            requested_role,
+            change_reason=f"{change_reason} [assign {requested_role}]",
+        )
+        partition = verify_active_role_partition(root)
+    except Exception:
+        if activation_applied:
+            _restore_ollama_harness_record(
+                db,
+                root,
+                current,
+                changed_by=changed_by,
+                change_reason=change_reason,
+                generate_harness_projection=generate_harness_projection,
+            )
+        raise
+    result.update(
+        {
+            "applied": True,
+            "would_apply": False,
+            "reason": "applied",
+            "previous_status": prior_status,
+            "transaction": {
+                "harness_id": transaction.harness_id,
+                "previous_role_set": list(transaction.previous_role_set),
+                "new_role_set": list(transaction.new_role_set),
+                "derived_topology": transaction.derived_topology,
+                "audit_record_path": str(transaction.audit_record_path),
+            },
+            "partition": {
+                "prime_builder_id": partition.prime_builder_id,
+                "loyal_opposition_id": partition.loyal_opposition_id,
+                "active_harness_ids": list(partition.active_harness_ids),
+            },
+        }
+    )
+    return result
+
+
+def _work_item_row_closed(row: dict[str, Any] | None) -> bool:
+    if row is None:
+        return False
+    resolution_status = str(row.get("resolution_status") or "").strip().lower()
+    stage = str(row.get("stage") or "").strip().lower()
+    return resolution_status in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES and stage == "resolved"
+
+
+def _ollama_harness_promoted(project_root: Path, requested_role: str) -> bool:
+    projection = load_harness_projection(project_root)
+    for record in projection.get("harnesses", []):
+        if not isinstance(record, dict):
+            continue
+        if str(record.get("id") or "") != OLLAMA_HARNESS_ID:
+            continue
+        return record.get("status") == "active" and requested_role in _normalize_role_field(record.get("role"))
+    return False
+
+
+def _phase2_memory_path(project_root: Path) -> Path:
+    return project_root / "memory" / "MEMORY.md"
+
+
+def _phase2_memory_needs_update(project_root: Path) -> bool:
+    path = _phase2_memory_path(project_root)
+    try:
+        return OLLAMA_PHASE2_MEMORY_MARKER not in path.read_text(encoding="utf-8")
+    except OSError:
+        return True
+
+
+def _append_ollama_phase2_memory_closure(project_root: Path, *, evidence: str, changed_at: str) -> bool:
+    path = _phase2_memory_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        text = "# Agent Red Memory\n\n## Current Status\n\n"
+    if OLLAMA_PHASE2_MEMORY_MARKER in text:
+        return False
+
+    day = changed_at.split("T", 1)[0]
+    entry = (
+        f"- **{day} (PROJECT-GTKB-OLLAMA-INTEGRATION Phase 2+ guarded closure):** "
+        f"{OLLAMA_PHASE2_MEMORY_MARKER} Phase 2+ successor work items "
+        "WI-4379, WI-4380, WI-4381, and WI-4382 resolved after the routing, "
+        "adapter, dispatch, and harness D role-promotion gates passed. "
+        f"Evidence: {evidence}\n"
+    )
+    marker = "## Current Status"
+    if marker in text:
+        before, after = text.split(marker, 1)
+        after = after.lstrip("\n")
+        text = f"{before}{marker}\n\n{entry}{after}"
+    else:
+        suffix = "" if text.endswith("\n") else "\n"
+        text = f"{text}{suffix}\n## Current Status\n\n{entry}"
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return True
+
+
+def _project_completion_ready(db: Any, project_id: str) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+    project = db.get_project(project_id)
+    if project is None:
+        return False, ["project_missing"]
+    if str(project.get("status") or "").strip().lower() in PROJECT_TERMINAL_STATUSES:
+        return False, ["project_already_terminal"]
+
+    active_authorizations = db.list_project_authorizations(project_id, status="active")
+    if active_authorizations:
+        reasons.append("active_project_authorizations_remain")
+
+    linked_work_items = db.list_project_work_items(project_id)
+    if not linked_work_items:
+        reasons.append("no_linked_project_work_items")
+    elif any(not _work_item_row_closed(row) for row in linked_work_items):
+        reasons.append("linked_work_items_not_terminal")
+
+    return not reasons, reasons
+
+
+def _complete_ollama_phase2_project_if_ready(
+    db: Any,
+    project_root: Path,
+    *,
+    changed_by: str,
+    change_reason: str,
+    changed_at: str,
+) -> bool:
+    ready, _reasons = _project_completion_ready(db, OLLAMA_PHASE2_PROJECT_ID)
+    if not ready:
+        return False
+    try:
+        from groundtruth_kb.project.lifecycle import ProjectLifecycleService
+    except Exception as exc:  # pragma: no cover - import environment guard
+        raise RuntimeError(f"cannot import project lifecycle service: {exc}") from exc
+
+    _ = project_root
+    service = ProjectLifecycleService(db)
+    service.update_project(
+        OLLAMA_PHASE2_PROJECT_ID,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        status="completed",
+        completed_at=changed_at,
+    )
+    return True
+
+
+def evaluate_ollama_phase2_closure(
+    project_root: Path,
+    *,
+    role: str = ROLE_LOYAL_OPPOSITION,
+) -> dict[str, Any]:
+    """Evaluate whether Ollama Phase 2+ closure may mutate project artifacts.
+
+    Closure is intentionally downstream of role promotion: if harness D is not
+    active with the requested operating role, this helper refuses work-item,
+    project-authorization, project, and memory updates.
+    """
+
+    requested_role = _set_role_validate(role)
+    root = project_root.resolve()
+    prerequisites = ollama_role_promotion_prerequisites(root)
+    promoted = _ollama_harness_promoted(root, requested_role)
+    memory_update_needed = _phase2_memory_needs_update(root)
+    db_path = root / "groundtruth.db"
+    blocking_reasons: list[str] = []
+    if not prerequisites["all_verified"]:
+        blocking_reasons.append("missing_verified_child_bridge")
+    if not promoted:
+        blocking_reasons.append("ollama_role_not_promoted")
+    if not db_path.is_file():
+        blocking_reasons.append("groundtruth_db_missing")
+        return {
+            "ready": False,
+            "blocking_reasons": blocking_reasons,
+            "requested_role": requested_role,
+            "prerequisites": prerequisites,
+            "ollama_promoted": promoted,
+            "project": None,
+            "authorization": None,
+            "work_items": {},
+            "missing_work_items": list(OLLAMA_PHASE2_CLOSURE_WORK_ITEMS),
+            "work_items_requiring_update": [],
+            "memory_update_needed": memory_update_needed,
+            "project_completion_ready": False,
+            "project_completion_deferred_reasons": ["groundtruth_db_missing"],
+        }
+
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+    except Exception as exc:  # pragma: no cover - import environment guard
+        blocking_reasons.append("knowledge_db_unavailable")
+        return {
+            "ready": False,
+            "blocking_reasons": blocking_reasons,
+            "requested_role": requested_role,
+            "prerequisites": prerequisites,
+            "ollama_promoted": promoted,
+            "project": None,
+            "authorization": None,
+            "work_items": {},
+            "missing_work_items": list(OLLAMA_PHASE2_CLOSURE_WORK_ITEMS),
+            "work_items_requiring_update": [],
+            "memory_update_needed": memory_update_needed,
+            "project_completion_ready": False,
+            "project_completion_deferred_reasons": [f"knowledge_db_unavailable: {exc}"],
+        }
+
+    db = KnowledgeDB(db_path=db_path)
+    project = db.get_project(OLLAMA_PHASE2_PROJECT_ID)
+    authorization = db.get_project_authorization(OLLAMA_PHASE2_AUTHORIZATION_ID)
+    work_items = {item_id: db.get_work_item(item_id) for item_id in OLLAMA_PHASE2_CLOSURE_WORK_ITEMS}
+    missing_work_items = [item_id for item_id, row in work_items.items() if row is None]
+    work_items_requiring_update = [
+        item_id for item_id, row in work_items.items() if row is not None and not _work_item_row_closed(row)
+    ]
+    if project is None:
+        blocking_reasons.append("phase2_project_missing")
+    if authorization is None:
+        blocking_reasons.append("phase2_authorization_missing")
+    if missing_work_items:
+        blocking_reasons.append("phase2_work_items_missing")
+
+    project_completion_ready, project_completion_deferred_reasons = _project_completion_ready(
+        db,
+        OLLAMA_PHASE2_PROJECT_ID,
+    )
+    return {
+        "ready": not blocking_reasons,
+        "blocking_reasons": blocking_reasons,
+        "requested_role": requested_role,
+        "prerequisites": prerequisites,
+        "ollama_promoted": promoted,
+        "project": project,
+        "authorization": authorization,
+        "work_items": work_items,
+        "missing_work_items": missing_work_items,
+        "work_items_requiring_update": work_items_requiring_update,
+        "memory_update_needed": memory_update_needed,
+        "project_completion_ready": project_completion_ready,
+        "project_completion_deferred_reasons": project_completion_deferred_reasons,
+    }
+
+
+def apply_ollama_phase2_closure(
+    project_root: Path,
+    *,
+    role: str = ROLE_LOYAL_OPPOSITION,
+    dry_run: bool = True,
+    changed_by: str = "codex-prime-builder",
+    change_reason: str = "WI-4382 governed Ollama Phase 2+ closure",
+) -> dict[str, Any]:
+    """Resolve Ollama Phase 2+ lifecycle artifacts after role promotion."""
+
+    root = project_root.resolve()
+    evaluation = evaluate_ollama_phase2_closure(root, role=role)
+    result: dict[str, Any] = {
+        "applied": False,
+        "would_apply": bool(evaluation["ready"]),
+        "dry_run": dry_run,
+        "evaluation": evaluation,
+        "resolved_work_items": [],
+        "authorization_completed": False,
+        "project_completed": False,
+        "memory_updated": False,
+        "evidence": OLLAMA_PHASE2_COMPLETION_EVIDENCE,
+    }
+    if not evaluation["ready"]:
+        result["reason"] = "closure gates failed"
+        return result
+    if dry_run:
+        result["reason"] = "dry run"
+        return result
+
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+    except Exception as exc:  # pragma: no cover - import environment guard
+        raise RuntimeError(f"cannot import KnowledgeDB: {exc}") from exc
+
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    changed_at = _now_iso()
+    for item_id in evaluation["work_items_requiring_update"]:
+        current = db.get_work_item(item_id)
+        if current is None:
+            continue
+        fields: dict[str, Any] = {
+            "stage": "resolved",
+            "status_detail": "Resolved by guarded Ollama Phase 2+ closure.",
+            "completion_evidence": OLLAMA_PHASE2_COMPLETION_EVIDENCE,
+        }
+        if str(current.get("resolution_status") or "").strip().lower() not in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
+            fields["resolution_status"] = "resolved"
+        db.update_work_item(
+            item_id,
+            changed_by,
+            change_reason,
+            owner_approved=True,
+            **fields,
+        )
+        result["resolved_work_items"].append(item_id)
+
+    authorization = db.get_project_authorization(OLLAMA_PHASE2_AUTHORIZATION_ID)
+    if authorization is not None and authorization.get("status") == "active":
+        db.update_project_authorization(
+            OLLAMA_PHASE2_AUTHORIZATION_ID,
+            changed_by,
+            change_reason,
+            status="completed",
+        )
+        result["authorization_completed"] = True
+
+    result["project_completed"] = _complete_ollama_phase2_project_if_ready(
+        db,
+        root,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        changed_at=changed_at,
+    )
+    result["memory_updated"] = _append_ollama_phase2_memory_closure(
+        root,
+        evidence=OLLAMA_PHASE2_COMPLETION_EVIDENCE,
+        changed_at=changed_at,
+    )
+    result.update({"applied": True, "would_apply": False, "reason": "applied"})
+    return result
 
 
 def role_for_harness(
