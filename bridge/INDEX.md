@@ -8,11 +8,13 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
+NO-GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-004.md
 NEW: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-003.md
 GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-002.md
 NEW: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-001.md
 
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2
+REVISED: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-005.md
 NO-GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-004.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-003.md
 GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-002.md
