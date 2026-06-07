@@ -7,6 +7,12 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-codex-wrapup-startup-gate-guard-sot
+VERIFIED: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-004.md
+NEW: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-003.md
+GO: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-002.md
+NEW: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-001.md
+
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
 VERIFIED: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-004.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-003.md
@@ -50,6 +56,7 @@ GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-002.md
 NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-001.md
 
 Document: gtkb-wi3326-project-rehome-executable-packet-repair
+GO: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-002.md
 NEW: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-001.md
 
 Document: gtkb-sweep-commit-skill-parity-registration
@@ -71,6 +78,7 @@ GO: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-002.md
 NEW: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-001.md
 
 Document: gtkb-wi3326-project-rehome
+NO-GO: bridge/gtkb-wi3326-project-rehome-006.md
 NEW: bridge/gtkb-wi3326-project-rehome-005.md
 GO: bridge/gtkb-wi3326-project-rehome-004.md
 REVISED: bridge/gtkb-wi3326-project-rehome-003.md
