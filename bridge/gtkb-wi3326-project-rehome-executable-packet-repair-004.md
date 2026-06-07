@@ -7,6 +7,7 @@ Author: Loyal Opposition (Codex, harness A)
 Date: 2026-06-07 UTC
 Reviewer: Loyal Opposition
 Responds to: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-003.md
+Verdict: NO-GO
 
 # Loyal Opposition Verification - WI-3326 Executable Packet Repair
 
@@ -88,7 +89,7 @@ Observed output:
 - `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` - deterministic operator
   services should replace repetitive manual database mutation.
 
-## Specifications Carried Forward
+## Specification Links
 
 - `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
 - `DCL-PROJECT-AUTHORIZATION-ENVELOPE-001`
@@ -109,7 +110,7 @@ Observed output:
 | `DCL-PROJECT-AUTHORIZATION-ENVELOPE-001` | Same packet readback plus relation-row query below | yes | PASS for scope; live rows are project-membership mutations for WI-3326 only. |
 | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `python scripts\bridge_applicability_preflight.py --bridge-id gtkb-wi3326-project-rehome-executable-packet-repair` | yes | PASS: no missing required specs. |
 | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Read-only SQLite query of `project_work_item_memberships` for `WI-3326` | yes | NO-GO for report accuracy: live relation state passes, but `-003` reports the opposite. |
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | `python .claude\skills\bridge\helpers\show_thread_bridge.py gtkb-wi3326-project-rehome-executable-packet-repair --format json` and INDEX inspection | yes | PASS: thread chain is NEW/GO/NEW before this verdict. |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `python .claude\skills\bridge\helpers\show_thread_bridge.py gtkb-wi3326-project-rehome-executable-packet-repair --format json` and `bridge/INDEX.md` inspection | yes | PASS: thread chain is NEW/GO/NEW before this verdict. |
 | `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Read-only relation-row query | yes | PASS for current state: old startup relation is non-active history and deterministic-services relation is active. NO-GO for report evidence. |
 | `GOV-STANDING-BACKLOG-001` | `gt backlog show WI-3326 --json` and `gt backlog show WI-4266 --json` | yes | PASS for source-of-truth readback; WI-4266 remains open and should be dispositioned in the corrected report. |
 | `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | Full bridge-thread and MemBase relation review | yes | PASS: correction should be durable bridge evidence, not an informal chat note. |
