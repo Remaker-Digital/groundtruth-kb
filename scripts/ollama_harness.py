@@ -17,7 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+try:
+    from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+except ModuleNotFoundError:  # pragma: no cover - exercised when imported as scripts.ollama_harness.
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 
 try:
     import tomllib
@@ -555,9 +558,31 @@ def _require_string(arguments: Mapping[str, Any], *names: str) -> str:
     raise OllamaHarnessError(f"missing required argument: {'/'.join(names)}")
 
 
+def _positive_int_argument(arguments: Mapping[str, Any], name: str, default: int) -> int:
+    if name not in arguments:
+        return default
+
+    value = arguments[name]
+    parsed: int | None = None
+    if isinstance(value, bool):
+        parsed = None
+    elif isinstance(value, int):
+        parsed = value
+    elif isinstance(value, float):
+        parsed = int(value) if value.is_integer() else None
+    elif isinstance(value, str):
+        text = value.strip()
+        if re.fullmatch(r"\d+(?:\.0+)?", text):
+            parsed = int(text.split(".", 1)[0])
+
+    if parsed is None or parsed <= 0:
+        raise OllamaHarnessError(f"{name} must be a positive integer")
+    return parsed
+
+
 def _dispatch_read(arguments: Mapping[str, Any], project_root: Path) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
-    max_chars = int(arguments.get("max_chars") or MAX_TOOL_OUTPUT_CHARS)
+    max_chars = _positive_int_argument(arguments, "max_chars", MAX_TOOL_OUTPUT_CHARS)
     try:
         return path.read_text(encoding="utf-8")[:max_chars]
     except FileNotFoundError:
@@ -614,7 +639,7 @@ def _iter_text_files(root: Path) -> Iterable[Path]:
 def _dispatch_grep(arguments: Mapping[str, Any], project_root: Path) -> str:
     pattern = _require_string(arguments, "pattern")
     base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
-    max_results = int(arguments.get("max_results") or MAX_GREP_RESULTS)
+    max_results = _positive_int_argument(arguments, "max_results", MAX_GREP_RESULTS)
     regex = re.compile(pattern)
     roots = [base] if base.is_file() else list(_iter_text_files(base))
     matches: list[str] = []
@@ -635,7 +660,7 @@ def _dispatch_grep(arguments: Mapping[str, Any], project_root: Path) -> str:
 def _dispatch_glob(arguments: Mapping[str, Any], project_root: Path) -> str:
     pattern = _require_string(arguments, "pattern")
     base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
-    max_results = int(arguments.get("max_results") or MAX_GLOB_RESULTS)
+    max_results = _positive_int_argument(arguments, "max_results", MAX_GLOB_RESULTS)
     matches: list[str] = []
     for path in base.rglob("*"):
         rel = _relative_path(project_root, path)
