@@ -449,6 +449,106 @@ related_specs = ["PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001"]
 related_deliberations = []
 
 [[systems]]
+id = "startup-index"
+canonical_name = "startup index"
+accepted_aliases = ["startup index", "session startup index", "SESSION-STARTUP-INDEX.md", "startup load order"]
+discouraged_aliases = ["startup report"]
+forbidden_aliases = []
+concept_vs_artifact = "control_index"
+authoritative_source = "config/agent-control/SESSION-STARTUP-INDEX.md"
+generated_or_authoritative = "authoritative_control_index"
+read_method = "Read config/agent-control/SESSION-STARTUP-INDEX.md for canonical startup load order and role-overlay routing."
+mutation_method = "Update through governed startup-control bridge work."
+role_permissions = "Prime Builder may update within approved startup-control scope; Loyal Opposition verifies load-order and role-overlay correctness."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Generated startup disclosures and dashboard summaries cite this index but do not replace it."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["GOV-SESSION-SELF-INITIALIZATION-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"]
+related_deliberations = []
+
+[[systems]]
+id = "startup-control-map"
+canonical_name = "startup control map"
+accepted_aliases = ["startup control map", "session startup control map", "SESSION-STARTUP-CONTROL-MAP.md", "startup surface inventory"]
+discouraged_aliases = ["dashboard authority"]
+forbidden_aliases = []
+concept_vs_artifact = "control_surface_inventory"
+authoritative_source = "config/agent-control/SESSION-STARTUP-CONTROL-MAP.md"
+generated_or_authoritative = "authoritative_control_map"
+read_method = "Read config/agent-control/SESSION-STARTUP-CONTROL-MAP.md for classified startup surfaces and authority boundaries."
+mutation_method = "Update through governed startup-control bridge work."
+role_permissions = "Prime Builder may update within approved startup-control scope; Loyal Opposition verifies authority classification and generated-surface separation."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Use this map to distinguish canonical files from generated summaries before relying on startup/dashboard output."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["GOV-SESSION-SELF-INITIALIZATION-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"]
+related_deliberations = []
+
+[[systems]]
+id = "startup-role-overlay"
+canonical_name = "startup role overlay"
+accepted_aliases = ["startup role overlay", "role overlay", "prime builder startup overlay", "loyal opposition startup overlay"]
+discouraged_aliases = ["role assignment", "mode file"]
+forbidden_aliases = []
+concept_vs_artifact = "role_specific_startup_contract"
+authoritative_source = "config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md and config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md"
+generated_or_authoritative = "authoritative_role_overlay"
+read_method = "Read the Prime Builder or Loyal Opposition startup overlay selected by the resolved durable role."
+mutation_method = "Update through governed startup-control bridge work; do not use overlays to change durable role assignment."
+role_permissions = "Prime Builder and Loyal Opposition each apply only the overlay matching the resolved role."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Role overlays describe role-specific startup behavior; durable role authority remains harness-state/harness-registry.json."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["GOV-SESSION-ROLE-AUTHORITY-001", "DCL-SESSION-ROLE-RESOLUTION-001"]
+related_deliberations = []
+
+[[systems]]
+id = "harness-registry-hot-path-projection"
+canonical_name = "harness registry hot-path projection"
+accepted_aliases = ["hot-path projection", "harness registry hot-path projection", "role hot path", "gt harness roles"]
+discouraged_aliases = ["role assignment mirror", "mode file"]
+forbidden_aliases = []
+concept_vs_artifact = "generated_projection"
+authoritative_source = "harness-state/harness-registry.json"
+generated_or_authoritative = "generated_hot_path_projection"
+read_method = "Resolve harness roles through groundtruth_kb.harness_projection.read_roles or `gt harness roles`; inspect harness-state/harness-registry.json only as the canonical projection file."
+mutation_method = "Update only through canonical role writers such as `gt mode set-role` or owner-directed harness role operations."
+role_permissions = "Both roles must resolve durable harness identity before applying role-specific behavior."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Hot-path projection is for deterministic startup reads; do not recreate retired role-assignment mirrors."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["REQ-HARNESS-REGISTRY-001", "GOV-SESSION-ROLE-AUTHORITY-001", "DCL-SESSION-ROLE-RESOLUTION-001"]
+related_deliberations = []
+
+[[systems]]
+id = "repo-local-adapter"
+canonical_name = "repo-local adapter"
+accepted_aliases = ["repo-local adapter", "repo-local skill adapter", "generated skill adapter", "harness capability adapter"]
+discouraged_aliases = ["plugin"]
+forbidden_aliases = []
+concept_vs_artifact = "generated_harness_adapter"
+authoritative_source = "config/agent-control/harness-capability-registry.toml"
+generated_or_authoritative = "registry_driven_generated_artifact"
+read_method = "Read config/agent-control/harness-capability-registry.toml to locate the canonical source and generated repo-local adapter path for a capability."
+mutation_method = "Edit the canonical source, then regenerate adapters through scripts/generate_codex_skill_adapters.py; do not hand-edit generated adapters."
+role_permissions = "Both roles may read adapters as session skills; Prime Builder updates adapters only through approved capability or skill work."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Repo-local adapters are generated projections of canonical skills or capability metadata, not independent source files."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
 id = "work-subject"
 canonical_name = "work subject"
 accepted_aliases = ["work subject", "active subject", "project subject"]

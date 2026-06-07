@@ -36,6 +36,11 @@ Dashboard/startup surfaces are summaries only.
 | doctor check | `groundtruth-kb/src/groundtruth_kb/project/doctor.py` | Workstation/project health check. |
 | startup disclosure | `scripts/session_self_initialization.py` | Generated orientation surface. |
 | session focus | `scripts/session_self_initialization.py` | Prime Builder selection/mapping surface. |
+| startup index | `config/agent-control/SESSION-STARTUP-INDEX.md` | Canonical startup load order and role-overlay routing. |
+| startup control map | `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md` | Classified startup surfaces and authority boundaries. |
+| startup role overlay | `config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md`, `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md` | Role-specific startup behavior; not durable role assignment. |
+| harness registry hot-path projection | `harness-state/harness-registry.json` | Read through `groundtruth_kb.harness_projection.read_roles` or `gt harness roles`. |
+| repo-local adapter | `config/agent-control/harness-capability-registry.toml` | Registry-driven generated harness adapter locations. |
 | work subject | `.claude/rules/operating-model.md` | Current active project/application scope. |
 | role assignment record | `harness-state/role-assignments.json` | Durable role map. |
 | harness identity record | `harness-state/harness-identities.json` | Durable harness installation IDs. |

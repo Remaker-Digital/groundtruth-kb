@@ -96,6 +96,7 @@ REVISED: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-002.md
 NEW: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-001.md
 
 Document: gtkb-startup-control-vocabulary-map
+VERIFIED: bridge/gtkb-startup-control-vocabulary-map-004.md
 NEW: bridge/gtkb-startup-control-vocabulary-map-003.md
 GO: bridge/gtkb-startup-control-vocabulary-map-002.md
 NEW: bridge/gtkb-startup-control-vocabulary-map-001.md

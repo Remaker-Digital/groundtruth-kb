@@ -11,6 +11,14 @@ from pathlib import Path
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "resolve_system_interface.py"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+STARTUP_CONTROL_TERMS = {
+    "startup index": ("startup-index", "config/agent-control/SESSION-STARTUP-INDEX.md"),
+    "startup control map": ("startup-control-map", "config/agent-control/SESSION-STARTUP-CONTROL-MAP.md"),
+    "role overlay": ("startup-role-overlay", "config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md"),
+    "hot-path projection": ("harness-registry-hot-path-projection", "harness-state/harness-registry.json"),
+    "repo-local adapter": ("repo-local-adapter", "config/agent-control/harness-capability-registry.toml"),
+}
+
 
 def _load_module():
     spec = importlib.util.spec_from_file_location("resolve_system_interface", SCRIPT_PATH)
@@ -51,6 +59,16 @@ def test_common_owner_terms_resolve_to_expected_systems() -> None:
     assert module.resolve_term("bridge queue")["system"]["id"] == "bridge-queue"
     assert module.resolve_term("resource registry")["system"]["id"] == "resource-alias-registry"
     assert module.resolve_term("release gate")["system"]["id"] == "release-gate"
+
+
+def test_startup_control_owner_terms_resolve_to_authoritative_sources() -> None:
+    module = _load_module()
+
+    for term, (expected_id, expected_source) in STARTUP_CONTROL_TERMS.items():
+        result = module.resolve_term(term)
+        assert result["status"] == "resolved"
+        assert result["system"]["id"] == expected_id
+        assert expected_source in result["system"]["authoritative_source"]
 
 
 def test_ambiguous_owner_term_fails_closed() -> None:
@@ -150,3 +168,22 @@ def test_cli_status_reports_compact_payload() -> None:
     payload = json.loads(result.stdout)
     assert payload["status"] == "pass"
     assert payload["first_reconciliation_case"] == "backlog"
+
+
+def test_cli_resolves_startup_control_terms() -> None:
+    for term, (expected_id, expected_source) in STARTUP_CONTROL_TERMS.items():
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH), term, "--json"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["status"] == "resolved"
+        assert payload["system"]["id"] == expected_id
+        assert expected_source in payload["system"]["authoritative_source"]
