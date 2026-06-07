@@ -142,3 +142,16 @@ def test_skill_body_cites_lifecycle_trigger_dcl() -> None:
     assert "lifecycle trigger" in text, (
         "SKILL.md body must contain 'lifecycle trigger' workflow language (per REVISED-2 F1)"
     )
+
+
+def test_skill_guidance_includes_cli_fallback() -> None:
+    required_fragments = [
+        "gt hygiene sweep",
+        "python -m groundtruth_kb hygiene sweep",
+        "PYTHONPATH=groundtruth-kb/src",
+    ]
+
+    for path in (CANONICAL_SKILL, CODEX_SKILL):
+        text = path.read_text(encoding="utf-8")
+        for fragment in required_fragments:
+            assert fragment in text, f"{path} must include hygiene CLI fallback guidance: {fragment}"
