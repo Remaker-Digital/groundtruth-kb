@@ -84,6 +84,30 @@ def test_heartbeat_tool_use_creates_when_absent(heartbeat_module, tmp_path: Path
     assert "last_refreshed" in payload
 
 
+def test_atomic_write_json_retries_transient_replace_permission_error(
+    heartbeat_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-HB-retry-transient-replace-denied: a one-shot Windows replace race is retried."""
+    lock = tmp_path / "active-codex-session.lock"
+    original_replace = heartbeat_module.os.replace
+    calls: list[tuple[str, str]] = []
+
+    def _flaky_replace(src: str, dst: str) -> None:
+        calls.append((src, dst))
+        if len(calls) == 1:
+            raise PermissionError("simulated transient access denied")
+        original_replace(src, dst)
+
+    monkeypatch.setattr(heartbeat_module.os, "replace", _flaky_replace)
+    monkeypatch.setattr(heartbeat_module, "REPLACE_RETRY_DELAYS_SECONDS", (0.0,))
+
+    heartbeat_module._atomic_write_json(lock, {"ok": True})
+
+    assert len(calls) == 2
+    assert lock.is_file()
+    assert json.loads(lock.read_text(encoding="utf-8")) == {"ok": True}
+
+
 def test_heartbeat_session_stop_removes_lock(heartbeat_module, tmp_path: Path) -> None:
     """T-HB-session-stop-removes-lock: --mode session-stop deletes the lock."""
     heartbeat_module._handle_session_start(tmp_path, "claude")

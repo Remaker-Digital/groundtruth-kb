@@ -40,9 +40,11 @@ import json
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 LOCK_FILENAME_TEMPLATE = "active-{role}-session.lock"
+REPLACE_RETRY_DELAYS_SECONDS = (0.05, 0.1, 0.2)
 
 
 def _now_iso() -> str:
@@ -60,7 +62,15 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(payload, f)
-        os.replace(tmp_name, str(path))
+        delays = (*REPLACE_RETRY_DELAYS_SECONDS, None)
+        for delay in delays:
+            try:
+                os.replace(tmp_name, str(path))
+                break
+            except PermissionError:
+                if delay is None:
+                    raise
+                time.sleep(delay)
     except Exception:
         try:
             os.unlink(tmp_name)
