@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
+NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-003.md
 GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-002.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-001.md
 
@@ -18,6 +19,7 @@ NO-GO: bridge/gtkb-ollama-tool-numeric-argument-coercion-002.md
 NEW: bridge/gtkb-ollama-tool-numeric-argument-coercion-001.md
 
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
+GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-008.md
 REVISED: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-007.md
 NO-GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-006.md
 REVISED: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-005.md
