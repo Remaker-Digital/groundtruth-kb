@@ -14,6 +14,7 @@ GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-002.md
 NEW: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-001.md
 
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2
+GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-006.md
 REVISED: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-005.md
 NO-GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-004.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-003.md
@@ -21,6 +22,7 @@ GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-002.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-001.md
 
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
+REVISED: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-005.md
 NO-GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-004.md
 NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-003.md
 GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-002.md
