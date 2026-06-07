@@ -14,6 +14,8 @@ GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-appr
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-001.md
 
 Document: gtkb-ollama-tool-numeric-argument-coercion
+VERIFIED: bridge/gtkb-ollama-tool-numeric-argument-coercion-006.md
+NEW: bridge/gtkb-ollama-tool-numeric-argument-coercion-005.md
 GO: bridge/gtkb-ollama-tool-numeric-argument-coercion-004.md
 REVISED: bridge/gtkb-ollama-tool-numeric-argument-coercion-003.md
 NO-GO: bridge/gtkb-ollama-tool-numeric-argument-coercion-002.md
