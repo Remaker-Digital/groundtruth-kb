@@ -205,6 +205,15 @@ def _index_with_one_new(root: Path, doc: str = "example-thread") -> str:
     return f"# bridge index\n\nDocument: {doc}\nNEW: bridge/{doc}-001.md\n"
 
 
+def _index_with_new_threads(root: Path, docs: list[str]) -> str:
+    """Build a newest-first INDEX with multiple NEW entries."""
+    lines = ["# bridge index", ""]
+    for doc in docs:
+        _write_bridge_file(root, f"{doc}-001.md")
+        lines.extend([f"Document: {doc}", f"NEW: bridge/{doc}-001.md", ""])
+    return "\n".join(lines)
+
+
 def _index_with_one_go(root: Path, doc: str = "example-thread") -> str:
     """Build an INDEX whose top status is GO (Prime-actionable)."""
     _write_bridge_file(root, f"{doc}-001.md", "bridge_kind: implementation_proposal\n")
@@ -294,6 +303,42 @@ def test_unchanged_signature_does_not_replay(tmp_path: Path) -> None:
 
     second = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     assert second["results"]["loyal-opposition"]["reason"] == "unchanged"
+
+
+def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> None:
+    """A failed prior worker must not permanently dedupe the same selected batch."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+    stderr_path = state_dir / "dispatch-runs" / "failed-worker.stderr.log"
+    stderr_path.parent.mkdir(parents=True, exist_ok=True)
+    stderr_path.write_text("ollama_harness: max-turn exhaustion before final assistant text\n", encoding="utf-8")
+
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    lo_state = state["recipients"]["loyal-opposition"]
+    lo_state["last_launch"] = {
+        "dispatch_id": "prior-dispatch",
+        "launched_at": "2026-06-07T03:56:00+00:00",
+        "stderr_path": str(stderr_path),
+    }
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert retried["results"]["loyal-opposition"]["reason"] == "dry_run"
+    retried_state = retried["dispatch_state"]["recipients"]["loyal-opposition"]
+    assert retried_state["last_result"] == "launch_failed"
+    assert retried_state["previous_launch_failed"]["reason"] == "previous_launch_failed"
+    assert retried_state["previous_launch_failed"]["matched_markers"][0]["label"] == "max_turn_exhaustion"
+
+    failures = _failure_records(state_dir)
+    assert any(record["reason"] == "previous_launch_failed" for record in failures)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -558,6 +603,43 @@ def test_default_max_items_matches_smart_poller_default_cap(tmp_path: Path) -> N
     """
     trigger = _load_trigger()
     assert trigger.DEFAULT_MAX_ITEMS == 2
+
+
+def test_ollama_lo_dispatch_caps_selected_batch_to_one(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ollama LO dispatch keeps the global cap unchanged but selects one item."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_three_new(root))
+
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda _root: {"ready": True})
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+
+    assert trigger.DEFAULT_MAX_ITEMS == 2
+    assert trigger.OLLAMA_LOYAL_OPPOSITION_MAX_ITEMS == 1
+    rec = summary["dispatch_state"]["recipients"]["loyal-opposition"]
+    assert rec["pending_count"] == 3
+    assert rec["selected_count"] == 1
+    command_head = summary["results"]["loyal-opposition"]["command_head"]
+    assert command_head[0] == "ollama-harness"
+    assert command_head[1].startswith("::init gtkb lo\n")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1804,6 +1886,68 @@ def test_dispatch_decision_unchanged_with_instrumentation(tmp_path: Path) -> Non
     assert (state_dir / "trigger-diagnostic.jsonl").is_file()
 
 
+def test_unchanged_signature_preserves_last_launch_metadata(tmp_path: Path) -> None:
+    """A deduped unchanged run keeps prior launch log paths available."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    first_launch = state["recipients"]["loyal-opposition"]["last_launch"]
+
+    second = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert second["results"]["loyal-opposition"]["reason"] == "unchanged"
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+
+    assert state["recipients"]["loyal-opposition"]["last_launch"] == first_launch
+
+
+def test_unchanged_signature_with_previous_fatal_worker_log_retries(tmp_path: Path) -> None:
+    """A prior fatal worker marker makes the same signature retryable."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    stdout_path = runs_dir / "prior.stdout.log"
+    stderr_path = runs_dir / "prior.stderr.log"
+    stdout_path.write_text("", encoding="utf-8")
+    stderr_path.write_text(
+        "ollama_harness: max-turn exhaustion before final assistant text\n",
+        encoding="utf-8",
+    )
+
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    rec = state["recipients"]["loyal-opposition"]
+    rec["last_result"] = "launched"
+    rec["last_launch"] = {
+        "dispatch_id": "prior-dispatch",
+        "recipient": "loyal-opposition",
+        "launched": True,
+        "launched_at": "2026-06-07T06:00:00+00:00",
+        "stdout_path": str(stdout_path),
+        "stderr_path": str(stderr_path),
+    }
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert retried["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+    previous_failures = [rec for rec in _failure_records(state_dir) if rec.get("reason") == "previous_launch_failed"]
+    assert previous_failures
+    assert previous_failures[-1]["prior_dispatch_id"] == "prior-dispatch"
+    assert previous_failures[-1]["matched_markers"][0]["label"] == "max_turn_exhaustion"
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # WI-3344 — data-driven _harness_command() from invocation_surfaces (FR8)
 # Per bridge/gtkb-harness-data-driven-dispatch-003.md (Codex GO at -004).
@@ -1923,7 +2067,45 @@ def test_dispatch_prompt_warns_worker_to_record_owner_decision_blockers() -> Non
     assert "cannot interactively ask the owner for input" in prompt
     assert "record the blocker in the bridge artifact" in prompt
     assert "asking in prose" in prompt
+    assert "harness-state/harness-identities.json" in prompt
+    assert "harness-state/harness-registry.json" in prompt
+    assert "groundtruth_kb.harness_projection" in prompt
+    assert ".claude/rules/operating-role.md" not in prompt
+    assert "harness-state/{harness}/operating-role.md" not in prompt
+    assert "bridge_applicability_preflight.py --bridge-id <document-name>" in prompt
+    assert "adr_dcl_clause_preflight.py --bridge-id <document-name>" in prompt
+    assert "clean Applicability Preflight section" in prompt
     assert "GO gtkb-prime-worker-delivery-regression-slice-4" in prompt
+
+
+def test_lo_dispatch_prompt_requires_preflights_before_verdicts() -> None:
+    """LO workers need explicit preflight instructions before GO/VERIFIED writes."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-ollama-dispatch-stall-retry-cap",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-ollama-dispatch-stall-retry-cap-001.md",
+        },
+    )()
+
+    prompt = trigger._dispatch_prompt(target, [item], max_items=1)
+
+    assert prompt.splitlines()[0] == "::init gtkb lo"
+    assert "Loyal Opposition verdict requirement" in prompt
+    assert "bridge_applicability_preflight.py --bridge-id <document-name>" in prompt
+    assert "adr_dcl_clause_preflight.py --bridge-id <document-name>" in prompt
+    assert "clean Applicability Preflight section" in prompt
+    assert "NEW gtkb-ollama-dispatch-stall-retry-cap" in prompt
 
 
 def test_harness_command_preserves_dispatch_prompt_as_single_argv_element(tmp_path: Path) -> None:
@@ -2094,6 +2276,41 @@ def _failure_records(state_dir: Path) -> list[dict]:
     if not path.is_file():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def test_ollama_loyal_opposition_dispatch_caps_selected_batch_to_one(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ollama Loyal Opposition dispatch uses a one-item cap without changing the global default."""
+    root = _make_synthetic_project(tmp_path)
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "-p", "{{PROMPT}}"]}},
+                event_driven_hooks=False,
+            ),
+            _rec("B", "claude", ["prime-builder"], "inactive", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_new_threads(root, ["newest-thread", "middle-thread", "oldest-thread"]))
+    state_dir = tmp_path / "state"
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda project_root: {"ready": True})
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert trigger.DEFAULT_MAX_ITEMS == 2
+    assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    rec = state["recipients"]["loyal-opposition"]
+    assert rec["pending_count"] == 3
+    assert rec["selected_count"] == 1
 
 
 def test_resolve_exactly_one_active_dispatches(tmp_path: Path) -> None:

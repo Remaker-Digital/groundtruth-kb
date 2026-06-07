@@ -128,11 +128,24 @@ DEFAULT_DISPATCH_FAILURES_MAX_BYTES = 1024 * 1024
 # requires a separate bridge proposal — Codex F1 on
 # ``-008`` flagged unilateral cap changes as scope creep.
 DEFAULT_MAX_ITEMS = 2
+OLLAMA_LOYAL_OPPOSITION_MAX_ITEMS = 1
 QUIESCE_WINDOW_SECONDS = 5.0
 QUIESCE_WINDOW_ENV_VAR = "GTKB_TRIGGER_QUIESCE_SECONDS"
 CLAUDE_WORKER_ALLOWED_TOOLS = "Read Edit Write Glob Grep Bash TodoWrite NotebookEdit"
 WORK_INTENT_TRIGGER_SESSION_PREFIX = "trigger-dispatched-"
 WORK_INTENT_TRIGGER_TTL_SECONDS = 120
+IMPLEMENTATION_AUTH_ENV_VARS = (
+    "GTKB_IMPLEMENTATION_AUTH_DISPATCH_ID",
+    "GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS",
+    "GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID",
+    "GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES",
+)
+FATAL_WORKER_OUTPUT_MARKERS = (
+    ("max-turn exhaustion", "max_turn_exhaustion"),
+    ("guard denied Write", "guard_denied_write"),
+    ("guard denied", "guard_denial"),
+)
+PRIOR_LAUNCH_LOG_READ_LIMIT_BYTES = 64 * 1024
 
 # WI-3265 (bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md, Codex
 # GO at -004): per-invocation diagnostic instrumentation. Observational only —
@@ -434,6 +447,59 @@ def _record_dispatch_failure(state_dir: Path, payload: dict[str, Any]) -> None:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
     except OSError:
         pass
+
+
+def _read_recent_text(path: Path, *, byte_limit: int = PRIOR_LAUNCH_LOG_READ_LIMIT_BYTES) -> str:
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return ""
+    return raw[-byte_limit:].decode("utf-8", errors="replace")
+
+
+def _detect_previous_launch_failure(
+    prior: dict[str, Any],
+    *,
+    recipient: str,
+    signature: str,
+) -> dict[str, Any] | None:
+    """Return failure evidence when prior worker logs show a fatal marker."""
+    launch = prior.get("last_launch")
+    if not isinstance(launch, dict):
+        return None
+
+    matched: list[dict[str, str]] = []
+    inspected_paths: dict[str, str] = {}
+    for field in ("stdout_path", "stderr_path"):
+        raw_path = launch.get(field)
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        path = Path(raw_path)
+        inspected_paths[field] = str(path)
+        text = _read_recent_text(path)
+        if not text:
+            continue
+        lowered = text.lower()
+        for marker, label in FATAL_WORKER_OUTPUT_MARKERS:
+            if marker.lower() in lowered:
+                matched.append({"field": field, "marker": marker, "label": label})
+
+    if not matched:
+        return None
+
+    return {
+        "ts": _now_iso(),
+        "dispatch_id": _now_iso() + "-previous-launch-failed",
+        "recipient": recipient,
+        "launched": False,
+        "reason": "previous_launch_failed",
+        "error_type": "fatal_worker_output_marker",
+        "prior_dispatch_id": launch.get("dispatch_id"),
+        "prior_launched_at": launch.get("launched_at"),
+        "signature": signature,
+        "matched_markers": matched,
+        **inspected_paths,
+    }
 
 
 def _new_dispatch_id(recipient_key: str) -> str:
@@ -742,6 +808,14 @@ def _selected_oldest_first(items: list[Any], max_items: int) -> list[Any]:
     return list(reversed(items))[:max_items]
 
 
+def _effective_max_items_for_target(target: DispatchTarget, max_items: int) -> int:
+    if max_items <= 0:
+        return 0
+    if target.needed_role_label == "loyal-opposition" and target.command_handle == OLLAMA_HARNESS_TYPE:
+        return min(max_items, OLLAMA_LOYAL_OPPOSITION_MAX_ITEMS)
+    return max_items
+
+
 def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -> str:
     """Build the dispatch prompt mirroring the smart-poller phrasing.
 
@@ -775,6 +849,12 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
         "work, record the blocker in the bridge artifact and stop instead of "
         "asking in prose."
     )
+    loyal_opposition_preflight_line = (
+        "Loyal Opposition verdict requirement: before writing GO or VERIFIED, "
+        "run `python scripts/bridge_applicability_preflight.py --bridge-id <document-name>` "
+        "and `python scripts/adr_dcl_clause_preflight.py --bridge-id <document-name>`, "
+        "then include the clean Applicability Preflight section in the verdict artifact."
+    )
     canonical_keyword = f"::init gtkb {target.canonical_mode}"
     return "\n".join(
         [
@@ -789,6 +869,7 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
             "",
             role_line,
             worker_context_line,
+            loyal_opposition_preflight_line,
             "Read bridge/INDEX.md directly before acting. Treat the live latest status as authoritative.",
             "If any listed entry is no longer actionable for your role, do not act on that stale entry.",
             "Keep work scoped to the selected bridge entries and preserve the bridge protocol audit trail.",
@@ -1489,6 +1570,8 @@ def _spawn_harness(
     # keeping the inherited session aligned prevents older worker surfaces from
     # claiming under a different id.
     env["GTKB_INHERITED_SESSION_ID"] = dispatch_id
+    for key in IMPLEMENTATION_AUTH_ENV_VARS:
+        env.pop(key, None)
     if packet_context is not None:
         packet_bridge_ids = [str(item) for item in packet_context.get("bridge_ids", [])]
         packet_hashes = [
@@ -1873,6 +1956,7 @@ def run_trigger(
             recipients_state[recipient] = recipient_state
             results[recipient] = {"launched": False, "reason": reason}
             continue
+        target_max_items = _effective_max_items_for_target(target, max_items)
         # Filter by dispatchable per smart-poller-kind-aware-routing -009 §1.5.
         # Terminal-kind GO entries are not dispatched.
         filtered = [it for it in items if getattr(it, "dispatchable", True)]
@@ -1883,7 +1967,7 @@ def run_trigger(
         # for_prompt(filtered, max_items))`` byte-for-byte. Signing the full
         # list would let entries outside the cap flip the signature without
         # changing the dispatch payload, causing redundant dispatches.
-        selected = _selected_oldest_first(filtered, max_items)
+        selected = _selected_oldest_first(filtered, target_max_items)
         signature = _signature(selected)
 
         prior = recipients_state.get(recipient) if isinstance(recipients_state.get(recipient), dict) else {}
@@ -1921,6 +2005,8 @@ def run_trigger(
             # Legacy field updated only on real dispatch; carry forward here.
             "signature": prior_legacy_signature,
         }
+        if isinstance(prior, dict) and isinstance(prior.get("last_launch"), dict):
+            recipient_state["last_launch"] = prior["last_launch"]
 
         if not selected:
             recipient_state["last_result"] = "no_pending_after_filter" if items else "no_pending"
@@ -1948,7 +2034,7 @@ def run_trigger(
                 dispatched_filtered = [
                     it for it in filtered if not is_lease_held(it.document_name, state_dir=state_dir)
                 ]
-                dispatched_selected = _selected_oldest_first(dispatched_filtered, max_items)
+                dispatched_selected = _selected_oldest_first(dispatched_filtered, target_max_items)
                 dispatched_signature = _signature(dispatched_selected)
                 spawn_items = dispatched_filtered
                 dispatch_id: str | None = None
@@ -1995,73 +2081,85 @@ def run_trigger(
                         "dispatch_id": dispatch_id,
                         "work_intent_session_id": work_intent_session_id,
                     }
-                elif prior_dispatched == dispatched_signature:
-                    # Slice 2 dedup: this exact signature was already dispatched.
-                    # Skip without spawning. Legacy `signature` stays in sync.
-                    recipient_state["signature"] = dispatched_signature
-                    recipient_state["last_result"] = "unchanged"
-                    results[recipient] = {"launched": False, "reason": "unchanged"}
                 else:
-                    # Dispatch path. Covers:
-                    #   - first dispatch ever
-                    #   - signature changed since last dispatch
-                    #   - prior_suppressed == signature (retry after target exit)
-                    if recipient == "prime-builder" and not dry_run:
-                        if dispatch_id is None:
-                            dispatch_id = _new_dispatch_id(target.dispatch_state_key)
-                        if work_intent_session_id is None:
-                            work_intent_session_id = _work_intent_session_id(dispatch_id)
-                        acquire_result = _acquire_prime_work_intent_batch(
-                            dispatched_selected,
+                    previous_launch_failure = None
+                    if prior_dispatched == dispatched_signature and isinstance(prior, dict):
+                        previous_launch_failure = _detect_previous_launch_failure(
+                            prior,
+                            recipient=recipient,
+                            signature=dispatched_signature,
+                        )
+                        if previous_launch_failure is not None:
+                            _record_dispatch_failure(state_dir, previous_launch_failure)
+                            recipient_state["previous_launch_failed"] = previous_launch_failure
+
+                    if prior_dispatched == dispatched_signature and previous_launch_failure is None:
+                        # Slice 2 dedup: this exact signature was already dispatched.
+                        # Skip without spawning. Legacy `signature` stays in sync.
+                        recipient_state["signature"] = dispatched_signature
+                        recipient_state["last_result"] = "unchanged"
+                        results[recipient] = {"launched": False, "reason": "unchanged"}
+                    else:
+                        # Dispatch path. Covers:
+                        #   - first dispatch ever
+                        #   - signature changed since last dispatch
+                        #   - prior_suppressed == signature (retry after target exit)
+                        if recipient == "prime-builder" and not dry_run:
+                            if dispatch_id is None:
+                                dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                            if work_intent_session_id is None:
+                                work_intent_session_id = _work_intent_session_id(dispatch_id)
+                            acquire_result = _acquire_prime_work_intent_batch(
+                                dispatched_selected,
+                                project_root=project_root,
+                                state_dir=state_dir,
+                                recipient=recipient,
+                                dispatch_id=dispatch_id,
+                                session_id=work_intent_session_id,
+                            )
+                            if not acquire_result["ok"]:
+                                recipient_state["last_result"] = acquire_result["reason"]
+                                recipient_state["last_launch"] = {
+                                    "dispatch_id": dispatch_id,
+                                    "recipient": recipient,
+                                    "launched": False,
+                                    "reason": acquire_result["reason"],
+                                    "work_intent_session_id": work_intent_session_id,
+                                    "failed_slug": acquire_result.get("failed_slug"),
+                                    "released_slugs": acquire_result.get("acquired_slugs", []),
+                                }
+                                results[recipient] = recipient_state["last_launch"]
+                                recipients_state[recipient] = recipient_state
+                                continue
+                            acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
+                        launch = _spawn_harness(
+                            target=target,
+                            items=spawn_items,
                             project_root=project_root,
                             state_dir=state_dir,
-                            recipient=recipient,
+                            max_items=target_max_items,
+                            dry_run=dry_run,
                             dispatch_id=dispatch_id,
-                            session_id=work_intent_session_id,
                         )
-                        if not acquire_result["ok"]:
-                            recipient_state["last_result"] = acquire_result["reason"]
-                            recipient_state["last_launch"] = {
-                                "dispatch_id": dispatch_id,
-                                "recipient": recipient,
-                                "launched": False,
-                                "reason": acquire_result["reason"],
-                                "work_intent_session_id": work_intent_session_id,
-                                "failed_slug": acquire_result.get("failed_slug"),
-                                "released_slugs": acquire_result.get("acquired_slugs", []),
-                            }
-                            results[recipient] = recipient_state["last_launch"]
-                            recipients_state[recipient] = recipient_state
-                            continue
-                        acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
-                    launch = _spawn_harness(
-                        target=target,
-                        items=spawn_items,
-                        project_root=project_root,
-                        state_dir=state_dir,
-                        max_items=max_items,
-                        dry_run=dry_run,
-                        dispatch_id=dispatch_id,
-                    )
-                    if work_intent_session_id is not None:
-                        launch["work_intent_session_id"] = work_intent_session_id
-                    if acquired_work_intent_slugs:
-                        launch["work_intent_slugs"] = acquired_work_intent_slugs
-                    if recipient == "prime-builder" and acquired_work_intent_slugs and not launch.get("launched"):
-                        _release_prime_work_intents(
-                            acquired_work_intent_slugs,
-                            project_root=project_root,
-                            session_id=work_intent_session_id or "",
-                        )
-                    recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
-                    recipient_state["last_launch"] = launch
-                    if recipient != "prime-builder" or dry_run or launch.get("launched"):
-                        recipient_state["last_dispatched_signature"] = dispatched_signature
-                        # Dispatch supersedes any prior suppression.
-                        recipient_state["last_suppressed_signature"] = None
-                        # Legacy `signature` field updated ONLY on real dispatch.
-                        recipient_state["signature"] = dispatched_signature
-                    results[recipient] = launch
+                        if work_intent_session_id is not None:
+                            launch["work_intent_session_id"] = work_intent_session_id
+                        if acquired_work_intent_slugs:
+                            launch["work_intent_slugs"] = acquired_work_intent_slugs
+                        if recipient == "prime-builder" and acquired_work_intent_slugs and not launch.get("launched"):
+                            _release_prime_work_intents(
+                                acquired_work_intent_slugs,
+                                project_root=project_root,
+                                session_id=work_intent_session_id or "",
+                            )
+                        recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
+                        recipient_state["last_launch"] = launch
+                        if recipient != "prime-builder" or dry_run or launch.get("launched"):
+                            recipient_state["last_dispatched_signature"] = dispatched_signature
+                            # Dispatch supersedes any prior suppression.
+                            recipient_state["last_suppressed_signature"] = None
+                            # Legacy `signature` field updated ONLY on real dispatch.
+                            recipient_state["signature"] = dispatched_signature
+                        results[recipient] = launch
 
         recipients_state[recipient] = recipient_state
 
