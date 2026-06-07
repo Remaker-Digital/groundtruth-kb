@@ -7,20 +7,23 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
-Document: gtkb-ollama-dispatch-failure-hardening
-VERIFIED: bridge/gtkb-ollama-dispatch-failure-hardening-004.md
-NEW: bridge/gtkb-ollama-dispatch-failure-hardening-003.md
-GO: bridge/gtkb-ollama-dispatch-failure-hardening-002.md
-NEW: bridge/gtkb-ollama-dispatch-failure-hardening-001.md
-Document: gtkb-ollama-lo-dispatch-session-propagation
-VERIFIED: bridge/gtkb-ollama-lo-dispatch-session-propagation-008.md
-NEW: bridge/gtkb-ollama-lo-dispatch-session-propagation-007.md
-GO: bridge/gtkb-ollama-lo-dispatch-session-propagation-006.md
-REVISED: bridge/gtkb-ollama-lo-dispatch-session-propagation-005.md
-GO: bridge/gtkb-ollama-lo-dispatch-session-propagation-004.md
-REVISED: bridge/gtkb-ollama-lo-dispatch-session-propagation-003.md
-GO: bridge/gtkb-ollama-lo-dispatch-session-propagation-002.md
-NEW: bridge/gtkb-ollama-lo-dispatch-session-propagation-001.md
+Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
+NEW: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-003.md
+GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-002.md
+NEW: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-001.md
+
+Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2
+NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-003.md
+GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-002.md
+NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-001.md
+
+Document: gtkb-role-enhancement-review-depth-contract-slice-1
+NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-003.md
+GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-002.md
+NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-001.md
+
+Document: gtkb-wi3326-project-rehome-executable-packet-repair
+NEW: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-001.md
 
 Document: gtkb-sweep-commit-skill-parity-registration
 VERIFIED: bridge/gtkb-sweep-commit-skill-parity-registration-009.md
@@ -41,17 +44,20 @@ GO: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-002.md
 NEW: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-001.md
 
 Document: gtkb-wi3326-project-rehome
+NEW: bridge/gtkb-wi3326-project-rehome-005.md
 GO: bridge/gtkb-wi3326-project-rehome-004.md
 REVISED: bridge/gtkb-wi3326-project-rehome-003.md
 REVISED: bridge/gtkb-wi3326-project-rehome-002.md
 NEW: bridge/gtkb-wi3326-project-rehome-001.md
 
 Document: gtkb-hygiene-cli-utf8-portability-slice-2-guidance
+NEW: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-004.md
 GO: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-003.md
 REVISED: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-002.md
 NEW: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-001.md
 
 Document: gtkb-startup-control-vocabulary-map
+NEW: bridge/gtkb-startup-control-vocabulary-map-003.md
 GO: bridge/gtkb-startup-control-vocabulary-map-002.md
 NEW: bridge/gtkb-startup-control-vocabulary-map-001.md
 
@@ -62,6 +68,7 @@ NO-GO: bridge/gtkb-role-enhancement-002.md
 NEW: bridge/gtkb-role-enhancement-001.md
 
 Document: gtkb-project-completion-plan-incomplete-guard
+NEW: bridge/gtkb-project-completion-plan-incomplete-guard-003.md
 GO: bridge/gtkb-project-completion-plan-incomplete-guard-002.md
 NEW: bridge/gtkb-project-completion-plan-incomplete-guard-001.md
 
@@ -78,6 +85,7 @@ GO: bridge/gtkb-ollama-qwen-full-lo-route-002.md
 NEW: bridge/gtkb-ollama-qwen-full-lo-route-001.md
 
 Document: gtkb-mirror-retirement-target-path-scope-correction
+REVISED: bridge/gtkb-mirror-retirement-target-path-scope-correction-007.md
 NO-GO: bridge/gtkb-mirror-retirement-target-path-scope-correction-006.md
 REVISED: bridge/gtkb-mirror-retirement-target-path-scope-correction-005.md
 NO-GO: bridge/gtkb-mirror-retirement-target-path-scope-correction-004.md
@@ -96,6 +104,7 @@ NO-GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-002.md
 NEW: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
+REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-017.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-016.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-015.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-014.md
