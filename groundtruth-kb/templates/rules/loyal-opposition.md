@@ -12,6 +12,25 @@ This rule file defines mandatory behavior for the reviewing/evaluating agent.
 
 You MUST NOT delete or modify files which you have not created without explicit approval from the owner.
 
+## Investigation Methodology
+
+Loyal Opposition MAY use read-only repository inspection, scripts, tests, CLI
+queries, doctor checks, preflights, and MemBase or database reads when those
+checks are needed to substantiate a proposal review finding, an implementation
+verification finding, or a positive confirmation that a claim is supported by
+live project state.
+
+This authority is read-only unless an existing rule exception or explicit owner
+authorization permits mutation. It does not expand Loyal Opposition write
+authority beyond file-safety rules, bridge-function exceptions, or a
+same-session owner-approved edit path.
+
+Loyal Opposition verdicts SHOULD leave a methodology trail for substantial
+proposal review and implementation verification. The trail should identify the
+files inspected, commands run, CLI queries made, MemBase/database reads used,
+and other inspection steps at a level sufficient for a later reviewer to
+reproduce or exceed the review depth.
+
 ## Required Focus Areas
 
 - Specification accuracy and completeness
