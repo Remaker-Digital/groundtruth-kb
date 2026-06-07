@@ -297,6 +297,26 @@ def _seed_completion_env(
     return db
 
 
+def _add_completion_guard(
+    db: KnowledgeDB,
+    *,
+    artifact_type: str = "completion_guard",
+    status: str = "active",
+    link_id: str = "PAL-PLAN-INCOMPLETE",
+) -> None:
+    db.add_project_artifact_link(
+        "PROJECT-X",
+        artifact_type,
+        "plan-incomplete-fixture",
+        "test",
+        "seed plan_incomplete guard",
+        relationship="plan_incomplete",
+        status=status,
+        notes="Fixture guard",
+        id=link_id,
+    )
+
+
 # --- complete_project_authorization: v2 automatic completion (no owner gate) -
 
 
@@ -439,6 +459,48 @@ def test_auto_complete_ready_authorizations_completes_and_retires(tmp_path) -> N
         assert completed[0]["project_retired"] is True
         assert db.get_project_authorization("PAUTH-X")["status"] == "completed"
         assert db.get_project("PROJECT-X")["status"] == "retired"
+    finally:
+        db.close()
+
+
+def test_auto_complete_plan_incomplete_guard_suppresses_completion(tmp_path) -> None:
+    db = _seed_completion_env(tmp_path)
+    try:
+        _add_completion_guard(db)
+        service = ProjectLifecycleService(db)
+        completed = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert completed == []
+        assert db.get_project_authorization("PAUTH-X")["status"] == "active"
+        assert db.get_project("PROJECT-X")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_complete_rejects_plan_incomplete_guard(tmp_path) -> None:
+    db = _seed_completion_env(tmp_path)
+    try:
+        _add_completion_guard(db, artifact_type="bridge_thread")
+        service = ProjectLifecycleService(db)
+        with pytest.raises(ProjectLifecycleError, match="plan_incomplete completion guard"):
+            service.complete_project_authorization(
+                "PAUTH-X",
+                project_root=tmp_path,
+                change_reason="complete",
+            )
+        assert db.get_project_authorization("PAUTH-X")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_superseded_plan_incomplete_guard_does_not_suppress_completion(tmp_path) -> None:
+    db = _seed_completion_env(tmp_path)
+    try:
+        _add_completion_guard(db, status="active")
+        _add_completion_guard(db, status="inactive")
+        service = ProjectLifecycleService(db)
+        completed = service.auto_complete_ready_authorizations(project_root=tmp_path)
+        assert [c["authorization_id"] for c in completed] == ["PAUTH-X"]
+        assert db.get_project_authorization("PAUTH-X")["status"] == "completed"
     finally:
         db.close()
 

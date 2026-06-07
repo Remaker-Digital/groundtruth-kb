@@ -126,6 +126,30 @@ def _seed(
         db.close()
 
 
+def _add_completion_guard(
+    project_root: Path,
+    *,
+    artifact_type: str = "completion_guard",
+    status: str = "active",
+    link_id: str = "PAL-PLAN-INCOMPLETE",
+) -> None:
+    db = KnowledgeDB(project_root / "groundtruth.db")
+    try:
+        db.add_project_artifact_link(
+            "PROJECT-X",
+            artifact_type,
+            "plan-incomplete-fixture",
+            "test",
+            "seed plan_incomplete guard",
+            relationship="plan_incomplete",
+            status=status,
+            notes="Fixture guard",
+            id=link_id,
+        )
+    finally:
+        db.close()
+
+
 def test_scanner_marks_all_verified_authorization_completion_ready(scanner, tmp_path):
     _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": True})
     ready = scanner.completion_ready(tmp_path)
@@ -133,6 +157,44 @@ def test_scanner_marks_all_verified_authorization_completion_ready(scanner, tmp_
     assert ready[0].completion_ready is True
     assert set(ready[0].verified_work_item_ids) == {"WI-8001", "WI-8002"}
     assert ready[0].unverified_work_item_ids == []
+
+
+@pytest.mark.parametrize("artifact_type", ["completion_guard", "bridge_thread"])
+def test_scanner_plan_incomplete_guard_suppresses_completion(scanner, tmp_path, artifact_type):
+    _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": True})
+    _add_completion_guard(tmp_path, artifact_type=artifact_type)
+
+    assert scanner.completion_ready(tmp_path) == []
+    full = scanner.scan(tmp_path)
+    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    assert auth.completion_ready is False
+    assert auth.completion_guarded is True
+    assert auth.unverified_work_item_ids == []
+    assert auth.completion_guard_refs[0]["artifact_type"] == artifact_type
+    assert auth.completion_guard_refs[0]["relationship"] == "plan_incomplete"
+    assert auth.as_dict()["completion_guarded"] is True
+    assert auth.as_dict()["completion_guard_refs"] == auth.completion_guard_refs
+
+
+def test_inactive_plan_incomplete_guard_does_not_suppress_completion(scanner, tmp_path):
+    _seed(tmp_path, wi_statuses={"WI-8001": True})
+    _add_completion_guard(tmp_path, status="active")
+    _add_completion_guard(tmp_path, status="inactive")
+
+    ready = scanner.completion_ready(tmp_path)
+    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert ready[0].completion_guarded is False
+
+
+def test_scanner_text_output_reports_completion_guard(scanner, tmp_path, monkeypatch, capsys):
+    _seed(tmp_path, wi_statuses={"WI-8001": True})
+    _add_completion_guard(tmp_path)
+    monkeypatch.setattr(scanner, "PROJECT_ROOT", tmp_path)
+
+    assert scanner.main(["--all"]) == 0
+    output = capsys.readouterr().out
+    assert "completion guard:" in output
+    assert "completion_guard:plan-incomplete-fixture (plan_incomplete)" in output
 
 
 def test_scanner_skips_authorization_with_one_non_verified_wi(scanner, tmp_path):

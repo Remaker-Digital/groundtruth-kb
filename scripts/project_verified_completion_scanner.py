@@ -39,6 +39,8 @@ _WORK_ITEM_LINE_RE = re.compile(
     r"^Work Item:\s*`?(WI-AUTO-[A-Z0-9-]+|WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
     re.MULTILINE,
 )
+_COMPLETION_GUARD_RELATIONSHIP = "plan_incomplete"
+_COMPLETION_GUARD_ARTIFACT_TYPES = ("completion_guard", "bridge_thread")
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,8 @@ class AuthorizationReadiness:
     included_work_item_ids: list[str]
     verified_work_item_ids: list[str]
     unverified_work_item_ids: list[str]
+    completion_guarded: bool
+    completion_guard_refs: list[dict[str, Any]]
     completion_ready: bool
 
     def as_dict(self) -> dict[str, Any]:
@@ -61,6 +65,8 @@ class AuthorizationReadiness:
             "included_work_item_ids": self.included_work_item_ids,
             "verified_work_item_ids": self.verified_work_item_ids,
             "unverified_work_item_ids": self.unverified_work_item_ids,
+            "completion_guarded": self.completion_guarded,
+            "completion_guard_refs": self.completion_guard_refs,
             "completion_ready": self.completion_ready,
         }
 
@@ -106,6 +112,41 @@ def _implements_links_by_project(project_root: Path) -> dict[str, set[str]]:
         if project_id and slug:
             by_project.setdefault(str(project_id), set()).add(str(slug))
     return by_project
+
+
+def _completion_guards_by_project(project_root: Path) -> dict[str, list[dict[str, Any]]]:
+    """Return active ``plan_incomplete`` completion guards keyed by project."""
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return {}
+    con = sqlite3.connect(db_path)
+    try:
+        rows = con.execute(
+            "SELECT project_id, artifact_type, artifact_ref, relationship, notes "
+            "FROM current_project_artifact_links "
+            "WHERE status = 'active' "
+            "AND relationship = ? "
+            f"AND artifact_type IN ({', '.join('?' for _ in _COMPLETION_GUARD_ARTIFACT_TYPES)}) "
+            "ORDER BY project_id, artifact_type, artifact_ref",
+            (_COMPLETION_GUARD_RELATIONSHIP, *_COMPLETION_GUARD_ARTIFACT_TYPES),
+        ).fetchall()
+    finally:
+        con.close()
+
+    guards: dict[str, list[dict[str, Any]]] = {}
+    for project_id, artifact_type, artifact_ref, relationship, notes in rows:
+        if not project_id:
+            continue
+        guards.setdefault(str(project_id), []).append(
+            {
+                "project_id": str(project_id),
+                "artifact_type": str(artifact_type or ""),
+                "artifact_ref": str(artifact_ref or ""),
+                "relationship": str(relationship or ""),
+                "notes": notes,
+            }
+        )
+    return guards
 
 
 def _verified_thread_work_items(project_root: Path) -> dict[str, set[str]]:
@@ -211,6 +252,7 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
         db.close()
 
     verified_by_project = verified_work_items_by_project(project_root)
+    guards_by_project = _completion_guards_by_project(project_root)
     results: list[AuthorizationReadiness] = []
     for authorization in active:
         project_id = str(authorization.get("project_id") or "")
@@ -220,7 +262,9 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
         project_verified = verified_by_project.get(project_id, set())
         verified_ids = [wi for wi in included if wi in project_verified]
         unverified_ids = [wi for wi in included if wi not in project_verified]
-        completion_ready = bool(included) and not unverified_ids
+        guard_refs = guards_by_project.get(project_id, [])
+        completion_guarded = bool(guard_refs)
+        completion_ready = bool(included) and not unverified_ids and not completion_guarded
         results.append(
             AuthorizationReadiness(
                 authorization_id=str(authorization.get("id") or ""),
@@ -229,6 +273,8 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
                 included_work_item_ids=included,
                 verified_work_item_ids=verified_ids,
                 unverified_work_item_ids=unverified_ids,
+                completion_guarded=completion_guarded,
+                completion_guard_refs=guard_refs,
                 completion_ready=completion_ready,
             )
         )
@@ -269,6 +315,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[{flag}] {r.authorization_id} ({r.project_id}) — {r.authorization_name}")
         if r.unverified_work_item_ids:
             print(f"         unverified WIs: {', '.join(r.unverified_work_item_ids)}")
+        if r.completion_guarded:
+            refs = ", ".join(
+                f"{ref['artifact_type']}:{ref['artifact_ref']} ({ref['relationship']})"
+                for ref in r.completion_guard_refs
+            )
+            print(f"         completion guard: {refs}")
     return 0
 
 

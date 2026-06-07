@@ -95,6 +95,7 @@ NO-GO: bridge/gtkb-role-enhancement-002.md
 NEW: bridge/gtkb-role-enhancement-001.md
 
 Document: gtkb-project-completion-plan-incomplete-guard
+VERIFIED: bridge/gtkb-project-completion-plan-incomplete-guard-004.md
 NEW: bridge/gtkb-project-completion-plan-incomplete-guard-003.md
 GO: bridge/gtkb-project-completion-plan-incomplete-guard-002.md
 NEW: bridge/gtkb-project-completion-plan-incomplete-guard-001.md

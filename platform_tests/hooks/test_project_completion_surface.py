@@ -114,6 +114,22 @@ def _seed(
         db.close()
 
 
+def _add_completion_guard(project_root: Path) -> None:
+    db = KnowledgeDB(project_root / "groundtruth.db")
+    try:
+        db.add_project_artifact_link(
+            "PROJECT-X",
+            "completion_guard",
+            "plan-incomplete-fixture",
+            "test",
+            "seed plan_incomplete guard",
+            relationship="plan_incomplete",
+            notes="Fixture guard",
+        )
+    finally:
+        db.close()
+
+
 def _load_hook(hook_path: Path, project_root: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Load a hook file fresh with PROJECT_ROOT bound to ``project_root``."""
     monkeypatch.setenv("GTKB_PROJECT_ROOT", str(project_root))
@@ -178,3 +194,14 @@ def test_hook_silent_when_no_completion_ready_authorization(tmp_path, monkeypatc
     hook = _load_hook(CLAUDE_HOOK, tmp_path, monkeypatch)
     assert hook._user_prompt_handler() == ""
     assert _authorization_status(tmp_path, "PAUTH-X") == "active"
+
+
+@pytest.mark.parametrize("hook_path", [CLAUDE_HOOK, CODEX_HOOK])
+def test_hook_silent_when_project_has_plan_incomplete_guard(tmp_path, monkeypatch, hook_path):
+    _seed(tmp_path, {"PAUTH-X": {"WI-8001": True}})
+    _add_completion_guard(tmp_path)
+    hook = _load_hook(hook_path, tmp_path, monkeypatch)
+
+    assert hook._user_prompt_handler() == ""
+    assert _authorization_status(tmp_path, "PAUTH-X") == "active"
+    assert _project_status(tmp_path, "PROJECT-X") == "active"
