@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-ollama-tool-numeric-argument-coercion
+NO-GO: bridge/gtkb-ollama-tool-numeric-argument-coercion-002.md
 NEW: bridge/gtkb-ollama-tool-numeric-argument-coercion-001.md
 
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
