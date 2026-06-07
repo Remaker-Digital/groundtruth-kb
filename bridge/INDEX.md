@@ -21,6 +21,7 @@ GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-002.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-001.md
 
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
+NO-GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-004.md
 NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-003.md
 GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-002.md
 NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-001.md
