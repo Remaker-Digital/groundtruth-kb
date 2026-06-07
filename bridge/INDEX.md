@@ -7,11 +7,17 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
+GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-002.md
+NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-001.md
+
 Document: gtkb-ollama-tool-numeric-argument-coercion
+REVISED: bridge/gtkb-ollama-tool-numeric-argument-coercion-003.md
 NO-GO: bridge/gtkb-ollama-tool-numeric-argument-coercion-002.md
 NEW: bridge/gtkb-ollama-tool-numeric-argument-coercion-001.md
 
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
+REVISED: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-007.md
 NO-GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-006.md
 REVISED: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-005.md
 NO-GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-004.md
@@ -28,6 +34,7 @@ GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-002.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-001.md
 
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
+NO-GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-006.md
 REVISED: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-005.md
 NO-GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-004.md
 NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-003.md
