@@ -55,7 +55,8 @@ BASELINE_SLOTS: tuple[CoreSpecSlot, ...] = (
     ),
 )
 
-_VALID_SOURCES: set[str] = {"owner_stated", "not_applicable"}
+_VALID_SOURCE_ORDER: tuple[CompletionSource, ...] = ("owner_stated", "not_applicable")
+_VALID_SOURCES: set[str] = set(_VALID_SOURCE_ORDER)
 _INTAKE_TAG = "core-spec-intake"
 _ENROLLMENT_NOTES_KEY = "core_spec_intake_enabled"
 
@@ -81,6 +82,33 @@ def next_missing_slot(db: KnowledgeDB, project_id: str) -> str | None:
         if _slot_completion(db, project_id, slot.name) is None:
             return slot.name
     return None
+
+
+def slot_statuses(db: KnowledgeDB, project_id: str) -> tuple[dict[str, object], ...]:
+    """Return read-only completion status for every baseline slot."""
+    statuses: list[dict[str, object]] = []
+    for slot in BASELINE_SLOTS:
+        completion = _slot_completion(db, project_id, slot.name)
+        statuses.append(
+            {
+                "name": slot.name,
+                "label": slot.label,
+                "prompt": slot.prompt,
+                "complete": completion is not None,
+                "completion_spec_id": completion.get("id") if completion else None,
+                "source": _completion_source(completion) if completion else None,
+            }
+        )
+    return tuple(statuses)
+
+
+def next_question(db: KnowledgeDB, project_id: str) -> dict[str, str] | None:
+    """Return the next unanswered slot prompt payload, or None when complete."""
+    slot_name = next_missing_slot(db, project_id)
+    if slot_name is None:
+        return None
+    slot = _slot_for_name(slot_name)
+    return {"name": slot.name, "label": slot.label, "prompt": slot.prompt}
 
 
 def mark_slot_complete(
@@ -214,6 +242,14 @@ def _slot_completion(db: KnowledgeDB, project_id: str, slot: str) -> dict[str, o
     if not any(f"source:{source}" in tags for source in _VALID_SOURCES):
         return None
     return spec
+
+
+def _completion_source(completion: dict[str, object]) -> CompletionSource | None:
+    tags = set(completion.get("tags_parsed") or [])
+    for source in _VALID_SOURCE_ORDER:
+        if f"source:{source}" in tags:
+            return source
+    return None
 
 
 def _slot_for_name(name: str) -> CoreSpecSlot:

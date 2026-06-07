@@ -261,14 +261,19 @@ Use the GT-KB file bridge as the authoritative workflow surface. Read bridge/IND
 acting, read the full version chain for the target document, and respond to latest NEW or
 REVISED bridge entries by writing the next numbered bridge verdict file and updating
 bridge/INDEX.md. Do not stop with prose when a bridge verdict is required.
+Use harness-state/harness-registry.json through the canonical role reader as the role source
+of truth. Do not treat harness-local operating-role.md files as live role authority.
 
 Before writing or editing a bridge verdict, acquire the bridge work-intent claim for the document
-slug with Bash: python scripts\\bridge_claim_cli.py claim <document-slug>
+slug with Bash: python scripts\\bridge_claim_cli.py claim <document-slug>. A nonzero claim
+command may report existing holder JSON; treat that as claim evidence, not as a harness crash.
 
 For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
 NO-GO. Run the mandatory preflights and include their observed output in the verdict:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
 python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
+Nonzero preflight exits are review evidence: exit 5 from the ADR/DCL clause preflight is a
+NO-GO input unless an explicit owner waiver is present.
 
 Bridge verdict author metadata to include:
 author_identity: Ollama Loyal Opposition
@@ -551,9 +556,14 @@ def _require_string(arguments: Mapping[str, Any], *names: str) -> str:
 
 
 def _dispatch_read(arguments: Mapping[str, Any], project_root: Path) -> str:
-    path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=False)
+    path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
     max_chars = int(arguments.get("max_chars") or MAX_TOOL_OUTPUT_CHARS)
-    return path.read_text(encoding="utf-8")[:max_chars]
+    try:
+        return path.read_text(encoding="utf-8")[:max_chars]
+    except FileNotFoundError:
+        return f"Read failed: file not found: {_relative_path(project_root, path)}"
+    except OSError as exc:
+        return f"Read failed: {_relative_path(project_root, path)}: {exc}"
 
 
 def _dispatch_write(
@@ -672,10 +682,21 @@ def _dispatch_bash(
         completed = runner(command, project_root, env, timeout)
     except subprocess.TimeoutExpired as exc:
         raise OllamaHarnessError(f"Bash command timed out: {command}") from exc
-    output = (completed.stdout or "") + (completed.stderr or "")
+    stdout = completed.stdout or ""
+    stderr = completed.stderr or ""
     if completed.returncode != 0:
-        raise OllamaHarnessError(f"Bash command failed ({completed.returncode}): {output[:MAX_TOOL_OUTPUT_CHARS]}")
-    return output[:MAX_TOOL_OUTPUT_CHARS]
+        output = "\n".join(
+            [
+                f"Bash command exited with return code {completed.returncode}.",
+                f"Command: {command}",
+                "STDOUT:",
+                stdout,
+                "STDERR:",
+                stderr,
+            ]
+        )
+        return output[:MAX_TOOL_OUTPUT_CHARS]
+    return (stdout + stderr)[:MAX_TOOL_OUTPUT_CHARS]
 
 
 def dispatch_tool_call(

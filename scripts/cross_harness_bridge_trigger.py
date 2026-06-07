@@ -148,6 +148,7 @@ TRIGGER_DIAGNOSTIC_FILENAME = "trigger-diagnostic.jsonl"
 TRIGGER_DIAGNOSTIC_CLASSIFICATIONS = frozenset(
     {
         "active_session_suppressed",
+        "dispatch_blocked",
         "dispatched",
         "no_change",
         "selected_batch_skipped",
@@ -169,6 +170,7 @@ _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
     LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT: "active_session_suppressed",
     "launched": "dispatched",
     "launch_failed": "dispatched",
+    "ollama_dispatch_not_ready": "dispatch_blocked",
     "unchanged": "no_change",
     "no_pending_after_filter": "selected_batch_skipped",
 }
@@ -758,9 +760,9 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
     rows = [f"- {item.top_status} {item.document_name} {item.top_file}" for item in selected]
     selected_text = "\n".join(rows) if rows else "- No selected entries."
     role_line = (
-        "Read your durable role from `.claude/rules/operating-role.md` "
-        "(or the harness-local override at `harness-state/{harness}/operating-role.md` "
-        "if present, which takes precedence per `.claude/rules/operating-role.md`). "
+        "Resolve your durable harness identity from `harness-state/harness-identities.json`, "
+        "then read your assigned role from `harness-state/harness-registry.json` "
+        "through the canonical `groundtruth_kb.harness_projection` or `gt harness roles` reader. "
         "Process the bridge entries selected below according to your declared role: "
         "Loyal Opposition reviews latest NEW or REVISED entries; "
         "Prime Builder acts on latest GO or NO-GO entries assigned to its harness. "
@@ -951,6 +953,15 @@ class DispatchTarget:
           - Forward writes use only new keys.
         """
         return self.needed_role_label
+
+
+class DispatchTargetNotReady(RuntimeError):
+    """Raised when an active dispatch target exists but is temporarily unusable."""
+
+    def __init__(self, reason: str, harness_id: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.harness_id = harness_id
 
 
 _LABEL_TO_CANONICAL_MODE = {
@@ -1252,9 +1263,7 @@ def _resolve_dispatch_target(
         if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
     ]
     active_matching = [
-        (h_id, h_info)
-        for h_id, h_info in role_matching
-        if _is_active(h_info) and _is_event_capable(h_info) and _is_dispatch_ready(h_id, h_info)
+        (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info) and _is_event_capable(h_info)
     ]
 
     if not active_matching:
@@ -1265,9 +1274,7 @@ def _resolve_dispatch_target(
         if state_dir is not None:
             inactive_ids = sorted(h_id for h_id, _ in role_matching)
             note = (
-                f" (role-set members exist but none active and event-capable and dispatch-ready: {inactive_ids})"
-                if inactive_ids
-                else ""
+                f" (role-set members exist but none active and event-capable: {inactive_ids})" if inactive_ids else ""
             )
             _record_dispatch_failure(
                 state_dir,
@@ -1286,6 +1293,8 @@ def _resolve_dispatch_target(
             f"multiple active harnesses for role {needed_role_label!r}: {sorted(h_id for h_id, _ in active_matching)}"
         )
     harness_id, role_record = active_matching[0]
+    if not _is_dispatch_ready(harness_id, role_record):
+        raise DispatchTargetNotReady("ollama_dispatch_not_ready", harness_id)
 
     identities = _read_harness_identities(project_root)
     id_to_handle = _invert_identities(identities)
@@ -1821,6 +1830,9 @@ def run_trigger(
     ):
         try:
             target = _resolve_dispatch_target(needed_role_label, project_root, state_dir)
+        except DispatchTargetNotReady as exc:
+            pending_by_target.append((None, items, needed_role_label, legacy_recipient, exc.reason))
+            continue
         except ValueError as exc:
             # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 3: multiple-ACTIVE
             # (and other config errors: drift, unknown label, missing identity)

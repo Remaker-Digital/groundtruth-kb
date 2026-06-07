@@ -164,13 +164,16 @@ def test_trigger_fails_closed_when_ollama_readiness_fails(tmp_path: Path, monkey
     )
     state_dir = tmp_path / "state"
 
-    target = trigger._resolve_dispatch_target("loyal-opposition", tmp_path, state_dir)
+    with pytest.raises(trigger.DispatchTargetNotReady) as excinfo:
+        trigger._resolve_dispatch_target("loyal-opposition", tmp_path, state_dir)
 
-    assert target is None
+    assert excinfo.value.reason == "ollama_dispatch_not_ready"
+    assert excinfo.value.harness_id == "D"
     failures = [
         json.loads(line) for line in (state_dir / "dispatch-failures.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert any(record["reason"] == "ollama_dispatch_not_ready" for record in failures)
+    assert not any(record["reason"] == "no_active_target_for_role" for record in failures)
 
 
 def test_registered_ollama_without_role_is_not_selected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

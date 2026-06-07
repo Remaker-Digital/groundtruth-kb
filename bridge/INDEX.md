@@ -7,6 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-dispatch-failure-hardening
+VERIFIED: bridge/gtkb-ollama-dispatch-failure-hardening-004.md
+NEW: bridge/gtkb-ollama-dispatch-failure-hardening-003.md
+GO: bridge/gtkb-ollama-dispatch-failure-hardening-002.md
+NEW: bridge/gtkb-ollama-dispatch-failure-hardening-001.md
 Document: gtkb-ollama-lo-dispatch-session-propagation
 VERIFIED: bridge/gtkb-ollama-lo-dispatch-session-propagation-008.md
 NEW: bridge/gtkb-ollama-lo-dispatch-session-propagation-007.md
@@ -29,6 +34,9 @@ NO-GO: bridge/gtkb-sweep-commit-skill-parity-registration-002.md
 NEW: bridge/gtkb-sweep-commit-skill-parity-registration-001.md
 
 Document: gtkb-core-spec-intake-current-root-phase3a-cli
+VERIFIED: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-005.md
+REVISED: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-004.md
+NEW: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-003.md
 GO: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-002.md
 NEW: bridge/gtkb-core-spec-intake-current-root-phase3a-cli-001.md
 

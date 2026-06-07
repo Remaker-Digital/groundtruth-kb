@@ -70,6 +70,7 @@ from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
 from groundtruth_kb.hygiene import PatternSetError, emit_json, emit_markdown, run_sweep
+from groundtruth_kb.project.core_spec_intake import next_missing_slot, next_question, slot_statuses
 from groundtruth_kb.project.lifecycle import (
     PROJECTS_CHANGED_BY,
     ProjectAuthorizationSpecLinkageError,
@@ -1201,6 +1202,135 @@ def _apply_limit(rows: list[dict[str, object]], limit: int | None) -> list[dict[
     if limit is None:
         return rows
     return rows[:limit]
+
+
+# ---------------------------------------------------------------------------
+# gt core-specs
+# ---------------------------------------------------------------------------
+
+
+@main.group(name="core-specs")
+def core_specs_cmd() -> None:
+    """Read core application specification intake state."""
+
+
+def _resolve_core_specs_project(
+    db: KnowledgeDB,
+    *,
+    project_id: str | None,
+    project_name: str | None,
+) -> dict[str, object]:
+    if bool(project_id) == bool(project_name):
+        raise click.UsageError("Provide exactly one of --project-id or --project-name.")
+    if project_id:
+        project = db.get_project(project_id)
+        if project is None:
+            raise click.ClickException(f"Project not found: {project_id}")
+        return project
+
+    assert project_name is not None
+    needle = project_name.casefold()
+    matches = [
+        project
+        for project in db.list_projects(include_terminal=True)
+        if str(project.get("name", "")).casefold() == needle
+    ]
+    if not matches:
+        raise click.ClickException(f"Project not found by name: {project_name}")
+    if len(matches) > 1:
+        ids = ", ".join(str(project["id"]) for project in matches)
+        raise click.ClickException(f"Project name is ambiguous: {project_name} ({ids})")
+    return matches[0]
+
+
+def _core_specs_project_payload(project: dict[str, object]) -> dict[str, object]:
+    return {"id": project.get("id"), "name": project.get("name")}
+
+
+@core_specs_cmd.command("status")
+@click.option("--project-id", default=None, help="Project id to inspect.")
+@click.option("--project-name", default=None, help="Project name to inspect.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--no-fail", is_flag=True, help="Exit zero even when intake is incomplete.")
+@click.pass_context
+def core_specs_status_cmd(
+    ctx: click.Context,
+    project_id: str | None,
+    project_name: str | None,
+    json_output: bool,
+    no_fail: bool,
+) -> None:
+    """Report baseline core-spec intake completion state."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        project = _resolve_core_specs_project(db, project_id=project_id, project_name=project_name)
+        resolved_project_id = str(project["id"])
+        slots = list(slot_statuses(db, resolved_project_id))
+        missing_slot = next_missing_slot(db, resolved_project_id)
+    finally:
+        db.close()
+
+    completed_count = sum(1 for slot in slots if slot["complete"])
+    payload = {
+        "project": _core_specs_project_payload(project),
+        "complete": missing_slot is None,
+        "completed_slots": completed_count,
+        "total_slots": len(slots),
+        "next_slot": missing_slot,
+        "slots": slots,
+    }
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        status = "complete" if payload["complete"] else "incomplete"
+        click.echo(f"{project['id']}: {status} ({completed_count}/{len(slots)} slots complete)")
+        if missing_slot is not None:
+            question = next(slot for slot in slots if slot["name"] == missing_slot)
+            click.echo(f"Next question: {question['label']} ({question['name']})")
+            click.echo(str(question["prompt"]))
+        for slot in slots:
+            slot_status = "complete" if slot["complete"] else "missing"
+            click.echo(f"{slot_status}\t{slot['name']}\t{slot['label']}")
+
+    if missing_slot is not None and not no_fail:
+        raise SystemExit(1)
+
+
+@core_specs_cmd.command("next-question")
+@click.option("--project-id", default=None, help="Project id to inspect.")
+@click.option("--project-name", default=None, help="Project name to inspect.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def core_specs_next_question_cmd(
+    ctx: click.Context,
+    project_id: str | None,
+    project_name: str | None,
+    json_output: bool,
+) -> None:
+    """Report the next missing core-spec intake question."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        project = _resolve_core_specs_project(db, project_id=project_id, project_name=project_name)
+        question = next_question(db, str(project["id"]))
+    finally:
+        db.close()
+
+    payload = {
+        "project": _core_specs_project_payload(project),
+        "complete": question is None,
+        "slot": question,
+        "question": question["prompt"] if question else None,
+    }
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    if question is None:
+        click.echo(f"All core spec slots are complete for {project['id']}.")
+        return
+    click.echo(f"{question['label']} ({question['name']})")
+    click.echo(question["prompt"])
 
 
 @backlog.command("list")

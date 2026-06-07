@@ -23,6 +23,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -175,6 +176,62 @@ def test_ollama_guard_payload_uses_dispatch_run_id(ollama_harness_module, tmp_pa
 
 
 # ── Live-mode: bridge filing via dispatch ────────────────────────────────
+
+
+def test_dispatch_read_missing_file_returns_model_visible_error(ollama_harness_module, tmp_path) -> None:
+    metadata = ollama_harness_module.ModelMetadata(
+        model_id="qwen3-coder-next:cloud",
+        model_version="cloud",
+        endpoint="http://localhost:11434",
+        route_key="qwen3-coder-next-cloud",
+    )
+
+    result = ollama_harness_module.dispatch_tool_call(
+        "Read",
+        {"path": "harness-state/d/operating-role.md"},
+        metadata,
+        tmp_path,
+    )
+
+    assert result == "Read failed: file not found: harness-state/d/operating-role.md"
+
+
+def test_dispatch_bash_nonzero_returns_model_visible_evidence(ollama_harness_module, tmp_path) -> None:
+    for guard_path in (
+        ".claude/hooks/destructive-gate.py",
+        ".claude/hooks/formal-artifact-approval-gate.py",
+        "scripts/implementation_start_gate.py",
+    ):
+        path = tmp_path / guard_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# fixture guard\n", encoding="utf-8")
+
+    metadata = ollama_harness_module.ModelMetadata(
+        model_id="qwen3-coder-next:cloud",
+        model_version="cloud",
+        endpoint="http://localhost:11434",
+        route_key="qwen3-coder-next-cloud",
+    )
+
+    def guard_runner(path, payload, env, timeout):  # noqa: ANN001, ARG001
+        return ollama_harness_module.GuardExecutionResult(0, "{}")
+
+    def command_runner(command, project_root, env, timeout):  # noqa: ANN001, ARG001
+        return subprocess.CompletedProcess(args=command, returncode=5, stdout="out", stderr="err")
+
+    result = ollama_harness_module.dispatch_tool_call(
+        "Bash",
+        {"command": "python scripts/adr_dcl_clause_preflight.py --bridge-id fixture"},
+        metadata,
+        tmp_path,
+        guard_runner=guard_runner,
+        command_runner=command_runner,
+    )
+
+    assert "Bash command exited with return code 5." in result
+    assert "Command: python scripts/adr_dcl_clause_preflight.py --bridge-id fixture" in result
+    assert "STDOUT:\nout" in result
+    assert "STDERR:\nerr" in result
 
 
 def test_dispatch_readiness_requires_full_lo_tool_set(verify_module) -> None:
