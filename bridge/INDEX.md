@@ -7,7 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
+Document: gtkb-ollama-tool-numeric-argument-coercion
+NEW: bridge/gtkb-ollama-tool-numeric-argument-coercion-001.md
+
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
+REVISED: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-005.md
 NO-GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-004.md
 NEW: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-003.md
 GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-002.md
