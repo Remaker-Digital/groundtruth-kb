@@ -114,6 +114,7 @@ GO: bridge/gtkb-ollama-qwen-full-lo-route-002.md
 NEW: bridge/gtkb-ollama-qwen-full-lo-route-001.md
 
 Document: gtkb-mirror-retirement-target-path-scope-correction
+VERIFIED: bridge/gtkb-mirror-retirement-target-path-scope-correction-008.md
 REVISED: bridge/gtkb-mirror-retirement-target-path-scope-correction-007.md
 NO-GO: bridge/gtkb-mirror-retirement-target-path-scope-correction-006.md
 REVISED: bridge/gtkb-mirror-retirement-target-path-scope-correction-005.md
