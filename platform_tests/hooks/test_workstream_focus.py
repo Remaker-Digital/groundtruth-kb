@@ -1020,7 +1020,8 @@ def test_startup_focus_lines_include_role_slot_topology_mode_init_keyword_and_br
 
     assert snapshot["role_slot"] == module.ROLE_SLOT_DEFAULT
     assert snapshot["topology_mode"] == module.TOPOLOGY_MODE_DEFAULT
-    assert "Bridge role slot:" in lines
+    assert "Work-subject bridge role slot:" in lines
+    assert "Bridge role slot:" not in lines
     assert module.ROLE_SLOT_DEFAULT in lines
     assert "Harness topology:" in lines
     assert module.TOPOLOGY_MODE_SINGLE in lines
@@ -1324,7 +1325,8 @@ def test_render_active_work_subject_combines_focus_overlay_and_counterpart(tmp_p
         overlay_status={"overlay_present": False},
     )
     assert "Active Work Subject" not in rendered  # heading is rendered by caller
-    assert "Bridge role slot:" in rendered
+    assert "Work-subject bridge role slot:" in rendered
+    assert "Bridge role slot:" not in rendered
     assert "No session overlay active" in rendered
 
 

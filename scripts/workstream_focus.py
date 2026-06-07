@@ -719,7 +719,7 @@ def render_startup_focus_lines(
         f"- Default work subject: {snapshot['default_label']}",
         f"- Current work subject: {snapshot['current_label']}",
         f"- Application label: {app_label}",
-        f"- Bridge role slot: `{role_slot}` (shared, prime-builder, or loyal-opposition).",
+        f"- Work-subject bridge role slot: `{role_slot}` (shared, prime-builder, or loyal-opposition).",
         f"- Harness topology: `{topology_mode}` (single_harness or multi_harness).",
         "- GT-KB is the default work subject; owner direction is interpreted as GroundTruth-KB work unless Mike explicitly names an adopter application.",
         "- Application work subject means owner direction is interpreted as work on a named adopter/demo application such as Agent Red.",

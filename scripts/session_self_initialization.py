@@ -281,7 +281,7 @@ def operating_role_path(
     if role_record_path is not None:
         return _normalized_path(role_record_path)
     if os.environ.get("GTKB_ROLE_ASSIGNMENTS_PATH"):
-        return role_assignments_path(project_root)
+        return role_assignments_path(project_root, override=Path(os.environ.get("GTKB_ROLE_ASSIGNMENTS_PATH")))
     _ = harness_name, harness_id, prefer_local
     registry_path = harness_registry_path(project_root)
     if registry_path.is_file():
@@ -4331,7 +4331,8 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
         # projection). load_role_assignments is fail-soft — a missing or
         # malformed projection yields an empty document, preserving the
         # canonical-helper fail-closed path below.
-        role_map = load_role_assignments(_PROJECT_ROOT_FOR_IMPORTS)
+        assignment_path = role_assignments_path(_PROJECT_ROOT_FOR_IMPORTS)
+        role_map = load_role_assignments(_PROJECT_ROOT_FOR_IMPORTS, assignment_path)
         topology_mode = topology_from_role_map(role_map)
         active_harness_id = model.get("role", {}).get("harness_id")
         role_slot = role_slot_from_active_harness(role_map, active_harness_id)
@@ -4357,7 +4358,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
                 f"{quality.get('ready_or_passing', 'unknown')} ready/passing "
                 f"(queried repo: {quality.get('queried_repo') or 'unknown'})"
             ),
-            f"- Bridge role slot: `{role_slot}` (prime-builder, loyal-opposition, or shared)",
+            f"- Active harness role slot: `{role_slot}` (prime-builder, loyal-opposition, or shared)",
             f"- Harness topology: `{topology_mode}` (single_harness or multi_harness)",
             (
                 "- GT-KB infrastructure posture: "

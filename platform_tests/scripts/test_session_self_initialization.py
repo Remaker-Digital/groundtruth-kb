@@ -1195,12 +1195,14 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Dashboard scope:" in report_text
     assert "Current Project State" in report_text
     assert "GT-KB release blockers:" in report_text
-    assert "Bridge role slot:" in report_text
+    assert "Active harness role slot:" in report_text
     assert "Harness topology:" in report_text
     assert "Testing/tool rollup:" in report_text
     assert "GT-KB dev environment inventory:" in report_text
     assert "Harness parity:" in report_text
     assert "Active Work Subject" in report_text
+    assert "Work-subject bridge role slot:" in report_text
+    assert "Bridge role slot:" not in report_text
     assert "Default work subject: GT-KB Infrastructure Focus" in report_text
     assert "Application work subject commands:" in report_text
     assert "`work subject application`" in report_text
@@ -2004,7 +2006,8 @@ def test_render_current_project_state_labels_application_headers() -> None:
     rendered = module._render_current_project_state(_minimal_model(current_focus="application"))
     assert "Application release blockers:" in rendered
     assert "Application Testing/tool rollup:" in rendered
-    assert "Bridge role slot:" in rendered
+    assert "Active harness role slot:" in rendered
+    assert "Bridge role slot:" not in rendered
     assert "Harness topology:" in rendered
 
 
