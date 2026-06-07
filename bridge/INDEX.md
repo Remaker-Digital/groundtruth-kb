@@ -56,6 +56,7 @@ GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-002.md
 NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-001.md
 
 Document: gtkb-wi3326-project-rehome-executable-packet-repair
+NO-GO: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-004.md
 NEW: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-003.md
 GO: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-002.md
 NEW: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-001.md
