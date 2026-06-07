@@ -134,6 +134,7 @@ NO-GO: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-002.md
 NEW: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-001.md
 
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
+VERIFIED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-018.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-017.md
 NO-GO: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-016.md
 REVISED: bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-015.md
