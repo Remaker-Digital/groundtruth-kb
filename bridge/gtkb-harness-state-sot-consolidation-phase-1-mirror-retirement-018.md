@@ -24,8 +24,13 @@ files, the sibling target-path scope correction is terminal VERIFIED at
 `bridge/gtkb-mirror-retirement-target-path-scope-correction-008.md`, and the
 core mirror-retirement evidence reproduces in this checkout.
 
-The broader follow-on `WI-4372` remains open, unapproved, and out of scope. This
-VERIFIED verdict covers the Phase-1 mirror-retirement parent work only.
+The broader follow-on `WI-4372` was treated as out of scope for the parent
+implementation review. After this live `VERIFIED` entry existed in
+`bridge/INDEX.md`, `gt backlog show WI-4372 --json` observed the separate
+bridge-verified backlog reconciler resolving `WI-4372` under
+`DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM`. That is a
+post-verification reconciler side effect, not a mutation introduced by the
+`-017` implementation report.
 
 ## Applicability Preflight
 
@@ -102,6 +107,7 @@ carried forward from the implementation report:
 - `DELIB-20260880`
 - `DELIB-20260778`
 - `DELIB-20260779`
+- `DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM`
 - `bridge/gtkb-mirror-retirement-target-path-scope-correction-008.md`
 - `bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-014.md`
 - `bridge/gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement-015.md`
@@ -137,18 +143,18 @@ carried forward from the implementation report:
 | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `python scripts\bridge_applicability_preflight.py --bridge-id gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement` | yes | PASS: no missing required or advisory specs. |
 | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Full command set in this table | yes | PASS: every carried-forward requirement has executed evidence. |
 | `RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001` | `Test-Path -LiteralPath 'E:\GT-KB\harness-state\role-assignments.json'` | yes | PASS: returned `False`. |
-| `DCL-HARNESS-STATE-SOT-ASSERTION-001` | `.\\groundtruth-kb\\.venv\\Scripts\\python.exe -m pytest platform_tests\\scripts\\test_mirror_retirement_role_assignments.py -q --tb=short --basetemp=E:\GT-KB\.gtkb-state\tmp\mirror-parent-017-lo` | yes | PASS: 5 passed. |
+| `DCL-HARNESS-STATE-SOT-ASSERTION-001` | `$env:PYTHONPATH='groundtruth-kb/src'; .\\groundtruth-kb\\.venv\\Scripts\\python.exe -m pytest platform_tests\\scripts\\test_mirror_retirement_role_assignments.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.test-tmp\lo-mirror-parent-017-rerun` | yes | PASS: 5 passed. |
 | `GOV-HARNESS-STATE-SOT-CONSOLIDATION-001` | Focused mirror-retirement pytest plus child scope-correction verification `-008` | yes | PASS: retired mirror remains absent and the corrected target-path envelope is verified. |
 | `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` | `.\\groundtruth-kb\\.venv\\Scripts\\python.exe scripts\\collect_dev_environment_inventory.py --check-only --max-age-hours 24` | yes | PASS: development environment inventory is fresh. |
 | `GOV-HARNESS-ROLE-PORTABILITY-001` | Report scope review and focused test | yes | PASS: no role-value mutation is claimed; legacy mirror deletion leaves registry authority intact. |
 | `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | Full thread review and PAUTH metadata in `-017` | yes | PASS: implementation remains within approved WI-4336/WI-4214 scope. |
 | `DCL-PROJECT-AUTHORIZATION-ENVELOPE-001` | Full thread review and child `-008` scope verification | yes | PASS: no new mutation class is introduced by `-017`. |
-| `DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001` | `.\\groundtruth-kb\\.venv\\Scripts\\gt.exe backlog show WI-4372 --json` | yes | PASS: WI-4372 remains `approval_state: unapproved`, `resolution_status: open`, and `stage: backlogged`. |
+| `DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001` | `.\\groundtruth-kb\\.venv\\Scripts\\gt.exe backlog show WI-4372 --json` | yes | PASS: `WI-4372` is now `stage: resolved` / `resolution_status: resolved` with `changed_by: bridge-verified-backlog-reconciler`, after the live `VERIFIED` line existed; this is a separate `DELIB-S345` reconciler result, not an implementation-scope mutation by `-017`. |
 | `GOV-ARTIFACT-APPROVAL-001` | `python scripts\check_narrative_artifact_evidence.py --paths .claude/rules/operating-role.md .claude/rules/sot-read-discipline.md --json` | yes | PASS: `status: pass`; both protected rule files cleared. |
 | `DCL-ARTIFACT-APPROVAL-HOOK-001` | Same explicit POSIX-path narrative checker plus empty diff checks on the two rule files | yes | PASS: checker clears both files; working-tree and staged diffs for those files are empty. |
 | `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Path review and mandatory clause preflight | yes | PASS: all inspected paths remain under `E:\GT-KB`; clause preflight has 0 blocking gaps. |
 | `.claude/rules/project-root-boundary.md` | Command/path review | yes | PASS: verification ran inside `E:\GT-KB`. |
-| `GOV-STANDING-BACKLOG-001` | `gt backlog show WI-4372 --json` | yes | PASS: WI-4372 boundary remains visible and open. |
+| `GOV-STANDING-BACKLOG-001` | `gt backlog show WI-4372 --json` | yes | PASS: WI-4372 closure is visible and attributed to the bridge-verified backlog reconciler with completion evidence naming this parent bridge thread. |
 | `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | Owner-decision, bridge, and PAUTH evidence review | yes | PASS: durable evidence chain is preserved. |
 | `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | Full bridge thread review | yes | PASS: correction is recorded as an append-only bridge version. |
 | `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Full bridge thread review and file-absence test | yes | PASS: retired artifact lifecycle evidence is explicit. |
@@ -167,7 +173,9 @@ carried forward from the implementation report:
 - The focused mirror-retirement role-assignments test passes.
 - The development environment inventory check passes.
 - Ruff format and lint over the claimed Python path set pass.
-- WI-4372 remains open, unapproved, and out of scope.
+- WI-4372 is now resolved by the separate bridge-verified backlog reconciler
+  after this `VERIFIED` line existed in live bridge state; the resolution is
+  attributed to `DELIB-S345`, not to the parent implementation report.
 
 ## Commands Executed
 
@@ -178,13 +186,13 @@ python scripts\bridge_applicability_preflight.py --bridge-id gtkb-harness-state-
 python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
 python scripts\check_narrative_artifact_evidence.py --paths .claude/rules/operating-role.md .claude/rules/sot-read-discipline.md --json
 Test-Path -LiteralPath 'E:\GT-KB\harness-state\role-assignments.json'
-.\\groundtruth-kb\\.venv\\Scripts\\python.exe -m pytest platform_tests\\scripts\\test_mirror_retirement_role_assignments.py -q --tb=short --basetemp=E:\GT-KB\.gtkb-state\tmp\mirror-parent-017-lo
+$env:PYTHONPATH='groundtruth-kb/src'; .\\groundtruth-kb\\.venv\\Scripts\\python.exe -m pytest platform_tests\\scripts\\test_mirror_retirement_role_assignments.py -q --tb=short -p no:cacheprovider --basetemp E:\GT-KB\.test-tmp\lo-mirror-parent-017-rerun
 .\\groundtruth-kb\\.venv\\Scripts\\python.exe scripts\\collect_dev_environment_inventory.py --check-only --max-age-hours 24
 .\\groundtruth-kb\\.venv\\Scripts\\gt.exe backlog show WI-4372 --json
 git diff -- .claude\rules\operating-role.md .claude\rules\sot-read-discipline.md
 git diff --cached -- .claude\rules\operating-role.md .claude\rules\sot-read-discipline.md
-uv run --with ruff ruff format --check <claimed Python path set>
-uv run --with ruff ruff check <claimed Python path set>
+.\\groundtruth-kb\\.venv\\Scripts\\ruff.exe format --check <claimed Python path set>
+.\\groundtruth-kb\\.venv\\Scripts\\ruff.exe check <claimed Python path set>
 ```
 
 Observed highlights:
@@ -201,8 +209,9 @@ PASS development environment inventory
 26 files already formatted
 All checks passed!
 WI-4372 approval_state: unapproved
-WI-4372 resolution_status: open
-WI-4372 stage: backlogged
+WI-4372 resolution_status: resolved
+WI-4372 stage: resolved
+WI-4372 changed_by: bridge-verified-backlog-reconciler
 ```
 
 ## Owner Action Required
