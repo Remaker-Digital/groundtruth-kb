@@ -7,25 +7,11 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
-Document: gtkb-codex-wrapup-startup-gate-guard-sot
-VERIFIED: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-004.md
-NEW: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-003.md
-GO: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-002.md
-NEW: bridge/gtkb-codex-wrapup-startup-gate-guard-sot-001.md
-
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
 VERIFIED: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-004.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-003.md
 GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-002.md
 NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-001.md
-
-Document: gtkb-ollama-tool-numeric-argument-coercion
-VERIFIED: bridge/gtkb-ollama-tool-numeric-argument-coercion-006.md
-NEW: bridge/gtkb-ollama-tool-numeric-argument-coercion-005.md
-GO: bridge/gtkb-ollama-tool-numeric-argument-coercion-004.md
-REVISED: bridge/gtkb-ollama-tool-numeric-argument-coercion-003.md
-NO-GO: bridge/gtkb-ollama-tool-numeric-argument-coercion-002.md
-NEW: bridge/gtkb-ollama-tool-numeric-argument-coercion-001.md
 
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
 GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-008.md
@@ -56,6 +42,7 @@ GO: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-002.md
 NEW: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-001.md
 
 Document: gtkb-wi3326-project-rehome-executable-packet-repair
+REVISED: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-005.md
 NO-GO: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-004.md
 NEW: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-003.md
 GO: bridge/gtkb-wi3326-project-rehome-executable-packet-repair-002.md
