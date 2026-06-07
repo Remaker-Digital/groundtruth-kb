@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -9,7 +10,6 @@ from typing import Any
 
 PROJECT_ROOT = Path(r"E:\GT-KB")
 OUT_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
-LIFECYCLE_GUARD_PATH = OUT_DIR / "session-lifecycle-guard.json"
 HARNESS_NAME = "codex"
 # Parity marker: prime-builder role is discovered by session_self_initialization.py.
 
@@ -121,9 +121,16 @@ def _emit_no_context() -> None:
     print("{}")
 
 
+def _lifecycle_guard_path() -> Path:
+    override = os.environ.get("GTKB_LIFECYCLE_GUARD_PATH")
+    if override:
+        return Path(override).expanduser().resolve()
+    return PROJECT_ROOT / "harness-state" / HARNESS_NAME / "session-lifecycle-guard.json"
+
+
 def _startup_input_gate_active() -> bool:
     try:
-        state = json.loads(LIFECYCLE_GUARD_PATH.read_text(encoding="utf-8"))
+        state = json.loads(_lifecycle_guard_path().read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return False
     if not isinstance(state, dict):
