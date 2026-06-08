@@ -8,6 +8,7 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 
 Document: gtkb-dirty-tree-reconciliation-2026-06-07
+GO: bridge/gtkb-dirty-tree-reconciliation-2026-06-07-002.md
 NEW: bridge/gtkb-dirty-tree-reconciliation-2026-06-07-001.md
 
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
