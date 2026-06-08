@@ -166,6 +166,7 @@ TRIGGER_DIAGNOSTIC_CLASSIFICATIONS = frozenset(
         "no_change",
         "selected_batch_skipped",
         "missed_stop_recovered",
+        "author_meets_reviewer_refused",
         "other",
     }
 )
@@ -186,6 +187,7 @@ _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
     "ollama_dispatch_not_ready": "dispatch_blocked",
     "unchanged": "no_change",
     "no_pending_after_filter": "selected_batch_skipped",
+    "author_meets_reviewer_refused": "author_meets_reviewer_refused",
 }
 
 
@@ -754,6 +756,143 @@ def _classify_invocation_outcome(last_result: str) -> str:
     ``dispatch_target_resolution_failed``) classify as ``other``.
     """
     return _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION.get(last_result, "other")
+
+
+def _should_refuse_self_review(
+    bridge_id: str,
+    dispatched_harness_id: str,
+    project_root: Path,
+) -> bool:
+    """Check if the latest version of the proposal for bridge_id was written by dispatched_harness_id."""
+    import fnmatch
+    import re
+
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return False
+
+    pattern1 = f"gtkb-{bridge_id}-*.md"
+    pattern2 = f"{bridge_id}-*.md"
+
+    candidate_files = []
+    for file in bridge_dir.glob("*.md"):
+        name = file.name
+        if fnmatch.fnmatch(name, pattern1) or fnmatch.fnmatch(name, pattern2):
+            candidate_files.append(file)
+
+    if not candidate_files:
+        return False
+
+    # Sort to find the latest version
+    candidate_files.sort(key=lambda f: f.name)
+    latest_file = candidate_files[-1]
+
+    try:
+        content = latest_file.read_text(encoding="utf-8")
+        # Parse first 30 lines for author_harness_id:
+        lines = content.splitlines()[:30]
+        for line in lines:
+            match = re.match(r"^author_harness_id:\s*(\S+)", line.strip())
+            if match:
+                author_id = match.group(1).strip().strip('"').strip("'")
+                if author_id == dispatched_harness_id:
+                    return True
+                break
+    except Exception:
+        pass
+
+    return False
+
+
+def _poll_dispatch_verdict(
+    dispatch_ts: float,
+    bridge_id: str,
+    project_root: Path,
+    timeout: float = 240.0,
+    poll_interval: float = 5.0,
+) -> tuple[str | None, float | None]:
+    """Poll for a verdict file created after dispatch_ts. Returns (path, latency)."""
+    import fnmatch
+    import time
+
+    start_time = time.monotonic()
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return None, None
+
+    pattern1 = f"gtkb-{bridge_id}-*.md"
+    pattern2 = f"{bridge_id}-*.md"
+
+    while (time.monotonic() - start_time) < timeout:
+        candidate_files = []
+        for file in bridge_dir.glob("*.md"):
+            name = file.name
+            if fnmatch.fnmatch(name, pattern1) or fnmatch.fnmatch(name, pattern2):
+                try:
+                    mtime = file.stat().st_mtime
+                    if mtime >= dispatch_ts:
+                        candidate_files.append((file, mtime))
+                except OSError:
+                    continue
+
+        if candidate_files:
+            candidate_files.sort(key=lambda x: x[1])
+            chosen_file, chosen_mtime = candidate_files[0]
+            rel_path = f"bridge/{chosen_file.name}"
+            latency = max(0.0, chosen_mtime - dispatch_ts)
+            return rel_path, latency
+
+        time.sleep(poll_interval)
+
+    return None, None
+
+
+def _poll_and_log_verdict(
+    dispatch_id: str,
+    bridge_id: str,
+    dispatch_ts: float,
+    project_root: Path,
+    state_dir: Path,
+) -> None:
+    """Poll for verdict file in bridge/ and log results to dispatch-diagnostic-post.jsonl."""
+    verdict_path, latency = _poll_dispatch_verdict(
+        dispatch_ts=dispatch_ts,
+        bridge_id=bridge_id,
+        project_root=project_root,
+    )
+    log_file = state_dir / "dispatch-diagnostic-post.jsonl"
+    record = {
+        "timestamp": _now_iso(),
+        "dispatch_id": dispatch_id,
+        "bridge_id": bridge_id,
+        "dispatch_timestamp": dt.datetime.fromtimestamp(dispatch_ts, dt.UTC).isoformat(timespec="seconds"),
+        "verdict_path": verdict_path,
+        "verdict_latency_seconds": latency,
+    }
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        with log_file.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def _post_dispatch_poll(
+    dispatch_id: str,
+    bridge_id: str,
+    dispatch_ts: float,
+    project_root: Path,
+    state_dir: Path,
+) -> None:
+    """Spawn a daemon thread to poll for dispatch verdict in background."""
+    import threading
+
+    t = threading.Thread(
+        target=_poll_and_log_verdict,
+        args=(dispatch_id, bridge_id, dispatch_ts, project_root, state_dir),
+        daemon=True,
+    )
+    t.start()
 
 
 def _emit_trigger_diagnostic(state_dir: Path, record: dict[str, Any]) -> None:
@@ -2104,6 +2243,21 @@ def run_trigger(
                         #   - first dispatch ever
                         #   - signature changed since last dispatch
                         #   - prior_suppressed == signature (retry after target exit)
+                        if recipient == "loyal-opposition" and dispatched_selected:
+                            first_item = dispatched_selected[0]
+                            if _should_refuse_self_review(
+                                bridge_id=first_item.document_name,
+                                dispatched_harness_id=target.harness_id,
+                                project_root=project_root,
+                            ):
+                                recipient_state["last_result"] = "author_meets_reviewer_refused"
+                                results[recipient] = {
+                                    "launched": False,
+                                    "reason": "author_meets_reviewer_refused",
+                                }
+                                recipients_state[recipient] = recipient_state
+                                continue
+
                         if recipient == "prime-builder" and not dry_run:
                             if dispatch_id is None:
                                 dispatch_id = _new_dispatch_id(target.dispatch_state_key)
@@ -2141,6 +2295,14 @@ def run_trigger(
                             dry_run=dry_run,
                             dispatch_id=dispatch_id,
                         )
+                        if launch.get("launched") and not dry_run:
+                            _post_dispatch_poll(
+                                dispatch_id=dispatch_id or launch.get("dispatch_id") or "",
+                                bridge_id=spawn_items[0].document_name if spawn_items else "",
+                                dispatch_ts=time.time(),
+                                project_root=project_root,
+                                state_dir=state_dir,
+                            )
                         if work_intent_session_id is not None:
                             launch["work_intent_session_id"] = work_intent_session_id
                         if acquired_work_intent_slugs:

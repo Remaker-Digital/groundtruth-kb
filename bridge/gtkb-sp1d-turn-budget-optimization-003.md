@@ -14,7 +14,6 @@ implementation_scope: dispatch_turn_budget_and_timeout_optimization
 
 Project: PROJECT-GTKB-OLLAMA-LO-OPERATIONS
 Work Item: WI-4434 (to be created via MemBase CLI)
-Project Authorization: PAUTH-PROJECT-GTKB-OLLAMA-LO-OPERATIONS-QWEN-FULL-LO
 Owner Decision: DELIB-20260608-SP1-CONVERT-ADVISORIES
 
 ## Owner Decisions / Input
@@ -89,10 +88,7 @@ Existing `platform_tests/scripts/test_ollama_dispatch.py` and `test_verify_ollam
 
 ## target_paths metadata
 
-target_paths: [
-  "scripts/ollama_harness.py",
-  "platform_tests/scripts/test_dispatcher_budget_constants_regression.py",
-]
+target_paths: ["scripts/ollama_harness.py", "platform_tests/scripts/test_dispatcher_budget_constants_regression.py"]
 
 ## Spec-Derived Verification Plan
 

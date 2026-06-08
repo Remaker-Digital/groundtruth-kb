@@ -1,20 +1,23 @@
----
-bridge_id: gtkb-p0-secrets-purge-enforcement
-version: 003
-bridge_kind: implementation_proposal
-title: "P0 Secrets Purge & Enforcement - Pre-commit Hook + CI Gate"
-status: REVISED
-date: 2026-06-08
-author_harness: prime-builder
-work_intent_claim: 2026-06-08T12:50:00Z:prime-builder:p0-secrets-purge
-supersedes:
-  - bridge_id: gtkb-p0-secrets-purge-enforcement-002
-    reason: LO-NO-GO-missing-metadata
-  - bridge_id: gtkb-p0-secrets-purge-enforcement-001
-    reason: LO-NO-GO-missing-metadata
----
+REVISED
 
 # P0 Secrets Purge & Enforcement - Pre-commit Hook + CI Gate
+
+bridge_kind: implementation_proposal
+Document: gtkb-p0-secrets-purge-enforcement
+Version: 003
+Author: Prime Builder (antigravity, harness C)
+Date: 2026-06-08 UTC
+
+author_identity: Antigravity Prime Builder
+author_harness_id: C
+author_session_context_id: ac8c7b4e-943f-4c9c-9194-7f7c11c89143
+author_model: gemini-3.5-flash-high
+author_model_configuration: Antigravity IDE interactive (session PB override)
+
+target_paths: [".githooks/pre-commit", ".github/workflows/secrets-scan.yml", "scripts/scan_secrets.py", ".groundtruth/inventory/dev-environment-inventory.json"]
+implementation_scope: Enforce automated secrets scanning in pre-commit hooks and CI/CD pipelines
+primary_work_item: WI-4399
+
 
 ## Specification Links
 
@@ -41,7 +44,7 @@ supersedes:
 
 ## Requirement Sufficiency
 
-**Requirement Sufficiency: EXISTING SUFFICIENT.**
+**Requirement Sufficiency: Existing requirements sufficient**
 
 No new or revised requirement is needed for this proposal. The existing governing specs (`GOV-SECRETS-PURGE-001`, `GOV-PROTECTED-ARTIFACT-CHANGES-001`, `GOV-EVIDENCE-BASED-CHANGES-001`) fully define the acceptance criteria:
 
@@ -126,7 +129,7 @@ else:
 
 **Rationale:** Protected artifact changes must be inventoried per `GOV-ARTIFACT-INVENTORY-001`.
 
-## Testing Plan
+## Specification-Derived Verification Plan
 
 ### Spec-to-Test Mapping
 

@@ -1,19 +1,30 @@
-Document: sp1d-turn-budget-optimization
+Document: gtkb-sp1d-turn-budget-optimization
+VERIFIED: bridge/gtkb-sp1d-turn-budget-optimization-006.md
+NEW: bridge/gtkb-sp1d-turn-budget-optimization-005.md
+GO: bridge/gtkb-sp1d-turn-budget-optimization-004.md
 NEW: bridge/gtkb-sp1d-turn-budget-optimization-003.md
 WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-002.md
 WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-001.md
 
-Document: sp1c-author-meets-reviewer-guard
+Document: gtkb-sp1c-author-meets-reviewer-guard
+VERIFIED: bridge/gtkb-sp1c-author-meets-reviewer-guard-006.md
+NEW: bridge/gtkb-sp1c-author-meets-reviewer-guard-005.md
+GO: bridge/gtkb-sp1c-author-meets-reviewer-guard-004.md
 NEW: bridge/gtkb-sp1c-author-meets-reviewer-guard-003.md
 WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-002.md
 WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-001.md
 
-Document: sp1b-dispatch-outcome-tracker
+Document: gtkb-sp1b-dispatch-outcome-tracker
+VERIFIED: bridge/gtkb-sp1b-dispatch-outcome-tracker-006.md
+NEW: bridge/gtkb-sp1b-dispatch-outcome-tracker-005.md
+GO: bridge/gtkb-sp1b-dispatch-outcome-tracker-004.md
 NEW: bridge/gtkb-sp1b-dispatch-outcome-tracker-003.md
 WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-002.md
 WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-001.md
 
 Document: gtkb-sp1a-ollama-lo-prompt-restructure
+VERIFIED: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-006.md
+NEW: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-005.md
 GO: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-004.md
 NEW: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-003.md
 WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-002.md
@@ -33,28 +44,15 @@ WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-001.md
 Document: sp1-dispatch-reliability-prime-handoff
 ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md
 
-Document: sp1d-turn-budget-optimization
-WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-002.md
-ADVISORY: bridge/gtkb-sp1d-turn-budget-optimization-001.md
-
-Document: sp1c-author-meets-reviewer-guard
-WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-002.md
-ADVISORY: bridge/gtkb-sp1c-author-meets-reviewer-guard-001.md
-
-Document: sp1b-dispatch-outcome-tracker
-WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-002.md
-ADVISORY: bridge/gtkb-sp1b-dispatch-outcome-tracker-001.md
-
-Document: gtkb-sp1a-ollama-lo-prompt-restructure
-NEW: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-003.md
-WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-002.md
-ADVISORY: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-001.md
-
 Document: gtkb-gov-file-bridge-authority-001
-NEW: bridge/gtkb-gov-file-bridge-authority-001-002.md
+VERIFIED: bridge/gtkb-gov-file-bridge-authority-001-004.md
+NEW: bridge/gtkb-gov-file-bridge-authority-001-003.md
+GO: bridge/gtkb-gov-file-bridge-authority-001-002.md
 NEW: bridge/gtkb-gov-file-bridge-authority-001-001.md
 
 Document: gtkb-v1-s509-proposal-remediation
+VERIFIED: bridge/gtkb-v1-s509-proposal-remediation-005.md
+NEW: bridge/gtkb-v1-s509-proposal-remediation-004.md
 GO: bridge/gtkb-v1-s509-proposal-remediation-003.md
 REVISED: bridge/gtkb-v1-s509-proposal-remediation-002.md
 NEW: bridge/gtkb-v1-s509-proposal-remediation-001.md
@@ -99,7 +97,10 @@ NO-GO: bridge/gtkb-isolation-phase3-implementation-002.md
 NEW: bridge/gtkb-isolation-phase3-implementation-001.md
 
 Document: gtkb-p0-secrets-purge-enforcement
-NEW: bridge/gtkb-p0-secrets-purge-enforcement-003.md
+VERIFIED: bridge/gtkb-p0-secrets-purge-enforcement-006.md
+NEW: bridge/gtkb-p0-secrets-purge-enforcement-005.md
+GO: bridge/gtkb-p0-secrets-purge-enforcement-004.md
+REVISED: bridge/gtkb-p0-secrets-purge-enforcement-003.md
 NO-GO: bridge/gtkb-p0-secrets-purge-enforcement-002.md
 NEW: bridge/gtkb-p0-secrets-purge-enforcement-001.md
 
@@ -220,25 +221,12 @@ REVISED: bridge/gtkb-role-enhancement-003.md
 NO-GO: bridge/gtkb-role-enhancement-002.md
 NEW: bridge/gtkb-role-enhancement-001.md
 
-Document: gtkb-project-completion-plan-incomplete-guard
-VERIFIED: bridge/gtkb-project-completion-plan-incomplete-guard-004.md
-NEW: bridge/gtkb-project-completion-plan-incomplete-guard-003.md
-GO: bridge/gtkb-project-completion-plan-incomplete-guard-002.md
-NEW: bridge/gtkb-project-completion-plan-incomplete-guard-001.md
-
 Document: gtkb-auto-push-investigation-slice-2
 VERIFIED: bridge/gtkb-auto-push-investigation-slice-2-005.md
 NEW: bridge/gtkb-auto-push-investigation-slice-2-004.md
 GO: bridge/gtkb-auto-push-investigation-slice-2-003.md
 REVISED: bridge/gtkb-auto-push-investigation-slice-2-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-2-001.md
-
-Document: gtkb-ollama-qwen-full-lo-route
-VERIFIED: bridge/gtkb-ollama-qwen-full-lo-route-005.md
-NEW: bridge/gtkb-ollama-qwen-full-lo-route-004.md
-WITHDRAWN: bridge/gtkb-ollama-qwen-full-lo-route-003.md
-GO: bridge/gtkb-ollama-qwen-full-lo-route-002.md
-NEW: bridge/gtkb-ollama-qwen-full-lo-route-001.md
 
 Document: gtkb-mirror-retirement-target-path-scope-correction
 VERIFIED: bridge/gtkb-mirror-retirement-target-path-scope-correction-008.md

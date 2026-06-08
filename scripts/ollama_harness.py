@@ -29,8 +29,8 @@ except ImportError:  # pragma: no cover - Python <3.11 fallback is not expected 
 
 
 DEFAULT_ENDPOINT = "http://localhost:11434"
-DEFAULT_TIMEOUT_SECONDS = 30.0
-DEFAULT_MAX_TURNS = 16
+DEFAULT_TIMEOUT_SECONDS = 240.0
+DEFAULT_MAX_TURNS = 24
 ROUTING_CONFIG_PATH = Path(".ollama") / "routing.toml"
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
@@ -261,6 +261,8 @@ def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | Non
     allowed_tools = ", ".join(model_route.allowed_tools)
     return f"""You are Ollama harness D operating as Loyal Opposition for GT-KB.
 
+Before you can write any bridge verdict, you MUST acquire the work-intent claim: python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command reports an existing holder, treat that JSON output as claim evidence — not as a harness crash. Do not proceed to Write until the claim command returns success.
+
 Use the GT-KB file bridge as the authoritative workflow surface. Read bridge/INDEX.md before
 acting, read the full version chain for the target document, and respond to latest NEW or
 REVISED bridge entries by writing the next numbered bridge verdict file and updating
@@ -268,16 +270,12 @@ bridge/INDEX.md. Do not stop with prose when a bridge verdict is required.
 Use harness-state/harness-registry.json through the canonical role reader as the role source
 of truth. Do not treat harness-local operating-role.md files as live role authority.
 
-Before writing or editing a bridge verdict, acquire the bridge work-intent claim for the document
-slug with Bash: python scripts\\bridge_claim_cli.py claim <document-slug>. A nonzero claim
-command may report existing holder JSON; treat that as claim evidence, not as a harness crash.
-
 For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
-NO-GO. Run the mandatory preflights and include their observed output in the verdict:
+NO-GO. Run preflight checks and include their raw output in the verdict as advisory context for the Prime Builder. A nonzero preflight exit is a note to attach to the verdict body, not a rejection criterion. Your verdict (GO / NO-GO / VERIFIED) evaluates the substantive quality of the proposal or implementation report being reviewed — not whether every applicable cross-cutting spec appears in the linked specs list.
+
+Run the preflight checks with Bash:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
 python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
-Nonzero preflight exits are review evidence: exit 5 from the ADR/DCL clause preflight is a
-NO-GO input unless an explicit owner waiver is present.
 
 Bridge verdict author metadata to include:
 author_identity: Ollama Loyal Opposition

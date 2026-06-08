@@ -14,7 +14,6 @@ implementation_scope: dispatch_post_dispatch_outcome_tracking
 
 Project: PROJECT-GTKB-OLLAMA-LO-OPERATIONS
 Work Item: WI-4432 (to be created via MemBase CLI)
-Project Authorization: PAUTH-PROJECT-GTKB-OLLAMA-LO-OPERATIONS-QWEN-FULL-LO
 Owner Decision: DELIB-20260608-SP1-CONVERT-ADVISORIES
 
 ## Owner Decisions / Input
@@ -99,10 +98,7 @@ Existing tests in `platform_tests/scripts/test_cross_harness_bridge_trigger*.py`
 
 ## target_paths metadata
 
-target_paths: [
-  "scripts/cross_harness_bridge_trigger.py",
-  "platform_tests/scripts/test_dispatch_post_dispatch_poll.py",
-]
+target_paths: ["scripts/cross_harness_bridge_trigger.py", "platform_tests/scripts/test_dispatch_post_dispatch_poll.py"]
 
 No new CLI, no new state directory (uses existing `.gtkb-state/cross-harness-trigger/`).
 

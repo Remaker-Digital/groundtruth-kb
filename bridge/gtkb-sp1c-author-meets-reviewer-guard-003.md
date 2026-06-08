@@ -14,7 +14,6 @@ implementation_scope: dispatch_self_review_prevention_guard
 
 Project: PROJECT-GTKB-OLLAMA-LO-OPERATIONS
 Work Item: WI-4433 (to be created via MemBase CLI)
-Project Authorization: PAUTH-PROJECT-GTKB-OLLAMA-LO-OPERATIONS-QWEN-FULL-LO
 Owner Decision: DELIB-20260608-SP1-CONVERT-ADVISORIES
 
 ## Owner Decisions / Input
@@ -101,10 +100,7 @@ No existing tests assert on "every dispatch proceeds unless suppressed by existi
 
 ## target_paths metadata
 
-target_paths: [
-  "scripts/cross_harness_bridge_trigger.py",
-  "platform_tests/scripts/test_dispatch_author_meets_reviewer.py",
-]
+target_paths: ["scripts/cross_harness_bridge_trigger.py", "platform_tests/scripts/test_dispatch_author_meets_reviewer.py"]
 
 ## Spec-Derived Verification Plan
 
