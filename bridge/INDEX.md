@@ -77,4 +77,7 @@ REVISED: bridge/gtkb-adr-isolation-application-placement-003.md
 NO-GO: bridge/gtkb-adr-isolation-application-placement-002.md
 NEW: bridge/gtkb-adr-isolation-application-placement-001.md
 
+Document: gtkb-p0-secrets-purge-enforcement
+NEW: bridge/gtkb-p0-secrets-purge-enforcement-001.md
+
 <!-- S389 isolation program backstop release-gate approval -->
