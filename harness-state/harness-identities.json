@@ -20,9 +20,14 @@
       "assigned_at": "2026-06-05T05:11:00Z",
       "assigned_by": "owner-directed-initial-identity-via-DELIB-20260663",
       "id": "D"
+    },
+    "goose": {
+      "assigned_at": "2026-06-08T00:19:00Z",
+      "assigned_by": "owner-directed-identity-registration",
+      "id": "E"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness installation identities",
-  "updated_at": "2026-06-05T05:11:00Z"
+  "updated_at": "2026-06-08T00:19:00Z"
 }

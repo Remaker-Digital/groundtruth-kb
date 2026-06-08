@@ -8,6 +8,9 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- LO bridge repair 2026-06-08: restored INDEX from 0b3ae25f after catastrophic truncation in fbfda62c; prepended post-truncation NEW threads only. -->
 
+Document: gtkb-gov-file-bridge-authority-001
+NEW: bridge/gtkb-gov-file-bridge-authority-001-001.md
+
 Document: gtkb-platform-observability-hygiene
 NO-GO: bridge/gtkb-platform-observability-hygiene-002.md
 NEW: bridge/gtkb-platform-observability-hygiene-001.md

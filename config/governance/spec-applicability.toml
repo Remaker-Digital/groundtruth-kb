@@ -26,6 +26,8 @@ applies_when_content_matches = [
 spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 severity = "blocking"
 rationale = "All bridge-mediated implementation and verification work must honor the file bridge authority model."
+spec_body_path = "config/governance/gov-file-bridge-authority-001.md"
+clause_count = 16
 applies_when_doc_matches = ["*"]
 applies_when_paths_match = [
   "bridge/**",
