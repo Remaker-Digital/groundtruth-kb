@@ -379,10 +379,10 @@ def close_session(
         closed_topic_count=open_topic_count,
     )
     observed_steps = {
-        int(item.get("step"))
+        int(item.get("step"))  # type: ignore[arg-type]
         for item in envelope["wrap_step_results"]
         if isinstance(item, dict) and item.get("step") is not None
-    }  # type: ignore[arg-type]
+    }
     missing = sorted(set(MANDATORY_WRAP_STEPS) - observed_steps)
     if missing:
         raise EnvelopeError(f"Wrap step results missing mandatory steps: {missing}")
