@@ -14,6 +14,7 @@ WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-002.md
 WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-001.md
 
 Document: gtkb-sp1a-ollama-lo-prompt-restructure
+GO: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-004.md
 NEW: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-003.md
 WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-002.md
 WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-001.md
@@ -50,9 +51,11 @@ WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-002.md
 ADVISORY: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-001.md
 
 Document: gtkb-gov-file-bridge-authority-001
+NEW: bridge/gtkb-gov-file-bridge-authority-001-002.md
 NEW: bridge/gtkb-gov-file-bridge-authority-001-001.md
 
 Document: gtkb-v1-s509-proposal-remediation
+GO: bridge/gtkb-v1-s509-proposal-remediation-003.md
 REVISED: bridge/gtkb-v1-s509-proposal-remediation-002.md
 NEW: bridge/gtkb-v1-s509-proposal-remediation-001.md
 
@@ -74,6 +77,7 @@ NO-GO: bridge/gtkb-mcp-stable-harness-surface-implementation-002.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-implementation-001.md
 
 Document: gtkb-bridge-advisory-message-type-implementation
+WITHDRAWN: bridge/gtkb-bridge-advisory-message-type-implementation-003.md
 NO-GO: bridge/gtkb-bridge-advisory-message-type-implementation-002.md
 NEW: bridge/gtkb-bridge-advisory-message-type-implementation-001.md
 
@@ -82,6 +86,7 @@ NO-GO: bridge/gtkb-ecosystem-scout-policy-implementation-002.md
 NEW: bridge/gtkb-ecosystem-scout-policy-implementation-001.md
 
 Document: gtkb-smart-poller-p1-p2-implementation
+WITHDRAWN: bridge/gtkb-smart-poller-p1-p2-implementation-003.md
 NO-GO: bridge/gtkb-smart-poller-p1-p2-implementation-002.md
 NEW: bridge/gtkb-smart-poller-p1-p2-implementation-001.md
 
@@ -94,10 +99,12 @@ NO-GO: bridge/gtkb-isolation-phase3-implementation-002.md
 NEW: bridge/gtkb-isolation-phase3-implementation-001.md
 
 Document: gtkb-p0-secrets-purge-enforcement
+NEW: bridge/gtkb-p0-secrets-purge-enforcement-003.md
 NO-GO: bridge/gtkb-p0-secrets-purge-enforcement-002.md
 NEW: bridge/gtkb-p0-secrets-purge-enforcement-001.md
 
 Document: gtkb-ollama-lo-prompt-hardening
+WITHDRAWN: bridge/gtkb-ollama-lo-prompt-hardening-003.md
 NO-GO: bridge/gtkb-ollama-lo-prompt-hardening-002.md
 NEW: bridge/gtkb-ollama-lo-prompt-hardening-001.md
 
@@ -110,10 +117,12 @@ NO-GO: bridge/gtkb-isolation-phase3-occupancy-detection-002.md
 NEW: bridge/gtkb-isolation-phase3-occupancy-detection-001.md
 
 Document: gtkb-directive-enforcement-p1-p2
+WITHDRAWN: bridge/gtkb-directive-enforcement-p1-p2-003.md
 NO-GO: bridge/gtkb-directive-enforcement-p1-p2-002.md
 NEW: bridge/gtkb-directive-enforcement-p1-p2-001.md
 
 Document: gtkb-smart-bridge-trigger-foundation-spike
+WITHDRAWN: bridge/gtkb-smart-bridge-trigger-foundation-spike-003.md
 NO-GO: bridge/gtkb-smart-bridge-trigger-foundation-spike-002.md
 REVISED: bridge/gtkb-smart-bridge-trigger-foundation-spike-001.md
 
@@ -225,6 +234,7 @@ REVISED: bridge/gtkb-auto-push-investigation-slice-2-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-2-001.md
 
 Document: gtkb-ollama-qwen-full-lo-route
+VERIFIED: bridge/gtkb-ollama-qwen-full-lo-route-005.md
 NEW: bridge/gtkb-ollama-qwen-full-lo-route-004.md
 WITHDRAWN: bridge/gtkb-ollama-qwen-full-lo-route-003.md
 GO: bridge/gtkb-ollama-qwen-full-lo-route-002.md
