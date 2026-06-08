@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-08T06:23:03Z",
+  "generated_at": "2026-06-08T17:19:39Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -43,6 +43,10 @@
       },
       "codex": {
         "id": "A",
+        "status": "verified"
+      },
+      "goose": {
+        "id": "E",
         "status": "verified"
       },
       "ollama": {
@@ -88,6 +92,13 @@
         "harness_type": "ollama",
         "role": [
           "loyal-opposition"
+        ],
+        "status": "verified"
+      },
+      "E": {
+        "harness_type": "goose",
+        "role": [
+          "prime-builder"
         ],
         "status": "verified"
       }
@@ -679,7 +690,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "26.1.2"
+      "version": "25.3"
     },
     "playwright": {
       "classification": "unsupported",
@@ -693,7 +704,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -707,7 +718,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.12"
     }
   },
   "verification": {
