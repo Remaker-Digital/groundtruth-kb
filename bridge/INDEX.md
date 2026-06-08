@@ -1,3 +1,24 @@
+Document: sp1d-turn-budget-optimization
+NEW: bridge/gtkb-sp1d-turn-budget-optimization-003.md
+WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-002.md
+WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-001.md
+
+Document: sp1c-author-meets-reviewer-guard
+NEW: bridge/gtkb-sp1c-author-meets-reviewer-guard-003.md
+WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-002.md
+WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-001.md
+
+Document: sp1b-dispatch-outcome-tracker
+NEW: bridge/gtkb-sp1b-dispatch-outcome-tracker-003.md
+WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-002.md
+WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-001.md
+
+Document: gtkb-sp1a-ollama-lo-prompt-restructure
+NEW: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-003.md
+WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-002.md
+WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-001.md
+
+
 # Bridge Index
 
 <!-- Prime inserts new document entries at the top of the list below. -->
