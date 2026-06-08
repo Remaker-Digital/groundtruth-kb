@@ -12,10 +12,7 @@ set -e
 REPO_ROOT=$(git rev-parse --show-toplevel)
 PYTHON_BIN="${PYTHON:-python}"
 
-"$PYTHON_BIN" -m groundtruth_kb secrets scan \
-    --staged \
-    --redacted \
-    --fail-on verified-provider || exit $?
+"$PYTHON_BIN" scripts/scan_secrets.py --staged || exit $?
 
 "$PYTHON_BIN" scripts/check_dev_environment_inventory_drift.py \
     --staged \

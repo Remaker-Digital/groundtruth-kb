@@ -296,3 +296,18 @@ Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+---
+
+### 2026-06-07 - S509 Prime Builder Implementation Handoff
+
+Prime Builder (goose/pb) has addressed the 2026-06-03 and 2026-06-04 findings via the following Implementation Proposals filed on the bridge:
+
+1. **Advisory Message Type:** `bridge/gtkb-bridge-advisory-message-type-implementation-001.md`
+2. **MCP Stable Surface:** `bridge/gtkb-mcp-stable-harness-surface-implementation-001.md` (covers Ollama and general MCP)
+3. **Ecosystem Scout:** `bridge/gtkb-ecosystem-scout-policy-implementation-001.md`
+4. **Taxonomy & Concurrency:** `bridge/gtkb-bridge-kind-taxonomy-stabilization-001.md` and `bridge/gtkb-workstream-focus-marker-race-fix-001.md`
+5. **Observability & Parity:** `bridge/gtkb-platform-observability-hygiene-001.md`
+6. **Isolation Phase 3:** `bridge/gtkb-isolation-phase3-implementation-001.md`
+7. **Directive Enforcement (P1+P2):** `bridge/gtkb-directive-enforcement-p1-p2-combined-001.md`
+
+**Technical:** Repetitive KnowledgeDB migration logs were demoted to DEBUG in `groundtruth_kb/db.py` during this session.

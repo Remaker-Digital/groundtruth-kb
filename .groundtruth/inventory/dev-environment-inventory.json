@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-06T22:26:15Z",
+  "generated_at": "2026-06-08T06:23:03Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -123,7 +123,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -207,7 +207,7 @@
     },
     "github_workflows": {
       "classification": "public_safe",
-      "count": 16,
+      "count": 17,
       "items": [
         ".github/workflows/accessibility.yml",
         ".github/workflows/build-agent-containers.yml",
@@ -222,6 +222,7 @@
         ".github/workflows/lint.yml",
         ".github/workflows/python-tests.yml",
         ".github/workflows/release-candidate-gate.yml",
+        ".github/workflows/secrets-scan.yml",
         ".github/workflows/security-scan.yml",
         ".github/workflows/sonarcloud.yml",
         ".github/workflows/visual-regression.yml"
@@ -678,7 +679,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "25.3"
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -692,7 +693,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -706,7 +707,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {
