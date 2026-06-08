@@ -11,6 +11,11 @@
 Document: gtkb-gov-file-bridge-authority-001
 NEW: bridge/gtkb-gov-file-bridge-authority-001-001.md
 
+Document: gtkb-v1-s509-proposal-remediation
+REVISED: bridge/gtkb-v1-s509-proposal-remediation-002.md
+NEW: bridge/gtkb-v1-s509-proposal-remediation-001.md
+
+
 Document: gtkb-platform-observability-hygiene
 NO-GO: bridge/gtkb-platform-observability-hygiene-002.md
 NEW: bridge/gtkb-platform-observability-hygiene-001.md
