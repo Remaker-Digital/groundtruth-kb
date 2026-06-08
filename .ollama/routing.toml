@@ -16,5 +16,5 @@ timeout_seconds = 180
 
 [routing.skills]
 bridge-review = "qwen3-coder-next-cloud"
-verification = "kimi-k2-6-cloud"
+verification = "qwen3-coder-next-cloud"
 implementation = "qwen3-coder-next-cloud"

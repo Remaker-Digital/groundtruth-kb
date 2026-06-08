@@ -184,6 +184,7 @@ REVISED: bridge/gtkb-auto-push-investigation-slice-2-002.md
 NEW: bridge/gtkb-auto-push-investigation-slice-2-001.md
 
 Document: gtkb-ollama-qwen-full-lo-route
+NEW: bridge/gtkb-ollama-qwen-full-lo-route-004.md
 WITHDRAWN: bridge/gtkb-ollama-qwen-full-lo-route-003.md
 GO: bridge/gtkb-ollama-qwen-full-lo-route-002.md
 NEW: bridge/gtkb-ollama-qwen-full-lo-route-001.md

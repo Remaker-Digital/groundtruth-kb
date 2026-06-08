@@ -41,14 +41,6 @@ MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
 AUTHOR_IDENTITY = "Ollama D"
 AUTHOR_HARNESS_ID = "D"
 
-# Bridge review skill may ONLY write to bridge/* files
-BRIDGE_ONLY_PATHS = ("bridge/",)
-
-
-def _is_bridge_write_path(rel_path: str) -> bool:
-    """True if rel_path starts with bridge/ prefix."""
-    return rel_path.startswith("bridge/")
-
 
 BRIDGE_WRITE_GUARDS = (
     Path(".claude/hooks/credential-scan.py"),
@@ -607,12 +599,6 @@ def _dispatch_write(
     guard_runner: GuardRunner | None,
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
-    rel = _relative_path(project_root, path)
-    if not _is_bridge_write_path(rel):
-        raise OllamaHarnessError(
-            f"Write denied: bridge-review skill may ONLY write to bridge/ files. "
-            f"Attempted path: {rel}. Use Bash for preflights, then Write verdict to bridge/<slug>-<NNN>.md."
-        )
     content = str(arguments.get("content", ""))
     invoke_guard_adapter(
         "Write", {"path": str(path), "content": content}, model_metadata, project_root, guard_runner=guard_runner
@@ -629,12 +615,6 @@ def _dispatch_edit(
     guard_runner: GuardRunner | None,
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=False)
-    rel = _relative_path(project_root, path)
-    if not _is_bridge_write_path(rel):
-        raise OllamaHarnessError(
-            f"Edit denied: bridge-review skill may ONLY edit bridge/ files. "
-            f"Attempted path: {rel}. Use Bash for preflights, then Edit bridge/INDEX.md to add verdict line."
-        )
     old_string = _require_string(arguments, "old_string")
     new_string = str(arguments.get("new_string", ""))
     invoke_guard_adapter(
