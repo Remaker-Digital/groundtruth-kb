@@ -8,6 +8,21 @@
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- LO bridge repair 2026-06-08: restored INDEX from 0b3ae25f after catastrophic truncation in fbfda62c; prepended post-truncation NEW threads only. -->
 
+Document: sp1-dispatch-reliability-prime-handoff
+ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md
+
+Document: sp1d-turn-budget-optimization
+WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-002.md
+
+Document: sp1c-author-meets-reviewer-guard
+WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-002.md
+
+Document: sp1b-dispatch-outcome-tracker
+WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-002.md
+
+Document: sp1a-ollama-lo-prompt-restructure
+WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-002.md
+
 Document: gtkb-gov-file-bridge-authority-001
 NEW: bridge/gtkb-gov-file-bridge-authority-001-001.md
 
