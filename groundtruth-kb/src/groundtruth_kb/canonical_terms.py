@@ -128,7 +128,7 @@ def _decode_list(value: str | None) -> list[str]:
     return [str(x) for x in decoded] if isinstance(decoded, list) else []
 
 
-def _row_to_term(row: sqlite3.Row | tuple | None) -> dict[str, Any] | None:
+def _row_to_term(row: sqlite3.Row | tuple[Any, ...] | None) -> dict[str, Any] | None:
     if row is None:
         return None
     if isinstance(row, sqlite3.Row):

@@ -71,9 +71,9 @@ def _resolve_harness_id(role_map: dict[str, Any], harness_id_or_name: str) -> st
         return harness_id_or_name
     for hid, record in harnesses.items():
         if isinstance(record, dict) and record.get("name") == harness_id_or_name:
-            return hid
+            return str(hid)
         if isinstance(record, dict) and record.get("harness_name") == harness_id_or_name:
-            return hid
+            return str(hid)
     raise TransactionValidationError(f"unknown harness id-or-name: {harness_id_or_name!r}", axis="role")
 
 

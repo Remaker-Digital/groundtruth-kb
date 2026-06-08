@@ -245,7 +245,7 @@ def _slot_completion(db: KnowledgeDB, project_id: str, slot: str) -> dict[str, o
 
 
 def _completion_source(completion: dict[str, object]) -> CompletionSource | None:
-    tags = set(completion.get("tags_parsed") or [])
+    tags = set(completion.get("tags_parsed") or [])  # type: ignore[call-overload]
     for source in _VALID_SOURCE_ORDER:
         if f"source:{source}" in tags:
             return source

@@ -314,7 +314,7 @@ def _parse_documents_or_raise(index_text: str) -> list[Any]:
         raise BridgeIndexMutationError(
             f"bridge INDEX parse error at line {first.line_number}: expected {first.expected_state}"
         )
-    return result.documents
+    return list(result.documents)
 
 
 def _raise_on_duplicate_documents(documents: list[Any]) -> None:

@@ -326,7 +326,7 @@ def close_topic(
             topic["closed_at"] = utc_now_iso()
             topic["close_outcome"] = close_outcome
             write_current(project_root, resolved_name, envelope)
-            return topic
+            return dict(topic)
     raise EnvelopeError(f"No open topic envelope for type {topic_type!r}.")
 
 
@@ -378,7 +378,11 @@ def close_session(
         project_root,
         closed_topic_count=open_topic_count,
     )
-    observed_steps = {int(item.get("step")) for item in envelope["wrap_step_results"] if isinstance(item, dict)}
+    observed_steps = {
+        int(item.get("step"))
+        for item in envelope["wrap_step_results"]
+        if isinstance(item, dict) and item.get("step") is not None
+    }  # type: ignore[arg-type]
     missing = sorted(set(MANDATORY_WRAP_STEPS) - observed_steps)
     if missing:
         raise EnvelopeError(f"Wrap step results missing mandatory steps: {missing}")

@@ -144,11 +144,11 @@ class ProjectLifecycleService:
 
         values = {field: fields.get(field, current.get(field)) for field in allowed_fields}
         project = self.db.insert_project(
-            values["name"],
+            str(values["name"]),
             _require_nonempty(changed_by, "changed_by"),
             _require_nonempty(change_reason, "change_reason"),
             id=current["id"],
-            status=values["status"],
+            status=str(values["status"]),
             rank=values["rank"],
             parent_project_id=values["parent_project_id"],
             purpose=values["purpose"],

@@ -1026,7 +1026,7 @@ class KnowledgeDB:
             conn.execute("UPDATE specifications SET type = 'governance' WHERE id LIKE 'GOV-%'")
             conn.execute("UPDATE specifications SET type = 'protected_behavior' WHERE id LIKE 'PB-%'")
             conn.commit()
-            _log.info("Applied migration: add type column to specifications")
+            _log.debug("Applied migration: add type column to specifications")
 
         # Migration 2: Backfill architecture_decision and design_constraint types (GOV-20 Phase 1)
         conn.execute(
@@ -1053,14 +1053,14 @@ class KnowledgeDB:
                 added_f1.append(col_name)
         conn.commit()
         if added_f1:
-            _log.info("Applied migration: F1 schema enrichment columns %s", added_f1)
+            _log.debug("Applied migration: F1 schema enrichment columns %s", added_f1)
 
         # Migration 4: Add source_paths column for spec-before-code governance hook
         cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
         if "source_paths" not in cols:
             conn.execute("ALTER TABLE specifications ADD COLUMN source_paths TEXT DEFAULT NULL")
             conn.commit()
-            _log.info("Applied migration: add source_paths column")
+            _log.debug("Applied migration: add source_paths column")
 
         # Migration 5: lifecycle schema additions.
         cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
@@ -1076,7 +1076,7 @@ class KnowledgeDB:
                 added_lifecycle_cols.append(col_name)
         conn.commit()
         if added_lifecycle_cols:
-            _log.info("Applied migration: lifecycle schema columns %s", added_lifecycle_cols)
+            _log.debug("Applied migration: lifecycle schema columns %s", added_lifecycle_cols)
 
         # Migration 6: unify backlog metadata onto work_items.
         cols = {row[1] for row in conn.execute("PRAGMA table_info(work_items)").fetchall()}
@@ -1089,7 +1089,7 @@ class KnowledgeDB:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_work_items_order ON work_items(implementation_order)")
         conn.commit()
         if added_work_item_cols:
-            _log.info("Applied migration: unified backlog work item columns %s", added_work_item_cols)
+            _log.debug("Applied migration: unified backlog work item columns %s", added_work_item_cols)
 
         # Migration 7: first-class project layer over canonical work_items.
         self._backfill_project_artifacts_from_work_items()
@@ -4934,6 +4934,14 @@ class KnowledgeDB:
         session_id: str,
         idempotency_key: str,
     ) -> dict[str, Any] | None:
+        """Retrieve a session prompt by its idempotency key.
+
+        Args:
+            idempotency_key: Unique key to identify the session prompt.
+
+        Returns:
+            Dictionary containing session prompt data or None if not found.
+        """
         # Idempotency lookup for the deterministic handoff service
         # (SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001). The key is stored
         # inside the existing ``context`` JSON field, not a dedicated column.
@@ -5054,6 +5062,14 @@ class KnowledgeDB:
         changed_by: str = "dispatch-envelope-scheduler",
         change_reason: str = "dispatch-envelope event recorded",
     ) -> dict[str, Any] | None:
+        """Insert a dispatch event into the database.
+
+        Args:
+            event_data: Dictionary containing dispatch event fields.
+
+        Returns:
+            The inserted dispatch event record.
+        """
         resolved_target = target_value or target
         if not resolved_target:
             raise ValueError("target_value or target is required")

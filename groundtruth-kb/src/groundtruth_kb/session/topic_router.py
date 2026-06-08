@@ -38,7 +38,7 @@ def parse_topic_command(prompt: str) -> TopicCommand | None:
     match = TOPIC_COMMAND_RE.fullmatch(line)
     if not match:
         return None
-    return TopicCommand(action=match.group("action"), topic_type=match.group("topic"), raw=line)
+    return TopicCommand(action=match.group("action"), topic_type=match.group("topic"), raw=line)  # type: ignore[arg-type]
 
 
 def handle_topic_command(
@@ -64,7 +64,7 @@ def handle_topic_command(
     log_dir.mkdir(parents=True, exist_ok=True)
     with (log_dir / "events.jsonl").open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(result, sort_keys=True) + "\n")
-    return result
+    return result  # type: ignore[return-value]
 
 
 def render_topic_context(result: dict[str, object]) -> str:

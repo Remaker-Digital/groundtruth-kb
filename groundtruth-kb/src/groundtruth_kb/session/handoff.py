@@ -228,7 +228,7 @@ def _resolve_active_harness_name(project_root: Path) -> str:
             "must land before the handoff service can read archived envelopes.",
         )
     if len(candidates) == 1:
-        return candidates[0]
+        return str(candidates[0])
     raise HandoffError(
         "Cannot deterministically resolve active harness: multiple harnesses have "
         f"session-envelope archives ({candidates}); supply the active harness explicitly.",
@@ -326,7 +326,7 @@ def _role_from_envelope(envelope: dict[str, Any]) -> str:
     """Extract the canonical operating role from the envelope."""
     role = envelope.get("role_resolved") or envelope.get("role")
     if role in _ROLE_ACTIONABLE_STATUSES:
-        return role
+        return str(role)
     return "prime-builder"
 
 
@@ -492,5 +492,5 @@ class _suppress:
     def __enter__(self) -> _suppress:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: object) -> bool:
         return exc_type is None or issubclass(exc_type, AttributeError)

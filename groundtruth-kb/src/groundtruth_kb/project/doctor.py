@@ -446,7 +446,7 @@ def _check_harness_state_sot_consistency(target: Path) -> ToolCheck:
             reader(project_root=target)
         except HarnessStateError as exc:
             findings.append(f"L1: {label} SoT parse failed: {exc}")
-        except Exception as exc:  # noqa: BLE001 - fail-soft per WARN severity
+        except Exception as exc:  # intentional-catch: fail-soft per WARN severity
             findings.append(f"L1: {label} SoT unexpected reader error: {type(exc).__name__}: {exc}")
 
     # ── Layer 2 — grep_absent for direct SoT reads outside harness_projection ──
@@ -1906,7 +1906,7 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
 
     try:
         toml_records = sot_registry.load_toml(registry_path)
-    except Exception as exc:  # InvalidSoTRecord / UnknownDomain / parse error
+    except Exception as exc:  # intentional-catch: InvalidSoTRecord / UnknownDomain / parse error
         return ToolCheck(
             name=check_name,
             required=True,
@@ -2054,7 +2054,8 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
         except (OSError, json.JSONDecodeError) as exc:
             warnings.append(f".codex/hooks.json unreadable: {exc}")
             codex_data = {}
-        codex_pre = codex_data.get("hooks", {}).get("PreToolUse", []) if isinstance(codex_data, dict) else []
+        _hooks = codex_data.get("hooks", {}) if isinstance(codex_data, dict) else {}
+        codex_pre = _hooks.get("PreToolUse", []) if isinstance(_hooks, dict) else []
         codex_bash_hit = False
         codex_false_green = False
         for entry in codex_pre if isinstance(codex_pre, list) else []:
@@ -2109,7 +2110,7 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
                             "which does not match any known SoT storage_path"
                         )
                         break  # one warning per record is enough
-        except Exception:  # noqa: BLE001 - defensive
+        except Exception:  # intentional-catch: defensive
             pass
 
     if warnings:

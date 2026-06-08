@@ -199,7 +199,7 @@ def build_backlog_status(config: GTConfig, request: BacklogStatusRequest) -> dic
             # Lazy-import the scanner ONLY when needed. The base command path
             # (no scanner flags) must not depend on scripts.* — test 10 of the
             # spec-derived verification matrix asserts this contract.
-            from scripts.project_verified_completion_scanner import (  # noqa: PLC0415  # type: ignore[import-untyped]
+            from scripts.project_verified_completion_scanner import (  # type: ignore  # noqa: PLC0415
                 completion_ready,
                 verified_work_items_by_project,
             )
