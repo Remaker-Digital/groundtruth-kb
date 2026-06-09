@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-09T16:45:20Z",
+  "generated_at": "2026-06-09T17:52:37Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -108,10 +108,8 @@
       },
       "F": {
         "harness_type": "openrouter",
-        "role": [
-          "loyal-opposition"
-        ],
-        "status": "verified"
+        "role": [],
+        "status": "unknown"
       }
     }
   },
