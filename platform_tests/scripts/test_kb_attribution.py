@@ -11,6 +11,7 @@ variant. Also asserts the 4 archive helpers no longer contain the literal
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from unittest import mock
@@ -29,9 +30,57 @@ from scripts._kb_attribution import (  # noqa: E402
     resolve_changed_by_or_none,
 )
 
-# Resolver tests use real role-assignments.json + harness-identities.json.
-# Current state: harness A = codex, harness B = claude.
-# Per harness-state/role-assignments.json: claude = prime-builder, codex = loyal-opposition.
+
+@pytest.fixture(autouse=True)
+def mock_harness_state(tmp_path, monkeypatch):
+    registry_file = tmp_path / "harness-registry.json"
+    identities_file = tmp_path / "harness-identities.json"
+
+    registry_file.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_of_truth": "MemBase harnesses table",
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "role": ["loyal-opposition"],
+                        "status": "active",
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "role": ["prime-builder"],
+                        "status": "active",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    identities_file.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_of_truth": "GT-KB harness installation identities",
+                "harnesses": {
+                    "claude": {"id": "B"},
+                    "codex": {"id": "A"},
+                    "antigravity": {"id": "C"},
+                    "ollama": {"id": "D"},
+                    "goose": {"id": "E"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry_file))
+    monkeypatch.setenv("GTKB_HARNESS_IDENTITIES_PATH", str(identities_file))
 
 
 def test_explicit_kwarg_resolves_codex() -> None:
@@ -64,11 +113,9 @@ def test_single_prime_fallback_resolves_to_claude() -> None:
     Current role state: claude = prime-builder, codex = loyal-opposition.
     Sole Prime Builder is claude.
     """
-    # Ensure env var is unset for this test
-    with (
-        mock.patch.dict("os.environ", {}, clear=False),
-        mock.patch.dict("os.environ", {}, clear=True),
-    ):
+    # Ensure env var is unset for this test, preserving others like registry paths
+    with mock.patch.dict("os.environ", {}):
+        os.environ.pop(ENV_VAR_HARNESS_NAME, None)
         assert resolve_changed_by() == "prime-builder/claude"
 
 

@@ -166,6 +166,7 @@ def test_propose_bridge_pre_populate_opt_out_preserves_body(helper_module, tmp_p
     so the test asserts via patched body inspection: the bridge file's
     content matches the input body modulo the credential scan.
     """
+    monkeypatch.setenv("GTKB_SESSION_ID", "test-session-id")
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "INDEX.md").write_text("# Bridge Index\n\n<!-- comment -->\n\n", encoding="utf-8")

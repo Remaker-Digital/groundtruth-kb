@@ -238,7 +238,7 @@ def test_schema_version_mismatch_returns_empty(tmp_path: Path) -> None:
     )
 
     artifact = reader.read_for_recipient(tmp_path, n.BridgeAgent.CODEX)
-    # Canonical reader surfaces the artifact regardless of schema version.
+    # Alignment check: reader surfaces the artifact regardless of schema version.
     assert artifact is not None
     assert artifact.schema_version == 99
     # But the formatter defensively returns empty for schema mismatch.

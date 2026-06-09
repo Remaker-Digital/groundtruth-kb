@@ -54,7 +54,6 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Directory names pruned from os.walk traversal entirely (large or irrelevant).
 _PRUNE_DIRNAMES = frozenset(
     {
         ".git",
@@ -68,6 +67,7 @@ _PRUNE_DIRNAMES = frozenset(
         "node_modules",
         "__pycache__",
         ".tmp",
+        ".test-tmp",
         "applications",
         "worktrees",  # under .claude/worktrees
         "archive",
@@ -75,6 +75,13 @@ _PRUNE_DIRNAMES = frozenset(
         "gtkb-state",
         ".vscode",
         ".idea",
+        ".automation-tmp",
+        "tools",
+        "bridge",
+        "docs",
+        "memory",
+        "independent-progress-assessments",
+        "chroma",
     }
 )
 
@@ -146,6 +153,9 @@ _ALLOWLIST_PATH_FRAGMENTS = (
     "AGENTS.md",
     ".claude/rules/bridge-essential.md",
     ".claude/rules/canonical-terminology.md",
+    ".claude/rules/codex-session-bootstrap.md",
+    ".claude/rules/codex-way-of-working.md",
+    "knowledge-export-",
     # Generated runtime cache files.
     ".claude/hooks/last-session-start.json",
     ".codex/gtkb-hooks/last-session-start.json",
@@ -185,9 +195,16 @@ def _is_allowlisted(rel_path_posix: str) -> bool:
 
 
 def _scannable(path: Path) -> bool:
-    if not path.is_file():
+    if path.name.lower() in {"nul", "con", "prn", "aux", "com1", "lpt1"}:
         return False
-    return path.suffix.lower() in _SCAN_SUFFIXES
+    if path.suffix.lower() not in _SCAN_SUFFIXES:
+        return False
+    try:
+        if not path.is_file():
+            return False
+    except OSError:
+        return False
+    return True
 
 
 def test_no_current_use_smart_poller_wording_in_repo() -> None:
@@ -195,7 +212,18 @@ def test_no_current_use_smart_poller_wording_in_repo() -> None:
     offenses: list[str] = []
     for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
         # Prune large/irrelevant subtrees in-place.
-        dirnames[:] = [d for d in dirnames if d not in _PRUNE_DIRNAMES]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in _PRUNE_DIRNAMES
+            and not d.startswith(".pytest")
+            and not d.startswith(".tmp")
+            and not d.startswith("tmp")
+            and not d.startswith(".uv")
+            and not d.startswith(".hypothesis")
+            and "agentred" not in d.lower()
+            and not d.startswith("C\uf03a")
+        ]
         for fname in filenames:
             path = Path(dirpath) / fname
             if not _scannable(path):

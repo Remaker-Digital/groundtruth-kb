@@ -54,10 +54,10 @@ this workspace and reads `AGENTS.md`:
   entries may be Loyal Opposition responses created in a separate previous
   session.
 - The poller is separate from the bridge. The retired OS poller remains
-  disabled, but the verified smart poller should be used when it is available
-  and functioning. When smart-poller automation is unavailable, use manual scans
-  or activate monitoring only when Prime Builder and Loyal Opposition are
-  running in separate harnesses or asynchronous monitoring is otherwise needed.
+  disabled. Use the cross-harness event-driven trigger when its registrations and
+  dispatch state are healthy; otherwise use manual scans or activate monitoring
+  only when Prime Builder and Loyal Opposition are running in separate harnesses
+  or asynchronous monitoring is otherwise needed.
 - Prime Builder startup presents the GT-KB numbered session-focus choices to the
   owner. Loyal Opposition startup does not present those choices.
 - The owner's first message in a fresh session is only a session-start stimulus,

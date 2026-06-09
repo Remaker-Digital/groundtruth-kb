@@ -59,6 +59,7 @@ NEW: bridge/gtkb-v1-s509-proposal-remediation-001.md
 
 
 Document: gtkb-platform-observability-hygiene
+REVISED: bridge/gtkb-platform-observability-hygiene-003.md
 NO-GO: bridge/gtkb-platform-observability-hygiene-002.md
 NEW: bridge/gtkb-platform-observability-hygiene-001.md
 

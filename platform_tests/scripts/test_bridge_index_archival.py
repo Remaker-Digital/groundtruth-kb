@@ -228,7 +228,7 @@ class TestAuthorizationAwareSkip:
         # discoverable from live bridge/INDEX.md after the prune.
         import project_verified_completion_scanner as pvcs
 
-        assert "WI-9999" in pvcs.verified_work_items(tmp_path)
+        assert any("WI-9999" in wis for wis in pvcs._verified_thread_work_items(tmp_path).values())
 
     def test_already_archived_protected_thread_is_skipped(self, tmp_path, monkeypatch) -> None:
         index, report = self._run(

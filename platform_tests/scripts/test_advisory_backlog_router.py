@@ -277,3 +277,23 @@ def test_canonical_glossary_contains_advisory_router_entry():
     assert "scripts/advisory_backlog_router.py" in body, (
         "advisory-router glossary entry should include an Implementation pointer to scripts/advisory_backlog_router.py"
     )
+
+
+def test_router_compact_mode(router, fake_project, db_factory):
+    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-COMPACT.md", _basic_advisory())
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
+
+    # 1. Non-compact format check
+    normal_json = json.loads(result.as_json(compact=False))
+    assert "created" in normal_json
+    assert "skipped_existing" in normal_json
+    assert "created_count" not in normal_json
+    assert "skipped_existing_count" not in normal_json
+
+    # 2. Compact format check
+    compact_json = json.loads(result.as_json(compact=True))
+    assert "created" not in compact_json
+    assert "skipped_existing" not in compact_json
+    assert compact_json["created_count"] == 1
+    assert compact_json["skipped_existing_count"] == 0

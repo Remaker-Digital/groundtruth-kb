@@ -108,13 +108,17 @@ def test_startup_relay_cache_write_is_parity_across_dispatchers() -> None:
     the harness-scoped cache; a one-harness implementation would break the relay
     for the other harness.
     """
+    # Verify the core implementation contains the cache writing logic
+    core_path = REPO_ROOT / "scripts" / "session_start_dispatch_core.py"
+    core_text = core_path.read_text(encoding="utf-8")
+    assert "def _write_startup_relay_cache(" in core_text, (
+        "Core dispatcher logic is missing the _write_startup_relay_cache helper"
+    )
+    assert "_write_startup_relay_cache(" in core_text, "Core dispatcher logic must call _write_startup_relay_cache"
+    assert "last-user-visible-startup.md" in core_text
+    assert "last-user-visible-startup.meta.json" in core_text
+
+    # Verify each wrapper delegates/imports the core dispatcher
     for harness, path in _RELAY_DISPATCHERS.items():
         text = path.read_text(encoding="utf-8")
-        assert "def _write_startup_relay_cache(" in text, (
-            f"{harness} dispatcher is missing the _write_startup_relay_cache helper"
-        )
-        assert "_write_startup_relay_cache(startup_context)" in text, (
-            f"{harness} dispatcher must call _write_startup_relay_cache on the startup path"
-        )
-        assert "last-user-visible-startup.md" in text
-        assert "last-user-visible-startup.meta.json" in text
+        assert "session_start_dispatch_core" in text, f"{harness} dispatcher is missing the core delegation import"

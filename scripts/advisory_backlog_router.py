@@ -29,10 +29,11 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 ROUTER_ID = "advisory-backlog-router/1.0"
 SOURCE_SPEC_ID = "GOV-STANDING-BACKLOG-001"
@@ -85,16 +86,27 @@ class RouterResult:
     scan_finished_at: str = ""
     dry_run: bool = False
 
-    def as_json(self) -> str:
-        payload = {
-            "created": self.created,
-            "skipped_existing": self.skipped_existing,
-            "errors": self.errors,
-            "scanned": self.scanned,
-            "scan_started_at": self.scan_started_at,
-            "scan_finished_at": self.scan_finished_at,
-            "dry_run": self.dry_run,
-        }
+    def as_json(self, *, compact: bool = False) -> str:
+        if compact:
+            payload = {
+                "created_count": len(self.created),
+                "skipped_existing_count": len(self.skipped_existing),
+                "errors": self.errors,
+                "scanned": self.scanned,
+                "scan_started_at": self.scan_started_at,
+                "scan_finished_at": self.scan_finished_at,
+                "dry_run": self.dry_run,
+            }
+        else:
+            payload = {
+                "created": self.created,
+                "skipped_existing": self.skipped_existing,
+                "errors": self.errors,
+                "scanned": self.scanned,
+                "scan_started_at": self.scan_started_at,
+                "scan_finished_at": self.scan_finished_at,
+                "dry_run": self.dry_run,
+            }
         return json.dumps(payload, indent=2, sort_keys=True)
 
 
@@ -167,7 +179,22 @@ def _extract_first_paragraph(text: str) -> str:
             if in_first_para:
                 break
             continue
-        if stripped.startswith(("**Date:", "**Author:", "**Scope:", "**Objective:", "**Disposition:", "Date:", "Author:", "Scope:", "Audience:", "Role:", "Objective:", "Disposition:")):
+        if stripped.startswith(
+            (
+                "**Date:",
+                "**Author:",
+                "**Scope:",
+                "**Objective:",
+                "**Disposition:",
+                "Date:",
+                "Author:",
+                "Scope:",
+                "Audience:",
+                "Role:",
+                "Objective:",
+                "Disposition:",
+            )
+        ):
             continue
         in_first_para = True
         buffer.append(stripped)
@@ -322,9 +349,7 @@ def _existing_wi_for(db, source_key: str) -> str | None:
 def _next_work_item_id(db) -> str:
     """Mint the next ``WI-NNNN`` id by scanning the live ``work_items`` table."""
     conn = db._get_conn()
-    rows = conn.execute(
-        "SELECT id FROM work_items WHERE id LIKE 'WI-%'"
-    ).fetchall()
+    rows = conn.execute("SELECT id FROM work_items WHERE id LIKE 'WI-%'").fetchall()
     max_n = 0
     for (raw_id,) in rows:
         match = re.match(r"^WI-(\d+)$", str(raw_id))
@@ -450,12 +475,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--since", help="ISO date (YYYY-MM-DD); skip advisories dated before this")
     parser.add_argument("--project-root", default=None, help="override project root (defaults to script parent)")
+    parser.add_argument("--compact", action="store_true", help="suppress full created and skipped lists in output JSON")
     args = parser.parse_args(argv)
 
     since = _parse_iso_date(args.since) if args.since else None
     root = _project_root_from_arg(args.project_root)
     result = run(project_root=root, source=args.source, since=since, dry_run=args.dry_run)
-    print(result.as_json())
+    print(result.as_json(compact=args.compact))
     return 0 if not result.errors else 1
 
 

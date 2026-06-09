@@ -89,10 +89,10 @@ Purpose: define execution behavior by assigned role.
   and downstream bridge-dependent artifacts needed to sustain bridge function
   and full utilization without another approval.
 - Treat the poller as a separate monitoring/activation service. Do not restore
-  the retired OS poller implementation. Use the verified smart poller when it is
-  available and functioning; otherwise use manual scans or monitoring only when
-  the roles are running in separate harnesses or asynchronous monitoring is
-  otherwise needed.
+  the retired OS poller implementation. Use the cross-harness event-driven
+  trigger when its registrations and dispatch state are healthy; otherwise use
+  manual scans or monitoring only when the roles are running in separate
+  harnesses or asynchronous monitoring is otherwise needed.
 - The first Loyal Opposition startup task is to verify that the file bridge is
   functioning.
 - If the bridge is functioning, the Loyal Opposition harness begins processing

@@ -19,7 +19,7 @@ def test_common_bridge_scan_role_authority_guard_exists() -> None:
     assert "function Test-BridgeScanRoleAuthority" in common
     assert "function Get-BridgeScanHarnessId" in common
     assert "harness-state\\harness-identities.json" in common
-    assert "harness-state\\role-assignments.json" in common
+    assert "harness-state\\harness-registry.json" in common
     assert "ConvertFrom-Json" in common
     assert "ROLE-AUTHORITY-BLOCKED" in common
     assert "Allowed      = $false" in common
@@ -46,10 +46,10 @@ def test_codex_review_scanner_requires_loyal_opposition_authority() -> None:
     assert 'ScannerName "Codex automated Loyal Opposition bridge review scan"' in scanner
     assert "paused (role authority blocked)" in scanner
     assert "Effective role: Loyal Opposition" in scanner
-    assert "Role map source: harness-state/role-assignments.json" in scanner
+    assert "Role map source: harness-state/harness-registry.json" in scanner
     assert "Required durable role at spawn time: harness" in scanner
     assert "Observed durable role at spawn time: harness" in scanner
-    assert "Before writing any review result, re-read `harness-state/role-assignments.json`." in scanner
+    assert "Before writing any review result, re-read `harness-state/harness-registry.json`." in scanner
     assert "report `ROLE-AUTHORITY-BLOCKED`. Do not issue GO, NO-GO, or VERIFIED." in scanner
     assert "Every review file you create must include a `## Role Authority` section" in scanner
 
@@ -65,9 +65,9 @@ def test_claude_prime_scanner_requires_prime_builder_authority() -> None:
     assert 'ScannerName "Claude automated Prime Builder bridge continuation scan"' in scanner
     assert "paused (role authority blocked)" in scanner
     assert "Effective role: Prime Builder" in scanner
-    assert "Role map source: harness-state/role-assignments.json" in scanner
+    assert "Role map source: harness-state/harness-registry.json" in scanner
     assert "Required durable role at spawn time: harness" in scanner
     assert "Observed durable role at spawn time: harness" in scanner
-    assert "Before writing any implementation result, re-read `harness-state/role-assignments.json`." in scanner
+    assert "Before writing any implementation result, re-read `harness-state/harness-registry.json`." in scanner
     assert "report `ROLE-AUTHORITY-BLOCKED`." in scanner
     assert "Do not implement, revise, or file bridge updates." in scanner
