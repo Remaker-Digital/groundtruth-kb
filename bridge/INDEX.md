@@ -1,63 +1,5 @@
-Document: gtkb-sp1d-turn-budget-optimization
-VERIFIED: bridge/gtkb-sp1d-turn-budget-optimization-006.md
-NEW: bridge/gtkb-sp1d-turn-budget-optimization-005.md
-GO: bridge/gtkb-sp1d-turn-budget-optimization-004.md
-NEW: bridge/gtkb-sp1d-turn-budget-optimization-003.md
-WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-002.md
-WITHDRAWN: bridge/gtkb-sp1d-turn-budget-optimization-001.md
-
-Document: gtkb-sp1c-author-meets-reviewer-guard
-VERIFIED: bridge/gtkb-sp1c-author-meets-reviewer-guard-006.md
-NEW: bridge/gtkb-sp1c-author-meets-reviewer-guard-005.md
-GO: bridge/gtkb-sp1c-author-meets-reviewer-guard-004.md
-NEW: bridge/gtkb-sp1c-author-meets-reviewer-guard-003.md
-WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-002.md
-WITHDRAWN: bridge/gtkb-sp1c-author-meets-reviewer-guard-001.md
-
-Document: gtkb-sp1b-dispatch-outcome-tracker
-VERIFIED: bridge/gtkb-sp1b-dispatch-outcome-tracker-006.md
-NEW: bridge/gtkb-sp1b-dispatch-outcome-tracker-005.md
-GO: bridge/gtkb-sp1b-dispatch-outcome-tracker-004.md
-NEW: bridge/gtkb-sp1b-dispatch-outcome-tracker-003.md
-WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-002.md
-WITHDRAWN: bridge/gtkb-sp1b-dispatch-outcome-tracker-001.md
-
-Document: gtkb-sp1a-ollama-lo-prompt-restructure
-VERIFIED: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-006.md
-NEW: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-005.md
-GO: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-004.md
-NEW: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-003.md
-WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-002.md
-WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-001.md
-
-
-# Bridge Index
-
-<!-- Prime inserts new document entries at the top of the list below. -->
-<!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
-<!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
-<!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
-<!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
-<!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
-<!-- LO bridge repair 2026-06-08: restored INDEX from 0b3ae25f after catastrophic truncation in fbfda62c; prepended post-truncation NEW threads only. -->
-<!-- Antigravity wrap-up: marked harness status as active. -->
-
 Document: sp1-dispatch-reliability-prime-handoff
 ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md
-
-Document: gtkb-gov-file-bridge-authority-001
-VERIFIED: bridge/gtkb-gov-file-bridge-authority-001-004.md
-NEW: bridge/gtkb-gov-file-bridge-authority-001-003.md
-GO: bridge/gtkb-gov-file-bridge-authority-001-002.md
-NEW: bridge/gtkb-gov-file-bridge-authority-001-001.md
-
-Document: gtkb-v1-s509-proposal-remediation
-VERIFIED: bridge/gtkb-v1-s509-proposal-remediation-005.md
-NEW: bridge/gtkb-v1-s509-proposal-remediation-004.md
-GO: bridge/gtkb-v1-s509-proposal-remediation-003.md
-REVISED: bridge/gtkb-v1-s509-proposal-remediation-002.md
-NEW: bridge/gtkb-v1-s509-proposal-remediation-001.md
-
 
 Document: gtkb-platform-observability-hygiene
 REVISED: bridge/gtkb-platform-observability-hygiene-003.md
@@ -70,10 +12,12 @@ NO-GO: bridge/gtkb-bridge-kind-taxonomy-stabilization-002.md
 NEW: bridge/gtkb-bridge-kind-taxonomy-stabilization-001.md
 
 Document: gtkb-workstream-focus-marker-race-fix
+REVISED: bridge/gtkb-workstream-focus-marker-race-fix-003.md
 NO-GO: bridge/gtkb-workstream-focus-marker-race-fix-002.md
 NEW: bridge/gtkb-workstream-focus-marker-race-fix-001.md
 
 Document: gtkb-mcp-stable-harness-surface-implementation
+REVISED: bridge/gtkb-mcp-stable-harness-surface-implementation-003.md
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-implementation-002.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-implementation-001.md
 
@@ -83,6 +27,7 @@ NO-GO: bridge/gtkb-bridge-advisory-message-type-implementation-002.md
 NEW: bridge/gtkb-bridge-advisory-message-type-implementation-001.md
 
 Document: gtkb-ecosystem-scout-policy-implementation
+REVISED: bridge/gtkb-ecosystem-scout-policy-implementation-003.md
 NO-GO: bridge/gtkb-ecosystem-scout-policy-implementation-002.md
 NEW: bridge/gtkb-ecosystem-scout-policy-implementation-001.md
 
@@ -92,20 +37,14 @@ NO-GO: bridge/gtkb-smart-poller-p1-p2-implementation-002.md
 NEW: bridge/gtkb-smart-poller-p1-p2-implementation-001.md
 
 Document: gtkb-directive-enforcement-p1-p2-combined
+REVISED: bridge/gtkb-directive-enforcement-p1-p2-combined-003.md
 NO-GO: bridge/gtkb-directive-enforcement-p1-p2-combined-002.md
 NEW: bridge/gtkb-directive-enforcement-p1-p2-combined-001.md
 
 Document: gtkb-isolation-phase3-implementation
+REVISED: bridge/gtkb-isolation-phase3-implementation-003.md
 NO-GO: bridge/gtkb-isolation-phase3-implementation-002.md
 NEW: bridge/gtkb-isolation-phase3-implementation-001.md
-
-Document: gtkb-p0-secrets-purge-enforcement
-VERIFIED: bridge/gtkb-p0-secrets-purge-enforcement-006.md
-NEW: bridge/gtkb-p0-secrets-purge-enforcement-005.md
-GO: bridge/gtkb-p0-secrets-purge-enforcement-004.md
-REVISED: bridge/gtkb-p0-secrets-purge-enforcement-003.md
-NO-GO: bridge/gtkb-p0-secrets-purge-enforcement-002.md
-NEW: bridge/gtkb-p0-secrets-purge-enforcement-001.md
 
 Document: gtkb-ollama-lo-prompt-hardening
 WITHDRAWN: bridge/gtkb-ollama-lo-prompt-hardening-003.md
@@ -113,10 +52,12 @@ NO-GO: bridge/gtkb-ollama-lo-prompt-hardening-002.md
 NEW: bridge/gtkb-ollama-lo-prompt-hardening-001.md
 
 Document: gtkb-ollama-dispatch-state-recovery
+REVISED: bridge/gtkb-ollama-dispatch-state-recovery-003.md
 NO-GO: bridge/gtkb-ollama-dispatch-state-recovery-002.md
 NEW: bridge/gtkb-ollama-dispatch-state-recovery-001.md
 
 Document: gtkb-isolation-phase3-occupancy-detection
+REVISED: bridge/gtkb-isolation-phase3-occupancy-detection-003.md
 NO-GO: bridge/gtkb-isolation-phase3-occupancy-detection-002.md
 NEW: bridge/gtkb-isolation-phase3-occupancy-detection-001.md
 
