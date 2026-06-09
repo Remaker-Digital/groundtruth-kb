@@ -570,85 +570,75 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
     promotion lands in Phase 2+.
     """
     import tomllib  # noqa: PLC0415 - py3.11+; defer import
+    from groundtruth_kb.harness_projection import (  # noqa: PLC0415
+        HarnessStateError,
+        read_capabilities,
+        read_identity,
+        read_roles,
+    )
 
     findings: list[str] = []
 
     # ── Layer 1 — identity store ─────────────────────────────────────
-    identities_path = target / "harness-state" / "harness-identities.json"
     ollama_id: str | None = None
-    if not identities_path.is_file():
-        findings.append("L1: harness-state/harness-identities.json missing")
+    try:
+        identities = read_identity(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L1: identities store error: {exc}")
     else:
-        try:
-            identities = json.loads(identities_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            findings.append(f"L1: identities JSON unreadable: {exc}")
+        harness_block = identities.get("harnesses") if isinstance(identities, dict) else None
+        if not isinstance(harness_block, dict) or "ollama" not in harness_block:
+            findings.append("L1: identities store missing 'ollama' entry")
         else:
-            harness_block = identities.get("harnesses") if isinstance(identities, dict) else None
-            if not isinstance(harness_block, dict) or "ollama" not in harness_block:
-                findings.append("L1: identities store missing 'ollama' entry")
-            else:
-                ollama_id = harness_block["ollama"].get("id") if isinstance(harness_block["ollama"], dict) else None
-                if ollama_id != "D":
-                    findings.append(f"L1: identities ollama.id={ollama_id!r}; expected 'D'")
+            ollama_id = harness_block["ollama"].get("id") if isinstance(harness_block["ollama"], dict) else None
+            if ollama_id != "D":
+                findings.append(f"L1: identities ollama.id={ollama_id!r}; expected 'D'")
 
     # ── Layer 2 — registry store ─────────────────────────────────────
-    registry_path = target / "harness-state" / "harness-registry.json"
     registry_entry: dict[str, Any] | None = None
-    if not registry_path.is_file():
-        findings.append("L2: harness-state/harness-registry.json missing")
+    try:
+        registry = read_roles(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L2: registry store error: {exc}")
     else:
-        try:
-            registry = json.loads(registry_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            findings.append(f"L2: registry JSON unreadable: {exc}")
+        harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
+        if isinstance(harnesses, list):
+            for entry in harnesses:
+                if isinstance(entry, dict) and entry.get("id") == "D":
+                    registry_entry = entry
+                    break
+        if registry_entry is None:
+            findings.append("L2: registry has no entry for id=D")
         else:
-            harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
-            if isinstance(harnesses, list):
-                for entry in harnesses:
-                    if isinstance(entry, dict) and entry.get("id") == "D":
-                        registry_entry = entry
-                        break
-            if registry_entry is None:
-                findings.append("L2: registry has no entry for id=D")
-            else:
-                if registry_entry.get("harness_name") != "ollama":
-                    findings.append(
-                        f"L2: registry harness_name={registry_entry.get('harness_name')!r}; expected 'ollama'"
-                    )
-                if registry_entry.get("harness_type") != "ollama":
-                    findings.append(
-                        f"L2: registry harness_type={registry_entry.get('harness_type')!r}; expected 'ollama'"
-                    )
-                if registry_entry.get("status") != "registered":
-                    findings.append(f"L2: registry status={registry_entry.get('status')!r}; expected 'registered'")
-                role = registry_entry.get("role")
-                if role != []:
-                    findings.append(f"L2: registry role={role!r}; expected []")
+            if registry_entry.get("harness_name") != "ollama":
+                findings.append(f"L2: registry harness_name={registry_entry.get('harness_name')!r}; expected 'ollama'")
+            if registry_entry.get("harness_type") != "ollama":
+                findings.append(f"L2: registry harness_type={registry_entry.get('harness_type')!r}; expected 'ollama'")
+            if registry_entry.get("status") != "registered":
+                findings.append(f"L2: registry status={registry_entry.get('status')!r}; expected 'registered'")
+            role = registry_entry.get("role")
+            if role != []:
+                findings.append(f"L2: registry role={role!r}; expected []")
 
     # ── Layer 3 — capability registry ────────────────────────────────
-    capability_path = target / "config" / "agent-control" / "harness-capability-registry.toml"
-    if not capability_path.is_file():
-        findings.append("L3: config/agent-control/harness-capability-registry.toml missing")
+    try:
+        cap_data = read_capabilities(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L3: capability registry error: {exc}")
     else:
-        try:
-            cap_data = tomllib.loads(capability_path.read_text(encoding="utf-8"))
-        except (OSError, tomllib.TOMLDecodeError) as exc:
-            findings.append(f"L3: capability registry unreadable: {exc}")
+        ollama_caps = cap_data.get("harnesses", {}).get("ollama") if isinstance(cap_data, dict) else None
+        if not isinstance(ollama_caps, dict):
+            findings.append("L3: capability registry missing [harnesses.ollama]")
         else:
-            ollama_caps = cap_data.get("harnesses", {}).get("ollama") if isinstance(cap_data, dict) else None
-            if not isinstance(ollama_caps, dict):
-                findings.append("L3: capability registry missing [harnesses.ollama]")
-            else:
-                required_keys = (
-                    "bridge_compliance_gate_respect",
-                    "root_boundary_respect",
-                    "author_metadata_env_var_setting",
-                    "destructive_gate_delegation",
-                )
-                missing_keys = [k for k in required_keys if k not in ollama_caps]
-                if missing_keys:
-                    findings.append(f"L3: capability registry missing keys: {missing_keys}")
+            required_keys = (
+                "bridge_compliance_gate_respect",
+                "root_boundary_respect",
+                "author_metadata_env_var_setting",
+                "destructive_gate_delegation",
+            )
+            missing_keys = [k for k in required_keys if k not in ollama_caps]
+            if missing_keys:
+                findings.append(f"L3: capability registry missing keys: {missing_keys}")
 
     # ── Layer 4 — routing TOML ──────────────────────────────────────
     routing_path = target / ".ollama" / "routing.toml"

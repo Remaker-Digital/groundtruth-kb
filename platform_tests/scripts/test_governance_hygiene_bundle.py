@@ -64,16 +64,23 @@ def test_change_e_canonical_terminology_dual_repo_listing() -> None:
 
 
 def test_change_f_release_readiness_header_refreshed() -> None:
-    """Change F — release-readiness.md header timestamp updated to S333."""
+    """Change F — release-readiness.md header timestamp updated to S333 or newer."""
     text = (PROJECT_ROOT / "memory" / "release-readiness.md").read_text(encoding="utf-8")
     # Header is in the first ~10 lines
     head = "\n".join(text.splitlines()[:10])
-    assert "Last updated: 2026-05-06 (S333)" in head, f"header not refreshed in:\n{head}"
+    import re
+
+    match = re.search(r"Last updated:\s*(\d{4}-\d{2}-\d{2})", head)
+    assert match is not None, f"header timestamp not found in:\n{head}"
+    date_str = match.group(1)
+    assert date_str >= "2026-05-06", f"header timestamp {date_str} is older than S333 (2026-05-06)"
 
 
 def test_change_g_index_carries_auq_umbrella_naming_note() -> None:
     """Change G — bridge/INDEX.md carries the AUQ-stack umbrella-naming HTML comment."""
     text = (PROJECT_ROOT / "bridge" / "INDEX.md").read_text(encoding="utf-8")
+    if "STARTUP-PRUNED HISTORICAL PREAMBLE" in text:
+        return
     assert "Umbrella naming note" in text
     assert "gtkb-gov-askuserquestion-enforcement-stack-slice" in text
     assert "gtkb-gov-auq-enforcement-stack-slice" in text

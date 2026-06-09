@@ -16,6 +16,9 @@ REVISED
 - [DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001](file:///E:/GT-KB/config/governance/adr-dcl-clauses.toml) — Verification must execute spec-derived tests.
 - [GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001](file:///E:/GT-KB/config/governance/adr-dcl-clauses.toml) — Sessions actively inform and engage the user.
 - [GOV-SOURCE-OF-TRUTH-FRESHNESS-001](file:///E:/GT-KB/config/governance/adr-dcl-clauses.toml) — State claims derive from fresh canonical reads.
+- [ADR-ISOLATION-APPLICATION-PLACEMENT-001](file:///E:/GT-KB/config/governance/adr-dcl-clauses.toml) — Placement contract for application isolation.
+- [DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001](file:///E:/GT-KB/config/governance/adr-dcl-clauses.toml) — Artifact lifecycle transitions and validation triggers.
+- [GOV-ARTIFACT-ORIENTED-GOVERNANCE-001](file:///E:/GT-KB/config/governance/adr-dcl-clauses.toml) — Governance over design, specification, and implementation records.
 
 ## Implementation Scope
 
@@ -27,6 +30,8 @@ REVISED
   - `groundtruth-kb/src/groundtruth_kb/project/doctor.py`
   - `scripts/check_harness_parity.py`
   - `scripts/cross_harness_bridge_trigger.py`
+
+All target paths and implementation artifacts reside under the project root (`E:\GT-KB`), satisfying the in-root requirement of `ADR-ISOLATION-APPLICATION-PLACEMENT-001`.
 
 ## Proposed Design Constraints
 

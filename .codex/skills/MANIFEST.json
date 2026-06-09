@@ -36,6 +36,13 @@
       "source_sha256": "5189b0b9b27922ed104e74e87ecc7f745bae629a5d659d5d67b6acb74a5e876b"
     },
     {
+      "adapter_relative_path": ".codex/skills/gtkb-propose/SKILL.md",
+      "canonical_name": "gtkb-propose",
+      "capability_id": "skill.gtkb-propose",
+      "source_relative_path": ".claude/skills/gtkb-propose/SKILL.md",
+      "source_sha256": "087724fc1d5476119c12ec1af2fd5e425677e5e07385feb1906063e88e8c1d87"
+    },
+    {
       "adapter_relative_path": ".codex/skills/check-deliberations/SKILL.md",
       "canonical_name": "check-deliberations",
       "capability_id": "skill.check-deliberations",

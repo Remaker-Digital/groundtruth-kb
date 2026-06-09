@@ -31,7 +31,7 @@
       "capability_id": "skill.bridge",
       "description": "Operate the full bridge protocol \u2014 file proposals, scan INDEX for actionable items, write GO/NO-GO/VERIFIED verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "ade5841ecf1d5d0a43fd33984f125e4fe635fb9d787bd7475f826aeeb6b5b81a"
+      "source_sha256": "c99097647444bc3206949e6794d76c78eddbfdc56e0fe57eb8c1eab2bf195632"
     },
     {
       "adapter_relative_path": ".ollama/skills/bridge-propose/SKILL.md",
@@ -40,6 +40,14 @@
       "description": "Write a bridge proposal to ``bridge/<topic>-001.md`` and insert its entry into ``bridge/INDEX.md`` under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
       "source_sha256": "5189b0b9b27922ed104e74e87ecc7f745bae629a5d659d5d67b6acb74a5e876b"
+    },
+    {
+      "adapter_relative_path": ".ollama/skills/gtkb-propose/SKILL.md",
+      "canonical_name": "gtkb-propose",
+      "capability_id": "skill.gtkb-propose",
+      "description": "Scaffold a structurally compliant bridge proposal body (status token, project-linkage metadata, inline-JSON target_paths, seeded Prior Deliberations, spec-derived verification heading, required sections) and run a self-review checklist BEFORE filing, then hand off to gtkb-bridge-propose for the write. Use when starting a NEW bridge implementation proposal and you want it to clear the bridge-compliance gates on the first review instead of in a revise loop.",
+      "source_relative_path": ".claude/skills/gtkb-propose/SKILL.md",
+      "source_sha256": "087724fc1d5476119c12ec1af2fd5e425677e5e07385feb1906063e88e8c1d87"
     },
     {
       "adapter_relative_path": ".ollama/skills/check-deliberations/SKILL.md",
@@ -258,6 +266,14 @@
       "source_sha256": "ab44d51daee2a80b3bc210af77391d98da9c095b964e7e7d32eee8aa0f21c9c7"
     },
     {
+      "adapter_relative_path": ".ollama/skills/gtkb-sweep-commit/SKILL.md",
+      "canonical_name": "gtkb-sweep-commit",
+      "capability_id": "skill.gtkb-sweep-commit",
+      "description": "Sweep and locally commit all current non-ignored GroundTruth-KB worktree changes after owner authorization. Use when the owner says to \"sweep commit\", \"commit everything\", \"commit all changes\", consolidate verified bridge work, or perform the regular GT-KB full-worktree cleanup commit. Handles GT-KB governance hooks, inventory drift, narrative-artifact approval evidence, staged credential scans, and verification before committing. Does not push unless the owner explicitly asks.",
+      "source_relative_path": ".claude/skills/gtkb-sweep-commit/SKILL.md",
+      "source_sha256": "2b816bb22269b98641a9d30c019f2d62888a37cf2b3062c9adf2b266e67d9c5b"
+    },
+    {
       "adapter_relative_path": ".ollama/skills/loyal-opposition-hygiene-assessment/SKILL.md",
       "canonical_name": "loyal-opposition-hygiene-assessment",
       "capability_id": "skill.loyal-opposition-hygiene-assessment",
@@ -271,7 +287,7 @@
       "capability_id": "skill.verify",
       "description": "Author a Loyal Opposition post-implementation VERIFIED or NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate. Use when a post-implementation report enters the Loyal Opposition actionable queue, when asked to verify a post-implementation report, when authoring a VERIFIED/NO-GO verdict, or when reviewing an implementation report for spec-derived testing.",
       "source_relative_path": ".claude/skills/verify/SKILL.md",
-      "source_sha256": "07f4f196062f808be9008887ab5f3f165bdd9326153501f35ff5204431783743"
+      "source_sha256": "461b2e8eb3605e0481efa79537a660866ecdb8618d30e03b2f196afd3c226e83"
     }
   ],
   "generated_by": "scripts/generate_ollama_skill_adapters.py",

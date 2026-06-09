@@ -49,6 +49,11 @@ def mock_harness_registry_for_tests(request) -> None:
             "test_cross_harness_trigger_suppression",
             "test_cross_harness_trigger_durable_keyed_regression",
             "test_lo_file_safety_gate_role_resolution",
+            "test_governing_specs_preserved",
+            "test_ollama_dispatch",
+            "test_ollama_role_promotion",
+            "test_session_self_initialization_canonical_consistency",
+            "test_harness_registry_reader_migration",
         ]
     ):
         yield

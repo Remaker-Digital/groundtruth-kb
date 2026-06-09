@@ -64,6 +64,7 @@ NO-GO: bridge/gtkb-platform-observability-hygiene-002.md
 NEW: bridge/gtkb-platform-observability-hygiene-001.md
 
 Document: gtkb-bridge-kind-taxonomy-stabilization
+REVISED: bridge/gtkb-bridge-kind-taxonomy-stabilization-003.md
 NO-GO: bridge/gtkb-bridge-kind-taxonomy-stabilization-002.md
 NEW: bridge/gtkb-bridge-kind-taxonomy-stabilization-001.md
 

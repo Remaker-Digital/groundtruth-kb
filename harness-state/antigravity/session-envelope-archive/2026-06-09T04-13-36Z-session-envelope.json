@@ -1,0 +1,60 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-09T04:13:36Z",
+  "envelope_schema_version": 1,
+  "harness_id": "C",
+  "harness_name": "antigravity",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-09T04:13:36Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "C-2026-06-09T04-13-36Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": "M .claude/rules/codex-session-bootstrap.md\n M .claude/rules/codex-way-of-working.md\n M independent-progress-assessments/LOYAL-OPPOSITION-LOG.md\n M memory/MEMORY.md\n M platform_tests/scripts/conftest.py\n M platform_tests/scripts/test_advisory_backlog_router.py\n M platform_tests/scripts/test_bridge_automation_role_authority.py\n M platform_tests/scripts/test_bridge_index_archival.py\n D platform_tests/scripts/test_bridge_notify_reader.py\n M platform_tests/scripts/test_kb_attribution.py\n M platform_tests/scripts/test_workstream_focus_hook_parity.py\n M platform_tests/skills/test_bridge_propose_helper.py\n M platform_tests/test_no_active_smart_poller_wording.py\n M platform_tests/unit/test_knowledge_db_artifacts.py\n M scripts/advisory_backlog_router.py\n M scripts/harness_roles.py\n?? ${NUL}\n?? archive/smart-poller-2026-05-09/tests/test_bridge_notify_reader.py\n?? harness-state/antigravity/\n?? memory/CLAUDE_ARCHIVE.md"
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

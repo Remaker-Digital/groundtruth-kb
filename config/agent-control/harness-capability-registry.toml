@@ -94,7 +94,7 @@ source_sha256 = "e8faa844e34da804d511531d9269af4e95242351e784853807526283c18b2ae
 surface = ".agent/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "f11905ff9c935c622b4d37bc258997eb3153adb062c3984af2272f739b9bd3f0"
+source_sha256 = "e8faa844e34da804d511531d9269af4e95242351e784853807526283c18b2ae8"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -118,6 +118,29 @@ surface = ".agent/skills/bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge-propose/SKILL.md"
 source_sha256 = "5189b0b9b27922ed104e74e87ecc7f745bae629a5d659d5d67b6acb74a5e876b"
+[[capabilities]]
+id = "skill.gtkb-propose"
+kind = "skill"
+canonical_name = "gtkb-propose"
+canonical_purpose = "Scaffold a structurally compliant bridge proposal body and run a self-review checklist before filing."
+canonical_source = ".claude/skills/gtkb-propose/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/gtkb-propose/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/gtkb-propose/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
+source_sha256 = "087724fc1d5476119c12ec1af2fd5e425677e5e07385feb1906063e88e8c1d87"
+[capabilities.antigravity]
+surface = ".agent/skills/gtkb-propose/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
+source_sha256 = "087724fc1d5476119c12ec1af2fd5e425677e5e07385feb1906063e88e8c1d87"
 [[capabilities]]
 id = "skill.check-deliberations"
 kind = "skill"
@@ -824,8 +847,7 @@ source_sha256 = "a8a39cd634d0797c8aa629b197bee5b66754ba6738d1dd3f7fa5ecb2578ff7a
 surface = ".agent/skills/verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/verify/SKILL.md"
-source_sha256 = "0cb8669690d00770ee94ef1362700c6d0fbbacaddf0ac2f31a69a281d71e716c"
-
+source_sha256 = "a8a39cd634d0797c8aa629b197bee5b66754ba6738d1dd3f7fa5ecb2578ff7aa"
 [harnesses.ollama]
 # Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3
 # (spec inserted by Child 4; draft assertions updated from capabilities.ollama.* to
