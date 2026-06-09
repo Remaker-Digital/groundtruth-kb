@@ -864,6 +864,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     project_root = resolve_project_root(Path.cwd())
     
+    try:
+        from scripts._env import load_env_local
+        load_env_local()
+    except ImportError:
+        try:
+            from _env import load_env_local
+            load_env_local()
+        except ImportError:
+            pass
+
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         print("openrouter_harness: OPENROUTER_API_KEY environment variable is not set.", file=sys.stderr)
