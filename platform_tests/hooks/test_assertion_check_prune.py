@@ -31,13 +31,20 @@ def _load_hook_module(project_dir: Path) -> types.ModuleType:
     Resets the env var on import so PROJECT_DIR captures the fixture root,
     not the live repo root. Returns the loaded module.
     """
+    orig_env = os.environ.get("CLAUDE_PROJECT_DIR")
     os.environ["CLAUDE_PROJECT_DIR"] = str(project_dir)
-    spec = importlib.util.spec_from_file_location("_assertion_check_under_test", HOOK_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["_assertion_check_under_test"] = module
-    spec.loader.exec_module(module)
-    return module
+    try:
+        spec = importlib.util.spec_from_file_location("_assertion_check_under_test", HOOK_PATH)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["_assertion_check_under_test"] = module
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        if orig_env is None:
+            os.environ.pop("CLAUDE_PROJECT_DIR", None)
+        else:
+            os.environ["CLAUDE_PROJECT_DIR"] = orig_env
 
 
 class _FakeDB:

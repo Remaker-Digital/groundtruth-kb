@@ -113,7 +113,7 @@ def test_verify_role_document_partition_rejects_invalid_candidate_document() -> 
             "C": {"role": ["loyal-opposition"], "status": "registered"},
         }
     }
-    with pytest.raises(RolePartitionViolation, match="exactly one prime-builder"):
+    with pytest.raises(RolePartitionViolation, match="at least one loyal-opposition"):
         verify_role_document_partition(candidate)
 
 
@@ -125,22 +125,20 @@ def test_verify_role_partition_rejects_zero_prime_builder(tmp_path: Path) -> Non
             "B": {"role": ["loyal-opposition"]},
         },
     )
-    with pytest.raises(RolePartitionViolation):
+    with pytest.raises(RolePartitionViolation, match="at least one prime-builder"):
         verify_role_partition(tmp_path)
 
 
-def test_verify_role_partition_rejects_multiple_prime_builder(tmp_path: Path) -> None:
+def test_verify_role_partition_allows_multiple_prime_builders(tmp_path: Path) -> None:
     _write_role_map(
         tmp_path,
         {
             "A": {"role": ["prime-builder"]},
             "B": {"role": ["prime-builder"]},
+            "C": {"role": ["loyal-opposition"]},
         },
     )
-    with pytest.raises(RolePartitionViolation) as exc:
-        verify_role_partition(tmp_path)
-    message = str(exc.value)
-    assert "A" in message and "B" in message
+    assert verify_role_partition(tmp_path) == "A"
 
 
 def test_verify_role_partition_rejects_non_target_without_loyal_opposition(

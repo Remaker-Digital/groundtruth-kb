@@ -753,10 +753,11 @@ deterministic service invoked at canonical ``::wrap``; persisted as a
 or Loyal Opposition). The owner assigns the Prime Builder role; the bridge
 counterpart is always Loyal Opposition. The role map records a role SET per harness ID (singleton lists for
 multi-harness mode, multi-element lists for single-harness mode). Switching
-an ACTIVE harness to Prime Builder updates that harness's role set; another
-active harness holding the complementary role is preserved on its current
-holder or atomically reassigned to maintain the single-active-per-role
-invariant. Inactive harnesses (registered or suspended) retain their
+an ACTIVE harness to Prime Builder updates that harness's role set; other
+active harnesses holding operating roles are preserved. The single-active-per-role
+invariant is obsolete: multiple active harnesses may hold the same operating
+role concurrently (e.g., coexisting Loyal Opposition harnesses). Inactive
+harnesses (registered or suspended) retain their
 existing role sets unchanged: role and status are orthogonal axes per the
 role/status orthogonality model in
 `DELIB-S378-ROLE-STATUS-ORTHOGONALITY-DISPATCH` and

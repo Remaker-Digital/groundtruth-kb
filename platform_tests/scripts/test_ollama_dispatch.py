@@ -37,7 +37,7 @@ def _ollama_record(
     role: list[str] | None = None,
     status: str = "registered",
     surfaces: dict | None = None,
-    event_driven_hooks: bool = False,
+    event_driven_hooks: bool = True,
 ) -> dict:
     return {
         "id": "D",

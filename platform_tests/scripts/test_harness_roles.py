@@ -159,7 +159,7 @@ def test_setting_loyal_rejects_candidate_without_prime(tmp_path: Path) -> None:
         },
     )
 
-    with pytest.raises(ValueError, match="exactly one prime-builder"):
+    with pytest.raises(ValueError, match="at least one prime-builder"):
         set_harness_role(
             tmp_path,
             ROLE_LOYAL_OPPOSITION,

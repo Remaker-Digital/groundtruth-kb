@@ -315,14 +315,14 @@ def test_harness_set_role_rejects_invalid_active_candidate(tmp_path: Path) -> No
     _seed_harness_roles(root, {"A": ["prime-builder"], "B": ["loyal-opposition"]})
     result = _invoke(config, "set-role", "--harness", "B", "--role", "prime-builder")
     assert result.exit_code != 0, result.output
-    assert "exactly one prime-builder" in result.output
+    assert "at least one loyal-opposition" in result.output
     role_map = _read_role_map(root)
     assert role_map["A"]["role"] == ["prime-builder"]
     assert role_map["B"]["role"] == ["loyal-opposition"]
 
 
-def test_harness_set_role_three_harness_rejects_without_suspending_non_targets(tmp_path: Path) -> None:
-    """Invalid candidates do not suspend unrelated active harnesses."""
+def test_harness_set_role_three_harness_allows_multiple_prime_builders(tmp_path: Path) -> None:
+    """Active candidates can have multiple prime-builders and loyal-oppositions."""
     root, config = _project(tmp_path)
     _register_active(config, "A", "codex-cli", role=["prime-builder"])
     _register_active(config, "B", "claude-code", role=["loyal-opposition"])
@@ -333,12 +333,11 @@ def test_harness_set_role_three_harness_rejects_without_suspending_non_targets(t
         {"A": ["prime-builder"], "B": ["loyal-opposition"], "C": ["loyal-opposition"]},
     )
     result = _invoke(config, "set-role", "--harness", "C", "--role", "prime-builder")
-    assert result.exit_code != 0, result.output
-    assert "exactly one prime-builder" in result.output
+    assert result.exit_code == 0, result.output
     role_map = _read_role_map(root)
     assert role_map["A"]["role"] == ["prime-builder"]
     assert role_map["B"]["role"] == ["loyal-opposition"]
-    assert role_map["C"]["role"] == ["loyal-opposition"]
+    assert role_map["C"]["role"] == ["prime-builder"]
 
 
 def test_harness_set_role_allows_non_active_metadata_and_rejects_retired(tmp_path: Path) -> None:

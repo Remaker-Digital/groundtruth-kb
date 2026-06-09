@@ -96,7 +96,10 @@ def test_diagnose_emits_expected_sections(tmp_path: Path) -> None:
     assert "suppressed (target active session detected; by design)" in output
 
 
-def test_diagnose_classifies_target_active_session_result(tmp_path: Path) -> None:
+def test_diagnose_classifies_target_active_session_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     state_dir = tmp_path / "state"
     _seed_state(state_dir)
     state_path = state_dir / "dispatch-state.json"
@@ -104,6 +107,16 @@ def test_diagnose_classifies_target_active_session_result(tmp_path: Path) -> Non
     payload["recipients"]["prime"]["last_result"] = "target_active_session_present"
     state_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
+    monkeypatch.setattr(
+        cht,
+        "_read_role_assignments",
+        lambda *a, **k: {
+            "harnesses": {
+                "C": {"status": "active", "role": ["prime-builder"]},
+                "D": {"status": "active", "role": ["loyal-opposition"]},
+            }
+        },
+    )
     output = cht._emit_diagnose_summary(state_dir)
 
     assert "suppressed (target active session detected; by design)" in output

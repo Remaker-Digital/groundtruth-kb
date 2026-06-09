@@ -179,13 +179,16 @@ def _desired_role_assignments(
     assignments: dict[str, list[str]] = {}
     for row in rows:
         harness_id = _record_id(row)
-        roles: list[str] = []
         if harness_id not in active_by_id:
-            roles = _current_roles(row)
-        if harness_id == lo_id:
-            roles.append(ROLE_LOYAL_OPPOSITION)
+            assignments[harness_id] = _current_roles(row)
+            continue
+        roles: list[str] = []
         if harness_id == prime_id:
             roles.append(ROLE_PRIME_BUILDER)
+        elif harness_id == lo_id:
+            roles.append(ROLE_LOYAL_OPPOSITION)
+        else:
+            roles = [r for r in _current_roles(row) if r in {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION}]
         assignments[harness_id] = roles
     return assignments
 

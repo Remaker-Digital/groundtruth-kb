@@ -77,7 +77,9 @@ _PROJECTED_FIELDS = (
 # Fields stored as JSON text in the DB, decoded to native objects here.
 _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 
-_EVENT_DRIVEN_HOOK_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli"})
+_EVENT_DRIVEN_HOOK_CAPABLE_TYPES = frozenset(
+    {"claude", "claude-code", "codex", "codex-cli", "ollama", "openrouter", "antigravity", "goose"}
+)
 
 
 def _now_iso() -> str:

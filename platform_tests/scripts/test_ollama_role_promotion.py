@@ -40,8 +40,8 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
 def _seed_registry(root: Path) -> KnowledgeDB:
     db = KnowledgeDB(db_path=root / "groundtruth.db")
     fixtures: list[tuple[str, str, list[str], str]] = [
-        ("A", "codex", ["loyal-opposition"], "active"),
-        ("B", "claude", [], "active"),
+        ("A", "codex", ["loyal-opposition"], "suspended"),
+        ("B", "claude", [], "suspended"),
         ("C", "antigravity", ["prime-builder"], "active"),
         ("D", "ollama", [], "registered"),
     ]

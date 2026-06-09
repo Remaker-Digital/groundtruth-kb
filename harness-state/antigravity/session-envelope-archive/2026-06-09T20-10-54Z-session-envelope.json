@@ -1,0 +1,60 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-09T20:10:54Z",
+  "envelope_schema_version": 1,
+  "harness_id": "C",
+  "harness_name": "antigravity",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-09T20:10:54Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "C-2026-06-09T20-10-54Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": "M  .claude/rules/canonical-terminology.md\nM  .claude/rules/operating-role.md\nA  .groundtruth/formal-artifact-approvals/2026-06-09-claude-rules-canonical-terminology-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-09-claude-rules-operating-role-md.json\nM  .groundtruth/inventory/dev-environment-inventory.json\nM  .groundtruth/inventory/dev-environment-inventory.md\nM  bridge/INDEX.md\nM  groundtruth-kb/src/groundtruth_kb/harness_ops.py\nM  groundtruth-kb/src/groundtruth_kb/harness_projection.py\nM  groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py\nA  harness-state/antigravity/session-envelope-archive/2026-06-09T05-02-50Z-session-envelope.json\nA  harness-state/antigravity/session-envelope-archive/2026-06-09T05-45-34Z-session-envelope.json\nA  harness-state/antigravity/session-envelope-archive/2026-06-09T13-55-24Z-session-envelope.json\nA  harness-state/antigravity/session-envelope-archive/2026-06-09T13-56-09Z-session-envelope.json\nA  harness-state/antigravity/session-envelope-archive/2026-06-09T19-49-49Z-session-envelope.json\nM  harness-state/harness-registry.json\nM  memory/MEMORY.md\nM  platform_tests/groundtruth_kb/cli/test_harness_cli.py\nM  platform_tests/groundtruth_kb/test_mode_switch_invariants.py\nM  platform_tests/groundtruth_kb/test_mode_switch_transaction.py\nM  platform_tests/scripts/test_cross_harness_bridge_trigger.py\nM  platform_tests/scripts/test_cross_harness_bridge_trigger_diagnose.py\nM  platform_tests/scripts/test_harness_roles.py\nM  platform_tests/scripts/test_ollama_governance_artifacts.py\nM  platform_tests/scripts/test_ollama_role_promotion.py\nM  scripts/cross_harness_bridge_trigger.py\nM  scripts/harness_roles.py\n?? harness-state/antigravity/session-envelope.json"
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

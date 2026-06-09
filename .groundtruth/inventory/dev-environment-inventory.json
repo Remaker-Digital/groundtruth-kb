@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-09T18:24:18Z",
+  "generated_at": "2026-06-09T19:51:50Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -108,8 +108,10 @@
       },
       "F": {
         "harness_type": "openrouter",
-        "role": [],
-        "status": "unknown"
+        "role": [
+          "loyal-opposition"
+        ],
+        "status": "verified"
       }
     }
   },
@@ -699,7 +701,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "25.3"
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -713,7 +715,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -727,7 +729,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {

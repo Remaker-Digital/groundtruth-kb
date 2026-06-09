@@ -620,7 +620,12 @@ def test_ollama_lo_dispatch_caps_selected_batch_to_one(
                 "ollama",
                 ["loyal-opposition"],
                 "active",
-                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+                {
+                    "headless": {
+                        "argv": ["ollama-harness", "{{PROMPT}}"],
+                        "max_items": 1,
+                    }
+                },
             ),
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
@@ -633,7 +638,6 @@ def test_ollama_lo_dispatch_caps_selected_batch_to_one(
     summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     assert trigger.DEFAULT_MAX_ITEMS == 2
-    assert trigger.OLLAMA_LOYAL_OPPOSITION_MAX_ITEMS == 1
     rec = summary["dispatch_state"]["recipients"]["loyal-opposition"]
     assert rec["pending_count"] == 3
     assert rec["selected_count"] == 1
@@ -1586,7 +1590,10 @@ def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evi
     assert "updated_at" in recipients["loyal-opposition"]
 
 
-def test_diagnose_reports_current_role_recipient_keys_and_single_harness_as_inert(tmp_path: Path) -> None:
+def test_diagnose_reports_current_role_recipient_keys_and_single_harness_as_inert(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Diagnose must read current role-label state keys, not legacy prime/codex keys."""
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -1611,6 +1618,16 @@ def test_diagnose_reports_current_role_recipient_keys_and_single_harness_as_iner
     (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
 
     trigger = _load_trigger()
+    monkeypatch.setattr(
+        trigger,
+        "_read_role_assignments",
+        lambda *a, **k: {
+            "harnesses": {
+                "C": {"status": "active", "role": ["prime-builder"]},
+                "D": {"status": "active", "role": ["loyal-opposition"]},
+            }
+        },
+    )
     output = trigger._emit_diagnose_summary(state_dir)
 
     assert "- prime-builder: last_result=single_harness_topology_not_applicable" in output
@@ -1622,7 +1639,10 @@ def test_diagnose_reports_current_role_recipient_keys_and_single_harness_as_iner
     assert "DEGRADED" not in output
 
 
-def test_diagnose_migrates_legacy_recipient_keys_before_liveness(tmp_path: Path) -> None:
+def test_diagnose_migrates_legacy_recipient_keys_before_liveness(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Legacy dispatch-state keys are translated before diagnose renders liveness."""
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -1647,6 +1667,16 @@ def test_diagnose_migrates_legacy_recipient_keys_before_liveness(tmp_path: Path)
     (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
 
     trigger = _load_trigger()
+    monkeypatch.setattr(
+        trigger,
+        "_read_role_assignments",
+        lambda *a, **k: {
+            "harnesses": {
+                "C": {"status": "active", "role": ["prime-builder"]},
+                "D": {"status": "active", "role": ["loyal-opposition"]},
+            }
+        },
+    )
     output = trigger._emit_diagnose_summary(state_dir)
 
     assert "- prime-builder: last_result=no_pending" in output
@@ -2292,8 +2322,13 @@ def test_ollama_loyal_opposition_dispatch_caps_selected_batch_to_one(
                 "ollama",
                 ["loyal-opposition"],
                 "active",
-                {"headless": {"argv": ["ollama-harness", "-p", "{{PROMPT}}"]}},
-                event_driven_hooks=False,
+                {
+                    "headless": {
+                        "argv": ["ollama-harness", "-p", "{{PROMPT}}"],
+                        "max_items": 1,
+                    }
+                },
+                event_driven_hooks=True,
             ),
             _rec("B", "claude", ["prime-builder"], "inactive", _CLAUDE_INVOCATION_SURFACES),
         ],

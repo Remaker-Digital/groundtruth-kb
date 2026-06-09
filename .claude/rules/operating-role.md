@@ -66,10 +66,11 @@ change.
   `ADR-SINGLE-HARNESS-OPERATING-MODE-001` +
   `SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001` +
   `DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`).
-- When a requested role metadata update would leave the active dispatcher
-  partition without exactly one active Prime Builder and exactly one active
-  Loyal Opposition, the command fails closed and no audit or registry write is
-  made.
+- **Active dispatcher partition validation:** When a requested role metadata update
+  would leave the active dispatcher partition without at least one active Prime Builder
+  and at least one active Loyal Opposition, the command fails closed and no audit
+  or registry write is made. Multiple active harnesses may hold the same operating
+  role concurrently.
 - If startup finds no harness recorded as Prime Builder (no role set contains
   `prime-builder`), the starting harness assumes Prime Builder and updates
   the registry (via `gt mode set-role`) with the appropriate role set for the

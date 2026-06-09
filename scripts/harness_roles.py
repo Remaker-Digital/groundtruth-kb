@@ -635,37 +635,7 @@ def apply_ollama_role_promotion(
     _validate_role_switch_preconditions(root, requested_role)
     activation_applied = False
     try:
-        # Suspend any active counterpart harnesses that are not the prime builder
         suspended_any = False
-        for row in db.list_harnesses():
-            if not isinstance(row, dict):
-                continue
-            harness_id = str(row.get("id") or "")
-            if harness_id == OLLAMA_HARNESS_ID:
-                continue
-            status = str(row.get("status") or "")
-            if status != "active":
-                continue
-
-            raw_role = row.get("role")
-            if isinstance(raw_role, str) and raw_role.startswith("["):
-                try:
-                    import json
-
-                    raw_role = json.loads(raw_role)
-                except Exception:
-                    pass
-            role_set = _normalize_role_field(raw_role)
-            if not (ROLE_PRIME_BUILDER in role_set or ROLE_ACTING_PRIME_BUILDER in role_set):
-                harness_ops.transition_harness(
-                    db,
-                    harness_id,
-                    "suspended",
-                    changed_by=changed_by,
-                    change_reason=f"{change_reason} [suspend active counterpart {harness_id}]",
-                )
-                suspended_any = True
-
         if prior_status != "active":
             harness_ops.transition_harness(
                 db,

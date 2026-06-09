@@ -119,7 +119,8 @@ def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refus
     assert diag_file.is_file()
     diag_lines = diag_file.read_text(encoding="utf-8").splitlines()
     assert len(diag_lines) > 0
-    last_diag = json.loads(diag_lines[-1])
-    assert last_diag["recipient"] == "loyal-opposition"
-    assert last_diag["last_result"] == "author_meets_reviewer_refused"
-    assert last_diag["classification"] == "author_meets_reviewer_refused"
+    lo_diags = [json.loads(line) for line in diag_lines if json.loads(line).get("recipient") == "loyal-opposition"]
+    assert len(lo_diags) > 0
+    lo_diag = lo_diags[-1]
+    assert lo_diag["last_result"] == "author_meets_reviewer_refused"
+    assert lo_diag["classification"] == "author_meets_reviewer_refused"

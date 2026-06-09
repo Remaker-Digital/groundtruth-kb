@@ -45,6 +45,8 @@ class RolePartitionSummary:
     prime_builder_id: str
     loyal_opposition_id: str
     active_harness_ids: tuple[str, ...]
+    prime_builder_ids: tuple[str, ...] = ()
+    loyal_opposition_ids: tuple[str, ...] = ()
 
 
 def _role_tokens(role_field: Any) -> set[str]:
@@ -134,27 +136,30 @@ def verify_role_document_partition(role_document: dict[str, Any]) -> RolePartiti
         )
 
     primes = prime_builder_ids(normalized_document)
-    if len(primes) != 1:
+    if len(primes) < 1:
         raise RolePartitionViolation(
-            f"active role map must hold exactly one prime-builder; found {len(primes)}: {primes if primes else '[]'}"
+            f"active role map must hold at least one prime-builder; found {len(primes)}: {primes if primes else '[]'}"
         )
     prime_id = primes[0]
 
     los = loyal_opposition_ids(normalized_document)
-    if len(los) != 1:
+    if len(los) < 1:
         raise RolePartitionViolation(
-            f"active role map must hold exactly one loyal-opposition; found {len(los)}: {los if los else '[]'}"
+            f"active role map must hold at least one loyal-opposition; found {len(los)}: {los if los else '[]'}"
         )
     lo_id = los[0]
-    if len(active_ids) > 1 and lo_id == prime_id:
-        raise RolePartitionViolation(
-            "prime-builder and loyal-opposition must be assigned to different "
-            "active harnesses when more than one active harness exists"
-        )
+    if len(active_ids) > 1:
+        overlapping = set(primes) & set(los)
+        if overlapping:
+            raise RolePartitionViolation(
+                f"harnesses cannot carry both prime-builder and loyal-opposition when more than one active harness exists; overlapping: {sorted(overlapping)}"
+            )
     return RolePartitionSummary(
         prime_builder_id=prime_id,
         loyal_opposition_id=lo_id,
         active_harness_ids=active_ids,
+        prime_builder_ids=tuple(primes),
+        loyal_opposition_ids=tuple(los),
     )
 
 

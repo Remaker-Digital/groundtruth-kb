@@ -1856,3 +1856,5 @@ NO-GO: bridge/gtkb-adr-isolation-application-placement-002.md
 NEW: bridge/gtkb-adr-isolation-application-placement-001.md
 
 <!-- S389 isolation program backstop release-gate approval -->
+<!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
+

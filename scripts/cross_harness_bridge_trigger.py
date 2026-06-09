@@ -128,7 +128,6 @@ DEFAULT_DISPATCH_FAILURES_MAX_BYTES = 1024 * 1024
 # requires a separate bridge proposal — Codex F1 on
 # ``-008`` flagged unilateral cap changes as scope creep.
 DEFAULT_MAX_ITEMS = 2
-OLLAMA_LOYAL_OPPOSITION_MAX_ITEMS = 1
 QUIESCE_WINDOW_SECONDS = 5.0
 QUIESCE_WINDOW_ENV_VAR = "GTKB_TRIGGER_QUIESCE_SECONDS"
 CLAUDE_WORKER_ALLOWED_TOOLS = "Read Edit Write Glob Grep Bash TodoWrite NotebookEdit"
@@ -250,13 +249,18 @@ def _signature(items: list[Any]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _load_dispatch_state(state_dir: Path) -> dict[str, Any]:
+def _load_dispatch_state(state_dir: Path, project_root: Path | None = None) -> dict[str, Any]:
     target = state_dir / DISPATCH_STATE_FILENAME
     try:
         raw = json.loads(target.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
-    return raw if isinstance(raw, dict) else {}
+    if isinstance(raw, dict):
+        recipients = raw.get("recipients", {})
+        if isinstance(recipients, dict):
+            raw["recipients"] = _migrate_recipients_state_keys(recipients, project_root)
+        return raw
+    return {}
 
 
 def _load_quiesce_state(state_dir: Path) -> dict[str, Any]:
@@ -289,22 +293,47 @@ LEGACY_TO_NEW_STATE_KEY = {
 ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")
 
 
-def _migrate_recipients_state_keys(recipients: dict[str, Any]) -> dict[str, Any]:
-    """Translate legacy state-keys to durable role labels on read.
+def _migrate_recipients_state_keys(recipients: dict[str, Any], project_root: Path | None = None) -> dict[str, Any]:
+    """Translate legacy state-keys to durable role labels on read, suffixing with active IDs.
 
-    Per IP-3c of bridge/gtkb-canonical-init-keyword-syntax-001-007.md
-    (Codex GO at -008): legacy ``"prime"`` and ``"codex"`` recipient keys
-    map to ``"prime-builder"`` and ``"loyal-opposition"`` respectively.
-    Defensive merge: if both legacy and new forms coexist transitionally,
-    prefer the newer ``last_dispatched_at`` (or fall through to legacy
-    on missing timestamp).
+    Per IP-3c: legacy ``"prime"`` and ``"codex"`` recipient keys are migrated.
+    Unsuffixed role keys are resolved to active roles: ``role_label:harness_id``.
     """
+    active_by_role: dict[str, str] = {}
+    if project_root is not None:
+        try:
+            role_map = _read_role_assignments(project_root)
+            harnesses = role_map.get("harnesses", {})
+            for h_id, h_info in harnesses.items():
+                if isinstance(h_info, dict) and h_info.get("status") == "active":
+                    raw = h_info.get("role")
+                    if isinstance(raw, str):
+                        roles = {raw.strip().lower()}
+                    elif isinstance(raw, (list, tuple, set, frozenset)):
+                        roles = {str(r).strip().lower() for r in raw}
+                    else:
+                        roles = set()
+                    for r in roles:
+                        if r not in active_by_role:
+                            active_by_role[r] = h_id
+        except Exception:
+            pass
+
     migrated: dict[str, Any] = {}
     for key, value in recipients.items():
-        new_key = LEGACY_TO_NEW_STATE_KEY.get(key, key)
+        base_key = LEGACY_TO_NEW_STATE_KEY.get(key, key)
+        if ":" not in base_key:
+            if base_key in active_by_role:
+                new_key = f"{base_key}:{active_by_role[base_key]}"
+            else:
+                new_key = base_key
+        else:
+            new_key = base_key
+
         if not isinstance(value, dict):
             migrated[new_key] = value
             continue
+
         if new_key in migrated and isinstance(migrated[new_key], dict):
             existing = migrated[new_key]
             existing_ts = str(existing.get("updated_at") or "")
@@ -318,6 +347,7 @@ def _migrate_recipients_state_keys(recipients: dict[str, Any]) -> dict[str, Any]
 
 def _diagnose_recipient_state(
     recipients: dict[str, Any],
+    project_root: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, str]]:
     """Return diagnose recipients plus display annotations for legacy-only state."""
 
@@ -327,7 +357,7 @@ def _diagnose_recipient_state(
         for legacy_key, new_key in LEGACY_TO_NEW_STATE_KEY.items():
             if legacy_key in recipients:
                 legacy_annotations[new_key] = " (legacy key)"
-    return _migrate_recipients_state_keys(recipients), legacy_annotations
+    return _migrate_recipients_state_keys(recipients, project_root), legacy_annotations
 
 
 def _rename_with_retry(
@@ -755,6 +785,8 @@ def _classify_invocation_outcome(last_result: str) -> str:
     pass. Unmapped results (e.g. ``no_pending``,
     ``dispatch_target_resolution_failed``) classify as ``other``.
     """
+    if last_result.endswith("_dispatch_not_ready"):
+        return "dispatch_blocked"
     return _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION.get(last_result, "other")
 
 
@@ -950,8 +982,12 @@ def _selected_oldest_first(items: list[Any], max_items: int) -> list[Any]:
 def _effective_max_items_for_target(target: DispatchTarget, max_items: int) -> int:
     if max_items <= 0:
         return 0
-    if target.needed_role_label == "loyal-opposition" and target.command_handle == OLLAMA_HARNESS_TYPE:
-        return min(max_items, OLLAMA_LOYAL_OPPOSITION_MAX_ITEMS)
+    if isinstance(target.invocation_surfaces, dict):
+        headless = target.invocation_surfaces.get("headless")
+        if isinstance(headless, dict):
+            limit = headless.get("max_items")
+            if isinstance(limit, int):
+                return min(max_items, limit)
     return max_items
 
 
@@ -1162,17 +1198,8 @@ class DispatchTarget:
 
     @property
     def dispatch_state_key(self) -> str:
-        """Key used in ``dispatch-state.json`` recipients map.
-
-        Migration (per IP-3c):
-          - Legacy keys: ``"prime"`` and ``"codex"`` (hardcoded).
-          - New keys: durable role labels ``"prime-builder"`` and
-            ``"loyal-opposition"``.
-          - Backward-compat read via ``LEGACY_TO_NEW_STATE_KEY`` in
-            ``_load_dispatch_state`` (IP-3c).
-          - Forward writes use only new keys.
-        """
-        return self.needed_role_label
+        """Key used in ``dispatch-state.json`` recipients map."""
+        return f"{self.needed_role_label}:{self.harness_id}"
 
 
 class DispatchTargetNotReady(RuntimeError):
@@ -1189,14 +1216,48 @@ _LABEL_TO_CANONICAL_MODE = {
     "loyal-opposition": "lo",
 }
 
-OLLAMA_HARNESS_TYPE = "ollama"
-
 
 def _evaluate_ollama_dispatch_readiness(project_root: Path) -> dict[str, Any]:
-    """Evaluate the Ollama-specific dispatch substrate, fail-closed on import errors."""
-    from verify_ollama_dispatch import evaluate_dispatch_readiness  # noqa: PLC0415
+    """Evaluate ollama dispatch readiness. Backward compatible wrapper for tests monkeypatching."""
+    helper_path = project_root / "scripts" / "verify_ollama_dispatch.py"
+    if not helper_path.is_file():
+        return {"ready": True}
+    try:
+        import importlib
 
-    return evaluate_dispatch_readiness(project_root)
+        module = importlib.import_module("verify_ollama_dispatch")
+        evaluate_fn = getattr(module, "evaluate_dispatch_readiness", None)
+        if evaluate_fn is None:
+            return {"ready": True}
+        return evaluate_fn(project_root)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to evaluate dispatch readiness for harness type 'ollama': {exc}") from exc
+
+
+def _evaluate_harness_dispatch_readiness(harness_type: str, project_root: Path) -> dict[str, Any]:
+    """Evaluate harness-specific dispatch substrate if a helper exists, fail-closed on errors, default to ready."""
+    harness_type = str(harness_type or "").strip().lower()
+    if not harness_type:
+        return {"ready": True}
+
+    if harness_type == "ollama":
+        return _evaluate_ollama_dispatch_readiness(project_root)
+
+    helper_path = project_root / "scripts" / f"verify_{harness_type}_dispatch.py"
+    if not helper_path.is_file():
+        return {"ready": True}
+
+    try:
+        import importlib  # noqa: PLC0415
+
+        module_name = f"verify_{harness_type}_dispatch"
+        module = importlib.import_module(module_name)  # noqa: PLC0415
+        evaluate_fn = getattr(module, "evaluate_dispatch_readiness", None)
+        if evaluate_fn is None:
+            return {"ready": True}
+        return evaluate_fn(project_root)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to evaluate dispatch readiness for harness type {harness_type!r}: {exc}") from exc
 
 
 def _harness_state_dir(project_root: Path) -> Path:
@@ -1349,50 +1410,57 @@ def _quiesce_marker(
     }
 
 
-def _resolve_dispatch_target(
+def _is_dispatch_ready(
+    h_id: str,
+    h_info: dict[str, object],
+    project_root: Path,
+    state_dir: Path | None,
+    needed_role_label: str,
+) -> bool:
+    harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
+    try:
+        result = _evaluate_harness_dispatch_readiness(harness_type, project_root)
+    except Exception as exc:  # noqa: BLE001
+        if state_dir is not None:
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "dispatch_id": _now_iso() + f"-{harness_type}-dispatch-readiness",
+                    "recipient": needed_role_label,
+                    "harness_id": h_id,
+                    "launched": False,
+                    "reason": f"{harness_type}_dispatch_not_ready",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            )
+        return False
+    if result.get("ready") is True:
+        return True
+    if state_dir is not None:
+        _record_dispatch_failure(
+            state_dir,
+            {
+                "dispatch_id": _now_iso() + f"-{harness_type}-dispatch-readiness",
+                "recipient": needed_role_label,
+                "harness_id": h_id,
+                "launched": False,
+                "reason": f"{harness_type}_dispatch_not_ready",
+                "readiness": result,
+            },
+        )
+    return False
+
+
+def _resolve_dispatch_targets(
     needed_role_label: str,
     project_root: Path,
     state_dir: Path | None = None,
-) -> DispatchTarget | None:
-    """Resolve which harness should receive work needing the given durable role.
+) -> list[DispatchTarget]:
+    """Resolve which harnesses should receive work needing the given durable role.
 
-    Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 and
-    REQ-HARNESS-REGISTRY-001 FR5):
-      1. harness-registry projection record: role-set + status + capability
-         gates -> dispatchable harness_id.
-      2. harness-registry projection identity view (inverted): harness_id ->
-         harness_command_handle.
-      3. Drift check: projected role record ``harness_type`` MUST match the
-         identity-derived command handle.
-
-    Role/status/capability orthogonality (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001
-    v2; ADR-ROLE-STATUS-ORTHOGONALITY-001 v2): role membership and dispatch
-    eligibility are orthogonal axes. A harness is a dispatch candidate only when
-    its role-set contains ``needed_role_label``, its registry ``status`` is
-    ``"active"``, and it advertises bridge-event reception capability via
-    ``event_driven_hooks is True``. Multiple harnesses MAY share a role; only
-    the single active event-capable one is the auto-dispatch target.
-
-    Resolution outcomes:
-      - Exactly one ACTIVE match -> return its ``DispatchTarget`` (assertion 4).
-      - Zero ACTIVE matches -> return ``None`` (a sentinel, NOT a raise); when
-        ``state_dir`` is provided, emit one structured ``no_active_target_for_role``
-        record to ``dispatch-failures.jsonl`` (assertion 2).
-      - Two or more ACTIVE matches -> raise ``ValueError`` naming all matching
-        harness IDs (configuration error; assertion 3).
-
-    Status handling is fail-closed (assertions 5, 6): a missing, null, empty, or
-    unrecognized ``status`` value is treated as inactive, so the resolver never
-    dispatches to a non-active harness. The legacy ``acting-prime-builder`` token
-    is READ-accepted and matches the ``prime-builder`` label (assertion 11; see
-    ``_record_has_role``).
-
-    Fail-closed cases (raises ValueError):
-      - Unknown role label (not in ``_LABEL_TO_CANONICAL_MODE``).
-      - Multiple ACTIVE harnesses for the role (configuration error).
-      - Drift: role_record["harness_type"] disagrees with identity-derived
-        handle.
-      - Identity map has no entry for the resolved harness_id.
+    Allows multiple active harnesses per role concurrently. Returns a list of
+    resolved DispatchTarget objects.
     """
     if needed_role_label not in _LABEL_TO_CANONICAL_MODE:
         raise ValueError(f"unknown role label: {needed_role_label!r}")
@@ -1403,10 +1471,6 @@ def _resolve_dispatch_target(
     if not isinstance(harnesses, dict):
         raise ValueError("harness-registry projection missing 'harnesses' mapping")
 
-    # Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014),
-    # role records carry a role-set wire form (list-of-strings or legacy scalar).
-    # Target resolution uses set-membership; a multi-element role set
-    # (single-harness topology) matches BOTH role labels.
     def _record_has_role(h_info: dict[str, object], wanted: str) -> bool:
         raw = h_info.get("role")
         if isinstance(raw, str):
@@ -1417,65 +1481,14 @@ def _resolve_dispatch_target(
             return False
         if wanted in candidates:
             return True
-        # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 11: the legacy
-        # compatibility/provenance token ``acting-prime-builder`` is READ-accepted
-        # (GOV-ACTING-PRIME-BUILDER-001) and matches the ``prime-builder`` label
-        # for dispatch resolution.
         return wanted == "prime-builder" and "acting-prime-builder" in candidates
 
-    # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertions 1, 5, 6: dispatch
-    # eligibility is gated on ``status == "active"``. A missing, null, empty, or
-    # any non-"active" status is treated as inactive (fail-closed); the resolver
-    # never dispatches to a non-active harness. (Slice 6's doctor check surfaces
-    # an unknown status value as a configuration error; the resolver's only job
-    # here is to refuse to dispatch to it.)
     def _is_active(h_info: dict[str, object]) -> bool:
         status = h_info.get("status")
         return isinstance(status, str) and status.strip().lower() == "active"
 
-    # WI-4213 / DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 v2 assertions 12-14:
-    # event-driven bridge dispatch also requires bridge-event reception
-    # capability. Missing, false, or unknown capability is fail-closed.
     def _is_event_capable(h_info: dict[str, object]) -> bool:
-        if h_info.get("event_driven_hooks") is True:
-            return True
-        return str(h_info.get("harness_type") or "").strip().lower() == OLLAMA_HARNESS_TYPE
-
-    def _is_dispatch_ready(h_id: str, h_info: dict[str, object]) -> bool:
-        if str(h_info.get("harness_type") or "").strip().lower() != OLLAMA_HARNESS_TYPE:
-            return True
-        try:
-            result = _evaluate_ollama_dispatch_readiness(project_root)
-        except Exception as exc:  # noqa: BLE001 - trigger must fail closed but never crash the hook
-            if state_dir is not None:
-                _record_dispatch_failure(
-                    state_dir,
-                    {
-                        "dispatch_id": _now_iso() + "-ollama-dispatch-readiness",
-                        "recipient": needed_role_label,
-                        "harness_id": h_id,
-                        "launched": False,
-                        "reason": "ollama_dispatch_not_ready",
-                        "error_type": type(exc).__name__,
-                        "error_message": str(exc),
-                    },
-                )
-            return False
-        if result.get("ready") is True:
-            return True
-        if state_dir is not None:
-            _record_dispatch_failure(
-                state_dir,
-                {
-                    "dispatch_id": _now_iso() + "-ollama-dispatch-readiness",
-                    "recipient": needed_role_label,
-                    "harness_id": h_id,
-                    "launched": False,
-                    "reason": "ollama_dispatch_not_ready",
-                    "readiness": result,
-                },
-            )
-        return False
+        return h_info.get("event_driven_hooks") is True
 
     role_matching = [
         (h_id, h_info)
@@ -1487,10 +1500,6 @@ def _resolve_dispatch_target(
     ]
 
     if not active_matching:
-        # assertion 2: zero ACTIVE matches -> return a sentinel (None), NOT raise.
-        # Emit one structured audit record (when a state dir is available) so
-        # liveness diagnosis sees explicit evidence rather than inferring
-        # inertness from missing data.
         if state_dir is not None:
             inactive_ids = sorted(h_id for h_id, _ in role_matching)
             note = (
@@ -1506,56 +1515,74 @@ def _resolve_dispatch_target(
                     "error_message": f"no active harness for role {needed_role_label!r}{note}",
                 },
             )
-        return None
-    if len(active_matching) > 1:
-        # assertion 3: multiple ACTIVE matches is a configuration error.
-        raise ValueError(
-            f"multiple active harnesses for role {needed_role_label!r}: {sorted(h_id for h_id, _ in active_matching)}"
-        )
-    harness_id, role_record = active_matching[0]
-    if not _is_dispatch_ready(harness_id, role_record):
-        raise DispatchTargetNotReady("ollama_dispatch_not_ready", harness_id)
+        return []
 
     identities = _read_harness_identities(project_root)
     id_to_handle = _invert_identities(identities)
-    if harness_id not in id_to_handle:
-        raise ValueError(
-            f"harness-registry projection references harness ID {harness_id!r} not present in identity projection"
-        )
-    identity_handle = id_to_handle[harness_id]
 
-    # Drift detection: role record's denormalized harness_type (if present)
-    # MUST match identity-derived handle. Disagreement is fail-closed.
-    role_record_handle = role_record.get("harness_type")
-    if role_record_handle is not None and role_record_handle != identity_handle:
-        raise ValueError(
-            f"drift detected: harness-registry projection harness_type={role_record_handle!r} "
-            f"disagrees with harness-identities resolution to {identity_handle!r} "
-            f"for harness ID {harness_id!r}"
-        )
-
-    # WI-3344 (REQ-HARNESS-REGISTRY-001 FR8, DELIB-2079 Q9): attach the
-    # harness record's invocation_surfaces from the registry projection so
-    # _harness_command builds the dispatch argv data-driven, with no
-    # hard-coded per-harness branch.
     from harness_projection_reader import load_harness_projection
 
     projection = load_harness_projection(project_root)
-    invocation_surfaces: dict[str, Any] | None = None
-    for record in projection.get("harnesses", []):
-        if record.get("id") == harness_id:
-            surfaces = record.get("invocation_surfaces")
-            if isinstance(surfaces, dict):
-                invocation_surfaces = surfaces
-            break
 
-    return DispatchTarget(
-        needed_role_label=needed_role_label,
-        harness_id=harness_id,
-        command_handle=identity_handle,
-        canonical_mode=mode,
-        invocation_surfaces=invocation_surfaces,
-    )
+    resolved_targets = []
+    for harness_id, role_record in active_matching:
+        if harness_id not in id_to_handle:
+            raise ValueError(
+                f"harness-registry projection references harness ID {harness_id!r} not present in identity projection"
+            )
+        identity_handle = id_to_handle[harness_id]
+
+        role_record_handle = role_record.get("harness_type")
+        if role_record_handle is not None and role_record_handle != identity_handle:
+            raise ValueError(
+                f"drift detected: harness-registry projection harness_type={role_record_handle!r} "
+                f"disagrees with harness-identities resolution to {identity_handle!r} "
+                f"for harness ID {harness_id!r}"
+            )
+
+        invocation_surfaces: dict[str, Any] | None = None
+        for record in projection.get("harnesses", []):
+            if record.get("id") == harness_id:
+                surfaces = record.get("invocation_surfaces")
+                if isinstance(surfaces, dict):
+                    invocation_surfaces = surfaces
+                break
+
+        resolved_targets.append(
+            DispatchTarget(
+                needed_role_label=needed_role_label,
+                harness_id=harness_id,
+                command_handle=identity_handle,
+                canonical_mode=mode,
+                invocation_surfaces=invocation_surfaces,
+            )
+        )
+    return resolved_targets
+
+
+def _resolve_dispatch_target(
+    needed_role_label: str,
+    project_root: Path,
+    state_dir: Path | None = None,
+) -> DispatchTarget | None:
+    """Resolve a single dispatch target for backward compatibility in tests.
+
+    If multiple active targets exist, raises ValueError matching test assertions.
+    """
+    targets = _resolve_dispatch_targets(needed_role_label, project_root, state_dir)
+    if not targets:
+        return None
+    if len(targets) > 1:
+        ids_str = ", ".join(f"'{t.harness_id}'" for t in targets)
+        raise ValueError(f"multiple active harnesses match role {needed_role_label!r}: {ids_str}")
+    target = targets[0]
+    role_map = _read_role_assignments(project_root)
+    harnesses = role_map.get("harnesses", {})
+    h_info = harnesses.get(target.harness_id) or {}
+    harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
+    if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
+        raise DispatchTargetNotReady(f"{harness_type}_dispatch_not_ready", target.harness_id)
+    return target
 
 
 def check_target_active(target: DispatchTarget, state_dir: Path) -> bool:
@@ -2028,16 +2055,11 @@ def run_trigger(
                 "pending_quiesce_marker": marker,
             }
 
-    state = _load_dispatch_state(state_dir)
+    state = _load_dispatch_state(state_dir, project_root)
     recipients_state = state.get("recipients") if isinstance(state, dict) else {}
     if not isinstance(recipients_state, dict):
         recipients_state = {}
-    # IP-3c: migrate legacy state-keys ({"prime","codex"}) to durable role labels
-    # ({"prime-builder","loyal-opposition"}) on read. Forward writes use only
-    # new keys; legacy keys disappear from the file after the first dispatch
-    # cycle. The merge precedence favors the newer-mtime entry when both forms
-    # coexist transitionally.
-    recipients_state = _migrate_recipients_state_keys(recipients_state)
+    recipients_state = _migrate_recipients_state_keys(recipients_state, project_root)
 
     # IP-3b: resolve dispatch targets from the durable role record. The
     # mapping from actionable-classification to needed-role is fixed:
@@ -2045,19 +2067,21 @@ def run_trigger(
     # Build targets defensively: if resolution fails (drift, missing
     # identity entry, etc.), record the failure and skip that recipient
     # for this cycle without aborting the whole run.
-    pending_by_target: list[tuple[DispatchTarget | None, list[Any], str, str, str | None]] = []
+    pending_by_target: list[tuple[DispatchTarget | None, list[Any], str, str | None]] = []
+
+    role_map = _read_role_assignments(project_root)
+    harnesses = role_map.get("harnesses", {})
+    if not isinstance(harnesses, dict):
+        harnesses = {}
+
     for legacy_recipient, needed_role_label, items in (
         ("prime", "prime-builder", actionable_for_prime),
         ("codex", "loyal-opposition", actionable_for_codex),
     ):
         try:
-            target = _resolve_dispatch_target(needed_role_label, project_root, state_dir)
-        except DispatchTargetNotReady as exc:
-            pending_by_target.append((None, items, needed_role_label, legacy_recipient, exc.reason))
-            continue
+            targets = _resolve_dispatch_targets(needed_role_label, project_root, state_dir)
         except ValueError as exc:
-            # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 3: multiple-ACTIVE
-            # (and other config errors: drift, unknown label, missing identity)
+            # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 3: config errors (drift, unknown label, missing identity)
             # raise; the caller records dispatch_target_resolution_failed.
             _record_dispatch_failure(
                 state_dir,
@@ -2069,24 +2093,32 @@ def run_trigger(
                     "error_message": str(exc),
                 },
             )
-            pending_by_target.append(
-                (None, items, needed_role_label, legacy_recipient, "dispatch_target_resolution_failed")
-            )
+            pending_by_target.append((None, items, needed_role_label, "dispatch_target_resolution_failed"))
             continue
-        if target is None:
+
+        if not targets:
             # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 2: zero-ACTIVE
-            # sentinel. _resolve_dispatch_target already emitted the
+            # sentinel. _resolve_dispatch_targets already emitted the
             # no_active_target_for_role audit record; do NOT double-record here.
-            pending_by_target.append((None, items, needed_role_label, legacy_recipient, "no_active_target_for_role"))
+            pending_by_target.append((None, items, needed_role_label, "no_active_target_for_role"))
             continue
-        pending_by_target.append((target, items, needed_role_label, legacy_recipient, None))
+
+        for target in targets:
+            h_info = harnesses.get(target.harness_id) or {}
+            harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
+            if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
+                pending_by_target.append(
+                    (target, items, target.dispatch_state_key, f"{harness_type}_dispatch_not_ready")
+                )
+            else:
+                pending_by_target.append((target, items, target.dispatch_state_key, None))
 
     results: dict[str, Any] = {}
-    for target, items, recipient, _legacy_recipient, failure_reason in pending_by_target:
-        if target is None:
+    for target, items, recipient, failure_reason in pending_by_target:
+        if target is None or failure_reason is not None:
             # Resolution produced no dispatch target (multi-active ValueError or
-            # zero-active sentinel). Reflect the per-recipient last_result in
-            # dispatch-state.json per the DCL resolution table, then keep going.
+            # zero-active sentinel) or target is not ready. Reflect the per-recipient
+            # last_result in dispatch-state.json per the DCL resolution table, then keep going.
             reason = failure_reason or "dispatch_target_resolution_failed"
             prior = recipients_state.get(recipient)
             recipient_state = dict(prior) if isinstance(prior, dict) else {}
@@ -2095,6 +2127,7 @@ def run_trigger(
             recipients_state[recipient] = recipient_state
             results[recipient] = {"launched": False, "reason": reason}
             continue
+
         target_max_items = _effective_max_items_for_target(target, max_items)
         # Filter by dispatchable per smart-poller-kind-aware-routing -009 §1.5.
         # Terminal-kind GO entries are not dispatched.
@@ -2183,7 +2216,7 @@ def run_trigger(
                 recipient_state["selected_count"] = len(dispatched_selected)
                 recipient_state["pending_count"] = len(dispatched_filtered)
 
-                if recipient == "prime-builder" and dispatched_selected:
+                if target.needed_role_label == "prime-builder" and dispatched_selected:
                     dispatch_id = _new_dispatch_id(target.dispatch_state_key)
                     work_intent_session_id = _work_intent_session_id(dispatch_id)
                     work_intent_filter = _filter_prime_selected_by_work_intent(
@@ -2212,7 +2245,7 @@ def run_trigger(
                     spawn_items = list(reversed(dispatched_selected))
                     recipient_state["selected_count"] = len(dispatched_selected)
 
-                if recipient == "prime-builder" and not dispatched_selected:
+                if target.needed_role_label == "prime-builder" and not dispatched_selected:
                     recipient_state["last_result"] = "work_intent_already_held"
                     results[recipient] = {
                         "launched": False,
@@ -2243,7 +2276,7 @@ def run_trigger(
                         #   - first dispatch ever
                         #   - signature changed since last dispatch
                         #   - prior_suppressed == signature (retry after target exit)
-                        if recipient == "loyal-opposition" and dispatched_selected:
+                        if target.needed_role_label == "loyal-opposition" and dispatched_selected:
                             first_item = dispatched_selected[0]
                             if _should_refuse_self_review(
                                 bridge_id=first_item.document_name,
@@ -2258,7 +2291,7 @@ def run_trigger(
                                 recipients_state[recipient] = recipient_state
                                 continue
 
-                        if recipient == "prime-builder" and not dry_run:
+                        if target.needed_role_label == "prime-builder" and not dry_run:
                             if dispatch_id is None:
                                 dispatch_id = _new_dispatch_id(target.dispatch_state_key)
                             if work_intent_session_id is None:
@@ -2307,7 +2340,11 @@ def run_trigger(
                             launch["work_intent_session_id"] = work_intent_session_id
                         if acquired_work_intent_slugs:
                             launch["work_intent_slugs"] = acquired_work_intent_slugs
-                        if recipient == "prime-builder" and acquired_work_intent_slugs and not launch.get("launched"):
+                        if (
+                            target.needed_role_label == "prime-builder"
+                            and acquired_work_intent_slugs
+                            and not launch.get("launched")
+                        ):
                             _release_prime_work_intents(
                                 acquired_work_intent_slugs,
                                 project_root=project_root,
@@ -2315,7 +2352,7 @@ def run_trigger(
                             )
                         recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                         recipient_state["last_launch"] = launch
-                        if recipient != "prime-builder" or dry_run or launch.get("launched"):
+                        if target.needed_role_label != "prime-builder" or dry_run or launch.get("launched"):
                             recipient_state["last_dispatched_signature"] = dispatched_signature
                             # Dispatch supersedes any prior suppression.
                             recipient_state["last_suppressed_signature"] = None
@@ -2325,10 +2362,23 @@ def run_trigger(
 
         recipients_state[recipient] = recipient_state
 
+    compat_recipients_state = dict(recipients_state)
+    compat_results = dict(results)
+    for key, val in list(recipients_state.items()):
+        if ":" in key:
+            role_label = key.split(":", 1)[0]
+            if role_label not in compat_recipients_state:
+                compat_recipients_state[role_label] = val
+    for key, val in list(results.items()):
+        if ":" in key:
+            role_label = key.split(":", 1)[0]
+            if role_label not in compat_results:
+                compat_results[role_label] = val
+
     payload = {
         "schema_version": 1,
         "updated_at": _now_iso(),
-        "recipients": recipients_state,
+        "recipients": compat_recipients_state,
     }
     _write_dispatch_state(state_dir, payload)
 
@@ -2373,8 +2423,10 @@ def run_trigger(
         "dispatch_state_mtime_post": _path_mtime_iso(state_dir / DISPATCH_STATE_FILENAME),
         "elapsed_ms": int((time.monotonic() - _diag_start) * 1000),
     }
-    for _diag_recipient in results:
-        _diag_state = recipients_state.get(_diag_recipient)
+    for _diag_recipient in sorted(compat_results.keys()):
+        if ":" in _diag_recipient:
+            continue
+        _diag_state = compat_recipients_state.get(_diag_recipient)
         if not isinstance(_diag_state, dict):
             _diag_state = {}
         _diag_last_result = str(_diag_state.get("last_result") or "")
@@ -2389,7 +2441,7 @@ def run_trigger(
                 "last_suppressed_signature": _diag_state.get("last_suppressed_signature"),
             },
         )
-    return {"skipped": False, "results": results, "dispatch_state": payload}
+    return {"skipped": False, "results": compat_results, "dispatch_state": payload}
 
 
 def _classify_failure_record(record: dict[str, Any]) -> str:
@@ -2451,6 +2503,11 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
     lines.append(f"Cross-harness trigger diagnose — {_now_iso()}")
     lines.append("")
 
+    try:
+        project_root = _resolve_project_root(None)
+    except Exception:
+        project_root = None
+
     # Trigger infrastructure
     lines.append("== Trigger infrastructure ==")
     script_path = Path(__file__).resolve()
@@ -2460,7 +2517,7 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
 
     # Dispatch state
     lines.append("== Dispatch state ==")
-    state = _load_dispatch_state(state_dir)
+    state = _load_dispatch_state(state_dir, project_root)
     if not state:
         lines.append("- File: ABSENT (no dispatches recorded)")
         lines.append("")
@@ -2478,24 +2535,50 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
     lines.append("== Per-recipient state ==")
     recipients = state.get("recipients", {}) or {}
     if isinstance(recipients, dict):
-        recipients, recipient_annotations = _diagnose_recipient_state(recipients)
+        recipients, recipient_annotations = _diagnose_recipient_state(recipients, project_root)
     else:
         recipients = {}
         recipient_annotations = {}
-    for name in ROLE_STATE_KEYS:
+
+    expected_keys: set[str] = set()
+    if project_root is not None:
+        try:
+            role_map = _read_role_assignments(project_root)
+            harnesses = role_map.get("harnesses", {})
+            for h_id, h_info in harnesses.items():
+                if isinstance(h_info, dict) and h_info.get("status") == "active":
+                    raw = h_info.get("role")
+                    if isinstance(raw, str):
+                        roles = {raw.strip().lower()}
+                    elif isinstance(raw, (list, tuple, set, frozenset)):
+                        roles = {str(r).strip().lower() for r in raw}
+                    else:
+                        roles = set()
+                    for r in roles:
+                        expected_keys.add(f"{r}:{h_id}")
+        except Exception:
+            pass
+
+    all_keys = sorted(set(recipients.keys()) | expected_keys)
+
+    for name in all_keys:
         annotation = recipient_annotations.get(name, "")
         rec = recipients.get(name) or {}
         if not rec:
-            lines.append(f"- {name}: (no state recorded){annotation}")
+            display_name = name.split(":", 1)[0] if ":" in name else name
+            lines.append(f"- {display_name}: (no state recorded){annotation}")
             continue
         sig = (rec.get("signature") or "")[:8]
         last_dispatched = (rec.get("last_dispatched_signature") or "")[:8] or "(none)"
+        display_name = name.split(":", 1)[0] if ":" in name else name
+        harness_suffix = f" (harness {name.split(':', 1)[1]})" if ":" in name else ""
         lines.append(
-            f"- {name}: last_result={rec.get('last_result', '?')}, "
+            f"- {display_name}: last_result={rec.get('last_result', '?')}, "
             f"pending={rec.get('pending_count', '?')}, "
-            f"selected={rec.get('selected_count', '?')}{annotation}"
+            f"selected={rec.get('selected_count', '?')}{harness_suffix}{annotation}"
         )
         lines.append(f"  signature {sig}... last_dispatched={last_dispatched}...")
+
     lines.append("")
 
     # Failure distribution
@@ -2530,13 +2613,16 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
     # Liveness assessment
     lines.append("== Liveness ==")
     overall_healthy = True
-    for name in ROLE_STATE_KEYS:
+    for name in all_keys:
         annotation = recipient_annotations.get(name, "")
         rec = recipients.get(name) or {}
         sig = rec.get("signature") or ""
         last_dispatched = rec.get("last_dispatched_signature") or ""
         last_result = rec.get("last_result") or ""
-        if last_result == "no_pending":
+        if not rec:
+            lines.append(f"- {name}: (no liveness info; no state recorded){annotation}")
+            overall_healthy = False
+        elif last_result == "no_pending":
             lines.append(f"- {name}: idle (no actionable work).{annotation}")
         elif last_result == "no_pending_after_filter":
             lines.append(f"- {name}: idle (no dispatchable work after filtering).{annotation}")

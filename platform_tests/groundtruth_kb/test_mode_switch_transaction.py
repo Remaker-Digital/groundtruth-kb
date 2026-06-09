@@ -202,7 +202,7 @@ def test_apply_role_switch_rejects_invalid_active_candidate_without_reassignment
             "B": ("claude", ["loyal-opposition"]),
         },
     )
-    with pytest.raises(TransactionValidationError, match="exactly one prime-builder"):
+    with pytest.raises(TransactionValidationError, match="at least one loyal-opposition"):
         apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
     updated = _read_role_map(project_root)
     assert updated["A"] == ["prime-builder"]
@@ -225,10 +225,10 @@ def test_audit_record_contains_required_fields(project_root: Path) -> None:
     assert record["deferred"] is False
 
 
-def test_apply_role_switch_rejects_three_active_candidate_without_suspending_non_targets(
+def test_apply_role_switch_allows_multiple_prime_builders(
     project_root: Path,
 ) -> None:
-    """Invalid candidates do not suspend unrelated active harnesses."""
+    """Active candidates can have multiple prime-builders and loyal-oppositions."""
     _seed_workspace(
         project_root,
         harnesses={
@@ -237,13 +237,11 @@ def test_apply_role_switch_rejects_three_active_candidate_without_suspending_non
             "C": ("antigravity", ["loyal-opposition"]),
         },
     )
-    with pytest.raises(TransactionValidationError, match="exactly one prime-builder"):
-        apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
+    apply_role_switch(project_root, "B", "prime-builder", change_reason="t")
     updated = _read_role_map(project_root)
     assert updated["A"] == ["prime-builder"]
-    assert updated["B"] == ["loyal-opposition"]
+    assert updated["B"] == ["prime-builder"]
     assert updated["C"] == ["loyal-opposition"]
-    assert _audit_records(project_root) == []
 
 
 def test_apply_role_switch_preserves_non_active_retained_roles(project_root: Path) -> None:
