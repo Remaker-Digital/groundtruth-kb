@@ -275,7 +275,7 @@ def _check_tool_loop_round_trip(
                         {
                             "function": {
                                 "name": "Read",
-                                "arguments": {"file_path": str(project_root / ".ollama" / "routing.toml")},
+                                "arguments": {"file_path": str(project_root / ".api-harness" / "routing.toml")},
                             },
                             "id": "call_read_1",
                         }
@@ -292,7 +292,7 @@ def _check_tool_loop_round_trip(
 
     try:
         result = run_tool_loop(
-            prompt="Read the file .ollama/routing.toml and return its content verbatim.",
+            prompt="Read the file .api-harness/routing.toml and return its content verbatim.",
             model_route=model_route,
             endpoint=endpoint,
             max_turns=3,

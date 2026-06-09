@@ -70,6 +70,9 @@ from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     issue_dispatch_authorization_packets,
 )
+from bridge_lease_registry import is_lease_held
+from gtkb_session_id import SESSION_ID_ENV_VARS
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -380,45 +383,100 @@ def _issue_dispatch_authorization_for_selected(
     return {"ok": True, "reason": None, "context": context}
 
 
+def _resolve_dispatcher_targets(
+    needed_role_label: str,
+    project_root: Path,
+) -> list[Any]:
+    """Resolve active harnesses for the given role to be dispatched by the poller.
+
+    Orthogonal to event-driven hooks capability. Spawns workers for ALL active
+    harnesses registered for the role.
+    """
+    trigger = _load_trigger_module()
+    role_map = trigger._read_role_assignments(project_root)
+    harnesses = role_map.get("harnesses", {})
+    if not isinstance(harnesses, dict):
+        raise ValueError("harness-registry projection missing 'harnesses' mapping")
+
+    def _record_has_role(h_info: dict[str, object], wanted: str) -> bool:
+        raw = h_info.get("role")
+        if isinstance(raw, str):
+            candidates = {raw.strip().lower()}
+        elif isinstance(raw, (list, tuple, set, frozenset)):
+            candidates = {str(r).strip().lower() for r in raw}
+        else:
+            return False
+        if wanted in candidates:
+            return True
+        return wanted == "prime-builder" and "acting-prime-builder" in candidates
+
+    def _is_active(h_info: dict[str, object]) -> bool:
+        status = h_info.get("status")
+        return isinstance(status, str) and status.strip().lower() == "active"
+
+    role_matching = [
+        (h_id, h_info)
+        for h_id, h_info in harnesses.items()
+        if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
+    ]
+    active_matching = [
+        (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info)
+    ]
+
+    targets = []
+    identities = trigger._read_harness_identities(project_root)
+    id_to_handle = trigger._invert_identities(identities)
+
+    for h_id, role_record in active_matching:
+        identity_handle = id_to_handle.get(h_id)
+        if not identity_handle:
+            raise ValueError(f"harness ID {h_id!r} has no entry in harness-identities")
+        role_type = str(role_record.get("harness_type") or "").strip().lower()
+        if role_type != identity_handle:
+            raise ValueError(
+                f"harness {h_id!r} type drift: role registry says {role_type!r} but "
+                f"harness-identities says {identity_handle!r}"
+            )
+        targets.append(
+            trigger.DispatchTarget(
+                needed_role_label=needed_role_label,
+                harness_id=h_id,
+                command_handle=identity_handle,
+                canonical_mode=_LABEL_TO_CANONICAL_MODE[needed_role_label],
+                invocation_surfaces=role_record.get("invocation_surfaces"),
+            )
+        )
+
+    return targets
+
+
 def _spawn_worker(
     *,
-    command_handle: str,
-    needed_role_label: str,
-    target_mode: str,
+    target: Any,
     items: list[Any],
     project_root: Path,
     state_dir: Path,
     max_items: int,
     dry_run: bool,
     trigger,
+    dispatch_id: str | None = None,
 ) -> dict[str, Any]:
-    """Fire-and-forget spawn a worker subprocess.
+    """Spawn a worker subprocess dynamically using the target's argv template.
 
-    Per SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 § Wake Mechanism step 4-5:
-    invoke ``claude -p <prompt>`` or ``codex exec <prompt> --cd <root>`` with
-    the canonical init keyword as first line + dispatch env vars set.
+    Ensures environment isolation by popping parent session IDs.
     """
-    prompt = _build_prompt(target_mode, items, max_items, trigger)
-    dispatch_id = f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{needed_role_label}-{uuid.uuid4().hex[:6]}"
+    prompt = trigger._dispatch_prompt(target, items, max_items)
+    command = trigger._harness_command(target, prompt, project_root)
+    recipient_key = target.dispatch_state_key
+    dispatch_id = dispatch_id or f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{recipient_key}-{uuid.uuid4().hex[:6]}"
 
-    if command_handle == "codex":
-        command = ["codex", "exec", prompt, "--cd", str(project_root)]
-    elif command_handle == "claude":
-        command = [
-            "claude",
-            "-p",
-            prompt,
-            "--add-dir",
-            str(project_root),
-            "--output-format",
-            "json",
-        ]
-    else:
+    if command is None:
         meta = {
             "dispatch_id": dispatch_id,
-            "recipient": needed_role_label,
+            "recipient": recipient_key,
             "launched": False,
-            "reason": "unknown_command_handle",
+            "reason": "unknown_recipient",
+            "error_message": f"No headless surface or command template registered for harness {target.harness_id!r}",
         }
         trigger._record_dispatch_failure(state_dir, meta)
         return meta
@@ -426,27 +484,26 @@ def _spawn_worker(
     if dry_run:
         return {
             "dispatch_id": dispatch_id,
-            "recipient": needed_role_label,
+            "recipient": recipient_key,
             "launched": False,
             "reason": "dry_run",
             "command_head": command[:2],
         }
 
     packet_context: dict[str, Any] | None = None
-    if needed_role_label == "prime-builder":
+    if target.needed_role_label == "prime-builder":
         selected = trigger._selected_oldest_first(items, max_items)
-        issue_result = _issue_dispatch_authorization_for_selected(
+        issue_result = trigger._issue_dispatch_authorization_for_selected(
             selected,
             project_root=project_root,
             state_dir=state_dir,
-            recipient=needed_role_label,
+            recipient=recipient_key,
             dispatch_id=dispatch_id,
-            trigger=trigger,
         )
         if not issue_result["ok"]:
             return {
                 "dispatch_id": dispatch_id,
-                "recipient": needed_role_label,
+                "recipient": recipient_key,
                 "launched": False,
                 "reason": issue_result["reason"],
                 "failed_slug": issue_result.get("failed_slug"),
@@ -461,7 +518,15 @@ def _spawn_worker(
 
     env = dict(os.environ)
     env["GTKB_PROJECT_ROOT"] = str(project_root)
+
+    # Strip all parent session-related environment variables
+    for var in SESSION_ID_ENV_VARS:
+        env.pop(var, None)
+
+    # Re-apply only worker-specific session identifiers
     env["GTKB_BRIDGE_POLLER_RUN_ID"] = dispatch_id
+    env["GTKB_INHERITED_SESSION_ID"] = dispatch_id
+
     if packet_context is not None:
         packet_bridge_ids = [str(item) for item in packet_context.get("bridge_ids", [])]
         packet_hashes = [
@@ -473,14 +538,14 @@ def _spawn_worker(
         env["GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS"] = ",".join(packet_bridge_ids)
         env["GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID"] = str(packet_context.get("current_bridge_id") or "")
         env["GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES"] = ",".join(packet_hashes)
-    env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = f"::init gtkb {target_mode}"
+    env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = f"::init gtkb {target.canonical_mode}"
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
 
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
     meta: dict[str, Any] = {
         "dispatch_id": dispatch_id,
-        "recipient": needed_role_label,
+        "recipient": recipient_key,
         "launched_at": _now_iso(),
         "command_head": command[:2],
         "stdout_path": str(stdout_path),
@@ -530,14 +595,6 @@ def run_dispatcher(
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
 
-    applicable, harness_id = _is_single_harness_topology_applicable(project_root)
-    if not applicable:
-        return {"skipped": True, "reason": "not_applicable_multi_harness_topology"}
-    assert harness_id is not None
-
-    if _foreground_session_active(state_dir, harness_id, project_root):
-        return {"skipped": True, "reason": "foreground_session_active"}
-
     if not _acquire_lock(state_dir):
         return {"skipped": True, "reason": "another_instance_running"}
 
@@ -545,27 +602,6 @@ def run_dispatcher(
         trigger = _load_trigger_module()
         index_text = trigger._read_index_live(project_root)
         actionable_for_prime, actionable_for_codex = trigger._compute_actionable(index_text, project_root)
-
-        command_handle = _resolve_command_handle(project_root, harness_id)
-        if command_handle is None:
-            trigger._record_dispatch_failure(
-                state_dir,
-                {
-                    "dispatch_id": f"{_now_iso()}-resolve-fail",
-                    "recipient": "unknown",
-                    "launched": False,
-                    "reason": "command_handle_resolution_failed",
-                    "error_message": (
-                        f"Could not resolve command handle for harness ID {harness_id!r}. "
-                        "Check harness-state/harness-identities.json."
-                    ),
-                },
-            )
-            return {
-                "skipped": True,
-                "reason": "command_handle_resolution_failed",
-                "harness_id": harness_id,
-            }
 
         state = trigger._load_dispatch_state(state_dir)
         recipients_state = state.get("recipients") if isinstance(state, dict) else {}
@@ -578,13 +614,62 @@ def run_dispatcher(
             ("prime-builder", actionable_for_prime),
             ("loyal-opposition", actionable_for_codex),
         ]
+        resolved_targets = []
         for needed_role_label, items in pending:
             mode = _LABEL_TO_CANONICAL_MODE[needed_role_label]
+
+            # Resolve targets
+            try:
+                targets = _resolve_dispatcher_targets(needed_role_label, project_root)
+            except ValueError as exc:
+                trigger._record_dispatch_failure(
+                    state_dir,
+                    {
+                        "dispatch_id": f"{_now_iso()}-resolve-fail",
+                        "recipient": needed_role_label,
+                        "launched": False,
+                        "reason": "dispatch_target_resolution_failed",
+                        "error_message": str(exc),
+                    },
+                )
+                prior = recipients_state.get(needed_role_label)
+                recipient_state = dict(prior) if isinstance(prior, dict) else {}
+                recipient_state["last_result"] = "dispatch_target_resolution_failed"
+                recipient_state["updated_at"] = _now_iso()
+                recipients_state[needed_role_label] = recipient_state
+                results[needed_role_label] = {"launched": False, "reason": "dispatch_target_resolution_failed"}
+                continue
+
+            if not targets:
+                trigger._record_dispatch_failure(
+                    state_dir,
+                    {
+                        "dispatch_id": f"{_now_iso()}-no-active-target",
+                        "recipient": needed_role_label,
+                        "launched": False,
+                        "reason": "no_active_target_for_role",
+                        "error_message": f"no active harness for role {needed_role_label!r}",
+                    },
+                )
+                prior = recipients_state.get(needed_role_label)
+                recipient_state = dict(prior) if isinstance(prior, dict) else {}
+                recipient_state["last_result"] = "no_active_target_for_role"
+                recipient_state["updated_at"] = _now_iso()
+                recipients_state[needed_role_label] = recipient_state
+                results[needed_role_label] = {"launched": False, "reason": "no_active_target_for_role"}
+                continue
+
+            # Keep track of first resolved target for backward-compat keys
+            for t in targets:
+                resolved_targets.append(t)
+
+            # Filter out leased items
             filtered = [it for it in items if getattr(it, "dispatchable", True)]
-            selected = trigger._selected_oldest_first(filtered, max_items)
+            non_leased = [it for it in filtered if not is_lease_held(it.document_name, state_dir=state_dir)]
+            selected = trigger._selected_oldest_first(non_leased, max_items)
             signature = trigger._signature(selected)
 
-            prior = recipients_state.get(needed_role_label)
+            prior = recipients_state.get(needed_role_label) if isinstance(recipients_state.get(needed_role_label), dict) else {}
             prior_legacy_signature = prior.get("signature") if isinstance(prior, dict) else None
             prior_dispatched = (
                 prior.get("last_dispatched_signature")
@@ -592,15 +677,17 @@ def run_dispatcher(
                 else prior_legacy_signature
             )
 
-            recipient_state: dict[str, Any] = {
+            recipient_state = {
                 "signature_scope": "selected_dispatch_batch",
-                "pending_count": len(filtered),
+                "pending_count": len(non_leased),
                 "selected_count": len(selected),
                 "raw_pending_count": len(items),
                 "updated_at": _now_iso(),
                 "last_dispatched_signature": prior_dispatched,
                 "signature": prior_legacy_signature,
             }
+            if isinstance(prior, dict) and isinstance(prior.get("last_launch"), dict):
+                recipient_state["last_launch"] = prior["last_launch"]
 
             if not selected:
                 recipient_state["last_result"] = "no_pending_after_filter" if items else "no_pending"
@@ -617,22 +704,89 @@ def run_dispatcher(
                     "reason": "unchanged",
                 }
             else:
-                launch = _spawn_worker(
-                    command_handle=command_handle,
-                    needed_role_label=needed_role_label,
-                    target_mode=mode,
-                    items=filtered,
-                    project_root=project_root,
-                    state_dir=state_dir,
-                    max_items=max_items,
-                    dry_run=dry_run,
-                    trigger=trigger,
-                )
-                recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
-                recipient_state["last_launch"] = launch
+                # Spawn workers for all resolved active targets
+                launches = []
+                for target in targets:
+                    dispatch_id = trigger._new_dispatch_id(target.dispatch_state_key)
+                    work_intent_session_id = trigger._work_intent_session_id(dispatch_id)
+                    spawn_items = non_leased
+
+                    if needed_role_label == "prime-builder" and selected:
+                        work_intent_filter = trigger._filter_prime_selected_by_work_intent(
+                            selected,
+                            project_root=project_root,
+                            state_dir=state_dir,
+                            recipient=needed_role_label,
+                            dispatch_id=dispatch_id,
+                            session_id=work_intent_session_id,
+                        )
+                        if not work_intent_filter["ok"]:
+                            launches.append({
+                                "dispatch_id": dispatch_id,
+                                "recipient": target.dispatch_state_key,
+                                "launched": False,
+                                "reason": work_intent_filter["reason"],
+                            })
+                            continue
+
+                        dispatched_selected = list(work_intent_filter["selected"])
+                        if not dispatched_selected:
+                            launches.append({
+                                "dispatch_id": dispatch_id,
+                                "recipient": target.dispatch_state_key,
+                                "launched": False,
+                                "reason": "work_intent_already_held",
+                            })
+                            continue
+
+                        if not dry_run:
+                            acquire_result = trigger._acquire_prime_work_intent_batch(
+                                dispatched_selected,
+                                project_root=project_root,
+                                state_dir=state_dir,
+                                recipient=needed_role_label,
+                                dispatch_id=dispatch_id,
+                                session_id=work_intent_session_id,
+                            )
+                            if not acquire_result["ok"]:
+                                launches.append({
+                                    "dispatch_id": dispatch_id,
+                                    "recipient": target.dispatch_state_key,
+                                    "launched": False,
+                                    "reason": acquire_result["reason"],
+                                })
+                                continue
+                        spawn_items = dispatched_selected
+
+                    launch = _spawn_worker(
+                        target=target,
+                        items=spawn_items,
+                        project_root=project_root,
+                        state_dir=state_dir,
+                        max_items=max_items,
+                        dry_run=dry_run,
+                        trigger=trigger,
+                        dispatch_id=dispatch_id,
+                    )
+                    if launch.get("launched") and not dry_run:
+                        first_bridge_id = spawn_items[0].document_name if spawn_items else ""
+                        import time
+                        trigger._post_dispatch_poll(
+                            dispatch_id=dispatch_id,
+                            bridge_id=first_bridge_id,
+                            dispatch_ts=time.time(),
+                            project_root=project_root,
+                            state_dir=state_dir,
+                        )
+                    launches.append(launch)
+
+                # Aggregate results
+                any_launched = any(ln.get("launched") for ln in launches)
+                recipient_state["last_result"] = "launched" if any_launched else "launch_failed"
+                recipient_state["last_launch"] = launches[0] if len(launches) == 1 else {"launches": launches}
                 recipient_state["last_dispatched_signature"] = signature
                 recipient_state["signature"] = signature
-                results[needed_role_label] = launch
+                results[needed_role_label] = launches[0] if len(launches) == 1 else {"launches": launches}
 
             recipients_state[needed_role_label] = recipient_state
 
@@ -642,6 +796,11 @@ def run_dispatcher(
             "recipients": recipients_state,
         }
         trigger._write_dispatch_state(state_dir, payload)
+        
+        # Populate backward-compat keys if at least one target was resolved
+        harness_id = resolved_targets[0].harness_id if resolved_targets else "unknown"
+        command_handle = resolved_targets[0].command_handle if resolved_targets else "unknown"
+        
         return {
             "skipped": False,
             "harness_id": harness_id,
@@ -671,8 +830,7 @@ def _emit_diagnose_summary(state_dir: Path, project_root: Path) -> str:
     script_path = Path(__file__).resolve()
     lines.append(f"- Script: {script_path}")
     lines.append(f"- State dir: {state_dir}")
-    applicable, harness_id = _is_single_harness_topology_applicable(project_root)
-    lines.append(f"- Applicability: {applicable} (harness_id={harness_id})")
+    lines.append("- Applicability: ALWAYS APPLICABLE (Unified periodic dispatcher)")
     lines.append("")
 
     trigger = _load_trigger_module()
@@ -733,10 +891,7 @@ def _emit_diagnose_summary(state_dir: Path, project_root: Path) -> str:
     lines.append("")
 
     lines.append("== Overall ==")
-    if applicable:
-        lines.append("- HEALTHY (applicable): dispatcher is the active substrate for this topology.")
-    else:
-        lines.append("- NOT APPLICABLE: multi-harness topology; cross-harness trigger is the active substrate.")
+    lines.append("- HEALTHY: unified scheduled dispatcher is active for all topologies.")
     return "\n".join(lines)
 
 

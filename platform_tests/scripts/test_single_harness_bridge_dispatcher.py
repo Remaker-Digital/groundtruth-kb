@@ -64,6 +64,32 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
         ),
         encoding="utf-8",
     )
+
+    claude_surfaces = {
+        "headless": {
+            "argv": [
+                "claude",
+                "-p",
+                "{{PROMPT}}",
+                "--add-dir",
+                "{{PROJECT_ROOT}}",
+                "--output-format",
+                "json"
+            ]
+        }
+    }
+    codex_surfaces = {
+        "headless": {
+            "argv": [
+                "codex",
+                "exec",
+                "{{PROMPT}}",
+                "--cd",
+                "{{PROJECT_ROOT}}"
+            ]
+        }
+    }
+
     if single_harness:
         (harness_state / "role-assignments.json").write_text(
             json.dumps(
@@ -87,6 +113,7 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
                 "status": "active",
                 "event_driven_hooks": True,
                 "role": ["prime-builder", "loyal-opposition"],
+                "invocation_surfaces": claude_surfaces,
             }
         ]
     else:
@@ -110,6 +137,7 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
                 "status": "active",
                 "event_driven_hooks": True,
                 "role": ["prime-builder"],
+                "invocation_surfaces": claude_surfaces,
             },
             {
                 "id": "A",
@@ -118,6 +146,7 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
                 "status": "active",
                 "event_driven_hooks": True,
                 "role": ["loyal-opposition"],
+                "invocation_surfaces": codex_surfaces,
             },
         ]
     (harness_state / "harness-registry.json").write_text(
@@ -174,16 +203,16 @@ def _index_with_one_new(root: Path) -> str:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_dispatcher_no_op_in_multi_harness_topology(tmp_path: Path) -> None:
-    """ADR-SINGLE-HARNESS-OPERATING-MODE-001: substrates mutually exclusive."""
+def test_dispatcher_runs_in_multi_harness_topology(tmp_path: Path) -> None:
+    """ADR-SINGLE-HARNESS-OPERATING-MODE-001: unified poller runs in both topologies."""
     root = _make_synthetic_project(tmp_path, single_harness=False)
     _write_index(root, _index_with_one_new(root))
     state_dir = tmp_path / "state"
 
     dispatcher = _load_dispatcher()
     summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
-    assert summary["skipped"] is True
-    assert summary["reason"] == "not_applicable_multi_harness_topology"
+    assert summary["skipped"] is False
+    assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -238,6 +267,17 @@ def test_dispatcher_resolves_codex_single_harness_command_handle(tmp_path: Path)
                         "status": "active",
                         "event_driven_hooks": True,
                         "role": ["prime-builder", "loyal-opposition"],
+                        "invocation_surfaces": {
+                            "headless": {
+                                "argv": [
+                                    "codex",
+                                    "exec",
+                                    "{{PROMPT}}",
+                                    "--cd",
+                                    "{{PROJECT_ROOT}}"
+                                ]
+                            }
+                        },
                     }
                 ],
             }
@@ -291,25 +331,42 @@ def test_dispatcher_keyword_pb_mode(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_dispatcher_suppresses_on_active_session_lock(tmp_path: Path) -> None:
-    """SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 § Idle Suppression.
-
-    Single-harness topology + fresh active-session lock for the active harness
-    -> dispatcher no-ops with reason `foreground_session_active`.
-    """
+def test_dispatcher_does_not_suppress_on_active_session_lock(tmp_path: Path) -> None:
+    """Active-session suppression is disabled in the unified periodic dispatcher by design."""
     root = _make_synthetic_project(tmp_path, single_harness=True)
     _write_index(root, _index_with_one_new(root))
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write a fresh active-session lock for Claude (the harness holding both roles).
+    # Write a fresh active-session lock for Claude.
     lock_path = state_dir / "active-claude-session.lock"
     lock_path.write_text(json.dumps({"role": "claude"}), encoding="utf-8")
 
     dispatcher = _load_dispatcher()
     summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
-    assert summary["skipped"] is True
-    assert summary["reason"] == "foreground_session_active"
+    assert summary["skipped"] is False
+    assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+
+def test_dispatcher_suppresses_on_document_lease(tmp_path: Path) -> None:
+    """Verify that if a document has a lease held, it is not dispatched by the dispatcher."""
+    from bridge_lease_registry import acquire_lease, release_lease
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    _write_index(root, _index_with_one_new(root))
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    # Acquire lease on example-thread
+    lease = acquire_lease("example-thread", action="test", state_dir=state_dir)
+    assert lease is not None
+
+    dispatcher = _load_dispatcher()
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
+    # Loyal opposition results should be no_pending_after_filter because example-thread is leased!
+    assert summary["skipped"] is False
+    assert summary["results"]["loyal-opposition"]["reason"] == "no_pending_after_filter"
+
+    release_lease(lease)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -424,10 +481,27 @@ def test_prime_worker_spawn_creates_dispatch_authorization_packet_and_env(
         dispatchable=True,
     )
 
-    meta = dispatcher._spawn_worker(
-        command_handle="claude",
+    target = trigger.DispatchTarget(
         needed_role_label="prime-builder",
-        target_mode="pb",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces={
+            "headless": {
+                "argv": [
+                    "claude",
+                    "-p",
+                    "{{PROMPT}}",
+                    "--add-dir",
+                    "{{PROJECT_ROOT}}",
+                    "--output-format",
+                    "json"
+                ]
+            }
+        }
+    )
+    meta = dispatcher._spawn_worker(
+        target=target,
         items=[fake_item],
         project_root=root,
         state_dir=state_dir,

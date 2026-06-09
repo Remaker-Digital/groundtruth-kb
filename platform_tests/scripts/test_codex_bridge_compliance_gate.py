@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADAPTER_PATH = REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-gate-bash-adapter.py"
@@ -20,6 +21,31 @@ AUTHOR_METADATA = (
     "author_model_version: 5.5\n"
     "author_model_configuration: Extra High\n"
 )
+
+
+@pytest.fixture(autouse=True)
+def manage_work_intent_claims():
+    subprocess.run(
+        ["python", "scripts/bridge_claim_cli.py", "claim", "test-codex-deny", "--session-id", "test"],
+        cwd=str(REPO_ROOT),
+        check=True,
+    )
+    subprocess.run(
+        ["python", "scripts/bridge_claim_cli.py", "claim", "test-codex-allow", "--session-id", "test"],
+        cwd=str(REPO_ROOT),
+        check=True,
+    )
+    yield
+    subprocess.run(
+        ["python", "scripts/bridge_claim_cli.py", "release", "test-codex-deny", "--session-id", "test"],
+        cwd=str(REPO_ROOT),
+        check=False,
+    )
+    subprocess.run(
+        ["python", "scripts/bridge_claim_cli.py", "release", "test-codex-allow", "--session-id", "test"],
+        cwd=str(REPO_ROOT),
+        check=False,
+    )
 
 
 def _load_adapter():

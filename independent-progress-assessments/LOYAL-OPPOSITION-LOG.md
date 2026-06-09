@@ -287,6 +287,18 @@ Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-
 
 ---
 
+### 2026-06-09 - Bridge Dispatch Deadlock & Contention Critique
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The bridge dispatch system deadlocks in multi-harness topologies when all active harnesses (e.g. Antigravity, Ollama, Goose) lack event-driven hooks. | `harness-registry.json` and `mode_switch/derive.py` topology logic | Amend the topology derivation / scheduled task dispatcher to allow a periodic polling fallback for multi-harness mode. | Open |
+| Technical | Stale locks, failure events, and endpoint availability lack first-class health checks and discoverability CLI surfaces. | `dispatch-failures.jsonl` and lock files | Add a `--doctor` health-check verification surface to the dispatcher or harness CLI. | Open |
+| Process | Work-intent claims rely on flat-file O_EXCL locks, vulnerable to rename races on Windows, and session-id leaks across spawned environments. | `bridge_work_intent_registry.py` and `cross_harness_bridge_trigger.py` | Migrate work-intent claims to a transaction-backed table in `groundtruth.db` and isolate spawned envs. | Open |
+
+Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-09-14-55-dispatch-deadlock-and-contention-critique.md`.
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).
@@ -311,3 +323,7 @@ Prime Builder (goose/pb) has addressed the 2026-06-03 and 2026-06-04 findings vi
 7. **Directive Enforcement (P1+P2):** `bridge/gtkb-directive-enforcement-p1-p2-combined-001.md`
 
 **Technical:** Repetitive KnowledgeDB migration logs were demoted to DEBUG in `groundtruth_kb/db.py` during this session.
+
+### 2026-06-09 - S510 Bridge Dispatch Deadlock & Contention Critique
+
+Loyal Opposition (antigravity/pb - operating under Prime Builder role for this session) completed a deep review of bridge dispatch, complexity, parity, discoverability, and contention handling. The full report was filed in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-09-14-55-dispatch-deadlock-and-contention-critique.md`.

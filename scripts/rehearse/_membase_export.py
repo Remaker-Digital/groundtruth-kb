@@ -137,6 +137,10 @@ _EXCLUDED_TELEMETRY_POLICY: dict[str, dict[str, str]] = {
         "reason": "per_run_test_telemetry",
         "cutover_policy": "regenerate_at_new_root",
     },
+    "work_intent_claims": {
+        "reason": "transient_coordination_data",
+        "cutover_policy": "discard_post_migration",
+    },
 }
 
 # Per-session tables: rows classified by session-ownership metadata.

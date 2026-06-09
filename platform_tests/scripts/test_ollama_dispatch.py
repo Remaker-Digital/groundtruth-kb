@@ -53,9 +53,9 @@ def _ollama_record(
 def _write_routing(root: Path, *, allowed_tools: list[str] | None = None) -> None:
     if allowed_tools is None:
         allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
-    (root / ".ollama").mkdir(parents=True, exist_ok=True)
+    (root / ".api-harness").mkdir(parents=True, exist_ok=True)
     tools_literal = json.dumps(allowed_tools)
-    (root / ".ollama" / "routing.toml").write_text(
+    (root / ".api-harness" / "routing.toml").write_text(
         "schema_version = 1\n"
         "\n"
         "[models.review-route]\n"
@@ -63,10 +63,10 @@ def _write_routing(root: Path, *, allowed_tools: list[str] | None = None) -> Non
         "tool_calling_supported = true\n"
         f"allowed_tools = {tools_literal}\n"
         "\n"
-        "[routing]\n"
+        "[routing.ollama]\n"
         'default_model = "review-route"\n'
         "\n"
-        "[routing.skills]\n"
+        "[routing.ollama.skills]\n"
         'bridge-review = "review-route"\n',
         encoding="utf-8",
     )

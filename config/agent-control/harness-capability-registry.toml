@@ -710,6 +710,10 @@ status = "native"
 [capabilities.codex]
 surface = ".claude/hooks/advisory-router-scan.py"
 status = "native"
+
+[capabilities.antigravity]
+surface = ".claude/hooks/advisory-router-scan.py"
+status = "native"
 [[capabilities]]
 id = "skill.gtkb-benchmarks"
 kind = "skill"
@@ -864,7 +868,25 @@ routing_multiple_model_rows_supported = true
 routing_skill_overrides_supported = true
 routing_advertised_model_inventory_check = true
 skill_adapter_generation_supported = true
-skill_adapter_generator = "scripts/generate_ollama_skill_adapters.py"
-skill_adapter_manifest = ".ollama/skills/MANIFEST.json"
+skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
+skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
 skill_adapter_drift_check_supported = true
 phase_1_only = true  # remove when role promotion lands in Phase 2+
+
+[harnesses.openrouter]
+# Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3.
+bridge_compliance_gate_respect = true
+root_boundary_respect = true
+author_metadata_env_var_setting = true
+destructive_gate_delegation = true
+advertised_tool_subset = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+tool_guard_adapter_fail_closed = true
+routing_schema_version = 1
+routing_multiple_model_rows_supported = true
+routing_skill_overrides_supported = true
+routing_advertised_model_inventory_check = false
+skill_adapter_generation_supported = true
+skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
+skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
+skill_adapter_drift_check_supported = true
+phase_1_only = true

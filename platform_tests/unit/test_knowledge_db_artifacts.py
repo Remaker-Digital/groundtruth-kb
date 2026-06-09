@@ -95,6 +95,7 @@ class TestSchemaExists:
                 "test_procedures",
                 "testable_elements",
                 "tests",
+                "work_intent_claims",
                 "work_items",
             ]
         )

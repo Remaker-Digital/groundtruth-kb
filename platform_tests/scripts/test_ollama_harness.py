@@ -17,7 +17,7 @@ def make_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".ollama").mkdir()
+    (root / ".api-harness").mkdir()
     (root / ".claude" / "hooks").mkdir(parents=True)
     (root / "scripts").mkdir()
     for guard in {*oh.BRIDGE_WRITE_GUARDS, *oh.BRIDGE_EDIT_GUARDS, *oh.WRITE_EDIT_GUARDS, *oh.BASH_GUARDS}:
@@ -33,7 +33,7 @@ model_id = "fixture-model:fixture-version"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
-[routing]
+[routing.ollama]
 default_model = "fixture-full"
 """.strip()
         + "\n",

@@ -26,9 +26,15 @@
       "assigned_at": "2026-06-08T00:19:00Z",
       "assigned_by": "owner-directed-identity-registration",
       "id": "E"
+    },
+    "openrouter": {
+      "assigned_at": "2026-06-09T15:47:00Z",
+      "assigned_by": "owner-directed-identity-registration",
+      "id": "F",
+      "status": "active"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness installation identities",
-  "updated_at": "2026-06-08T00:19:00Z"
+  "updated_at": "2026-06-09T15:47:00Z"
 }

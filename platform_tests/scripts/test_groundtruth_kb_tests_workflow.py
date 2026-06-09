@@ -40,5 +40,5 @@ def test_groundtruth_kb_tests_workflow_runs_platform_pytest_lane() -> None:
     assert job["runs-on"] == "ubuntu-latest"
     assert test_step["working-directory"] == "groundtruth-kb"
     assert "./groundtruth-kb[dev,search]" in install_step["run"]
-    assert "python -m pytest tests/ -q --tb=short" in test_step["run"]
+    assert "python -m pytest platform_tests/ -q --tb=short" in test_step["run"]
     assert "--junitxml=.pytest-results/groundtruth-kb-tests.xml" in test_step["run"]

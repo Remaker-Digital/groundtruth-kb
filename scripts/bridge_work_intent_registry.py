@@ -6,18 +6,13 @@ from __future__ import annotations
 import json
 import os
 import re
-import time
-from collections.abc import Iterator
-from contextlib import contextmanager
+import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
-STATE_DIR_RELATIVE: Final[Path] = Path(".gtkb-state/work-intent")
-LOCK_RETRY_SECONDS: Final[float] = 1.0
-LOCK_SLEEP_SECONDS: Final[float] = 0.02
 SLUG_RE: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
 INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
@@ -62,79 +57,57 @@ def _root(project_root: Path | None = None) -> Path:
     return (project_root or PROJECT_ROOT).resolve()
 
 
-def _state_dir(project_root: Path | None = None) -> Path:
-    return _root(project_root) / STATE_DIR_RELATIVE
-
-
-def _record_path(thread_slug: str, project_root: Path | None = None) -> Path:
-    return _state_dir(project_root) / f"{_validate_slug(thread_slug)}.json"
-
-
-def _lock_path(thread_slug: str, project_root: Path | None = None) -> Path:
-    return _state_dir(project_root) / f"{_validate_slug(thread_slug)}.lock"
-
-
-@contextmanager
-def _thread_lock(thread_slug: str, project_root: Path | None = None) -> Iterator[None]:
-    state_dir = _state_dir(project_root)
-    state_dir.mkdir(parents=True, exist_ok=True)
-    path = _lock_path(thread_slug, project_root)
-    deadline = time.monotonic() + LOCK_RETRY_SECONDS
-    fd: int | None = None
-    while fd is None:
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            if time.monotonic() >= deadline:
-                raise WorkIntentRegistryError(f"Could not acquire registry file lock for {thread_slug!r}")
-            time.sleep(LOCK_SLEEP_SECONDS)
+def _get_conn(project_root: Path | None = None) -> sqlite3.Connection:
+    root = _root(project_root)
+    db_path = root / "groundtruth.db"
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(str(os.getpid()))
-        yield
-    finally:
-        path.unlink(missing_ok=True)
-
-
-def _read_record(path: Path) -> dict[str, str] | None:
-    if not path.is_file():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise WorkIntentRegistryError(f"Could not read work-intent record {path}") from exc
-    if not isinstance(data, dict):
-        raise WorkIntentRegistryError(f"Invalid work-intent record shape: {path}")
-    session_id = data.get("session_id")
-    acquired_at = data.get("acquired_at")
-    ttl_expires_at = data.get("ttl_expires_at")
-    if not all(isinstance(value, str) and value for value in (session_id, acquired_at, ttl_expires_at)):
-        raise WorkIntentRegistryError(f"Invalid work-intent record fields: {path}")
-    return {
-        "session_id": session_id,
-        "acquired_at": acquired_at,
-        "ttl_expires_at": ttl_expires_at,
-    }
+        conn = sqlite3.connect(str(db_path), timeout=10)
+        conn.row_factory = sqlite3.Row
+        # Ensure database schema is initialized dynamically (robust fallback)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS work_intent_claims (
+            rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_slug TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            acquired_at TEXT NOT NULL,
+            ttl_expires_at TEXT NOT NULL,
+            UNIQUE(thread_slug)
+        );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);")
+        conn.commit()
+        return conn
+    except sqlite3.Error as exc:
+        raise WorkIntentRegistryError(f"Could not open database {db_path}: {exc}") from exc
 
 
 def _is_expired(record: dict[str, str], *, now: datetime | None = None) -> bool:
     return _parse_iso(record["ttl_expires_at"]) <= (now or now_utc())
 
 
-def _write_record_atomic(path: Path, record: dict[str, str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_name(f"{path.name}.tmp.{os.getpid()}")
-    tmp_path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp_path, path)
-
-
 def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dict[str, str] | None:
     """Return the unexpired holder record for ``thread_slug``, if present."""
-    path = _record_path(thread_slug, project_root)
-    record = _read_record(path)
-    if record is None or _is_expired(record):
-        return None
-    return record
+    slug = _validate_slug(thread_slug)
+    conn = _get_conn(project_root)
+    try:
+        row = conn.execute(
+            "SELECT session_id, acquired_at, ttl_expires_at FROM work_intent_claims WHERE thread_slug = ?",
+            (slug,)
+        ).fetchone()
+        if row is None:
+            return None
+        record = {
+            "session_id": row["session_id"],
+            "acquired_at": row["acquired_at"],
+            "ttl_expires_at": row["ttl_expires_at"],
+        }
+        if _is_expired(record):
+            return None
+        return record
+    except sqlite3.Error as exc:
+        raise WorkIntentRegistryError(f"Database error during current_holder: {exc}") from exc
+    finally:
+        conn.close()
 
 
 def acquire(
@@ -151,28 +124,56 @@ def acquire(
     """
     if not session_id.strip():
         raise WorkIntentRegistryError("session_id must be non-empty")
-    path = _record_path(thread_slug, project_root)
-    with _thread_lock(thread_slug, project_root):
-        existing = _read_record(path)
-        if existing and not _is_expired(existing) and existing["session_id"] != session_id:
-            return False
-        acquired_at = now_utc()
-        record = {
-            "session_id": session_id,
-            "acquired_at": _iso(acquired_at),
-            "ttl_expires_at": _iso(acquired_at + timedelta(seconds=ttl_seconds)),
-        }
-        _write_record_atomic(path, record)
-        return True
+    slug = _validate_slug(thread_slug)
+    conn = _get_conn(project_root)
+    try:
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT session_id, acquired_at, ttl_expires_at FROM work_intent_claims WHERE thread_slug = ?",
+                (slug,)
+            ).fetchone()
+            now = now_utc()
+            if row:
+                existing = {
+                    "session_id": row["session_id"],
+                    "acquired_at": row["acquired_at"],
+                    "ttl_expires_at": row["ttl_expires_at"],
+                }
+                if not _is_expired(existing, now=now) and existing["session_id"] != session_id:
+                    return False
+            
+            acquired_at = now
+            ttl_expires_at = now + timedelta(seconds=ttl_seconds)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO work_intent_claims (thread_slug, session_id, acquired_at, ttl_expires_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (slug, session_id, _iso(acquired_at), _iso(ttl_expires_at))
+            )
+            return True
+    except sqlite3.Error as exc:
+        raise WorkIntentRegistryError(f"Database error during acquire: {exc}") from exc
+    finally:
+        conn.close()
 
 
 def release(thread_slug: str, session_id: str, *, project_root: Path | None = None) -> None:
     """Release a per-thread work-intent record when held by ``session_id``."""
-    path = _record_path(thread_slug, project_root)
-    with _thread_lock(thread_slug, project_root):
-        record = _read_record(path)
-        if record and record["session_id"] == session_id:
-            path.unlink(missing_ok=True)
+    slug = _validate_slug(thread_slug)
+    conn = _get_conn(project_root)
+    try:
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "DELETE FROM work_intent_claims WHERE thread_slug = ? AND session_id = ?",
+                (slug, session_id)
+            )
+    except sqlite3.Error as exc:
+        raise WorkIntentRegistryError(f"Database error during release: {exc}") from exc
+    finally:
+        conn.close()
 
 
 def _version_from_path(rel_path: str, thread_slug: str) -> int | None:

@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - Python <3.11 fallback is not expected 
 DEFAULT_ENDPOINT = "http://localhost:11434"
 DEFAULT_TIMEOUT_SECONDS = 240.0
 DEFAULT_MAX_TURNS = 24
-ROUTING_CONFIG_PATH = Path(".ollama") / "routing.toml"
+ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
@@ -227,9 +227,9 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
             raise OllamaHarnessError(f"models.{key}.allowed_tools contains noncanonical tools: {unknown_tools}")
         models[key] = ModelRoute(key, model_id, model_version, True, allowed_tools)
 
-    routing = raw.get("routing")
+    routing = raw.get("routing", {}).get("ollama")
     if not isinstance(routing, dict):
-        raise OllamaHarnessError("routing config must define [routing]")
+        raise OllamaHarnessError("routing config must define [routing.ollama]")
     default_model = routing.get("default_model")
     if not isinstance(default_model, str) or default_model not in models:
         raise OllamaHarnessError("routing.default_model must name a configured model")

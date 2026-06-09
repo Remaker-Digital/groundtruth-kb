@@ -840,6 +840,18 @@ SELECT s.* FROM sot_artifacts s
 INNER JOIN (
     SELECT id, MAX(version) AS max_version FROM sot_artifacts GROUP BY id
 ) latest ON s.id = latest.id AND s.version = latest.max_version;
+
+-- Work intent claims registry for bridge thread coordination
+CREATE TABLE IF NOT EXISTS work_intent_claims (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_slug TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    acquired_at TEXT NOT NULL,
+    ttl_expires_at TEXT NOT NULL,
+    UNIQUE(thread_slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);
 """
 
 

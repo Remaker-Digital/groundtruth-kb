@@ -16,7 +16,7 @@ def make_root(tmp_path: Path, routing_text: str) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".ollama").mkdir()
+    (root / ".api-harness").mkdir()
     (root / oh.ROUTING_CONFIG_PATH).write_text(routing_text.strip() + "\n", encoding="utf-8")
     return root
 
@@ -35,7 +35,7 @@ model_id = "{READ_ONLY_MODEL_ID}"
 tool_calling_supported = true
 allowed_tools = ["Read", "Grep", "Glob"]
 
-[routing]
+[routing.ollama]
 default_model = "full-route"
 {extra_routing}
 """
@@ -46,7 +46,7 @@ def test_skill_route_selects_full_tool_review_model(tmp_path: Path) -> None:
         tmp_path,
         routing_text(
             """
-[routing.skills]
+[routing.ollama.skills]
 bridge-review = "full-route"
 """
         ),
@@ -65,7 +65,7 @@ def test_explicit_model_overrides_skill_route(tmp_path: Path) -> None:
         tmp_path,
         routing_text(
             """
-[routing.skills]
+[routing.ollama.skills]
 bridge-review = "read-only-route"
 """
         ),
@@ -83,7 +83,7 @@ def test_unknown_skill_uses_default_route(tmp_path: Path) -> None:
         tmp_path,
         routing_text(
             """
-[routing.skills]
+[routing.ollama.skills]
 bridge-review = "read-only-route"
 """
         ),
@@ -100,7 +100,7 @@ def test_invalid_skill_route_reference_fails_closed(tmp_path: Path) -> None:
         tmp_path,
         routing_text(
             """
-[routing.skills]
+[routing.ollama.skills]
 bridge-review = "missing-route"
 """
         ),
@@ -115,7 +115,7 @@ def test_table_form_skill_route_reference_is_supported(tmp_path: Path) -> None:
         tmp_path,
         routing_text(
             """
-[routing.skills.bridge-review]
+[routing.ollama.skills.bridge-review]
 model = "read-only-route"
 """
         ),
@@ -177,4 +177,4 @@ def test_repository_routing_config_has_skill_overrides() -> None:
     assert selected.key == config.skill_routes["bridge-review"]
     assert selected.allowed_tools == FULL_TOOL_SET
     assert selected.model_version == oh.infer_model_version(selected.model_id)
-    assert "model_version" not in (repo_root / ".ollama" / "routing.toml").read_text(encoding="utf-8")
+    assert "model_version" not in (repo_root / ".api-harness" / "routing.toml").read_text(encoding="utf-8")

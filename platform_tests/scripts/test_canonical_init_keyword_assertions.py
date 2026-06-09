@@ -27,6 +27,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_HOOK_PATH = PROJECT_ROOT / ".claude" / "hooks" / "session_start_dispatch.py"
 CODEX_HOOK_PATH = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
+CORE_PATH = PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py"
 TRIGGER_PATH = PROJECT_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
 
 
@@ -81,20 +82,20 @@ def _has_set_membership_check(src: str) -> bool:
 
 
 def test_claude_session_start_checks_set_membership_against_own_role_set() -> None:
-    """DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause (Claude)."""
-    src = _read(CLAUDE_HOOK_PATH)
-    assert "_resolve_own_role_set" in src, "Claude SessionStart hook missing _resolve_own_role_set helper."
+    """DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause (Claude via core)."""
+    src = _read(CORE_PATH)
+    assert "_resolve_own_role_set" in src, "SessionStart core missing _resolve_own_role_set helper."
     assert _has_set_membership_check(src), (
-        "Claude SessionStart hook missing set-membership check (`keyword_mode in own_role_set` or equivalent)."
+        "SessionStart core missing set-membership check (`keyword_mode in own_role_set` or equivalent)."
     )
 
 
 def test_codex_session_start_checks_set_membership_against_own_role_set() -> None:
-    """DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause (Codex parity)."""
-    src = _read(CODEX_HOOK_PATH)
-    assert "_resolve_own_role_set" in src, "Codex SessionStart hook missing _resolve_own_role_set helper."
+    """DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause (Codex via core)."""
+    src = _read(CORE_PATH)
+    assert "_resolve_own_role_set" in src, "SessionStart core missing _resolve_own_role_set helper."
     assert _has_set_membership_check(src), (
-        "Codex SessionStart hook missing set-membership check (`keyword_mode in own_role_set` or equivalent)."
+        "SessionStart core missing set-membership check (`keyword_mode in own_role_set` or equivalent)."
     )
 
 
@@ -104,25 +105,25 @@ def test_codex_session_start_checks_set_membership_against_own_role_set() -> Non
 
 
 def test_claude_strict_drop_writes_dispatch_failures_jsonl() -> None:
-    """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Claude)."""
-    src = _read(CLAUDE_HOOK_PATH)
+    """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Claude via core)."""
+    src = _read(CORE_PATH)
     assert "dispatch-failures.jsonl" in src, (
-        "Claude SessionStart hook missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
+        "SessionStart core missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
     )
     assert "_audit_log_misdirected_dispatch" in src, (
-        "Claude SessionStart hook missing _audit_log_misdirected_dispatch helper."
+        "SessionStart core missing _audit_log_misdirected_dispatch helper."
     )
     assert "STRICT_DROP" in src and "_audit_log_misdirected_dispatch(" in src
 
 
 def test_codex_strict_drop_writes_dispatch_failures_jsonl() -> None:
-    """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Codex parity)."""
-    src = _read(CODEX_HOOK_PATH)
+    """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Codex via core)."""
+    src = _read(CORE_PATH)
     assert "dispatch-failures.jsonl" in src, (
-        "Codex SessionStart hook missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
+        "SessionStart core missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
     )
     assert "_audit_log_misdirected_dispatch" in src, (
-        "Codex SessionStart hook missing _audit_log_misdirected_dispatch helper."
+        "SessionStart core missing _audit_log_misdirected_dispatch helper."
     )
     assert "STRICT_DROP" in src and "_audit_log_misdirected_dispatch(" in src
 
@@ -139,10 +140,8 @@ def test_strict_drop_audit_path_matches_glossary_citation() -> None:
     # Glossary cites the exact path.
     assert ".gtkb-state/bridge-poller/dispatch-failures.jsonl" in glossary
     # Both hooks bind to the same path constant.
-    claude_src = _read(CLAUDE_HOOK_PATH)
-    codex_src = _read(CODEX_HOOK_PATH)
-    assert ".gtkb-state" in claude_src and "bridge-poller" in claude_src
-    assert ".gtkb-state" in codex_src and "bridge-poller" in codex_src
+    core_src = _read(CORE_PATH)
+    assert ".gtkb-state" in core_src and "bridge-poller" in core_src
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -159,7 +158,7 @@ def test_no_harness_local_operating_role_used_as_authority() -> None:
     ``harness-state/role-assignments.json``. The IP-4 receiver MUST NOT
     revive the legacy override path.
     """
-    for path in (CLAUDE_HOOK_PATH, CODEX_HOOK_PATH):
+    for path in (CLAUDE_HOOK_PATH, CODEX_HOOK_PATH, CORE_PATH):
         src = _read(path)
         # The legacy override pattern reads `<harness>/operating-role.md`.
         # The bare string `operating-role.md` would also match in a docstring;
@@ -191,7 +190,7 @@ def test_trigger_does_not_use_role_record_harness_type_as_command_handle() -> No
     This test checks the assignment-style patterns that would indicate
     using ``harness_type`` AS the command handle. Reading it for the drift
     comparison is permitted (see the drift-check branch in
-    ``_resolve_dispatch_target``).
+    "__resolve_dispatch_target").
     """
     src = _read(TRIGGER_PATH)
     # The drift-check branch reads role_record["harness_type"] via .get() for
@@ -225,11 +224,11 @@ def test_keyword_env_var_name_parity() -> None:
     ``GTKB_BRIDGE_DISPATCH_KEYWORD``. Drift would silently break dispatch
     keyword recognition."""
     trigger_src = _read(TRIGGER_PATH)
-    claude_src = _read(CLAUDE_HOOK_PATH)
-    codex_src = _read(CODEX_HOOK_PATH)
+    core_src = _read(CORE_PATH)
     env_name = "GTKB_BRIDGE_DISPATCH_KEYWORD"
-    assert env_name in trigger_src, f"Trigger does not emit env var {env_name!r}; receiver would see no keyword."
-    assert env_name in claude_src, (
-        f"Claude hook does not read env var {env_name!r}; receiver keyword check would no-op."
+    assert env_name in trigger_src, (
+        f"Trigger does not emit env var {env_name!r}; receiver would see no keyword."
     )
-    assert env_name in codex_src, f"Codex hook does not read env var {env_name!r}; receiver keyword check would no-op."
+    assert env_name in core_src, (
+        f"SessionStart core does not read env var {env_name!r}; receiver keyword check would no-op."
+    )

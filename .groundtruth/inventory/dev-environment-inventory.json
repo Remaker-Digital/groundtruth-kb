@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-08T17:19:39Z",
+  "generated_at": "2026-06-09T16:45:20Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -51,6 +51,10 @@
       },
       "ollama": {
         "id": "D",
+        "status": "verified"
+      },
+      "openrouter": {
+        "id": "F",
         "status": "verified"
       }
     },
@@ -99,6 +103,13 @@
         "harness_type": "goose",
         "role": [
           "prime-builder"
+        ],
+        "status": "verified"
+      },
+      "F": {
+        "harness_type": "openrouter",
+        "role": [
+          "loyal-opposition"
         ],
         "status": "verified"
       }

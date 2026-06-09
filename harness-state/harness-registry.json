@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-09T04:44:32Z",
+  "generated_at": "2026-06-09T16:30:03Z",
   "harnesses": [
     {
       "capabilities_ref": null,
@@ -77,7 +77,7 @@
         "prime-builder"
       ],
       "status": "active",
-      "version": 11
+      "version": 13
     },
     {
       "capabilities_ref": null,
@@ -101,8 +101,8 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "active",
-      "version": 6
+      "status": "suspended",
+      "version": 7
     },
     {
       "capabilities_ref": null,
@@ -120,8 +120,33 @@
       "role": [
         "prime-builder"
       ],
+      "status": "suspended",
+      "version": 2
+    },
+    {
+      "capabilities_ref": null,
+      "event_driven_hooks": false,
+      "harness_name": "openrouter",
+      "harness_type": "openrouter",
+      "id": "F",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/openrouter_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review"
+          ]
+        }
+      },
+      "reviewer_precedence": null,
+      "role": [
+        "loyal-opposition"
+      ],
       "status": "active",
-      "version": 1
+      "version": 3
     }
   ],
   "schema_version": 1,

@@ -134,25 +134,55 @@ def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _strip_generated_block(text: str) -> str:
-    start = text.find(GENERATED_MARKER)
+def _find_markers(text: str, expected_marker: str | None = None) -> tuple[str, str] | None:
+    if expected_marker:
+        match = re.search(r"<!--\s*(" + re.escape(expected_marker) + r")", text)
+    else:
+        match = re.search(r"<!--\s*(GTKB-[A-Z0-9_-]+-SKILL-ADAPTER)", text)
+    if not match:
+        return None
+    marker_name = match.group(1)
+    start_idx = text.find(marker_name)
+    if start_idx == -1:
+        return None
+    prefix_idx = text.rfind("<!--", 0, start_idx)
+    if prefix_idx == -1:
+        return None
+    start_marker = text[prefix_idx : start_idx + len(marker_name)]
+    suffix_match = re.search(re.escape(marker_name) + r"\s*-->", text)
+    if not suffix_match:
+        return None
+    end_marker = suffix_match.group(0)
+    return start_marker, end_marker
+
+
+def _strip_generated_block(text: str, expected_marker: str | None = None) -> str:
+    markers = _find_markers(text, expected_marker)
+    if not markers:
+        return text
+    start_marker, end_marker = markers
+    start = text.find(start_marker)
     if start == -1:
         return text
-    end = text.find(GENERATED_END_MARKER, start)
+    end = text.find(end_marker, start)
     if end == -1:
         return text
-    return text[:start] + text[end + len(GENERATED_END_MARKER) :].lstrip("\r\n")
+    return text[:start] + text[end + len(end_marker) :].lstrip("\r\n")
 
 
-def _canonical_hash(text: str) -> str:
-    return _sha256_text(_strip_generated_block(text).rstrip() + "\n")
+def _canonical_hash(text: str, expected_marker: str | None = None) -> str:
+    return _sha256_text(_strip_generated_block(text, expected_marker).rstrip() + "\n")
 
 
-def _adapter_metadata(text: str) -> dict[str, str]:
-    start = text.find(GENERATED_MARKER)
+def _adapter_metadata(text: str, expected_marker: str | None = None) -> dict[str, str]:
+    markers = _find_markers(text, expected_marker)
+    if not markers:
+        return {}
+    start_marker, end_marker = markers
+    start = text.find(start_marker)
     if start == -1:
         return {}
-    end = text.find(GENERATED_END_MARKER, start)
+    end = text.find(end_marker, start)
     if end == -1:
         return {}
     metadata: dict[str, str] = {}
@@ -271,8 +301,21 @@ def _status_for_surface(
     project_root: Path,
     capability: dict[str, Any],
     harness: str,
+    manifest_adapters: dict[str, dict[str, Any]] | None = None,
 ) -> CapabilityResult:
     harness_config = capability.get(harness)
+    if not isinstance(harness_config, dict):
+        if manifest_adapters and harness in manifest_adapters:
+            kind = capability.get("kind")
+            if kind == "hook":
+                harness_config = {
+                    "surface": capability.get("canonical_source"),
+                    "status": "native",
+                }
+            elif kind == "skill":
+                cap_id = capability.get("id")
+                harness_config = manifest_adapters[harness].get(cap_id)
+
     if not isinstance(harness_config, dict):
         return CapabilityResult(
             harness=harness,
@@ -333,9 +376,10 @@ def _status_for_surface(
         source_path = project_root / adapter_source
         if not source_path.is_file():
             return CapabilityResult(**common, state="MISSING", note=f"Adapter source is absent: {adapter_source}")
-        source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"))
+        expected_marker = "GTKB-API-SKILL-ADAPTER" if manifest_adapters and harness in manifest_adapters else "GTKB-CODEX-SKILL-ADAPTER"
+        source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"), expected_marker)
         declared_source_hash = str(harness_config.get("source_sha256") or "").strip()
-        metadata = _adapter_metadata(adapter_text)
+        metadata = _adapter_metadata(adapter_text, expected_marker)
         adapter_source_hash = metadata.get("Canonical source sha256", "")
         adapter_source_path = metadata.get("Canonical source", "")
         if declared_source_hash and declared_source_hash != source_hash:
@@ -549,12 +593,37 @@ def check_harness_parity(
         else:
             active_harnesses.append(selected_harness)
 
+    harness_manifest_adapters: dict[str, dict[str, dict[str, Any]]] = {}
+    harnesses_config = registry.get("harnesses", {})
+    for selected_harness in active_harnesses:
+        floor = harnesses_config.get(selected_harness, {})
+        manifest_path_str = floor.get("skill_adapter_manifest") if isinstance(floor, dict) else None
+        if manifest_path_str:
+            manifest_path = project_root / manifest_path_str
+            if manifest_path.is_file():
+                try:
+                    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    adapters_list = manifest_data.get("adapters", [])
+                    adapters_map = {}
+                    for entry in adapters_list:
+                        cap_id = entry.get("capability_id")
+                        if cap_id:
+                            adapters_map[cap_id] = {
+                                "surface": entry.get("adapter_relative_path"),
+                                "status": "adapter",
+                                "adapter_source": entry.get("source_relative_path"),
+                                "source_sha256": entry.get("source_sha256"),
+                            }
+                    harness_manifest_adapters[selected_harness] = adapters_map
+                except Exception as exc:
+                    errors.append(f"failed to load manifest for {selected_harness} at {manifest_path_str}: {exc}")
+
     results: list[CapabilityResult] = []
     for capability in capabilities:
         if not _role_applies(capability, selected_role, include_all):
             continue
         for selected_harness in active_harnesses:
-            results.append(_status_for_surface(project_root, capability, selected_harness))
+            results.append(_status_for_surface(project_root, capability, selected_harness, harness_manifest_adapters))
     for floor_harness in registered_floor_harnesses:
         results.extend(_evaluate_capability_floor(floor_harness, registry))
 

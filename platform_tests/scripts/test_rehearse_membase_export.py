@@ -51,7 +51,7 @@ _PER_SESSION_QUALITY_SCHEMA = "id INTEGER PRIMARY KEY, session_id TEXT, score RE
 
 
 def _create_minimal_live_schema(kb_path: Path) -> sqlite3.Connection:
-    """Create all 21 live-schema tables in the fixture KB.
+    """Create all 22 live-schema tables in the fixture KB.
 
     Per Codex GO ``-006`` implementation constraint 5: tests must use
     live table names. This fixture creates every table the live
@@ -81,8 +81,8 @@ def _create_minimal_live_schema(kb_path: Path) -> sqlite3.Connection:
     # Relationship tables (2).
     cur.execute(f'CREATE TABLE "deliberation_specs" ({_RELATIONSHIP_DELIB_SPECS_SCHEMA})')
     cur.execute(f'CREATE TABLE "deliberation_work_items" ({_RELATIONSHIP_DELIB_WIS_SCHEMA})')
-    # Excluded telemetry tables (4).
-    for name in ("assertion_runs", "pipeline_events", "quality_scores", "test_coverage"):
+    # Excluded telemetry tables (5).
+    for name in ("assertion_runs", "pipeline_events", "quality_scores", "test_coverage", "work_intent_claims"):
         cur.execute(f'CREATE TABLE "{name}" ({_TELEMETRY_SCHEMA})')
     # Per-session tables (3).
     cur.execute(f'CREATE TABLE "session_prompts" ({_PER_SESSION_PROMPTS_SCHEMA})')
@@ -626,8 +626,8 @@ def test_run_excludes_pipeline_events_with_documented_reason(tmp_path: Path) -> 
     assert excluded["pipeline_events"]["cutover_policy"] == "discard_post_migration"
 
 
-def test_run_excluded_tables_block_includes_all_four_telemetry_tables(tmp_path: Path) -> None:
-    """All four telemetry tables present in excluded_tables block."""
+def test_run_excluded_tables_block_includes_all_five_telemetry_tables(tmp_path: Path) -> None:
+    """All five telemetry tables present in excluded_tables block."""
     kb_path = _build_kb(tmp_path)
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
@@ -637,6 +637,7 @@ def test_run_excluded_tables_block_includes_all_four_telemetry_tables(tmp_path: 
         "pipeline_events",
         "quality_scores",
         "test_coverage",
+        "work_intent_claims",
     }
 
 
@@ -660,6 +661,7 @@ def test_run_excluded_table_row_counts_reflect_actual_data(tmp_path: Path) -> No
     assert excluded["test_coverage"]["row_count"] == 11
     assert excluded["pipeline_events"]["row_count"] == 0
     assert excluded["quality_scores"]["row_count"] == 0
+    assert excluded["work_intent_claims"]["row_count"] == 0
 
 
 # ---- Relationship parent tracing (Codex -006 constraint 3) ------------
@@ -884,9 +886,9 @@ def test_run_summary_aggregates_classifications_by_type(tmp_path: Path) -> None:
     summary = payload["summary"]
     assert summary["versioned_by_classification"]["adopter"] == 1
     assert summary["versioned_by_classification"]["framework"] == 1
-    assert summary["tables_discovered"] == 21
+    assert summary["tables_discovered"] == 22
     assert summary["tables_versioned"] == 12
     assert summary["tables_relationship"] == 2
-    assert summary["tables_excluded_telemetry"] == 4
+    assert summary["tables_excluded_telemetry"] == 5
     assert summary["tables_per_session"] == 3
     assert summary["tables_unclassified"] == 0
