@@ -40,6 +40,7 @@ WITHDRAWN: bridge/gtkb-sp1a-ollama-lo-prompt-restructure-001.md
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->
 <!-- LO bridge repair 2026-06-08: restored INDEX from 0b3ae25f after catastrophic truncation in fbfda62c; prepended post-truncation NEW threads only. -->
+<!-- Antigravity wrap-up: marked harness status as active. -->
 
 Document: sp1-dispatch-reliability-prime-handoff
 ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md

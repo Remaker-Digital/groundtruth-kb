@@ -14,7 +14,8 @@
     "antigravity": {
       "assigned_at": "2026-05-31T14:25:00Z",
       "assigned_by": "owner-directed-identity-registration",
-      "id": "C"
+      "id": "C",
+      "status": "active"
     },
     "ollama": {
       "assigned_at": "2026-06-05T05:11:00Z",
