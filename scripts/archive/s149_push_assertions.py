@@ -12,7 +12,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db"))
 from db import KnowledgeDB
 
 # Mapping: spec_id -> (file, pattern, description)
@@ -50,7 +50,11 @@ ASSERTIONS = {
     "217": ("src/multi_tenant/knowledge_vectorizer.py", "vectoriz", "Bulk import/export via vectorizer exists"),
     "225": ("src/multi_tenant/mcp_credential_cache.py", "cache", "Cache monitoring exists"),
     "287": ("admin/shared/components/OnboardingWizard.tsx", "step", "Wizard steps implementation exists"),
-    "SPEC-0179": ("src/multi_tenant/cost_model.py", "conversation", "Strategic quality-over-cost direction in cost model"),
+    "SPEC-0179": (
+        "src/multi_tenant/cost_model.py",
+        "conversation",
+        "Strategic quality-over-cost direction in cost model",
+    ),
     "SPEC-0181": ("src/multi_tenant/knowledge_vectorizer.py", "threshold", "Quality threshold alerting exists"),
     "SPEC-0184": ("src/multi_tenant/admin_analytics_api.py", "breakdown", "Per-topic quality breakdown exists"),
     "SPEC-0198": ("admin/shared/components/OnboardingWizard.tsx", "active", "Setup checklist checks activation status"),
@@ -66,7 +70,11 @@ ASSERTIONS = {
     "SPEC-0288": ("src/multi_tenant/tenant_secret_service.py", "TenantSecret", "Per-tenant Key Vault secrets exist"),
     "SPEC-0289": ("src/multi_tenant/gdpr_services.py", "Pii", "PII scrubbing service exists"),
     "SPEC-0292": ("src/multi_tenant/gdpr_services.py", "Consent", "Consent management for PCM exists"),
-    "SPEC-0300": ("src/multi_tenant/customer_profile_service.py", "CustomerProfile", "Customer profile with purchase data"),
+    "SPEC-0300": (
+        "src/multi_tenant/customer_profile_service.py",
+        "CustomerProfile",
+        "Customer profile with purchase data",
+    ),
     "SPEC-0308": ("src/multi_tenant/admin_conversation_api.py", "conversations", "Conversation inbox API exists"),
     "SPEC-0770": ("src/integrations/provisioning.py", "provision", "Customer identity provisioning flow exists"),
 }
@@ -84,7 +92,7 @@ def main():
             print(f"  MISSING FILE {spec_id}: {filepath}")
             fail += 1
             continue
-        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
         if re.search(pattern, content, re.IGNORECASE):
             ok += 1
@@ -99,9 +107,10 @@ def main():
 
     # Check which specs already have assertions (skip duplicates)
     import sqlite3
-    conn = sqlite3.connect('tools/knowledge-db/knowledge.db')
+
+    conn = sqlite3.connect("tools/knowledge-db/knowledge.db")
     c = conn.cursor()
-    existing = set(r[0] for r in c.execute('SELECT DISTINCT spec_id FROM assertion_runs').fetchall())
+    existing = set(r[0] for r in c.execute("SELECT DISTINCT spec_id FROM assertion_runs").fetchall())
 
     # Also check current assertion fields on specs
     skipped = 0
@@ -125,25 +134,18 @@ def main():
     inserted = 0
     for spec_id, (filepath, pattern, desc) in to_insert.items():
         # Get latest spec version
-        row = c.execute(
-            'SELECT MAX(version) FROM specifications WHERE id = ?', (spec_id,)
-        ).fetchone()
+        row = c.execute("SELECT MAX(version) FROM specifications WHERE id = ?", (spec_id,)).fetchone()
         if not row or not row[0]:
             print(f"  SPEC NOT FOUND: {spec_id}")
             continue
 
         spec_version = row[0]
-        assertion_json = json.dumps([{
-            "type": "grep",
-            "file": filepath,
-            "pattern": pattern
-        }])
+        assertion_json = json.dumps([{"type": "grep", "file": filepath, "pattern": pattern}])
 
         # Update spec assertions field
         # Insert new version with assertions
         current = c.execute(
-            'SELECT * FROM specifications WHERE id = ? AND version = ?',
-            (spec_id, spec_version)
+            "SELECT * FROM specifications WHERE id = ? AND version = ?", (spec_id, spec_version)
         ).fetchone()
 
         if not current:
@@ -151,53 +153,62 @@ def main():
             continue
 
         # Get column names
-        col_names = [col[1] for col in c.execute('PRAGMA table_info(specifications)').fetchall()]
+        col_names = [col[1] for col in c.execute("PRAGMA table_info(specifications)").fetchall()]
         current_dict = dict(zip(col_names, current))
 
         # Check if spec already has assertions field set
-        if current_dict.get('assertions') and current_dict['assertions'].strip():
+        if current_dict.get("assertions") and current_dict["assertions"].strip():
             # Already has assertions definition, just need to run them
             pass
         else:
             # Update assertions field by inserting new version
             new_version = spec_version + 1
-            c.execute('''
+            c.execute(
+                """
                 INSERT INTO specifications (id, version, title, description, priority, scope,
                     section, handle, tags, status, assertions, changed_by, changed_at,
                     change_reason, type)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?)
-            ''', (
-                spec_id, new_version, current_dict['title'], current_dict['description'],
-                current_dict['priority'], current_dict['scope'], current_dict['section'],
-                current_dict['handle'], current_dict['tags'], current_dict['status'],
-                assertion_json, 'claude',
-                'S149: Add machine-checkable grep assertion',
-                current_dict['type']
-            ))
+            """,
+                (
+                    spec_id,
+                    new_version,
+                    current_dict["title"],
+                    current_dict["description"],
+                    current_dict["priority"],
+                    current_dict["scope"],
+                    current_dict["section"],
+                    current_dict["handle"],
+                    current_dict["tags"],
+                    current_dict["status"],
+                    assertion_json,
+                    "claude",
+                    "S149: Add machine-checkable grep assertion",
+                    current_dict["type"],
+                ),
+            )
 
         # Insert assertion run result
         # Verify the pattern actually matches
-        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
         matches = len(re.findall(pattern, content, re.IGNORECASE))
         passed = matches > 0
 
-        result_json = json.dumps([{
-            "type": "grep",
-            "description": desc,
-            "passed": passed,
-            "detail": f"Found {matches} match(es), need >= 1"
-        }])
+        result_json = json.dumps(
+            [{"type": "grep", "description": desc, "passed": passed, "detail": f"Found {matches} match(es), need >= 1"}]
+        )
 
         # Get the version to use for assertion_run
-        final_version = c.execute(
-            'SELECT MAX(version) FROM specifications WHERE id = ?', (spec_id,)
-        ).fetchone()[0]
+        final_version = c.execute("SELECT MAX(version) FROM specifications WHERE id = ?", (spec_id,)).fetchone()[0]
 
-        c.execute('''
+        c.execute(
+            """
             INSERT INTO assertion_runs (spec_id, spec_version, run_at, overall_passed, results, triggered_by)
             VALUES (?, ?, datetime('now'), ?, ?, ?)
-        ''', (spec_id, final_version, 1 if passed else 0, result_json, 'S149-batch'))
+        """,
+            (spec_id, final_version, 1 if passed else 0, result_json, "S149-batch"),
+        )
 
         inserted += 1
         status = "PASS" if passed else "FAIL"
@@ -207,15 +218,15 @@ def main():
     conn.close()
 
     # Final coverage check
-    conn2 = sqlite3.connect('tools/knowledge-db/knowledge.db')
+    conn2 = sqlite3.connect("tools/knowledge-db/knowledge.db")
     c2 = conn2.cursor()
-    total_specs = c2.execute('SELECT COUNT(DISTINCT id) FROM specifications').fetchone()[0]
-    covered = c2.execute('SELECT COUNT(DISTINCT spec_id) FROM assertion_runs').fetchone()[0]
+    total_specs = c2.execute("SELECT COUNT(DISTINCT id) FROM specifications").fetchone()[0]
+    covered = c2.execute("SELECT COUNT(DISTINCT spec_id) FROM assertion_runs").fetchone()[0]
     coverage = 100 * covered / total_specs
     print(f"\nInserted {inserted} new assertions")
     print(f"Coverage: {covered}/{total_specs} = {coverage:.1f}%")
     conn2.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -2,6 +2,7 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 from db import KnowledgeDB
 

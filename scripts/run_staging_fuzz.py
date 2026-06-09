@@ -42,14 +42,18 @@ def run_fuzz(
     openapi_url = f"{staging_url}/openapi.json"
 
     cmd = [
-        sys.executable, "-m", "schemathesis", "run",
+        sys.executable,
+        "-m",
+        "schemathesis",
+        "run",
         openapi_url,
         "--checks=all",
         "--stateful=links",
         f"--hypothesis-max-examples={max_cases}",
         "--hypothesis-deadline=10000",
         "--request-timeout=15000",
-        "--base-url", staging_url,
+        "--base-url",
+        staging_url,
     ]
 
     if api_key:
@@ -90,9 +94,7 @@ def run_fuzz(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Run Schemathesis API fuzzing against staging (SPEC-1839)"
-    )
+    parser = argparse.ArgumentParser(description="Run Schemathesis API fuzzing against staging (SPEC-1839)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--report", help="Save cassette report to this path")
     parser.add_argument("--max-cases", type=int, default=50)

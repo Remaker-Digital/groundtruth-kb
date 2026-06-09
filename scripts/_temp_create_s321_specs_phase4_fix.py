@@ -88,12 +88,9 @@ OWNER_DIRECTIVES = {
         "that we are working on the hosted application."
     ),
     "platform_app_non_specific": (
-        "all work on the GT-KB project must be implemented in a fashion "
-        "that is application non-specific."
+        "all work on the GT-KB project must be implemented in a fashion that is application non-specific."
     ),
-    "strict_mechanical_enforcement": (
-        "We need *STRICT MECHANICAL ENFORCEMENT* of these directives."
-    ),
+    "strict_mechanical_enforcement": ("We need *STRICT MECHANICAL ENFORCEMENT* of these directives."),
     "smart_poller_auto_trigger": (
         "the requirement has always been for the AI harness to be "
         "automatically triggered by notification without user intervention, "
@@ -132,8 +129,14 @@ OWNER_DIRECTIVES = {
 
 SPEC_TO_DIRECTIVES = {
     "GOV-SPEC-CREATION-STANDING-AUTHORIZATION-001": ["spec_creation_standing_auth"],
-    "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001": ["impl_proposal_spec_linkage", "strict_mechanical_enforcement"],
-    "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001": ["verified_spec_derived_testing", "strict_mechanical_enforcement"],
+    "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001": [
+        "impl_proposal_spec_linkage",
+        "strict_mechanical_enforcement",
+    ],
+    "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001": [
+        "verified_spec_derived_testing",
+        "strict_mechanical_enforcement",
+    ],
     "DCL-DEFAULT-WORKSPACE-IS-GT-KB-001": ["default_workspace_gtkb"],
     "DCL-WORKSPACE-EXCEPTION-INTERROGATION-001": ["default_workspace_gtkb"],
     "DCL-WORKSPACE-INFERENCE-PROHIBITED-001": ["default_workspace_gtkb", "strict_mechanical_enforcement"],

@@ -57,11 +57,21 @@ ENVIRONMENTS = {
 def list_key_vault_secrets() -> list[dict]:
     """List all secrets in Key Vault (names only, no values)."""
     result = subprocess.run(
-        ["az", "keyvault", "secret", "list",
-         "--vault-name", KEY_VAULT_NAME,
-         "--query", "[].{name:name, enabled:attributes.enabled, updated:attributes.updated}",
-         "-o", "json"],
-        capture_output=True, text=True, timeout=30,
+        [
+            "az",
+            "keyvault",
+            "secret",
+            "list",
+            "--vault-name",
+            KEY_VAULT_NAME,
+            "--query",
+            "[].{name:name, enabled:attributes.enabled, updated:attributes.updated}",
+            "-o",
+            "json",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if result.returncode != 0:
         logger.error("az keyvault secret list failed: %s", result.stderr)
@@ -72,11 +82,23 @@ def list_key_vault_secrets() -> list[dict]:
 def get_secret_value(name: str) -> str | None:
     """Get a secret value from Key Vault."""
     result = subprocess.run(
-        ["az", "keyvault", "secret", "show",
-         "--vault-name", KEY_VAULT_NAME,
-         "--name", name,
-         "--query", "value", "-o", "tsv"],
-        capture_output=True, text=True, timeout=15,
+        [
+            "az",
+            "keyvault",
+            "secret",
+            "show",
+            "--vault-name",
+            KEY_VAULT_NAME,
+            "--name",
+            name,
+            "--query",
+            "value",
+            "-o",
+            "tsv",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
     if result.returncode != 0:
         logger.warning("Failed to read secret %s: %s", name, result.stderr.strip())
@@ -99,6 +121,7 @@ async def get_cosmos_client(database_name: str):
     if not key:
         # Try managed identity
         from azure.identity.aio import DefaultAzureCredential
+
         credential = DefaultAzureCredential()
         client = CosmosClient(endpoint, credential=credential)
     else:
@@ -125,10 +148,7 @@ async def list_tenants_with_keys(database) -> list[dict]:
 async def get_tenant_superadmin_email(database, tenant_id: str) -> str | None:
     """Find the superadmin email for a tenant."""
     container = database.get_container_client("team_members")
-    query = (
-        "SELECT c.email FROM c "
-        "WHERE c.tenant_id = @tid AND c.role = 'superadmin' AND c.is_active = true"
-    )
+    query = "SELECT c.email FROM c WHERE c.tenant_id = @tid AND c.role = 'superadmin' AND c.is_active = true"
     params = [{"name": "@tid", "value": tenant_id}]
     async for item in container.query_items(query=query, parameters=params):
         return item.get("email")
@@ -159,10 +179,7 @@ async def rotate_tenant_key(database, tenant_id: str, dry_run: bool = True) -> d
 
     # Update Cosmos — find and update the superadmin team member
     container = database.get_container_client("team_members")
-    query = (
-        "SELECT * FROM c "
-        "WHERE c.tenant_id = @tid AND c.role = 'superadmin' AND c.is_active = true"
-    )
+    query = "SELECT * FROM c WHERE c.tenant_id = @tid AND c.role = 'superadmin' AND c.is_active = true"
     params = [{"name": "@tid", "value": tenant_id}]
     member = None
     async for item in container.query_items(query=query, parameters=params):
@@ -182,6 +199,7 @@ async def rotate_tenant_key(database, tenant_id: str, dry_run: bool = True) -> d
     email_sent = False
     try:
         from src.multi_tenant.welcome_email import send_welcome_email
+
         email_sent = await send_welcome_email(
             to_email=superadmin_email,
             tenant_id=tenant_id,
@@ -232,8 +250,9 @@ async def audit_command(env: str) -> None:
         print(f"  Without api_key_hash: {len(tenants_without_keys)}")
 
         # 3. Identify Key Vault entries that look like tenant keys
-        kv_tenant_keys = [s for s in secrets if "API-KEY" in s["name"].upper()
-                          and s["name"] != "SPA-PLATFORM-ADMIN-KEY"]
+        kv_tenant_keys = [
+            s for s in secrets if "API-KEY" in s["name"].upper() and s["name"] != "SPA-PLATFORM-ADMIN-KEY"
+        ]
         print(f"\nKey Vault tenant-related secrets: {len(kv_tenant_keys)}")
 
         # 4. Cross-reference
@@ -276,10 +295,7 @@ async def rotate_command(env: str, tenant_ids: list[str], dry_run: bool) -> None
         if not tenant_ids:
             # Rotate all tenants with existing keys
             tenants = await list_tenants_with_keys(database)
-            active_tenants = [
-                t for t in tenants
-                if t.get("status") == "active" and t.get("user_api_key_hash")
-            ]
+            active_tenants = [t for t in tenants if t.get("status") == "active" and t.get("user_api_key_hash")]
             tenant_ids = [t["tenant_id"] for t in active_tenants]
             print(f"Found {len(tenant_ids)} active tenants with user API keys")
 
@@ -287,9 +303,11 @@ async def rotate_command(env: str, tenant_ids: list[str], dry_run: bool) -> None
         for tid in tenant_ids:
             result = await rotate_tenant_key(database, tid, dry_run=dry_run)
             results.append(result)
-            print(f"  {result['status']:10s} {tid[:12]}... "
-                  f"email={result.get('email', 'N/A')} "
-                  f"prefix={result.get('new_prefix', 'N/A')}")
+            print(
+                f"  {result['status']:10s} {tid[:12]}... "
+                f"email={result.get('email', 'N/A')} "
+                f"prefix={result.get('new_prefix', 'N/A')}"
+            )
 
         # Summary
         rotated = sum(1 for r in results if r["status"] == "ROTATED")
@@ -297,8 +315,7 @@ async def rotate_command(env: str, tenant_ids: list[str], dry_run: bool) -> None
         failed = sum(1 for r in results if r["status"] == "FAIL")
         dry = sum(1 for r in results if r["status"] == "DRY_RUN")
 
-        print(f"\nSummary: {rotated} rotated, {skipped} skipped, "
-              f"{failed} failed, {dry} dry-run")
+        print(f"\nSummary: {rotated} rotated, {skipped} skipped, {failed} failed, {dry} dry-run")
 
         if not dry_run and rotated > 0:
             emails_sent = sum(1 for r in results if r.get("email_sent"))

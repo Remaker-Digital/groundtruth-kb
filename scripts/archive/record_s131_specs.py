@@ -293,9 +293,7 @@ print("TEST-2915 recorded")
 
 # These are billing/metering tests — assign to Phase 2 (unit tests)
 conn = sqlite3.connect(str(Path(__file__).resolve().parent.parent / "tools" / "knowledge-db" / "knowledge.db"))
-row = conn.execute(
-    "SELECT test_ids FROM current_test_plan_phases WHERE id = 'PHASE-002'"
-).fetchone()
+row = conn.execute("SELECT test_ids FROM current_test_plan_phases WHERE id = 'PHASE-002'").fetchone()
 
 if row and row[0]:
     existing_ids = json.loads(row[0])
@@ -303,8 +301,13 @@ else:
     existing_ids = []
 
 new_test_ids = [
-    "TEST-2909", "TEST-2910", "TEST-2911", "TEST-2912",
-    "TEST-2913", "TEST-2914", "TEST-2915",
+    "TEST-2909",
+    "TEST-2910",
+    "TEST-2911",
+    "TEST-2912",
+    "TEST-2913",
+    "TEST-2914",
+    "TEST-2915",
 ]
 updated_ids = existing_ids + [tid for tid in new_test_ids if tid not in existing_ids]
 

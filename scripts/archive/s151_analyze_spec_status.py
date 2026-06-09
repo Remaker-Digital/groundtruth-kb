@@ -3,9 +3,10 @@
 
 (C) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sqlite3, json, os
 
-db_path = os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db', 'knowledge.db')
+db_path = os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db", "knowledge.db")
 conn = sqlite3.connect(db_path)
 conn.row_factory = sqlite3.Row
 c = conn.cursor()
@@ -25,10 +26,13 @@ specs = c.fetchall()
 # Check which have passing assertion runs
 passing_specs = []
 for s in specs:
-    c.execute("""
+    c.execute(
+        """
         SELECT overall_passed FROM assertion_runs
         WHERE spec_id = ? ORDER BY rowid DESC LIMIT 1
-    """, (s["id"],))
+    """,
+        (s["id"],),
+    )
     ar = c.fetchone()
     if ar and ar["overall_passed"] == 1:
         passing_specs.append(s)
@@ -49,14 +53,15 @@ for t, cnt in sorted(types.items(), key=lambda x: -x[1]):
 print(f"\nSamples:")
 for s in passing_specs[:15]:
     a = json.loads(s["assertions"]) if s["assertions"] else []
-    f = a[0].get("file","") if a else ""
-    pat = a[0].get("pattern","") if a else ""
-    print(f"  {s['id']} [{s['type']}]: \"{pat}\" in {f}")
+    f = a[0].get("file", "") if a else ""
+    pat = a[0].get("pattern", "") if a else ""
+    print(f'  {s["id"]} [{s["type"]}]: "{pat}" in {f}')
     print(f"    {s['title'][:80]}")
 
 # Are ANY of these specs about features NOT yet implemented?
 # Check if assertion file exists and pattern matches
 import re
+
 verified_impl = 0
 questionable = []
 for s in passing_specs:
@@ -65,10 +70,10 @@ for s in passing_specs:
         continue
     f = a[0].get("file", "")
     pat = a[0].get("pattern", "")
-    target = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', f))
+    target = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", f))
     if os.path.exists(target):
         try:
-            with open(target, 'r', encoding='utf-8', errors='replace') as fp:
+            with open(target, "r", encoding="utf-8", errors="replace") as fp:
                 content = fp.read()
             if re.search(pat, content):
                 verified_impl += 1

@@ -37,6 +37,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -139,10 +140,7 @@ async def main(dry_run: bool) -> None:
     prefs_container = db.get_container_client("preferences")
 
     # Find the current preferences document
-    prefs_query = (
-        f"SELECT * FROM c WHERE c.tenant_id = '{TENANT_ID}' "
-        f"AND c.is_current = true"
-    )
+    prefs_query = f"SELECT * FROM c WHERE c.tenant_id = '{TENANT_ID}' AND c.is_current = true"
     prefs_doc = None
     async for item in prefs_container.query_items(
         query=prefs_query,

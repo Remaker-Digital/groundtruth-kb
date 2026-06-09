@@ -6,6 +6,7 @@ artifact system (test plans, coverage metrics, get_untested_specs()).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
 import os
 
@@ -45,7 +46,6 @@ TESTS = [
         "PASS when: (1) every new WI has a linked Test artifact before entering 'backlogged' stage, (2) _check_untested_work_items() in assertion-check.py reports no drift at session start",
         "Abstract description test. GOV-12 requires that creating a work item initiates test creation; the backlog initiates implementation. Verification: assertion-check.py drift detection at session start + audit of recent WIs for linked tests.",
     ),
-
     # ── Cluster 2: Co-Pilot design decisions (4) ────────────────────────────
     (
         "SPEC-1563",
@@ -75,7 +75,6 @@ TESTS = [
         "PASS when: widget with data-admin-key attribute renders Co-Pilot branding, uses X-API-Key header for HTTP and api_key query param for SSE/WS, and sends conversation_type='admin_assistance'",
         "Structural assertion test. Spec has 6 structural assertions covering TransportConfig.adminApiKey, conditional auth, and branding overrides in StandaloneLayout.",
     ),
-
     # ── Cluster 3: Dashboard billable-only filtering (8) ────────────────────
     (
         "SPEC-1593",
@@ -133,7 +132,6 @@ TESTS = [
         "PASS when: topic breakdown table Cosmos query includes is_billable filter",
         "Grep assertion test. Spec asserts is_billable appears in topic breakdown query path.",
     ),
-
     # ── Cluster 4: AGNTCY infrastructure (16) ───────────────────────────────
     (
         "SPEC-1516",
@@ -247,7 +245,6 @@ TESTS = [
         "PASS when: shopify.app.toml contains correct app URL, redirect URLs, GDPR endpoints, and scopes matching the active Dev Dashboard version",
         "Grep assertion test. Spec has 4 grep assertions for Shopify configuration values.",
     ),
-
     # ── Cluster 5: Visual regression baselines (26) ─────────────────────────
     (
         "VR-agentconfig-s0-topleft",
@@ -459,11 +456,11 @@ def main():
             print(f"  ERR {test_id} -> {spec_id}: {e}")
             errors += 1
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Created: {created}/{len(TESTS)}")
     print(f"Errors:  {errors}")
     print(f"ID range: TEST-{NEXT_ID:04d} through TEST-{NEXT_ID + len(TESTS) - 1:04d}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Verify by querying untested specs
     untested = database.get_untested_specs()

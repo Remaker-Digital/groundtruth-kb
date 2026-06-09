@@ -148,9 +148,7 @@ print("TEST-2923 recorded")
 
 # Email tests — assign to Phase 2 (multi-tenant / integration tests)
 conn = sqlite3.connect(str(Path(__file__).resolve().parent.parent / "tools" / "knowledge-db" / "knowledge.db"))
-row = conn.execute(
-    "SELECT test_ids FROM current_test_plan_phases WHERE id = 'PHASE-002'"
-).fetchone()
+row = conn.execute("SELECT test_ids FROM current_test_plan_phases WHERE id = 'PHASE-002'").fetchone()
 
 if row and row[0]:
     existing_ids = json.loads(row[0])

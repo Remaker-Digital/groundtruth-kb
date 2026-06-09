@@ -58,18 +58,50 @@ def _make_project(root: Path, *, topology: str) -> Path:
         encoding="utf-8",
     )
     if topology == "codex-single":
-        roles = {"A": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "codex"}}
+        harnesses = [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["prime-builder", "loyal-opposition"],
+                "event_driven_hooks": True,
+            }
+        ]
     elif topology == "claude-single":
-        roles = {"B": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "claude"}}
+        harnesses = [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder", "loyal-opposition"],
+                "event_driven_hooks": True,
+            }
+        ]
     elif topology == "multi":
-        roles = {
-            "A": {"role": ["loyal-opposition"], "harness_type": "codex"},
-            "B": {"role": ["prime-builder"], "harness_type": "claude"},
-        }
+        harnesses = [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "event_driven_hooks": True,
+            },
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder"],
+                "event_driven_hooks": True,
+            },
+        ]
     else:
         raise AssertionError(f"unknown topology: {topology}")
-    (harness_state / "role-assignments.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": roles}),
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": harnesses}),
         encoding="utf-8",
     )
     return root

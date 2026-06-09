@@ -7,6 +7,7 @@ Usage:
     python scripts/create_untested_spec_work_items.py          # dry run
     python scripts/create_untested_spec_work_items.py --execute # write to DB
 """
+
 import sys, io
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -47,6 +48,7 @@ print(f"Retired (skipped): {len(retired)}")
 
 # Status breakdown
 from collections import Counter
+
 status_counts = Counter(s.get("status") for s in active)
 print(f"\nStatus breakdown of untested active specs:")
 for status, count in status_counts.most_common():
@@ -77,17 +79,19 @@ for i, spec in enumerate(active, start=1):
     status = spec.get("status", "specified")
     priority = STATUS_TO_PRIORITY.get(status, "P2")
 
-    work_items.append({
-        "id": wi_id,
-        "title": title,
-        "origin": "new",
-        "component": component,
-        "resolution_status": "open",
-        "source_spec_id": spec["id"],
-        "priority": priority,
-        "description": f"Spec {spec['id']} ({status}) has no linked test artifact. "
-                       f"Create an appropriate test to verify: {spec_title}",
-    })
+    work_items.append(
+        {
+            "id": wi_id,
+            "title": title,
+            "origin": "new",
+            "component": component,
+            "resolution_status": "open",
+            "source_spec_id": spec["id"],
+            "priority": priority,
+            "description": f"Spec {spec['id']} ({status}) has no linked test artifact. "
+            f"Create an appropriate test to verify: {spec_title}",
+        }
+    )
 
 # Report
 print(f"\n=== WORK ITEMS TO CREATE: {len(work_items)} ===")

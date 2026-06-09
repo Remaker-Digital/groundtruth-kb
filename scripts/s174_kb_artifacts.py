@@ -21,7 +21,9 @@ def main():
 
     specs = [
         {
-            "id": "SPEC-1745", "version": 1, "priority": "critical",
+            "id": "SPEC-1745",
+            "version": 1,
+            "priority": "critical",
             "title": "Sharded Rate Limiting for 680-Tenant Scale",
             "description": (
                 "Replace the single asyncio.Lock in RateLimitMiddleware with a sharded locking strategy. "
@@ -39,13 +41,19 @@ def main():
                 "[Source: src/multi_tenant/rate_limit_backend.py]\n\n"
                 "Scale target: SPEC-1516 (680 concurrent merchant tenants). Analysis: S174."
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "rate-limiting",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "rate-limiting",
             "tags": json.dumps(["scale", "performance", "rate-limiting", "680-tenants"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/rate_limit_backend.py", "pattern": "Shard|shard"}]),
+            "assertions": json.dumps(
+                [{"type": "grep", "file": "src/multi_tenant/rate_limit_backend.py", "pattern": "Shard|shard"}]
+            ),
         },
         {
-            "id": "SPEC-1746", "version": 1, "priority": "critical",
+            "id": "SPEC-1746",
+            "version": 1,
+            "priority": "critical",
             "title": "Fix Trial Tier Level Mapping in require_tier()",
             "description": (
                 "Trial tier is mapped to level 0 (same as Starter) in require_tier(). Trial users have "
@@ -58,13 +66,19 @@ def main():
                 "[Source: src/multi_tenant/cosmos_schema.py]\n\n"
                 "Impact: Trial-to-paid conversion funnel."
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "entitlements",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "entitlements",
             "tags": json.dumps(["entitlements", "trial", "tier-mapping", "conversion"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/middleware.py", "pattern": "TRIAL.*1|trial.*professional"}]),
+            "assertions": json.dumps(
+                [{"type": "grep", "file": "src/multi_tenant/middleware.py", "pattern": "TRIAL.*1|trial.*professional"}]
+            ),
         },
         {
-            "id": "SPEC-1747", "version": 1, "priority": "critical",
+            "id": "SPEC-1747",
+            "version": 1,
+            "priority": "critical",
             "title": "Atomic Reservation for Tier Count Limits (TOCTOU Fix)",
             "description": (
                 "Replace count-check-then-write pattern with atomic reservation for all tier-limited counts. "
@@ -80,13 +94,25 @@ def main():
                 "[Source: src/multi_tenant/endpoints.py]\n"
                 "[Source: src/multi_tenant/admin_knowledge_api.py]"
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "entitlements",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "entitlements",
             "tags": json.dumps(["entitlements", "concurrency", "TOCTOU", "680-tenants"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/admin_quick_action_api.py", "pattern": "atomic|reservation|etag|If-Match"}]),
+            "assertions": json.dumps(
+                [
+                    {
+                        "type": "grep",
+                        "file": "src/multi_tenant/admin_quick_action_api.py",
+                        "pattern": "atomic|reservation|etag|If-Match",
+                    }
+                ]
+            ),
         },
         {
-            "id": "SPEC-1748", "version": 1, "priority": "high",
+            "id": "SPEC-1748",
+            "version": 1,
+            "priority": "high",
             "title": "Tier Re-validation in ActivationService.activate()",
             "description": (
                 "ActivationService.activate() deploys configuration without re-checking the tenant's current tier "
@@ -95,13 +121,25 @@ def main():
                 "Fix: Add _validate_tier_entitlements(config, tenant.tier) check at the start of activate().\n\n"
                 "[Source: src/multi_tenant/activation_service.py]"
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "entitlements",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "entitlements",
             "tags": json.dumps(["entitlements", "activation", "defense-in-depth"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/activation_service.py", "pattern": "validate_tier|tier_entitlement|tier_check"}]),
+            "assertions": json.dumps(
+                [
+                    {
+                        "type": "grep",
+                        "file": "src/multi_tenant/activation_service.py",
+                        "pattern": "validate_tier|tier_entitlement|tier_check",
+                    }
+                ]
+            ),
         },
         {
-            "id": "SPEC-1749", "version": 1, "priority": "high",
+            "id": "SPEC-1749",
+            "version": 1,
+            "priority": "high",
             "title": "Add Tier Gate to import_knowledge_from_url()",
             "description": (
                 "The import_knowledge_from_url() endpoint has NO tier check. A Starter tenant could call the "
@@ -109,13 +147,25 @@ def main():
                 "Fix: Add require_tier() or explicit count validation to the import handler.\n\n"
                 "[Source: src/multi_tenant/admin_knowledge_api.py]"
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "entitlements",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "entitlements",
             "tags": json.dumps(["entitlements", "knowledge-base", "tier-gate"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/admin_knowledge_api.py", "pattern": "require_tier|tier_gate|tier_check.*import"}]),
+            "assertions": json.dumps(
+                [
+                    {
+                        "type": "grep",
+                        "file": "src/multi_tenant/admin_knowledge_api.py",
+                        "pattern": "require_tier|tier_gate|tier_check.*import",
+                    }
+                ]
+            ),
         },
         {
-            "id": "SPEC-1750", "version": 1, "priority": "high",
+            "id": "SPEC-1750",
+            "version": 1,
+            "priority": "high",
             "title": "Null Tier Guard for Admin Endpoints",
             "description": (
                 "When ctx.tier is None (missing or corrupt Cosmos document), most admin endpoints silently "
@@ -124,13 +174,25 @@ def main():
                 "Apply to all /api/admin/* endpoints. Exempt widget-facing endpoints.\n\n"
                 "[Source: src/multi_tenant/middleware.py]"
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "entitlements",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "entitlements",
             "tags": json.dumps(["entitlements", "security", "null-safety"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/middleware.py", "pattern": "tier.*None|tier_required|null.*tier"}]),
+            "assertions": json.dumps(
+                [
+                    {
+                        "type": "grep",
+                        "file": "src/multi_tenant/middleware.py",
+                        "pattern": "tier.*None|tier_required|null.*tier",
+                    }
+                ]
+            ),
         },
         {
-            "id": "SPEC-1751", "version": 1, "priority": "medium",
+            "id": "SPEC-1751",
+            "version": 1,
+            "priority": "medium",
             "title": "Extended Cache TTLs for 680-Tenant Scale",
             "description": (
                 "Current cache TTLs cause unnecessary Cosmos DB load at 680 tenants:\n\n"
@@ -140,13 +202,25 @@ def main():
                 "[Source: src/multi_tenant/activation_service.py]\n"
                 "[Source: src/multi_tenant/middleware.py]"
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "performance",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "performance",
             "tags": json.dumps(["performance", "caching", "cosmos-db", "680-tenants"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/activation_service.py", "pattern": "300|cache_ttl|lru_cache"}]),
+            "assertions": json.dumps(
+                [
+                    {
+                        "type": "grep",
+                        "file": "src/multi_tenant/activation_service.py",
+                        "pattern": "300|cache_ttl|lru_cache",
+                    }
+                ]
+            ),
         },
         {
-            "id": "SPEC-1752", "version": 1, "priority": "medium",
+            "id": "SPEC-1752",
+            "version": 1,
+            "priority": "medium",
             "title": "Per-Tier Caps for KB Articles and Escalation Categories",
             "description": (
                 "Three features have no per-tier caps:\n\n"
@@ -157,13 +231,25 @@ def main():
                 "[Source: src/multi_tenant/cosmos_schema.py]\n"
                 "[Source: src/multi_tenant/admin_knowledge_api.py]"
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "entitlements",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "entitlements",
             "tags": json.dumps(["entitlements", "tier-caps", "knowledge-base"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/cosmos_schema.py", "pattern": "max_kb_articles|max_escalation_categories|max_team_members"}]),
+            "assertions": json.dumps(
+                [
+                    {
+                        "type": "grep",
+                        "file": "src/multi_tenant/cosmos_schema.py",
+                        "pattern": "max_kb_articles|max_escalation_categories|max_team_members",
+                    }
+                ]
+            ),
         },
         {
-            "id": "SPEC-1753", "version": 1, "priority": "medium",
+            "id": "SPEC-1753",
+            "version": 1,
+            "priority": "medium",
             "title": "Enforce History Depth at API Boundary",
             "description": (
                 "Conversation history filtering happens only in DataRetentionService (daily sweep). "
@@ -172,10 +258,20 @@ def main():
                 "[Source: src/multi_tenant/admin_inbox_api.py]\n"
                 "[Source: src/multi_tenant/cosmos_schema.py]"
             ),
-            "status": "specified", "type": "requirement",
-            "scope": "backend", "section": "entitlements",
+            "status": "specified",
+            "type": "requirement",
+            "scope": "backend",
+            "section": "entitlements",
             "tags": json.dumps(["entitlements", "history", "data-retention", "defense-in-depth"]),
-            "assertions": json.dumps([{"type": "grep", "file": "src/multi_tenant/admin_inbox_api.py", "pattern": "history_retention|retention_days|date_filter"}]),
+            "assertions": json.dumps(
+                [
+                    {
+                        "type": "grep",
+                        "file": "src/multi_tenant/admin_inbox_api.py",
+                        "pattern": "history_retention|retention_days|date_filter",
+                    }
+                ]
+            ),
         },
     ]
 
@@ -186,41 +282,107 @@ def main():
              change_reason, priority, scope, section, handle, tags, assertions)
             VALUES (?, ?, ?, ?, ?, ?, 'claude', ?,
              'S174: 680-tenant scale entitlements improvements', ?, ?, ?, NULL, ?, ?)""",
-            (s["id"], s["version"], s["title"], s["description"], s["status"], s["type"],
-             now, s["priority"], s["scope"], s["section"], s["tags"], s["assertions"]),
+            (
+                s["id"],
+                s["version"],
+                s["title"],
+                s["description"],
+                s["status"],
+                s["type"],
+                now,
+                s["priority"],
+                s["scope"],
+                s["section"],
+                s["tags"],
+                s["assertions"],
+            ),
         )
     print(f"Inserted {len(specs)} specifications (SPEC-1745..SPEC-1753)")
 
     # ─── WORK ITEMS ───────────────────────────────────────────────
 
     work_items = [
-        ("WI-1265", "SPEC-1745", "Implement sharded rate limiting backend",
-         "Replace single asyncio.Lock with 16-shard locking. Critical: 2.61x oversubscribed at 680 tenants.",
-         "new", "rate-limiting", "critical"),
-        ("WI-1266", "SPEC-1746", "Fix Trial tier level mapping to Professional equivalent",
-         "Map Trial to tier level 1 (Professional) in require_tier().",
-         "defect", "entitlements", "critical"),
-        ("WI-1267", "SPEC-1747", "Implement atomic reservation for tier count limits",
-         "Replace count-check-then-write with ETag-based atomic reservation.",
-         "defect", "entitlements", "critical"),
-        ("WI-1268", "SPEC-1748", "Add tier re-validation to ActivationService.activate()",
-         "Validate tenant tier against activated features before deployment.",
-         "new", "activation", "high"),
-        ("WI-1269", "SPEC-1749", "Add tier gate to import_knowledge_from_url()",
-         "Gate knowledge import endpoint with tier check.",
-         "defect", "knowledge-base", "high"),
-        ("WI-1270", "SPEC-1750", "Add null tier guard to admin endpoints",
-         "Reject requests with None tier at middleware level.",
-         "new", "middleware", "high"),
-        ("WI-1271", "SPEC-1751", "Extend cache TTLs for 680-tenant scale",
-         "ConfigProcessor 60s->300s, add 120s LRU tenant metadata cache.",
-         "new", "performance", "medium"),
-        ("WI-1272", "SPEC-1752", "Add per-tier caps for KB articles, categories, team members",
-         "Add max_kb_articles, max_escalation_categories, max_team_members to TIER_DEFAULTS.",
-         "new", "entitlements", "medium"),
-        ("WI-1273", "SPEC-1753", "Enforce history retention at API boundary",
-         "Add tier-based date filter to conversation list/detail endpoints.",
-         "new", "entitlements", "medium"),
+        (
+            "WI-1265",
+            "SPEC-1745",
+            "Implement sharded rate limiting backend",
+            "Replace single asyncio.Lock with 16-shard locking. Critical: 2.61x oversubscribed at 680 tenants.",
+            "new",
+            "rate-limiting",
+            "critical",
+        ),
+        (
+            "WI-1266",
+            "SPEC-1746",
+            "Fix Trial tier level mapping to Professional equivalent",
+            "Map Trial to tier level 1 (Professional) in require_tier().",
+            "defect",
+            "entitlements",
+            "critical",
+        ),
+        (
+            "WI-1267",
+            "SPEC-1747",
+            "Implement atomic reservation for tier count limits",
+            "Replace count-check-then-write with ETag-based atomic reservation.",
+            "defect",
+            "entitlements",
+            "critical",
+        ),
+        (
+            "WI-1268",
+            "SPEC-1748",
+            "Add tier re-validation to ActivationService.activate()",
+            "Validate tenant tier against activated features before deployment.",
+            "new",
+            "activation",
+            "high",
+        ),
+        (
+            "WI-1269",
+            "SPEC-1749",
+            "Add tier gate to import_knowledge_from_url()",
+            "Gate knowledge import endpoint with tier check.",
+            "defect",
+            "knowledge-base",
+            "high",
+        ),
+        (
+            "WI-1270",
+            "SPEC-1750",
+            "Add null tier guard to admin endpoints",
+            "Reject requests with None tier at middleware level.",
+            "new",
+            "middleware",
+            "high",
+        ),
+        (
+            "WI-1271",
+            "SPEC-1751",
+            "Extend cache TTLs for 680-tenant scale",
+            "ConfigProcessor 60s->300s, add 120s LRU tenant metadata cache.",
+            "new",
+            "performance",
+            "medium",
+        ),
+        (
+            "WI-1272",
+            "SPEC-1752",
+            "Add per-tier caps for KB articles, categories, team members",
+            "Add max_kb_articles, max_escalation_categories, max_team_members to TIER_DEFAULTS.",
+            "new",
+            "entitlements",
+            "medium",
+        ),
+        (
+            "WI-1273",
+            "SPEC-1753",
+            "Enforce history retention at API boundary",
+            "Add tier-based date filter to conversation list/detail endpoints.",
+            "new",
+            "entitlements",
+            "medium",
+        ),
     ]
 
     for wi_id, spec_id, title, desc, origin, component, priority in work_items:
@@ -249,10 +411,16 @@ def main():
 
     wi_ids = [b["wi_id"] for b in backlog_items]
     by_origin = json.dumps({"new": 6, "defect": 3})
-    by_component = json.dumps({
-        "rate-limiting": 1, "entitlements": 5, "activation": 1,
-        "middleware": 1, "performance": 1, "knowledge-base": 1,
-    })
+    by_component = json.dumps(
+        {
+            "rate-limiting": 1,
+            "entitlements": 5,
+            "activation": 1,
+            "middleware": 1,
+            "performance": 1,
+            "knowledge-base": 1,
+        }
+    )
     conn.execute(
         """INSERT INTO backlog_snapshots
         (id, version, title, description, snapshot_at, work_item_ids,

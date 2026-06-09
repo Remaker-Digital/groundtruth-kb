@@ -3,16 +3,20 @@
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys, os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db"))
 from db import KnowledgeDB
 
 kb = KnowledgeDB()
 
 # Get next spec ID
-row = kb._get_conn().execute(
-    'SELECT MAX(CAST(REPLACE(id, "SPEC-", "") AS INTEGER)) FROM specifications WHERE id LIKE "SPEC-%"'
-).fetchone()
+row = (
+    kb._get_conn()
+    .execute('SELECT MAX(CAST(REPLACE(id, "SPEC-", "") AS INTEGER)) FROM specifications WHERE id LIKE "SPEC-%"')
+    .fetchone()
+)
 next_id = (row[0] or 0) + 1
 print(f"Starting at SPEC-{next_id}")
 
@@ -57,7 +61,10 @@ kb.insert_spec(
     ),
     assertions=[
         {"description": "Page outer Stack has no maxWidth — fills browser window", "type": "source_inspection"},
-        {"description": "Two-column Group: align=flex-start wrap=nowrap gap=lg minHeight=600", "type": "source_inspection"},
+        {
+            "description": "Two-column Group: align=flex-start wrap=nowrap gap=lg minHeight=600",
+            "type": "source_inspection",
+        },
         {"description": "Left column: flex 0 0 55% maxWidth 55%", "type": "source_inspection"},
         {"description": "Right column: flex 0 0 calc(45%-16px) position sticky top 16", "type": "source_inspection"},
         {"description": "Exactly 4 form Paper sections with p=lg radius=md withBorder", "type": "source_inspection"},
@@ -175,8 +182,14 @@ kb.insert_spec(
         "- fontFamily: Inter, headings fontWeight: 600"
     ),
     assertions=[
-        {"description": "Dark: chrome=#0c0a09 page=#1c1917 surface=#292524 border=#44403c", "type": "source_inspection"},
-        {"description": "Paper border override: border-color var(--ar-border) border-width 1px", "type": "source_inspection"},
+        {
+            "description": "Dark: chrome=#0c0a09 page=#1c1917 surface=#292524 border=#44403c",
+            "type": "source_inspection",
+        },
+        {
+            "description": "Paper border override: border-color var(--ar-border) border-width 1px",
+            "type": "source_inspection",
+        },
         {"description": "Mantine primaryColor=action defaultRadius=md", "type": "source_inspection"},
     ],
     changed_by="S121",

@@ -80,9 +80,7 @@ def _validate_role(role: str) -> str:
     if not isinstance(role, str) or not role:
         raise ValueError(f"dispatch role must be a non-empty string, got {role!r}")
     if role not in _CANONICAL_ROLES:
-        raise ValueError(
-            f"unknown dispatch role {role!r}; expected one of {sorted(_CANONICAL_ROLES)}"
-        )
+        raise ValueError(f"unknown dispatch role {role!r}; expected one of {sorted(_CANONICAL_ROLES)}")
     return role
 
 
@@ -242,7 +240,7 @@ def _write_all(fd: int, payload: bytes) -> None:
     """
     view = memoryview(payload)
     while view:
-        view = view[os.write(fd, view):]
+        view = view[os.write(fd, view) :]
 
 
 def _try_create_slot(slot_path: Path, record: dict) -> bool:
@@ -368,8 +366,7 @@ class WorkerSlot:
     module-level refresh_worker / release_worker.
     """
 
-    def __init__(self, *, role: str, slot_index: int, worker_token: str,
-                 state_dir: str | Path, ttl_seconds: float):
+    def __init__(self, *, role: str, slot_index: int, worker_token: str, state_dir: str | Path, ttl_seconds: float):
         self.role = role
         self.slot_index = slot_index
         self.worker_token = worker_token
@@ -389,15 +386,15 @@ class WorkerSlot:
         release_worker(self)
 
     def __repr__(self) -> str:
-        return (f"WorkerSlot(role={self.role!r}, slot_index={self.slot_index}, "
-                f"released={self._released})")
+        return f"WorkerSlot(role={self.role!r}, slot_index={self.slot_index}, released={self._released})"
 
 
 # --- public API --------------------------------------------------------------
 
 
-def register_worker(role: str, *, state_dir: str | Path,
-                     ttl_seconds: float = DEFAULT_WORKER_TTL_SECONDS) -> WorkerSlot | None:
+def register_worker(
+    role: str, *, state_dir: str | Path, ttl_seconds: float = DEFAULT_WORKER_TTL_SECONDS
+) -> WorkerSlot | None:
     """Atomically claim one of the role's bounded dispatch slots.
 
     Walks slot indices 0 .. role_limit(role) - 1 and atomically creates the
@@ -421,9 +418,13 @@ def register_worker(role: str, *, state_dir: str | Path,
             _reclaim_slot(slot_path)
             won = _try_create_slot(slot_path, record)
         if won:
-            return WorkerSlot(role=role, slot_index=slot_index,
-                              worker_token=worker_token, state_dir=state_dir,
-                              ttl_seconds=float(ttl_seconds))
+            return WorkerSlot(
+                role=role,
+                slot_index=slot_index,
+                worker_token=worker_token,
+                state_dir=state_dir,
+                ttl_seconds=float(ttl_seconds),
+            )
     return None
 
 
@@ -520,8 +521,7 @@ def reclaim_stale_workers(state_dir: str | Path) -> list[str]:
 
 
 @contextlib.contextmanager
-def worker_slot(role: str, *, state_dir: str | Path,
-                ttl_seconds: float = DEFAULT_WORKER_TTL_SECONDS):
+def worker_slot(role: str, *, state_dir: str | Path, ttl_seconds: float = DEFAULT_WORKER_TTL_SECONDS):
     """Context manager: register a worker slot on enter, release it on exit.
 
     Raises DispatchCapacityExhausted on enter when the role is already at
@@ -530,9 +530,7 @@ def worker_slot(role: str, *, state_dir: str | Path,
     """
     slot = register_worker(role, state_dir=state_dir, ttl_seconds=ttl_seconds)
     if slot is None:
-        raise DispatchCapacityExhausted(
-            f"dispatch role {role!r} is at capacity ({role_limit(role)} workers)"
-        )
+        raise DispatchCapacityExhausted(f"dispatch role {role!r} is at capacity ({role_limit(role)} workers)")
     try:
         yield slot
     finally:

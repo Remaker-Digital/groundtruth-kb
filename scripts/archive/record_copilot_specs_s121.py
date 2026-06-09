@@ -6,6 +6,7 @@ for the Admin Co-pilot Agent feature.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
 import io
 
@@ -35,11 +36,23 @@ specs = [
         "priority": "P1",
         "tags": ["co-pilot", "admin-assistant", "agent", "agntcy"],
         "assertions": [
-            {"description": "CoPilotAgent extends AgentRedBaseAgent with agent_type = 'co-pilot'", "type": "structural"},
+            {
+                "description": "CoPilotAgent extends AgentRedBaseAgent with agent_type = 'co-pilot'",
+                "type": "structural",
+            },
             {"description": "AgentTopic enum includes CO_PILOT = 'co-pilot'", "type": "structural"},
-            {"description": "Co-pilot follows 3-tier dispatch (SLIM transport → HTTP container → in-process)", "type": "functional"},
-            {"description": "Co-pilot retrieves documentation from a shared vector index, not the tenant's customer-facing KB", "type": "functional"},
-            {"description": "Co-pilot responses cite documentation sources (page/section references)", "type": "functional"},
+            {
+                "description": "Co-pilot follows 3-tier dispatch (SLIM transport → HTTP container → in-process)",
+                "type": "functional",
+            },
+            {
+                "description": "Co-pilot retrieves documentation from a shared vector index, not the tenant's customer-facing KB",
+                "type": "functional",
+            },
+            {
+                "description": "Co-pilot responses cite documentation sources (page/section references)",
+                "type": "functional",
+            },
         ],
     },
     {
@@ -59,10 +72,22 @@ specs = [
         "tags": ["co-pilot", "intent-classification", "routing", "authentication"],
         "assertions": [
             {"description": "admin_assistance is added to INTENT_TAXONOMY (18th intent)", "type": "structural"},
-            {"description": "Intent classifier returns admin_assistance for admin-context questions about Agent Red features", "type": "functional"},
-            {"description": "Pipeline dispatches to Co-pilot agent when intent is admin_assistance", "type": "functional"},
-            {"description": "Widget-key-authenticated requests never receive admin_assistance classification", "type": "security"},
-            {"description": "Admin-key-authenticated requests may receive any intent (including customer-facing intents when testing the widget)", "type": "functional"},
+            {
+                "description": "Intent classifier returns admin_assistance for admin-context questions about Agent Red features",
+                "type": "functional",
+            },
+            {
+                "description": "Pipeline dispatches to Co-pilot agent when intent is admin_assistance",
+                "type": "functional",
+            },
+            {
+                "description": "Widget-key-authenticated requests never receive admin_assistance classification",
+                "type": "security",
+            },
+            {
+                "description": "Admin-key-authenticated requests may receive any intent (including customer-facing intents when testing the widget)",
+                "type": "functional",
+            },
         ],
     },
     {
@@ -82,12 +107,18 @@ specs = [
         "priority": "P1",
         "tags": ["co-pilot", "vector-database", "cosmos-db", "embeddings", "documentation"],
         "assertions": [
-            {"description": "admin_documentation_vectors collection exists in Cosmos DB (container #18)", "type": "structural"},
+            {
+                "description": "admin_documentation_vectors collection exists in Cosmos DB (container #18)",
+                "type": "structural",
+            },
             {"description": "Partition key is /document_category, not /tenant_id", "type": "structural"},
             {"description": "Embeddings use text-embedding-3-large (3072 dimensions)", "type": "functional"},
             {"description": "Hybrid retrieval (vector 70% + BM25 30%) via RRF", "type": "functional"},
             {"description": "At least 12 document categories cover all admin feature areas", "type": "functional"},
-            {"description": "Documentation updates propagate to all tenants without per-tenant migration", "type": "functional"},
+            {
+                "description": "Documentation updates propagate to all tenants without per-tenant migration",
+                "type": "functional",
+            },
         ],
     },
     {
@@ -105,9 +136,18 @@ specs = [
         "priority": "P2",
         "tags": ["co-pilot", "fine-tuning", "layer-4", "pii", "cross-tenant"],
         "assertions": [
-            {"description": "Admin conversations are eligible for Co-pilot fine-tuning data collection", "type": "functional"},
-            {"description": "PII tokenization is applied before conversation data enters the training corpus", "type": "security"},
-            {"description": "Fine-tuning uses existing Layer 4 quality gates (hallucination, format, tone, accuracy, BLEU/ROUGE)", "type": "functional"},
+            {
+                "description": "Admin conversations are eligible for Co-pilot fine-tuning data collection",
+                "type": "functional",
+            },
+            {
+                "description": "PII tokenization is applied before conversation data enters the training corpus",
+                "type": "security",
+            },
+            {
+                "description": "Fine-tuning uses existing Layer 4 quality gates (hallucination, format, tone, accuracy, BLEU/ROUGE)",
+                "type": "functional",
+            },
             {"description": "Training data is aggregated cross-tenant (platform-level model)", "type": "functional"},
             {"description": "A/B validation compares fine-tuned Co-pilot against base model", "type": "functional"},
         ],
@@ -129,11 +169,23 @@ specs = [
         "priority": "P1",
         "tags": ["co-pilot", "analytics", "conversation-type", "pii", "billing"],
         "assertions": [
-            {"description": "ConversationDocument includes conversation_type field (default: 'customer')", "type": "structural"},
-            {"description": "Co-pilot conversations are stored with conversation_type: 'admin_assistance'", "type": "functional"},
-            {"description": "Admin conversations are excluded from tenant billable conversation counts (is_billable: false)", "type": "functional"},
+            {
+                "description": "ConversationDocument includes conversation_type field (default: 'customer')",
+                "type": "structural",
+            },
+            {
+                "description": "Co-pilot conversations are stored with conversation_type: 'admin_assistance'",
+                "type": "functional",
+            },
+            {
+                "description": "Admin conversations are excluded from tenant billable conversation counts (is_billable: false)",
+                "type": "functional",
+            },
             {"description": "Admin conversation history is PII-tokenized before vectorization", "type": "security"},
-            {"description": "Cross-tenant analytics query on conversation_type = 'admin_assistance' is supported", "type": "functional"},
+            {
+                "description": "Cross-tenant analytics query on conversation_type = 'admin_assistance' is supported",
+                "type": "functional",
+            },
         ],
     },
     {
@@ -151,10 +203,16 @@ specs = [
         "priority": "P1",
         "tags": ["co-pilot", "widget", "admin-mode", "authentication"],
         "assertions": [
-            {"description": "Widget in admin panel authenticates chat messages with admin API key", "type": "functional"},
+            {
+                "description": "Widget in admin panel authenticates chat messages with admin API key",
+                "type": "functional",
+            },
             {"description": "Widget in admin panel displays a Co-pilot mode indicator", "type": "ui"},
             {"description": "Widget on storefront uses widget key authentication (unchanged)", "type": "functional"},
-            {"description": "Admin mode is determined by authentication method, not a client-side flag", "type": "security"},
+            {
+                "description": "Admin mode is determined by authentication method, not a client-side flag",
+                "type": "security",
+            },
         ],
     },
 ]
@@ -267,7 +325,7 @@ for wi in work_items:
 # ─── Summary ─────────────────────────────────────────────────────────
 
 total_assertions = sum(len(s.get("assertions", [])) for s in specs)
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 print(f"Recorded: {len(specs)} specifications, {len(work_items)} work items")
 print(f"Spec IDs: SPEC-1557..SPEC-1562")
 print(f"WI IDs:   WI-0875..WI-0880")

@@ -14,9 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-FORBIDDEN_OVERRIDES: frozenset[str] = frozenset(
-    {"project_root", "dashboard_db", "target_path", "script", "command"}
-)
+FORBIDDEN_OVERRIDES: frozenset[str] = frozenset({"project_root", "dashboard_db", "target_path", "script", "command"})
 
 
 @dataclass(frozen=True)
@@ -215,9 +213,7 @@ def dispatch(request: Mapping[str, Any], context: OperationContext) -> dict[str,
 
     supplied_overrides = set(request.keys()) & FORBIDDEN_OVERRIDES
     if supplied_overrides:
-        raise InvalidRequestError(
-            f"request may not override service-owned fields: {sorted(supplied_overrides)}"
-        )
+        raise InvalidRequestError(f"request may not override service-owned fields: {sorted(supplied_overrides)}")
 
     descriptor = get_descriptor(operation_id)
 
@@ -225,8 +221,6 @@ def dispatch(request: Mapping[str, Any], context: OperationContext) -> dict[str,
     if not isinstance(dry_run, bool):
         raise InvalidRequestError("dry_run must be a boolean")
     if dry_run and not descriptor.supports_dry_run:
-        raise InvalidRequestError(
-            f"operation_id {operation_id!r} does not support dry_run"
-        )
+        raise InvalidRequestError(f"operation_id {operation_id!r} does not support dry_run")
 
     return _HANDLERS[operation_id](descriptor, request, context)

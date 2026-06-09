@@ -125,7 +125,7 @@ def _try_create_lock(lock_path: Path, token: str) -> bool:
         # residual malformed-lock case, reclaimed by _reclaim_malformed_lock.
         view = memoryview(payload)
         while view:
-            view = view[os.write(fd, view):]
+            view = view[os.write(fd, view) :]
     finally:
         os.close(fd)
     return True
@@ -208,9 +208,7 @@ def _acquire(lock_path: Path, token: str, timeout_seconds: float, ttl_seconds: f
                 # self-guards on the absent case.
                 _reclaim_malformed_lock(lock_path, ttl_seconds)
         if time.monotonic() >= deadline:
-            raise IndexWriteLockTimeout(
-                f"INDEX write lock at {lock_path} not acquired within {timeout_seconds}s"
-            )
+            raise IndexWriteLockTimeout(f"INDEX write lock at {lock_path} not acquired within {timeout_seconds}s")
         time.sleep(_POLL_INTERVAL_SECONDS)
 
 
@@ -303,9 +301,7 @@ def atomic_index_update(
     mutate raises, the lock is released and index_path is left unchanged.
     """
     index_path = Path(index_path)
-    with index_write_lock(
-        state_dir=state_dir, timeout_seconds=timeout_seconds, ttl_seconds=ttl_seconds
-    ):
+    with index_write_lock(state_dir=state_dir, timeout_seconds=timeout_seconds, ttl_seconds=ttl_seconds):
         try:
             current_text = index_path.read_text(encoding="utf-8")
         except FileNotFoundError:

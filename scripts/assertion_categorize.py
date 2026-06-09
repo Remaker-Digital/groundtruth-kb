@@ -43,10 +43,10 @@ from typing import Any
 
 # Default thresholds (configurable via CLI).
 # Calibrated to the 5-run history cap enforced by .claude/hooks/assertion-check.py.
-DEFAULT_CHRONIC_THRESHOLD = 5      # consecutive FAIL runs to classify as chronic_noise
-DEFAULT_FLAKY_WINDOW = 5           # window of recent runs to check for transitions
-DEFAULT_DRIFT_PRIOR_PASS = 2       # minimum prior consecutive PASS runs needed to call newly-FAIL a drift
-DEFAULT_DRIFT_WINDOW_DAYS = 7      # transition must be within this many days
+DEFAULT_CHRONIC_THRESHOLD = 5  # consecutive FAIL runs to classify as chronic_noise
+DEFAULT_FLAKY_WINDOW = 5  # window of recent runs to check for transitions
+DEFAULT_DRIFT_PRIOR_PASS = 2  # minimum prior consecutive PASS runs needed to call newly-FAIL a drift
+DEFAULT_DRIFT_WINDOW_DAYS = 7  # transition must be within this many days
 
 # Category constants
 CATEGORY_GENUINE_DRIFT = "genuine_drift"
@@ -73,10 +73,7 @@ def _resolve_project_root(explicit: str | None) -> Path:
     for candidate in [here, *here.parents]:
         if (candidate / "groundtruth.toml").is_file():
             return candidate
-    raise SystemExit(
-        "Could not resolve GT-KB project root. Pass --project-root or set "
-        "GTKB_PROJECT_ROOT."
-    )
+    raise SystemExit("Could not resolve GT-KB project root. Pass --project-root or set GTKB_PROJECT_ROOT.")
 
 
 def _assertion_id(spec_id: str, assertion_index: int, description: str) -> str:
@@ -92,8 +89,7 @@ def _assertion_id(spec_id: str, assertion_index: int, description: str) -> str:
 def _load_runs_for_spec(conn: sqlite3.Connection, spec_id: str) -> list[dict[str, Any]]:
     """Load all assertion_runs rows for a spec, ordered oldest -> newest."""
     cursor = conn.execute(
-        "SELECT run_at, overall_passed, results FROM assertion_runs "
-        "WHERE spec_id = ? ORDER BY run_at ASC",
+        "SELECT run_at, overall_passed, results FROM assertion_runs WHERE spec_id = ? ORDER BY run_at ASC",
         (spec_id,),
     )
     out = []
@@ -128,21 +124,25 @@ def _extract_assertion_history(
         if target_index < len(results):
             entry = results[target_index]
             if isinstance(entry, dict) and entry.get("description") == target_desc:
-                history.append({
-                    "run_at": run["run_at"],
-                    "passed": bool(entry.get("passed", False)),
-                    "detail": entry.get("detail", ""),
-                })
+                history.append(
+                    {
+                        "run_at": run["run_at"],
+                        "passed": bool(entry.get("passed", False)),
+                        "detail": entry.get("detail", ""),
+                    }
+                )
                 continue
         # Fallback: scan run for matching description regardless of index
         if isinstance(results, list):
             for entry in results:
                 if isinstance(entry, dict) and entry.get("description") == target_desc:
-                    history.append({
-                        "run_at": run["run_at"],
-                        "passed": bool(entry.get("passed", False)),
-                        "detail": entry.get("detail", ""),
-                    })
+                    history.append(
+                        {
+                            "run_at": run["run_at"],
+                            "passed": bool(entry.get("passed", False)),
+                            "detail": entry.get("detail", ""),
+                        }
+                    )
                     break
     return history
 
@@ -243,8 +243,7 @@ def _categorize(
         return {
             "category": CATEGORY_FLAKY,
             "rationale": (
-                f"window of {len(window)} runs has {pass_count} PASS, {fail_count} FAIL, "
-                f"{transitions} transition(s)"
+                f"window of {len(window)} runs has {pass_count} PASS, {fail_count} FAIL, {transitions} transition(s)"
             ),
             "confidence": 0.8,
         }
@@ -254,8 +253,7 @@ def _categorize(
     return {
         "category": CATEGORY_UNCATEGORIZED,
         "rationale": (
-            f"latest FAIL with {len(history)} runs of history; "
-            f"insufficient data for drift/chronic/flaky classification"
+            f"latest FAIL with {len(history)} runs of history; insufficient data for drift/chronic/flaky classification"
         ),
         "confidence": 0.5,
     }

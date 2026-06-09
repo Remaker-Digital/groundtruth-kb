@@ -91,7 +91,7 @@ def extract_json_from_text(text: str) -> list[dict]:
     - Multiple JSON blocks (takes the largest)
     """
     # Try fenced JSON blocks first
-    fenced = re.findall(r'```json\s*\n(.*?)```', text, re.DOTALL)
+    fenced = re.findall(r"```json\s*\n(.*?)```", text, re.DOTALL)
     if fenced:
         # Take the largest fenced block
         largest = max(fenced, key=len)
@@ -108,15 +108,15 @@ def extract_json_from_text(text: str) -> list[dict]:
     start = None
     candidates = []
     for i, ch in enumerate(text):
-        if ch == '[' and bracket_depth == 0:
+        if ch == "[" and bracket_depth == 0:
             start = i
             bracket_depth = 1
-        elif ch == '[':
+        elif ch == "[":
             bracket_depth += 1
-        elif ch == ']':
+        elif ch == "]":
             bracket_depth -= 1
             if bracket_depth == 0 and start is not None:
-                candidate = text[start:i+1]
+                candidate = text[start : i + 1]
                 if len(candidate) > 100:  # Skip tiny arrays
                     candidates.append(candidate)
                 start = None
@@ -173,9 +173,7 @@ def main():
     # Find next available SPEC ID
     specs = db.list_specs()
     existing_nums = [
-        int(s["id"].split("-")[1])
-        for s in specs
-        if s["id"].startswith("SPEC-") and s["id"].split("-")[1].isdigit()
+        int(s["id"].split("-")[1]) for s in specs if s["id"].startswith("SPEC-") and s["id"].split("-")[1].isdigit()
     ]
     next_num = max(existing_nums) + 1 if existing_nums else 872
 

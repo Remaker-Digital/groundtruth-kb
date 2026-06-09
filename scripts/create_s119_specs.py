@@ -29,8 +29,14 @@ specs = [
         "status": "specified",
         "section": "MEMORY",
         "assertions": [
-            {"description": "fine_tuning_pipeline._call_fine_tuning_api does not raise NotImplementedError", "type": "functional"},
-            {"description": "fine_tuning_pipeline._check_job_status_api does not raise NotImplementedError", "type": "functional"},
+            {
+                "description": "fine_tuning_pipeline._call_fine_tuning_api does not raise NotImplementedError",
+                "type": "functional",
+            },
+            {
+                "description": "fine_tuning_pipeline._check_job_status_api does not raise NotImplementedError",
+                "type": "functional",
+            },
             {"description": "Training data is uploaded as JSONL file before job creation", "type": "functional"},
         ],
     },
@@ -45,7 +51,10 @@ specs = [
         "status": "specified",
         "section": "MEMORY",
         "assertions": [
-            {"description": "_call_model_for_evaluation returns actual model output, not hardcoded string", "type": "functional"},
+            {
+                "description": "_call_model_for_evaluation returns actual model output, not hardcoded string",
+                "type": "functional",
+            },
             {"description": "Quality gates score against real model responses", "type": "functional"},
         ],
     },
@@ -60,8 +69,14 @@ specs = [
         "status": "specified",
         "section": "MEMORY",
         "assertions": [
-            {"description": "TrainingJobRecord persisted to Cosmos DB fine_tuning_jobs container", "type": "functional"},
-            {"description": "FineTunedModelRecord persisted to Cosmos DB fine_tuned_models container", "type": "functional"},
+            {
+                "description": "TrainingJobRecord persisted to Cosmos DB fine_tuning_jobs container",
+                "type": "functional",
+            },
+            {
+                "description": "FineTunedModelRecord persisted to Cosmos DB fine_tuned_models container",
+                "type": "functional",
+            },
             {"description": "In-memory dev stores not used in production mode", "type": "functional"},
         ],
     },
@@ -78,8 +93,14 @@ specs = [
         "section": "ADMIN_UI",
         "assertions": [
             {"description": "POST /api/admin/fine-tuning/trigger returns 200 with job_id", "type": "functional"},
-            {"description": "GET /api/admin/fine-tuning/status returns model history and job status", "type": "functional"},
-            {"description": "POST /api/admin/fine-tuning/rollback reverts to specified model version", "type": "functional"},
+            {
+                "description": "GET /api/admin/fine-tuning/status returns model history and job status",
+                "type": "functional",
+            },
+            {
+                "description": "POST /api/admin/fine-tuning/rollback reverts to specified model version",
+                "type": "functional",
+            },
             {"description": "Non-Enterprise tier receives 403 Forbidden", "type": "functional"},
         ],
     },
@@ -95,7 +116,10 @@ specs = [
         "status": "specified",
         "section": "ADMIN_UI",
         "assertions": [
-            {"description": "MemoryPrivacy page renders fine-tuning enable/disable toggle for Enterprise", "type": "ui"},
+            {
+                "description": "MemoryPrivacy page renders fine-tuning enable/disable toggle for Enterprise",
+                "type": "ui",
+            },
             {"description": "MemoryPrivacy page renders schedule picker with 3 options", "type": "ui"},
             {"description": "Non-Enterprise users see upgrade prompt instead of controls", "type": "ui"},
         ],
@@ -129,7 +153,10 @@ specs = [
         "section": "INFRASTRUCTURE",
         "assertions": [
             {"description": "Pipeline routes messages via SLIM transport when configured", "type": "functional"},
-            {"description": "All A2A messages include X-Tenant-Id, X-Conversation-Id, X-Trace-Id headers", "type": "functional"},
+            {
+                "description": "All A2A messages include X-Tenant-Id, X-Conversation-Id, X-Trace-Id headers",
+                "type": "functional",
+            },
             {"description": "Agent responses use reply_to routing", "type": "functional"},
         ],
     },
@@ -220,7 +247,10 @@ specs = [
             {"description": "Pipeline trace includes per-stage latency for all agents", "type": "functional"},
             {"description": "Pipeline trace includes agent output summaries", "type": "functional"},
             {"description": "Pipeline trace persisted on conversation document", "type": "functional"},
-            {"description": "GET /api/admin/conversations/{id}/trace returns pipeline trace data", "type": "functional"},
+            {
+                "description": "GET /api/admin/conversations/{id}/trace returns pipeline trace data",
+                "type": "functional",
+            },
         ],
     },
     {

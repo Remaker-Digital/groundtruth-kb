@@ -12,6 +12,7 @@ Strategy:
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
 import os
 import json
@@ -138,7 +139,9 @@ def main():
             existing_ids = []
             if phase.get("test_ids"):
                 try:
-                    existing_ids = json.loads(phase["test_ids"]) if isinstance(phase["test_ids"], str) else phase["test_ids"]
+                    existing_ids = (
+                        json.loads(phase["test_ids"]) if isinstance(phase["test_ids"], str) else phase["test_ids"]
+                    )
                 except (json.JSONDecodeError, TypeError):
                     existing_ids = []
             phase_data[phase_id] = {
@@ -160,10 +163,7 @@ def main():
 
     orphans = []
     for t in all_tests:
-        test = {
-            "id": t[0], "title": t[1], "spec_id": t[2],
-            "test_type": t[3], "test_file": t[4]
-        }
+        test = {"id": t[0], "title": t[1], "spec_id": t[2], "test_type": t[3], "test_file": t[4]}
         if test["id"] not in all_phase_ids:
             orphans.append(test)
 
@@ -220,14 +220,14 @@ def main():
 
     all_test_ids = set(t[0] for t in all_tests)
     remaining_orphans = all_test_ids - all_phase_ids_after
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Total tests: {len(all_test_ids)}")
     print(f"Tests in phases: {len(all_phase_ids_after)}")
     print(f"Remaining orphans: {len(remaining_orphans)}")
     if remaining_orphans:
         for oid in sorted(remaining_orphans)[:10]:
             print(f"  {oid}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

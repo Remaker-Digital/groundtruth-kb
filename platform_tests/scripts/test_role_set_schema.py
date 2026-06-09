@@ -22,6 +22,12 @@ from pathlib import Path
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def clear_registry_env(monkeypatch):
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGE_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
 if str(_PACKAGE_SRC) not in sys.path:
@@ -60,13 +66,16 @@ from scripts.harness_roles import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> None:
+def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]] | tuple[str, list[str], str]]) -> None:
     """Seed a groundtruth.db ``harnesses`` table + generated projection.
 
-    ``harnesses`` maps each durable harness id to ``(harness_name, role_set)``.
+    ``harnesses`` maps each durable harness id to ``(harness_name, role_set, [status])``.
     """
     db = KnowledgeDB(db_path=root / "groundtruth.db")
-    for harness_id, (harness_name, role_set) in harnesses.items():
+    for harness_id, val in harnesses.items():
+        harness_name = val[0]
+        role_set = val[1]
+        status = val[2] if len(val) > 2 else "active"
         db.insert_harness(
             id=harness_id,
             harness_name=harness_name,
@@ -74,7 +83,7 @@ def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> N
             role=list(role_set),
             changed_by="test",
             change_reason="WI-3342 IP-6 role_set_schema fixture",
-            status="active",
+            status=status,
         )
     generate_harness_projection(db, root)
 
@@ -84,8 +93,11 @@ def _write_projection_directly(root: Path, harnesses: list[dict]) -> None:
 
     Used by the legacy-scalar READ-tolerance tests: the projection reader and
     ``_normalize_role_field`` must accept a legacy scalar ``role`` wire form in
-    a projection record even though the DB writer always emits list form.
+    a projection record even though the DB writer itself always emits list form.
     """
+    # Ensure they have status active so load_role_assignments doesn't ignore them
+    for h in harnesses:
+        h.setdefault("status", "active")
     registry = root / "harness-state" / "harness-registry.json"
     registry.parent.mkdir(parents=True, exist_ok=True)
     registry.write_text(
@@ -205,7 +217,15 @@ def test_primary_role_prime_first() -> None:
 def test_set_harness_role_writes_list_form(tmp_path: Path) -> None:
     # WI-3342 IP-6: the write path persists to the DB ``harnesses`` table and
     # regenerates the registry projection; the harness must exist in the DB.
-    _seed_registry(tmp_path, {"A": ("codex", [ROLE_LOYAL_OPPOSITION])})
+    # Seed active B and D to satisfy active partition, A is suspended
+    _seed_registry(
+        tmp_path,
+        {
+            "A": ("codex", [ROLE_LOYAL_OPPOSITION], "suspended"),
+            "B": ("claude", [ROLE_PRIME_BUILDER], "active"),
+            "D": ("ollama", [ROLE_LOYAL_OPPOSITION], "active"),
+        },
+    )
     set_harness_role(
         tmp_path,
         ROLE_PRIME_BUILDER,
@@ -220,7 +240,15 @@ def test_set_harness_role_writes_list_form(tmp_path: Path) -> None:
 def test_role_for_harness_writes_list_form_on_self_correction(tmp_path: Path) -> None:
     # WI-3342 IP-6: self-correction writes to the DB + projection; seed harness
     # B so the corrective role write lands (the mirror skips DB-less harnesses).
-    _seed_registry(tmp_path, {"B": ("claude", [])})
+    # Seed active A and D to satisfy active partition, B is suspended
+    _seed_registry(
+        tmp_path,
+        {
+            "B": ("claude", [], "suspended"),
+            "A": ("codex", [ROLE_LOYAL_OPPOSITION], "active"),
+            "D": ("ollama", [ROLE_PRIME_BUILDER], "active"),
+        },
+    )
     role_for_harness(
         tmp_path,
         harness_id="B",
@@ -264,15 +292,17 @@ def test_legacy_scalar_upgrades_to_list_on_first_write(tmp_path: Path) -> None:
     list-emission contract: after a ``set_harness_role`` write, every role
     record in the regenerated projection is list form (no scalar leaks).
     """
+    # Seed active A and D to satisfy active partition, B is suspended
     _seed_registry(
         tmp_path,
         {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
+            "A": ("codex", [ROLE_LOYAL_OPPOSITION], "active"),
+            "B": ("claude", [ROLE_PRIME_BUILDER], "suspended"),
+            "D": ("ollama", [ROLE_PRIME_BUILDER], "active"),
         },
     )
 
-    # Trigger a write via set_harness_role.
+    # Trigger a write via set_harness_role on B (suspended)
     set_harness_role(
         tmp_path,
         ROLE_LOYAL_OPPOSITION,

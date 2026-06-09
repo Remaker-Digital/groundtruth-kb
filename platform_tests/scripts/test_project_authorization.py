@@ -44,6 +44,13 @@ def _seed_project_authorization_inputs(tmp_path: Path) -> None:
             "seed owner decision",
             outcome="owner_decision",
         )
+        db.insert_spec(
+            "SPEC-SCOPED-IMPL",
+            "Scoped spec",
+            "specified",
+            "test",
+            "seed spec",
+        )
         db.insert_work_item(
             "WI-PROJECT-AUTH-001",
             "Project authorization work item",

@@ -31,8 +31,7 @@ def run(window_start, window_end, project_root=None):
         with sqlite3.connect(str(db_path)) as con:
             for table in per_table:
                 rows = con.execute(
-                    "SELECT COALESCE(change_reason, '') FROM " + table + " "
-                    "WHERE changed_at >= ? AND changed_at <= ?",
+                    "SELECT COALESCE(change_reason, '') FROM " + table + " WHERE changed_at >= ? AND changed_at <= ?",
                     (window_start, window_end),
                 ).fetchall()
                 for (reason,) in rows:

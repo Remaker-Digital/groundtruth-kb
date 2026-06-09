@@ -176,9 +176,7 @@ def handle_control_plane_request(
             descriptor = None
 
     dry_run = bool(request.get("dry_run", False))
-    requires_token = (
-        descriptor is not None and bool(descriptor.required_role_slots) and not dry_run
-    )
+    requires_token = descriptor is not None and bool(descriptor.required_role_slots) and not dry_run
 
     if requires_token:
         if not state.token:
@@ -238,9 +236,9 @@ def _make_handler(state: RefreshState) -> type[BaseHTTPRequestHandler]:
 
         def _handle_control_plane_post(self) -> None:
             body = self._read_json_body()
-            supplied_token = (
-                str(body.get("token", "")) if isinstance(body, dict) else ""
-            ) or self.headers.get("X-Refresh-Token", "")
+            supplied_token = (str(body.get("token", "")) if isinstance(body, dict) else "") or self.headers.get(
+                "X-Refresh-Token", ""
+            )
             # Do not forward the token field into the registry — it is a
             # transport-layer credential, not a handler parameter.
             request = {k: v for k, v in body.items() if k != "token"}

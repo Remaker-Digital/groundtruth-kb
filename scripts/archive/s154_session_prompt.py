@@ -1,9 +1,10 @@
 """S154 session handoff prompt."""
+
 import sqlite3
 import os
 from datetime import datetime, timezone
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db', 'knowledge.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db", "knowledge.db")
 
 conn = sqlite3.connect(DB_PATH)
 c = conn.cursor()
@@ -29,12 +30,12 @@ Current state:
 
 Next: [describe task]"""
 
-now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 c.execute(
     """INSERT INTO session_prompts (session_id, version, event_type, created_at, prompt_text, context)
        VALUES (?, 1, 'created', ?, ?, ?)""",
-    ('S154', now, prompt_text, 'S154 documentation + GitHub hygiene session')
+    ("S154", now, prompt_text, "S154 documentation + GitHub hygiene session"),
 )
 conn.commit()
 print(f"Inserted S154 session prompt")

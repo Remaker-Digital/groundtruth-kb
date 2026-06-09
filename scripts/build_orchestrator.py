@@ -103,18 +103,23 @@ def _run(cmd: list[str], timeout: int = 600) -> subprocess.CompletedProcess:
     """Run subprocess with real-time streaming."""
     r = stream_subprocess(cmd, cwd=str(PROJECT_ROOT), timeout=timeout, prefix="  ")
     return subprocess.CompletedProcess(
-        args=cmd, returncode=r.returncode, stdout=r.stdout, stderr="",
+        args=cmd,
+        returncode=r.returncode,
+        stdout=r.stdout,
+        stderr="",
     )
 
 
 def _step(result: BuildResult, name: str, status: str, detail: str = "") -> None:
     """Record a step in the build result."""
-    result.steps.append({
-        "name": name,
-        "status": status,
-        "detail": detail,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+    result.steps.append(
+        {
+            "name": name,
+            "status": status,
+            "detail": detail,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +130,9 @@ def _get_git_sha() -> str:
     try:
         r = subprocess.run(
             ["git", "rev-parse", "--short=8", "HEAD"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             cwd=str(PROJECT_ROOT),
         )
         return r.stdout.strip() if r.returncode == 0 else ""
@@ -184,26 +191,44 @@ def _acr_build(result: BuildResult, version: str, dry_run: bool) -> bool:
         _log("INFO", f"  [DRY RUN] Would build {full_image}")
         return True
 
-    r = _run([
-        "az", "acr", "build",
-        "--registry", ACR_NAME,
-        "--image", f"{IMAGE_REPO}:{version}",
-        "--build-arg", f"BUILD_VERSION={version}",
-        "--file", "Dockerfile",
-        "--no-logs",
-        ".",
-    ], timeout=600)
+    r = _run(
+        [
+            "az",
+            "acr",
+            "build",
+            "--registry",
+            ACR_NAME,
+            "--image",
+            f"{IMAGE_REPO}:{version}",
+            "--build-arg",
+            f"BUILD_VERSION={version}",
+            "--file",
+            "Dockerfile",
+            "--no-logs",
+            ".",
+        ],
+        timeout=600,
+    )
 
     # az acr build may crash with encoding errors on Windows even on success.
     # Verify via ACR run status instead of exit code alone.
     _log("INFO", "  Verifying ACR build status...")
-    r2 = _run([
-        "az", "acr", "task", "list-runs",
-        "--registry", ACR_NAME,
-        "--top", "1",
-        "--query", "[0].status",
-        "-o", "tsv",
-    ])
+    r2 = _run(
+        [
+            "az",
+            "acr",
+            "task",
+            "list-runs",
+            "--registry",
+            ACR_NAME,
+            "--top",
+            "1",
+            "--query",
+            "[0].status",
+            "-o",
+            "tsv",
+        ]
+    )
     build_status = r2.stdout.strip()
     if build_status != "Succeeded":
         _step(result, "acr_build", "failed", f"ACR status: {build_status}")
@@ -211,13 +236,22 @@ def _acr_build(result: BuildResult, version: str, dry_run: bool) -> bool:
         return False
 
     # Get run ID
-    r3 = _run([
-        "az", "acr", "task", "list-runs",
-        "--registry", ACR_NAME,
-        "--top", "1",
-        "--query", "[0].runId",
-        "-o", "tsv",
-    ])
+    r3 = _run(
+        [
+            "az",
+            "acr",
+            "task",
+            "list-runs",
+            "--registry",
+            ACR_NAME,
+            "--top",
+            "1",
+            "--query",
+            "[0].runId",
+            "-o",
+            "tsv",
+        ]
+    )
     result.acr_run_id = r3.stdout.strip()
 
     _step(result, "acr_build", "passed", f"run={result.acr_run_id}")
@@ -245,25 +279,32 @@ def _verify_image_tag(result: BuildResult, version: str, dry_run: bool) -> bool:
     delay_seconds = 5
 
     for attempt in range(1, max_attempts + 1):
-        r = _run([
-            "az", "acr", "repository", "show-tags",
-            "--name", ACR_NAME,
-            "--repository", IMAGE_REPO,
-            "--query", f"[?@=='{version}']",
-            "-o", "tsv",
-        ])
+        r = _run(
+            [
+                "az",
+                "acr",
+                "repository",
+                "show-tags",
+                "--name",
+                ACR_NAME,
+                "--repository",
+                IMAGE_REPO,
+                "--query",
+                f"[?@=='{version}']",
+                "-o",
+                "tsv",
+            ]
+        )
         if r.stdout.strip() == version:
             _step(result, "verify_tag", "passed", f"{version} (attempt {attempt})")
             _log("PASS", f"  Tag {version} verified in ACR (attempt {attempt}/{max_attempts})")
             return True
 
         if attempt < max_attempts:
-            _log("INFO", f"  Tag not yet visible (attempt {attempt}/{max_attempts}), "
-                 f"retrying in {delay_seconds}s...")
+            _log("INFO", f"  Tag not yet visible (attempt {attempt}/{max_attempts}), retrying in {delay_seconds}s...")
             time.sleep(delay_seconds)
 
-    _step(result, "verify_tag", "failed",
-          f"Tag {version} not found after {max_attempts} attempts")
+    _step(result, "verify_tag", "failed", f"Tag {version} not found after {max_attempts} attempts")
     result.error = (
         f"Image tag {version} not found in ACR after {max_attempts} attempts "
         f"(total wait: {(max_attempts - 1) * delay_seconds}s)"
@@ -287,13 +328,20 @@ def _tag_with_sha(result: BuildResult, version: str, dry_run: bool) -> bool:
         return True
 
     # Import the manifest to create an alias tag
-    r = _run([
-        "az", "acr", "import",
-        "--name", ACR_NAME,
-        "--source", f"{ACR_LOGIN_SERVER}/{IMAGE_REPO}:{version}",
-        "--image", f"{IMAGE_REPO}:{sha}",
-        "--force",
-    ])
+    r = _run(
+        [
+            "az",
+            "acr",
+            "import",
+            "--name",
+            ACR_NAME,
+            "--source",
+            f"{ACR_LOGIN_SERVER}/{IMAGE_REPO}:{version}",
+            "--image",
+            f"{IMAGE_REPO}:{sha}",
+            "--force",
+        ]
+    )
     if r.returncode != 0:
         _log("WARN", f"  SHA tag failed (non-fatal): {r.stdout.strip()[:200]}")
         _step(result, "sha_tag", "warning", f"Tag failed: {r.stdout.strip()[:100]}")
@@ -320,8 +368,7 @@ def run_build(version: str, *, dry_run: bool = False) -> BuildResult:
         started_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    _log("INFO", f"Build Orchestrator starting: {IMAGE_REPO}:{version}"
-         + (" [DRY RUN]" if dry_run else ""))
+    _log("INFO", f"Build Orchestrator starting: {IMAGE_REPO}:{version}" + (" [DRY RUN]" if dry_run else ""))
 
     steps = [
         lambda: _validate_prerequisites(result, version, dry_run),
@@ -340,8 +387,7 @@ def run_build(version: str, *, dry_run: bool = False) -> BuildResult:
 
     result.completed_at = datetime.now(timezone.utc).isoformat()
     result.duration_s = round(
-        (datetime.fromisoformat(result.completed_at)
-         - datetime.fromisoformat(result.started_at)).total_seconds(), 1
+        (datetime.fromisoformat(result.completed_at) - datetime.fromisoformat(result.started_at)).total_seconds(), 1
     )
 
     level = "PASS" if result.status == "succeeded" else "FAIL"
@@ -357,12 +403,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build Orchestrator — ACR build + tag + verify (SPEC-1825)",
     )
-    parser.add_argument("--version", required=True,
-                        help="Image version tag (e.g., v1.90.0)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validate without executing builds")
-    parser.add_argument("--json", action="store_true",
-                        help="Output result as JSON (for SPA integration)")
+    parser.add_argument("--version", required=True, help="Image version tag (e.g., v1.90.0)")
+    parser.add_argument("--dry-run", action="store_true", help="Validate without executing builds")
+    parser.add_argument("--json", action="store_true", help="Output result as JSON (for SPA integration)")
     args = parser.parse_args()
 
     result = run_build(args.version, dry_run=args.dry_run)

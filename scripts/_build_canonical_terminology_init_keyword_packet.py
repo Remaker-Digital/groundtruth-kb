@@ -23,7 +23,7 @@ from pathlib import Path
 NEW_SECTION = (
     "### canonical init keyword\n"
     "\n"
-    "**Canonical alias:** init-keyword; \"::init gtkb <mode>\".\n"
+    '**Canonical alias:** init-keyword; "::init gtkb <mode>".\n'
     "\n"
     "**Definition:** The canonical first-line activator syntax for machine-emitted GroundTruth-KB session "
     "prompts, formalized as `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001`. Regex `^::init gtkb (pb|lo)$`; "
@@ -62,11 +62,7 @@ def main() -> None:
             "anchor for new glossary entry insertion not found in canonical-terminology.md; "
             "check that the OS poller block still ends at the expected sentence."
         )
-    replacement = (
-        "`bridge-essential.md` § Re-Enabling Pollers.\n\n"
-        + NEW_SECTION
-        + "### doctor\n"
-    )
+    replacement = "`bridge-essential.md` § Re-Enabling Pollers.\n\n" + NEW_SECTION + "### doctor\n"
     new_content = current.replace(anchor, replacement, 1)
     new_hash = hashlib.sha256(new_content.encode("utf-8")).hexdigest()
 
@@ -98,7 +94,9 @@ def main() -> None:
         "approved_by": "owner",
     }
 
-    out_path = Path(".groundtruth/formal-artifact-approvals/2026-05-12-canonical-terminology-canonical-init-keyword-entry.json")
+    out_path = Path(
+        ".groundtruth/formal-artifact-approvals/2026-05-12-canonical-terminology-canonical-init-keyword-entry.json"
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
     print(f"wrote packet: {out_path}")

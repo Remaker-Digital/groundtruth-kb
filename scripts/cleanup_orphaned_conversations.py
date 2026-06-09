@@ -33,6 +33,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts._env import load_env_local
+
 load_env_local()
 
 from azure.cosmos import CosmosClient  # noqa: E402
@@ -82,11 +83,13 @@ def find_orphaned_conversations(container, tenant_id: str) -> list[dict]:
       )
     """
     params = [{"name": "@tenant_id", "value": tenant_id}]
-    items = list(container.query_items(
-        query=query,
-        parameters=params,
-        partition_key=tenant_id,
-    ))
+    items = list(
+        container.query_items(
+            query=query,
+            parameters=params,
+            partition_key=tenant_id,
+        )
+    )
     return items
 
 
@@ -102,11 +105,13 @@ def count_all_conversations(container, tenant_id: str) -> dict[str, int]:
     WHERE c.tenant_id = @tenant_id
     """
     params = [{"name": "@tenant_id", "value": tenant_id}]
-    results = list(container.query_items(
-        query=query,
-        parameters=params,
-        partition_key=tenant_id,
-    ))
+    results = list(
+        container.query_items(
+            query=query,
+            parameters=params,
+            partition_key=tenant_id,
+        )
+    )
     if results:
         return results[0]
     return {"total": 0, "billable": 0, "zero_messages": 0, "billable_zero_msg": 0}
@@ -133,21 +138,19 @@ def patch_to_non_billable(container, item: dict, dry_run: bool = True) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="WI-0930: Cleanup orphaned conversations")
-    parser.add_argument("--env", choices=["staging"], required=True,
-                        help="Target environment (staging only)")
+    parser.add_argument("--env", choices=["staging"], required=True, help="Target environment (staging only)")
     parser.add_argument("--tenant", help="Specific tenant ID (default: all staging tenants)")
-    parser.add_argument("--dry-run", action="store_true", default=False,
-                        help="Report only, do not patch")
+    parser.add_argument("--dry-run", action="store_true", default=False, help="Report only, do not patch")
     args = parser.parse_args()
 
     tenants = [args.tenant] if args.tenant else STAGING_TENANTS
 
     print(f"\nWI-0930: Staging Data Cleanup")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Environment: {args.env}")
     print(f"  Tenants:     {', '.join(tenants)}")
     print(f"  Mode:        {'DRY RUN' if args.dry_run else 'LIVE PATCH'}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     client = get_cosmos_client()
     database = client.get_database_client(STAGING_DATABASE)
@@ -179,13 +182,19 @@ def main():
 
         # Categorize
         zero_msg = [o for o in orphans if o.get("message_count", 0) == 0]
-        prefixed = [o for o in orphans
-                     if any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES)
-                     and o.get("message_count", 0) > 0]
-        admin_asst = [o for o in orphans
-                      if o.get("conversation_type") == "admin_assistance"
-                      and o.get("message_count", 0) > 0
-                      and not any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES)]
+        prefixed = [
+            o
+            for o in orphans
+            if any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES)
+            and o.get("message_count", 0) > 0
+        ]
+        admin_asst = [
+            o
+            for o in orphans
+            if o.get("conversation_type") == "admin_assistance"
+            and o.get("message_count", 0) > 0
+            and not any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES)
+        ]
 
         print(f"    Zero-message (abandoned):     {len(zero_msg)}")
         print(f"    Non-billable prefix:          {len(prefixed)}")
@@ -196,9 +205,14 @@ def main():
         patched = 0
         errors = 0
         for o in orphans:
-            reason = "zero_msg" if o.get("message_count", 0) == 0 else (
-                "prefix" if any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES) else
-                "admin_assistance"
+            reason = (
+                "zero_msg"
+                if o.get("message_count", 0) == 0
+                else (
+                    "prefix"
+                    if any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES)
+                    else "admin_assistance"
+                )
             )
             status = o.get("status", "?")
             msg_count = o.get("message_count", 0)
@@ -229,9 +243,9 @@ def main():
 
         print()
 
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Total found:   {total_found}")
     print(f"  Total {'would patch' if args.dry_run else 'patched'}:  {total_patched}")
     print(f"  Total errors:  {total_errors}")

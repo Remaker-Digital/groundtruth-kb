@@ -92,15 +92,15 @@ async def seed_platform_admin(
         "last_login_at": None,
     }
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  SPA Platform Admin Seed — {env.upper()}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Database:     {config['database']}")
     print(f"  Collection:   {COLLECTION_PLATFORM_ADMINS}")
     print(f"  Admin ID:     {admin_id}")
     print(f"  Email:        {email}")
     print(f"  Display Name: {display_name}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     async with CosmosClient(endpoint, credential=key) as client:
         database = client.get_database_client(config["database"])
@@ -156,18 +156,18 @@ async def seed_platform_admin(
         print(f"  [OK] Platform admin created: {admin_id}")
 
     # Print credentials — MUST BE SAVED IMMEDIATELY
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  CREDENTIALS — SAVE THESE NOW")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  SPA API Key:  {raw_key}")
     print(f"  Key Hash:     {key_hash[:16]}...")
     print(f"  Admin ID:     {admin_id}")
     print(f"  Email:        {email}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"\n  This key is printed ONCE and never stored in plaintext.")
     print(f"  Store it in Azure Key Vault:")
     print(f"    az keyvault secret set --vault-name kv-agentred-eastus \\")
-    print(f"      --name SPA-PLATFORM-ADMIN-KEY --value \"{raw_key}\"")
+    print(f'      --name SPA-PLATFORM-ADMIN-KEY --value "{raw_key}"')
     print()
 
 

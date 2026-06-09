@@ -131,16 +131,11 @@ OWNER_DIRECTIVES_INDEX = {
         "source_ref": "owner_conversation:2026-04-29-S321-default-workspace-gtkb-with-interrogation",
     },
     "platform_app_non_specific": {
-        "quote": (
-            "all work on the GT-KB project must be implemented in a fashion "
-            "that is application non-specific."
-        ),
+        "quote": ("all work on the GT-KB project must be implemented in a fashion that is application non-specific."),
         "source_ref": "owner_conversation:2026-04-29-S321-platform-application-non-specificity",
     },
     "strict_mechanical_enforcement": {
-        "quote": (
-            "We need *STRICT MECHANICAL ENFORCEMENT* of these directives."
-        ),
+        "quote": ("We need *STRICT MECHANICAL ENFORCEMENT* of these directives."),
         "source_ref": "owner_conversation:2026-04-29-S321-strict-mechanical-enforcement",
     },
     "smart_poller_auto_trigger": {
@@ -209,8 +204,14 @@ OWNER_DIRECTIVES_INDEX = {
 SPEC_TO_DIRECTIVES = {
     # Phase 1 (commit 49f5b6dd)
     "GOV-SPEC-CREATION-STANDING-AUTHORIZATION-001": ["spec_creation_standing_auth"],
-    "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001": ["impl_proposal_spec_linkage", "strict_mechanical_enforcement"],
-    "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001": ["verified_spec_derived_testing", "strict_mechanical_enforcement"],
+    "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001": [
+        "impl_proposal_spec_linkage",
+        "strict_mechanical_enforcement",
+    ],
+    "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001": [
+        "verified_spec_derived_testing",
+        "strict_mechanical_enforcement",
+    ],
     "DCL-DEFAULT-WORKSPACE-IS-GT-KB-001": ["default_workspace_gtkb"],
     "DCL-WORKSPACE-EXCEPTION-INTERROGATION-001": ["default_workspace_gtkb"],
     "DCL-WORKSPACE-INFERENCE-PROHIBITED-001": ["default_workspace_gtkb", "strict_mechanical_enforcement"],
@@ -226,7 +227,11 @@ SPEC_TO_DIRECTIVES = {
     "DCL-SPEC-RELEVANCE-CLOSURE-001": ["impl_proposal_spec_linkage"],
     "DCL-VERIFIED-BRIDGE-HISTORY-001": ["verified_spec_derived_testing"],
     "DCL-CROSS-HARNESS-ENFORCEMENT-001": ["impl_proposal_spec_linkage", "strict_mechanical_enforcement"],
-    "ADR-SPEC-COVERAGE-ARCHITECTURE-001": ["platform_failure_diagnosis", "impl_proposal_spec_linkage", "verified_spec_derived_testing"],
+    "ADR-SPEC-COVERAGE-ARCHITECTURE-001": [
+        "platform_failure_diagnosis",
+        "impl_proposal_spec_linkage",
+        "verified_spec_derived_testing",
+    ],
     # Phase 3 (commit e060d6fd)
     "DCL-SPEC-TEST-IMPL-TRIAD-COMPLETENESS-001": ["triad_completeness"],
     "DCL-RETROACTIVE-LINKAGE-OBLIGATION-001": ["triad_completeness"],
@@ -240,30 +245,49 @@ SPEC_TO_DIRECTIVES = {
 
 def make_approval_packet_spec(spec: dict) -> dict:
     full_content = json.dumps(
-        {"id": spec["id"], "type": spec["type"], "title": spec["title"],
-         "description": spec["description"], "tags": spec.get("tags", []),
-         "assertions": spec.get("assertions", []), "scope": spec.get("scope", "")},
-        indent=2, sort_keys=True,
+        {
+            "id": spec["id"],
+            "type": spec["type"],
+            "title": spec["title"],
+            "description": spec["description"],
+            "tags": spec.get("tags", []),
+            "assertions": spec.get("assertions", []),
+            "scope": spec.get("scope", ""),
+        },
+        indent=2,
+        sort_keys=True,
     )
     sha256 = hashlib.sha256(full_content.encode("utf-8")).hexdigest()
     return {
-        "artifact_type": "specification", "artifact_id": spec["id"], "action": "insert",
+        "artifact_type": "specification",
+        "artifact_id": spec["id"],
+        "action": "insert",
         "source_ref": "owner_conversation:2026-04-29-S321-da-citation-mandatory",
-        "full_content": full_content, "full_content_sha256": sha256,
-        "approval_mode": "acknowledge", "presented_to_user": True, "transcript_captured": True,
+        "full_content": full_content,
+        "full_content_sha256": sha256,
+        "approval_mode": "acknowledge",
+        "presented_to_user": True,
+        "transcript_captured": True,
         "explicit_change_request": "Owner directive 2026-04-29: LO can reject specs without DA backing; DA must capture originating user input.",
         "changed_by": CHANGED_BY,
         "change_reason": "Capture S321 phase-4 spec; standing authorization grants approval.",
-        "approved_by": "owner", "acknowledged_by": "owner",
+        "approved_by": "owner",
+        "acknowledged_by": "owner",
     }
 
 
 def make_approval_packet_delib(delib: dict) -> dict:
     full_content = json.dumps(
-        {"id": delib.get("id", ""), "title": delib["title"],
-         "summary": delib.get("summary", ""), "outcome": delib.get("outcome", ""),
-         "source_type": delib.get("source_type", ""), "source_ref": delib.get("source_ref", "")},
-        indent=2, sort_keys=True,
+        {
+            "id": delib.get("id", ""),
+            "title": delib["title"],
+            "summary": delib.get("summary", ""),
+            "outcome": delib.get("outcome", ""),
+            "source_type": delib.get("source_type", ""),
+            "source_ref": delib.get("source_ref", ""),
+        },
+        indent=2,
+        sort_keys=True,
     )
     sha256 = hashlib.sha256(full_content.encode("utf-8")).hexdigest()
     return {
@@ -279,7 +303,8 @@ def make_approval_packet_delib(delib: dict) -> dict:
         "explicit_change_request": "Owner directive S321 captured as DA entry per DCL-SPEC-DA-CITATION-MANDATORY-001.",
         "changed_by": CHANGED_BY,
         "change_reason": "Retroactive DA capture for S321 owner directive that originated linked specs.",
-        "approved_by": "owner", "acknowledged_by": "owner",
+        "approved_by": "owner",
+        "acknowledged_by": "owner",
     }
 
 
@@ -295,11 +320,17 @@ def main() -> int:
     packet_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
     try:
         api.insert_spec(
-            id=NEW_SPEC["id"], title=NEW_SPEC["title"], status="specified",
-            changed_by=CHANGED_BY, change_reason="S321 phase-4: DA-citation directive",
-            description=NEW_SPEC["description"], type=NEW_SPEC["type"],
-            tags=NEW_SPEC["tags"], assertions=NEW_SPEC["assertions"],
-            scope=NEW_SPEC["scope"], validate_assertions=False,
+            id=NEW_SPEC["id"],
+            title=NEW_SPEC["title"],
+            status="specified",
+            changed_by=CHANGED_BY,
+            change_reason="S321 phase-4: DA-citation directive",
+            description=NEW_SPEC["description"],
+            type=NEW_SPEC["type"],
+            tags=NEW_SPEC["tags"],
+            assertions=NEW_SPEC["assertions"],
+            scope=NEW_SPEC["scope"],
+            validate_assertions=False,
         )
         print(f"  OK {NEW_SPEC['id']}")
     except Exception as exc:

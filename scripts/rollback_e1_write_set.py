@@ -58,16 +58,12 @@ def validate_agent_red_destination(path_text: str, repo_root: Path) -> Path:
     """
     # 1. Reject absolute paths under EITHER OS's rules.
     if PurePosixPath(path_text).is_absolute() or PureWindowsPath(path_text).is_absolute():
-        raise AssertionError(
-            f"Refusing to remove absolute destination path: {path_text}"
-        )
+        raise AssertionError(f"Refusing to remove absolute destination path: {path_text}")
 
     # 2. Reject parent traversal at the string layer (before any filesystem operation).
     normalized_parts = path_text.replace("\\", "/").split("/")
     if ".." in normalized_parts:
-        raise AssertionError(
-            f"Refusing to remove destination path with parent traversal: {path_text}"
-        )
+        raise AssertionError(f"Refusing to remove destination path with parent traversal: {path_text}")
 
     # 3. Resolve relative to repo_root and check containment via relative_to().
     candidate = (repo_root / path_text).resolve(strict=False)
@@ -75,9 +71,7 @@ def validate_agent_red_destination(path_text: str, repo_root: Path) -> Path:
     try:
         candidate.relative_to(allowed_root)
     except ValueError:
-        raise AssertionError(
-            f"Refusing to remove out-of-scope destination path: {path_text}"
-        )
+        raise AssertionError(f"Refusing to remove out-of-scope destination path: {path_text}")
 
     return candidate
 
@@ -176,8 +170,7 @@ def main() -> int:
     write_set_path = Path(".tmp/e1-drift/write-set.json")
     if not write_set_path.exists():
         print(
-            f"ERROR: write-set not found at {write_set_path}. "
-            "Run Step 0 and Step 0.5 first to generate it.",
+            f"ERROR: write-set not found at {write_set_path}. Run Step 0 and Step 0.5 first to generate it.",
             file=sys.stderr,
         )
         return 1

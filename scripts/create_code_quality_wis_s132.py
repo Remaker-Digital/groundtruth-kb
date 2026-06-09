@@ -190,8 +190,7 @@ wis = [
         priority="P1",
         source_spec_id="SPEC-1622",
         failure_description=(
-            "11 modules use blocking smtplib in async code paths, blocking the event loop "
-            "for 1-10s per send."
+            "11 modules use blocking smtplib in async code paths, blocking the event loop for 1-10s per send."
         ),
         description=(
             "Wrap each smtplib send block in asyncio.to_thread(). Affected: standalone_auth, "
@@ -207,9 +206,7 @@ wis = [
         component="infrastructure_automation",
         priority="P3",
         source_spec_id="SPEC-1623",
-        failure_description=(
-            "PreAuthRateLimiter.cleanup() exists but is never called. Memory grows unbounded."
-        ),
+        failure_description=("PreAuthRateLimiter.cleanup() exists but is never called. Memory grows unbounded."),
         description=(
             "Add a background task in lifecycle.py startup that calls "
             "get_pre_auth_limiter().cleanup() periodically (every 5-10 minutes)."
@@ -236,8 +233,7 @@ wis = [
         priority="P4",
         source_spec_id="SPEC-1625",
         description=(
-            "Wrap the semaphore.locked() check and _waiting increment in an asyncio.Lock "
-            "for defensive robustness."
+            "Wrap the semaphore.locked() check and _waiting increment in an asyncio.Lock for defensive robustness."
         ),
     ),
     dict(
@@ -260,8 +256,7 @@ wis = [
         priority="P4",
         source_spec_id="SPEC-1627",
         description=(
-            "Rename repository.py to repositories/tenant.py or consolidate all into "
-            "repositories/. Update all imports."
+            "Rename repository.py to repositories/tenant.py or consolidate all into repositories/. Update all imports."
         ),
     ),
 ]
@@ -328,8 +323,7 @@ tests = [
         spec_id="SPEC-1624",
         test_type="assertion",
         expected_outcome=(
-            "Zero occurrences of app.on_event() in src/. All startup/shutdown logic "
-            "uses the lifespan context manager."
+            "Zero occurrences of app.on_event() in src/. All startup/shutdown logic uses the lifespan context manager."
         ),
     ),
     dict(

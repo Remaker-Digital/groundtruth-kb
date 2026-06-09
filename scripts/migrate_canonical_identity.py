@@ -109,7 +109,10 @@ async def migrate_tenant(
         if dry_run:
             logger.info(
                 "  [DRY RUN] %s → %s (attr: %s=%s)",
-                old_customer_id, canonical_id, attr_type.value, old_customer_id,
+                old_customer_id,
+                canonical_id,
+                attr_type.value,
+                old_customer_id,
             )
             stats["profiles_migrated"] += 1
             continue
@@ -129,7 +132,9 @@ async def migrate_tenant(
             stats["profiles_migrated"] += 1
             logger.info(
                 "  Migrated %s → %s (attr: %s)",
-                old_customer_id, canonical_id, attr_type.value,
+                old_customer_id,
+                canonical_id,
+                attr_type.value,
             )
         except Exception as exc:
             logger.error("  FAILED to migrate profile %s: %s", old_customer_id, exc)
@@ -190,6 +195,7 @@ async def main(args: argparse.Namespace) -> None:
 
     # Initialize Cosmos DB connection (lightweight — only connect, don't create containers)
     from src.multi_tenant.cosmos_client import get_cosmos_manager
+
     manager = get_cosmos_manager()
     try:
         await manager.initialize()
@@ -204,6 +210,7 @@ async def main(args: argparse.Namespace) -> None:
     else:
         # Query all active tenants
         from src.multi_tenant.repository import TenantRepository
+
         tenant_repo = TenantRepository()
         tenants = await tenant_repo.query(
             tenant_id="",  # platform-wide

@@ -79,8 +79,7 @@ from scripts._subprocess_stream import stream_subprocess  # noqa: E402
 class PhaseResult:
     """Result of a single pipeline phase."""
 
-    def __init__(self, phase: int, name: str, status: str, duration: float,
-                 detail: str = "", extra: str = ""):
+    def __init__(self, phase: int, name: str, status: str, duration: float, detail: str = "", extra: str = ""):
         self.phase = phase
         self.name = name
         self.status = status  # PASS, FAIL, WARN, SKIP
@@ -140,6 +139,7 @@ def _get_env_vars(args: argparse.Namespace) -> dict[str, str]:
     """
     try:
         from scripts.upgrade_verification import ENVIRONMENTS, TENANTS
+
         env_cfg = ENVIRONMENTS.get(args.env, {})
         fqdn = env_cfg.get("fqdn", "")
         superadmin_key = env_cfg.get("api_key", "")  # ENVIRONMENTS uses "api_key" key
@@ -202,15 +202,19 @@ def _check_required_env_vars(
     if missing:
         detail = ", ".join(missing)
         log("WARN", f"  {phase_name}: missing env vars: {detail} — skipping (SPEC-1845)")
-        return PhaseResult(phase_num, phase_name, "WARN", 0.0,
-                           f"missing env vars: {detail} — SPEC-1845")
+        return PhaseResult(phase_num, phase_name, "WARN", 0.0, f"missing env vars: {detail} — SPEC-1845")
     return None
 
 
-def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
-                prefix: str = "  [pytest] ", extra_args: list[str] | None = None,
-                xdist: bool = False,
-                extra_env: dict[str, str] | None = None) -> tuple[int, int, int, int, float, str]:
+def _run_pytest(
+    test_path: str | list[str],
+    *,
+    timeout: int = 300,
+    prefix: str = "  [pytest] ",
+    extra_args: list[str] | None = None,
+    xdist: bool = False,
+    extra_env: dict[str, str] | None = None,
+) -> tuple[int, int, int, int, float, str]:
     """Run pytest and return (passed, failed, errors, xfailed, duration, stdout).
 
     Handles all output parsing consistently across phases.
@@ -225,9 +229,17 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
     # Previous shared file caused 0/0/0 results for overwritten phases.
     phase_tag = prefix.strip().replace(" ", "-").strip("[]")
     junit_xml = os.path.join(xml_dir, f"test-results-pipeline-{phase_tag}.xml")
-    cmd = [sys.executable, "-m", "pytest", *test_path,
-           "-v", "--timeout=60", "--tb=short", "--no-header",
-           f"--junitxml={junit_xml}"]
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        *test_path,
+        "-v",
+        "--timeout=60",
+        "--tb=short",
+        "--no-header",
+        f"--junitxml={junit_xml}",
+    ]
     if xdist:
         cmd.extend(["-n", "4"])
     if extra_args:
@@ -244,8 +256,7 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
         os.remove(junit_xml)
 
     t0 = time.time()
-    r = stream_subprocess(cmd, cwd=PROJECT_ROOT, timeout=timeout, prefix=prefix,
-                          env=env)
+    r = stream_subprocess(cmd, cwd=PROJECT_ROOT, timeout=timeout, prefix=prefix, env=env)
     dt = time.time() - t0
 
     # Parse pytest summary — take LAST match (thermal-safe runner prints per-batch)
@@ -264,6 +275,7 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
     if passed == 0 and failed == 0 and errors == 0 and os.path.isfile(junit_xml):
         try:
             import xml.etree.ElementTree as ET
+
             tree = ET.parse(junit_xml)
             root = tree.getroot()
             # JUnit XML: <testsuite tests="N" errors="N" failures="N" ...>
@@ -276,8 +288,7 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
                 passed = xml_tests - xml_failures - xml_errors - xml_skipped
                 failed = xml_failures
                 errors = xml_errors
-                log("INFO", f"  {prefix.strip()}: JUnit XML fallback - "
-                    f"{passed}P/{failed}F/{errors}E from {junit_xml}")
+                log("INFO", f"  {prefix.strip()}: JUnit XML fallback - {passed}P/{failed}F/{errors}E from {junit_xml}")
         except Exception as e:
             log("WARN", f"  JUnit XML fallback failed: {e}")
 
@@ -288,6 +299,7 @@ def _record_phase_result(phase_num: int, result: str, detail: str) -> None:
     """Update the PLAN-001 phase record in the Knowledge Database."""
     try:
         from db import KnowledgeDB
+
         kdb = KnowledgeDB()
         try:
             phase_id = f"PHASE-{phase_num:03d}"
@@ -321,6 +333,7 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     # pytest available
     try:
         import pytest  # noqa: F401
+
         log("INFO", f"  pytest: {pytest.__version__}")
     except ImportError:
         failures.append("pytest not installed")
@@ -328,6 +341,7 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     # pytest-xdist
     try:
         import xdist  # noqa: F401
+
         log("INFO", "  pytest-xdist: available")
     except ImportError:
         failures.append("pytest-xdist not installed")
@@ -335,6 +349,7 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     # pytest-timeout
     try:
         import pytest_timeout  # noqa: F401
+
         log("INFO", "  pytest-timeout: available")
     except ImportError:
         failures.append("pytest-timeout not installed")
@@ -342,14 +357,16 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     # Playwright
     try:
         from playwright.sync_api import sync_playwright  # noqa: F401
+
         log("INFO", "  Playwright: available")
     except ImportError:
         failures.append("playwright not installed")
 
     # Node.js (use subprocess.run — stream_subprocess hangs on .cmd wrappers)
     try:
-        r = subprocess.run(["node", "--version"], capture_output=True, text=True,
-                           timeout=10, shell=(sys.platform == "win32"))
+        r = subprocess.run(
+            ["node", "--version"], capture_output=True, text=True, timeout=10, shell=(sys.platform == "win32")
+        )
         if r.returncode == 0:
             log("INFO", f"  Node.js: {r.stdout.strip()}")
         else:
@@ -359,8 +376,9 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
 
     # npm
     try:
-        r = subprocess.run(["npm", "--version"], capture_output=True, text=True,
-                           timeout=10, shell=(sys.platform == "win32"))
+        r = subprocess.run(
+            ["npm", "--version"], capture_output=True, text=True, timeout=10, shell=(sys.platform == "win32")
+        )
         if r.returncode == 0:
             log("INFO", f"  npm: {r.stdout.strip()}")
         else:
@@ -378,6 +396,7 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     # Locust (required — Phase 10 load testing)
     try:
         import locust as _locust_check  # noqa: F401
+
         log("INFO", f"  Locust: available ({_locust_check.__version__})")
     except ImportError:
         failures.append("Locust not installed — pip install locust")
@@ -388,6 +407,7 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
         # .env.local credentials
         try:
             from scripts._env import load_env_local
+
             load_env_local()
             log("INFO", "  .env.local: loaded")
         except Exception as e:
@@ -396,6 +416,7 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
         # ENVIRONMENTS dict
         try:
             from scripts.upgrade_verification import ENVIRONMENTS
+
             if args.env in ENVIRONMENTS:
                 log("INFO", f"  ENVIRONMENTS[{args.env}]: present")
             else:
@@ -406,10 +427,12 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
         # Health endpoint reachable
         try:
             from scripts.upgrade_verification import ENVIRONMENTS as _ENV
+
             env_cfg = _ENV.get(args.env, {})
             fqdn = env_cfg.get("fqdn", "")
             if fqdn:
                 import httpx
+
                 with httpx.Client(timeout=10.0) as c:
                     resp = c.get(f"https://{fqdn}/health")
                     if resp.status_code == 200:
@@ -442,9 +465,19 @@ def phase_1_preflight(args: argparse.Namespace) -> PhaseResult:
     t0 = time.time()
 
     r = stream_subprocess(
-        [sys.executable, str(PROJECT_ROOT / "scripts" / "pre_flight_checklist.py"),
-         "--phase", "C", "--env", args.env, "--new-version", args.version],
-        cwd=PROJECT_ROOT, timeout=600, prefix="  [preflight] ",
+        [
+            sys.executable,
+            str(PROJECT_ROOT / "scripts" / "pre_flight_checklist.py"),
+            "--phase",
+            "C",
+            "--env",
+            args.env,
+            "--new-version",
+            args.version,
+        ],
+        cwd=PROJECT_ROOT,
+        timeout=600,
+        prefix="  [preflight] ",
     )
 
     # Parse "NN PASS, NN WARN, NN FAIL" or "NN PASS"
@@ -465,8 +498,7 @@ def phase_1_preflight(args: argparse.Namespace) -> PhaseResult:
     if failed == 0 and passed > 0:
         status = "WARN" if warned > 0 else "PASS"
         log(status, f"  Pre-flight: {passed} PASS, {warned} WARN")
-        return PhaseResult(1, "Pre-flight Checks", status, dt,
-                           extra=f"[{passed} PASS, {warned} WARN]")
+        return PhaseResult(1, "Pre-flight Checks", status, dt, extra=f"[{passed} PASS, {warned} WARN]")
     else:
         detail = f"{passed} PASS, {failed} FAIL, {warned} WARN"
         log("FAIL", f"  Pre-flight: {detail}")
@@ -501,8 +533,7 @@ def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
 
     if args.env == "production":
         log("SKIP", "  Data seeding skipped — production environment")
-        return PhaseResult(2, "Data Seeding", "SKIP", time.time() - t0,
-                           "Skipped for production safety")
+        return PhaseResult(2, "Data Seeding", "SKIP", time.time() - t0, "Skipped for production safety")
 
     try:
         # S158 fix: seed_midflight reads env vars directly (not subprocess).
@@ -513,6 +544,7 @@ def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
             os.environ[k] = v
 
         from scripts.seed_midflight import run_seed
+
         ok = run_seed(
             env=args.env,
             skip_conversations=False,
@@ -523,6 +555,7 @@ def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
         # Phase 5 and Phase 8 assert tenant_b has >=1 team members.
         if args.env == "staging":
             from scripts.upgrade_verification import TENANTS
+
             tenant_b = TENANTS.get("staging:staging-001", {})
             tb_key = tenant_b.get("api_key", "")
             tb_widget = tenant_b.get("widget_key", "")
@@ -550,9 +583,16 @@ def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
         log("INFO", "  Refreshing upgrade verification Phase A snapshots...")
         try:
             snapshot_r = stream_subprocess(
-                [sys.executable, str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
-                 "multi-a", "--env", args.env],
-                cwd=PROJECT_ROOT, timeout=120, prefix="  [snapshot] ",
+                [
+                    sys.executable,
+                    str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
+                    "multi-a",
+                    "--env",
+                    args.env,
+                ],
+                cwd=PROJECT_ROOT,
+                timeout=120,
+                prefix="  [snapshot] ",
             )
             if snapshot_r.returncode == 0:
                 log("INFO", "  Phase A snapshots refreshed")
@@ -566,8 +606,7 @@ def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
             return PhaseResult(2, "Data Seeding", "PASS", dt)
         else:
             log("WARN", "  Data seeding completed with warnings")
-            return PhaseResult(2, "Data Seeding", "WARN", dt,
-                               "Some seed operations failed")
+            return PhaseResult(2, "Data Seeding", "WARN", dt, "Some seed operations failed")
     except Exception as e:
         dt = time.time() - t0
         detail = str(e)[:200]
@@ -588,8 +627,9 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
     # PROD_URL derives from STAGING_FQDN in both conftests (:43,:55).
     # Pipeline must ensure at least one URL surface is set.
     if not env_vars.get("PROD_URL") and not os.environ.get("STAGING_FQDN") and not os.environ.get("STAGING_URL"):
-        return PhaseResult(3, "Live E2E", "WARN", time.time() - t0,
-                           "missing PROD_URL/STAGING_FQDN/STAGING_URL — SPEC-1845")
+        return PhaseResult(
+            3, "Live E2E", "WARN", time.time() - t0, "missing PROD_URL/STAGING_FQDN/STAGING_URL — SPEC-1845"
+        )
     skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY"], 3, "Live E2E")
     if skip:
         return skip
@@ -606,7 +646,9 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
     # class-scoped shared fixtures.  Timeout reduced: class-scoped fixtures
     # + xdist parallelism reduces ~130 min to ~12-18 min.
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        "tests/e2e_live/", timeout=3600, prefix="  [live-e2e] ",
+        "tests/e2e_live/",
+        timeout=3600,
+        prefix="  [live-e2e] ",
         extra_env=env_vars,
         extra_args=["--timeout=120", "--dist=loadfile"],
         xdist=True,
@@ -617,8 +659,7 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
         if xfailed:
             extra_parts.append(f"{xfailed} xfailed")
         log("PASS", f"  Live E2E: {', '.join(extra_parts)}")
-        return PhaseResult(3, "Production Regression", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(3, "Production Regression", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Live E2E: {detail}")
@@ -641,12 +682,18 @@ def phase_5_tenant_isolation(args: argparse.Namespace) -> PhaseResult:
     env_vars = _get_env_vars(args)
     # Audit: test_tenant_isolation_live.py consumes PROD_URL, API_KEY,
     # WIDGET_KEY, TENANT_B_API_KEY, TENANT_B_WIDGET_KEY.
-    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "TENANT_B_API_KEY", "TENANT_B_WIDGET_KEY", "PROD_URL"], 5, "Tenant Isolation")
+    skip = _check_required_env_vars(
+        env_vars,
+        ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "TENANT_B_API_KEY", "TENANT_B_WIDGET_KEY", "PROD_URL"],
+        5,
+        "Tenant Isolation",
+    )
     if skip:
         return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_tenant_isolation_live.py",
-        timeout=300, prefix="  [isolation] ",
+        timeout=300,
+        prefix="  [isolation] ",
         extra_env=env_vars,
     )
 
@@ -667,19 +714,21 @@ def phase_6_security_penetration(args: argparse.Namespace) -> PhaseResult:
     t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_live_penetration.py consumes PROD_URL, API_KEY, WIDGET_KEY.
-    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 6, "Security Penetration")
+    skip = _check_required_env_vars(
+        env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 6, "Security Penetration"
+    )
     if skip:
         return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_live_penetration.py",
-        timeout=300, prefix="  [security] ",
+        timeout=300,
+        prefix="  [security] ",
         extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  API Security: {passed} passed")
-        return PhaseResult(6, "API Security & Penetration", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(6, "API Security & Penetration", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  API Security: {detail}")
@@ -700,20 +749,19 @@ def phase_7_rate_limiting(args: argparse.Namespace) -> PhaseResult:
     if not test_file.exists():
         dt = time.time() - t0
         log("WARN", "  Rate Limiting: test file not found — tests/security/test_rate_limiting_live.py")
-        return PhaseResult(7, "Rate Limiting & DoS", "WARN", dt,
-                           "test file missing — SPEC-1845 defect")
+        return PhaseResult(7, "Rate Limiting & DoS", "WARN", dt, "test file missing — SPEC-1845 defect")
 
     # SPEC-1845: Validate required env vars before running.
     env_vars = _get_env_vars(args)
     if not env_vars.get("SUPERADMIN_PREVIEW_API_KEY"):
         dt = time.time() - t0
         log("WARN", "  Rate Limiting: SUPERADMIN_PREVIEW_API_KEY not set — skipping")
-        return PhaseResult(7, "Rate Limiting & DoS", "WARN", dt,
-                           "missing env var — SPEC-1845")
+        return PhaseResult(7, "Rate Limiting & DoS", "WARN", dt, "missing env var — SPEC-1845")
 
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_rate_limiting_live.py",
-        timeout=600, prefix="  [rate-limit] ",
+        timeout=600,
+        prefix="  [rate-limit] ",
         extra_env=env_vars,
     )
 
@@ -735,19 +783,21 @@ def phase_8_data_integrity(args: argparse.Namespace) -> PhaseResult:
     env_vars = _get_env_vars(args)
     # Audit: test_data_integrity_live.py consumes PROD_URL, API_KEY, TENANT_B_API_KEY.
     # PREVIEW_WIDGET_KEY is declared but NOT consumed by any test.
-    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "TENANT_B_API_KEY", "PROD_URL"], 8, "Data Integrity")
+    skip = _check_required_env_vars(
+        env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "TENANT_B_API_KEY", "PROD_URL"], 8, "Data Integrity"
+    )
     if skip:
         return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_data_integrity_live.py",
-        timeout=300, prefix="  [integrity] ",
+        timeout=300,
+        prefix="  [integrity] ",
         extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  Data Integrity: {passed} passed")
-        return PhaseResult(8, "Data Integrity & Backup", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(8, "Data Integrity & Backup", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Data Integrity: {detail}")
@@ -762,12 +812,15 @@ def phase_9_resilience(args: argparse.Namespace) -> PhaseResult:
     t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_resilience_live.py consumes PROD_URL, API_KEY, WIDGET_KEY.
-    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 9, "Resilience")
+    skip = _check_required_env_vars(
+        env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 9, "Resilience"
+    )
     if skip:
         return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_resilience_live.py",
-        timeout=300, prefix="  [resilience] ",
+        timeout=300,
+        prefix="  [resilience] ",
         extra_env=env_vars,
     )
 
@@ -776,8 +829,7 @@ def phase_9_resilience(args: argparse.Namespace) -> PhaseResult:
         if xfailed:
             extra_parts.append(f"{xfailed} xfailed")
         log("PASS", f"  Resilience: {', '.join(extra_parts)}")
-        return PhaseResult(9, "Resilience & Failover", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(9, "Resilience & Failover", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Resilience: {detail}")
@@ -796,14 +848,15 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
     except ImportError:
         dt = time.time() - t0
         log("FAIL", "  Load Testing: locust not installed")
-        return PhaseResult(10, "Load Testing", "FAIL", dt,
-                           "locust not installed — pip install locust")
+        return PhaseResult(10, "Load Testing", "FAIL", dt, "locust not installed — pip install locust")
 
     # SPEC-1845: Validate required env vars before running.
     # locustfile.py requires LOAD_TEST_API_KEY and LOAD_TEST_WIDGET_KEY.
     # Locust also requires a target host (from conf file or PROD_URL).
     env_vars = _get_env_vars(args)
-    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 10, "Load Testing")
+    skip = _check_required_env_vars(
+        env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 10, "Load Testing"
+    )
     if skip:
         return skip
     load_api_key = env_vars.get("SUPERADMIN_PREVIEW_API_KEY", "")
@@ -827,15 +880,23 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
     # leave host unset (locust-staging.conf) or default to localhost (locust.conf).
     locust_host = env_vars.get("PROD_URL", "")
     locust_cmd = [
-        sys.executable, "-m", "locust", "-f", "tests/performance/locustfile.py",
-        "--config", conf_file, "--headless",
+        sys.executable,
+        "-m",
+        "locust",
+        "-f",
+        "tests/performance/locustfile.py",
+        "--config",
+        conf_file,
+        "--headless",
     ]
     if locust_host:
         locust_cmd.extend(["--host", locust_host])
 
     r = stream_subprocess(
         locust_cmd,
-        cwd=PROJECT_ROOT, timeout=300, prefix="  [locust] ",
+        cwd=PROJECT_ROOT,
+        timeout=300,
+        prefix="  [locust] ",
     )
 
     dt = time.time() - t0
@@ -853,13 +914,11 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
 
     if r.returncode == 0 and fail_count == 0:
         log("PASS", f"  Load Testing: 0 failures, P95={p95}ms")
-        return PhaseResult(10, "Load Testing", "PASS", dt,
-                           extra=f"[P95={p95}ms]")
+        return PhaseResult(10, "Load Testing", "PASS", dt, extra=f"[P95={p95}ms]")
     elif r.returncode == 0:
         # Locust succeeded but had some failures — WARN
         log("WARN", f"  Load Testing: {fail_count} failures, P95={p95}ms")
-        return PhaseResult(10, "Load Testing", "WARN", dt,
-                           f"{fail_count} failures, P95={p95}ms")
+        return PhaseResult(10, "Load Testing", "WARN", dt, f"{fail_count} failures, P95={p95}ms")
     else:
         detail = f"exit {r.returncode}, {fail_count} failures"
         log("FAIL", f"  Load Testing: {detail}")
@@ -883,14 +942,14 @@ def phase_11_conversation_quality(args: argparse.Namespace) -> PhaseResult:
         return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/live_api/test_conversation_quality_live.py",
-        timeout=300, prefix="  [conv-quality] ",
+        timeout=300,
+        prefix="  [conv-quality] ",
         extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  Conversation Quality: {passed} passed")
-        return PhaseResult(11, "Conversation Quality", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(11, "Conversation Quality", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Conversation Quality: {detail}")
@@ -919,20 +978,22 @@ def phase_13_config_pipeline(args: argparse.Namespace) -> PhaseResult:
     # Pass environment-specific variables (S132 lesson: env-aware config tests)
     env_vars = _get_env_vars(args)
     # Audit: test_config_pipeline_live.py consumes PROD_URL, API_KEY, WIDGET_KEY.
-    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 13, "Config Pipeline")
+    skip = _check_required_env_vars(
+        env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 13, "Config Pipeline"
+    )
     if skip:
         return skip
 
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_config_pipeline_live.py",
-        timeout=300, prefix="  [config] ",
+        timeout=300,
+        prefix="  [config] ",
         extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  Config Pipeline: {passed} passed")
-        return PhaseResult(13, "SPA Provisioning + Critical Path", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(13, "SPA Provisioning + Critical Path", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Config Pipeline: {detail}")
@@ -949,14 +1010,25 @@ def phase_14_upgrade_verification(args: argparse.Namespace) -> PhaseResult:
     # upgrade_verification.py multi-c also uses STAGING_001_*/STAGING_002_* keys
     # loaded directly via _load_env(). Those are validated by the script itself.
     # Pipeline gates on the primary credentials it controls.
-    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 14, "Upgrade Verification")
+    skip = _check_required_env_vars(
+        env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 14, "Upgrade Verification"
+    )
     if skip:
         return skip
 
     r = stream_subprocess(
-        [sys.executable, str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
-         "multi-c", "--env", args.env, "--new-version", args.version],
-        cwd=PROJECT_ROOT, timeout=900, prefix="  [upgrade] ",
+        [
+            sys.executable,
+            str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
+            "multi-c",
+            "--env",
+            args.env,
+            "--new-version",
+            args.version,
+        ],
+        cwd=PROJECT_ROOT,
+        timeout=900,
+        prefix="  [upgrade] ",
     )
 
     m = re.search(r"(\d+)\s+PASS,\s+(\d+)\s+FAIL", r.stdout)
@@ -967,8 +1039,7 @@ def phase_14_upgrade_verification(args: argparse.Namespace) -> PhaseResult:
         fail_count = int(m.group(2))
         if fail_count == 0 and pass_count > 0:
             log("PASS", f"  Upgrade verification: {pass_count}/{pass_count}")
-            return PhaseResult(14, "Upgrade Verification", "PASS", dt,
-                               extra=f"[{pass_count}/{pass_count}]")
+            return PhaseResult(14, "Upgrade Verification", "PASS", dt, extra=f"[{pass_count}/{pass_count}]")
         else:
             detail = f"{pass_count} PASS, {fail_count} FAIL"
             log("FAIL", f"  Upgrade verification: {detail}")
@@ -996,14 +1067,14 @@ def phase_15_external_verification(args: argparse.Namespace) -> PhaseResult:
         return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/live_api/test_external_urls_live.py",
-        timeout=120, prefix="  [ext-verify] ",
+        timeout=120,
+        prefix="  [ext-verify] ",
         extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  External Verification: {passed} passed")
-        return PhaseResult(15, "External Verification", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(15, "External Verification", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  External Verification: {detail}")
@@ -1038,14 +1109,14 @@ def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
     ]
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         test_paths,
-        timeout=180, prefix="  [widget-embed] ",
+        timeout=180,
+        prefix="  [widget-embed] ",
         extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  Widget Embed: {passed} passed")
-        return PhaseResult(16, "Widget Embed", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(16, "Widget Embed", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Widget Embed: {detail}")
@@ -1064,14 +1135,14 @@ def phase_17_api_fuzzing(args: argparse.Namespace) -> PhaseResult:
     t0 = time.time()
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/fuzzing/",
-        timeout=600, prefix="  [fuzzing] ",
+        timeout=600,
+        prefix="  [fuzzing] ",
         extra_env={"RATE_LIMIT_DISABLED": "true"},
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  API Fuzzing: {passed} passed")
-        return PhaseResult(17, "API Fuzzing", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(17, "API Fuzzing", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  API Fuzzing: {detail}")
@@ -1090,13 +1161,13 @@ def phase_18_property_tests(args: argparse.Namespace) -> PhaseResult:
     t0 = time.time()
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/property/",
-        timeout=120, prefix="  [property] ",
+        timeout=120,
+        prefix="  [property] ",
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  Property Tests: {passed} passed")
-        return PhaseResult(18, "Property Tests", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(18, "Property Tests", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Property Tests: {detail}")
@@ -1113,20 +1184,23 @@ def phase_19_widget_transport(args: argparse.Namespace) -> PhaseResult:
     t0 = time.time()
     env_vars = _get_env_vars(args)
     skip = _check_required_env_vars(
-        env_vars, ["PREVIEW_WIDGET_KEY", "PROD_URL"], 19, "Widget Transport",
+        env_vars,
+        ["PREVIEW_WIDGET_KEY", "PROD_URL"],
+        19,
+        "Widget Transport",
     )
     if skip:
         return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/live_api/test_widget_transport_live.py",
-        timeout=120, prefix="  [widget-transport] ",
+        timeout=120,
+        prefix="  [widget-transport] ",
         extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
         log("PASS", f"  Widget Transport: {passed} passed")
-        return PhaseResult(19, "Widget Transport", "PASS", dt,
-                           extra=f"[{passed}]")
+        return PhaseResult(19, "Widget Transport", "PASS", dt, extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Widget Transport: {detail}")
@@ -1136,13 +1210,13 @@ def phase_19_widget_transport(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 # Summary — create DEFECTs, write log, update KB
 # ---------------------------------------------------------------------------
-def run_summary(results: list[PhaseResult], args: argparse.Namespace,
-                start_time: float, log_path: Path) -> PhaseResult:
+def run_summary(results: list[PhaseResult], args: argparse.Namespace, start_time: float, log_path: Path) -> PhaseResult:
     """Print summary, create DEFECT WIs, write log file, update KB phases."""
     t0 = time.time()
 
     # Create DEFECT WIs for failed phases (SPEC-1617)
     from scripts._defect_reporter import create_defect
+
     defect_wis = []
     for r in results:
         if r.status == "FAIL" and r.phase > 0:  # Skip pre-check (phase 0)
@@ -1165,8 +1239,7 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace,
     # Update KB phase records
     for r in results:
         if r.phase > 0:  # Only numbered phases (not pre-check)
-            _record_phase_result(r.phase, r.status,
-                                f"{r.name}: {r.detail}" if r.detail else r.name)
+            _record_phase_result(r.phase, r.status, f"{r.name}: {r.detail}" if r.detail else r.name)
 
     # Write log file
     try:
@@ -1210,8 +1283,7 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace,
 
     _sp(f"\n{'=' * 70}")
     _sp(f"  RESULT: {result_str}")
-    _sp(f"  Phases: {passed_count} PASS, {failed_count} FAIL, "
-        f"{warn_count} WARN, {skip_count} SKIP")
+    _sp(f"  Phases: {passed_count} PASS, {failed_count} FAIL, {warn_count} WARN, {skip_count} SKIP")
     _sp(f"  Duration: {minutes}m {seconds}s")
     _sp(f"  Environment: {args.env}")
     _sp(f"  Version: {args.version}")
@@ -1238,10 +1310,10 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace,
 PHASE_ORDER_ALL = [1, 2, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19]
 
 PHASE_GROUPS = {
-    "live":     [1, 2, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 19],
+    "live": [1, 2, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 19],
     "security": [5, 6, 8, 9],
-    "quality":  [17, 18],
-    "all":      PHASE_ORDER_ALL,
+    "quality": [17, 18],
+    "all": PHASE_ORDER_ALL,
 }
 
 # ALL remaining phases are live (SPEC-1649)
@@ -1279,8 +1351,10 @@ def _self_provision_tenants(args: argparse.Namespace) -> list:
     fqdn = env_cfg.get("fqdn", "")
 
     if not spa_key:
-        log("FAIL", "  No SPA key found — self-provisioning requires STAGING_SPA_KEY or "
-            "STAGING_SPA_API_KEY in .env.local")
+        log(
+            "FAIL",
+            "  No SPA key found — self-provisioning requires STAGING_SPA_KEY or STAGING_SPA_API_KEY in .env.local",
+        )
         return []
 
     if not fqdn:
@@ -1293,7 +1367,8 @@ def _self_provision_tenants(args: argparse.Namespace) -> list:
     # 1. Primary test tenant (professional tier for full feature access)
     try:
         primary = provision_test_tenant(
-            base_url, spa_key,
+            base_url,
+            spa_key,
             tier="professional",
             merchant_name=f"Pipeline Primary {args.version}",
         )
@@ -1328,7 +1403,8 @@ def _self_provision_tenants(args: argparse.Namespace) -> list:
     # 2. Tenant B (starter tier for isolation tests)
     try:
         tenant_b = provision_test_tenant(
-            base_url, spa_key,
+            base_url,
+            spa_key,
             tier="starter",
             merchant_name=f"Pipeline Tenant B {args.version}",
         )
@@ -1360,9 +1436,7 @@ def _self_provision_tenants(args: argparse.Namespace) -> list:
     return provisioned
 
 
-def _cleanup_provisioned_tenants(
-    args: argparse.Namespace, tenants: list[tuple[str, str]]
-) -> None:
+def _cleanup_provisioned_tenants(args: argparse.Namespace, tenants: list[tuple[str, str]]) -> None:
     """Expire ephemeral test tenants after pipeline run."""
     if not tenants:
         return
@@ -1389,20 +1463,19 @@ def _cleanup_provisioned_tenants(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Master Test Plan Runner — PLAN-001 (live-only, SPEC-1649)")
-    parser.add_argument("--env", required=True, choices=["staging", "production"],
-                        help="Target environment")
-    parser.add_argument("--version", required=True,
-                        help="Expected product version (e.g., 1.66.0)")
-    parser.add_argument("--phase", default=None,
-                        choices=["live", "security", "all"],
-                        help="Phase group to run (default: all)")
-    parser.add_argument("--stop-on-fail", action="store_true",
-                        help="Stop after first FAIL")
-    parser.add_argument("--self-provision", action="store_true",
-                        help="Self-provision ephemeral test tenants via SPA key "
-                        "(WI-1107 — eliminates need for provider-held tenant keys)")
+    parser = argparse.ArgumentParser(description="Master Test Plan Runner — PLAN-001 (live-only, SPEC-1649)")
+    parser.add_argument("--env", required=True, choices=["staging", "production"], help="Target environment")
+    parser.add_argument("--version", required=True, help="Expected product version (e.g., 1.66.0)")
+    parser.add_argument(
+        "--phase", default=None, choices=["live", "security", "all"], help="Phase group to run (default: all)"
+    )
+    parser.add_argument("--stop-on-fail", action="store_true", help="Stop after first FAIL")
+    parser.add_argument(
+        "--self-provision",
+        action="store_true",
+        help="Self-provision ephemeral test tenants via SPA key "
+        "(WI-1107 — eliminates need for provider-held tenant keys)",
+    )
     args = parser.parse_args()
 
     phase_group = args.phase or "all"
@@ -1430,18 +1503,17 @@ def main():
     # SPEC-1845: Centralized test file pre-check (hard-fail).
     # Validates all referenced test files exist BEFORE any phase runs.
     _PHASE_TEST_FILES: dict[int, list[str]] = {
-        3:  ["tests/e2e_live/"],
-        5:  ["tests/security/test_tenant_isolation_live.py"],
-        6:  ["tests/security/test_live_penetration.py"],
+        3: ["tests/e2e_live/"],
+        5: ["tests/security/test_tenant_isolation_live.py"],
+        6: ["tests/security/test_live_penetration.py"],
         # Phase 7 removed from pipeline — SPEC-1845 req 4.
-        8:  ["tests/security/test_data_integrity_live.py"],
-        9:  ["tests/security/test_resilience_live.py"],
+        8: ["tests/security/test_data_integrity_live.py"],
+        9: ["tests/security/test_resilience_live.py"],
         10: ["tests/performance/locustfile.py"],
         11: ["tests/live_api/test_conversation_quality_live.py"],
         13: ["tests/security/test_config_pipeline_live.py"],
         15: ["tests/live_api/test_external_urls_live.py"],
-        16: ["tests/live_api/test_widget_embed_live.py",
-             "tests/e2e_live/test_widget_readiness_live.py"],
+        16: ["tests/live_api/test_widget_embed_live.py", "tests/e2e_live/test_widget_readiness_live.py"],
         17: ["tests/fuzzing/"],
         18: ["tests/property/"],
         19: ["tests/live_api/test_widget_transport_live.py"],
@@ -1468,14 +1540,14 @@ def main():
 
     # Phase dispatch table (SPEC-1649: live-only phases)
     phase_funcs: dict[int, callable] = {
-        1:  lambda: phase_1_preflight(args),
-        2:  lambda: phase_2_data_seeding(args),
-        3:  lambda: phase_3_live_e2e(args),
-        5:  lambda: phase_5_tenant_isolation(args),
-        6:  lambda: phase_6_security_penetration(args),
+        1: lambda: phase_1_preflight(args),
+        2: lambda: phase_2_data_seeding(args),
+        3: lambda: phase_3_live_e2e(args),
+        5: lambda: phase_5_tenant_isolation(args),
+        6: lambda: phase_6_security_penetration(args),
         # Phase 7 removed — SPEC-1845 req 4: test file does not exist.
-        8:  lambda: phase_8_data_integrity(args),
-        9:  lambda: phase_9_resilience(args),
+        8: lambda: phase_8_data_integrity(args),
+        9: lambda: phase_9_resilience(args),
         10: lambda: phase_10_load_testing(args),
         11: lambda: phase_11_conversation_quality(args),
         13: lambda: phase_13_config_pipeline(args),
@@ -1496,7 +1568,10 @@ def main():
         if needs_cooldown:
             _cooldown(f"Phase {phase_num}")
 
-        log("INFO", f"--- Phase {phase_num}: {phase_funcs[phase_num].__name__ if hasattr(phase_funcs[phase_num], '__name__') else '?'} ---")
+        log(
+            "INFO",
+            f"--- Phase {phase_num}: {phase_funcs[phase_num].__name__ if hasattr(phase_funcs[phase_num], '__name__') else '?'} ---",
+        )
 
         result = phase_funcs[phase_num]()
         results.append(result)

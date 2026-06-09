@@ -226,9 +226,7 @@ def main():
                         spec_id,
                         changed_by="S146-batch-round2",
                         change_reason="Auto-generated assertion by source file discovery",
-                        assertions=[
-                            {"type": "grep", "file": source_file, "pattern": pat}
-                        ],
+                        assertions=[{"type": "grep", "file": source_file, "pattern": pat}],
                     )
                     p2_generated += 1
                     break

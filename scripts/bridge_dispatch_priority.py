@@ -58,10 +58,7 @@ def _to_utc(value: str | datetime) -> datetime:
     elif isinstance(value, datetime):
         dt = value
     else:
-        raise TypeError(
-            f"filed_at/now must be a UTC ISO-8601 string or a datetime, "
-            f"got {type(value).__name__}"
-        )
+        raise TypeError(f"filed_at/now must be a UTC ISO-8601 string or a datetime, got {type(value).__name__}")
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
@@ -91,9 +88,13 @@ def priority_headstart(priority: object) -> float:
     return DEFAULT_PRIORITY_HEADSTART_HOURS[_normalize_priority(priority)]
 
 
-def dispatch_score(*, filed_at: str | datetime, priority: object = None,
-                    now: str | datetime | None = None,
-                    aging_rate: float = DEFAULT_AGING_RATE_PER_HOUR) -> float:
+def dispatch_score(
+    *,
+    filed_at: str | datetime,
+    priority: object = None,
+    now: str | datetime | None = None,
+    aging_rate: float = DEFAULT_AGING_RATE_PER_HOUR,
+) -> float:
     """Compute the dispatch-priority score for one bridge entry.
 
     score = priority_headstart(priority) + aging_rate * age_hours, where
@@ -108,8 +109,9 @@ def dispatch_score(*, filed_at: str | datetime, priority: object = None,
     return priority_headstart(priority) + aging_rate * age_hours
 
 
-def sort_by_dispatch_priority(entries, *, now: str | datetime | None = None,
-                              aging_rate: float = DEFAULT_AGING_RATE_PER_HOUR) -> list:
+def sort_by_dispatch_priority(
+    entries, *, now: str | datetime | None = None, aging_rate: float = DEFAULT_AGING_RATE_PER_HOUR
+) -> list:
     """Return entries ordered by descending dispatch score.
 
     Each entry is a mapping carrying at least 'filed_at' and optionally
@@ -123,8 +125,7 @@ def sort_by_dispatch_priority(entries, *, now: str | datetime | None = None,
 
     def _key(entry):
         filed_dt = _to_utc(entry["filed_at"])
-        score = dispatch_score(filed_at=filed_dt, priority=entry.get("priority"),
-                               now=now_dt, aging_rate=aging_rate)
+        score = dispatch_score(filed_at=filed_dt, priority=entry.get("priority"), now=now_dt, aging_rate=aging_rate)
         # Ascending sort on (-score, filed_dt): highest score first, then
         # oldest filed_at first. A stable sort keeps input order for entries
         # equal on both keys.
@@ -133,8 +134,7 @@ def sort_by_dispatch_priority(entries, *, now: str | datetime | None = None,
     return sorted(materialized, key=_key)
 
 
-def select_next(entries, *, now: str | datetime | None = None,
-                aging_rate: float = DEFAULT_AGING_RATE_PER_HOUR):
+def select_next(entries, *, now: str | datetime | None = None, aging_rate: float = DEFAULT_AGING_RATE_PER_HOUR):
     """Return the single highest-scoring entry, or None for empty input."""
     ordered = sort_by_dispatch_priority(entries, now=now, aging_rate=aging_rate)
     return ordered[0] if ordered else None

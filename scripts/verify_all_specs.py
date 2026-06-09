@@ -115,25 +115,29 @@ def main():
         raw = row["assertions"]
         if not raw or raw in ("", "null", "[]"):
             without_assertions += 1
-            no_assertion_specs.append({
-                "id": row["id"],
-                "title": row["title"],
-                "status": row["status"],
-                "type": row["type"],
-            })
+            no_assertion_specs.append(
+                {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "status": row["status"],
+                    "type": row["type"],
+                }
+            )
             continue
 
         with_assertions += 1
         try:
             assertions = json.loads(raw)
         except json.JSONDecodeError:
-            failed_specs.append({
-                "id": row["id"],
-                "title": row["title"],
-                "status": row["status"],
-                "type": row["type"],
-                "failures": [("JSON parse error", str(raw)[:100])],
-            })
+            failed_specs.append(
+                {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "status": row["status"],
+                    "type": row["type"],
+                    "failures": [("JSON parse error", str(raw)[:100])],
+                }
+            )
             continue
 
         if not isinstance(assertions, list):
@@ -149,20 +153,22 @@ def main():
                 spec_failures.append((desc, detail))
 
         if spec_failures:
-            failed_specs.append({
-                "id": row["id"],
-                "title": row["title"],
-                "status": row["status"],
-                "type": row["type"],
-                "failures": spec_failures,
-            })
+            failed_specs.append(
+                {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "status": row["status"],
+                    "type": row["type"],
+                    "failures": spec_failures,
+                }
+            )
         else:
             passed += 1
 
     # Report
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"FULL SPEC-VS-CODE VERIFICATION REPORT")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Total implemented/verified specs: {total}")
     print(f"  With assertions: {with_assertions}")
     print(f"  Without assertions: {without_assertions}")
@@ -177,9 +183,9 @@ def main():
             t = f.get("type") or "requirement"
             by_type.setdefault(t, []).append(f)
 
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"FAILURES BY TYPE ({len(failed_specs)} specs)")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         for t in sorted(by_type.keys()):
             items = by_type[t]
@@ -191,9 +197,9 @@ def main():
                     print(f"    -> {detail}")
 
     if no_assertion_specs:
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"SPECS WITHOUT ASSERTIONS ({len(no_assertion_specs)})")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         # Group by type
         by_type2: dict[str, list] = {}
         for s in no_assertion_specs:

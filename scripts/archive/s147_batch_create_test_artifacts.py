@@ -6,6 +6,7 @@ don't yet have entries, improving test traceability toward the 80% target.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -77,14 +78,16 @@ def parse_junit_xml(xml_path: str) -> list[dict]:
                 break
             module_parts.append(part)
         file_path = "/".join(module_parts) + ".py" if module_parts else ""
-        cases.append({
-            "file": file_path,
-            "classname": classname,
-            "class": class_name,
-            "function": name,
-            "result": result,
-            "duration": time_val,
-        })
+        cases.append(
+            {
+                "file": file_path,
+                "classname": classname,
+                "class": class_name,
+                "function": name,
+                "result": result,
+                "duration": time_val,
+            }
+        )
     return cases
 
 
@@ -174,9 +177,12 @@ def main():
         return
 
     # Get max TEST-NNNN number
-    max_num = conn.execute(
-        "SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) as n FROM tests WHERE id LIKE 'TEST-%'"
-    ).fetchone()["n"] or 0
+    max_num = (
+        conn.execute("SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) as n FROM tests WHERE id LIKE 'TEST-%'").fetchone()[
+            "n"
+        ]
+        or 0
+    )
     print(f"Starting from TEST-{max_num + 1}")
 
     now = datetime.now(timezone.utc).isoformat()
@@ -217,10 +223,8 @@ def main():
 
     # Check new traceability
     total = conn.execute("SELECT COUNT(DISTINCT id) as c FROM tests").fetchone()["c"]
-    traced = conn.execute(
-        "SELECT COUNT(*) as c FROM current_tests WHERE last_result IS NOT NULL"
-    ).fetchone()["c"]
-    print(f"\nTest Traceability: {traced}/{total} ({100*traced/total:.1f}%)")
+    traced = conn.execute("SELECT COUNT(*) as c FROM current_tests WHERE last_result IS NOT NULL").fetchone()["c"]
+    print(f"\nTest Traceability: {traced}/{total} ({100 * traced / total:.1f}%)")
 
     db.close()
 

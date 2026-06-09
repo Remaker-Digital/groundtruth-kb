@@ -25,7 +25,22 @@ from test_cross_harness_bridge_trigger import (  # noqa: E402
     _write_index,
 )
 
-_BRIDGE_KIND_BODY = "bridge_kind: " + "implementation_proposal\n"
+_BRIDGE_KIND_BODY = (
+    "bridge_kind: implementation_proposal\n"
+    'target_paths: ["scripts/cross_harness_bridge_trigger.py"]\n'
+    "\n"
+    "## Specification Links\n"
+    "\n"
+    "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    "\n"
+    "## Requirement Sufficiency\n"
+    "\n"
+    "Existing requirements are sufficient.\n"
+    "\n"
+    "## Spec-derived verification plan\n"
+    "\n"
+    "Run focused dispatch tests.\n"
+)
 
 
 class _FakeProcess:

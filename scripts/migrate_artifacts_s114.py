@@ -314,10 +314,7 @@ def migrate_operational_procedures(db: KnowledgeDB, *, dry_run: bool = False) ->
     """Migration 3: Remaining operational procedures from markdown → DB."""
     conn = db._get_conn()
 
-    existing_ids = {
-        r["id"]
-        for r in conn.execute("SELECT id FROM current_operational_procedures").fetchall()
-    }
+    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM current_operational_procedures").fetchall()}
     print(f"  Existing operational procedures: {existing_ids}")
 
     # Procedures from REPEATABLE-PROCEDURES.md not yet in the DB

@@ -63,9 +63,7 @@ def test_idempotent() -> None:
     for bare in ("GTKB-X", "PROJECT-GTKB-X", "GTKB-Y-Z", "PROJECT-GTKB-Y-Z"):
         once = _project_id_from_names(bare)
         twice = _project_id_from_names(once)
-        assert once == twice, (
-            f"non-idempotent for input {bare!r}: once={once!r}, twice={twice!r}"
-        )
+        assert once == twice, f"non-idempotent for input {bare!r}: once={once!r}, twice={twice!r}"
 
 
 def test_insert_work_item_no_doubled_membership(tmp_path: Path) -> None:
@@ -96,18 +94,14 @@ def test_insert_work_item_no_doubled_membership(tmp_path: Path) -> None:
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT project_id, work_item_id, source "
-            "FROM current_project_work_item_memberships "
-            "WHERE work_item_id = ?",
+            "SELECT project_id, work_item_id, source FROM current_project_work_item_memberships WHERE work_item_id = ?",
             ("WI-9999",),
         ).fetchall()
 
     project_ids = {row["project_id"] for row in rows}
     assert "PROJECT-GTKB-RELIABILITY-FIXES" in project_ids, (
-        f"expected canonical membership PROJECT-GTKB-RELIABILITY-FIXES; "
-        f"got project_ids={project_ids!r}"
+        f"expected canonical membership PROJECT-GTKB-RELIABILITY-FIXES; got project_ids={project_ids!r}"
     )
     assert "PROJECT-PROJECT-GTKB-RELIABILITY-FIXES" not in project_ids, (
-        f"doubled-prefix membership present after fix; "
-        f"project_ids={project_ids!r}"
+        f"doubled-prefix membership present after fix; project_ids={project_ids!r}"
     )

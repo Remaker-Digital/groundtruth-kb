@@ -42,6 +42,7 @@ def get_product_version() -> str:
     try:
         sys.path.insert(0, ".")
         from src.multi_tenant.api_versioning import PRODUCT_VERSION
+
         return PRODUCT_VERSION
     except ImportError:
         return "dev"
@@ -52,21 +53,28 @@ def build_image(name: str, entry_module: str, port: int, tag: str, push: bool) -
     image_name = f"{IMAGE_PREFIX}-{name}"
     full_tag = f"{ACR_REGISTRY}/{image_name}:{tag}"
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Building {image_name}:{tag}")
     print(f"  Entry: {entry_module}")
     print(f"  Port:  {port}")
     print(f"  Image: {full_tag}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Build using az acr build (no-logs to avoid Windows charmap crash)
     build_cmd = [
-        "az", "acr", "build",
-        "--registry", "acragentredeastus",
-        "--image", f"{image_name}:{tag}",
-        "--build-arg", f"AGENT_MODULE={entry_module}",
-        "--build-arg", f"AGENT_PORT={port}",
-        "--file", "Dockerfile.agent",
+        "az",
+        "acr",
+        "build",
+        "--registry",
+        "acragentredeastus",
+        "--image",
+        f"{image_name}:{tag}",
+        "--build-arg",
+        f"AGENT_MODULE={entry_module}",
+        "--build-arg",
+        f"AGENT_PORT={port}",
+        "--file",
+        "Dockerfile.agent",
         "--no-logs",
         ".",
     ]
@@ -76,11 +84,16 @@ def build_image(name: str, entry_module: str, port: int, tag: str, push: bool) -
     else:
         print(f"  Building (no push)...")
         build_cmd = [
-            "docker", "build",
-            "--build-arg", f"AGENT_MODULE={entry_module}",
-            "--build-arg", f"AGENT_PORT={port}",
-            "-f", "Dockerfile.agent",
-            "-t", full_tag,
+            "docker",
+            "build",
+            "--build-arg",
+            f"AGENT_MODULE={entry_module}",
+            "--build-arg",
+            f"AGENT_PORT={port}",
+            "-f",
+            "Dockerfile.agent",
+            "-t",
+            full_tag,
             ".",
         ]
 
@@ -124,9 +137,9 @@ def main() -> None:
         results.append((name, ok))
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Build Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     passed = sum(1 for _, ok in results if ok)
     failed = sum(1 for _, ok in results if not ok)
     for name, ok in results:

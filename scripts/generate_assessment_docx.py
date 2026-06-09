@@ -2,6 +2,7 @@
 Generate Agent Red Full Assessment DOCX
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -20,6 +21,7 @@ style.paragraph_format.space_after = Pt(6)
 for level in range(1, 4):
     hs = doc.styles[f"Heading {level}"]
     hs.font.color.rgb = RGBColor(0xFF, 0x36, 0x21)  # Agent Red brand
+
 
 # Helper: add a table with header row
 def add_table(headers, rows):
@@ -42,15 +44,18 @@ def add_table(headers, rows):
                     r.font.size = Pt(10)
     doc.add_paragraph()  # spacer
 
+
 def bold_para(text):
     p = doc.add_paragraph()
     r = p.add_run(text)
     r.bold = True
     return p
 
+
 def bullet(text, level=0):
     p = doc.add_paragraph(text, style="List Bullet")
     p.paragraph_format.left_indent = Inches(0.25 + level * 0.25)
+
 
 # ── Title Page ──────────────────────────────────────
 doc.add_paragraph()
@@ -110,31 +115,61 @@ doc.add_page_break()
 doc.add_heading("1. Strengths", level=1)
 
 doc.add_heading("Architecture & Design", level=2)
-bullet("Multi-agent pipeline (AGNTCY) — 6 specialized agents (Intent, Knowledge, Response, Escalation, Analytics, Critic) with NATS-based A2A messaging. This is 12-18 months ahead of any competitor.")
-bullet("Multi-tenant isolation from day one — Per-tenant Cosmos DB partitioning, rate limiting, secrets (Key Vault), and configuration. Not bolted on after the fact.")
-bullet("Triple authentication — Shopify JWT + API Key + Widget Key. Each path resolves to a TenantContext, providing clean authorization boundaries.")
-bullet("4-layer customer memory — Identity extraction → vectorized memory (DiskANN 3072-dim) → cross-session pattern extraction → fine-tuning pipeline. No competitor has this depth.")
-bullet("Critic supervisor (fail-closed) — Content safety validation with retraction. The SSE stream can emit 'retracted' events if the Critic catches a policy violation after initial generation.")
-bullet("3 admin SPAs sharing components — Standalone (Mantine), Shopify (Polaris + App Bridge), and Provider (Mantine) all consume admin/shared/. Efficient code reuse across distinct deployment targets.")
+bullet(
+    "Multi-agent pipeline (AGNTCY) — 6 specialized agents (Intent, Knowledge, Response, Escalation, Analytics, Critic) with NATS-based A2A messaging. This is 12-18 months ahead of any competitor."
+)
+bullet(
+    "Multi-tenant isolation from day one — Per-tenant Cosmos DB partitioning, rate limiting, secrets (Key Vault), and configuration. Not bolted on after the fact."
+)
+bullet(
+    "Triple authentication — Shopify JWT + API Key + Widget Key. Each path resolves to a TenantContext, providing clean authorization boundaries."
+)
+bullet(
+    "4-layer customer memory — Identity extraction → vectorized memory (DiskANN 3072-dim) → cross-session pattern extraction → fine-tuning pipeline. No competitor has this depth."
+)
+bullet(
+    "Critic supervisor (fail-closed) — Content safety validation with retraction. The SSE stream can emit 'retracted' events if the Critic catches a policy violation after initial generation."
+)
+bullet(
+    "3 admin SPAs sharing components — Standalone (Mantine), Shopify (Polaris + App Bridge), and Provider (Mantine) all consume admin/shared/. Efficient code reuse across distinct deployment targets."
+)
 
 doc.add_heading("Process & Governance", level=2)
-bullet("Specification-first workflow — 17 governance rules (GOV-01 through GOV-17) enforce spec → work item → test → implementation flow.")
-bullet("Append-only knowledge database — No UPDATE/DELETE anywhere. Every artifact is versioned. Complete audit trail back to session S7.")
+bullet(
+    "Specification-first workflow — 17 governance rules (GOV-01 through GOV-17) enforce spec → work item → test → implementation flow."
+)
+bullet(
+    "Append-only knowledge database — No UPDATE/DELETE anywhere. Every artifact is versioned. Complete audit trail back to session S7."
+)
 bullet("Machine-checkable assertions — 156 passing assertions validate codebase invariants at every session start.")
-bullet("Protected behaviors — PB-* specs with automated verification prevent accidental removal of critical functionality.")
-bullet("Session handoff prompts — db.insert_session_prompt() creates structured handoff between context windows, preserving continuity across LLM session boundaries.")
+bullet(
+    "Protected behaviors — PB-* specs with automated verification prevent accidental removal of critical functionality."
+)
+bullet(
+    "Session handoff prompts — db.insert_session_prompt() creates structured handoff between context windows, preserving continuity across LLM session boundaries."
+)
 
 doc.add_heading("Testing", level=2)
-bullet("8,352 tests, 73.1% coverage — Comprehensive multi-layer testing: unit, integration, live E2E, security, performance, and evaluation.")
-bullet("936 live E2E tests against real staging — Not mocked. These exercise the actual deployed API, Cosmos DB, and admin SPAs via Playwright.")
+bullet(
+    "8,352 tests, 73.1% coverage — Comprehensive multi-layer testing: unit, integration, live E2E, security, performance, and evaluation."
+)
+bullet(
+    "936 live E2E tests against real staging — Not mocked. These exercise the actual deployed API, Cosmos DB, and admin SPAs via Playwright."
+)
 bullet("13-phase autonomous test pipeline — test_pipeline.py runs all quality gates with zero human intervention.")
 bullet("Real-rendering Shopify tests (S144) — Tests that caught the exact class of bugs that mock-based tests missed.")
-bullet("Testable element inventory (SPEC-1653) — 520 elements across 12 subsystems, each with dimension taxonomy (A-N, 68 dimensions).")
+bullet(
+    "Testable element inventory (SPEC-1653) — 520 elements across 12 subsystems, each with dimension taxonomy (A-N, 68 dimensions)."
+)
 
 doc.add_heading("Business Model", level=2)
 bullet("Dual-channel billing — Stripe (direct) + Shopify App Billing. Channel-agnostic provisioning.")
-bullet("Metered usage with conversation packs — 3-tier metering (included → packs → overage) with FIFO balance tracking.")
-bullet("76-90% gross margins — At ~$0.0073/conversation cost vs $0.025-$0.04 overage pricing, unit economics are strong.")
+bullet(
+    "Metered usage with conversation packs — 3-tier metering (included → packs → overage) with FIFO balance tracking."
+)
+bullet(
+    "76-90% gross margins — At ~$0.0073/conversation cost vs $0.025-$0.04 overage pricing, unit economics are strong."
+)
 bullet("White-label/provider architecture — The Provider Admin console enables platform operators to resell.")
 
 # ── 2. WEAKNESSES ───────────────────────────────────
@@ -145,13 +180,41 @@ doc.add_heading("Architecture Gaps", level=2)
 add_table(
     ["Gap", "Risk", "Detail"],
     [
-        ["No caching layer", "High", "Every request hits Cosmos DB. No Redis, no in-memory cache for tenant config, API key validation, or knowledge search results."],
-        ["No message queue", "High", "Email sending, webhook delivery, and analytics aggregation appear synchronous in the request path."],
-        ["No CDN for widget", "Medium", "Widget JS (~17KB gzip) served from same container as API. Users far from Azure East US experience 200-800ms load times."],
-        ["No CI/CD pipeline", "Medium", "Builds and deploys are manual via deploy_pipeline.py. No GitHub Actions, no automatic staging deploys."],
-        ["Single-stage Docker build", "Low", "A multi-stage build would reduce image size by excluding build tools and test dependencies."],
-        ["No webhook delivery", "Medium", "Enterprise tenants expect outbound webhooks for events (new conversation, escalation, config change)."],
-        ["No structured observability", "Medium", "OpenTelemetry code exists but no observability backend (Grafana, Datadog, App Insights) is connected."],
+        [
+            "No caching layer",
+            "High",
+            "Every request hits Cosmos DB. No Redis, no in-memory cache for tenant config, API key validation, or knowledge search results.",
+        ],
+        [
+            "No message queue",
+            "High",
+            "Email sending, webhook delivery, and analytics aggregation appear synchronous in the request path.",
+        ],
+        [
+            "No CDN for widget",
+            "Medium",
+            "Widget JS (~17KB gzip) served from same container as API. Users far from Azure East US experience 200-800ms load times.",
+        ],
+        [
+            "No CI/CD pipeline",
+            "Medium",
+            "Builds and deploys are manual via deploy_pipeline.py. No GitHub Actions, no automatic staging deploys.",
+        ],
+        [
+            "Single-stage Docker build",
+            "Low",
+            "A multi-stage build would reduce image size by excluding build tools and test dependencies.",
+        ],
+        [
+            "No webhook delivery",
+            "Medium",
+            "Enterprise tenants expect outbound webhooks for events (new conversation, escalation, config change).",
+        ],
+        [
+            "No structured observability",
+            "Medium",
+            "OpenTelemetry code exists but no observability backend (Grafana, Datadog, App Insights) is connected.",
+        ],
     ],
 )
 
@@ -159,11 +222,26 @@ doc.add_heading("Frontend Concerns", level=2)
 add_table(
     ["Issue", "Detail"],
     [
-        ["React 18, not 19", "React 19 shipped Dec 2024. Server Components, use(), and improved Suspense are available."],
-        ["No state management library", "Admin SPAs use hooks + sessionStorage. Shared state will become painful at scale."],
-        ["Widget is Preact, admin is React", "Two different virtual DOM implementations. Intentional (widget size) but increases maintenance surface."],
-        ["No i18n framework", "All strings are hardcoded English. International expansion requires retrofitting every component."],
-        ["No accessibility testing", "SPEC-1653 defines an a11y dimension but no a11y tests exist. Shopify may require WCAG compliance."],
+        [
+            "React 18, not 19",
+            "React 19 shipped Dec 2024. Server Components, use(), and improved Suspense are available.",
+        ],
+        [
+            "No state management library",
+            "Admin SPAs use hooks + sessionStorage. Shared state will become painful at scale.",
+        ],
+        [
+            "Widget is Preact, admin is React",
+            "Two different virtual DOM implementations. Intentional (widget size) but increases maintenance surface.",
+        ],
+        [
+            "No i18n framework",
+            "All strings are hardcoded English. International expansion requires retrofitting every component.",
+        ],
+        [
+            "No accessibility testing",
+            "SPEC-1653 defines an a11y dimension but no a11y tests exist. Shopify may require WCAG compliance.",
+        ],
     ],
 )
 
@@ -172,7 +250,10 @@ add_table(
     ["Risk", "Detail"],
     [
         ["Single developer/operator", "All infrastructure knowledge is in Claude's memory and KB. Bus factor = 1."],
-        ["Windows development only", "Thermal-safe runner, PowerShell scripts, and dev environment are Windows-specific."],
+        [
+            "Windows development only",
+            "Thermal-safe runner, PowerShell scripts, and dev environment are Windows-specific.",
+        ],
         ["Docker Hub rate limiting", "Builds have failed due to anonymous pull limits. No registry mirror configured."],
         ["Staging scales to zero", "min=0, max=1 means first request after idle takes 15-30s (cold start)."],
         ["111 open work items", "Significant backlog. Unclear how many are blockers vs nice-to-haves."],
@@ -238,21 +319,43 @@ add_table(
 )
 
 doc.add_heading("Competitor Weaknesses to Exploit", level=2)
-bullet("Intercom's pricing backlash — $0.99/resolution is unpredictable. Agent Red's tiered included-conversations model is more transparent.")
-bullet("Gorgias's AI immaturity — Gorgias is Shopify-native but NOT AI-first. Their Automate feature is rule-based with AI augmentation, not a multi-agent pipeline.")
-bullet("Ada's enterprise-only pricing — Ada has the best AI but starts at ~$10K/month. Agent Red at $149-$999/month addresses the massive SMB-to-mid-market segment.")
-bullet("Zendesk's complexity — Massive feature sprawl. New merchants find it overbuilt. Agent Red can win on simplicity.")
-bullet("No one embeds in Shopify admin — Every competitor operates as a separate application. Agent Red's embedded admin is genuinely unique.")
+bullet(
+    "Intercom's pricing backlash — $0.99/resolution is unpredictable. Agent Red's tiered included-conversations model is more transparent."
+)
+bullet(
+    "Gorgias's AI immaturity — Gorgias is Shopify-native but NOT AI-first. Their Automate feature is rule-based with AI augmentation, not a multi-agent pipeline."
+)
+bullet(
+    "Ada's enterprise-only pricing — Ada has the best AI but starts at ~$10K/month. Agent Red at $149-$999/month addresses the massive SMB-to-mid-market segment."
+)
+bullet(
+    "Zendesk's complexity — Massive feature sprawl. New merchants find it overbuilt. Agent Red can win on simplicity."
+)
+bullet(
+    "No one embeds in Shopify admin — Every competitor operates as a separate application. Agent Red's embedded admin is genuinely unique."
+)
 
 doc.add_heading("Competitive Risks", level=2)
 add_table(
     ["Risk", "Severity", "Mitigation"],
     [
         ["Brand recognition = zero", "High", "Content marketing, Shopify App Store reviews, case studies from beta"],
-        ["Competitors have years of production hardening", "High", "Lean into quality process (spec-first, 8K tests) as a differentiator"],
-        ["Zendesk has billions of tickets for model training", "Medium", "Focus on RAG quality from merchant's own KB, not generic models"],
+        [
+            "Competitors have years of production hardening",
+            "High",
+            "Lean into quality process (spec-first, 8K tests) as a differentiator",
+        ],
+        [
+            "Zendesk has billions of tickets for model training",
+            "Medium",
+            "Focus on RAG quality from merchant's own KB, not generic models",
+        ],
         ["Gorgias owns Shopify mindshare", "High", "Differentiate on AI capability, not just Shopify integration"],
-        ["Per-resolution pricing could undercut", "Medium", "Transparent tiered pricing is a selling point, not a weakness"],
+        [
+            "Per-resolution pricing could undercut",
+            "Medium",
+            "Transparent tiered pricing is a selling point, not a weakness",
+        ],
     ],
 )
 
@@ -261,7 +364,9 @@ doc.add_page_break()
 doc.add_heading("5. Development Process Assessment", level=1)
 
 doc.add_heading("Strengths", level=2)
-bullet("Specification-first discipline is rare and valuable. Most projects skip the 'agree on what we're building' step.")
+bullet(
+    "Specification-first discipline is rare and valuable. Most projects skip the 'agree on what we're building' step."
+)
 bullet("Session continuity via MEMORY.md + session prompts + KB handoff enables effective multi-session development.")
 bullet("17 governance rules prevent common process failures.")
 bullet("Audit sessions (every 5th) provide systematic quality checkpoints.")
@@ -284,7 +389,9 @@ doc.add_heading("6. Testing Process Assessment", level=1)
 
 doc.add_heading("Strengths", level=2)
 bullet("Test pyramid is well-shaped — 3,100 unit tests at base, 325 integration in middle, 936 live E2E at top.")
-bullet("Live-only E2E philosophy (SPEC-1649) — Removing mock-only phases was bold and correct. S142-S144 Shopify bugs proved it.")
+bullet(
+    "Live-only E2E philosophy (SPEC-1649) — Removing mock-only phases was bold and correct. S142-S144 Shopify bugs proved it."
+)
 bullet("Testable element inventory — 520 elements with dimension taxonomy turns testing into systematic coverage.")
 bullet("Thermal-safe runner — Adapting test harness to hardware thermal constraints is pragmatic engineering.")
 
@@ -321,7 +428,9 @@ doc.add_heading("Weaknesses", level=2)
 bullet("MEMORY.md is approaching its limit — Recent Sessions section is dense.")
 bullet("Session summaries are too long — 10-20 lines each, forcing aggressive pruning of older sessions.")
 bullet("No semantic search over memory — Retrieval is grep-based. Vector search would enable targeted recall.")
-bullet("Token consumption per session is high — CLAUDE.md + MEMORY.md + hooks consume ~3,000-5,000 tokens before any user message.")
+bullet(
+    "Token consumption per session is high — CLAUDE.md + MEMORY.md + hooks consume ~3,000-5,000 tokens before any user message."
+)
 
 doc.add_heading("Recommendations", level=2)
 bullet("Compress session summaries to 3-5 lines max in MEMORY.md. Move details into topic files.")
@@ -352,7 +461,13 @@ add_table(
     ["Technology", "Priority", "Impact", "Cost", "Rationale"],
     [
         ["CDN (Cloudflare)", "P0", "High", "$0", "Widget load: 50ms global vs 200-800ms from single region"],
-        ["Redis (Upstash serverless)", "P0", "High", "$0-10/mo", "Caching + task queue + rate limits. Reduces Cosmos RUs 60-80%"],
+        [
+            "Redis (Upstash serverless)",
+            "P0",
+            "High",
+            "$0-10/mo",
+            "Caching + task queue + rate limits. Reduces Cosmos RUs 60-80%",
+        ],
         ["GitHub Actions", "P1", "High", "$0", "Automated lint → test → build → staging deploy on merge"],
         ["Grafana Cloud (free tier)", "P1", "High", "$0", "OpenTelemetry traces, Prometheus metrics, Loki logs"],
         ["structlog", "P2", "Medium", "$0", "Structured JSON logging with tenant_id in every log line"],
@@ -452,10 +567,7 @@ r.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
 # ── Save ────────────────────────────────────────────
 # Per S307 hardcoded-path directive: derive output path from script location.
 from pathlib import Path
-output_path = str(
-    Path(__file__).resolve().parent.parent
-    / "docs"
-    / "Agent-Red-Full-Assessment-2026-03-05.docx"
-)
+
+output_path = str(Path(__file__).resolve().parent.parent / "docs" / "Agent-Red-Full-Assessment-2026-03-05.docx")
 doc.save(output_path)
 print(f"Saved: {output_path}")

@@ -6,6 +6,7 @@ that doesn't already have a matching (test_file, test_function) entry.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -66,9 +67,7 @@ def main():
     conn = k._conn
 
     # Build set of existing (test_file, test_function) pairs
-    cur = conn.execute(
-        "SELECT test_file, test_function FROM current_tests WHERE test_file IS NOT NULL"
-    )
+    cur = conn.execute("SELECT test_file, test_function FROM current_tests WHERE test_file IS NOT NULL")
     existing = set()
     for row in cur.fetchall():
         existing.add((row[0], row[1]))
@@ -156,9 +155,7 @@ def main():
     # Final traceability
     cur = conn.execute("SELECT COUNT(*) FROM current_tests")
     total = cur.fetchone()[0]
-    cur = conn.execute(
-        "SELECT COUNT(*) FROM current_tests WHERE last_result IS NOT NULL AND last_result != ''"
-    )
+    cur = conn.execute("SELECT COUNT(*) FROM current_tests WHERE last_result IS NOT NULL AND last_result != ''")
     traced = cur.fetchone()[0]
     print(f"Test Traceability: {traced}/{total} ({traced / total * 100:.1f}%)")
 

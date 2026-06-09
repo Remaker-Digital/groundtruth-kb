@@ -1,4 +1,5 @@
 """Analyze test artifact file paths to determine phase assignment rules."""
+
 import sys, io, json, re
 from collections import Counter, defaultdict
 
@@ -57,13 +58,33 @@ for tp, c in type_counter.most_common():
 # Look for keyword patterns in file paths to identify phase-relevant tests
 print("\n=== KEYWORD SCAN (file path patterns) ===")
 keywords = {
-    "security": [], "rate_limit": [], "tenant": [], "isolation": [],
-    "regression": [], "url": [], "reachab": [], "load": [], "performance": [],
-    "quality": [], "conversation": [], "ui": [], "e2e": [],
-    "widget": [], "critical": [], "upgrade": [], "preflight": [],
-    "pre_flight": [], "seed": [], "verification": [], "provision": [],
-    "manual": [], "visual": [], "data_integrity": [], "backup": [],
-    "resilience": [], "failover": [],
+    "security": [],
+    "rate_limit": [],
+    "tenant": [],
+    "isolation": [],
+    "regression": [],
+    "url": [],
+    "reachab": [],
+    "load": [],
+    "performance": [],
+    "quality": [],
+    "conversation": [],
+    "ui": [],
+    "e2e": [],
+    "widget": [],
+    "critical": [],
+    "upgrade": [],
+    "preflight": [],
+    "pre_flight": [],
+    "seed": [],
+    "verification": [],
+    "provision": [],
+    "manual": [],
+    "visual": [],
+    "data_integrity": [],
+    "backup": [],
+    "resilience": [],
+    "failover": [],
 }
 for t in tests:
     f = (t.get("test_file") or "").lower()

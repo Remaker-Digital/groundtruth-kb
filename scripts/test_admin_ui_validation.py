@@ -50,6 +50,7 @@ import httpx
 # ---------------------------------------------------------------------------
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 # ---------------------------------------------------------------------------
@@ -74,6 +75,7 @@ TIMEOUT = 20  # seconds per request
 # Result tracking
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TestResult:
     """Outcome of a single admin UI validation test."""
@@ -91,6 +93,7 @@ class TestResult:
 # ---------------------------------------------------------------------------
 # HTTP client helpers
 # ---------------------------------------------------------------------------
+
 
 def admin_headers() -> dict[str, str]:
     """Headers for authenticated admin API calls."""
@@ -131,9 +134,7 @@ async def api_call(
 
     t0 = time.monotonic()
     try:
-        resp = await client.request(
-            method, url, headers=hdrs, json=json_body, timeout=TIMEOUT
-        )
+        resp = await client.request(method, url, headers=hdrs, json=json_body, timeout=TIMEOUT)
         elapsed = (time.monotonic() - t0) * 1000
 
         passed = resp.status_code in exp
@@ -194,23 +195,41 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
     results = []
 
     # /health — liveness probe (auth-exempt)
-    results.append(await api_call(
-        client, "GET", "/health",
-        headers={}, expected=[200], category=cat, name="GET /health (liveness)",
-        allow_503=False,
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/health",
+            headers={},
+            expected=[200],
+            category=cat,
+            name="GET /health (liveness)",
+            allow_503=False,
+        )
+    )
 
     # /ready — readiness probe (auth-exempt)
-    results.append(await api_call(
-        client, "GET", "/ready",
-        headers={}, expected=[200], category=cat, name="GET /ready (readiness)",
-        allow_503=False,
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/ready",
+            headers={},
+            expected=[200],
+            category=cat,
+            name="GET /ready (readiness)",
+            allow_503=False,
+        )
+    )
 
     # Standalone admin SPA serves HTML
     r = await api_call(
-        client, "GET", "/admin/standalone/",
-        headers={}, expected=[200, 401, 403], category=cat,
+        client,
+        "GET",
+        "/admin/standalone/",
+        headers={},
+        expected=[200, 401, 403],
+        category=cat,
         name="GET /admin/standalone/ (HTML)",
         allow_503=False,
     )
@@ -218,8 +237,12 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
 
     # Shopify admin SPA serves HTML
     r = await api_call(
-        client, "GET", "/admin/shopify/",
-        headers={}, expected=[200, 401, 403], category=cat,
+        client,
+        "GET",
+        "/admin/shopify/",
+        headers={},
+        expected=[200, 401, 403],
+        category=cat,
         name="GET /admin/shopify/ (HTML)",
         allow_503=False,
     )
@@ -227,8 +250,12 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
 
     # Widget.js bundle
     r = await api_call(
-        client, "GET", "/widget.js",
-        headers={}, expected=[200, 404], category=cat,
+        client,
+        "GET",
+        "/widget.js",
+        headers={},
+        expected=[200, 404],
+        category=cat,
         name="GET /widget.js (widget bundle)",
         allow_503=False,
     )
@@ -236,8 +263,12 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
 
     # OpenAPI schema
     r = await api_call(
-        client, "GET", "/openapi.json",
-        headers={}, expected=[200], category=cat,
+        client,
+        "GET",
+        "/openapi.json",
+        headers={},
+        expected=[200],
+        category=cat,
         name="GET /openapi.json (API schema)",
         allow_503=False,
     )
@@ -252,95 +283,161 @@ async def test_config_endpoints(client: httpx.AsyncClient) -> list[TestResult]:
     results = []
 
     # GET /api/config — read current config
-    results.append(await api_call(
-        client, "GET", "/api/config", category=cat,
-        name="GET /api/config (current config)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/config",
+            category=cat,
+            name="GET /api/config (current config)",
+        )
+    )
 
     # PUT /api/config — update config (empty body = 400 or 422)
-    results.append(await api_call(
-        client, "PUT", "/api/config", json_body={}, category=cat,
-        name="PUT /api/config (empty update)",
-        expected=[200, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "PUT",
+            "/api/config",
+            json_body={},
+            category=cat,
+            name="PUT /api/config (empty update)",
+            expected=[200, 400, 422],
+        )
+    )
 
     # PUT /api/config — update with valid field
-    results.append(await api_call(
-        client, "PUT", "/api/config",
-        json_body={"fields": {"brand_name": "Test Brand"}},
-        category=cat, name="PUT /api/config (brand_name update)",
-        expected=[200, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "PUT",
+            "/api/config",
+            json_body={"fields": {"brand_name": "Test Brand"}},
+            category=cat,
+            name="PUT /api/config (brand_name update)",
+            expected=[200, 400, 422],
+        )
+    )
 
     # POST /api/config/validate — dry-run validation (preview)
-    results.append(await api_call(
-        client, "POST", "/api/config/validate",
-        json_body={"fields": {"brand_name": "Preview"}},
-        category=cat, name="POST /api/config/validate (preview)",
-        expected=[200, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/config/validate",
+            json_body={"fields": {"brand_name": "Preview"}},
+            category=cat,
+            name="POST /api/config/validate (preview)",
+            expected=[200, 400, 422],
+        )
+    )
 
     # GET /api/config/versions — version history
-    results.append(await api_call(
-        client, "GET", "/api/config/versions", category=cat,
-        name="GET /api/config/versions (history)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/config/versions",
+            category=cat,
+            name="GET /api/config/versions (history)",
+        )
+    )
 
     # GET /api/config/onboarding — onboarding state
-    results.append(await api_call(
-        client, "GET", "/api/config/onboarding", category=cat,
-        name="GET /api/config/onboarding (wizard state)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/config/onboarding",
+            category=cat,
+            name="GET /api/config/onboarding (wizard state)",
+        )
+    )
 
     # GET /api/config/schema — field metadata for UI
-    results.append(await api_call(
-        client, "GET", "/api/config/schema",
-        category=cat, name="GET /api/config/schema (field metadata)",
-        expected=[200],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/config/schema",
+            category=cat,
+            name="GET /api/config/schema (field metadata)",
+            expected=[200],
+        )
+    )
 
     # GET /api/config/schema/1 — step-specific fields
-    results.append(await api_call(
-        client, "GET", "/api/config/schema/1",
-        category=cat, name="GET /api/config/schema/1 (step fields)",
-        expected=[200, 400],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/config/schema/1",
+            category=cat,
+            name="GET /api/config/schema/1 (step fields)",
+            expected=[200, 400],
+        )
+    )
 
     # GET /api/config/diff — config diff
-    results.append(await api_call(
-        client, "GET", "/api/config/diff", category=cat,
-        name="GET /api/config/diff",
-        expected=[200, 400],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/config/diff",
+            category=cat,
+            name="GET /api/config/diff",
+            expected=[200, 400],
+        )
+    )
 
     # POST /api/config/reset — reset config to defaults
-    results.append(await api_call(
-        client, "POST", "/api/config/reset",
-        json_body={}, category=cat,
-        name="POST /api/config/reset (reset to defaults)",
-        expected=[200, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/config/reset",
+            json_body={},
+            category=cat,
+            name="POST /api/config/reset (reset to defaults)",
+            expected=[200, 400, 422],
+        )
+    )
 
     # GET /api/config/named — named configs list
-    results.append(await api_call(
-        client, "GET", "/api/config/named", category=cat,
-        name="GET /api/config/named (saved configs)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/config/named",
+            category=cat,
+            name="GET /api/config/named (saved configs)",
+        )
+    )
 
     # POST /api/config/named — save named config
-    results.append(await api_call(
-        client, "POST", "/api/config/named",
-        json_body={"name": "test-config", "description": "Test"},
-        category=cat, name="POST /api/config/named (save config)",
-        expected=[200, 201, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/config/named",
+            json_body={"name": "test-config", "description": "Test"},
+            category=cat,
+            name="POST /api/config/named (save config)",
+            expected=[200, 201, 400, 422],
+        )
+    )
 
     # DELETE /api/config/named/test-nonexistent — delete named config
-    results.append(await api_call(
-        client, "DELETE", "/api/config/named/test-nonexistent",
-        category=cat, name="DELETE /api/config/named/{name} (delete)",
-        expected=[200, 204, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "DELETE",
+            "/api/config/named/test-nonexistent",
+            category=cat,
+            name="DELETE /api/config/named/{name} (delete)",
+            expected=[200, 204, 404],
+        )
+    )
 
     return results
 
@@ -351,90 +448,150 @@ async def test_knowledge_endpoints(client: httpx.AsyncClient) -> list[TestResult
     results = []
 
     # GET /api/admin/knowledge — list entries
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge", category=cat,
-        name="GET /api/admin/knowledge (list)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge",
+            category=cat,
+            name="GET /api/admin/knowledge (list)",
+        )
+    )
 
     # GET /api/admin/knowledge?entry_type=faq — filtered list
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge?entry_type=faq", category=cat,
-        name="GET /api/admin/knowledge?entry_type=faq (filtered)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge?entry_type=faq",
+            category=cat,
+            name="GET /api/admin/knowledge?entry_type=faq (filtered)",
+        )
+    )
 
     # GET /api/admin/knowledge?search=return — search
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge?search=return", category=cat,
-        name="GET /api/admin/knowledge?search=return (search)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge?search=return",
+            category=cat,
+            name="GET /api/admin/knowledge?search=return (search)",
+        )
+    )
 
     # POST /api/admin/knowledge — create entry
-    results.append(await api_call(
-        client, "POST", "/api/admin/knowledge",
-        json_body={
-            "title": "__test_article__",
-            "content": "This is a test article created by admin UI validation.",
-            "entry_type": "faq",
-            "language": "en",
-        },
-        category=cat, name="POST /api/admin/knowledge (create)",
-        expected=[200, 201, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/knowledge",
+            json_body={
+                "title": "__test_article__",
+                "content": "This is a test article created by admin UI validation.",
+                "entry_type": "faq",
+                "language": "en",
+            },
+            category=cat,
+            name="POST /api/admin/knowledge (create)",
+            expected=[200, 201, 400, 422],
+        )
+    )
 
     # GET /api/admin/knowledge/{id} — get specific (will 404)
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge/nonexistent-id", category=cat,
-        name="GET /api/admin/knowledge/{id} (get by ID)",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge/nonexistent-id",
+            category=cat,
+            name="GET /api/admin/knowledge/{id} (get by ID)",
+            expected=[200, 404],
+        )
+    )
 
     # PUT /api/admin/knowledge/{id} — update (will 404)
-    results.append(await api_call(
-        client, "PUT", "/api/admin/knowledge/nonexistent-id",
-        json_body={"title": "Updated", "content": "Updated content"},
-        category=cat, name="PUT /api/admin/knowledge/{id} (update)",
-        expected=[200, 404, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "PUT",
+            "/api/admin/knowledge/nonexistent-id",
+            json_body={"title": "Updated", "content": "Updated content"},
+            category=cat,
+            name="PUT /api/admin/knowledge/{id} (update)",
+            expected=[200, 404, 400, 422],
+        )
+    )
 
     # DELETE /api/admin/knowledge/{id} — delete (will 404)
-    results.append(await api_call(
-        client, "DELETE", "/api/admin/knowledge/nonexistent-id",
-        category=cat, name="DELETE /api/admin/knowledge/{id} (delete)",
-        expected=[200, 204, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "DELETE",
+            "/api/admin/knowledge/nonexistent-id",
+            category=cat,
+            name="DELETE /api/admin/knowledge/{id} (delete)",
+            expected=[200, 204, 404],
+        )
+    )
 
     # POST /api/admin/knowledge/scan — trigger conflict scan
-    results.append(await api_call(
-        client, "POST", "/api/admin/knowledge/scan",
-        json_body={}, category=cat,
-        name="POST /api/admin/knowledge/scan (conflict scan)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/knowledge/scan",
+            json_body={},
+            category=cat,
+            name="POST /api/admin/knowledge/scan (conflict scan)",
+        )
+    )
 
     # GET /api/admin/knowledge/scan/result — last scan result
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge/scan/result", category=cat,
-        name="GET /api/admin/knowledge/scan/result",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge/scan/result",
+            category=cat,
+            name="GET /api/admin/knowledge/scan/result",
+            expected=[200, 404],
+        )
+    )
 
     # GET /api/admin/knowledge/stale — stale entries
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge/stale", category=cat,
-        name="GET /api/admin/knowledge/stale",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge/stale",
+            category=cat,
+            name="GET /api/admin/knowledge/stale",
+        )
+    )
 
     # GET /api/admin/knowledge/staleness — staleness summary
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge/staleness", category=cat,
-        name="GET /api/admin/knowledge/staleness (summary)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge/staleness",
+            category=cat,
+            name="GET /api/admin/knowledge/staleness (summary)",
+        )
+    )
 
     # GET /api/admin/knowledge/export — CSV export
-    results.append(await api_call(
-        client, "GET", "/api/admin/knowledge/export", category=cat,
-        name="GET /api/admin/knowledge/export (CSV)",
-        expected=[200],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/knowledge/export",
+            category=cat,
+            name="GET /api/admin/knowledge/export (CSV)",
+            expected=[200],
+        )
+    )
 
     return results
 
@@ -445,54 +602,89 @@ async def test_conversation_endpoints(client: httpx.AsyncClient) -> list[TestRes
     results = []
 
     # GET /api/admin/conversations — list
-    results.append(await api_call(
-        client, "GET", "/api/admin/conversations", category=cat,
-        name="GET /api/admin/conversations (list)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/conversations",
+            category=cat,
+            name="GET /api/admin/conversations (list)",
+        )
+    )
 
     # GET /api/admin/conversations?status=active — filtered
-    results.append(await api_call(
-        client, "GET", "/api/admin/conversations?status=active", category=cat,
-        name="GET /api/admin/conversations?status=active",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/conversations?status=active",
+            category=cat,
+            name="GET /api/admin/conversations?status=active",
+        )
+    )
 
     # GET /api/admin/conversations/{id} — detail (will 404)
-    results.append(await api_call(
-        client, "GET", "/api/admin/conversations/nonexistent-id", category=cat,
-        name="GET /api/admin/conversations/{id} (detail)",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/conversations/nonexistent-id",
+            category=cat,
+            name="GET /api/admin/conversations/{id} (detail)",
+            expected=[200, 404],
+        )
+    )
 
     # GET /api/admin/conversations/{id}/messages — messages (will 404)
-    results.append(await api_call(
-        client, "GET", "/api/admin/conversations/nonexistent-id/messages", category=cat,
-        name="GET /api/admin/conversations/{id}/messages",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/conversations/nonexistent-id/messages",
+            category=cat,
+            name="GET /api/admin/conversations/{id}/messages",
+            expected=[200, 404],
+        )
+    )
 
     # POST /api/admin/conversations/{id}/assign — assign agent
-    results.append(await api_call(
-        client, "POST", "/api/admin/conversations/nonexistent-id/assign",
-        json_body={"agent_id": "test-agent"},
-        category=cat, name="POST /api/admin/conversations/{id}/assign",
-        expected=[200, 404, 400],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/conversations/nonexistent-id/assign",
+            json_body={"agent_id": "test-agent"},
+            category=cat,
+            name="POST /api/admin/conversations/{id}/assign",
+            expected=[200, 404, 400],
+        )
+    )
 
     # POST /api/admin/conversations/{id}/notes — add note
-    results.append(await api_call(
-        client, "POST", "/api/admin/conversations/nonexistent-id/notes",
-        json_body={"content": "Test note"},
-        category=cat, name="POST /api/admin/conversations/{id}/notes",
-        expected=[200, 201, 404, 400],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/conversations/nonexistent-id/notes",
+            json_body={"content": "Test note"},
+            category=cat,
+            name="POST /api/admin/conversations/{id}/notes",
+            expected=[200, 201, 404, 400],
+        )
+    )
 
     # POST /api/admin/conversations/search — search
-    results.append(await api_call(
-        client, "POST", "/api/admin/conversations/search",
-        json_body={"query": "test"},
-        category=cat, name="POST /api/admin/conversations/search",
-        expected=[200, 400, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/conversations/search",
+            json_body={"query": "test"},
+            category=cat,
+            name="POST /api/admin/conversations/search",
+            expected=[200, 400, 404],
+        )
+    )
 
     return results
 
@@ -503,22 +695,37 @@ async def test_analytics_endpoints(client: httpx.AsyncClient) -> list[TestResult
     results = []
 
     # GET /api/analytics/summary — analytics summary
-    results.append(await api_call(
-        client, "GET", "/api/analytics/summary", category=cat,
-        name="GET /api/analytics/summary",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/analytics/summary",
+            category=cat,
+            name="GET /api/analytics/summary",
+        )
+    )
 
     # GET /api/analytics/intents — intent breakdown
-    results.append(await api_call(
-        client, "GET", "/api/analytics/intents", category=cat,
-        name="GET /api/analytics/intents",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/analytics/intents",
+            category=cat,
+            name="GET /api/analytics/intents",
+        )
+    )
 
     # GET /api/analytics/gaps — knowledge gaps
-    results.append(await api_call(
-        client, "GET", "/api/analytics/gaps", category=cat,
-        name="GET /api/analytics/gaps",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/analytics/gaps",
+            category=cat,
+            name="GET /api/analytics/gaps",
+        )
+    )
 
     return results
 
@@ -529,44 +736,69 @@ async def test_team_endpoints(client: httpx.AsyncClient) -> list[TestResult]:
     results = []
 
     # GET /api/admin/team — list members
-    results.append(await api_call(
-        client, "GET", "/api/admin/team", category=cat,
-        name="GET /api/admin/team (list)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/team",
+            category=cat,
+            name="GET /api/admin/team (list)",
+        )
+    )
 
     # POST /api/admin/team — invite member
-    results.append(await api_call(
-        client, "POST", "/api/admin/team",
-        json_body={
-            "email": "test@example.com",
-            "name": "Test User",
-            "role": "viewer",
-        },
-        category=cat, name="POST /api/admin/team (invite)",
-        expected=[200, 201, 400, 422],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/team",
+            json_body={
+                "email": "test@example.com",
+                "name": "Test User",
+                "role": "viewer",
+            },
+            category=cat,
+            name="POST /api/admin/team (invite)",
+            expected=[200, 201, 400, 422],
+        )
+    )
 
     # GET /api/admin/team/{id} — get member (will 404)
-    results.append(await api_call(
-        client, "GET", "/api/admin/team/nonexistent-id", category=cat,
-        name="GET /api/admin/team/{id} (detail)",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/team/nonexistent-id",
+            category=cat,
+            name="GET /api/admin/team/{id} (detail)",
+            expected=[200, 404],
+        )
+    )
 
     # PUT /api/admin/team/{id} — update member (will 404)
-    results.append(await api_call(
-        client, "PUT", "/api/admin/team/nonexistent-id",
-        json_body={"role": "editor"},
-        category=cat, name="PUT /api/admin/team/{id} (update)",
-        expected=[200, 404, 400],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "PUT",
+            "/api/admin/team/nonexistent-id",
+            json_body={"role": "editor"},
+            category=cat,
+            name="PUT /api/admin/team/{id} (update)",
+            expected=[200, 404, 400],
+        )
+    )
 
     # DELETE /api/admin/team/{id} — remove member (will 404)
-    results.append(await api_call(
-        client, "DELETE", "/api/admin/team/nonexistent-id",
-        category=cat, name="DELETE /api/admin/team/{id} (remove)",
-        expected=[200, 204, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "DELETE",
+            "/api/admin/team/nonexistent-id",
+            category=cat,
+            name="DELETE /api/admin/team/{id} (remove)",
+            expected=[200, 204, 404],
+        )
+    )
 
     return results
 
@@ -577,35 +809,60 @@ async def test_dashboard_endpoints(client: httpx.AsyncClient) -> list[TestResult
     results = []
 
     # GET /api/dashboard/usage — usage summary
-    results.append(await api_call(
-        client, "GET", "/api/dashboard/usage", category=cat,
-        name="GET /api/dashboard/usage",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/dashboard/usage",
+            category=cat,
+            name="GET /api/dashboard/usage",
+        )
+    )
 
     # GET /api/dashboard/usage/daily — daily volume
-    results.append(await api_call(
-        client, "GET", "/api/dashboard/usage/daily", category=cat,
-        name="GET /api/dashboard/usage/daily",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/dashboard/usage/daily",
+            category=cat,
+            name="GET /api/dashboard/usage/daily",
+        )
+    )
 
     # GET /api/dashboard/conversations — conversation list
-    results.append(await api_call(
-        client, "GET", "/api/dashboard/conversations", category=cat,
-        name="GET /api/dashboard/conversations",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/dashboard/conversations",
+            category=cat,
+            name="GET /api/dashboard/conversations",
+        )
+    )
 
     # GET /api/dashboard/conversations/{id} — billing detail
-    results.append(await api_call(
-        client, "GET", "/api/dashboard/conversations/nonexistent-id", category=cat,
-        name="GET /api/dashboard/conversations/{id} (billing detail)",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/dashboard/conversations/nonexistent-id",
+            category=cat,
+            name="GET /api/dashboard/conversations/{id} (billing detail)",
+            expected=[200, 404],
+        )
+    )
 
     # GET /api/dashboard/conversations/export — CSV export
-    results.append(await api_call(
-        client, "GET", "/api/dashboard/conversations/export", category=cat,
-        name="GET /api/dashboard/conversations/export (CSV)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/dashboard/conversations/export",
+            category=cat,
+            name="GET /api/dashboard/conversations/export (CSV)",
+        )
+    )
 
     return results
 
@@ -616,41 +873,66 @@ async def test_gdpr_endpoints(client: httpx.AsyncClient) -> list[TestResult]:
     results = []
 
     # POST /api/gdpr/export — data export (requires scope + customer_id)
-    results.append(await api_call(
-        client, "POST", "/api/gdpr/export",
-        json_body={"scope": "customer", "customer_id": "test-customer"},
-        category=cat, name="POST /api/gdpr/export",
-        expected=[200, 400, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/gdpr/export",
+            json_body={"scope": "customer", "customer_id": "test-customer"},
+            category=cat,
+            name="POST /api/gdpr/export",
+            expected=[200, 400, 404],
+        )
+    )
 
     # POST /api/gdpr/delete — data deletion (requires scope + customer_id)
-    results.append(await api_call(
-        client, "POST", "/api/gdpr/delete",
-        json_body={"scope": "customer", "customer_id": "test-customer-nonexistent"},
-        category=cat, name="POST /api/gdpr/delete",
-        expected=[200, 400, 404, 409],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/gdpr/delete",
+            json_body={"scope": "customer", "customer_id": "test-customer-nonexistent"},
+            category=cat,
+            name="POST /api/gdpr/delete",
+            expected=[200, 400, 404, 409],
+        )
+    )
 
     # GET /api/gdpr/consent/{id} — consent status
-    results.append(await api_call(
-        client, "GET", "/api/gdpr/consent/test-customer", category=cat,
-        name="GET /api/gdpr/consent/{id}",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/gdpr/consent/test-customer",
+            category=cat,
+            name="GET /api/gdpr/consent/{id}",
+            expected=[200, 404],
+        )
+    )
 
     # PUT /api/gdpr/consent/{id} — update consent
-    results.append(await api_call(
-        client, "PUT", "/api/gdpr/consent/test-customer",
-        json_body={"consent_status": "granted"},
-        category=cat, name="PUT /api/gdpr/consent/{id}",
-        expected=[200, 400, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "PUT",
+            "/api/gdpr/consent/test-customer",
+            json_body={"consent_status": "granted"},
+            category=cat,
+            name="PUT /api/gdpr/consent/{id}",
+            expected=[200, 400, 404],
+        )
+    )
 
     # GET /api/gdpr/consent — all consent records
-    results.append(await api_call(
-        client, "GET", "/api/gdpr/consent", category=cat,
-        name="GET /api/gdpr/consent (list)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/gdpr/consent",
+            category=cat,
+            name="GET /api/gdpr/consent (list)",
+        )
+    )
 
     return results
 
@@ -662,18 +944,28 @@ async def test_audit_endpoints(client: httpx.AsyncClient) -> list[TestResult]:
 
     # GET /api/audit — paginated query
     # 500 may occur if audit log collection query fails (Cosmos DB index/partition issue)
-    results.append(await api_call(
-        client, "GET", "/api/audit", category=cat,
-        name="GET /api/audit (query)",
-        expected=[200, 500],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/audit",
+            category=cat,
+            name="GET /api/audit (query)",
+            expected=[200, 500],
+        )
+    )
 
     # GET /api/audit/export — CSV export
-    results.append(await api_call(
-        client, "GET", "/api/audit/export", category=cat,
-        name="GET /api/audit/export (CSV)",
-        expected=[200, 500],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/audit/export",
+            category=cat,
+            name="GET /api/audit/export (CSV)",
+            expected=[200, 500],
+        )
+    )
 
     return results
 
@@ -684,40 +976,65 @@ async def test_profile_endpoints(client: httpx.AsyncClient) -> list[TestResult]:
     results = []
 
     # GET /api/admin/profiles — list profiles
-    results.append(await api_call(
-        client, "GET", "/api/admin/profiles", category=cat,
-        name="GET /api/admin/profiles (list)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/profiles",
+            category=cat,
+            name="GET /api/admin/profiles (list)",
+        )
+    )
 
     # GET /api/admin/profiles/{id} — profile detail
-    results.append(await api_call(
-        client, "GET", "/api/admin/profiles/test-customer", category=cat,
-        name="GET /api/admin/profiles/{id} (detail)",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/profiles/test-customer",
+            category=cat,
+            name="GET /api/admin/profiles/{id} (detail)",
+            expected=[200, 404],
+        )
+    )
 
     # PUT /api/admin/profiles/{id}/consent — update consent
-    results.append(await api_call(
-        client, "PUT", "/api/admin/profiles/test-customer/consent",
-        json_body={"consent_status": "granted"},
-        category=cat, name="PUT /api/admin/profiles/{id}/consent",
-        expected=[200, 400, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "PUT",
+            "/api/admin/profiles/test-customer/consent",
+            json_body={"consent_status": "granted"},
+            category=cat,
+            name="PUT /api/admin/profiles/{id}/consent",
+            expected=[200, 400, 404],
+        )
+    )
 
     # POST /api/admin/profiles/{id}/sync — Shopify sync (requires shopify_data)
-    results.append(await api_call(
-        client, "POST", "/api/admin/profiles/test-customer/sync",
-        json_body={"shopify_data": {"customer_id": "test"}}, category=cat,
-        name="POST /api/admin/profiles/{id}/sync (Shopify)",
-        expected=[200, 400, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/profiles/test-customer/sync",
+            json_body={"shopify_data": {"customer_id": "test"}},
+            category=cat,
+            name="POST /api/admin/profiles/{id}/sync (Shopify)",
+            expected=[200, 400, 404],
+        )
+    )
 
     # DELETE /api/admin/profiles/{id} — delete profile
-    results.append(await api_call(
-        client, "DELETE", "/api/admin/profiles/test-nonexistent-profile",
-        category=cat, name="DELETE /api/admin/profiles/{id}",
-        expected=[200, 204, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "DELETE",
+            "/api/admin/profiles/test-nonexistent-profile",
+            category=cat,
+            name="DELETE /api/admin/profiles/{id}",
+            expected=[200, 204, 404],
+        )
+    )
 
     return results
 
@@ -728,20 +1045,30 @@ async def test_apikey_endpoints(client: httpx.AsyncClient) -> list[TestResult]:
     results = []
 
     # GET /api/admin/api-keys — metadata
-    results.append(await api_call(
-        client, "GET", "/api/admin/api-keys", category=cat,
-        name="GET /api/admin/api-keys (metadata)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/api-keys",
+            category=cat,
+            name="GET /api/admin/api-keys (metadata)",
+        )
+    )
 
     # POST /api/admin/api-keys/reset — public endpoint (no auth)
-    results.append(await api_call(
-        client, "POST", "/api/admin/api-keys/reset",
-        headers={"Content-Type": "application/json"},
-        json_body={"email": "test-nonexistent@example.com"},
-        category=cat, name="POST /api/admin/api-keys/reset (public)",
-        expected=[200],  # always returns 200 for security
-        allow_503=True,
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/api-keys/reset",
+            headers={"Content-Type": "application/json"},
+            json_body={"email": "test-nonexistent@example.com"},
+            category=cat,
+            name="POST /api/admin/api-keys/reset (public)",
+            expected=[200],  # always returns 200 for security
+            allow_503=True,
+        )
+    )
 
     return results
 
@@ -752,25 +1079,40 @@ async def test_integration_endpoints(client: httpx.AsyncClient) -> list[TestResu
     results = []
 
     # GET /api/admin/integrations — list integrations
-    results.append(await api_call(
-        client, "GET", "/api/admin/integrations", category=cat,
-        name="GET /api/admin/integrations (list)",
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/integrations",
+            category=cat,
+            name="GET /api/admin/integrations (list)",
+        )
+    )
 
     # GET /api/admin/integrations/{provider} — detail
-    results.append(await api_call(
-        client, "GET", "/api/admin/integrations/zendesk", category=cat,
-        name="GET /api/admin/integrations/zendesk (detail)",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            "/api/admin/integrations/zendesk",
+            category=cat,
+            name="GET /api/admin/integrations/zendesk (detail)",
+            expected=[200, 404],
+        )
+    )
 
     # POST /api/admin/integrations/{provider}/configure
-    results.append(await api_call(
-        client, "POST", "/api/admin/integrations/zendesk/configure",
-        json_body={"enabled": False},
-        category=cat, name="POST /api/admin/integrations/zendesk/configure",
-        expected=[200, 400, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "POST",
+            "/api/admin/integrations/zendesk/configure",
+            json_body={"enabled": False},
+            category=cat,
+            name="POST /api/admin/integrations/zendesk/configure",
+            expected=[200, 400, 404],
+        )
+    )
 
     return results
 
@@ -797,7 +1139,9 @@ async def test_auth_enforcement(client: httpx.AsyncClient) -> list[TestResult]:
 
     for path in protected_paths:
         r = await api_call(
-            client, "GET", path,
+            client,
+            "GET",
+            path,
             headers={"Accept": "application/json"},  # No auth
             expected=[401, 403],
             category=cat,
@@ -815,7 +1159,9 @@ async def test_auth_enforcement(client: httpx.AsyncClient) -> list[TestResult]:
 
     for path in exempt_paths:
         r = await api_call(
-            client, "GET", path,
+            client,
+            "GET",
+            path,
             headers={},
             expected=[200],
             category=cat,
@@ -834,7 +1180,9 @@ async def test_chat_api_with_widget_key(client: httpx.AsyncClient) -> list[TestR
 
     # POST /api/chat/conversations — start conversation
     r = await api_call(
-        client, "POST", "/api/chat/conversations",
+        client,
+        "POST",
+        "/api/chat/conversations",
         headers=widget_headers(),
         json_body={"customer_id": "admin-ui-test", "metadata": {}},
         category=cat,
@@ -863,43 +1211,61 @@ async def test_chat_api_with_widget_key(client: httpx.AsyncClient) -> list[TestR
 
     if conv_id:
         # GET /api/chat/conversations/{id} — state
-        results.append(await api_call(
-            client, "GET", f"/api/chat/conversations/{conv_id}",
-            headers=widget_headers(),
-            category=cat,
-            name="GET /api/chat/conversations/{id} (state)",
-            expected=[200, 404],
-        ))
+        results.append(
+            await api_call(
+                client,
+                "GET",
+                f"/api/chat/conversations/{conv_id}",
+                headers=widget_headers(),
+                category=cat,
+                name="GET /api/chat/conversations/{id} (state)",
+                expected=[200, 404],
+            )
+        )
 
         # POST /api/chat/conversations/{id}/end — end conversation
-        results.append(await api_call(
-            client, "POST", f"/api/chat/conversations/{conv_id}/end",
-            headers=widget_headers(),
-            json_body={},
-            category=cat,
-            name="POST /api/chat/conversations/{id}/end",
-            expected=[200, 400, 404],
-        ))
+        results.append(
+            await api_call(
+                client,
+                "POST",
+                f"/api/chat/conversations/{conv_id}/end",
+                headers=widget_headers(),
+                json_body={},
+                category=cat,
+                name="POST /api/chat/conversations/{id}/end",
+                expected=[200, 400, 404],
+            )
+        )
     else:
-        results.append(TestResult(
-            name="GET /api/chat/conversations/{id} (state)",
-            category=cat, passed=True,
-            details="Skipped — no conversation ID (503 is acceptable)",
-        ))
-        results.append(TestResult(
-            name="POST /api/chat/conversations/{id}/end",
-            category=cat, passed=True,
-            details="Skipped — no conversation ID (503 is acceptable)",
-        ))
+        results.append(
+            TestResult(
+                name="GET /api/chat/conversations/{id} (state)",
+                category=cat,
+                passed=True,
+                details="Skipped — no conversation ID (503 is acceptable)",
+            )
+        )
+        results.append(
+            TestResult(
+                name="POST /api/chat/conversations/{id}/end",
+                category=cat,
+                passed=True,
+                details="Skipped — no conversation ID (503 is acceptable)",
+            )
+        )
 
     # GET /api/chat/stream/{id}/status — stream status
-    results.append(await api_call(
-        client, "GET", f"/api/chat/stream/{conv_id or 'nonexistent'}/status",
-        headers=widget_headers(),
-        category=cat,
-        name="GET /api/chat/stream/{id}/status",
-        expected=[200, 404],
-    ))
+    results.append(
+        await api_call(
+            client,
+            "GET",
+            f"/api/chat/stream/{conv_id or 'nonexistent'}/status",
+            headers=widget_headers(),
+            category=cat,
+            name="GET /api/chat/stream/{id}/status",
+            expected=[200, 404],
+        )
+    )
 
     return results
 
@@ -907,6 +1273,7 @@ async def test_chat_api_with_widget_key(client: httpx.AsyncClient) -> list[TestR
 # ===========================================================================
 # RESPONSE TIME ANALYSIS
 # ===========================================================================
+
 
 def analyze_response_times(results: list[TestResult]) -> dict[str, Any]:
     """Compute response time statistics."""
@@ -934,6 +1301,7 @@ def analyze_response_times(results: list[TestResult]) -> dict[str, Any]:
 # ===========================================================================
 # MAIN
 # ===========================================================================
+
 
 async def main() -> int:
     """Run all admin UI validation tests."""
@@ -975,12 +1343,14 @@ async def main() -> int:
                 results = await test_fn(client)
             except Exception as e:
                 print(f"  ✗ Category failed with exception: {e}")
-                results = [TestResult(
-                    name=f"{cat_name} (category error)",
-                    category=cat_name,
-                    passed=False,
-                    failure_reason=str(e),
-                )]
+                results = [
+                    TestResult(
+                        name=f"{cat_name} (category error)",
+                        category=cat_name,
+                        passed=False,
+                        failure_reason=str(e),
+                    )
+                ]
             all_results.extend(results)
 
             # Print inline results
@@ -1019,13 +1389,13 @@ async def main() -> int:
     print(f"  Total tests:    {total}")
     print(f"  Passed:         {passed}")
     print(f"  Failed:         {failed}")
-    print(f"  Pass rate:      {passed/total*100:.1f}%")
+    print(f"  Pass rate:      {passed / total * 100:.1f}%")
     print()
 
     print("  Category Breakdown:")
     for cat, (p, f) in categories_seen.items():
         status = "PASS" if f == 0 else f"FAIL ({f})"
-        print(f"    {cat:<30s} {p}/{p+f} {status}")
+        print(f"    {cat:<30s} {p}/{p + f} {status}")
     print()
 
     if timing.get("count", 0) > 0:

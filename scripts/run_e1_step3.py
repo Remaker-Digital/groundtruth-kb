@@ -70,10 +70,12 @@ def main() -> int:
     ):
         moves.append(("test_file", src, dst))
 
-    print(f"Step 3: {len(moves)} moves planned ("
-          f"{sum(1 for k,_,_ in moves if k=='cluster_dir')} cluster_dir + "
-          f"{sum(1 for k,_,_ in moves if k=='cluster_file')} cluster_file + "
-          f"{sum(1 for k,_,_ in moves if k=='test_file')} test_file)")
+    print(
+        f"Step 3: {len(moves)} moves planned ("
+        f"{sum(1 for k, _, _ in moves if k == 'cluster_dir')} cluster_dir + "
+        f"{sum(1 for k, _, _ in moves if k == 'cluster_file')} cluster_file + "
+        f"{sum(1 for k, _, _ in moves if k == 'test_file')} test_file)"
+    )
 
     failures: list[tuple[str, str, str, str]] = []
     for index, (kind, src, dst) in enumerate(moves, start=1):

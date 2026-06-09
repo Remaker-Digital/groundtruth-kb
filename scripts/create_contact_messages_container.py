@@ -64,6 +64,7 @@ def main() -> None:
 
     if cm_config.indexing_policy:
         import json
+
         print(f"Indexing policy: {json.dumps(cm_config.indexing_policy, indent=2)}")
 
     if args.dry_run:
@@ -79,6 +80,7 @@ def main() -> None:
     # Use DefaultAzureCredential (managed identity in Azure, CLI locally)
     try:
         from azure.identity import DefaultAzureCredential
+
         credential = DefaultAzureCredential()
         client = CosmosClient(env["endpoint"], credential=credential)
     except Exception as exc:

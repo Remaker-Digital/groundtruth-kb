@@ -120,12 +120,7 @@ ASSERTIONS = [
     },
 ]
 
-PACKET_PATH = (
-    REPO_ROOT
-    / ".groundtruth"
-    / "formal-artifact-approvals"
-    / "2026-05-02-backlog-slice1-dcl.json"
-)
+PACKET_PATH = REPO_ROOT / ".groundtruth" / "formal-artifact-approvals" / "2026-05-02-backlog-slice1-dcl.json"
 
 
 def main() -> int:

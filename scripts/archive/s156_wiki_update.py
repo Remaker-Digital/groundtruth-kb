@@ -2,6 +2,7 @@
 S156 Wiki Update Script — updates 5 wiki pages with S155-S156 changes.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import os
 
 wiki = r"C:\Users\micha\AppData\Local\Temp\agent-red-wiki"
@@ -198,7 +199,7 @@ c = c.replace(
 )
 c = c.replace(
     "| **Failures** | 0 |",
-    '| **Failures** | 1 known fail (SPEC-1620) |',
+    "| **Failures** | 1 known fail (SPEC-1620) |",
 )
 c = c.replace("### Unit Tests (949 tests)", "### Unit Tests (967 tests)")
 c = c.replace("### Multi-Tenant Tests (3,717 tests)", "### Multi-Tenant Tests (4,423 tests)")

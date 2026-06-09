@@ -112,8 +112,7 @@ HEALTH_POLL_INTERVAL = 10
 class PhaseResult:
     """Result of a single pipeline phase."""
 
-    def __init__(self, phase: int, name: str, status: str, duration: float,
-                 detail: str = "", extra: str = ""):
+    def __init__(self, phase: int, name: str, status: str, duration: float, detail: str = "", extra: str = ""):
         self.phase = phase
         self.name = name
         self.status = status  # PASS, FAIL, SKIP
@@ -159,8 +158,7 @@ def _write_log_file(env: str) -> Path:
 from scripts._subprocess_stream import stream_subprocess as _stream  # noqa: E402
 
 
-def _run(cmd: list[str], cwd: str | Path | None = None,
-         timeout: int = 600) -> subprocess.CompletedProcess:
+def _run(cmd: list[str], cwd: str | Path | None = None, timeout: int = 600) -> subprocess.CompletedProcess:
     """Run a subprocess with real-time output streaming.
 
     Returns a CompletedProcess-compatible object so all existing call sites
@@ -169,18 +167,21 @@ def _run(cmd: list[str], cwd: str | Path | None = None,
     """
     r = _stream(cmd, cwd=cwd, timeout=timeout, prefix="  ")
     return subprocess.CompletedProcess(
-        args=cmd, returncode=r.returncode,
-        stdout=r.stdout, stderr="",
+        args=cmd,
+        returncode=r.returncode,
+        stdout=r.stdout,
+        stderr="",
     )
 
 
-def _run_shell(cmd: str, cwd: str | Path | None = None,
-               timeout: int = 600) -> subprocess.CompletedProcess:
+def _run_shell(cmd: str, cwd: str | Path | None = None, timeout: int = 600) -> subprocess.CompletedProcess:
     """Run a shell command with real-time output streaming."""
     r = _stream(cmd, cwd=cwd, timeout=timeout, prefix="  ")
     return subprocess.CompletedProcess(
-        args=cmd, returncode=r.returncode,
-        stdout=r.stdout, stderr="",
+        args=cmd,
+        returncode=r.returncode,
+        stdout=r.stdout,
+        stderr="",
     )
 
 
@@ -219,19 +220,17 @@ def phase_0_validate_environment(args: argparse.Namespace) -> PhaseResult:
     log("INFO", f"  Python: {sys.version.split()[0]}")
 
     # 6. Version matches PRODUCT_VERSION
-    r = _run([sys.executable, "-c",
-              "from src.multi_tenant.api_versioning import PRODUCT_VERSION; print(PRODUCT_VERSION)"],
-             cwd=PROJECT_ROOT)
+    r = _run(
+        [sys.executable, "-c", "from src.multi_tenant.api_versioning import PRODUCT_VERSION; print(PRODUCT_VERSION)"],
+        cwd=PROJECT_ROOT,
+    )
     if r.returncode != 0:
         failures.append(f"Cannot read PRODUCT_VERSION: {r.stderr.strip()[:200]}")
     else:
         product_version = r.stdout.strip()
         expected = args.version.lstrip("v")
         if product_version != expected:
-            failures.append(
-                f"PRODUCT_VERSION mismatch: code has '{product_version}', "
-                f"pipeline version is '{expected}'"
-            )
+            failures.append(f"PRODUCT_VERSION mismatch: code has '{product_version}', pipeline version is '{expected}'")
         else:
             log("INFO", f"  PRODUCT_VERSION: {product_version} (matches)")
 
@@ -248,10 +247,7 @@ def phase_0_validate_environment(args: argparse.Namespace) -> PhaseResult:
     # 9. Production approval gate (GOV-16, SPEC-1882, Codex WP1)
     # Must fail BEFORE any build or ACR work — this is pre-flight.
     if args.env == "production":
-        approved = (
-            os.environ.get("DEPLOY_APPROVED") == "1"
-            or getattr(args, "approved", False)
-        )
+        approved = os.environ.get("DEPLOY_APPROVED") == "1" or getattr(args, "approved", False)
         if not approved:
             failures.append(
                 "Production deploy requires explicit owner approval. "
@@ -484,26 +480,44 @@ def phase_7_acr_build(args: argparse.Namespace, build_context: str) -> PhaseResu
     version = args.version
     log("INFO", f"  Building {IMAGE_REPO}:{version} on ACR (--no-logs)...")
 
-    _run([
-        "az", "acr", "build",
-        "--registry", ACR_NAME,
-        "--image", f"{IMAGE_REPO}:{version}",
-        "--build-arg", f"BUILD_VERSION={version}",
-        "--file", str(Path(build_context) / "Dockerfile"),
-        "--no-logs",
-        build_context,
-    ], timeout=600)
+    _run(
+        [
+            "az",
+            "acr",
+            "build",
+            "--registry",
+            ACR_NAME,
+            "--image",
+            f"{IMAGE_REPO}:{version}",
+            "--build-arg",
+            f"BUILD_VERSION={version}",
+            "--file",
+            str(Path(build_context) / "Dockerfile"),
+            "--no-logs",
+            build_context,
+        ],
+        timeout=600,
+    )
 
     # Note: on Windows, az acr build may crash with UnicodeEncodeError
     # even when the build succeeds. Check ACR run status instead.
     log("INFO", "  Verifying ACR build status...")
-    r2 = _run([
-        "az", "acr", "task", "list-runs",
-        "--registry", ACR_NAME,
-        "--top", "1",
-        "--query", "[0].status",
-        "-o", "tsv",
-    ])
+    r2 = _run(
+        [
+            "az",
+            "acr",
+            "task",
+            "list-runs",
+            "--registry",
+            ACR_NAME,
+            "--top",
+            "1",
+            "--query",
+            "[0].status",
+            "-o",
+            "tsv",
+        ]
+    )
     build_status = r2.stdout.strip()
     if build_status != "Succeeded":
         detail = f"ACR build status: {build_status} (expected 'Succeeded')"
@@ -512,26 +526,44 @@ def phase_7_acr_build(args: argparse.Namespace, build_context: str) -> PhaseResu
 
     # Verify tag exists in registry
     log("INFO", "  Verifying image tag in ACR...")
-    r3 = _run([
-        "az", "acr", "repository", "show-tags",
-        "--name", ACR_NAME,
-        "--repository", IMAGE_REPO,
-        "--query", f"[?@=='{version}']",
-        "-o", "tsv",
-    ])
+    r3 = _run(
+        [
+            "az",
+            "acr",
+            "repository",
+            "show-tags",
+            "--name",
+            ACR_NAME,
+            "--repository",
+            IMAGE_REPO,
+            "--query",
+            f"[?@=='{version}']",
+            "-o",
+            "tsv",
+        ]
+    )
     if r3.stdout.strip() != version:
         detail = f"Image tag {version} not found in ACR after build"
         log("FAIL", f"  {detail}")
         return PhaseResult(7, "ACR Docker Build", "FAIL", time.time() - t0, detail)
 
     # Get build ID for logging
-    r4 = _run([
-        "az", "acr", "task", "list-runs",
-        "--registry", ACR_NAME,
-        "--top", "1",
-        "--query", "[0].runId",
-        "-o", "tsv",
-    ])
+    r4 = _run(
+        [
+            "az",
+            "acr",
+            "task",
+            "list-runs",
+            "--registry",
+            ACR_NAME,
+            "--top",
+            "1",
+            "--query",
+            "[0].runId",
+            "-o",
+            "tsv",
+        ]
+    )
     build_id = r4.stdout.strip()
     log("PASS", f"  Image {IMAGE_REPO}:{version} built (run: {build_id})")
 
@@ -557,18 +589,26 @@ def phase_8_deploy(args: argparse.Namespace) -> PhaseResult:
         args._deploy_evidence["target_container_app"] = container_app
 
     log("INFO", f"  Deploying {new_image} to {container_app}...")
-    r = _run([
-        "az", "containerapp", "update",
-        "--name", container_app,
-        "--resource-group", RESOURCE_GROUP,
-        "--image", new_image,
-    ], timeout=120)
+    r = _run(
+        [
+            "az",
+            "containerapp",
+            "update",
+            "--name",
+            container_app,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--image",
+            new_image,
+        ],
+        timeout=120,
+    )
 
     # Track 1: record update attempt outcome BEFORE returning failure
     # (Codex GO -006 condition 2: failed update must record evidence).
     if hasattr(args, "_deploy_evidence"):
         args._deploy_evidence["target_update_attempted"] = True
-        args._deploy_evidence["target_update_succeeded"] = (r.returncode == 0)
+        args._deploy_evidence["target_update_succeeded"] = r.returncode == 0
 
     if r.returncode != 0:
         # Track 1: record phase timing on failure path so attempted-failed
@@ -584,13 +624,21 @@ def phase_8_deploy(args: argparse.Namespace) -> PhaseResult:
         return PhaseResult(9, "Deploy to Target", "FAIL", time.time() - t0, detail)
 
     # Verify the deployed image
-    r2 = _run([
-        "az", "containerapp", "show",
-        "--name", container_app,
-        "--resource-group", RESOURCE_GROUP,
-        "--query", "properties.template.containers[0].image",
-        "-o", "tsv",
-    ])
+    r2 = _run(
+        [
+            "az",
+            "containerapp",
+            "show",
+            "--name",
+            container_app,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--query",
+            "properties.template.containers[0].image",
+            "-o",
+            "tsv",
+        ]
+    )
     deployed_image = r2.stdout.strip()
     if deployed_image != new_image:
         log("WARN", f"  Expected {new_image}, got {deployed_image} — may still be transitioning")
@@ -601,13 +649,23 @@ def phase_8_deploy(args: argparse.Namespace) -> PhaseResult:
     # Track 1: query revision name (non-fatal on failure) and record
     # phase timing + verification timestamp.
     if hasattr(args, "_deploy_evidence"):
-        r3 = _run([
-            "az", "containerapp", "revision", "list",
-            "--name", container_app,
-            "--resource-group", RESOURCE_GROUP,
-            "--query", f"[?properties.template.containers[0].image=='{new_image}'].name | [0]",
-            "-o", "tsv",
-        ], timeout=30)
+        r3 = _run(
+            [
+                "az",
+                "containerapp",
+                "revision",
+                "list",
+                "--name",
+                container_app,
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--query",
+                f"[?properties.template.containers[0].image=='{new_image}'].name | [0]",
+                "-o",
+                "tsv",
+            ],
+            timeout=30,
+        )
         if r3.returncode == 0 and r3.stdout.strip():
             args._deploy_evidence["revision_name"] = r3.stdout.strip()
         args._deploy_evidence["target_verified_at"] = datetime.now().isoformat()
@@ -674,8 +732,9 @@ def phase_10_startup_and_version(args: argparse.Namespace) -> PhaseResult:
                     "duration_seconds": round(time.time() - t0, 1),
                 }
             return PhaseResult(10, "Startup + Version Verify", "PASS", time.time() - t0)
-        detail = (f"Health 200 but product_version={actual_version}, expected={expected_version} "
-                  f"-- old revision still active")
+        detail = (
+            f"Health 200 but product_version={actual_version}, expected={expected_version} -- old revision still active"
+        )
     else:
         detail = f"Not healthy after {HEALTH_WAIT_SECONDS}s (last status={last_status})"
 
@@ -708,8 +767,7 @@ def phase_15_enforce_scaling(args: argparse.Namespace) -> PhaseResult:
     t0 = time.time()
     if args.dry_run:
         log("INFO", f"  [DRY RUN] Would enforce scaling on {args.env} apps")
-        return PhaseResult(15, "Enforce Scaling Baseline", "PASS",
-                           time.time() - t0, "dry-run")
+        return PhaseResult(15, "Enforce Scaling Baseline", "PASS", time.time() - t0, "dry-run")
 
     # Import lazily so unit tests can mock these without importing deploy.py
     # at module load time. The shared library is cheap to import (no side effects).
@@ -742,9 +800,7 @@ def phase_15_enforce_scaling(args: argparse.Namespace) -> PhaseResult:
     if failed:
         for name in failed:
             log("WARN", f"  Scaling enforcement failed: {name}")
-        log("WARN",
-            f"  {len(failed)}/{total} apps failed scaling enforcement "
-            f"(non-blocking per WI-3156)")
+        log("WARN", f"  {len(failed)}/{total} apps failed scaling enforcement (non-blocking per WI-3156)")
         # `extra` is what _print_summary() displays after the status, so this
         # makes drift visible in the final summary line:
         #   Phase 15: Enforce Scaling Baseline ......... PASS (12.4s)
@@ -766,8 +822,7 @@ def phase_15_enforce_scaling(args: argparse.Namespace) -> PhaseResult:
             "duration_seconds": round(dt, 1),
         }
 
-    return PhaseResult(15, "Enforce Scaling Baseline", "PASS", dt,
-                       detail=detail, extra=extra)
+    return PhaseResult(15, "Enforce Scaling Baseline", "PASS", dt, detail=detail, extra=extra)
 
 
 def phase_10a_pre_deploy_snapshot(args: argparse.Namespace) -> PhaseResult:
@@ -804,8 +859,7 @@ def phase_10a_pre_deploy_snapshot(args: argparse.Namespace) -> PhaseResult:
     # Verify snapshot files were created
     results_dir = PROJECT_ROOT / "scripts" / "upgrade-results"
     if env == "staging":
-        expected_files = [results_dir / "phase_a_staging-001.json",
-                          results_dir / "phase_a_staging-002.json"]
+        expected_files = [results_dir / "phase_a_staging-001.json", results_dir / "phase_a_staging-002.json"]
     else:
         prod_tenant = ENVIRONMENTS["production"]["tenant_id"] or "remaker-digital-001"
         expected_files = [results_dir / f"phase_a_{prod_tenant}.json"]
@@ -842,8 +896,7 @@ def phase_13_upgrade_verification(args: argparse.Namespace) -> PhaseResult:
     log("INFO", f"  Running {phase_name} --new-version {version_stripped}...")
     try:
         r = _run(
-            [sys.executable, str(script), phase_name,
-             "--env", env, "--new-version", version_stripped],
+            [sys.executable, str(script), phase_name, "--env", env, "--new-version", version_stripped],
             cwd=PROJECT_ROOT,
             timeout=600,  # 10 min — rate limiting at 10 rpm means 70 calls ≈ 7 min
         )
@@ -1003,7 +1056,9 @@ def phase_13_seed_test_tenant(args: argparse.Namespace) -> PhaseResult:
 
     r = _stream(
         [sys.executable, str(script), "--execute"],
-        cwd=PROJECT_ROOT, timeout=300, env=seed_env,
+        cwd=PROJECT_ROOT,
+        timeout=300,
+        env=seed_env,
         prefix="  [seed] ",
     )
 
@@ -1172,6 +1227,7 @@ def phase_14_verify_initialized_state(args: argparse.Namespace) -> PhaseResult:
     # I.10 -- Admin SPA serves HTML (static files built correctly)
     try:
         import httpx
+
         with httpx.Client(timeout=10.0) as client:
             r = client.get(f"https://{fqdn}/admin/standalone/")
             if r.status_code == 200 and "<!doctype html" in r.text.lower()[:200]:
@@ -1224,10 +1280,20 @@ def phase_11_production_verification(args: argparse.Namespace) -> PhaseResult:
     else:
         try:
             r = _stream(
-                [sys.executable, str(script), "phase-c",
-                 "--env", "production", "--new-version", expected_version,
-                 "--snapshot", snapshot_path],
-                cwd=PROJECT_ROOT, timeout=600, prefix="  [phase-c] ",
+                [
+                    sys.executable,
+                    str(script),
+                    "phase-c",
+                    "--env",
+                    "production",
+                    "--new-version",
+                    expected_version,
+                    "--snapshot",
+                    snapshot_path,
+                ],
+                cwd=PROJECT_ROOT,
+                timeout=600,
+                prefix="  [phase-c] ",
             )
         except Exception as e:
             failures.append(f"phase-c exception: {e}")
@@ -1365,8 +1431,13 @@ def _safe_print(*args_p, **kwargs_p) -> None:
         pass
 
 
-def _print_summary(results: list[PhaseResult], args: argparse.Namespace,
-                   start_time: float, log_path: Path | None, defect_wi: str | None) -> None:
+def _print_summary(
+    results: list[PhaseResult],
+    args: argparse.Namespace,
+    start_time: float,
+    log_path: Path | None,
+    defect_wi: str | None,
+) -> None:
     """Print final summary report."""
     total_time = time.time() - start_time
     minutes = int(total_time // 60)
@@ -1408,14 +1479,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Automated Build/Deploy Pipeline (SPEC-1615) — Two-Track",
     )
-    parser.add_argument("--env", required=True, choices=["staging", "production"],
-                        help="Target environment (staging=comprehensive, production=safe)")
-    parser.add_argument("--version", required=True,
-                        help="Image version tag (e.g., v1.66.0)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validate without executing destructive actions")
-    parser.add_argument("--approved", action="store_true",
-                        help="Explicit owner approval for production deploy (GOV-16)")
+    parser.add_argument(
+        "--env",
+        required=True,
+        choices=["staging", "production"],
+        help="Target environment (staging=comprehensive, production=safe)",
+    )
+    parser.add_argument("--version", required=True, help="Image version tag (e.g., v1.66.0)")
+    parser.add_argument("--dry-run", action="store_true", help="Validate without executing destructive actions")
+    parser.add_argument(
+        "--approved", action="store_true", help="Explicit owner approval for production deploy (GOV-16)"
+    )
     args = parser.parse_args()
 
     # Validate version format
@@ -1443,8 +1517,7 @@ def main() -> int:
 
     repo_sha = "unknown"
     try:
-        _r = _sp.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5,
-                     cwd=str(PROJECT_ROOT))
+        _r = _sp.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5, cwd=str(PROJECT_ROOT))
         if _r.returncode == 0:
             repo_sha = _r.stdout.strip()[:12]
     except Exception:
@@ -1513,17 +1586,19 @@ def main() -> int:
                 log("INFO", f"  Rollback image captured: {rollback_img}")
             else:
                 log("FAIL", "  Cannot capture rollback image — aborting deploy (fail-closed)")
-                results.append(PhaseResult(
-                    8, "Rollback Pre-flight", "FAIL", 0.0,
-                    "get_current_image returned None; deploy blocked until rollback baseline is established"
-                ))
+                results.append(
+                    PhaseResult(
+                        8,
+                        "Rollback Pre-flight",
+                        "FAIL",
+                        0.0,
+                        "get_current_image returned None; deploy blocked until rollback baseline is established",
+                    )
+                )
                 all_ok = False
         except Exception as exc:
             log("FAIL", f"  Rollback image capture raised exception: {exc}")
-            results.append(PhaseResult(
-                8, "Rollback Pre-flight", "FAIL", 0.0,
-                f"get_current_image exception: {exc}"
-            ))
+            results.append(PhaseResult(8, "Rollback Pre-flight", "FAIL", 0.0, f"get_current_image exception: {exc}"))
             all_ok = False
 
     if all_ok:
@@ -1589,8 +1664,7 @@ def main() -> int:
             results.append(result)
         else:
             # Seed failed — skip initialized verification
-            results.append(PhaseResult(14, "Verify Initialized State", "SKIP",
-                                       0, "seed failed"))
+            results.append(PhaseResult(14, "Verify Initialized State", "SKIP", 0, "seed failed"))
 
     elif all_ok and args.env == "production":
         # PRODUCTION TRACK: safe verification (no mutations)

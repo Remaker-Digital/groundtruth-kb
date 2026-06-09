@@ -124,7 +124,9 @@ PACKET = {
 
 
 def main() -> None:
-    out_path = Path(".groundtruth/formal-artifact-approvals/2026-05-12-dcl-single-harness-dispatcher-desktop-task-001.json")
+    out_path = Path(
+        ".groundtruth/formal-artifact-approvals/2026-05-12-dcl-single-harness-dispatcher-desktop-task-001.json"
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(PACKET, indent=2), encoding="utf-8")
     print(f"wrote packet: {out_path}")

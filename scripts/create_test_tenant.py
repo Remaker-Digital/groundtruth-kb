@@ -128,10 +128,14 @@ def upload_file(
         file_data = f.read()
 
     body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="{field_name}"; filename="{file_name}"\r\n'
-        f"Content-Type: {mime_type}\r\n\r\n"
-    ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{field_name}"; filename="{file_name}"\r\n'
+            f"Content-Type: {mime_type}\r\n\r\n"
+        ).encode()
+        + file_data
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
 
     url = f"{PROD_URL}{path}"
     req = urllib.request.Request(url, data=body, method="POST")
@@ -154,6 +158,7 @@ def upload_file(
 # Logging
 # ---------------------------------------------------------------------------
 
+
 class _Colors:
     PASS = "\033[92m"
     FAIL = "\033[91m"
@@ -169,14 +174,15 @@ def log(level: str, msg: str) -> None:
 
 
 def phase_header(num: int, name: str) -> None:
-    log("PHASE", f"\n{'='*60}")
+    log("PHASE", f"\n{'=' * 60}")
     log("PHASE", f"  PHASE {num}: {name}")
-    log("PHASE", f"{'='*60}")
+    log("PHASE", f"{'=' * 60}")
 
 
 # ---------------------------------------------------------------------------
 # Phase 0: Seed Tenant
 # ---------------------------------------------------------------------------
+
 
 def phase_0_seed(dry_run: bool) -> None:
     phase_header(0, "Seed Tenant via seed_tenant.py")
@@ -266,7 +272,8 @@ def phase_0_seed(dry_run: bool) -> None:
 
     # Verify tenant exists
     status, body = api_call(
-        "GET", "/api/tenants/lookup",
+        "GET",
+        "/api/tenants/lookup",
         api_key=CREDENTIALS.get("superadmin_key", ""),
     )
     if status == 200:
@@ -278,6 +285,7 @@ def phase_0_seed(dry_run: bool) -> None:
 # ---------------------------------------------------------------------------
 # Phase 1: Configure & Activate
 # ---------------------------------------------------------------------------
+
 
 def phase_1_configure(dry_run: bool) -> None:
     phase_header(1, "Configure & Activate")
@@ -399,8 +407,10 @@ def phase_2_team(dry_run: bool) -> None:
             log("FAIL", f"Failed to create {member['email']}: {status} — {body}")
 
     CREDENTIALS["member_keys"] = json.dumps(member_keys)
-    log("PASS" if created == len(ADDITIONAL_TEAM_MEMBERS) else "WARN",
-        f"Team members created: {created}/{len(ADDITIONAL_TEAM_MEMBERS)}")
+    log(
+        "PASS" if created == len(ADDITIONAL_TEAM_MEMBERS) else "WARN",
+        f"Team members created: {created}/{len(ADDITIONAL_TEAM_MEMBERS)}",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -409,23 +419,95 @@ def phase_2_team(dry_run: bool) -> None:
 
 QUICK_ACTIONS = [
     # home page
-    {"label": "What's new today?", "promptTemplate": "What new products or promotions do you have today?", "icon": "🆕", "sortOrder": 0, "page": "home"},
-    {"label": "Help me find something", "promptTemplate": "I'm looking for something specific but I'm not sure where to find it.", "icon": "🔍", "sortOrder": 1, "page": "home"},
+    {
+        "label": "What's new today?",
+        "promptTemplate": "What new products or promotions do you have today?",
+        "icon": "🆕",
+        "sortOrder": 0,
+        "page": "home",
+    },
+    {
+        "label": "Help me find something",
+        "promptTemplate": "I'm looking for something specific but I'm not sure where to find it.",
+        "icon": "🔍",
+        "sortOrder": 1,
+        "page": "home",
+    },
     # product page
-    {"label": "Is this in stock?", "promptTemplate": "Is this product currently in stock and available for shipping?", "icon": "📦", "sortOrder": 0, "page": "product"},
-    {"label": "Size guide", "promptTemplate": "Can you help me find the right size for this product?", "icon": "📏", "sortOrder": 1, "page": "product"},
+    {
+        "label": "Is this in stock?",
+        "promptTemplate": "Is this product currently in stock and available for shipping?",
+        "icon": "📦",
+        "sortOrder": 0,
+        "page": "product",
+    },
+    {
+        "label": "Size guide",
+        "promptTemplate": "Can you help me find the right size for this product?",
+        "icon": "📏",
+        "sortOrder": 1,
+        "page": "product",
+    },
     # collection page
-    {"label": "Compare products", "promptTemplate": "Can you help me compare the products in this collection?", "icon": "⚖️", "sortOrder": 0, "page": "collection"},
-    {"label": "Best sellers", "promptTemplate": "Which products in this collection are the most popular?", "icon": "⭐", "sortOrder": 1, "page": "collection"},
+    {
+        "label": "Compare products",
+        "promptTemplate": "Can you help me compare the products in this collection?",
+        "icon": "⚖️",
+        "sortOrder": 0,
+        "page": "collection",
+    },
+    {
+        "label": "Best sellers",
+        "promptTemplate": "Which products in this collection are the most popular?",
+        "icon": "⭐",
+        "sortOrder": 1,
+        "page": "collection",
+    },
     # cart page
-    {"label": "Apply discount", "promptTemplate": "Do you have any discount codes or promotions I can use on my order?", "icon": "🏷️", "sortOrder": 0, "page": "cart"},
-    {"label": "Shipping options", "promptTemplate": "What shipping options are available for my order?", "icon": "🚚", "sortOrder": 1, "page": "cart"},
+    {
+        "label": "Apply discount",
+        "promptTemplate": "Do you have any discount codes or promotions I can use on my order?",
+        "icon": "🏷️",
+        "sortOrder": 0,
+        "page": "cart",
+    },
+    {
+        "label": "Shipping options",
+        "promptTemplate": "What shipping options are available for my order?",
+        "icon": "🚚",
+        "sortOrder": 1,
+        "page": "cart",
+    },
     # search page
-    {"label": "Refine my search", "promptTemplate": "I searched but couldn't find exactly what I need. Can you help me refine my search?", "icon": "🎯", "sortOrder": 0, "page": "search"},
-    {"label": "Popular searches", "promptTemplate": "What are other customers commonly searching for?", "icon": "📊", "sortOrder": 1, "page": "search"},
+    {
+        "label": "Refine my search",
+        "promptTemplate": "I searched but couldn't find exactly what I need. Can you help me refine my search?",
+        "icon": "🎯",
+        "sortOrder": 0,
+        "page": "search",
+    },
+    {
+        "label": "Popular searches",
+        "promptTemplate": "What are other customers commonly searching for?",
+        "icon": "📊",
+        "sortOrder": 1,
+        "page": "search",
+    },
     # blog page
-    {"label": "Related products", "promptTemplate": "Are there any products related to this blog post?", "icon": "🛍️", "sortOrder": 0, "page": "blog"},
-    {"label": "More articles", "promptTemplate": "Can you recommend more articles on this topic?", "icon": "📚", "sortOrder": 1, "page": "blog"},
+    {
+        "label": "Related products",
+        "promptTemplate": "Are there any products related to this blog post?",
+        "icon": "🛍️",
+        "sortOrder": 0,
+        "page": "blog",
+    },
+    {
+        "label": "More articles",
+        "promptTemplate": "Can you recommend more articles on this topic?",
+        "icon": "📚",
+        "sortOrder": 1,
+        "page": "blog",
+    },
 ]
 
 
@@ -464,8 +546,10 @@ def phase_3_quick_actions(dry_run: bool) -> None:
                 "autoOpenDelayMs": 3000,
             }
             status, body = api_call(
-                "PUT", "/api/admin/quick-actions/assignments",
-                body=assignment, api_key=key,
+                "PUT",
+                "/api/admin/quick-actions/assignments",
+                body=assignment,
+                api_key=key,
             )
             if status == 200:
                 log("PASS", f"Assigned: {page_type} -- [{ids[0][:8]}, {ids[1][:8]}]")
@@ -473,8 +557,10 @@ def phase_3_quick_actions(dry_run: bool) -> None:
             else:
                 log("FAIL", f"Assignment {page_type} failed: {status} — {body}")
 
-    log("PASS" if assigned == 6 else "WARN",
-        f"Quick actions: {sum(len(v) for v in created_ids.values())} created, {assigned}/6 pages assigned")
+    log(
+        "PASS" if assigned == 6 else "WARN",
+        f"Quick actions: {sum(len(v) for v in created_ids.values())} created, {assigned}/6 pages assigned",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -534,8 +620,10 @@ def phase_4_knowledge(dry_run: bool) -> None:
         else:
             log("FAIL", f"Failed KB '{entry['title']}': {status} — {body}")
 
-    log("PASS" if created == len(MANUAL_KB_ENTRIES) else "WARN",
-        f"KB entries created: {created}/{len(MANUAL_KB_ENTRIES)}")
+    log(
+        "PASS" if created == len(MANUAL_KB_ENTRIES) else "WARN",
+        f"KB entries created: {created}/{len(MANUAL_KB_ENTRIES)}",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -556,8 +644,10 @@ def phase_4b_ka_template(dry_run: bool) -> None:
 
     # Apply template
     status, body = api_call(
-        "POST", f"/api/admin/knowledge/templates/{TEMPLATE_TO_APPLY}/apply",
-        body={}, api_key=key,
+        "POST",
+        f"/api/admin/knowledge/templates/{TEMPLATE_TO_APPLY}/apply",
+        body={},
+        api_key=key,
     )
 
     if status in (200, 201):
@@ -583,25 +673,79 @@ def phase_4b_ka_template(dry_run: bool) -> None:
 
 CONVERSATIONS = [
     # Quick-action-triggered (6)
-    {"name": "QA-home", "message": "What new products or promotions do you have today?", "page_url": "https://testcustomer.com/"},
-    {"name": "QA-product", "message": "Is this product currently in stock and available for shipping?", "page_url": "https://testcustomer.com/products/widget-pro"},
-    {"name": "QA-collection", "message": "Can you help me compare the products in this collection?", "page_url": "https://testcustomer.com/collections/summer"},
-    {"name": "QA-cart", "message": "Do you have any discount codes or promotions I can use on my order?", "page_url": "https://testcustomer.com/cart"},
-    {"name": "QA-search", "message": "I searched but couldn't find exactly what I need. Can you help me refine my search?", "page_url": "https://testcustomer.com/search?q=blue+widget"},
-    {"name": "QA-blog", "message": "Are there any products related to this blog post?", "page_url": "https://testcustomer.com/blogs/news/summer-trends"},
+    {
+        "name": "QA-home",
+        "message": "What new products or promotions do you have today?",
+        "page_url": "https://testcustomer.com/",
+    },
+    {
+        "name": "QA-product",
+        "message": "Is this product currently in stock and available for shipping?",
+        "page_url": "https://testcustomer.com/products/widget-pro",
+    },
+    {
+        "name": "QA-collection",
+        "message": "Can you help me compare the products in this collection?",
+        "page_url": "https://testcustomer.com/collections/summer",
+    },
+    {
+        "name": "QA-cart",
+        "message": "Do you have any discount codes or promotions I can use on my order?",
+        "page_url": "https://testcustomer.com/cart",
+    },
+    {
+        "name": "QA-search",
+        "message": "I searched but couldn't find exactly what I need. Can you help me refine my search?",
+        "page_url": "https://testcustomer.com/search?q=blue+widget",
+    },
+    {
+        "name": "QA-blog",
+        "message": "Are there any products related to this blog post?",
+        "page_url": "https://testcustomer.com/blogs/news/summer-trends",
+    },
     # Escalation-triggering (6)
-    {"name": "ESC-service", "message": "I received a broken item and I want to speak to a human about getting it replaced", "expect_escalation": True},
-    {"name": "ESC-support", "message": "This is completely unacceptable, I demand to speak with a supervisor immediately", "expect_escalation": True},
-    {"name": "ESC-sales", "message": "I'm interested in a bulk order of 500 units, I need to discuss pricing with sales", "expect_escalation": True},
-    {"name": "ESC-account", "message": "I need to update my account billing information and there's a discrepancy in my charges", "expect_escalation": True},
-    {"name": "ESC-tech", "message": "I'm getting error 502 when trying to use the integration API and need technical help", "expect_escalation": True},
+    {
+        "name": "ESC-service",
+        "message": "I received a broken item and I want to speak to a human about getting it replaced",
+        "expect_escalation": True,
+    },
+    {
+        "name": "ESC-support",
+        "message": "This is completely unacceptable, I demand to speak with a supervisor immediately",
+        "expect_escalation": True,
+    },
+    {
+        "name": "ESC-sales",
+        "message": "I'm interested in a bulk order of 500 units, I need to discuss pricing with sales",
+        "expect_escalation": True,
+    },
+    {
+        "name": "ESC-account",
+        "message": "I need to update my account billing information and there's a discrepancy in my charges",
+        "expect_escalation": True,
+    },
+    {
+        "name": "ESC-tech",
+        "message": "I'm getting error 502 when trying to use the integration API and need technical help",
+        "expect_escalation": True,
+    },
     {"name": "ESC-general", "message": "I'd rather just chat with a real person please", "expect_escalation": True},
     # General multi-turn (2)
     {"name": "GENERAL-1", "message": "What's your return policy?"},
     {"name": "GENERAL-2", "message": "Can you tell me about your shipping options?"},
     # Will be manually escalated (2)
-    {"name": "MANUAL-ESC-1", "message": "I have a question about my recent order", "manual_escalate": True, "escalation_category": "service"},
-    {"name": "MANUAL-ESC-2", "message": "I need help with a product I purchased", "manual_escalate": True, "escalation_category": "support"},
+    {
+        "name": "MANUAL-ESC-1",
+        "message": "I have a question about my recent order",
+        "manual_escalate": True,
+        "escalation_category": "service",
+    },
+    {
+        "name": "MANUAL-ESC-2",
+        "message": "I need help with a product I purchased",
+        "manual_escalate": True,
+        "escalation_category": "support",
+    },
     # Unassigned escalated (2)
     {"name": "UNASSIGNED-1", "message": "I want a human agent, not a bot", "manual_escalate": True},
     {"name": "UNASSIGNED-2", "message": "Transfer me to a real person right now", "manual_escalate": True},
@@ -622,7 +766,7 @@ def phase_5_conversations(dry_run: bool) -> None:
                 flags.append("manual-escalate")
             if conv.get("end_after"):
                 flags.append("end-after")
-            log("INFO", f"[DRY RUN] {conv['name']}: \"{conv['message'][:50]}...\" [{', '.join(flags) or 'general'}]")
+            log("INFO", f'[DRY RUN] {conv["name"]}: "{conv["message"][:50]}..." [{", ".join(flags) or "general"}]')
         return
 
     widget_key = CREDENTIALS.get("widget_key", "")
@@ -639,7 +783,8 @@ def phase_5_conversations(dry_run: bool) -> None:
             start_body["page_url"] = conv["page_url"]
 
         status, body = api_call(
-            "POST", "/api/chat/conversations",
+            "POST",
+            "/api/chat/conversations",
             body=start_body,
             widget_key=widget_key,
             timeout=60,
@@ -648,7 +793,7 @@ def phase_5_conversations(dry_run: bool) -> None:
         if status == 201:
             conv_id = body.get("conversationId", body.get("conversation_id", ""))
             conversation_ids[conv["name"]] = conv_id
-            log("PASS", f"[{i+1}/{len(CONVERSATIONS)}] {conv['name']}: created (id={conv_id[:12]}...)")
+            log("PASS", f"[{i + 1}/{len(CONVERSATIONS)}] {conv['name']}: created (id={conv_id[:12]}...)")
             created += 1
 
             # Wait for AI response to complete
@@ -658,7 +803,8 @@ def phase_5_conversations(dry_run: bool) -> None:
             if conv["name"].startswith("GENERAL"):
                 follow_up = "Can you give me more details about that?"
                 api_call(
-                    "POST", "/api/chat/message",
+                    "POST",
+                    "/api/chat/message",
                     body={"conversation_id": conv_id, "content": follow_up},
                     widget_key=widget_key,
                     timeout=60,
@@ -671,7 +817,8 @@ def phase_5_conversations(dry_run: bool) -> None:
                 if conv.get("escalation_category"):
                     esc_body["category"] = conv["escalation_category"]
                 esc_status, esc_resp = api_call(
-                    "POST", f"/api/admin/conversations/{conv_id}/escalate",
+                    "POST",
+                    f"/api/admin/conversations/{conv_id}/escalate",
                     body=esc_body,
                     api_key=admin_key,
                 )
@@ -683,7 +830,8 @@ def phase_5_conversations(dry_run: bool) -> None:
             # End conversation (archive candidate)
             if conv.get("end_after"):
                 end_status, _ = api_call(
-                    "POST", f"/api/chat/conversations/{conv_id}/end",
+                    "POST",
+                    f"/api/chat/conversations/{conv_id}/end",
                     body={},
                     widget_key=widget_key,
                 )
@@ -693,19 +841,19 @@ def phase_5_conversations(dry_run: bool) -> None:
                     log("WARN", f"  End failed for {conv['name']}: {end_status}")
 
         elif status == 403:
-            log("FAIL", f"[{i+1}] {conv['name']}: 403 — tenant not active. Run Phase 1 first.")
+            log("FAIL", f"[{i + 1}] {conv['name']}: 403 — tenant not active. Run Phase 1 first.")
             raise RuntimeError("Tenant not active — conversations blocked")
         else:
-            log("FAIL", f"[{i+1}] {conv['name']}: {status} — {body}")
+            log("FAIL", f"[{i + 1}] {conv['name']}: {status} — {body}")
 
     CREDENTIALS["conversation_ids"] = json.dumps(conversation_ids)
-    log("PASS" if created == len(CONVERSATIONS) else "WARN",
-        f"Conversations created: {created}/{len(CONVERSATIONS)}")
+    log("PASS" if created == len(CONVERSATIONS) else "WARN", f"Conversations created: {created}/{len(CONVERSATIONS)}")
 
 
 # ---------------------------------------------------------------------------
 # Phase 6: Upload Avatar
 # ---------------------------------------------------------------------------
+
 
 def phase_6_avatar(dry_run: bool) -> None:
     phase_header(6, "Upload Avatar")
@@ -738,6 +886,7 @@ def phase_6_avatar(dry_run: bool) -> None:
 # Phase 7: Verify Tier Override
 # ---------------------------------------------------------------------------
 
+
 def phase_7_tier_verify(dry_run: bool) -> None:
     phase_header(7, "Verify Tier Override")
 
@@ -752,7 +901,8 @@ def phase_7_tier_verify(dry_run: bool) -> None:
         return
 
     status, body = api_call(
-        "PUT", f"/api/superadmin/tenants/{TENANT_ID}/tier",
+        "PUT",
+        f"/api/superadmin/tenants/{TENANT_ID}/tier",
         body={"tier": "starter"},
         api_key=rd_key,
     )
@@ -768,6 +918,7 @@ def phase_7_tier_verify(dry_run: bool) -> None:
 # ---------------------------------------------------------------------------
 # Postconditions
 # ---------------------------------------------------------------------------
+
 
 def verify_postconditions(dry_run: bool) -> None:
     phase_header(8, "Verify Postconditions")
@@ -884,7 +1035,7 @@ def verify_postconditions(dry_run: bool) -> None:
         log("FAIL", f"Gate 8: Config read for KA field failed — {status}")
 
     # Summary
-    log("PHASE", f"\n{'='*60}")
+    log("PHASE", f"\n{'=' * 60}")
     if gates_passed == total_gates:
         log("PASS", f"ALL {total_gates} POSTCONDITION GATES PASSED")
     else:

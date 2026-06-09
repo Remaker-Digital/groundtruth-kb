@@ -3,6 +3,7 @@
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import sys

@@ -193,9 +193,7 @@ def _sha256(path: Path) -> str:
 def _assert_not_forbidden(source_uri: str) -> None:
     for pattern in FORBIDDEN_NAME_PATTERNS:
         if pattern.search(source_uri):
-            raise OverlayPolicyError(
-                f"refusing to copy forbidden source into overlay: {source_uri}"
-            )
+            raise OverlayPolicyError(f"refusing to copy forbidden source into overlay: {source_uri}")
 
 
 def _validate_allowlist_source(source_uri: str) -> str:
@@ -256,9 +254,7 @@ def build_overlay(
         # belt-and-braces: the allowlist binds source -> overlay name; the
         # caller does not get to rename.
         if expected_overlay_path != overlay_basename:
-            raise OverlayPolicyError(
-                f"allowlist entry mismatch: {source_uri} -> {overlay_basename!r}"
-            )
+            raise OverlayPolicyError(f"allowlist entry mismatch: {source_uri} -> {overlay_basename!r}")
         source_path = _resolve_inside_root(resolved_root, source_uri)
         if not source_path.is_file():
             # Skip missing sources; staleness evaluation will flag them.
@@ -439,9 +435,7 @@ def validate_manifest(manifest: OverlayManifest, *, project_root: Path) -> None:
                 f"overlay {manifest.overlay_id} entry {entry.overlay_path!r} source_hash is not a sha256 hex digest"
             )
         if entry.source_uri in seen_sources:
-            raise OverlayPolicyError(
-                f"overlay {manifest.overlay_id} has duplicate source_uri {entry.source_uri!r}"
-            )
+            raise OverlayPolicyError(f"overlay {manifest.overlay_id} has duplicate source_uri {entry.source_uri!r}")
         seen_sources.add(entry.source_uri)
 
 
@@ -517,11 +511,7 @@ def iter_overlay_dirs(project_root: Path = PROJECT_ROOT) -> list[Path]:
     root = overlay_root(project_root)
     if not root.is_dir():
         return []
-    return sorted(
-        path
-        for path in root.iterdir()
-        if path.is_dir() and (path / OVERLAY_MANIFEST_NAME).is_file()
-    )
+    return sorted(path for path in root.iterdir() if path.is_dir() and (path / OVERLAY_MANIFEST_NAME).is_file())
 
 
 def current_overlay_status(project_root: Path = PROJECT_ROOT) -> dict[str, Any]:

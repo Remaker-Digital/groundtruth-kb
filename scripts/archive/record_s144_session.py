@@ -5,6 +5,7 @@ Record S144 session handoff prompt in Knowledge DB.
 """
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db
 

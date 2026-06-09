@@ -34,9 +34,7 @@ _SCRIPT_PATH = _REPO_ROOT / "scripts" / "discover_orphan_wi_memberships.py"
 @pytest.fixture(scope="module")
 def discover_module():
     """Import discover_orphan_wi_memberships as a module."""
-    spec = importlib.util.spec_from_file_location(
-        "discover_orphan_wi_memberships", _SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("discover_orphan_wi_memberships", _SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["discover_orphan_wi_memberships"] = module
@@ -115,9 +113,7 @@ def test_classifier_all_classes(discover_module):
     ]
 
     for wi, expected_class in cases:
-        result = discover_module._classify_orphan(
-            wi, spec_to_project, bridge_to_project, project_index
-        )
+        result = discover_module._classify_orphan(wi, spec_to_project, bridge_to_project, project_index)
         assert result["recoverability_class"] == expected_class, (
             f"WI {wi['id']} expected {expected_class}, got {result['recoverability_class']}"
         )
@@ -364,8 +360,7 @@ def test_root_cause_attribution_uses_version_1_creator(discover_module, tmp_path
     inventory = discover_module.build_inventory(db, run_id="regression-v1-creator-001")
 
     assert inventory["orphan_count"] == 1, (
-        f"Expected exactly 1 orphan, got {inventory['orphan_count']}: "
-        f"orphans={inventory['orphans']}"
+        f"Expected exactly 1 orphan, got {inventory['orphan_count']}: orphans={inventory['orphans']}"
     )
     rec = inventory["orphans"][0]
     assert rec["id"] == "WI-TEST-REGRESSION-9001"

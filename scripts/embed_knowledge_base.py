@@ -38,6 +38,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -81,10 +82,7 @@ async def run(tenant_id: str, do_embed: bool = False) -> None:
     print("  Querying Cosmos DB for KB entries...", flush=True)
     summary = await kb_repo.query(
         tenant_id=tenant_id,
-        query_text=(
-            "SELECT c.id, c.title, c.is_active, c.embedding_model "
-            "FROM c WHERE c.is_active = true"
-        ),
+        query_text=("SELECT c.id, c.title, c.is_active, c.embedding_model FROM c WHERE c.is_active = true"),
     )
     embedded_count = sum(1 for e in summary if e.get("embedding_model"))
     unembedded_ids = [e["id"] for e in summary if not e.get("embedding_model")]
@@ -151,7 +149,7 @@ async def run(tenant_id: str, do_embed: bool = False) -> None:
         try:
             entry = await kb_repo.read(tenant_id, entry_id)
         except Exception as exc:
-            print(f"  [{idx+1}/{total_to_embed}] Failed to read entry {entry_id[:20]}: {exc}", flush=True)
+            print(f"  [{idx + 1}/{total_to_embed}] Failed to read entry {entry_id[:20]}: {exc}", flush=True)
             fail_count += 1
             continue
 
@@ -188,16 +186,16 @@ async def run(tenant_id: str, do_embed: bool = False) -> None:
                 exc_str = str(exc)
                 if "429" in exc_str or "RateLimitReached" in exc_str:
                     wait = RATE_LIMIT_WAIT
-                    print(f"  [{idx+1}/{total_to_embed}] Rate limited. Waiting {wait}s...", flush=True)
+                    print(f"  [{idx + 1}/{total_to_embed}] Rate limited. Waiting {wait}s...", flush=True)
                     await asyncio.sleep(wait)
                 else:
-                    print(f"  [{idx+1}/{total_to_embed}] ERROR: {exc_str[:100]}")
+                    print(f"  [{idx + 1}/{total_to_embed}] ERROR: {exc_str[:100]}")
                     if attempt < MAX_RETRIES - 1:
                         await asyncio.sleep(5)
 
         if embedding is None:
             fail_count += 1
-            print(f"  [{idx+1}/{total_to_embed}] FAILED: {title[:50]}")
+            print(f"  [{idx + 1}/{total_to_embed}] FAILED: {title[:50]}")
             continue
 
         # Update entry in Cosmos DB
@@ -219,7 +217,7 @@ async def run(tenant_id: str, do_embed: bool = False) -> None:
             if success_count % 10 == 0 or idx == total_to_embed - 1:
                 elapsed = time.monotonic() - start
                 print(
-                    f"  [{idx+1}/{total_to_embed}] "
+                    f"  [{idx + 1}/{total_to_embed}] "
                     f"Embedded {success_count} entries "
                     f"({elapsed:.0f}s elapsed, "
                     f"{elapsed / success_count:.1f}s/entry)",
@@ -227,7 +225,7 @@ async def run(tenant_id: str, do_embed: bool = False) -> None:
                 )
         except Exception as exc:
             fail_count += 1
-            print(f"  [{idx+1}/{total_to_embed}] DB update failed: {exc}")
+            print(f"  [{idx + 1}/{total_to_embed}] DB update failed: {exc}")
 
         # Rate limit delay between entries
         if idx < total_to_embed - 1:

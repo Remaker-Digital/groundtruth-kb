@@ -171,7 +171,7 @@ class TestGovernanceGateAllowsReal:
     def test_allows_pass_with_real_file(self, test_db, transport_gated_spec_id):
         """insert_test with pass and a real file that exists on disk must succeed."""
         # Gate resolves relative to project_root (_PROJECT_ROOT)
-        real_file = "tests/transport/test_governance_integrity.py"
+        real_file = "platform_tests/transport/test_governance_integrity.py"
         resolved = _PROJECT_ROOT / real_file
         assert resolved.is_file(), f"Test file {real_file} must resolve to an existing file (got {resolved})"
 

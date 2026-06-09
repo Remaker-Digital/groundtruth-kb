@@ -110,9 +110,7 @@ def test_pass_when_only_registry_enumerated_harness_commands_resolve_out_of_root
 
     result = _check_external_harness_exec_boundary(project)
 
-    assert result.status == "pass", (
-        f"expected pass; got {result.status}: {result.message}"
-    )
+    assert result.status == "pass", f"expected pass; got {result.status}: {result.message}"
     assert result.found is True
     assert "codex" in result.message
     assert "claude" in result.message
@@ -138,9 +136,7 @@ def test_fail_when_non_harness_literal_subprocess_call_introduced(
 
     result = _check_external_harness_exec_boundary(project)
 
-    assert result.status == "fail", (
-        f"expected fail; got {result.status}: {result.message}"
-    )
+    assert result.status == "fail", f"expected fail; got {result.status}: {result.message}"
     assert "wget" in result.message
     assert "cross_harness_bridge_trigger.py" in result.message
     assert "non-harness" in result.message.lower()
@@ -163,9 +159,7 @@ def test_warn_when_harness_registry_missing(tmp_path: Path) -> None:
 
     result = _check_external_harness_exec_boundary(project)
 
-    assert result.status == "warning", (
-        f"expected warning; got {result.status}: {result.message}"
-    )
+    assert result.status == "warning", f"expected warning; got {result.status}: {result.message}"
     assert "harness-registry.json" in result.message
 
 
@@ -183,23 +177,13 @@ def test_check_is_deterministic_and_read_only(tmp_path: Path) -> None:
         verify_text=_PARAMETRIZED_VERIFY,
     )
 
-    files_before = {
-        path: path.stat().st_mtime_ns
-        for path in project.rglob("*")
-        if path.is_file()
-    }
+    files_before = {path: path.stat().st_mtime_ns for path in project.rglob("*") if path.is_file()}
 
     result_first = _check_external_harness_exec_boundary(project)
     result_second = _check_external_harness_exec_boundary(project)
 
-    files_after = {
-        path: path.stat().st_mtime_ns
-        for path in project.rglob("*")
-        if path.is_file()
-    }
+    files_after = {path: path.stat().st_mtime_ns for path in project.rglob("*") if path.is_file()}
 
     assert result_first.status == result_second.status
     assert result_first.message == result_second.message
-    assert files_before == files_after, (
-        "check mutated filesystem state — must be strictly read-only"
-    )
+    assert files_before == files_after, "check mutated filesystem state — must be strictly read-only"

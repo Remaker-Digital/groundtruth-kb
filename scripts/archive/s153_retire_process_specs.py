@@ -6,7 +6,9 @@ MEMORY.md session procedures. One-time tasks and outdated directives retired.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 from db import KnowledgeDB
 
@@ -29,12 +31,10 @@ process_specs = {
     "SPEC-0791": "Process directive — covered by GOV-07 (defects as WIs) and GOV-12",
     "SPEC-0773": "Process directive — specific test ordering rule, covered by PLAN-001 phases",
     "SPEC-0774": "Process directive — covered by GOV-07 (no fixes during testing)",
-
     # Quality/release gate process directives
     "SPEC-0834": "Process directive — quality standard for GA release, covered by GOV-17 (quality first)",
     "SPEC-0835": "Process directive — quality standard for GA release, covered by GOV-17",
     "SPEC-0836": "Process directive — beta feedback process, covered by release plan",
-
     # One-time tasks or outdated directives
     "SPEC-0226": "One-time task — re-test after CSS changes; CSS centralization not yet done",
     "SPEC-0232": "One-time task — merge test procedures 4 and 8; no longer applicable",
@@ -71,7 +71,6 @@ process_specs = {
     "SPEC-0618": "Process directive — add chat widget tests to plan; test creation governed by GOV-12",
     "SPEC-0737": "Process directive — UI review methodology",
     "SPEC-0738": "Process directive — UI review methodology",
-
     # Old-format IDs
     "202": "Process directive — deploy and verify, one-time task instruction",
 }
@@ -79,7 +78,8 @@ process_specs = {
 total = 0
 for sid, reason in process_specs.items():
     db.update_spec(
-        sid, changed_by=SESSION,
+        sid,
+        changed_by=SESSION,
         change_reason=f"OBSOLETE — {reason}. Owner directive: process directives are not specifications.",
         status="retired",
     )

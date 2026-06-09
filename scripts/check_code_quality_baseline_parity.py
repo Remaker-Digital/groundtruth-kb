@@ -30,7 +30,11 @@ def main() -> int:
             if "bridge_kind: implementation_proposal" not in text:
                 continue
             for finding in validate(text):
-                findings.append(f"{file_path.relative_to(PROJECT_ROOT)}: {finding.code}: {finding.message}")
+                try:
+                    rel_path = str(file_path.relative_to(PROJECT_ROOT))
+                except ValueError:
+                    rel_path = file_path.name
+                findings.append(f"{rel_path}: {finding.code}: {finding.message}")
     if findings:
         print("\n".join(findings))
         return 1

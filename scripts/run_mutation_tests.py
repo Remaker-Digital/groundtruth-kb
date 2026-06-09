@@ -11,6 +11,7 @@ If --files is not given, auto-detects changed src/ files from git status.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,7 +29,9 @@ def get_changed_src_files() -> list[str]:
     """Get src/ Python files modified in the working tree (staged + unstaged)."""
     result = subprocess.run(
         ["git", "diff", "--name-only", "HEAD", "--diff-filter=ACMR"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+        capture_output=True,
+        text=True,
+        cwd=str(PROJECT_ROOT),
     )
     files = []
     for line in result.stdout.strip().splitlines():
@@ -40,7 +43,9 @@ def get_changed_src_files() -> list[str]:
     # Also check unstaged changes
     result2 = subprocess.run(
         ["git", "diff", "--name-only", "--diff-filter=ACMR"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+        capture_output=True,
+        text=True,
+        cwd=str(PROJECT_ROOT),
     )
     for line in result2.stdout.strip().splitlines():
         if line.startswith("src/") and line.endswith(".py") and line not in files:
@@ -75,11 +80,17 @@ def run_mutmut(files: list[str], target_score: int) -> int:
         print(f"--- Mutating: {filepath} ---")
         result = subprocess.run(
             [
-                sys.executable, "-m", "mutmut", "run",
-                "--paths-to-mutate", filepath,
+                sys.executable,
+                "-m",
+                "mutmut",
+                "run",
+                "--paths-to-mutate",
+                filepath,
                 "--no-progress",
             ],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
             timeout=300,  # 5 min per file max
         )
 
@@ -95,7 +106,9 @@ def run_mutmut(files: list[str], target_score: int) -> int:
     # Get overall results
     result = subprocess.run(
         [sys.executable, "-m", "mutmut", "results"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+        capture_output=True,
+        text=True,
+        cwd=str(PROJECT_ROOT),
     )
     print("\n=== Mutation Testing Results ===")
     print(result.stdout)
@@ -131,11 +144,14 @@ def run_mutmut(files: list[str], target_score: int) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Session-scoped mutation testing")
     parser.add_argument(
-        "--target-score", type=int, default=DEFAULT_TARGET_SCORE,
+        "--target-score",
+        type=int,
+        default=DEFAULT_TARGET_SCORE,
         help=f"Minimum mutation score percentage (default: {DEFAULT_TARGET_SCORE})",
     )
     parser.add_argument(
-        "--files", nargs="*",
+        "--files",
+        nargs="*",
         help="Specific files to mutate (default: auto-detect from git)",
     )
     args = parser.parse_args()

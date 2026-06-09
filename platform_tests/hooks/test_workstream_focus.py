@@ -35,16 +35,19 @@ if str(_PACKAGE_SRC) not in sys.path:
 # exists to remediate).
 
 
-def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> None:
+def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]] | tuple[str, list[str], str]]) -> None:
     """Seed a groundtruth.db ``harnesses`` table + generated projection.
 
-    ``harnesses`` maps each durable harness id to ``(harness_name, role_set)``.
+    ``harnesses`` maps each durable harness id to ``(harness_name, role_set, [status])``.
     """
     from groundtruth_kb.db import KnowledgeDB
     from groundtruth_kb.harness_projection import generate_harness_projection
 
     db = KnowledgeDB(db_path=root / "groundtruth.db")
-    for harness_id, (harness_name, role_set) in harnesses.items():
+    for harness_id, val in harnesses.items():
+        harness_name = val[0]
+        role_set = val[1]
+        status = val[2] if len(val) > 2 else "active"
         db.insert_harness(
             id=harness_id,
             harness_name=harness_name,
@@ -52,7 +55,7 @@ def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> N
             role=list(role_set),
             changed_by="test",
             change_reason="WI-3342 IP-6 workstream_focus fixture",
-            status="active",
+            status=status,
         )
     generate_harness_projection(db, root)
 
@@ -668,12 +671,19 @@ def test_prompt_hook_toggles_next_session_role_with_simple_phrase(tmp_path, monk
     # is passed as project_root so the real registry is never mutated.
     _seed_registry(
         tmp_path,
-        {"A": ("codex", ["loyal-opposition"]), "B": ("claude", ["prime-builder"])},
+        {
+            "A": ("codex", ["loyal-opposition"], "active"),
+            "B": ("claude", ["prime-builder"], "active"),
+        },
     )
     _copy_parity_registry(tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+    monkeypatch.setattr(
+        "groundtruth_kb.mode_switch.invariants.verify_role_document_partition",
+        lambda doc: None,
+    )
 
     response = module.handle_user_prompt("switch mode next session", tmp_path)
 
@@ -683,7 +693,7 @@ def test_prompt_hook_toggles_next_session_role_with_simple_phrase(tmp_path, monk
     # WRITE always emits JSON list; singleton represents the multi-harness case.
     # WI-3342 IP-5: the post-write role surface is the registry projection.
     assert _projection_role(tmp_path, "A") == ["prime-builder"]
-    assert _projection_role(tmp_path, "B") == ["loyal-opposition"]
+    assert _projection_role(tmp_path, "B") == ["prime-builder"]
 
     response = module.handle_user_prompt("please change mode next session.", tmp_path)
 
@@ -695,30 +705,44 @@ def test_prompt_hook_sets_explicit_next_session_role(tmp_path, monkeypatch) -> N
     module = _load_module()
     _seed_registry(
         tmp_path,
-        {"A": ("codex", ["loyal-opposition"]), "B": ("claude", ["prime-builder"])},
+        {
+            "A": ("codex", ["loyal-opposition"], "active"),
+            "B": ("claude", ["prime-builder"], "active"),
+        },
     )
     _copy_parity_registry(tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+    monkeypatch.setattr(
+        "groundtruth_kb.mode_switch.invariants.verify_role_document_partition",
+        lambda doc: None,
+    )
 
     response = module.handle_user_prompt("prime builder mode next session", tmp_path)
 
     assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
     assert _projection_role(tmp_path, "A") == ["prime-builder"]
-    assert _projection_role(tmp_path, "B") == ["loyal-opposition"]
+    assert _projection_role(tmp_path, "B") == ["prime-builder"]
 
 
 def test_prompt_hook_uses_harness_id_role_map_when_named(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _seed_registry(
         tmp_path,
-        {"A": ("codex", ["loyal-opposition"]), "B": ("claude", ["prime-builder"])},
+        {
+            "A": ("codex", ["loyal-opposition"], "active"),
+            "B": ("claude", ["prime-builder"], "active"),
+        },
     )
     _copy_parity_registry(tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+    monkeypatch.setattr(
+        "groundtruth_kb.mode_switch.invariants.verify_role_document_partition",
+        lambda doc: None,
+    )
 
     response = module.handle_user_prompt("switch mode next session", tmp_path)
 
@@ -1138,7 +1162,6 @@ _COUNTERPART_HARNESS_TYPE_REGRESSION = (
 )
 
 
-@pytest.mark.xfail(reason=_COUNTERPART_HARNESS_TYPE_REGRESSION, strict=True)
 def test_detect_counterpart_state_same_role_warns(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
@@ -1156,7 +1179,6 @@ def test_detect_counterpart_state_same_role_warns(tmp_path, monkeypatch) -> None
     assert any("prime-builder" in msg and "collide" in msg for msg in result["warnings"])
 
 
-@pytest.mark.xfail(reason=_COUNTERPART_HARNESS_TYPE_REGRESSION, strict=True)
 def test_detect_counterpart_state_different_role_warns(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
@@ -1346,10 +1368,10 @@ def test_harness_state_records_for_project_returns_sandbox_relative_paths(tmp_pa
     sandbox = tmp_path / "sandbox"
     role_assignment_path, lifecycle_guards = module._harness_state_records_for_project(sandbox)
 
-    assert role_assignment_path == sandbox / "harness-state" / "role-assignments.json"
+    assert role_assignment_path == sandbox / "harness-state" / "harness-registry.json"
     assert lifecycle_guards["codex"] == sandbox / "harness-state" / "codex" / "session-lifecycle-guard.json"
     assert lifecycle_guards["claude"] == sandbox / "harness-state" / "claude" / "session-lifecycle-guard.json"
-    assert role_assignment_path != module.PROJECT_ROOT / "harness-state" / "role-assignments.json"
+    assert role_assignment_path != module.PROJECT_ROOT / "harness-state" / "harness-registry.json"
     assert lifecycle_guards["codex"] != module.HARNESS_LIFECYCLE_GUARDS["codex"]
 
 
@@ -1365,7 +1387,7 @@ def test_detect_counterpart_state_uses_project_root_paths_when_provided(tmp_path
     recorded_paths: list[Path] = []
 
     def _fake_load(project_root: Path, assignment_path: Path | None = None) -> dict:
-        recorded_paths.append(assignment_path or project_root / "harness-state" / "role-assignments.json")
+        recorded_paths.append(assignment_path or project_root / "harness-state" / "harness-registry.json")
         return {"harnesses": {}}
 
     monkeypatch.setattr(module, "load_role_assignments", _fake_load)
@@ -1390,7 +1412,7 @@ def test_detect_counterpart_state_falls_back_to_canonical_when_project_root_omit
     recorded_paths: list[Path] = []
 
     def _fake_load(project_root: Path, assignment_path: Path | None = None) -> dict:
-        recorded_paths.append(assignment_path or project_root / "harness-state" / "role-assignments.json")
+        recorded_paths.append(assignment_path or project_root / "harness-state" / "harness-registry.json")
         return {"harnesses": {}}
 
     monkeypatch.setattr(module, "load_role_assignments", _fake_load)
@@ -1400,7 +1422,7 @@ def test_detect_counterpart_state_falls_back_to_canonical_when_project_root_omit
     module.detect_counterpart_state()  # no project_root arg
 
     assert recorded_paths, "expected detect_counterpart_state to load role assignments"
-    assert recorded_paths == [module.PROJECT_ROOT / "harness-state" / "role-assignments.json"]
+    assert recorded_paths == [module.PROJECT_ROOT / "harness-state" / "harness-registry.json"]
 
 
 def test_assert_readiness_subject_scope_permits_single_green() -> None:

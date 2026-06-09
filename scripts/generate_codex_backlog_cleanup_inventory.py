@@ -123,8 +123,7 @@ def render_markdown(rows: list[dict], cross_check_count: int) -> str:
         change_reason = (row["change_reason"] or "").replace("|", "\\|")
         changed_at = row["changed_at"] or ""
         lines.append(
-            f"| {index} | `{row['wi_id']}` | {title} | {pre_state} | "
-            f"{post_state} | {change_reason} | `{changed_at}` |"
+            f"| {index} | `{row['wi_id']}` | {title} | {pre_state} | {post_state} | {change_reason} | `{changed_at}` |"
         )
 
     lines.extend(

@@ -31,7 +31,7 @@ NEW_SPEC = {
     "title": "Smart-poller dispatch prompts must defer to the durable role record, not assert role inline",
     "description": (
         "Per owner directive 2026-04-29 (S321): '(b) the dispatch prompt "
-        "ALWAYS defers to the durable record by saying \"Read your durable "
+        'ALWAYS defers to the durable record by saying "Read your durable '
         "role from .claude/rules/operating-role.md\".'\n\n"
         "RATIONALE: spawned harnesses (claude -p, codex exec) currently "
         "receive role assignment via the dispatch prompt's hard-coded "
@@ -82,7 +82,7 @@ NEW_SPEC = {
 
 OWNER_QUOTE = (
     "(b) the dispatch prompt ALWAYS defers to the durable record by "
-    "saying \"Read your durable role from .claude/rules/operating-role.md\""
+    'saying "Read your durable role from .claude/rules/operating-role.md"'
 )
 
 

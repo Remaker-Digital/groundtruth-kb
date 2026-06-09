@@ -4,6 +4,7 @@
 """
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db  # noqa: E402
 

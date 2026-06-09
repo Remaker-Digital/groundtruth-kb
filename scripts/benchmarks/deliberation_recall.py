@@ -29,6 +29,7 @@ def _load_db(project_root):
         sys.path.insert(0, str(src))
     try:
         from groundtruth_kb.db import KnowledgeDB
+
         return KnowledgeDB(project_root / "groundtruth.db")
     except Exception:
         return None

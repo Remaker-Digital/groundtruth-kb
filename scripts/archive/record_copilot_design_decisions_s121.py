@@ -6,6 +6,7 @@ implementation of the Co-pilot agent feature (WI-0875..0880).
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
 import io
 

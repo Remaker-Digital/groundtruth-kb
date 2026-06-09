@@ -191,9 +191,7 @@ def _mirror_identities_to_registry(project_root: Path, document: dict[str, Any])
                 change_reason="WI-3342 harness identity write",
                 status=str(current.get("status") or "registered"),
                 reviewer_precedence=current.get("reviewer_precedence"),
-                invocation_surfaces=_decode_harness_json_field(
-                    current.get("invocation_surfaces")
-                ),
+                invocation_surfaces=_decode_harness_json_field(current.get("invocation_surfaces")),
                 capabilities_ref=current.get("capabilities_ref"),
             )
             changed = True
@@ -204,9 +202,7 @@ def _mirror_identities_to_registry(project_root: Path, document: dict[str, Any])
         # identity surface (the transitional harness-identities.json write was
         # removed), so a registry-write failure must surface rather than
         # silently lose the identity write.
-        raise RuntimeError(
-            f"harness registry identity write failed: {exc}"
-        ) from exc
+        raise RuntimeError(f"harness registry identity write failed: {exc}") from exc
 
 
 def validate_unique_harness_ids(document: dict[str, Any]) -> list[str]:

@@ -1,4 +1,5 @@
 """S146 handoff prompt insertion."""
+
 import os
 import sys
 

@@ -3,6 +3,7 @@
 Phase assignment rules based on file path, test type, and title keywords.
 Each test is assigned to exactly one phase (primary match).
 """
+
 import sys, io, json, re
 from collections import defaultdict
 
@@ -25,17 +26,22 @@ rows = conn.execute(
 tests = [dict(r) for r in rows]
 print(f"Total test artifacts to assign: {len(tests)}")
 
+
 # Phase assignment rules (evaluated in order; first match wins)
 # Each rule is: (phase_id, description, match_function)
 def make_path_matcher(*fragments):
     """Match if any fragment appears in the file path (case-insensitive)."""
+
     def matcher(t):
         f = (t.get("test_file") or "").lower().replace("\\", "/")
         return any(frag in f for frag in fragments)
+
     return matcher
+
 
 def make_path_and_title_matcher(path_frags=None, title_frags=None):
     """Match on path OR title fragments."""
+
     def matcher(t):
         f = (t.get("test_file") or "").lower().replace("\\", "/")
         title = (t.get("title") or "").lower()
@@ -44,6 +50,7 @@ def make_path_and_title_matcher(path_frags=None, title_frags=None):
         if title_frags and any(frag in title for frag in title_frags):
             return True
         return False
+
     return matcher
 
 
@@ -56,105 +63,123 @@ def make_path_and_title_matcher(path_frags=None, title_frags=None):
 rules = [
     # PHASE-001: Pre-flight Checks
     # Pre-flight scripts, environment validation, health checks
-    ("PHASE-001", "Pre-flight Checks",
-     make_path_and_title_matcher(
-         path_frags=["test_pre_flight", "test_health.py", "test_env_loader.py",
-                     "test_conftest_smoke.py", "test_conftest_fixtures.py"],
-         title_frags=["pre-flight", "preflight", "health endpoint", "env loader",
-                      "conftest smoke", "conftest fixture"]
-     )),
-
+    (
+        "PHASE-001",
+        "Pre-flight Checks",
+        make_path_and_title_matcher(
+            path_frags=[
+                "test_pre_flight",
+                "test_health.py",
+                "test_env_loader.py",
+                "test_conftest_smoke.py",
+                "test_conftest_fixtures.py",
+            ],
+            title_frags=[
+                "pre-flight",
+                "preflight",
+                "health endpoint",
+                "env loader",
+                "conftest smoke",
+                "conftest fixture",
+            ],
+        ),
+    ),
     # PHASE-016: Widget Visual Regression
     # Visual regression tests for the widget
-    ("PHASE-016", "Widget Visual Regression",
-     make_path_matcher("tests/visual/")),
-
+    ("PHASE-016", "Widget Visual Regression", make_path_matcher("tests/visual/")),
     # PHASE-010: Load Testing / Performance
-    ("PHASE-010", "Load Testing",
-     lambda t: t.get("test_type") == "performance"),
-
+    ("PHASE-010", "Load Testing", lambda t: t.get("test_type") == "performance"),
     # PHASE-003: Production Regression
-    ("PHASE-003", "Production Regression",
-     lambda t: t.get("test_type") == "regression"),
-
+    ("PHASE-003", "Production Regression", lambda t: t.get("test_type") == "regression"),
     # PHASE-007: Rate Limiting & DoS Resilience
-    ("PHASE-007", "Rate Limiting & DoS Resilience",
-     make_path_and_title_matcher(
-         path_frags=["test_rate_limit", "test_abuse_detection"],
-         title_frags=["rate limit", "rate-limit", "dos ", "abuse detection",
-                      "throttl"]
-     )),
-
+    (
+        "PHASE-007",
+        "Rate Limiting & DoS Resilience",
+        make_path_and_title_matcher(
+            path_frags=["test_rate_limit", "test_abuse_detection"],
+            title_frags=["rate limit", "rate-limit", "dos ", "abuse detection", "throttl"],
+        ),
+    ),
     # PHASE-005: Tenant Isolation (specific isolation tests)
-    ("PHASE-005", "Tenant Isolation",
-     make_path_and_title_matcher(
-         path_frags=["test_multi_tenant_isolation", "test_tenant_isolation_live"],
-         title_frags=["tenant isolation", "cross-tenant", "partition key isolation"]
-     )),
-
+    (
+        "PHASE-005",
+        "Tenant Isolation",
+        make_path_and_title_matcher(
+            path_frags=["test_multi_tenant_isolation", "test_tenant_isolation_live"],
+            title_frags=["tenant isolation", "cross-tenant", "partition key isolation"],
+        ),
+    ),
     # PHASE-006: API Security & Penetration Testing
-    ("PHASE-006", "API Security & Penetration Testing",
-     lambda t: t.get("test_type") == "security"),
-
+    ("PHASE-006", "API Security & Penetration Testing", lambda t: t.get("test_type") == "security"),
     # PHASE-008: Data Integrity & Backup Verification
-    ("PHASE-008", "Data Integrity & Backup Verification",
-     make_path_and_title_matcher(
-         path_frags=["test_data_integrity", "test_backup", "test_cosmos_repository",
-                     "test_repository_classes", "test_knowledge_repository",
-                     "test_preferences_repository"],
-         title_frags=["data integrity", "backup", "repository"]
-     )),
-
+    (
+        "PHASE-008",
+        "Data Integrity & Backup Verification",
+        make_path_and_title_matcher(
+            path_frags=[
+                "test_data_integrity",
+                "test_backup",
+                "test_cosmos_repository",
+                "test_repository_classes",
+                "test_knowledge_repository",
+                "test_preferences_repository",
+            ],
+            title_frags=["data integrity", "backup", "repository"],
+        ),
+    ),
     # PHASE-014: Upgrade Verification
-    ("PHASE-014", "Upgrade Verification",
-     make_path_and_title_matcher(
-         path_frags=["test_upgrade", "test_config_pipeline_live"],
-         title_frags=["upgrade verification", "config pipeline live"]
-     )),
-
+    (
+        "PHASE-014",
+        "Upgrade Verification",
+        make_path_and_title_matcher(
+            path_frags=["test_upgrade", "test_config_pipeline_live"],
+            title_frags=["upgrade verification", "config pipeline live"],
+        ),
+    ),
     # PHASE-011: Conversation Quality
-    ("PHASE-011", "Conversation Quality",
-     make_path_and_title_matcher(
-         path_frags=["tests/evaluation/", "test_conversation_quality",
-                     "test_critic_supervisor"],
-         title_frags=["conversation quality", "quality score", "critic supervisor",
-                      "evaluation"]
-     )),
-
+    (
+        "PHASE-011",
+        "Conversation Quality",
+        make_path_and_title_matcher(
+            path_frags=["tests/evaluation/", "test_conversation_quality", "test_critic_supervisor"],
+            title_frags=["conversation quality", "quality score", "critic supervisor", "evaluation"],
+        ),
+    ),
     # PHASE-009: Resilience & Failover
-    ("PHASE-009", "Resilience & Failover",
-     make_path_and_title_matcher(
-         path_frags=["test_error_handling.py", "test_cross_module.py"],
-         title_frags=["resilience", "failover", "error handling", "cross-module",
-                      "graceful"]
-     )),
-
+    (
+        "PHASE-009",
+        "Resilience & Failover",
+        make_path_and_title_matcher(
+            path_frags=["test_error_handling.py", "test_cross_module.py"],
+            title_frags=["resilience", "failover", "error handling", "cross-module", "graceful"],
+        ),
+    ),
     # PHASE-004: External URL Reachability
-    ("PHASE-004", "External URL Reachability",
-     make_path_and_title_matcher(
-         path_frags=["test_external_url", "test_reachab"],
-         title_frags=["url reachab", "external url"]
-     )),
-
+    (
+        "PHASE-004",
+        "External URL Reachability",
+        make_path_and_title_matcher(
+            path_frags=["test_external_url", "test_reachab"], title_frags=["url reachab", "external url"]
+        ),
+    ),
     # PHASE-013: SPA Provisioning + Critical Path
-    ("PHASE-013", "SPA Provisioning + Critical Path",
-     make_path_and_title_matcher(
-         path_frags=["test_seed_tenant", "test_provision", "test_activation_service"],
-         title_frags=["provisioning", "seed tenant", "activation service",
-                      "critical path"]
-     )),
-
+    (
+        "PHASE-013",
+        "SPA Provisioning + Critical Path",
+        make_path_and_title_matcher(
+            path_frags=["test_seed_tenant", "test_provision", "test_activation_service"],
+            title_frags=["provisioning", "seed tenant", "activation service", "critical path"],
+        ),
+    ),
     # PHASE-012: UI Regression (E2E page tests + widget E2E)
-    ("PHASE-012", "UI Regression",
-     make_path_and_title_matcher(
-         path_frags=["tests/e2e/", "tests/widget/"],
-         title_frags=[]
-     )),
-
+    (
+        "PHASE-012",
+        "UI Regression",
+        make_path_and_title_matcher(path_frags=["tests/e2e/", "tests/widget/"], title_frags=[]),
+    ),
     # PHASE-002: Unit & Integration Tests (everything else)
     # This is the catch-all for unit and integration tests not matched above
-    ("PHASE-002", "Unit & Integration Tests (Thermal-Safe)",
-     lambda t: t.get("test_type") in ("unit", "integration")),
+    ("PHASE-002", "Unit & Integration Tests (Thermal-Safe)", lambda t: t.get("test_type") in ("unit", "integration")),
 ]
 
 
@@ -194,7 +219,7 @@ print(f"  Unassigned: {len(unassigned)}")
 if unassigned:
     print("\n  Unassigned tests:")
     for t in unassigned[:10]:
-        print(f"    {t['id']} | type={t['test_type']} | file={t.get('test_file','?')}")
+        print(f"    {t['id']} | type={t['test_type']} | file={t.get('test_file', '?')}")
 
 # ============================================================
 # DRY RUN vs EXECUTE

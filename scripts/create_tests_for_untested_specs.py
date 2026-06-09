@@ -203,7 +203,7 @@ TESTS = [
 # SPEC-1500..1503 tests → Phase 3 (Production Regression) — live verification
 
 PHASE_ASSIGNMENTS = {
-    "PHASE-001": ["TEST-2634"],           # GOV-09 → Pre-flight
+    "PHASE-001": ["TEST-2634"],  # GOV-09 → Pre-flight
     "PHASE-003": ["TEST-2635", "TEST-2636", "TEST-2637", "TEST-2638"],  # Live E2E → Prod Regression
 }
 
@@ -368,8 +368,10 @@ def main() -> None:
 
     # Summary
     print("\n" + "=" * 70)
-    print(f"SUMMARY: {wi_count} WIs created, {test_count} tests created, "
-          f"{phase_count} phases updated, {resolved_count} WIs resolved")
+    print(
+        f"SUMMARY: {wi_count} WIs created, {test_count} tests created, "
+        f"{phase_count} phases updated, {resolved_count} WIs resolved"
+    )
     print("=" * 70)
 
 

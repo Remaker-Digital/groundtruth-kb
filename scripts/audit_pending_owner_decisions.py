@@ -49,18 +49,20 @@ AUDIT_LOG_PATH = AUDIT_LOG_DIR / "sub-slice-d-cleanup-2026-05-04.log"
 SUBSLICE_A_VERIFIED_DATE = datetime(2026, 5, 4, 0, 0, 0, tzinfo=timezone.utc)
 
 # Recognized detected_via values per Sub-slice A -014 split + AUQ.
-RECOGNIZED_DETECTED_VIA = frozenset({
-    "ask_user_question",
-    "prose:offering_or_choice",
-    "prose:should_i_or",
-    "prose:awaiting_input",            # legacy pre-Sub-slice-A-007 split
-    "prose:awaiting_input_q",          # post-split interrogative variant
-    "prose:awaiting_input_first_person",
-    "prose:standing_by_for",           # legacy pre-Sub-slice-A-007 split
-    "prose:standing_by_for_q",
-    "prose:standing_by_for_first_person",
-    "prose:your_decision_q",
-})
+RECOGNIZED_DETECTED_VIA = frozenset(
+    {
+        "ask_user_question",
+        "prose:offering_or_choice",
+        "prose:should_i_or",
+        "prose:awaiting_input",  # legacy pre-Sub-slice-A-007 split
+        "prose:awaiting_input_q",  # post-split interrogative variant
+        "prose:awaiting_input_first_person",
+        "prose:standing_by_for",  # legacy pre-Sub-slice-A-007 split
+        "prose:standing_by_for_q",
+        "prose:standing_by_for_first_person",
+        "prose:your_decision_q",
+    }
+)
 
 # Idempotency marker appended to moved entries' notes field.
 CLEANUP_NOTES_MARKER = "Sub-slice D cleanup audit"
@@ -143,13 +145,21 @@ def _audit_parsed_sections(sections: dict[str, list], hook) -> dict[str, Any]:
     for section_name, entries in sections.items():
         for entry in entries:
             if section_name == "pending" and entry.status != "pending":
-                section_mismatch.append({
-                    "id": entry.id, "section": section_name, "status": entry.status,
-                })
+                section_mismatch.append(
+                    {
+                        "id": entry.id,
+                        "section": section_name,
+                        "status": entry.status,
+                    }
+                )
             elif section_name in ("resolved", "history") and entry.status == "pending":
-                section_mismatch.append({
-                    "id": entry.id, "section": section_name, "status": entry.status,
-                })
+                section_mismatch.append(
+                    {
+                        "id": entry.id,
+                        "section": section_name,
+                        "status": entry.status,
+                    }
+                )
 
     # --- Orphan-ID detection (F1) ---
     all_ids = set(seen_ids.keys())
@@ -162,12 +172,8 @@ def _audit_parsed_sections(sections: dict[str, list], hook) -> dict[str, Any]:
     orphan_refs = sorted(referenced_ids - all_ids)
 
     # --- Distributions ---
-    detected_via_distribution = dict(Counter(
-        getattr(e, "detected_via", None) for e in all_entries
-    ))
-    status_distribution = dict(Counter(
-        e.status for e in all_entries
-    ))
+    detected_via_distribution = dict(Counter(getattr(e, "detected_via", None) for e in all_entries))
+    status_distribution = dict(Counter(e.status for e in all_entries))
     section_counts = {s: len(es) for s, es in sections.items()}
 
     # --- Historical-FP candidates (F3 prep) ---
@@ -177,12 +183,14 @@ def _audit_parsed_sections(sections: dict[str, list], hook) -> dict[str, Any]:
             asked_dt = _parse_iso(entry.asked_at)
             if asked_dt is not None and asked_dt < SUBSLICE_A_VERIFIED_DATE:
                 already_cleaned = CLEANUP_NOTES_MARKER in (entry.notes or "")
-                historical_fp_candidates.append({
-                    "id": entry.id,
-                    "asked_at": entry.asked_at,
-                    "detected_via": entry.detected_via,
-                    "already_marked": already_cleaned,
-                })
+                historical_fp_candidates.append(
+                    {
+                        "id": entry.id,
+                        "asked_at": entry.asked_at,
+                        "detected_via": entry.detected_via,
+                        "already_marked": already_cleaned,
+                    }
+                )
 
     return {
         "section_counts": section_counts,
@@ -211,9 +219,7 @@ def audit(path: Path = PENDING_PATH) -> dict[str, Any]:
 
     # Copy-to-tempfile dance: corruption-rename in _read_pending_file
     # would target the temp copy, leaving the live file untouched.
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, encoding="utf-8"
-    ) as tf:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
         tmp_path = Path(tf.name)
     try:
         shutil.copy2(path, tmp_path)
@@ -304,8 +310,7 @@ def cleanup(path: Path = PENDING_PATH, *, log_path: Path = AUDIT_LOG_PATH) -> di
         is_candidate = (
             entry.detected_via
             and entry.detected_via.startswith("prose:")
-            and (_parse_iso(entry.asked_at) or datetime.max.replace(tzinfo=timezone.utc))
-            < SUBSLICE_A_VERIFIED_DATE
+            and (_parse_iso(entry.asked_at) or datetime.max.replace(tzinfo=timezone.utc)) < SUBSLICE_A_VERIFIED_DATE
         )
         if not is_candidate:
             new_pending.append(entry)
@@ -327,8 +332,7 @@ def cleanup(path: Path = PENDING_PATH, *, log_path: Path = AUDIT_LOG_PATH) -> di
     run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with log_path.open("a", encoding="utf-8") as lf:
         lf.write(
-            f"{run_ts} run started cleanup invocation against {path.name} "
-            f"per DELIB-S332-D-F3-CLEANUP-PATH-1-CHOICE\n"
+            f"{run_ts} run started cleanup invocation against {path.name} per DELIB-S332-D-F3-CLEANUP-PATH-1-CHOICE\n"
         )
 
         if not moved_entries:
@@ -385,17 +389,22 @@ def _human_format(report: dict[str, Any]) -> str:
     out.append(f"  section_status_mismatch: {len(sf.get('section_status_mismatch', []))}")
     out.append("")
     out.append(f"Orphan ID references: {len(report.get('orphan_id_references', []))}")
-    out.append(f"Historical-FP candidates (in ## Pending, prose:*, pre-Sub-slice-A-014): "
-               f"{len(report.get('historical_fp_candidates', []))}")
+    out.append(
+        f"Historical-FP candidates (in ## Pending, prose:*, pre-Sub-slice-A-014): "
+        f"{len(report.get('historical_fp_candidates', []))}"
+    )
     return "\n".join(out)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
-    parser.add_argument("--cleanup", action="store_true",
-                        help="Apply bounded cleanup mutation (move historical-FP candidates "
-                             "from ## Pending to ## History; atomic, idempotent, AUQ-safe).")
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="Apply bounded cleanup mutation (move historical-FP candidates "
+        "from ## Pending to ## History; atomic, idempotent, AUQ-safe).",
+    )
     args = parser.parse_args()
 
     if args.cleanup:

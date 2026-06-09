@@ -95,6 +95,15 @@ _EXPECTED_VERSIONED_ARTIFACT_TABLES: frozenset[str] = frozenset(
         "test_plan_phases",
         "test_procedures",
         "testable_elements",
+        "projects",
+        "project_work_item_memberships",
+        "project_dependencies",
+        "project_artifact_links",
+        "project_authorizations",
+        "harnesses",
+        "sot_artifacts",
+        "canonical_terms",
+        "dispatch_events",
     }
 )
 
@@ -103,6 +112,7 @@ _RELATIONSHIP_TABLES: frozenset[str] = frozenset(
     {
         "deliberation_specs",
         "deliberation_work_items",
+        "specification_deliberation_sources",
     }
 )
 
@@ -167,6 +177,17 @@ _CONTENT_BEARING_COLUMNS: tuple[str, ...] = (
     "scope",
     "rationale",
     "summary",
+    "name",
+    "purpose",
+    "target_outcome",
+    "scope_note",
+    "notes",
+    "authorization_name",
+    "scope_summary",
+    "canonical_term",
+    "definition",
+    "usage_examples",
+    "harness_name",
 )
 
 # Per-table additional columns queried for the type-specific classifier
@@ -269,9 +290,9 @@ def _discover_tables(conn: sqlite3.Connection) -> list[dict[str, Any]]:
                 "table_name": name,
                 "columns": columns,
                 "row_count": row_count,
-                "has_id": "id" in columns,
+                "has_id": "id" in columns or "event_id" in columns,
                 "has_version": "version" in columns,
-                "has_id_version": "id" in columns and "version" in columns,
+                "has_id_version": ("id" in columns or "event_id" in columns) and "version" in columns,
                 "has_session_id": "session_id" in columns,
             }
         )
@@ -398,9 +419,10 @@ def _enumerate_versioned_table(conn: sqlite3.Connection, table_name: str) -> lis
     columns = [c[1] for c in cur.fetchall()]
     content_cols = [c for c in _CONTENT_BEARING_COLUMNS if c in columns]
     type_cols = [c for c in _TABLE_SPECIFIC_TYPE_COLUMNS.get(table_name, ()) if c in columns]
-    select_cols = ["id", "version", *content_cols, *type_cols]
+    id_col = "event_id" if "event_id" in columns else "id"
+    select_cols = [id_col, "version", *content_cols, *type_cols]
     select_list = ", ".join(select_cols)
-    cur.execute(f'SELECT {select_list} FROM "{table_name}" ORDER BY id, version')
+    cur.execute(f'SELECT {select_list} FROM "{table_name}" ORDER BY {id_col}, version')
     rows = cur.fetchall()
 
     n_content = len(content_cols)

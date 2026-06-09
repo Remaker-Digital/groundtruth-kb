@@ -17,7 +17,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _RUFF_TARGETS: tuple[str, ...] = (
     "scripts/rehearse",
     "scripts/rehearse_isolation.py",
-    "tests/scripts/test_rehearse_common_validation.py",
+    "platform_tests/scripts/test_rehearse_common_validation.py",
 )
 
 

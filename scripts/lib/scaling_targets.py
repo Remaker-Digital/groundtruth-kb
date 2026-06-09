@@ -56,18 +56,18 @@ INFRA_CONTAINER_APPS: dict[str, str] = {
 # Production values mirror infrastructure/terraform/main.tf.
 SCALING_CONFIG: dict[str, dict[str, int]] = {
     # --- Gateways (environment-specific) -----------------------------------
-    "agent-red-api-gateway":          {"min_replicas": 2, "max_replicas": 8},
-    "agent-red-staging":              {"min_replicas": 1, "max_replicas": 5},
+    "agent-red-api-gateway": {"min_replicas": 2, "max_replicas": 8},
+    "agent-red-staging": {"min_replicas": 1, "max_replicas": 5},
     # --- Critical agent containers -----------------------------------------
-    "agent-red-intent-classifier":    {"min_replicas": 2, "max_replicas": 6},
-    "agent-red-knowledge-retrieval":  {"min_replicas": 2, "max_replicas": 6},
-    "agent-red-response-generator":   {"min_replicas": 2, "max_replicas": 10},
-    "agent-red-critic-supervisor":    {"min_replicas": 2, "max_replicas": 4},
+    "agent-red-intent-classifier": {"min_replicas": 2, "max_replicas": 6},
+    "agent-red-knowledge-retrieval": {"min_replicas": 2, "max_replicas": 6},
+    "agent-red-response-generator": {"min_replicas": 2, "max_replicas": 10},
+    "agent-red-critic-supervisor": {"min_replicas": 2, "max_replicas": 4},
     # --- Non-critical agent containers -------------------------------------
-    "agent-red-escalation-handler":   {"min_replicas": 1, "max_replicas": 3},
-    "agent-red-analytics-collector":  {"min_replicas": 1, "max_replicas": 2},
+    "agent-red-escalation-handler": {"min_replicas": 1, "max_replicas": 3},
+    "agent-red-analytics-collector": {"min_replicas": 1, "max_replicas": 2},
     # --- Critical infrastructure -------------------------------------------
-    "agent-red-slim":                 {"min_replicas": 2, "max_replicas": 2},
+    "agent-red-slim": {"min_replicas": 2, "max_replicas": 2},
 }
 
 

@@ -54,6 +54,7 @@ _ROLLBACK_LINK_WINDOW_SECONDS = 7 * 24 * 60 * 60
 class IncidentIngestError(RuntimeError):
     """Raised when memory/incidents.yaml cannot be parsed or validated."""
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB_PATH = PROJECT_ROOT / "memory" / "gtkb-dashboard.sqlite"
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
@@ -335,18 +336,10 @@ def _migrate_schema(db_path: Path) -> None:
     try:
         conn.execute("BEGIN IMMEDIATE")
         try:
-            existing = {
-                row[1]
-                for row in conn.execute(
-                    "PRAGMA table_info('delivery_timeline_events')"
-                ).fetchall()
-            }
+            existing = {row[1] for row in conn.execute("PRAGMA table_info('delivery_timeline_events')").fetchall()}
             for col_name, col_decl in _REQUIRED_MIGRATION_COLUMNS:
                 if col_name not in existing:
-                    conn.execute(
-                        f"ALTER TABLE delivery_timeline_events "
-                        f"ADD COLUMN {col_name} {col_decl}"
-                    )
+                    conn.execute(f"ALTER TABLE delivery_timeline_events ADD COLUMN {col_name} {col_decl}")
             conn.execute("COMMIT")
         except BaseException:
             conn.execute("ROLLBACK")
@@ -442,7 +435,9 @@ def _read_existing_history(db_path: Path) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
-def _append_snapshot(history: list[dict[str, Any]], snapshot: dict[str, Any], max_history: int = 200) -> list[dict[str, Any]]:
+def _append_snapshot(
+    history: list[dict[str, Any]], snapshot: dict[str, Any], max_history: int = 200
+) -> list[dict[str, Any]]:
     filtered = [row for row in history if row.get("generated_at") != snapshot.get("generated_at")]
     filtered.append(snapshot)
     return filtered[-max_history:]
@@ -492,7 +487,13 @@ def _write_model_to_db(
         conn.executemany(
             "INSERT INTO health_cards (sort_order, label, value, status, tooltip) VALUES (?, ?, ?, ?, ?)",
             [
-                (idx, item.get("label", ""), str(item.get("value", "")), item.get("status", ""), item.get("tooltip", ""))
+                (
+                    idx,
+                    item.get("label", ""),
+                    str(item.get("value", "")),
+                    item.get("status", ""),
+                    item.get("tooltip", ""),
+                )
                 for idx, item in enumerate(intelligence.get("health", []), start=1)
             ],
         )
@@ -587,11 +588,7 @@ def _write_model_to_db(
             ],
         )
 
-        known_deploy_ids = {
-            item["_deployable_change_id"]
-            for item in enriched_events
-            if item["_deployable_change_id"]
-        }
+        known_deploy_ids = {item["_deployable_change_id"] for item in enriched_events if item["_deployable_change_id"]}
         _load_incidents(project_root, conn, known_deploy_ids)
 
         # DORA-001b Track 2 (S308): ingest canonical pipeline manifests as
@@ -710,12 +707,14 @@ def _replace_table(conn: sqlite3.Connection, table_name: str) -> None:
 
 _DORA_DEPLOYMENT_EVENT_KINDS: frozenset[str] = frozenset({"canonical_deploy"})
 
-_DORA_AUTHORITATIVE_EVENT_KINDS: frozenset[str] = frozenset({
-    "canonical_deploy",
-    "canonical_deploy_attempted_failed",
-    "canonical_pipeline_run",
-    "canonical_pipeline_dry_run",
-})
+_DORA_AUTHORITATIVE_EVENT_KINDS: frozenset[str] = frozenset(
+    {
+        "canonical_deploy",
+        "canonical_deploy_attempted_failed",
+        "canonical_pipeline_run",
+        "canonical_pipeline_dry_run",
+    }
+)
 
 
 def _is_deployment_event(event_kind: str) -> bool:
@@ -824,9 +823,7 @@ def _ingest_canonical_pipeline_manifests(
 
         # Stable manifest identity in the existing `source` column.
         # Forward-slash normalization for cross-platform stability.
-        relative_source = str(
-            manifest_path.relative_to(project_root)
-        ).replace("\\", "/")
+        relative_source = str(manifest_path.relative_to(project_root)).replace("\\", "/")
 
         # Query-before-insert dedup (no DB-level UNIQUE per scoping
         # design; the per-row WHERE clause filters by _authority_source
@@ -975,10 +972,16 @@ def _reconcile_against_azure_revisions(
                 continue
             result = subprocess.run(
                 [
-                    "az", "containerapp", "revision", "list",
-                    "--name", container_app,
-                    "--resource-group", "Agent-Red",
-                    "-o", "json",
+                    "az",
+                    "containerapp",
+                    "revision",
+                    "list",
+                    "--name",
+                    container_app,
+                    "--resource-group",
+                    "Agent-Red",
+                    "-o",
+                    "json",
                 ],
                 capture_output=True,
                 text=True,
@@ -1039,10 +1042,7 @@ def _reconcile_against_azure_revisions(
         for revision in azure_revisions[environment]:
             try:
                 rev_image = (
-                    revision.get("properties", {})
-                    .get("template", {})
-                    .get("containers", [{}])[0]
-                    .get("image", "")
+                    revision.get("properties", {}).get("template", {}).get("containers", [{}])[0].get("image", "")
                 )
             except (AttributeError, IndexError, TypeError):
                 continue
@@ -1055,9 +1055,7 @@ def _reconcile_against_azure_revisions(
 
         if match is not None:
             new_revision_name = match.get("name", revision_name) or revision_name
-            new_confidence = (
-                "high" if image_ref and revision_name else "medium"
-            )
+            new_confidence = "high" if image_ref and revision_name else "medium"
             conn.execute(
                 "UPDATE delivery_timeline_events "
                 "SET _consistency = ?, _revision_name = ?, _confidence = ? "
@@ -1067,9 +1065,7 @@ def _reconcile_against_azure_revisions(
             counts["rows_matched"] += 1
         else:
             conn.execute(
-                "UPDATE delivery_timeline_events "
-                "SET _consistency = ?, _confidence = ? "
-                "WHERE rowid = ?",
+                "UPDATE delivery_timeline_events SET _consistency = ?, _confidence = ? WHERE rowid = ?",
                 ("manifest_only", "medium", rowid),
             )
             counts["rows_drift"] += 1
@@ -1227,26 +1223,18 @@ def _load_incidents(
         raw = incidents_path.read_text(encoding="utf-8")
         parsed = yaml.safe_load(raw)
     except (OSError, yaml.YAMLError) as exc:
-        raise IncidentIngestError(
-            f"Failed to read or parse {incidents_path}: {exc}"
-        ) from exc
+        raise IncidentIngestError(f"Failed to read or parse {incidents_path}: {exc}") from exc
     if parsed is None:
         return
     if not isinstance(parsed, list):
-        raise IncidentIngestError(
-            f"{incidents_path} must be a YAML list of incident objects"
-        )
+        raise IncidentIngestError(f"{incidents_path} must be a YAML list of incident objects")
     rows: list[tuple[Any, ...]] = []
     for index, entry in enumerate(parsed):
         if not isinstance(entry, dict):
-            raise IncidentIngestError(
-                f"{incidents_path}[{index}] must be a mapping, got {type(entry).__name__}"
-            )
+            raise IncidentIngestError(f"{incidents_path}[{index}] must be a mapping, got {type(entry).__name__}")
         missing = [field for field in _INCIDENT_REQUIRED_FIELDS if not entry.get(field)]
         if missing:
-            raise IncidentIngestError(
-                f"{incidents_path}[{index}] is missing required fields: {missing}"
-            )
+            raise IncidentIngestError(f"{incidents_path}[{index}] is missing required fields: {missing}")
         caused_by = str(entry.get("caused_by_deploy_id") or "")
         if caused_by and caused_by not in known_deploy_ids:
             logger.warning(
@@ -1294,11 +1282,41 @@ def _current_metric_rows(metrics: dict[str, Any], intelligence: dict[str, Any]) 
     release = intelligence.get("release_readiness", {})
     quality = intelligence.get("quality_rollup", {})
     return [
-        ("project_health_issues", "Project Health Issues", _num(quality.get("failing", 0)) + _num(release.get("blocker_count", 0)), "red", "Failing checks plus release blockers."),
-        ("release_blockers", "Release Blockers", release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0)), "red", "Visible release blocker count."),
-        ("ci_testing_failing", "CI / Testing Failing", quality.get("failing", 0), "red", "Failing integration/tool checks."),
-        ("security_scan_posture", "Security Scan Posture", quality.get("ready_or_passing", 0), "green", "Ready or passing checks."),
-        ("governance_bridge_items", "Governance Bridge Items", metrics.get("contention", {}).get("actionable_count", 0), "green", "Actionable bridge/contention entries."),
+        (
+            "project_health_issues",
+            "Project Health Issues",
+            _num(quality.get("failing", 0)) + _num(release.get("blocker_count", 0)),
+            "red",
+            "Failing checks plus release blockers.",
+        ),
+        (
+            "release_blockers",
+            "Release Blockers",
+            release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0)),
+            "red",
+            "Visible release blocker count.",
+        ),
+        (
+            "ci_testing_failing",
+            "CI / Testing Failing",
+            quality.get("failing", 0),
+            "red",
+            "Failing integration/tool checks.",
+        ),
+        (
+            "security_scan_posture",
+            "Security Scan Posture",
+            quality.get("ready_or_passing", 0),
+            "green",
+            "Ready or passing checks.",
+        ),
+        (
+            "governance_bridge_items",
+            "Governance Bridge Items",
+            metrics.get("contention", {}).get("actionable_count", 0),
+            "green",
+            "Actionable bridge/contention entries.",
+        ),
         ("data_freshness", "Data Freshness", 1, "green", "Live probe freshness status."),
     ]
 

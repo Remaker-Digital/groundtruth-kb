@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """S147: Analyze test traceability gap."""
+
 import sqlite3
 from pathlib import Path
 
@@ -17,9 +18,7 @@ without_file = conn.execute(
 with_both = conn.execute(
     "SELECT COUNT(*) as c FROM current_tests WHERE test_file IS NOT NULL AND test_file <> '' AND test_function IS NOT NULL AND test_function <> ''"
 ).fetchone()["c"]
-traced = conn.execute(
-    "SELECT COUNT(*) as c FROM current_tests WHERE last_result IS NOT NULL"
-).fetchone()["c"]
+traced = conn.execute("SELECT COUNT(*) as c FROM current_tests WHERE last_result IS NOT NULL").fetchone()["c"]
 
 print(f"KB artifacts with test_file: {with_file}")
 print(f"KB artifacts without test_file: {without_file}")
@@ -50,6 +49,7 @@ for r in rows:
 
 # Unmatched pytest tests sample — what file patterns aren't in KB?
 import xml.etree.ElementTree as ET
+
 xml_files = [
     "tests/results/unit-results.xml",
     "tests/results/multi_tenant-results.xml",
@@ -76,8 +76,7 @@ for xf in xml_files:
         key = (file_path, name)
         # Check if in KB
         found = conn.execute(
-            "SELECT COUNT(*) as c FROM current_tests WHERE test_file = ? AND test_function = ?",
-            (file_path, name)
+            "SELECT COUNT(*) as c FROM current_tests WHERE test_file = ? AND test_function = ?", (file_path, name)
         ).fetchone()["c"]
         if found == 0:
             dir_key = "/".join(file_path.split("/")[:2]) if "/" in file_path else file_path

@@ -5,6 +5,7 @@ Runs actual grep commands against the codebase and records results as assertion 
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -20,10 +21,7 @@ def run_grep(pattern: str, filepath: str) -> tuple[bool, str]:
     if not full_path.exists():
         return False, f"File not found: {filepath}"
     try:
-        result = subprocess.run(
-            ["grep", "-c", pattern, str(full_path)],
-            capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(["grep", "-c", pattern, str(full_path)], capture_output=True, text=True, timeout=10)
         count = int(result.stdout.strip()) if result.stdout.strip() else 0
         passed = count >= 1
         return passed, f"grep -c '{pattern}' {filepath} => {count} match(es)"
@@ -99,12 +97,14 @@ def main():
         all_pass = True
         for pattern, filepath, desc in checks:
             passed, detail = run_grep(pattern, filepath)
-            results.append({
-                "type": "grep",
-                "description": desc,
-                "passed": passed,
-                "detail": detail,
-            })
+            results.append(
+                {
+                    "type": "grep",
+                    "description": desc,
+                    "passed": passed,
+                    "detail": detail,
+                }
+            )
             if not passed:
                 all_pass = False
 
@@ -132,7 +132,9 @@ def main():
     failing = [r for r in all_runs if not r.get("overall_passed")]
     passing = [r for r in all_runs if r.get("overall_passed")]
     coverage = len(all_runs) / 1867 * 100
-    print(f"\nOverall: {len(passing)} passing, {len(failing)} failing, {len(all_runs)} total ({coverage:.1f}% coverage)")
+    print(
+        f"\nOverall: {len(passing)} passing, {len(failing)} failing, {len(all_runs)} total ({coverage:.1f}% coverage)"
+    )
 
     k.close()
 

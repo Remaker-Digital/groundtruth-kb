@@ -148,9 +148,7 @@ async def survey(db, tenant_filter: str | None = None) -> None:
 
         # Check team members
         members = await _get_team_members(db, tid)
-        members_with_keys = sum(
-            1 for m in members if m.get("user_api_key_hash") is not None
-        )
+        members_with_keys = sum(1 for m in members if m.get("user_api_key_hash") is not None)
         print(
             f"           team_members={len(members)} "
             f"(with keys: {members_with_keys}, "

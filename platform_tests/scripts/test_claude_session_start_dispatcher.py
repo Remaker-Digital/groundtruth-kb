@@ -47,6 +47,11 @@ CODEX_HOOKS = PROJECT_ROOT / ".codex" / "hooks.json"
 STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 
 
+@pytest.fixture(autouse=True)
+def clear_registry_env(monkeypatch):
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+
+
 _BRIDGE_DISPATCH_ENV_VARS = frozenset({"GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_BRIDGE_DISPATCH_KEYWORD"})
 
 
@@ -104,7 +109,7 @@ def test_envelope_contains_governance_disclosure() -> None:
     assert "Programmatic Startup Payload" in ctx
     assert "Role being assumed:" in ctx
     assert "Role mapping source:" in ctx
-    assert "harness-state/role-assignments.json" in ctx
+    assert "harness-state/harness-registry.json" in ctx
 
 
 def test_envelope_contains_token_budget_content() -> None:
@@ -174,9 +179,12 @@ def test_diagnostic_files_land_in_claude_hooks_dir() -> None:
 
     Spec: ADR-ISOLATION-APPLICATION-PLACEMENT-001.
     """
-    _run_dispatcher()
-    assert DIAG_JSON.is_file(), f"missing {DIAG_JSON}"
-    assert DIAG_ERR.is_file(), f"missing {DIAG_ERR}"
+    res = _run_dispatcher()
+    assert res.returncode == 0, (
+        f"dispatcher returned non-zero exit: {res.returncode}\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
+    )
+    assert DIAG_JSON.is_file(), f"missing {DIAG_JSON}\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
+    assert DIAG_ERR.is_file(), f"missing {DIAG_ERR}\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
     # Both files must be under the project root
     assert PROJECT_ROOT in DIAG_JSON.resolve().parents
     assert PROJECT_ROOT in DIAG_ERR.resolve().parents

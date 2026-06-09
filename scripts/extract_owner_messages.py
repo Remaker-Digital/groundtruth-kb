@@ -22,9 +22,7 @@ from pathlib import Path
 # Project hash subdirectory (e.g. "E--GT-KB") is itself derived by Claude from
 # the project path; it can be overridden via env var if a project is moved.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_TRANSCRIPT_BASE = Path(
-    os.environ.get("CLAUDE_TRANSCRIPT_DIR", Path.home() / ".claude" / "projects")
-)
+_TRANSCRIPT_BASE = Path(os.environ.get("CLAUDE_TRANSCRIPT_DIR", Path.home() / ".claude" / "projects"))
 _PROJECT_HASH = os.environ.get("CLAUDE_PROJECT_HASH", "E--GT-KB")
 TRANSCRIPT_DIR = str(_TRANSCRIPT_BASE / _PROJECT_HASH)
 OUTPUT_FILE = str(_REPO_ROOT / "docs" / "owner-messages-all.json")
@@ -76,14 +74,18 @@ def extract_human_messages(filepath):
                     if len(text) < 10:
                         continue
                     # Skip pure system reminders
-                    if text.startswith("<system-reminder>") and not any(kw in text for kw in ["UserPromptSubmit", "SessionStart"]):
+                    if text.startswith("<system-reminder>") and not any(
+                        kw in text for kw in ["UserPromptSubmit", "SessionStart"]
+                    ):
                         continue
 
-                    messages.append({
-                        "line": line_num,
-                        "text": text[:8000],  # Cap at 8000 chars
-                        "length": len(text)
-                    })
+                    messages.append(
+                        {
+                            "line": line_num,
+                            "text": text[:8000],  # Cap at 8000 chars
+                            "length": len(text),
+                        }
+                    )
     except Exception as e:
         print(f"  Error reading {filepath}: {e}", file=sys.stderr)
 
@@ -97,8 +99,7 @@ def main():
 
     # Also check one level deep (session-id/session-id.jsonl)
     pattern2 = os.path.join(TRANSCRIPT_DIR, "*", "*.jsonl")
-    nested = [f for f in sorted(glob.glob(pattern2))
-              if "subagents" not in f]
+    nested = [f for f in sorted(glob.glob(pattern2)) if "subagents" not in f]
 
     all_files = sorted(set(top_level + nested))
     print(f"Found {len(all_files)} transcript files")
@@ -118,7 +119,7 @@ def main():
                 "file": filepath,
                 "message_count": len(messages),
                 "total_chars": char_count,
-                "messages": messages
+                "messages": messages,
             }
             total_messages += len(messages)
             total_chars += char_count
@@ -129,7 +130,7 @@ def main():
         "total_sessions": len(results),
         "total_messages": total_messages,
         "total_chars": total_chars,
-        "sessions": results
+        "sessions": results,
     }
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:

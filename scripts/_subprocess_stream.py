@@ -90,7 +90,7 @@ def stream_subprocess(
 
     # Force UTF-8 on subprocess stdout so pytest/node/az emit valid UTF-8
     # regardless of the Windows console codepage (cp1252).
-    sub_env = (env if env is not None else os.environ.copy())
+    sub_env = env if env is not None else os.environ.copy()
     if sys.platform == "win32":
         sub_env.setdefault("PYTHONIOENCODING", "utf-8")
 
@@ -111,7 +111,9 @@ def stream_subprocess(
     if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
         try:
             _safe_stdout = io.TextIOWrapper(
-                sys.stdout.buffer, encoding="utf-8", errors="replace",
+                sys.stdout.buffer,
+                encoding="utf-8",
+                errors="replace",
                 line_buffering=True,
             )
         except Exception:
@@ -153,7 +155,8 @@ def stream_subprocess(
                 # Use taskkill /T to kill the entire process tree.
                 subprocess.run(
                     ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                    capture_output=True, timeout=10,
+                    capture_output=True,
+                    timeout=10,
                 )
             else:
                 proc.kill()

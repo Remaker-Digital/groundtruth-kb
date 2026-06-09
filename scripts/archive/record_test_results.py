@@ -74,14 +74,16 @@ def _parse_junit_xml(xml_path: str) -> list[dict]:
             if module_parts:
                 file_path = "/".join(module_parts) + ".py"
 
-        cases.append({
-            "file": file_path,
-            "classname": classname,
-            "class": class_name if 'class_name' in dir() and class_name else None,
-            "function": name,
-            "result": result,
-            "duration": time_val,
-        })
+        cases.append(
+            {
+                "file": file_path,
+                "classname": classname,
+                "class": class_name if "class_name" in dir() and class_name else None,
+                "function": name,
+                "result": result,
+                "duration": time_val,
+            }
+        )
 
     return cases
 
@@ -114,17 +116,9 @@ def _build_kb_index(db) -> dict[tuple[str, str], list[dict]]:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Record pytest results into KB test artifacts (SPEC-1661)"
-    )
-    parser.add_argument(
-        "--xml", required=True,
-        help="Path to JUnit XML file from pytest --junitxml"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Show what would be updated without making changes"
-    )
+    parser = argparse.ArgumentParser(description="Record pytest results into KB test artifacts (SPEC-1661)")
+    parser.add_argument("--xml", required=True, help="Path to JUnit XML file from pytest --junitxml")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be updated without making changes")
     args = parser.parse_args()
 
     xml_path = args.xml
@@ -156,8 +150,10 @@ def main():
         # Build KB index
         print("Building KB test artifact index...")
         kb_index = _build_kb_index(db)
-        print(f"  Indexed {len(kb_index)} unique (file, function) pairs "
-              f"from {sum(len(v) for v in kb_index.values())} KB artifacts")
+        print(
+            f"  Indexed {len(kb_index)} unique (file, function) pairs "
+            f"from {sum(len(v) for v in kb_index.values())} KB artifacts"
+        )
 
         # Match and update
         now = datetime.now(timezone.utc).isoformat()
@@ -197,8 +193,7 @@ def main():
                     continue
 
                 if args.dry_run:
-                    print(f"  [DRY RUN] Would update {entry['id']}: "
-                          f"{entry['last_result']} → {kb_result}")
+                    print(f"  [DRY RUN] Would update {entry['id']}: {entry['last_result']} → {kb_result}")
                     updated += 1
                 else:
                     db.update_test(

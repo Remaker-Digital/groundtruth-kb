@@ -18,6 +18,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +29,12 @@ from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
 SEED_DELIB_ID = "DELIB-WI4357-TEST-DESIGN"
 SEED_PAUTH_ID = "PAUTH-PROJECT-TEST-BACKLOG-TEXT-EDIT-WI-IMPROVEMENT"
+
+
+@pytest.fixture(autouse=True)
+def set_harness_name(monkeypatch) -> None:
+    """Ensure a deterministic active prime builder is resolved by default in these tests."""
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "antigravity")
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:

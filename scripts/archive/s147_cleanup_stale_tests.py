@@ -7,6 +7,7 @@ drag down traceability metrics.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import ast
 import sys
 from datetime import datetime, timezone
@@ -51,11 +52,7 @@ def main():
             if p.exists():
                 try:
                     tree = ast.parse(p.read_text())
-                    funcs = {
-                        n.name
-                        for n in ast.walk(tree)
-                        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-                    }
+                    funcs = {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
                     ast_cache[test_file] = funcs
                 except Exception:
                     ast_cache[test_file] = None
@@ -98,9 +95,7 @@ def main():
     # Final traceability
     cur = conn.execute("SELECT COUNT(*) FROM current_tests")
     total = cur.fetchone()[0]
-    cur = conn.execute(
-        "SELECT COUNT(*) FROM current_tests WHERE last_result IS NOT NULL AND last_result != ''"
-    )
+    cur = conn.execute("SELECT COUNT(*) FROM current_tests WHERE last_result IS NOT NULL AND last_result != ''")
     traced = cur.fetchone()[0]
     print(f"\nTest Traceability: {traced}/{total} ({traced / total * 100:.1f}%)")
 

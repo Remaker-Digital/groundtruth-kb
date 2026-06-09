@@ -30,13 +30,11 @@ def get_staged_tsx_files() -> list[str]:
     """Return list of staged .tsx files (added, modified, renamed)."""
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
-        capture_output=True, text=True, cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
     )
-    return [
-        line.strip()
-        for line in result.stdout.strip().splitlines()
-        if line.strip().endswith(".tsx")
-    ]
+    return [line.strip() for line in result.stdout.strip().splitlines() if line.strip().endswith(".tsx")]
 
 
 def get_commit_message(msg_file_arg: str | None = None) -> str:
@@ -82,7 +80,7 @@ def main() -> int:
         print(f"    ... and {len(tsx_files) - 10} more")
     print()
     print("Every frontend change must reference a specification.")
-    print('Include SPEC-NNNN in the commit message, e.g.:')
+    print("Include SPEC-NNNN in the commit message, e.g.:")
     print('  git commit -m "feat(SPEC-1234): update login form layout"')
     print("=" * 70)
     return 1

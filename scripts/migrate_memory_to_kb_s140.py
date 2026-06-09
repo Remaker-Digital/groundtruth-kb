@@ -150,7 +150,9 @@ def main():
     d1 = kdb.get_document("DOC-cross-cutting-lessons")
     d2 = kdb.get_document("DOC-owner-preferences")
     print(f"\nVerification:")
-    print(f"  DOC-cross-cutting-lessons: {len(d1['content'])} chars" if d1 else "  DOC-cross-cutting-lessons: NOT FOUND")
+    print(
+        f"  DOC-cross-cutting-lessons: {len(d1['content'])} chars" if d1 else "  DOC-cross-cutting-lessons: NOT FOUND"
+    )
     print(f"  DOC-owner-preferences: {len(d2['content'])} chars" if d2 else "  DOC-owner-preferences: NOT FOUND")
 
     docs = kdb.list_documents()

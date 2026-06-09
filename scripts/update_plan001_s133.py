@@ -24,34 +24,36 @@ Remaining compliant phases (no changes to test_ids):
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
 import json
-sys.path.insert(0, 'tools/knowledge-db')
+
+sys.path.insert(0, "tools/knowledge-db")
 import db
 
 kdb = db.KnowledgeDB()
 
 # Phases to mark as excluded from pipeline (clear test_ids, update description)
 REMOVED_PHASES = {
-    'PHASE-002': 'REMOVED (SPEC-1649): MOCKED_UNIT tests excluded from live pipeline. Use thermal-safe harness for localhost.',
-    'PHASE-004': 'REMOVED (SPEC-1649): MOCKED_UNIT tests excluded. URL reachability covered by Phase 1 pre-flight.',
-    'PHASE-011': 'REMOVED (SPEC-1649): MOCKED_UNIT evaluation tests excluded. Future: live conversation quality via widget API.',
-    'PHASE-012': 'REMOVED (SPEC-1649): MOCKED_UI Playwright tests excluded. Live UI regression covered by Phase 3.',
-    'PHASE-015': 'REMOVED (SPEC-1649): SOURCE_INSPECTION tests excluded. Future: live external verification checks.',
-    'PHASE-016': 'REMOVED (SPEC-1649): SOURCE_INSPECTION + VISUAL_WIDGET tests excluded. Future: live widget E2E.',
+    "PHASE-002": "REMOVED (SPEC-1649): MOCKED_UNIT tests excluded from live pipeline. Use thermal-safe harness for localhost.",
+    "PHASE-004": "REMOVED (SPEC-1649): MOCKED_UNIT tests excluded. URL reachability covered by Phase 1 pre-flight.",
+    "PHASE-011": "REMOVED (SPEC-1649): MOCKED_UNIT evaluation tests excluded. Future: live conversation quality via widget API.",
+    "PHASE-012": "REMOVED (SPEC-1649): MOCKED_UI Playwright tests excluded. Live UI regression covered by Phase 3.",
+    "PHASE-015": "REMOVED (SPEC-1649): SOURCE_INSPECTION tests excluded. Future: live external verification checks.",
+    "PHASE-016": "REMOVED (SPEC-1649): SOURCE_INSPECTION + VISUAL_WIDGET tests excluded. Future: live widget E2E.",
 }
 
 for phase_id, new_desc in REMOVED_PHASES.items():
     # Pass raw Python list — the KB method calls json.dumps() internally
     kdb.update_test_plan_phase(
         id=phase_id,
-        changed_by='S133',
-        change_reason='SPEC-1649: Remove non-compliant (mocked/inspection) tests from PLAN-001.',
+        changed_by="S133",
+        change_reason="SPEC-1649: Remove non-compliant (mocked/inspection) tests from PLAN-001.",
         description=new_desc,
         test_ids=[],  # Raw Python list, KB will json.dumps() it
-        last_result='SKIP',
+        last_result="SKIP",
     )
-    print(f'{phase_id}: marked REMOVED, test_ids cleared')
+    print(f"{phase_id}: marked REMOVED, test_ids cleared")
 
 # Phase 13: keep only live config pipeline test IDs, remove KB assertion test IDs
 # The live config pipeline tests are TEST-* artifacts linked to SPEC-1500..1503
@@ -59,22 +61,22 @@ for phase_id, new_desc in REMOVED_PHASES.items():
 # The pipeline function already only runs test_config_pipeline_live.py.
 # We update the description to clarify.
 kdb.update_test_plan_phase(
-    id='PHASE-013',
-    changed_by='S133',
-    change_reason='SPEC-1649: Remove KB assertion checks (SOURCE_INSPECTION) from phase. Retain live config pipeline tests only.',
-    description='Live config pipeline E2E tests (26 tests via test_config_pipeline_live.py). KB assertion checks removed per SPEC-1649.',
+    id="PHASE-013",
+    changed_by="S133",
+    change_reason="SPEC-1649: Remove KB assertion checks (SOURCE_INSPECTION) from phase. Retain live config pipeline tests only.",
+    description="Live config pipeline E2E tests (26 tests via test_config_pipeline_live.py). KB assertion checks removed per SPEC-1649.",
 )
-print('PHASE-013: description updated (KB assertions removed from execution)')
+print("PHASE-013: description updated (KB assertions removed from execution)")
 
 # Verify final state
-print('\n--- PLAN-001 Phase Summary (post-SPEC-1649) ---')
-phases = kdb.list_test_plan_phases('PLAN-001')
+print("\n--- PLAN-001 Phase Summary (post-SPEC-1649) ---")
+phases = kdb.list_test_plan_phases("PLAN-001")
 for p in phases:
-    tids = json.loads(p['test_ids']) if p['test_ids'] else []
-    status = 'ACTIVE' if tids else 'REMOVED'
+    tids = json.loads(p["test_ids"]) if p["test_ids"] else []
+    status = "ACTIVE" if tids else "REMOVED"
     print(f"  {p['id']:10s} | {p['title']:45s} | {len(tids):4d} tests | {status}")
 
-active_phases = [p for p in phases if (json.loads(p['test_ids']) if p['test_ids'] else [])]
-removed_phases = [p for p in phases if not (json.loads(p['test_ids']) if p['test_ids'] else [])]
-print(f'\nActive: {len(active_phases)} phases')
-print(f'Removed: {len(removed_phases)} phases')
+active_phases = [p for p in phases if (json.loads(p["test_ids"]) if p["test_ids"] else [])]
+removed_phases = [p for p in phases if not (json.loads(p["test_ids"]) if p["test_ids"] else [])]
+print(f"\nActive: {len(active_phases)} phases")
+print(f"Removed: {len(removed_phases)} phases")

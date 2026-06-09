@@ -20,6 +20,12 @@ from typing import Any
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def clear_registry_env(monkeypatch):
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS_DIR = _PROJECT_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -40,7 +46,10 @@ def _write_role_map(root: Path, role_map: dict[str, Any]) -> None:
     rendered role-slot / topology line — is preserved.
     """
     harnesses_in = role_map.get("harnesses", {})
-    records = [{"id": harness_id, **record} for harness_id, record in harnesses_in.items()]
+    records = [
+        {"id": harness_id, "status": "active", "event_driven_hooks": True, **record}
+        for harness_id, record in harnesses_in.items()
+    ]
     registry_path = root / "harness-state" / "harness-registry.json"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text(json.dumps({"harnesses": records}, indent=2) + "\n", encoding="utf-8")
@@ -142,7 +151,7 @@ def test_role_slot_renders_singleton_role_token_prime(project_root: Path) -> Non
     )
     model = _make_model(role={"harness_id": "B"})
     rendered = ssi._render_current_project_state(model)
-    assert "Bridge role slot: `prime-builder`" in rendered
+    assert "Active harness role slot: `prime-builder`" in rendered
 
 
 def test_role_slot_renders_singleton_role_token_lo(project_root: Path) -> None:
@@ -158,7 +167,7 @@ def test_role_slot_renders_singleton_role_token_lo(project_root: Path) -> None:
     )
     model = _make_model(role={"harness_id": "A"})
     rendered = ssi._render_current_project_state(model)
-    assert "Bridge role slot: `loyal-opposition`" in rendered
+    assert "Active harness role slot: `loyal-opposition`" in rendered
 
 
 def test_role_slot_renders_shared_for_multi_element(project_root: Path) -> None:
@@ -173,7 +182,7 @@ def test_role_slot_renders_shared_for_multi_element(project_root: Path) -> None:
     )
     model = _make_model(role={"harness_id": "A"})
     rendered = ssi._render_current_project_state(model)
-    assert "Bridge role slot: `shared`" in rendered
+    assert "Active harness role slot: `shared`" in rendered
 
 
 def test_role_slot_renders_shared_for_missing_active_harness(project_root: Path) -> None:
@@ -189,7 +198,7 @@ def test_role_slot_renders_shared_for_missing_active_harness(project_root: Path)
     )
     model = _make_model(role={"harness_id": "C"})
     rendered = ssi._render_current_project_state(model)
-    assert "Bridge role slot: `shared`" in rendered
+    assert "Active harness role slot: `shared`" in rendered
 
 
 def test_render_ignores_stale_persisted_workstream_state(project_root: Path) -> None:
@@ -216,7 +225,7 @@ def test_render_ignores_stale_persisted_workstream_state(project_root: Path) -> 
     )
     rendered = ssi._render_current_project_state(model)
     assert "Harness topology: `multi_harness`" in rendered
-    assert "Bridge role slot: `prime-builder`" in rendered
+    assert "Active harness role slot: `prime-builder`" in rendered
     # Stale persisted values should NOT appear in the render
     assert "Harness topology: `single_harness`" not in rendered
 
@@ -235,7 +244,7 @@ def test_topology_label_canonical_fail_closed_for_missing_role_map_file(project_
     model = _make_model(role={"harness_id": "B"})
     rendered = ssi._render_current_project_state(model)
     assert "Harness topology: `multi_harness`" in rendered
-    assert "Bridge role slot: `shared`" in rendered
+    assert "Active harness role slot: `shared`" in rendered
     # The literal single_harness fallback that -006 F1 cited must NOT appear
     assert "Harness topology: `single_harness`" not in rendered
 
@@ -258,5 +267,5 @@ def test_topology_label_canonical_fail_closed_for_malformed_role_map_json(
     model = _make_model(role={"harness_id": "B"})
     rendered = ssi._render_current_project_state(model)
     assert "Harness topology: `multi_harness`" in rendered
-    assert "Bridge role slot: `shared`" in rendered
+    assert "Active harness role slot: `shared`" in rendered
     assert "Harness topology: `single_harness`" not in rendered

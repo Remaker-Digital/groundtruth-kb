@@ -1,10 +1,12 @@
 """Quick poll script for test run status."""
+
 import json
 import os
 import sys
 import urllib.request
 
 from _env import load_env_local
+
 load_env_local()
 
 run_id = sys.argv[1] if len(sys.argv) > 1 else "run-5fb396d9cc3e"

@@ -8,6 +8,7 @@ After:  from ... import _monolith as _state   # module ref, use _state._tenant_r
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import re
 import pathlib
 
@@ -53,9 +54,7 @@ def fix_file(filepath: pathlib.Path) -> int:
     import_body = match.group(1)
     # Extract imported names
     imported_names = [
-        n.strip().rstrip(",")
-        for n in import_body.split("\n")
-        if n.strip() and not n.strip().startswith("#")
+        n.strip().rstrip(",") for n in import_body.split("\n") if n.strip() and not n.strip().startswith("#")
     ]
 
     # Separate router (keep as local binding) from repo vars (use _state.)
@@ -71,7 +70,7 @@ def fix_file(filepath: pathlib.Path) -> int:
         new_import_lines.append("router = _state.router")
 
     new_import = "\n".join(new_import_lines)
-    text = text[:match.start()] + new_import + text[match.end():]
+    text = text[: match.start()] + new_import + text[match.end() :]
     changes += 1
 
     # Step 2: Replace all bare repo variable references with _state.varname
@@ -82,8 +81,8 @@ def fix_file(filepath: pathlib.Path) -> int:
         # - NOT preceded by another word char (would be part of a larger name)
         # - IS followed by a non-word char or end of string
         pattern = re.compile(
-            r"(?<!\.)"           # not preceded by dot
-            r"(?<!_state\.)"     # not already prefixed
+            r"(?<!\.)"  # not preceded by dot
+            r"(?<!_state\.)"  # not already prefixed
             r"\b" + re.escape(var) + r"\b"  # whole word
         )
         count = len(pattern.findall(text))

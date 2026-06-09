@@ -30,7 +30,9 @@ def get_staged_test_files() -> list[str]:
     """Return list of staged test_*.py files (relative paths, forward slashes)."""
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
-        capture_output=True, text=True, cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
     )
     files = []
     for line in result.stdout.strip().splitlines():

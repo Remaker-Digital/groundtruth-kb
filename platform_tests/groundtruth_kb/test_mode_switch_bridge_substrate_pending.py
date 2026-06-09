@@ -24,7 +24,14 @@ def _write(path: Path, content: str) -> None:
 def project_root(tmp_path: Path) -> Path:
     _write(
         tmp_path / "harness-state" / "harness-registry.json",
-        json.dumps({"harnesses": [{"id": "A", "role": ["prime-builder"], "status": "active"}]}),
+        json.dumps(
+            {
+                "harnesses": [
+                    {"id": "A", "role": ["loyal-opposition"], "status": "active"},
+                    {"id": "B", "role": ["prime-builder"], "status": "active"},
+                ]
+            }
+        ),
     )
     _write(
         tmp_path / "bridge" / "INDEX.md",
@@ -76,8 +83,8 @@ def test_apply_pending_preserves_legacy_role_pending_entries(project_root: Path)
     legacy_payload = {
         "schema_version": 1,
         "record_id": "legacy8",
-        "harness_id_or_name": "A",
-        "role": "loyal-opposition",
+        "harness_id_or_name": "B",
+        "role": "prime-builder",
         "change_reason": "legacy file compatibility test",
         "scheduled_at": "2026-05-05T12:00:00Z",
     }
@@ -87,7 +94,7 @@ def test_apply_pending_preserves_legacy_role_pending_entries(project_root: Path)
     pending = list_pending(project_root)
     assert len(pending) == 1
     assert pending[0].axis == "role"
-    assert pending[0].role == "loyal-opposition"
+    assert pending[0].role == "prime-builder"
 
     # Make sure apply runs role switch
     results = apply_pending(project_root)

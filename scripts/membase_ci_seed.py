@@ -187,9 +187,7 @@ def _clean_delib(delib: dict[str, Any]) -> dict[str, Any]:
     if delib.get("participants"):
         try:
             out["participants"] = (
-                json.loads(delib["participants"])
-                if isinstance(delib["participants"], str)
-                else delib["participants"]
+                json.loads(delib["participants"]) if isinstance(delib["participants"], str) else delib["participants"]
             )
         except (TypeError, json.JSONDecodeError):
             pass
@@ -285,7 +283,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mode == "export":
         result = export_records(args.db, args.fixture)
-        print(f"Exported {result['specs_written']} specs + {result['deliberations_written']} deliberations to {args.fixture}")
+        print(
+            f"Exported {result['specs_written']} specs + {result['deliberations_written']} deliberations to {args.fixture}"
+        )
         return 0
     if args.mode == "seed":
         result = seed_records(args.db, args.fixture)

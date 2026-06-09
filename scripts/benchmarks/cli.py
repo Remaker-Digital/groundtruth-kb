@@ -96,11 +96,16 @@ def cmd_compare(args):
     diff = {}
     for k in sorted(set(a_vals) | set(b_vals)):
         diff[k] = {"baseline": a_vals.get(k), "candidate": b_vals.get(k)}
-    print(json.dumps({
-        "baseline_key": a.get("idempotency_key"),
-        "candidate_key": b.get("idempotency_key"),
-        "diff": diff,
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "baseline_key": a.get("idempotency_key"),
+                "candidate_key": b.get("idempotency_key"),
+                "diff": diff,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

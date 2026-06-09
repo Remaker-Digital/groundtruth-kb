@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Quick Azure OpenAI connectivity test."""
+
 import asyncio
 import os
 import sys
@@ -10,6 +11,7 @@ if sys.platform == "win32":
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 

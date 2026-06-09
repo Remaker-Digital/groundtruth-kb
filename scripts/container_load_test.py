@@ -76,9 +76,11 @@ SELF_PROVISION_ENDPOINT = "/api/superadmin/test/provision-tenant"
 # Dataclasses
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ContainerStatus:
     """Health status snapshot of a single container."""
+
     name: str
     replicas: int = 0
     ready_replicas: int = 0
@@ -89,6 +91,7 @@ class ContainerStatus:
 @dataclass
 class PhaseResult:
     """Results from a single load test phase."""
+
     name: str
     description: str
     duration_s: float = 0.0
@@ -110,12 +113,16 @@ class PhaseResult:
 # Azure CLI helpers
 # ---------------------------------------------------------------------------
 
+
 def _az(cmd: list[str], timeout: int = 60) -> dict | list | str:
     """Run an Azure CLI command and return parsed JSON output."""
     full_cmd = ["az"] + cmd + ["-o", "json"]
     try:
         result = subprocess.run(
-            full_cmd, capture_output=True, text=True, timeout=timeout,
+            full_cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
             shell=True,  # Required on Windows — az is az.cmd
         )
         if result.returncode != 0:
@@ -131,21 +138,33 @@ def _az(cmd: list[str], timeout: int = 60) -> dict | list | str:
 
 def _get_container_replicas(container_name: str) -> int:
     """Get the current replica count for a container app."""
-    result = _az([
-        "containerapp", "show",
-        "--name", container_name,
-        "--resource-group", RESOURCE_GROUP,
-        "--query", "properties.runningStatus.replicas",
-    ])
+    result = _az(
+        [
+            "containerapp",
+            "show",
+            "--name",
+            container_name,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--query",
+            "properties.runningStatus.replicas",
+        ]
+    )
     if isinstance(result, int):
         return result
     # Fallback: check template
-    result = _az([
-        "containerapp", "show",
-        "--name", container_name,
-        "--resource-group", RESOURCE_GROUP,
-        "--query", "properties.template.scale",
-    ])
+    result = _az(
+        [
+            "containerapp",
+            "show",
+            "--name",
+            container_name,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--query",
+            "properties.template.scale",
+        ]
+    )
     if isinstance(result, dict) and "minReplicas" in result:
         return result.get("minReplicas", 0)
     return 0
@@ -154,13 +173,21 @@ def _get_container_replicas(container_name: str) -> int:
 def _scale_container(container_name: str, min_replicas: int, max_replicas: int) -> bool:
     """Scale a container app to the specified replica range."""
     print(f"    Scaling {container_name}: min={min_replicas}, max={max_replicas}")
-    result = _az([
-        "containerapp", "update",
-        "--name", container_name,
-        "--resource-group", RESOURCE_GROUP,
-        "--min-replicas", str(min_replicas),
-        "--max-replicas", str(max_replicas),
-    ], timeout=120)
+    result = _az(
+        [
+            "containerapp",
+            "update",
+            "--name",
+            container_name,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--min-replicas",
+            str(min_replicas),
+            "--max-replicas",
+            str(max_replicas),
+        ],
+        timeout=120,
+    )
     if isinstance(result, dict) and "error" in result:
         print(f"    [ERROR] Scale failed: {result['error'][:200]}")
         return False
@@ -169,19 +196,24 @@ def _scale_container(container_name: str, min_replicas: int, max_replicas: int) 
 
 def _get_container_logs(container_name: str, lines: int = 50) -> list[str]:
     """Get recent logs from a container app."""
-    result = _az([
-        "containerapp", "logs", "show",
-        "--name", container_name,
-        "--resource-group", RESOURCE_GROUP,
-        "--tail", str(lines),
-        "--type", "console",
-    ], timeout=30)
+    result = _az(
+        [
+            "containerapp",
+            "logs",
+            "show",
+            "--name",
+            container_name,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--tail",
+            str(lines),
+            "--type",
+            "console",
+        ],
+        timeout=30,
+    )
     if isinstance(result, list):
-        return [
-            entry.get("Log", "")
-            for entry in result
-            if isinstance(entry, dict) and entry.get("Log")
-        ]
+        return [entry.get("Log", "") for entry in result if isinstance(entry, dict) and entry.get("Log")]
     if isinstance(result, str):
         return result.strip().split("\n")
     return []
@@ -192,11 +224,16 @@ def _get_all_container_status() -> list[ContainerStatus]:
     statuses = []
     for name in AGENT_CONTAINERS:
         status = ContainerStatus(name=name)
-        show = _az([
-            "containerapp", "show",
-            "--name", name,
-            "--resource-group", RESOURCE_GROUP,
-        ])
+        show = _az(
+            [
+                "containerapp",
+                "show",
+                "--name",
+                name,
+                "--resource-group",
+                RESOURCE_GROUP,
+            ]
+        )
         if isinstance(show, dict) and "error" not in show:
             props = show.get("properties", {}) or {}
             running_status = props.get("runningStatus", "")
@@ -219,10 +256,12 @@ def _get_all_container_status() -> list[ContainerStatus]:
 # Gateway health helpers
 # ---------------------------------------------------------------------------
 
+
 def _check_gateway_health(host: str) -> dict:
     """Check gateway /health and /ready endpoints."""
     import urllib.request
     import urllib.error
+
     result = {}
     for endpoint in ["/health", "/ready"]:
         try:
@@ -246,14 +285,19 @@ def _self_provision(host: str, spa_key: str) -> dict | None:
     """Create an ephemeral test tenant via self-provisioning."""
     import urllib.request
     import urllib.error
+
     url = f"{host}{SELF_PROVISION_ENDPOINT}"
-    payload = json.dumps({
-        "merchantName": "LoadTest Container",
-        "superadminEmail": f"loadtest-{int(time.time())}@test.agentredcx.com",
-        "tier": "professional",
-    }).encode()
+    payload = json.dumps(
+        {
+            "merchantName": "LoadTest Container",
+            "superadminEmail": f"loadtest-{int(time.time())}@test.agentredcx.com",
+            "tier": "professional",
+        }
+    ).encode()
     req = urllib.request.Request(
-        url, data=payload, method="POST",
+        url,
+        data=payload,
+        method="POST",
         headers={"X-API-Key": spa_key, "Content-Type": "application/json"},
     )
     try:
@@ -272,11 +316,14 @@ def _expire_tenant(host: str, spa_key: str, tenant_id: str) -> None:
     import urllib.request
     import urllib.error
     from datetime import timezone
+
     now_iso = datetime.now(timezone.utc).isoformat()
     url = f"{host}/api/superadmin/tenants/{tenant_id}/expiry"
     payload = json.dumps({"expiresAt": now_iso}).encode()
     req = urllib.request.Request(
-        url, data=payload, method="PATCH",
+        url,
+        data=payload,
+        method="PATCH",
         headers={"X-API-Key": spa_key, "Content-Type": "application/json"},
     )
     try:
@@ -289,6 +336,7 @@ def _expire_tenant(host: str, spa_key: str, tenant_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Locust runner
 # ---------------------------------------------------------------------------
+
 
 def _run_locust(
     host: str,
@@ -307,17 +355,27 @@ def _run_locust(
     html_report = str(output_dir / f"{round_name}-report.html")
 
     cmd = [
-        sys.executable, "-m", "locust",
-        "-f", LOCUSTFILE,
-        "--host", host,
+        sys.executable,
+        "-m",
+        "locust",
+        "-f",
+        LOCUSTFILE,
+        "--host",
+        host,
         "--headless",
-        "-u", str(users),
-        "-r", str(spawn_rate),
-        "--run-time", duration,
-        "--csv", csv_prefix,
-        "--html", html_report,
+        "-u",
+        str(users),
+        "-r",
+        str(spawn_rate),
+        "--run-time",
+        duration,
+        "--csv",
+        csv_prefix,
+        "--html",
+        html_report,
         "--only-summary",
-        "--loglevel", "WARNING",
+        "--loglevel",
+        "WARNING",
     ]
     if user_classes:
         cmd.extend(user_classes)
@@ -328,8 +386,12 @@ def _run_locust(
 
     start = time.time()
     proc = subprocess.run(
-        cmd, cwd=str(project_root), env=env,
-        capture_output=True, text=True, timeout=600,
+        cmd,
+        cwd=str(project_root),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=600,
     )
     elapsed = time.time() - start
 
@@ -339,8 +401,11 @@ def _run_locust(
         "total_requests": 0,
         "total_failures": 0,
         "error_rate_pct": 0.0,
-        "p50": 0.0, "p75": 0.0, "p90": 0.0,
-        "p95": 0.0, "p99": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
         "max_response_time": 0.0,
         "rps": 0.0,
         "status_429_count": 0,
@@ -386,9 +451,14 @@ def _run_locust(
 # Phase implementations
 # ---------------------------------------------------------------------------
 
+
 def phase_baseline(
-    host: str, output_dir: Path, project_root: Path,
-    api_key: str, widget_key: str, quick: bool = False,
+    host: str,
+    output_dir: Path,
+    project_root: Path,
+    api_key: str,
+    widget_key: str,
+    quick: bool = False,
 ) -> PhaseResult:
     """Phase 1: Baseline load test with 1 replica per container."""
     phase = PhaseResult(
@@ -418,8 +488,15 @@ def phase_baseline(
     for round_name, users, spawn_rate, duration in rounds:
         print(f"\n  --- Round: {round_name} ({users} users, {duration}) ---")
         r = _run_locust(
-            host, users, spawn_rate, duration, output_dir, f"baseline-{round_name}",
-            project_root, api_key, widget_key,
+            host,
+            users,
+            spawn_rate,
+            duration,
+            output_dir,
+            f"baseline-{round_name}",
+            project_root,
+            api_key,
+            widget_key,
         )
         all_results.append((round_name, r))
         _print_round(round_name, r)
@@ -459,8 +536,12 @@ def phase_baseline(
 
 
 def phase_multi_replica(
-    host: str, output_dir: Path, project_root: Path,
-    api_key: str, widget_key: str, quick: bool = False,
+    host: str,
+    output_dir: Path,
+    project_root: Path,
+    api_key: str,
+    widget_key: str,
+    quick: bool = False,
 ) -> PhaseResult:
     """Phase 2: Scale to 2 replicas, run load test, verify distribution."""
     phase = PhaseResult(
@@ -500,8 +581,15 @@ def phase_multi_replica(
     for round_name, users, spawn_rate, duration in rounds:
         print(f"\n  --- Round: {round_name} ({users} users, {duration}) ---")
         r = _run_locust(
-            host, users, spawn_rate, duration, output_dir, f"multi-{round_name}",
-            project_root, api_key, widget_key,
+            host,
+            users,
+            spawn_rate,
+            duration,
+            output_dir,
+            f"multi-{round_name}",
+            project_root,
+            api_key,
+            widget_key,
         )
         all_results.append((round_name, r))
         _print_round(round_name, r)
@@ -516,13 +604,22 @@ def phase_multi_replica(
         short_name = container.replace("agent-red-", "")
 
         # Use system logs which include replica names
-        sys_logs = _az([
-            "containerapp", "logs", "show",
-            "--name", container,
-            "--resource-group", RESOURCE_GROUP,
-            "--tail", "200",
-            "--type", "system",
-        ], timeout=30)
+        sys_logs = _az(
+            [
+                "containerapp",
+                "logs",
+                "show",
+                "--name",
+                container,
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--tail",
+                "200",
+                "--type",
+                "system",
+            ],
+            timeout=30,
+        )
 
         replica_names: set[str] = set()
         if isinstance(sys_logs, list):
@@ -544,9 +641,7 @@ def phase_multi_replica(
             )
             print(f"    {short_name}: {len(replica_names)} replicas — {sorted(replica_names)[:4]}")
         else:
-            phase.observations.append(
-                f"{short_name}: {request_lines} log lines (replica names unavailable via API)"
-            )
+            phase.observations.append(f"{short_name}: {request_lines} log lines (replica names unavailable via API)")
             print(f"    {short_name}: {request_lines} log lines")
 
     # Aggregate results
@@ -573,8 +668,12 @@ def phase_multi_replica(
 
 
 def phase_resilience(
-    host: str, output_dir: Path, project_root: Path,
-    api_key: str, widget_key: str, quick: bool = False,
+    host: str,
+    output_dir: Path,
+    project_root: Path,
+    api_key: str,
+    widget_key: str,
+    quick: bool = False,
 ) -> PhaseResult:
     """Phase 3: Kill a container under load, observe recovery.
 
@@ -621,22 +720,36 @@ def phase_resilience(
     env["LOAD_TEST_WIDGET_KEY"] = widget_key
 
     locust_cmd = [
-        sys.executable, "-m", "locust",
-        "-f", LOCUSTFILE,
-        "--host", host,
+        sys.executable,
+        "-m",
+        "locust",
+        "-f",
+        LOCUSTFILE,
+        "--host",
+        host,
         "--headless",
-        "-u", str(users),
-        "-r", "5",
-        "--run-time", duration,
-        "--csv", csv_prefix,
-        "--html", html_report,
+        "-u",
+        str(users),
+        "-r",
+        "5",
+        "--run-time",
+        duration,
+        "--csv",
+        csv_prefix,
+        "--html",
+        html_report,
         "--only-summary",
-        "--loglevel", "WARNING",
+        "--loglevel",
+        "WARNING",
     ]
 
     locust_proc = subprocess.Popen(
-        locust_cmd, cwd=str(project_root), env=env,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        locust_cmd,
+        cwd=str(project_root),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
     timeline = []
@@ -649,19 +762,34 @@ def phase_resilience(
     # Phase 3b: Kill the container by deactivating its revision
     print(f"  [T+30s]  KILLING {target_short} (deactivate revision)...")
     # Get current active revision
-    rev = _az([
-        "containerapp", "revision", "list",
-        "--name", target,
-        "--resource-group", RESOURCE_GROUP,
-        "--query", "[?properties.active].name | [0]",
-    ])
+    rev = _az(
+        [
+            "containerapp",
+            "revision",
+            "list",
+            "--name",
+            target,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--query",
+            "[?properties.active].name | [0]",
+        ]
+    )
     if isinstance(rev, str) and rev:
-        _az([
-            "containerapp", "revision", "deactivate",
-            "--name", target,
-            "--resource-group", RESOURCE_GROUP,
-            "--revision", rev,
-        ], timeout=120)
+        _az(
+            [
+                "containerapp",
+                "revision",
+                "deactivate",
+                "--name",
+                target,
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--revision",
+                rev,
+            ],
+            timeout=120,
+        )
         timeline.append(("T+30s", f"Deactivated revision {rev}"))
     else:
         # Fallback: scale min=0/max=1 — container may stay at 1 but at least tests the path
@@ -688,12 +816,20 @@ def phase_resilience(
     restore_time = 30 + failure_window
     print(f"  [T+{restore_time}s] RESTORING {target_short}...")
     if rev:
-        _az([
-            "containerapp", "revision", "activate",
-            "--name", target,
-            "--resource-group", RESOURCE_GROUP,
-            "--revision", rev,
-        ], timeout=120)
+        _az(
+            [
+                "containerapp",
+                "revision",
+                "activate",
+                "--name",
+                target,
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--revision",
+                rev,
+            ],
+            timeout=120,
+        )
         timeline.append((f"T+{restore_time}s", f"Reactivated revision {rev}"))
     _scale_container(target, min_replicas=1, max_replicas=3)
     timeline.append((f"T+{restore_time}s", f"Scaled {target_short} to min=1, max=3"))
@@ -733,9 +869,7 @@ def phase_resilience(
                     phase.max_response_time = float(row.get("Max Response Time", 0))
                     phase.rps = float(row.get("Requests/s", 0))
                     if phase.total_requests > 0:
-                        phase.error_rate_pct = (
-                            phase.total_failures / phase.total_requests * 100
-                        )
+                        phase.error_rate_pct = phase.total_failures / phase.total_requests * 100
                     break
 
     failures_csv = f"{csv_prefix}_failures.csv"
@@ -769,13 +903,17 @@ def phase_resilience(
 # Output helpers
 # ---------------------------------------------------------------------------
 
+
 def _print_round(name: str, r: dict) -> None:
     """Print compact round summary."""
-    print(f"    Requests: {r['total_requests']:,}  "
-          f"Failures: {r['total_failures']:,} ({r['error_rate_pct']:.1f}%)  "
-          f"RPS: {r['rps']:.1f}")
-    print(f"    P50: {r['p50']:.0f}ms  P95: {r['p95']:.0f}ms  "
-          f"P99: {r['p99']:.0f}ms  Max: {r['max_response_time']:.0f}ms")
+    print(
+        f"    Requests: {r['total_requests']:,}  "
+        f"Failures: {r['total_failures']:,} ({r['error_rate_pct']:.1f}%)  "
+        f"RPS: {r['rps']:.1f}"
+    )
+    print(
+        f"    P50: {r['p50']:.0f}ms  P95: {r['p95']:.0f}ms  P99: {r['p99']:.0f}ms  Max: {r['max_response_time']:.0f}ms"
+    )
     if r["status_429_count"]:
         print(f"    429s: {r['status_429_count']}")
     if r["status_5xx_count"]:
@@ -795,12 +933,14 @@ def _print_final_report(phases: list[PhaseResult]) -> str:
         lines.append(f"  Phase: {phase.name}")
         lines.append(f"  {phase.description}")
         lines.append(f"  Duration: {phase.duration_s:.0f}s")
-        lines.append(f"  Requests: {phase.total_requests:,}  "
-                     f"Failures: {phase.total_failures:,} ({phase.error_rate_pct:.1f}%)")
-        lines.append(f"  P50: {phase.p50:.0f}ms  P95: {phase.p95:.0f}ms  "
-                     f"P99: {phase.p99:.0f}ms  Max: {phase.max_response_time:.0f}ms")
-        lines.append(f"  RPS: {phase.rps:.1f}  "
-                     f"429s: {phase.status_429_count}  5xx: {phase.status_5xx_count}")
+        lines.append(
+            f"  Requests: {phase.total_requests:,}  Failures: {phase.total_failures:,} ({phase.error_rate_pct:.1f}%)"
+        )
+        lines.append(
+            f"  P50: {phase.p50:.0f}ms  P95: {phase.p95:.0f}ms  "
+            f"P99: {phase.p99:.0f}ms  Max: {phase.max_response_time:.0f}ms"
+        )
+        lines.append(f"  RPS: {phase.rps:.1f}  429s: {phase.status_429_count}  5xx: {phase.status_5xx_count}")
 
         if phase.container_health:
             lines.append("  Containers:")
@@ -837,25 +977,30 @@ def _print_final_report(phases: list[PhaseResult]) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     """Run container agent load tests."""
-    parser = argparse.ArgumentParser(
-        description="Container agent load test & resilience runner"
-    )
+    parser = argparse.ArgumentParser(description="Container agent load test & resilience runner")
     parser.add_argument(
-        "--env", choices=["staging"], default="staging",
+        "--env",
+        choices=["staging"],
+        default="staging",
         help="Target environment (default: staging)",
     )
     parser.add_argument(
-        "--phase", choices=["baseline", "multi-replica", "resilience", "all"],
-        default="all", help="Which phase to run (default: all)",
+        "--phase",
+        choices=["baseline", "multi-replica", "resilience", "all"],
+        default="all",
+        help="Which phase to run (default: all)",
     )
     parser.add_argument(
-        "--quick", action="store_true",
+        "--quick",
+        action="store_true",
         help="Quick smoke test (reduced users and duration)",
     )
     parser.add_argument(
-        "--spa-key", help="SPA platform admin key for self-provisioning",
+        "--spa-key",
+        help="SPA platform admin key for self-provisioning",
     )
     args = parser.parse_args()
 
@@ -920,8 +1065,7 @@ def main() -> None:
         # Fall back to staging credentials
         print("  [WARN] Self-provisioning failed, using staging credentials")
         api_key = os.environ.get("STAGING_REMAKER_USER_KEY", "")
-        widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", ""
-        )
+        widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
         tenant_id = ""
 
     # Run phases
@@ -948,10 +1092,13 @@ def main() -> None:
             phases.append(result)
         except Exception as e:
             print(f"\n  [ERROR] Phase {phase_name} failed: {e}")
-            phases.append(PhaseResult(
-                name=phase_name, description=f"FAILED: {e}",
-                observations=[f"Exception: {e}"],
-            ))
+            phases.append(
+                PhaseResult(
+                    name=phase_name,
+                    description=f"FAILED: {e}",
+                    observations=[f"Exception: {e}"],
+                )
+            )
 
         # Cooldown between phases
         if phase_name != phase_order[-1]:
@@ -974,25 +1121,30 @@ def main() -> None:
     json_file = run_dir / "results.json"
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(
-            [{
-                "name": p.name,
-                "description": p.description,
-                "duration_s": p.duration_s,
-                "total_requests": p.total_requests,
-                "total_failures": p.total_failures,
-                "error_rate_pct": p.error_rate_pct,
-                "p50": p.p50, "p95": p.p95, "p99": p.p99,
-                "max_response_time": p.max_response_time,
-                "rps": p.rps,
-                "status_429_count": p.status_429_count,
-                "status_5xx_count": p.status_5xx_count,
-                "observations": p.observations,
-                "container_health": [
-                    {"name": c.name, "replicas": c.replicas, "running": c.running}
-                    for c in p.container_health
-                ],
-            } for p in phases],
-            f, indent=2,
+            [
+                {
+                    "name": p.name,
+                    "description": p.description,
+                    "duration_s": p.duration_s,
+                    "total_requests": p.total_requests,
+                    "total_failures": p.total_failures,
+                    "error_rate_pct": p.error_rate_pct,
+                    "p50": p.p50,
+                    "p95": p.p95,
+                    "p99": p.p99,
+                    "max_response_time": p.max_response_time,
+                    "rps": p.rps,
+                    "status_429_count": p.status_429_count,
+                    "status_5xx_count": p.status_5xx_count,
+                    "observations": p.observations,
+                    "container_health": [
+                        {"name": c.name, "replicas": c.replicas, "running": c.running} for c in p.container_health
+                    ],
+                }
+                for p in phases
+            ],
+            f,
+            indent=2,
         )
 
     # Cleanup: expire ephemeral tenant

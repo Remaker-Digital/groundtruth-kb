@@ -62,12 +62,20 @@ def check_existing(dry_run: bool = False) -> str | None:
         return None
 
     try:
-        output = run_az([
-            "monitor", "app-insights", "component", "show",
-            "--app", APP_INSIGHTS_NAME,
-            "--resource-group", RESOURCE_GROUP,
-            "--output", "json",
-        ])
+        output = run_az(
+            [
+                "monitor",
+                "app-insights",
+                "component",
+                "show",
+                "--app",
+                APP_INSIGHTS_NAME,
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--output",
+                "json",
+            ]
+        )
         if output:
             data = json.loads(output)
             return data.get("connectionString")
@@ -88,29 +96,53 @@ def provision(dry_run: bool = False) -> None:
     else:
         # Step 2: Create Log Analytics workspace (required by App Insights)
         logger.info("Step 2: Creating Log Analytics workspace...")
-        run_az([
-            "monitor", "log-analytics", "workspace", "create",
-            "--resource-group", RESOURCE_GROUP,
-            "--workspace-name", WORKSPACE_NAME,
-            "--location", LOCATION,
-            "--sku", "PerGB2018",
-            "--retention-in-days", "30",
-        ], dry_run=dry_run)
+        run_az(
+            [
+                "monitor",
+                "log-analytics",
+                "workspace",
+                "create",
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--workspace-name",
+                WORKSPACE_NAME,
+                "--location",
+                LOCATION,
+                "--sku",
+                "PerGB2018",
+                "--retention-in-days",
+                "30",
+            ],
+            dry_run=dry_run,
+        )
 
         # Step 3: Create Application Insights resource
         logger.info("Step 3: Creating Application Insights resource...")
-        output = run_az([
-            "monitor", "app-insights", "component", "create",
-            "--app", APP_INSIGHTS_NAME,
-            "--location", LOCATION,
-            "--resource-group", RESOURCE_GROUP,
-            "--kind", "web",
-            "--application-type", "web",
-            "--workspace", f"/subscriptions/4dce2122-690a-4654-b531-cc647db62331"
-                          f"/resourceGroups/{RESOURCE_GROUP}"
-                          f"/providers/Microsoft.OperationalInsights/workspaces/{WORKSPACE_NAME}",
-            "--output", "json",
-        ], dry_run=dry_run)
+        output = run_az(
+            [
+                "monitor",
+                "app-insights",
+                "component",
+                "create",
+                "--app",
+                APP_INSIGHTS_NAME,
+                "--location",
+                LOCATION,
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--kind",
+                "web",
+                "--application-type",
+                "web",
+                "--workspace",
+                f"/subscriptions/4dce2122-690a-4654-b531-cc647db62331"
+                f"/resourceGroups/{RESOURCE_GROUP}"
+                f"/providers/Microsoft.OperationalInsights/workspaces/{WORKSPACE_NAME}",
+                "--output",
+                "json",
+            ],
+            dry_run=dry_run,
+        )
 
         if output:
             data = json.loads(output)
@@ -127,23 +159,35 @@ def provision(dry_run: bool = False) -> None:
 
     # Step 4: Store connection string in Key Vault
     logger.info("Step 4: Storing connection string in Key Vault...")
-    run_az([
-        "keyvault", "secret", "set",
-        "--vault-name", KEY_VAULT_NAME,
-        "--name", SECRET_NAME,
-        "--value", existing_conn_str,
-    ])
+    run_az(
+        [
+            "keyvault",
+            "secret",
+            "set",
+            "--vault-name",
+            KEY_VAULT_NAME,
+            "--name",
+            SECRET_NAME,
+            "--value",
+            existing_conn_str,
+        ]
+    )
     logger.info("Secret stored: %s/%s", KEY_VAULT_NAME, SECRET_NAME)
 
     # Step 5: Add env var reference to container app
     logger.info("Step 5: Adding APPLICATIONINSIGHTS_CONNECTION_STRING to container app...")
-    run_az([
-        "containerapp", "update",
-        "--name", CONTAINER_APP_NAME,
-        "--resource-group", RESOURCE_GROUP,
-        "--set-env-vars",
-        f"APPLICATIONINSIGHTS_CONNECTION_STRING=secretref:{SECRET_NAME}",
-    ])
+    run_az(
+        [
+            "containerapp",
+            "update",
+            "--name",
+            CONTAINER_APP_NAME,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--set-env-vars",
+            f"APPLICATIONINSIGHTS_CONNECTION_STRING=secretref:{SECRET_NAME}",
+        ]
+    )
     logger.info("Container app updated with Application Insights connection string")
 
     # Summary
@@ -156,9 +200,7 @@ def provision(dry_run: bool = False) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Provision Azure Application Insights for Agent Red (SPEC-1834)"
-    )
+    parser = argparse.ArgumentParser(description="Provision Azure Application Insights for Agent Red (SPEC-1834)")
     parser.add_argument(
         "--dry-run",
         action="store_true",

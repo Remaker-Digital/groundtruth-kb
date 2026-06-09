@@ -19,6 +19,7 @@ Safety:
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -55,8 +56,12 @@ ENCRYPTED_COLLECTIONS: dict[str, list[str]] = {
     "team_members": ["email", "display_name"],
     "conversations": ["messages", "customer_intent", "escalation_reason", "transcript"],
     "customer_profiles": [
-        "email", "phone", "display_name", "contact_attributes",
-        "first_seen_channel", "last_seen_channel",
+        "email",
+        "phone",
+        "display_name",
+        "contact_attributes",
+        "first_seen_channel",
+        "last_seen_channel",
     ],
     "preferences": ["whatsapp_business_phone"],
     "knowledge_bases": ["content", "source_url", "title"],
@@ -174,10 +179,12 @@ async def fix_tenant(
         # Query all documents in this tenant's partition
         query = "SELECT * FROM c"
         try:
-            items = list(container.query_items(
-                query=query,
-                partition_key=tenant_id,
-            ))
+            items = list(
+                container.query_items(
+                    query=query,
+                    partition_key=tenant_id,
+                )
+            )
         except Exception as e:
             logger.warning("Could not query %s for %s: %s", collection_name, tenant_id, e)
             continue
@@ -198,13 +205,19 @@ async def fix_tenant(
                     changes[field] = plaintext
                     logger.info(
                         "  %s/%s.%s: decrypted (%d chars -> %d chars)",
-                        collection_name, doc_id[:12], field,
-                        len(value), len(plaintext),
+                        collection_name,
+                        doc_id[:12],
+                        field,
+                        len(value),
+                        len(plaintext),
                     )
                 except Exception as e:
                     logger.warning(
                         "  %s/%s.%s: decrypt failed (%s) — skipping",
-                        collection_name, doc_id[:12], field, e,
+                        collection_name,
+                        doc_id[:12],
+                        field,
+                        e,
                     )
 
             if changes and not dry_run:
@@ -217,12 +230,13 @@ async def fix_tenant(
                 except Exception as e:
                     logger.error(
                         "  %s/%s: replace failed: %s",
-                        collection_name, doc_id[:12], e,
+                        collection_name,
+                        doc_id[:12],
+                        e,
                     )
             elif changes:
                 fixed += len(changes)
-                logger.info("  [DRY RUN] Would fix %d fields in %s/%s",
-                            len(changes), collection_name, doc_id[:12])
+                logger.info("  [DRY RUN] Would fix %d fields in %s/%s", len(changes), collection_name, doc_id[:12])
 
         if fixed:
             stats[collection_name] = fixed
@@ -238,8 +252,7 @@ async def main_async(dry_run: bool, force: bool) -> None:
     if not force:
         if "staging" not in db_name and "dev" not in db_name:
             logger.error(
-                "SAFETY GATE: COSMOS_DB_DATABASE=%s looks like production. "
-                "Pass --force to confirm.",
+                "SAFETY GATE: COSMOS_DB_DATABASE=%s looks like production. Pass --force to confirm.",
                 db_name,
             )
             return
@@ -254,10 +267,12 @@ async def main_async(dry_run: bool, force: bool) -> None:
 
     # Get all tenants
     tenants_container = cosmos_db.get_container_client("tenants")
-    tenants = list(tenants_container.query_items(
-        query="SELECT c.id FROM c",
-        enable_cross_partition_query=True,
-    ))
+    tenants = list(
+        tenants_container.query_items(
+            query="SELECT c.id FROM c",
+            enable_cross_partition_query=True,
+        )
+    )
     logger.info("Found %d tenants", len(tenants))
 
     total_fixed = 0
@@ -266,8 +281,7 @@ async def main_async(dry_run: bool, force: bool) -> None:
         logger.info("Processing tenant: %s", tenant_id)
         stats = await fix_tenant(tenant_id, cosmos_db, dry_run)
         for coll, count in stats.items():
-            logger.info("  %s: %d fields %s",
-                        coll, count, "would be fixed" if dry_run else "fixed")
+            logger.info("  %s: %d fields %s", coll, count, "would be fixed" if dry_run else "fixed")
             total_fixed += count
 
     action = "would be fixed" if dry_run else "fixed"
@@ -275,9 +289,7 @@ async def main_async(dry_run: bool, force: bool) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Fix dev-mode encrypted fields by decrypting to plaintext"
-    )
+    parser = argparse.ArgumentParser(description="Fix dev-mode encrypted fields by decrypting to plaintext")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing")
     parser.add_argument("--force", action="store_true", help="Bypass production safety gate")
     args = parser.parse_args()

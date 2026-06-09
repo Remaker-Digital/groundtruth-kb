@@ -46,7 +46,9 @@ def _grep_exists(directory: str, pattern: str) -> bool:
     """Check if pattern exists anywhere in directory using git grep (fast)."""
     result = subprocess.run(
         ["git", "grep", "-l", pattern, "--", directory],
-        capture_output=True, text=True, cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
     )
     return bool(result.stdout.strip())
 
@@ -55,7 +57,9 @@ def get_staged_files() -> set[str]:
     """Return set of all staged files (added, modified, deleted)."""
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only"],
-        capture_output=True, text=True, cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
     )
     return {line.strip().replace("\\", "/") for line in result.stdout.strip().splitlines()}
 
@@ -86,18 +90,13 @@ GUARDS: list[dict] = [
     {
         "name": "Transport hierarchy reference",
         "trigger_paths": ["src/agents/"],
-        "check": lambda: (
-            _grep_exists("src/agents/", "SLIMTransport")
-            or _grep_exists("src/agents/", "NatsTransport")
-        ),
+        "check": lambda: _grep_exists("src/agents/", "SLIMTransport") or _grep_exists("src/agents/", "NatsTransport"),
         "message": "src/agents/ must reference SLIMTransport or NatsTransport (SPEC-1780/1788)",
     },
     {
         "name": "EntitlementService class",
         "trigger_paths": ["src/multi_tenant/"],
-        "check": lambda: _file_contains(
-            "src/multi_tenant/entitlement_service.py", "class EntitlementService"
-        ),
+        "check": lambda: _file_contains("src/multi_tenant/entitlement_service.py", "class EntitlementService"),
         "message": "EntitlementService must exist in src/multi_tenant/entitlement_service.py (SPEC-1815)",
     },
     {
@@ -118,10 +117,7 @@ def main() -> int:
 
     for guard in GUARDS:
         # Only check guards whose trigger paths overlap with staged files
-        relevant = any(
-            any(f.startswith(tp) for tp in guard["trigger_paths"])
-            for f in staged
-        )
+        relevant = any(any(f.startswith(tp) for tp in guard["trigger_paths"]) for f in staged)
         if not relevant:
             continue
 

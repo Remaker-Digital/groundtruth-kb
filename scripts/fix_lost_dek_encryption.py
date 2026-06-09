@@ -35,6 +35,7 @@ Usage:
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -130,6 +131,7 @@ TEAM_MEMBER_RESTORE: dict[str, dict[str, str]] = {
 # Phase 1: Evidence-only inventory (read-only, no scans)
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def build_inventory() -> dict:
     """Read exact documents from the hardcoded allowlist. No scans."""
     from azure.cosmos import CosmosClient
@@ -152,16 +154,21 @@ async def build_inventory() -> dict:
     # Read specific tenant documents by partition key (no cross-partition query)
     container = db.get_container_client("tenants")
     for tid in AFFECTED_TENANT_IDS:
-        items = list(container.query_items(
-            query="SELECT * FROM c WHERE c.id=@id",
-            parameters=[{"name": "@id", "value": tid}],
-            partition_key=tid,
-        ))
+        items = list(
+            container.query_items(
+                query="SELECT * FROM c WHERE c.id=@id",
+                parameters=[{"name": "@id", "value": tid}],
+                partition_key=tid,
+            )
+        )
         if not items:
             logger.warning("Tenant %s not found in database", tid)
-            inventory["tenant_evidence"].append({
-                "tenant_id": tid, "status": "NOT_FOUND",
-            })
+            inventory["tenant_evidence"].append(
+                {
+                    "tenant_id": tid,
+                    "status": "NOT_FOUND",
+                }
+            )
             continue
 
         doc = items[0]
@@ -174,29 +181,36 @@ async def build_inventory() -> dict:
                 "restore_to": TENANT_RESTORE[tid][field],
             }
 
-        inventory["tenant_evidence"].append({
-            "tenant_id": tid,
-            "document_id": doc["id"],
-            "partition_key": tid,
-            "_etag": doc.get("_etag", ""),
-            "fields": fields,
-        })
+        inventory["tenant_evidence"].append(
+            {
+                "tenant_id": tid,
+                "document_id": doc["id"],
+                "partition_key": tid,
+                "_etag": doc.get("_etag", ""),
+                "fields": fields,
+            }
+        )
 
     # Read exact team_member documents by document ID (no partition scan)
     tm_container = db.get_container_client("team_members")
     for tid in AFFECTED_TENANT_IDS:
         for doc_id in AFFECTED_TEAM_MEMBER_IDS[tid]:
-            items = list(tm_container.query_items(
-                query="SELECT * FROM c WHERE c.id=@id",
-                parameters=[{"name": "@id", "value": doc_id}],
-                partition_key=tid,
-            ))
+            items = list(
+                tm_container.query_items(
+                    query="SELECT * FROM c WHERE c.id=@id",
+                    parameters=[{"name": "@id", "value": doc_id}],
+                    partition_key=tid,
+                )
+            )
             if not items:
                 logger.warning("Team member %s not found in database", doc_id)
-                inventory["team_member_evidence"].append({
-                    "tenant_id": tid, "document_id": doc_id,
-                    "status": "NOT_FOUND",
-                })
+                inventory["team_member_evidence"].append(
+                    {
+                        "tenant_id": tid,
+                        "document_id": doc_id,
+                        "status": "NOT_FOUND",
+                    }
+                )
                 continue
 
             doc = items[0]
@@ -210,13 +224,15 @@ async def build_inventory() -> dict:
                     "restore_to": restore_values[field],
                 }
 
-            inventory["team_member_evidence"].append({
-                "tenant_id": tid,
-                "document_id": doc["id"],
-                "partition_key": tid,
-                "_etag": doc.get("_etag", ""),
-                "fields": fields,
-            })
+            inventory["team_member_evidence"].append(
+                {
+                    "tenant_id": tid,
+                    "document_id": doc["id"],
+                    "partition_key": tid,
+                    "_etag": doc.get("_etag", ""),
+                    "fields": fields,
+                }
+            )
 
     return inventory
 
@@ -224,6 +240,7 @@ async def build_inventory() -> dict:
 # ──────────────────────────────────────────────────────────────────────
 # Phase 2: Execute from reviewed inventory
 # ──────────────────────────────────────────────────────────────────────
+
 
 async def execute_from_inventory(inventory_path: str) -> dict:
     """Apply restoration using a reviewed inventory as the allowlist."""
@@ -237,7 +254,8 @@ async def execute_from_inventory(inventory_path: str) -> dict:
     if inventory["database"] != target_db:
         logger.error(
             "SAFETY: Inventory for '%s' but target is '%s'. Aborting.",
-            inventory["database"], target_db,
+            inventory["database"],
+            target_db,
         )
         sys.exit(1)
 
@@ -259,11 +277,13 @@ async def execute_from_inventory(inventory_path: str) -> dict:
             continue
 
         try:
-            items = list(container.query_items(
-                query="SELECT * FROM c WHERE c.id=@id",
-                parameters=[{"name": "@id", "value": entry["document_id"]}],
-                partition_key=entry["partition_key"],
-            ))
+            items = list(
+                container.query_items(
+                    query="SELECT * FROM c WHERE c.id=@id",
+                    parameters=[{"name": "@id", "value": entry["document_id"]}],
+                    partition_key=entry["partition_key"],
+                )
+            )
             if not items:
                 results["errors"].append(f"tenant {tid} not found")
                 continue
@@ -303,11 +323,13 @@ async def execute_from_inventory(inventory_path: str) -> dict:
             continue
 
         try:
-            items = list(tm_container.query_items(
-                query="SELECT * FROM c WHERE c.id=@id",
-                parameters=[{"name": "@id", "value": entry["document_id"]}],
-                partition_key=entry["partition_key"],
-            ))
+            items = list(
+                tm_container.query_items(
+                    query="SELECT * FROM c WHERE c.id=@id",
+                    parameters=[{"name": "@id", "value": entry["document_id"]}],
+                    partition_key=entry["partition_key"],
+                )
+            )
             if not items:
                 results["errors"].append(f"team_member {entry['document_id']} not found")
                 continue
@@ -341,6 +363,7 @@ async def execute_from_inventory(inventory_path: str) -> dict:
 # CLI
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def main_async(args: argparse.Namespace) -> None:
     db_name = os.environ.get("COSMOS_DB_DATABASE", "")
     logger.info("Target database: %s", db_name or "(not set)")
@@ -348,15 +371,13 @@ async def main_async(args: argparse.Namespace) -> None:
     if not args.force:
         if "staging" not in db_name and "dev" not in db_name:
             logger.error(
-                "SAFETY GATE: COSMOS_DB_DATABASE=%s looks like production. "
-                "Pass --force to confirm.",
+                "SAFETY GATE: COSMOS_DB_DATABASE=%s looks like production. Pass --force to confirm.",
                 db_name,
             )
             sys.exit(1)
 
     if args.inventory:
-        logger.info("Phase 1: Capturing evidence for %d tenants (no scans)...",
-                     len(AFFECTED_TENANT_IDS))
+        logger.info("Phase 1: Capturing evidence for %d tenants (no scans)...", len(AFFECTED_TENANT_IDS))
         inventory = await build_inventory()
 
         filename = f"remediation-inventory-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
@@ -377,9 +398,12 @@ async def main_async(args: argparse.Namespace) -> None:
         logger.info("Phase 2: Executing from inventory: %s", args.execute)
         results = await execute_from_inventory(args.execute)
 
-        logger.info("Results: %d tenants, %d team_members, %d fields restored",
-                     results["tenants_fixed"], results["team_members_fixed"],
-                     results["fields_fixed"])
+        logger.info(
+            "Results: %d tenants, %d team_members, %d fields restored",
+            results["tenants_fixed"],
+            results["team_members_fixed"],
+            results["fields_fixed"],
+        )
         if results["errors"]:
             logger.warning("Errors: %s", results["errors"])
             sys.exit(1)
@@ -394,12 +418,13 @@ async def main_async(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fix lost-DEK encrypted fields")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--inventory", action="store_true",
-                       help="Phase 1: capture evidence from hardcoded allowlist (read-only)")
-    group.add_argument("--execute", type=str, metavar="INVENTORY_FILE",
-                       help="Phase 2: apply fixes from reviewed inventory")
-    parser.add_argument("--force", action="store_true",
-                        help="Required for production database")
+    group.add_argument(
+        "--inventory", action="store_true", help="Phase 1: capture evidence from hardcoded allowlist (read-only)"
+    )
+    group.add_argument(
+        "--execute", type=str, metavar="INVENTORY_FILE", help="Phase 2: apply fixes from reviewed inventory"
+    )
+    parser.add_argument("--force", action="store_true", help="Required for production database")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")

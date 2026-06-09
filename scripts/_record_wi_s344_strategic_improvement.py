@@ -63,8 +63,7 @@ def main() -> int:
         priority="medium",
         stage="backlogged",
         status_detail=(
-            "S344 capture; investigation not yet started. Identified via "
-            "scope-bundling incident on commit 5611dc44."
+            "S344 capture; investigation not yet started. Identified via scope-bundling incident on commit 5611dc44."
         ),
         source_owner_directive=(
             "S344 owner directive: 'Both please' authorizing strategic-self-"

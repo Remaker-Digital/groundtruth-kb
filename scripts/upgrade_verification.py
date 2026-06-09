@@ -36,10 +36,12 @@ import os as _os
 # The dict reads os.environ.get() at definition time — env vars must be set first.
 import sys as _sys
 from pathlib import Path as _Path
+
 _PROJECT_ROOT = _Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in _sys.path:
     _sys.path.insert(0, str(_PROJECT_ROOT))
 from scripts._env import load_env_local as _load_env  # noqa: E402
+
 _load_env()
 
 # SPEC-1882 / Codex WP2: Shared config — single source of truth.
@@ -51,9 +53,9 @@ from scripts.deploy_config import ENVIRONMENTS  # noqa: E402
 from scripts.deploy_config import TENANTS  # noqa: E402
 
 
-def api_call(fqdn: str, path: str, api_key: str | None = None,
-             method: str = "GET", body: dict | None = None,
-             timeout: int = 30) -> tuple[int, dict | str, dict]:
+def api_call(
+    fqdn: str, path: str, api_key: str | None = None, method: str = "GET", body: dict | None = None, timeout: int = 30
+) -> tuple[int, dict | str, dict]:
     """Make an API call and return (status_code, response_body, response_headers)."""
     url = f"https://{fqdn}{path}"
     headers = {"Accept": "application/json"}
@@ -116,9 +118,9 @@ def widget_call(fqdn: str, widget_key: str, timeout: int = 30) -> tuple[int, dic
         return 0, str(e)
 
 
-def widget_api_call(fqdn: str, widget_key: str, path: str,
-                    method: str = "GET", body: dict | None = None,
-                    timeout: int = 30) -> tuple[int, dict | str, dict]:
+def widget_api_call(
+    fqdn: str, widget_key: str, path: str, method: str = "GET", body: dict | None = None, timeout: int = 30
+) -> tuple[int, dict | str, dict]:
     """Make an API call authenticated with a widget key (X-Widget-Key header).
 
     Returns (status_code, response_body, response_headers).
@@ -226,7 +228,9 @@ def phase_a(env: dict) -> dict:
     status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/admin/team", tid), key)
     members = data.get("members", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
     snapshot["A7_team_count"] = len(members)
-    snapshot["A8_team_members"] = [{"displayName": m.get("displayName", m.get("name", "?")), "role": m.get("role", "?")} for m in members]
+    snapshot["A8_team_members"] = [
+        {"displayName": m.get("displayName", m.get("name", "?")), "role": m.get("role", "?")} for m in members
+    ]
     print(f"  A.7  team count:         {len(members)}")
     for m in snapshot["A8_team_members"]:
         print(f"       - {m['displayName']}: {m['role']}")
@@ -270,17 +274,22 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     # Starter tier = 10 requests/minute. Phase C makes ~30 authenticated calls.
     # Pause for 65s every 8 calls to stay within the rate limit window.
     _orig_api_call = globals()["api_call"]
-    def api_call(fqdn_: str, path: str, api_key: str | None = None,
-                 method: str = "GET", body: dict | None = None,
-                 timeout: int = 30):
+
+    def api_call(
+        fqdn_: str,
+        path: str,
+        api_key: str | None = None,
+        method: str = "GET",
+        body: dict | None = None,
+        timeout: int = 30,
+    ):
         _api_call_count[0] += 1
         if _api_call_count[0] > 1 and _api_call_count[0] % 8 == 0:
             print(f"    ... rate limit cooldown (call {_api_call_count[0]}, pausing 65s) ...")
             time.sleep(65)
         return _orig_api_call(fqdn_, path, api_key, method, body, timeout)
 
-    def check(aid: str, desc: str, passed: bool, detail: str = "",
-              *, skip: bool = False):
+    def check(aid: str, desc: str, passed: bool, detail: str = "", *, skip: bool = False):
         if skip:
             status = "SKIP"
             results.append({"id": aid, "description": desc, "status": "SKIP", "detail": detail})
@@ -316,12 +325,18 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
         a3 = snapshot.get("A3_activation", {})
         # S164: Removed has_pending_changes from comparison — E2E tests
         # legitimately modify draft configs between Phase A and Phase C.
-        match = all([
-            d.get("is_active") == a3.get("is_active"),
-            d.get("is_configured") == a3.get("is_configured"),
-        ])
-        check("C.3", "Configuration state unchanged", match,
-              f"active={d.get('is_active')}, configured={d.get('is_configured')}")
+        match = all(
+            [
+                d.get("is_active") == a3.get("is_active"),
+                d.get("is_configured") == a3.get("is_configured"),
+            ]
+        )
+        check(
+            "C.3",
+            "Configuration state unchanged",
+            match,
+            f"active={d.get('is_active')}, configured={d.get('is_configured')}",
+        )
     else:
         check("C.3", "Configuration state unchanged", False, f"HTTP {s}")
 
@@ -330,8 +345,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     tc = d.get("totalCount", d.get("total_count", -1)) if isinstance(d, dict) else -1
     snap_count = snapshot.get("A4_conversation_count", -1)
     count_ok = isinstance(tc, int) and isinstance(snap_count, int) and tc >= snap_count
-    check("C.4", "Conversation count not decreased", count_ok,
-          f"{tc} vs {snap_count} (growth OK)")
+    check("C.4", "Conversation count not decreased", count_ok, f"{tc} vs {snap_count} (growth OK)")
 
     # C.5 Status breakdown unchanged
     s, d, _ = api_call(fqdn, tp("/api/admin/analytics/summary"), key)
@@ -339,30 +353,41 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
         bd = d.get("status_breakdown", d.get("statusBreakdown", {}))
     else:
         bd = {"http_status": s, "note": "analytics may need params"}
-    check("C.5", "Status breakdown unchanged", str(bd) == str(snapshot.get("A5_status_breakdown")),
-          f"{bd}")
+    check("C.5", "Status breakdown unchanged", str(bd) == str(snapshot.get("A5_status_breakdown")), f"{bd}")
 
     # C.6 KB count unchanged (camelCase: totalCount)
     s, d, _ = api_call(fqdn, tp("/api/admin/knowledge?limit=1"), key)
     kc = d.get("totalCount", d.get("total_count", -1)) if isinstance(d, dict) else -1
-    check("C.6", "KB article count unchanged", kc == snapshot.get("A6_kb_count"),
-          f"{kc} vs {snapshot.get('A6_kb_count')}")
+    check(
+        "C.6", "KB article count unchanged", kc == snapshot.get("A6_kb_count"), f"{kc} vs {snapshot.get('A6_kb_count')}"
+    )
 
     # C.7 Team member count unchanged
     s, d, _ = api_call(fqdn, tp("/api/admin/team"), key)
     members = d.get("members", []) if isinstance(d, dict) else (d if isinstance(d, list) else [])
-    check("C.7", "Team member count unchanged", len(members) == snapshot.get("A7_team_count"),
-          f"{len(members)} vs {snapshot.get('A7_team_count')}")
+    check(
+        "C.7",
+        "Team member count unchanged",
+        len(members) == snapshot.get("A7_team_count"),
+        f"{len(members)} vs {snapshot.get('A7_team_count')}",
+    )
 
     # C.8 Team member names+roles unchanged
-    current = sorted([{"displayName": m.get("displayName", m.get("name")), "role": m.get("role")} for m in members], key=lambda x: str(x["displayName"]))
+    current = sorted(
+        [{"displayName": m.get("displayName", m.get("name")), "role": m.get("role")} for m in members],
+        key=lambda x: str(x["displayName"]),
+    )
     expected = sorted(snapshot.get("A8_team_members", []), key=lambda x: str(x.get("displayName", x.get("name"))))
     check("C.8", "Team members unchanged", current == expected)
 
     # C.9 Draft config status unchanged
     s, d, _ = api_call(fqdn, tp("/api/config?state=draft"), key)
-    check("C.9", "Draft config unchanged", s == snapshot.get("A9_draft_status"),
-          f"HTTP {s} vs {snapshot.get('A9_draft_status')}")
+    check(
+        "C.9",
+        "Draft config unchanged",
+        s == snapshot.get("A9_draft_status"),
+        f"HTTP {s} vs {snapshot.get('A9_draft_status')}",
+    )
 
     # C.10 Active config keys unchanged
     s, d, _ = api_call(fqdn, tp("/api/config"), key)
@@ -370,13 +395,16 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
         current_keys = sorted(d.keys())
     else:
         current_keys = []
-    check("C.10", "Active config unchanged", current_keys == snapshot.get("A10_config_keys", []),
-          f"{len(current_keys)} keys vs {len(snapshot.get('A10_config_keys', []))}")
+    check(
+        "C.10",
+        "Active config unchanged",
+        current_keys == snapshot.get("A10_config_keys", []),
+        f"{len(current_keys)} keys vs {len(snapshot.get('A10_config_keys', []))}",
+    )
 
     # C.11 Widget key still valid (chat endpoint)
     s, d = widget_call(fqdn, wk)
-    check("C.11", "Widget key still valid", s in (200, 201),
-          f"HTTP {s}")
+    check("C.11", "Widget key still valid", s in (200, 201), f"HTTP {s}")
 
     # C.12 API key still authenticates
     s, d, _ = api_call(fqdn, tp("/api/config"), key)
@@ -388,8 +416,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     # C.14 Superadmin API
     s, d, _ = api_call(fqdn, "/api/superadmin/tenants", spa_key)
     total = d.get("total", 0) if isinstance(d, dict) else 0
-    check("C.14", "Superadmin API functional", s == 200 and total >= 1,
-          f"HTTP {s}, total={total}")
+    check("C.14", "Superadmin API functional", s == 200 and total >= 1, f"HTTP {s}, total={total}")
 
     # C.15 Public status API
     s, d, _ = api_call(fqdn, "/api/status")
@@ -413,8 +440,12 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.19", "MFA endpoint", s == 200, f"HTTP {s}")
 
     # C.20 Magic link request (requires tenant field — SPEC-1644)
-    s, d, _ = api_call(fqdn, "/api/auth/magic-link/request", method="POST",
-                    body={"email": "test@test.com", "tenant": env.get("tenant_id", "remaker-digital-001")})
+    s, d, _ = api_call(
+        fqdn,
+        "/api/auth/magic-link/request",
+        method="POST",
+        body={"email": "test@test.com", "tenant": env.get("tenant_id", "remaker-digital-001")},
+    )
     check("C.20", "Magic link request", s == 200, f"HTTP {s}")
 
     # C.21 Analytics period filtering
@@ -451,8 +482,12 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     # C.28 Add-on listing
     s, d, _ = api_call(fqdn, tp("/api/billing/addons"), key)
     has_addons = isinstance(d, dict) and isinstance(d.get("addons"), list) and d.get("total", 0) >= 4
-    check("C.28", "Add-on listing", s == 200 and has_addons,
-          f"HTTP {s}, total={d.get('total') if isinstance(d, dict) else '?'}")
+    check(
+        "C.28",
+        "Add-on listing",
+        s == 200 and has_addons,
+        f"HTTP {s}, total={d.get('total') if isinstance(d, dict) else '?'}",
+    )
 
     # C.29 Memory stats
     s, d, _ = api_call(fqdn, tp("/api/admin/memory/stats"), key)
@@ -500,32 +535,49 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     # If widget_key_hash is missing from tenant doc, this returns 401.
     s37, d37, _ = widget_api_call(fqdn, wk, "/api/config?page_type=all") if wk else (0, "", {})
     wk_config_ok = s37 == 200 and isinstance(d37, dict) and "config" in d37
-    check("C.37", "Widget config auth (admin widget)", wk_config_ok,
-          f"HTTP {s37}" + (" — widget_key_hash likely missing from tenant doc" if s37 == 401 else ""))
+    check(
+        "C.37",
+        "Widget config auth (admin widget)",
+        wk_config_ok,
+        f"HTTP {s37}" + (" — widget_key_hash likely missing from tenant doc" if s37 == 401 else ""),
+    )
 
     # C.38 Widget creates conversation (storefront visitor flow)
     conv_id = None
-    s38, d38, _ = widget_api_call(fqdn, wk, "/api/chat/conversations",
-                                   method="POST", body={"message": "health check"}) if wk else (0, "", {})
+    s38, d38, _ = (
+        widget_api_call(fqdn, wk, "/api/chat/conversations", method="POST", body={"message": "health check"})
+        if wk
+        else (0, "", {})
+    )
     if isinstance(d38, dict):
         conv_id = d38.get("conversation_id")
-    check("C.38", "Widget creates conversation", s38 in (200, 201) and bool(conv_id),
-          f"HTTP {s38}, conv={conv_id[:12] + '...' if conv_id else 'none'}")
+    check(
+        "C.38",
+        "Widget creates conversation",
+        s38 in (200, 201) and bool(conv_id),
+        f"HTTP {s38}, conv={conv_id[:12] + '...' if conv_id else 'none'}",
+    )
 
     # C.39 Widget sends message
     msg_id = None
     if conv_id and wk:
-        s39, d39, _ = widget_api_call(fqdn, wk, "/api/chat/message",
-                                       method="POST",
-                                       body={"conversation_id": conv_id,
-                                             "content": "What can you help me with?"})
+        s39, d39, _ = widget_api_call(
+            fqdn,
+            wk,
+            "/api/chat/message",
+            method="POST",
+            body={"conversation_id": conv_id, "content": "What can you help me with?"},
+        )
         if isinstance(d39, dict):
             msg_id = d39.get("message_id")
-        check("C.39", "Widget sends message", s39 == 200 and bool(msg_id),
-              f"HTTP {s39}, msg_id={msg_id[:12] + '...' if msg_id else 'none'}")
+        check(
+            "C.39",
+            "Widget sends message",
+            s39 == 200 and bool(msg_id),
+            f"HTTP {s39}, msg_id={msg_id[:12] + '...' if msg_id else 'none'}",
+        )
     else:
-        check("C.39", "Widget sends message", False,
-              "Skipped — no conversation from C.38")
+        check("C.39", "Widget sends message", False, "Skipped — no conversation from C.38")
 
     # C.40 AI response received (consume SSE stream, then verify persistence)
     # The widget's actual flow: POST message → GET /api/chat/stream/{id} (SSE).
@@ -538,12 +590,12 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
         ai_detail = "timeout — no AI response within 45s"
         try:
             import httpx
+
             stream_url = f"https://{fqdn}/api/chat/stream/{conv_id}"
             stream_headers = {"X-Widget-Key": wk, "Accept": "text/event-stream"}
             t0 = time.time()
             with httpx.Client(timeout=45.0) as hc:
-                with hc.stream("GET", stream_url, headers=stream_headers,
-                               timeout=45.0) as sse:
+                with hc.stream("GET", stream_url, headers=stream_headers, timeout=45.0) as sse:
                     if sse.status_code == 200:
                         token_count = 0
                         for line in sse.iter_lines():
@@ -552,10 +604,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
                             elif line.startswith("event: done"):
                                 elapsed = time.time() - t0
                                 ai_responded = True
-                                ai_detail = (
-                                    f"SSE stream complete: {token_count} tokens "
-                                    f"in {elapsed:.1f}s"
-                                )
+                                ai_detail = f"SSE stream complete: {token_count} tokens in {elapsed:.1f}s"
                                 break
                     else:
                         ai_detail = f"SSE stream HTTP {sse.status_code}"
@@ -565,8 +614,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
             for attempt in range(6):
                 if attempt > 0:
                     time.sleep(5)
-                s40, d40, _ = widget_api_call(
-                    fqdn, wk, f"/api/chat/conversations/{conv_id}", timeout=10)
+                s40, d40, _ = widget_api_call(fqdn, wk, f"/api/chat/conversations/{conv_id}", timeout=10)
                 if s40 == 200 and isinstance(d40, dict):
                     messages = d40.get("messages", [])
                     for m in messages:
@@ -582,11 +630,8 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
 
     # C.41 Conversation cleanup (end the test conversation)
     if conv_id and wk:
-        s41, _, _ = widget_api_call(fqdn, wk,
-                                     f"/api/chat/conversations/{conv_id}/end",
-                                     method="POST")
-        check("C.41", "Test conversation ended", s41 in (200, 204, 404),
-              f"HTTP {s41}")
+        s41, _, _ = widget_api_call(fqdn, wk, f"/api/chat/conversations/{conv_id}/end", method="POST")
+        check("C.41", "Test conversation ended", s41 in (200, 204, 404), f"HTTP {s41}")
     else:
         check("C.41", "Test conversation ended", False, "Skipped — no conversation")
 
@@ -612,8 +657,10 @@ def _resolve_env(env_name: str, tenant_id: str | None = None) -> dict:
         key = f"{env_name}:{tenant_id}"
         if key not in TENANTS:
             print(f"ERROR: Unknown tenant '{tenant_id}' for env '{env_name}'")
-            print(f"  Known: {base['tenant_id']}, " +
-                  ", ".join(t.split(":")[1] for t in TENANTS if t.startswith(env_name)))
+            print(
+                f"  Known: {base['tenant_id']}, "
+                + ", ".join(t.split(":")[1] for t in TENANTS if t.startswith(env_name))
+            )
             sys.exit(1)
         overlay = TENANTS[key]
         base["tenant_id"] = overlay["tenant_id"]
@@ -651,8 +698,11 @@ def _all_tenants(env_name: str) -> list[dict]:
 
 def main():
     parser = argparse.ArgumentParser(description="Upgrade Verification Procedure")
-    parser.add_argument("phase", choices=["phase-a", "phase-c", "multi-a", "multi-c", "full"],
-                        help="Which phase to run (multi-a/multi-c = all tenants)")
+    parser.add_argument(
+        "phase",
+        choices=["phase-a", "phase-c", "multi-a", "multi-c", "full"],
+        help="Which phase to run (multi-a/multi-c = all tenants)",
+    )
     parser.add_argument("--env", default="staging", choices=["staging", "production"])
     parser.add_argument("--tenant", help="Override tenant ID (must be in TENANTS registry)")
     parser.add_argument("--snapshot", help="Path to Phase A snapshot JSON (for phase-c)")

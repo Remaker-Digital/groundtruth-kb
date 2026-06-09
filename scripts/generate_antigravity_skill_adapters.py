@@ -80,6 +80,9 @@ def _lo_skill_capabilities(registry: dict) -> list[dict]:
             continue
         if not str(capability.get("canonical_source") or "").endswith("/SKILL.md"):
             continue
+        required_roles = capability.get("required_for_roles")
+        if not isinstance(required_roles, list) or ANTIGRAVITY_ROLE not in required_roles:
+            continue
         selected.append(capability)
     return selected
 

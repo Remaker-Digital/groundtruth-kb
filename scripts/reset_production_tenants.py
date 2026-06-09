@@ -66,10 +66,12 @@ def run(execute: bool) -> None:
     for coll_name in COLLECTIONS_TO_CLEAN:
         try:
             container = db.get_container_client(coll_name)
-            items = list(container.query_items(
-                query="SELECT c.id, c.tenant_id FROM c",
-                enable_cross_partition_query=True,
-            ))
+            items = list(
+                container.query_items(
+                    query="SELECT c.id, c.tenant_id FROM c",
+                    enable_cross_partition_query=True,
+                )
+            )
 
             if not items:
                 print(f"  {coll_name}: empty")

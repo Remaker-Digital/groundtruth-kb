@@ -134,18 +134,23 @@ def _run(cmd: list[str], timeout: int = 600) -> subprocess.CompletedProcess:
     """Run subprocess with real-time streaming."""
     r = stream_subprocess(cmd, cwd=str(PROJECT_ROOT), timeout=timeout, prefix="  ")
     return subprocess.CompletedProcess(
-        args=cmd, returncode=r.returncode, stdout=r.stdout, stderr="",
+        args=cmd,
+        returncode=r.returncode,
+        stdout=r.stdout,
+        stderr="",
     )
 
 
 def _step(result: DeployResult, name: str, status: str, detail: str = "") -> None:
     """Record a step in the deploy result."""
-    result.steps.append({
-        "name": name,
-        "status": status,
-        "detail": detail,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+    result.steps.append(
+        {
+            "name": name,
+            "status": status,
+            "detail": detail,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -165,13 +170,22 @@ def _validate_image(result: DeployResult, version: str, dry_run: bool) -> bool:
         _log("INFO", f"  [DRY RUN] Would verify {IMAGE_REPO}:{version}")
         return True
 
-    r = _run([
-        "az", "acr", "repository", "show-tags",
-        "--name", ACR_NAME,
-        "--repository", IMAGE_REPO,
-        "--query", f"[?@=='{version}']",
-        "-o", "tsv",
-    ])
+    r = _run(
+        [
+            "az",
+            "acr",
+            "repository",
+            "show-tags",
+            "--name",
+            ACR_NAME,
+            "--repository",
+            IMAGE_REPO,
+            "--query",
+            f"[?@=='{version}']",
+            "-o",
+            "tsv",
+        ]
+    )
     if r.stdout.strip() != version:
         _step(result, "validate_image", "failed", f"Tag {version} not found in ACR")
         result.error = f"Image {IMAGE_REPO}:{version} not found in ACR — build first"
@@ -186,13 +200,21 @@ def _validate_image(result: DeployResult, version: str, dry_run: bool) -> bool:
 def _get_current_image(env: str) -> str:
     """Query the currently deployed image for rollback reference."""
     container_app = ENVIRONMENTS[env]["container_app"]
-    r = _run([
-        "az", "containerapp", "show",
-        "--name", container_app,
-        "--resource-group", RESOURCE_GROUP,
-        "--query", "properties.template.containers[0].image",
-        "-o", "tsv",
-    ])
+    r = _run(
+        [
+            "az",
+            "containerapp",
+            "show",
+            "--name",
+            container_app,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--query",
+            "properties.template.containers[0].image",
+            "-o",
+            "tsv",
+        ]
+    )
     return r.stdout.strip()
 
 
@@ -213,8 +235,7 @@ def _pre_deploy_snapshot(result: DeployResult, env: str, dry_run: bool) -> bool:
     )
 
     if r.returncode != 0:
-        _step(result, "pre_deploy_snapshot", "failed",
-               f"Exit {r.returncode}: {r.stdout.strip()[:200]}")
+        _step(result, "pre_deploy_snapshot", "failed", f"Exit {r.returncode}: {r.stdout.strip()[:200]}")
         result.error = f"Phase A snapshot failed (exit={r.returncode})"
         return False
 
@@ -251,12 +272,20 @@ def _deploy_container(result: DeployResult, env: str, version: str, dry_run: boo
     result.previous_image = _get_current_image(env)
     _log("INFO", f"  Previous image: {result.previous_image}")
 
-    r = _run([
-        "az", "containerapp", "update",
-        "--name", container_app,
-        "--resource-group", RESOURCE_GROUP,
-        "--image", new_image,
-    ], timeout=120)
+    r = _run(
+        [
+            "az",
+            "containerapp",
+            "update",
+            "--name",
+            container_app,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--image",
+            new_image,
+        ],
+        timeout=120,
+    )
 
     if r.returncode != 0:
         _step(result, "deploy", "failed", f"Container update failed: {r.stdout.strip()[:200]}")
@@ -288,8 +317,7 @@ def _health_poll(result: DeployResult, env: str, version: str, dry_run: bool) ->
                 body = json.loads(resp.read().decode())
                 live_version = body.get("product_version", "")
                 if live_version == expected_version:
-                    _step(result, "health_poll", "passed",
-                          f"Healthy in {elapsed}s (version={live_version})")
+                    _step(result, "health_poll", "passed", f"Healthy in {elapsed}s (version={live_version})")
                     _log("PASS", f"  Healthy in {elapsed}s (version={live_version})")
                     return True
                 _log("INFO", f"  {elapsed}s: version={live_version} (waiting for {expected_version})")
@@ -301,14 +329,12 @@ def _health_poll(result: DeployResult, env: str, version: str, dry_run: bool) ->
         time.sleep(HEALTH_POLL_INTERVAL_S)
         elapsed += HEALTH_POLL_INTERVAL_S
 
-    _step(result, "health_poll", "failed",
-          f"Timeout after {HEALTH_TIMEOUT_S}s (last HTTP {last_status})")
+    _step(result, "health_poll", "failed", f"Timeout after {HEALTH_TIMEOUT_S}s (last HTTP {last_status})")
     result.error = f"Health check timeout after {HEALTH_TIMEOUT_S}s"
     return False
 
 
-def _post_deploy_verification(result: DeployResult, env: str, version: str,
-                               dry_run: bool) -> bool:
+def _post_deploy_verification(result: DeployResult, env: str, version: str, dry_run: bool) -> bool:
     """Step 5: Phase C — post-deploy verification against Phase A snapshots."""
     _log("INFO", "Step 5: Post-deploy verification (Phase C)")
     phase_name = "multi-c" if env == "staging" else "phase-c"
@@ -321,8 +347,7 @@ def _post_deploy_verification(result: DeployResult, env: str, version: str,
 
     script = PROJECT_ROOT / "scripts" / "upgrade_verification.py"
     r = _run(
-        [sys.executable, str(script), phase_name,
-         "--env", env, "--new-version", version_stripped],
+        [sys.executable, str(script), phase_name, "--env", env, "--new-version", version_stripped],
         timeout=600,
     )
     output = r.stdout
@@ -352,14 +377,12 @@ def _post_deploy_verification(result: DeployResult, env: str, version: str,
         result.error = f"Phase C verification failed: {detail}"
         return False
 
-    _step(result, "post_deploy_verification", "passed",
-          f"{total_pass}/{total_expected} assertions passed")
+    _step(result, "post_deploy_verification", "passed", f"{total_pass}/{total_expected} assertions passed")
     _log("PASS", f"  Phase C: {total_pass}/{total_expected} passed")
     return True
 
 
-def _optional_e2e_regression(result: DeployResult, env: str, dry_run: bool,
-                              run_e2e: bool) -> bool:
+def _optional_e2e_regression(result: DeployResult, env: str, dry_run: bool, run_e2e: bool) -> bool:
     """Step 6: Optional E2E regression (test_pipeline.py)."""
     if not run_e2e:
         _step(result, "e2e_regression", "skipped", "not requested")
@@ -405,12 +428,20 @@ def _rollback(result: DeployResult, env: str) -> None:
     container_app = ENVIRONMENTS[env]["container_app"]
     _log("INFO", f"Step 7: Rolling back {container_app} to {result.previous_image}")
 
-    r = _run([
-        "az", "containerapp", "update",
-        "--name", container_app,
-        "--resource-group", RESOURCE_GROUP,
-        "--image", result.previous_image,
-    ], timeout=120)
+    r = _run(
+        [
+            "az",
+            "containerapp",
+            "update",
+            "--name",
+            container_app,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--image",
+            result.previous_image,
+        ],
+        timeout=120,
+    )
 
     if r.returncode != 0:
         _log("FAIL", f"  Rollback FAILED: {r.stdout.strip()[:200]}")
@@ -425,6 +456,7 @@ def _rollback(result: DeployResult, env: str) -> None:
     # Create DEFECT work item for the rollback
     try:
         from scripts._defect_reporter import create_defect
+
         create_defect(
             title=f"Deploy rollback: {env} {result.version} → {result.previous_image}",
             description=(
@@ -465,8 +497,7 @@ def run_deploy(
         started_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    _log("INFO", f"Deploy Orchestrator starting: {env} {version}"
-         + (" [DRY RUN]" if dry_run else ""))
+    _log("INFO", f"Deploy Orchestrator starting: {env} {version}" + (" [DRY RUN]" if dry_run else ""))
 
     # --- Pre-deploy steps (abort on failure, no rollback needed) ---
     if not _validate_image(result, version, dry_run):
@@ -540,10 +571,15 @@ def _record_deployment_event(result: DeployResult, env: str) -> None:
     try:
         url = f"https://{fqdn}/api/superadmin/deployments/record"
         body = json.dumps(payload).encode("utf-8")
-        req = Request(url, data=body, method="POST", headers={
-            "Content-Type": "application/json",
-            "X-API-Key": api_key,
-        })
+        req = Request(
+            url,
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": api_key,
+            },
+        )
         with urlopen(req, timeout=10) as resp:
             _log("PASS", f"  Deployment event recorded: {event_type} ({resp.status})")
     except Exception as exc:
@@ -554,8 +590,7 @@ def _finalize(result: DeployResult, env: str) -> None:
     """Compute duration and write log file."""
     result.completed_at = datetime.now(timezone.utc).isoformat()
     result.duration_s = round(
-        (datetime.fromisoformat(result.completed_at)
-         - datetime.fromisoformat(result.started_at)).total_seconds(), 1
+        (datetime.fromisoformat(result.completed_at) - datetime.fromisoformat(result.started_at)).total_seconds(), 1
     )
 
     level = "PASS" if result.status == "succeeded" else "FAIL"
@@ -575,22 +610,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Deploy Orchestrator — deploy-verify-rollback (SPEC-1825)",
     )
-    parser.add_argument("--env", required=True, choices=["staging", "production"],
-                        help="Target environment")
-    parser.add_argument("--version", required=True,
-                        help="Image version tag (e.g., v1.90.0)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validate without executing deployment")
-    parser.add_argument("--e2e", action="store_true",
-                        help="Run optional E2E regression after verification")
-    parser.add_argument("--skip-snapshot", action="store_true",
-                        help="Skip Phase A snapshot (use existing snapshots)")
-    parser.add_argument("--json", action="store_true",
-                        help="Output result as JSON (for SPA integration)")
+    parser.add_argument("--env", required=True, choices=["staging", "production"], help="Target environment")
+    parser.add_argument("--version", required=True, help="Image version tag (e.g., v1.90.0)")
+    parser.add_argument("--dry-run", action="store_true", help="Validate without executing deployment")
+    parser.add_argument("--e2e", action="store_true", help="Run optional E2E regression after verification")
+    parser.add_argument("--skip-snapshot", action="store_true", help="Skip Phase A snapshot (use existing snapshots)")
+    parser.add_argument("--json", action="store_true", help="Output result as JSON (for SPA integration)")
     args = parser.parse_args()
 
     result = run_deploy(
-        args.env, args.version,
+        args.env,
+        args.version,
         dry_run=args.dry_run,
         run_e2e=args.e2e,
         skip_snapshot=args.skip_snapshot,

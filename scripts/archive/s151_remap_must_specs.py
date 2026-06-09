@@ -7,8 +7,10 @@ Usage: python scripts/s151_remap_must_specs.py
 
 (C) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys, os, json, datetime
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db"))
 import db
 
 # ── Verified file paths and patterns ──────────────────────────────────────────
@@ -24,7 +26,6 @@ REMAPPINGS = {
     "SPEC-0085": ("admin/standalone/layouts/StandaloneLayout.tsx", "StandaloneLayout"),
     "SPEC-0177": ("admin/standalone/layouts/StandaloneLayout.tsx", "StandaloneLayout"),
     "SPEC-0635": ("admin/standalone/layouts/StandaloneLayout.tsx", "StandaloneLayout"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 2: Configuration.tsx → ConfigurationPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -40,7 +41,6 @@ REMAPPINGS = {
     "SPEC-0631": ("admin/standalone/pages/Configuration.tsx", "ConfigurationPage"),
     "SPEC-0634": ("admin/standalone/pages/Configuration.tsx", "ConfigurationPage"),
     "SPEC-0743": ("admin/standalone/pages/Configuration.tsx", "ConfigurationPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 3: Team.tsx → TeamPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -56,7 +56,6 @@ REMAPPINGS = {
     "SPEC-0580": ("admin/standalone/pages/Team.tsx", "TeamPage"),
     "SPEC-0710": ("admin/standalone/pages/Team.tsx", "TeamPage"),
     "SPEC-0762": ("admin/standalone/pages/Team.tsx", "TeamPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 4: KnowledgeBase.tsx → KnowledgeBasePage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -68,7 +67,6 @@ REMAPPINGS = {
     "SPEC-0678": ("admin/standalone/pages/KnowledgeBase.tsx", "KnowledgeBasePage"),
     "SPEC-0793": ("admin/standalone/pages/KnowledgeBase.tsx", "KnowledgeBasePage"),
     "SPEC-0854": ("admin/standalone/pages/KnowledgeBase.tsx", "KnowledgeBasePage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 5: Widget.tsx → WidgetPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -79,7 +77,6 @@ REMAPPINGS = {
     "SPEC-0125": ("admin/standalone/pages/Widget.tsx", "WidgetPage"),
     "SPEC-0404": ("admin/standalone/pages/Widget.tsx", "WidgetPage"),
     "SPEC-0576": ("admin/standalone/pages/Widget.tsx", "WidgetPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 6: Billing.tsx → BillingPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -87,7 +84,6 @@ REMAPPINGS = {
     "SPEC-0173": ("admin/standalone/pages/Billing.tsx", "BillingPage"),
     "SPEC-0591": ("admin/standalone/pages/Billing.tsx", "BillingPage"),
     "SPEC-0700": ("admin/standalone/pages/Billing.tsx", "BillingPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 7: Inbox.tsx → InboxPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -98,7 +94,6 @@ REMAPPINGS = {
     "SPEC-0712": ("admin/standalone/pages/Inbox.tsx", "InboxPage"),
     "SPEC-0714": ("admin/standalone/pages/Inbox.tsx", "InboxPage"),
     "SPEC-0748": ("admin/standalone/pages/Inbox.tsx", "InboxPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 8: Dashboard.tsx → DashboardPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -106,7 +101,6 @@ REMAPPINGS = {
     "SPEC-0122": ("admin/standalone/pages/Dashboard.tsx", "DashboardPage"),
     "SPEC-0560": ("admin/standalone/pages/Dashboard.tsx", "DashboardPage"),
     "SPEC-0639": ("admin/standalone/pages/Dashboard.tsx", "DashboardPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 9: MemoryPrivacy.tsx → MemoryPrivacyPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -115,7 +109,6 @@ REMAPPINGS = {
     "SPEC-0736": ("admin/standalone/pages/MemoryPrivacy.tsx", "MemoryPrivacyPage"),
     "SPEC-0792": ("admin/standalone/pages/MemoryPrivacy.tsx", "MemoryPrivacyPage"),
     "SPEC-0845": ("admin/standalone/pages/MemoryPrivacy.tsx", "MemoryPrivacyPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 10: QuickActions.tsx → QuickActionsPage
     # ═══════════════════════════════════════════════════════════════════════════
@@ -123,18 +116,15 @@ REMAPPINGS = {
     "SPEC-0167": ("admin/standalone/pages/QuickActions.tsx", "QuickActionsPage"),
     "SPEC-0168": ("admin/standalone/pages/QuickActions.tsx", "QuickActionsPage"),
     "SPEC-0725": ("admin/standalone/pages/QuickActions.tsx", "QuickActionsPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 11: Integrations.tsx → IntegrationsPage
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0565": ("admin/standalone/pages/Integrations.tsx", "IntegrationsPage"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 12: HelpTooltip.tsx → HelpTooltip
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0371": ("admin/shared/HelpTooltip.tsx", "HelpTooltip"),
     "SPEC-0517": ("admin/shared/HelpTooltip.tsx", "HelpTooltip"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 13: cosmos_schema.py → TenantTier
     # ═══════════════════════════════════════════════════════════════════════════
@@ -150,7 +140,6 @@ REMAPPINGS = {
     "SPEC-1490": ("src/multi_tenant/cosmos_schema.py", "TenantTier"),
     "SPEC-1491": ("src/multi_tenant/cosmos_schema.py", "TenantTier"),
     "SPEC-1492": ("src/multi_tenant/cosmos_schema.py", "TenantTier"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 14: auth.py → TenantContext
     # ═══════════════════════════════════════════════════════════════════════════
@@ -164,7 +153,6 @@ REMAPPINGS = {
     "SPEC-0609": ("src/multi_tenant/auth.py", "TenantContext"),
     "SPEC-0627": ("src/multi_tenant/auth.py", "TenantContext"),
     "SPEC-0759": ("src/multi_tenant/auth.py", "TenantContext"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 15: activation_service.py → ActivationService
     # ═══════════════════════════════════════════════════════════════════════════
@@ -179,13 +167,11 @@ REMAPPINGS = {
     "SPEC-0597": ("src/multi_tenant/activation_service.py", "ActivationService"),
     "SPEC-0698": ("src/multi_tenant/activation_service.py", "ActivationService"),
     "SPEC-0842": ("src/multi_tenant/activation_service.py", "ActivationService"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 16: tenant_config_api.py → router
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0317": ("src/multi_tenant/tenant_config_api.py", "router"),
     "SPEC-0867": ("src/multi_tenant/tenant_config_api.py", "router"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 17: admin_team_api.py → TeamMemberResponse
     # ═══════════════════════════════════════════════════════════════════════════
@@ -194,7 +180,6 @@ REMAPPINGS = {
     "SPEC-0551": ("src/multi_tenant/admin_team_api.py", "TeamMemberResponse"),
     "SPEC-0666": ("src/multi_tenant/admin_team_api.py", "TeamMemberResponse"),
     "SPEC-0713": ("src/multi_tenant/admin_team_api.py", "TeamMemberResponse"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 18: seed_tenant.py → phase_
     # ═══════════════════════════════════════════════════════════════════════════
@@ -210,7 +195,6 @@ REMAPPINGS = {
     "SPEC-0765": ("scripts/seed_tenant.py", "phase_"),
     "SPEC-0778": ("scripts/seed_tenant.py", "phase_"),
     "SPEC-0785": ("scripts/seed_tenant.py", "phase_"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 19: db.py → KnowledgeDB
     # ═══════════════════════════════════════════════════════════════════════════
@@ -223,14 +207,12 @@ REMAPPINGS = {
     "SPEC-0805": ("tools/knowledge-db/db.py", "KnowledgeDB"),
     "SPEC-0853": ("tools/knowledge-db/db.py", "KnowledgeDB"),
     "SPEC-0859": ("tools/knowledge-db/db.py", "KnowledgeDB"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 20: welcome_email.py → send_welcome
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0009": ("src/multi_tenant/welcome_email.py", "send_welcome"),
     "SPEC-0690": ("src/multi_tenant/welcome_email.py", "send_welcome"),
     "SPEC-0691": ("src/multi_tenant/welcome_email.py", "send_welcome"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 21: CLAUDE.md → Agent Red
     # ═══════════════════════════════════════════════════════════════════════════
@@ -242,7 +224,6 @@ REMAPPINGS = {
     "SPEC-0667": ("CLAUDE.md", "Agent Red"),
     "SPEC-0735": ("CLAUDE.md", "Agent Red"),
     "SPEC-0806": ("CLAUDE.md", "Agent Red"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 22: orchestrator.py → ChatPipeline
     # ═══════════════════════════════════════════════════════════════════════════
@@ -250,58 +231,48 @@ REMAPPINGS = {
     "SPEC-0852": ("src/chat/pipeline/orchestrator.py", "ChatPipeline"),
     "SPEC-0866": ("src/chat/pipeline/orchestrator.py", "ChatPipeline"),
     "SPEC-1489": ("src/chat/pipeline/orchestrator.py", "ChatPipeline"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 23: critic_supervisor.py → CriticSupervisorAgent
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0644": ("src/agents/critic_supervisor.py", "CriticSupervisorAgent"),
     "SPEC-0751": ("src/agents/critic_supervisor.py", "CriticSupervisorAgent"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 24: critic_escalation.py → CriticEscalation
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0583": ("src/chat/pipeline/critic_escalation.py", "CriticEscalation"),
     "SPEC-0711": ("src/chat/pipeline/critic_escalation.py", "CriticEscalation"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 25: sse_manager.py → SSEConnectionManager
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0840": ("src/chat/sse_manager.py", "SSEConnectionManager"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 26: stripe_webhooks.py → handle_checkout
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0862": ("src/integrations/stripe_webhooks.py", "handle_checkout"),
     "SPEC-0863": ("src/integrations/stripe_webhooks.py", "handle_checkout"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 27: abuse_detection.py → AbuseSignal
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0709": ("src/multi_tenant/abuse_detection.py", "AbuseSignal"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 28: archival_pipeline.py → ArchivalPipeline
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0504": ("src/multi_tenant/archival_pipeline.py", "ArchivalPipeline"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 29: widget/src/index.ts → AgentRedSDK
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0023": ("widget/src/index.ts", "AgentRedSDK"),
     "SPEC-0460": ("widget/src/index.ts", "AgentRedSDK"),
     "SPEC-0768": ("widget/src/index.ts", "AgentRedSDK"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 30: middleware.py → RateLimitMiddleware
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0340": ("src/multi_tenant/middleware.py", "RateLimitMiddleware"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 31: docs/admin-guide.html → Agent Red
     # ═══════════════════════════════════════════════════════════════════════════
     "SPEC-0356": ("docs/admin-guide.html", "Agent Red"),
     "SPEC-0864": ("docs/admin-guide.html", "Agent Red"),
-
     # ═══════════════════════════════════════════════════════════════════════════
     # GROUP 32: OnboardingWizard.tsx — strengthen weak patterns
     # These specs ARE correctly mapped to OnboardingWizard.tsx but have weak
@@ -340,30 +311,32 @@ def _upgrade_spec(cursor, spec_id, new_file, new_pattern, now, require_wrong_fil
     """Upgrade a single spec's assertion. Returns 'ok', 'fail', or 'skip'."""
     import re
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT id, version, title, description, type, status, assertions,
                priority, scope, section, handle, tags
         FROM specifications
         WHERE id = ?
         ORDER BY version DESC LIMIT 1
-    """, (spec_id,))
+    """,
+        (spec_id,),
+    )
     row = cursor.fetchone()
     if not row:
         print(f"  SKIP {spec_id}: not found in KB")
-        return 'skip'
+        return "skip"
 
-    sid, version, title, description, stype, sstatus, assertions_json, \
-        priority, scope, section, handle, tags = row
+    sid, version, title, description, stype, sstatus, assertions_json, priority, scope, section, handle, tags = row
 
     try:
         assertions = json.loads(assertions_json) if assertions_json else []
     except json.JSONDecodeError:
         print(f"  SKIP {spec_id}: invalid JSON in assertions")
-        return 'skip'
+        return "skip"
 
     if not assertions:
         print(f"  SKIP {spec_id}: no assertions to remap")
-        return 'skip'
+        return "skip"
 
     current_file = assertions[0].get("file", "")
     current_pattern = assertions[0].get("pattern", "")
@@ -371,26 +344,26 @@ def _upgrade_spec(cursor, spec_id, new_file, new_pattern, now, require_wrong_fil
     # If require_wrong_file is set, only process specs pointing to that file
     if require_wrong_file and require_wrong_file not in current_file:
         print(f"  SKIP {spec_id}: not pointing to {require_wrong_file} (file={current_file})")
-        return 'skip'
+        return "skip"
 
     # Skip if already has the correct file AND pattern
     if current_file == new_file and current_pattern == new_pattern:
         print(f"  SKIP {spec_id}: already correct ({new_file} -> '{new_pattern}')")
-        return 'skip'
+        return "skip"
 
     # Verify target file and pattern
-    target_path = os.path.join(os.path.dirname(__file__), '..', new_file)
+    target_path = os.path.join(os.path.dirname(__file__), "..", new_file)
     target_path = os.path.normpath(target_path)
     if not os.path.exists(target_path):
         print(f"  FAIL {spec_id}: file not found: {new_file}")
-        return 'fail'
+        return "fail"
 
-    with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
+    with open(target_path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
 
     if not re.search(new_pattern, content):
         print(f"  FAIL {spec_id}: pattern '{new_pattern}' not found in {new_file}")
-        return 'fail'
+        return "fail"
 
     match_count = len(re.findall(new_pattern, content))
 
@@ -398,50 +371,74 @@ def _upgrade_spec(cursor, spec_id, new_file, new_pattern, now, require_wrong_fil
     new_assertions = [{"type": "grep", "file": new_file, "pattern": new_pattern}]
     new_version = version + 1
     try:
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO specifications
                 (id, version, title, description, type, status, assertions,
                  priority, scope, section, handle, tags,
                  changed_by, changed_at, change_reason)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (sid, new_version, title, description, stype, sstatus,
-              json.dumps(new_assertions),
-              priority, scope, section, handle, tags,
-              'claude', now, 'S151: Re-map assertion to correct source file'))
+        """,
+            (
+                sid,
+                new_version,
+                title,
+                description,
+                stype,
+                sstatus,
+                json.dumps(new_assertions),
+                priority,
+                scope,
+                section,
+                handle,
+                tags,
+                "claude",
+                now,
+                "S151: Re-map assertion to correct source file",
+            ),
+        )
     except Exception as e:
         print(f"  FAIL {spec_id}: insert error: {e}")
-        return 'fail'
+        return "fail"
 
     # Record passing assertion run
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO assertion_runs (spec_id, spec_version, run_at, overall_passed, results, triggered_by)
         VALUES (?, ?, ?, 1, ?, ?)
-    """, (sid, new_version, now, json.dumps([{
-        "type": "grep", "file": new_file, "pattern": new_pattern,
-        "passed": True, "match_count": match_count
-    }]), 's151_remap'))
+    """,
+        (
+            sid,
+            new_version,
+            now,
+            json.dumps(
+                [{"type": "grep", "file": new_file, "pattern": new_pattern, "passed": True, "match_count": match_count}]
+            ),
+            "s151_remap",
+        ),
+    )
 
     print(f"  OK   {spec_id} v{new_version}: {new_file} -> '{new_pattern}' ({match_count} matches)")
-    return 'ok'
+    return "ok"
 
 
 def main():
     """Re-map all wrongly-assigned assertions to correct files + patterns."""
     import sqlite3
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db', 'knowledge.db')
+
+    db_path = os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db", "knowledge.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     now = datetime.datetime.now().isoformat()
 
-    totals = {'ok': 0, 'fail': 0, 'skip': 0}
+    totals = {"ok": 0, "fail": 0, "skip": 0}
 
     # ── Phase 1: MUST specs wrongly mapped to admin_quick_action_api.py ──────
     print("=" * 60)
     print("PHASE 1: Re-mapping MUST specs from admin_quick_action_api.py")
     print("=" * 60)
     for spec_id, (new_file, new_pattern) in REMAPPINGS.items():
-        result = _upgrade_spec(cursor, spec_id, new_file, new_pattern, now,
-                               require_wrong_file="admin_quick_action_api")
+        result = _upgrade_spec(cursor, spec_id, new_file, new_pattern, now, require_wrong_file="admin_quick_action_api")
         totals[result] += 1
 
     # ── Phase 2: OnboardingWizard pattern strengthening ──────────────────────

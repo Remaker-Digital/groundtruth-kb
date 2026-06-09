@@ -227,10 +227,39 @@ def extract_keywords(name: str) -> set[str]:
 
 # Stopwords that don't carry matching value
 STOPWORDS = {
-    "test", "when", "then", "should", "must", "shall", "with", "without",
-    "returns", "return", "given", "that", "not", "none", "empty", "null",
-    "true", "false", "valid", "invalid", "default", "case", "for", "from",
-    "the", "and", "are", "has", "does", "this", "new", "get", "set",
+    "test",
+    "when",
+    "then",
+    "should",
+    "must",
+    "shall",
+    "with",
+    "without",
+    "returns",
+    "return",
+    "given",
+    "that",
+    "not",
+    "none",
+    "empty",
+    "null",
+    "true",
+    "false",
+    "valid",
+    "invalid",
+    "default",
+    "case",
+    "for",
+    "from",
+    "the",
+    "and",
+    "are",
+    "has",
+    "does",
+    "this",
+    "new",
+    "get",
+    "set",
 }
 
 
@@ -282,12 +311,14 @@ def extract_tests_from_file(filepath: str) -> list[dict]:
 
         if func_match:
             func_name = func_match.group(1)
-            tests.append({
-                "file": filepath.replace("\\", "/"),
-                "class": current_class,
-                "function": func_name,
-                "keywords": extract_keywords(func_name),
-            })
+            tests.append(
+                {
+                    "file": filepath.replace("\\", "/"),
+                    "class": current_class,
+                    "function": func_name,
+                    "keywords": extract_keywords(func_name),
+                }
+            )
 
     return tests
 
@@ -307,12 +338,14 @@ def main():
             section_specs[section] = []
         kw = extract_spec_keywords(spec["title"])
         desc_kw = extract_spec_keywords(spec.get("description", "") or "")
-        section_specs[section].append({
-            "id": spec["id"],
-            "title": spec["title"],
-            "keywords": kw | desc_kw,
-            "title_keywords": kw,
-        })
+        section_specs[section].append(
+            {
+                "id": spec["id"],
+                "title": spec["title"],
+                "keywords": kw | desc_kw,
+                "title_keywords": kw,
+            }
+        )
 
     print(f"Sections: {len(section_specs)}")
     for sec, slist in sorted(section_specs.items(), key=lambda x: -len(x[1])):
@@ -436,14 +469,16 @@ def main():
             overlap_count = best_score[0]
             confidence = "high" if overlap_count >= 3 else "medium"
             matched_kw = combined_kw & best_match["keywords"]
-            mappings.append({
-                "spec_id": best_match["id"],
-                "test_file": test["file"],
-                "test_class": test["class"],
-                "test_function": test["function"],
-                "confidence": confidence,
-                "match_reason": f"keywords({overlap_count}): {', '.join(sorted(matched_kw)[:5])}",
-            })
+            mappings.append(
+                {
+                    "spec_id": best_match["id"],
+                    "test_file": test["file"],
+                    "test_class": test["class"],
+                    "test_function": test["function"],
+                    "confidence": confidence,
+                    "match_reason": f"keywords({overlap_count}): {', '.join(sorted(matched_kw)[:5])}",
+                }
+            )
         else:
             unmapped_tests += 1
 
@@ -459,7 +494,7 @@ def main():
 
     # How many unique specs are covered?
     covered_specs = {m["spec_id"] for m in mappings}
-    print(f"\nUnique specs covered: {len(covered_specs)} / {len(specs)} ({len(covered_specs)/len(specs)*100:.1f}%)")
+    print(f"\nUnique specs covered: {len(covered_specs)} / {len(specs)} ({len(covered_specs) / len(specs) * 100:.1f}%)")
 
     # Section coverage breakdown
     covered_by_section: dict[str, set[str]] = {}

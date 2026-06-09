@@ -20,9 +20,40 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-@pytest.fixture(autouse=True, scope="session")
-def mock_harness_registry_for_tests() -> None:
+@pytest.fixture(autouse=True, scope="function")
+def mock_harness_registry_for_tests(request) -> None:
     """Mock the harness-registry.json to ensure suspended harnesses are active in tests."""
+    module_name = request.module.__name__
+    # Skip this mock override for tests that explicitly test harness registry/role/dispatch logic
+    if any(
+        x in module_name
+        for x in [
+            "test_check_harness_parity",
+            "test_claude_session_start_dispatcher",
+            "test_codex_session_start_dispatcher",
+            "test_role_set_schema",
+            "test_harness_roles",
+            "test_harness_projection_reader",
+            "test_harness_identity",
+            "test_kb_attribution",
+            "test_session_self_initialization",
+            "test_session_envelope_runtime",
+            "test_session_handoff_service",
+            "test_single_harness_bridge_automation",
+            "test_single_harness_bridge_dispatcher",
+            "test_single_harness_doctor_check_upgrade",
+            "test_single_harness_governance_artifacts",
+            "test_strict_drop_misdirected_headless_dispatch",
+            "test_verify_antigravity_dispatch",
+            "test_cross_harness_bridge_trigger",
+            "test_cross_harness_trigger_suppression",
+            "test_cross_harness_trigger_durable_keyed_regression",
+            "test_lo_file_safety_gate_role_resolution",
+        ]
+    ):
+        yield
+        return
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_registry = Path(tmpdir) / "harness-registry.json"
 

@@ -98,18 +98,14 @@ def load_scoped_service_config(project_root: Path | None = None) -> ScopedServic
     resolved_root = (project_root or DEFAULT_PROJECT_ROOT).resolve()
     config_path = resolved_root / CONFIG_FILE_NAME
     if not config_path.is_file():
-        raise ScopedServiceConfigError(
-            f"scoped-service config file not found at {config_path}"
-        )
+        raise ScopedServiceConfigError(f"scoped-service config file not found at {config_path}")
 
     with config_path.open("rb") as handle:
         data = tomllib.load(handle)
 
     section = data.get(CONFIG_SECTION)
     if not isinstance(section, dict):
-        raise ScopedServiceConfigError(
-            f"[{CONFIG_SECTION}] section missing or not a table in {config_path}"
-        )
+        raise ScopedServiceConfigError(f"[{CONFIG_SECTION}] section missing or not a table in {config_path}")
 
     missing: list[str] = []
     for required in (
@@ -122,9 +118,7 @@ def load_scoped_service_config(project_root: Path | None = None) -> ScopedServic
         if required not in section:
             missing.append(required)
     if missing:
-        raise ScopedServiceConfigError(
-            f"[{CONFIG_SECTION}] missing required fields: {', '.join(missing)}"
-        )
+        raise ScopedServiceConfigError(f"[{CONFIG_SECTION}] missing required fields: {', '.join(missing)}")
 
     default_subject = str(section["default_subject"]).strip()
     if not default_subject:
@@ -141,9 +135,7 @@ def load_scoped_service_config(project_root: Path | None = None) -> ScopedServic
 
     allowed_read = section["allowed_read_operations"]
     if not isinstance(allowed_read, list) or not allowed_read:
-        raise ScopedServiceConfigError(
-            "allowed_read_operations must be a non-empty list of operation names"
-        )
+        raise ScopedServiceConfigError("allowed_read_operations must be a non-empty list of operation names")
     normalized_read = tuple(str(op).strip() for op in allowed_read)
     for op in normalized_read:
         if not op:
@@ -154,8 +146,7 @@ def load_scoped_service_config(project_root: Path | None = None) -> ScopedServic
             )
         if op not in SUPPORTED_READ_OPERATIONS:
             raise ScopedServiceConfigError(
-                f"operation {op!r} is not supported in this slice (supported: "
-                f"{sorted(SUPPORTED_READ_OPERATIONS)})"
+                f"operation {op!r} is not supported in this slice (supported: {sorted(SUPPORTED_READ_OPERATIONS)})"
             )
 
     allowed_request_raw = section.get("allowed_request_operations", [])
@@ -163,9 +154,7 @@ def load_scoped_service_config(project_root: Path | None = None) -> ScopedServic
         raise ScopedServiceConfigError("allowed_request_operations must be a list when present")
     allowed_request = tuple(str(op).strip() for op in allowed_request_raw)
     if allowed_request:
-        raise ScopedServiceConfigError(
-            "allowed_request_operations must be empty in the Phase 4 baseline slice"
-        )
+        raise ScopedServiceConfigError("allowed_request_operations must be empty in the Phase 4 baseline slice")
 
     runtime_root_raw = str(section["runtime_root"]).strip()
     if not runtime_root_raw:
@@ -223,8 +212,7 @@ class GtkbScopedClient:
         normalized = operation.strip()
         if _is_mutating_operation_name(normalized):
             raise ScopedOperationError(
-                f"operation {normalized!r} is mutating/request-class and is not "
-                f"allowed on the read client"
+                f"operation {normalized!r} is mutating/request-class and is not allowed on the read client"
             )
         if normalized not in self._config.allowed_read_operations:
             raise ScopedOperationError(
@@ -287,9 +275,7 @@ class GtkbScopedClient:
             rows_by_table: dict[str, list[dict[str, Any]]] = {}
             for table in _DASHBOARD_SUMMARY_TABLES:
                 rows_by_table[table] = [dict(row) for row in connection.execute(f"SELECT * FROM {table}")]
-            test_procedures_count = int(
-                connection.execute("SELECT COUNT(*) FROM test_procedures").fetchone()[0]
-            )
+            test_procedures_count = int(connection.execute("SELECT COUNT(*) FROM test_procedures").fetchone()[0])
         finally:
             connection.close()
 

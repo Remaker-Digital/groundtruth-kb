@@ -68,9 +68,11 @@ if sys.platform == "win32":
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EndpointMetrics:
     """Metrics for a single endpoint at a single load step."""
+
     name: str
     requests: int = 0
     failures: int = 0
@@ -92,6 +94,7 @@ class EndpointMetrics:
 @dataclass
 class StepResult:
     """Results for an entire load step (all endpoints)."""
+
     step: int
     users: int
     timestamp: str
@@ -110,6 +113,7 @@ class StepResult:
 # ---------------------------------------------------------------------------
 # Locust CSV parser
 # ---------------------------------------------------------------------------
+
 
 def _parse_stats_csv(csv_path: Path) -> list[EndpointMetrics]:
     """Parse Locust stats CSV into per-endpoint metrics."""
@@ -235,6 +239,7 @@ def _parse_aggregate_percentiles(csv_path: Path) -> dict[str, float]:
 # Single step runner
 # ---------------------------------------------------------------------------
 
+
 def _run_step(
     step_num: int,
     users: int,
@@ -245,24 +250,33 @@ def _run_step(
 ) -> StepResult:
     """Run a single load step with the given user count."""
     ts = datetime.now(timezone.utc).isoformat()
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  Step {step_num}: {users} concurrent users for {duration_s}s")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # Temp CSV prefix for this step
     csv_prefix = str(OUTPUT_DIR / f"_ramp_step_{step_num}")
 
     cmd = [
-        sys.executable, "-m", "locust",
-        "-f", LOCUSTFILE,
-        "--host", host,
+        sys.executable,
+        "-m",
+        "locust",
+        "-f",
+        LOCUSTFILE,
+        "--host",
+        host,
         "--headless",
-        "--users", str(users),
-        "--spawn-rate", str(spawn_rate),
-        "--run-time", f"{duration_s}s",
-        "--csv", csv_prefix,
+        "--users",
+        str(users),
+        "--spawn-rate",
+        str(spawn_rate),
+        "--run-time",
+        f"{duration_s}s",
+        "--csv",
+        csv_prefix,
         "--only-summary",
-        "--loglevel", "WARNING",
+        "--loglevel",
+        "WARNING",
     ]
 
     env = {**os.environ, **env_vars}
@@ -270,15 +284,21 @@ def _run_step(
     t0 = time.time()
     try:
         r = subprocess.run(
-            cmd, cwd=str(PROJECT_ROOT), env=env,
-            capture_output=True, text=True,
+            cmd,
+            cwd=str(PROJECT_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
             timeout=duration_s + 60,  # grace period
         )
     except subprocess.TimeoutExpired:
         print(f"  [TIMEOUT] Step {step_num} timed out after {duration_s + 60}s")
         return StepResult(
-            step=step_num, users=users, timestamp=ts,
-            duration_s=time.time() - t0, overload_reached=True,
+            step=step_num,
+            users=users,
+            timestamp=ts,
+            duration_s=time.time() - t0,
+            overload_reached=True,
         )
     dt = time.time() - t0
 
@@ -309,26 +329,24 @@ def _run_step(
     )
 
     # Print step summary
-    print(f"  Requests: {total_req}  Failures: {total_fail}  "
-          f"Error: {err_rate:.1f}%  RPS: {result.aggregate_rps}")
-    print(f"  P50: {result.aggregate_p50}ms  P95: {result.aggregate_p95}ms  "
-          f"P99: {result.aggregate_p99}ms")
+    print(f"  Requests: {total_req}  Failures: {total_fail}  Error: {err_rate:.1f}%  RPS: {result.aggregate_rps}")
+    print(f"  P50: {result.aggregate_p50}ms  P95: {result.aggregate_p95}ms  P99: {result.aggregate_p99}ms")
 
     if endpoints:
-        print(f"\n  {'Endpoint':<55} {'Reqs':>5} {'Fail':>5} {'Err%':>6} "
-              f"{'P50':>6} {'P95':>6} {'P99':>6} {'RPS':>6}")
-        print(f"  {'-'*55} {'-'*5} {'-'*5} {'-'*6} {'-'*6} {'-'*6} {'-'*6} {'-'*6}")
+        print(f"\n  {'Endpoint':<55} {'Reqs':>5} {'Fail':>5} {'Err%':>6} {'P50':>6} {'P95':>6} {'P99':>6} {'RPS':>6}")
+        print(f"  {'-' * 55} {'-' * 5} {'-' * 5} {'-' * 6} {'-' * 6} {'-' * 6} {'-' * 6} {'-' * 6}")
         for ep in sorted(endpoints, key=lambda e: e.name):
-            print(f"  {ep.name:<55} {ep.requests:>5} {ep.failures:>5} "
-                  f"{ep.error_rate_pct:>5.1f}% {ep.p50:>6.0f} {ep.p95:>6.0f} "
-                  f"{ep.p99:>6.0f} {ep.rps:>6.2f}")
+            print(
+                f"  {ep.name:<55} {ep.requests:>5} {ep.failures:>5} "
+                f"{ep.error_rate_pct:>5.1f}% {ep.p50:>6.0f} {ep.p95:>6.0f} "
+                f"{ep.p99:>6.0f} {ep.rps:>6.2f}"
+            )
 
     if result.overload_reached:
         print(f"\n  ** OVERLOAD THRESHOLD REACHED: {err_rate:.1f}% > {OVERLOAD_THRESHOLD_PCT}% **")
 
     # Cleanup temp CSVs
-    for suffix in ["_stats.csv", "_stats_history.csv", "_failures.csv",
-                    "_exceptions.csv"]:
+    for suffix in ["_stats.csv", "_stats_history.csv", "_failures.csv", "_exceptions.csv"]:
         p = Path(f"{csv_prefix}{suffix}")
         if p.exists():
             p.unlink()
@@ -339,6 +357,7 @@ def _run_step(
 # ---------------------------------------------------------------------------
 # Write output files
 # ---------------------------------------------------------------------------
+
 
 def _write_time_series_csv(results: list[StepResult], path: Path) -> None:
     """Write per-endpoint time series CSV for charting."""
@@ -359,23 +378,25 @@ def _write_time_series_csv(results: list[StepResult], path: Path) -> None:
         }
         if step.endpoints:
             for ep in step.endpoints:
-                rows.append({
-                    **base,
-                    "endpoint": ep.name,
-                    "ep_requests": ep.requests,
-                    "ep_failures": ep.failures,
-                    "ep_error_pct": ep.error_rate_pct,
-                    "ep_avg_ms": ep.avg_ms,
-                    "ep_p50": ep.p50,
-                    "ep_p66": ep.p66,
-                    "ep_p75": ep.p75,
-                    "ep_p80": ep.p80,
-                    "ep_p90": ep.p90,
-                    "ep_p95": ep.p95,
-                    "ep_p98": ep.p98,
-                    "ep_p99": ep.p99,
-                    "ep_rps": ep.rps,
-                })
+                rows.append(
+                    {
+                        **base,
+                        "endpoint": ep.name,
+                        "ep_requests": ep.requests,
+                        "ep_failures": ep.failures,
+                        "ep_error_pct": ep.error_rate_pct,
+                        "ep_avg_ms": ep.avg_ms,
+                        "ep_p50": ep.p50,
+                        "ep_p66": ep.p66,
+                        "ep_p75": ep.p75,
+                        "ep_p80": ep.p80,
+                        "ep_p90": ep.p90,
+                        "ep_p95": ep.p95,
+                        "ep_p98": ep.p98,
+                        "ep_p99": ep.p99,
+                        "ep_rps": ep.rps,
+                    }
+                )
         else:
             rows.append({**base, "endpoint": "AGGREGATE"})
 
@@ -398,12 +419,8 @@ def _write_json(results: list[StepResult], path: Path) -> None:
         "steps": [asdict(r) for r in results],
         "summary": {
             "total_steps": len(results),
-            "max_users_before_overload": max(
-                (r.users for r in results if not r.overload_reached), default=0
-            ),
-            "overload_users": next(
-                (r.users for r in results if r.overload_reached), None
-            ),
+            "max_users_before_overload": max((r.users for r in results if not r.overload_reached), default=0),
+            "overload_users": next((r.users for r in results if r.overload_reached), None),
             "peak_rps": max((r.aggregate_rps for r in results), default=0),
         },
     }
@@ -414,6 +431,7 @@ def _write_json(results: list[StepResult], path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Warmup
 # ---------------------------------------------------------------------------
+
 
 def _warmup(host: str) -> None:
     """Send health requests to wake up cold-start containers."""
@@ -427,11 +445,11 @@ def _warmup(host: str) -> None:
         try:
             req = urllib.request.Request(url)
             resp = urllib.request.urlopen(req, timeout=30, context=ctx)
-            print(f"  Attempt {attempt+1}: HTTP {resp.status}")
+            print(f"  Attempt {attempt + 1}: HTTP {resp.status}")
             if resp.status == 200:
                 return
         except Exception as e:
-            print(f"  Attempt {attempt+1}: {e}")
+            print(f"  Attempt {attempt + 1}: {e}")
             if attempt < 4:
                 time.sleep(10)
     print("  Warning: warmup incomplete, proceeding anyway")
@@ -441,18 +459,15 @@ def _warmup(host: str) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ramp-to-overload load test")
     parser.add_argument("--env", choices=["staging", "production"], default="staging")
     parser.add_argument("--host", help="Override host URL")
-    parser.add_argument("--max-users", type=int, default=500,
-                        help="Maximum users to ramp to (default: 500)")
-    parser.add_argument("--step-duration", type=int, default=60,
-                        help="Seconds per step (default: 60)")
-    parser.add_argument("--spawn-rate", type=int, default=10,
-                        help="Users spawned per second (default: 10)")
-    parser.add_argument("--cooldown", type=int, default=15,
-                        help="Seconds between steps (default: 15)")
+    parser.add_argument("--max-users", type=int, default=500, help="Maximum users to ramp to (default: 500)")
+    parser.add_argument("--step-duration", type=int, default=60, help="Seconds per step (default: 60)")
+    parser.add_argument("--spawn-rate", type=int, default=10, help="Users spawned per second (default: 10)")
+    parser.add_argument("--cooldown", type=int, default=15, help="Seconds between steps (default: 15)")
     args = parser.parse_args()
 
     host = args.host or HOSTS[args.env]
@@ -465,16 +480,19 @@ def main() -> None:
     sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
     try:
         from scripts._env import load_env_local
+
         load_env_local()
     except ImportError:
         pass
 
     env_vars: dict[str, str] = {}
     # Try multiple env var names — .env.local uses STAGING_REMAKER_* format
-    api_key = (os.environ.get("STAGING_REMAKER_USER_KEY")
-               or os.environ.get("STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY", ""))
-    widget_key = (os.environ.get("STAGING_REMAKER_WIDGET_KEY")
-                  or os.environ.get("STAGING_REMAKER_DIGITAL_001_WIDGET_KEY", ""))
+    api_key = os.environ.get("STAGING_REMAKER_USER_KEY") or os.environ.get(
+        "STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY", ""
+    )
+    widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY") or os.environ.get(
+        "STAGING_REMAKER_DIGITAL_001_WIDGET_KEY", ""
+    )
     if api_key:
         env_vars["LOAD_TEST_API_KEY"] = api_key
     if widget_key:
@@ -522,19 +540,22 @@ def main() -> None:
             time.sleep(args.cooldown)
 
     # Final summary
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  RAMP-TO-OVERLOAD SUMMARY")
-    print(f"{'='*70}")
-    print(f"\n  {'Step':>4} {'Users':>6} {'Reqs':>6} {'Fail':>5} {'Err%':>6} "
-          f"{'P50':>6} {'P95':>6} {'P99':>6} {'RPS':>6}")
-    print(f"  {'-'*4} {'-'*6} {'-'*6} {'-'*5} {'-'*6} {'-'*6} {'-'*6} {'-'*6} {'-'*6}")
+    print(f"{'=' * 70}")
+    print(
+        f"\n  {'Step':>4} {'Users':>6} {'Reqs':>6} {'Fail':>5} {'Err%':>6} {'P50':>6} {'P95':>6} {'P99':>6} {'RPS':>6}"
+    )
+    print(f"  {'-' * 4} {'-' * 6} {'-' * 6} {'-' * 5} {'-' * 6} {'-' * 6} {'-' * 6} {'-' * 6} {'-' * 6}")
 
     for r in results:
         marker = " ** OVERLOAD" if r.overload_reached else ""
-        print(f"  {r.step:>4} {r.users:>6} {r.total_requests:>6} "
-              f"{r.total_failures:>5} {r.aggregate_error_rate_pct:>5.1f}% "
-              f"{r.aggregate_p50:>6.0f} {r.aggregate_p95:>6.0f} "
-              f"{r.aggregate_p99:>6.0f} {r.aggregate_rps:>6.1f}{marker}")
+        print(
+            f"  {r.step:>4} {r.users:>6} {r.total_requests:>6} "
+            f"{r.total_failures:>5} {r.aggregate_error_rate_pct:>5.1f}% "
+            f"{r.aggregate_p50:>6.0f} {r.aggregate_p95:>6.0f} "
+            f"{r.aggregate_p99:>6.0f} {r.aggregate_rps:>6.1f}{marker}"
+        )
 
     max_safe = max((r.users for r in results if not r.overload_reached), default=0)
     overload_at = next((r.users for r in results if r.overload_reached), None)
@@ -546,8 +567,10 @@ def main() -> None:
     else:
         print(f"  Overload NOT reached (max tested: {steps[-1]} users)")
     print(f"  Peak RPS: {peak_rps:.1f}")
-    print(f"  Recommended RPM ceiling: {int(peak_rps * 60 * 0.8)} "
-          f"(80% of peak {peak_rps:.1f} RPS = {peak_rps * 60:.0f} RPM)")
+    print(
+        f"  Recommended RPM ceiling: {int(peak_rps * 60 * 0.8)} "
+        f"(80% of peak {peak_rps:.1f} RPS = {peak_rps * 60:.0f} RPM)"
+    )
     print(f"\n  CSV: {csv_path}")
     print(f"  JSON: {json_path}")
 

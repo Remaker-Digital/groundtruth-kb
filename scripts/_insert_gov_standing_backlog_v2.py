@@ -50,12 +50,7 @@ These fields supersede the v1 narrative list (identifier, title, priority, sourc
 `related_spec_ids_at_creation` and `related_deliberation_ids` capture the spec/deliberation set known at the moment the backlog item was created. They are NOT exhaustive applicability claims. Implementation proposals derived from a backlog item must run fresh `db.list_specs(...)` and `db.search_deliberations(...)` at proposal time. The bridge-compliance-gate hook (Slice 5 extension) enforces this.
 """
 
-PACKET_PATH = (
-    REPO_ROOT
-    / ".groundtruth"
-    / "formal-artifact-approvals"
-    / "2026-05-02-backlog-slice1-gov-update.json"
-)
+PACKET_PATH = REPO_ROOT / ".groundtruth" / "formal-artifact-approvals" / "2026-05-02-backlog-slice1-gov-update.json"
 
 
 def main() -> int:

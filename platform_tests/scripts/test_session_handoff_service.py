@@ -287,7 +287,7 @@ def test_handoff_writes_handoff_markdown_file(tmp_path: Path) -> None:
 def test_cli_session_handoff_generate_echoes_prompt_to_stdout(tmp_path: Path) -> None:
     root = _make_project_root(tmp_path, session_id="S-CLI-OUT")
     config_path = root / "groundtruth.toml"
-    config_path.write_text(f'project_root = "{root.as_posix()}"\n', encoding="utf-8")
+    config_path.write_text(f'[groundtruth]\nproject_root = "{root.as_posix()}"\n', encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(
         gt_cli,

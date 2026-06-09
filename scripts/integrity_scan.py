@@ -46,6 +46,7 @@ from db import KnowledgeDB  # noqa: E402
 # Utilities
 # ---------------------------------------------------------------------------
 
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -70,6 +71,7 @@ def _print_check(name: str, status: str, count: int, details: list[str] | None =
 # TRACK 1: KB Referential Integrity
 # ===================================================================
 
+
 def track_1_kb_integrity(db: KnowledgeDB) -> dict:
     """Check referential integrity across KB tables."""
     _print_header("Track 1: KB Referential Integrity")
@@ -85,8 +87,7 @@ def track_1_kb_integrity(db: KnowledgeDB) -> dict:
     """).fetchall()
     ids = [f"{r['id']} -> {r['spec_id']}" for r in orphaned_tests]
     findings["orphaned_tests"] = {"count": len(ids), "ids": ids}
-    _print_check("Orphaned test artifacts (spec_id not in specs)",
-                 "finding" if ids else "pass", len(ids), ids)
+    _print_check("Orphaned test artifacts (spec_id not in specs)", "finding" if ids else "pass", len(ids), ids)
 
     # 1b. Orphaned work items — WIs referencing non-existent specs
     orphaned_wis = conn.execute("""
@@ -97,8 +98,7 @@ def track_1_kb_integrity(db: KnowledgeDB) -> dict:
     """).fetchall()
     ids = [f"{r['id']} -> {r['source_spec_id']}" for r in orphaned_wis]
     findings["orphaned_work_items"] = {"count": len(ids), "ids": ids}
-    _print_check("Orphaned work items (source_spec_id not in specs)",
-                 "finding" if ids else "pass", len(ids), ids)
+    _print_check("Orphaned work items (source_spec_id not in specs)", "finding" if ids else "pass", len(ids), ids)
 
     # 1c. Orphaned test_coverage — coverage links to non-existent specs
     orphaned_cov = conn.execute("""
@@ -107,10 +107,9 @@ def track_1_kb_integrity(db: KnowledgeDB) -> dict:
         LEFT JOIN current_specifications s ON tc.spec_id = s.id
         WHERE s.id IS NULL
     """).fetchall()
-    ids = list({r['spec_id'] for r in orphaned_cov})
+    ids = list({r["spec_id"] for r in orphaned_cov})
     findings["orphaned_test_coverage"] = {"count": len(ids), "spec_ids": ids}
-    _print_check("Orphaned test_coverage (spec_id not in specs)",
-                 "finding" if ids else "pass", len(ids), ids)
+    _print_check("Orphaned test_coverage (spec_id not in specs)", "finding" if ids else "pass", len(ids), ids)
 
     # 1d. Tests referencing retired specs (not orphaned, but wasteful)
     retired_spec_tests = conn.execute("""
@@ -119,15 +118,18 @@ def track_1_kb_integrity(db: KnowledgeDB) -> dict:
         JOIN current_specifications s ON t.spec_id = s.id
         WHERE s.status = 'retired'
     """).fetchall()
-    ids = list({r['spec_id'] for r in retired_spec_tests})
+    ids = list({r["spec_id"] for r in retired_spec_tests})
     findings["tests_on_retired_specs"] = {
         "count": len(retired_spec_tests),
         "unique_specs": len(ids),
         "spec_ids": ids,
     }
-    _print_check("Test artifacts linked to retired specs",
-                 "finding" if ids else "pass", len(retired_spec_tests),
-                 [f"{len(retired_spec_tests)} tests across {len(ids)} retired specs"])
+    _print_check(
+        "Test artifacts linked to retired specs",
+        "finding" if ids else "pass",
+        len(retired_spec_tests),
+        [f"{len(retired_spec_tests)} tests across {len(ids)} retired specs"],
+    )
 
     # 1e. Work items open >60 days
     stale_wis = conn.execute("""
@@ -139,8 +141,7 @@ def track_1_kb_integrity(db: KnowledgeDB) -> dict:
     """).fetchall()
     ids = [f"{r['id']} ({r['changed_at'][:10]}): {r['title'][:60]}" for r in stale_wis]
     findings["stale_work_items"] = {"count": len(ids), "items": ids}
-    _print_check("Work items open >60 days",
-                 "finding" if ids else "pass", len(ids), ids)
+    _print_check("Work items open >60 days", "finding" if ids else "pass", len(ids), ids)
 
     # 1f. Test artifacts never executed
     never_executed = conn.execute("""
@@ -153,9 +154,12 @@ def track_1_kb_integrity(db: KnowledgeDB) -> dict:
         "total": total_tests,
         "pct": round(never_executed / total_tests * 100, 1) if total_tests else 0,
     }
-    _print_check("Test artifacts never executed",
-                 "finding" if never_executed > 0 else "pass", never_executed,
-                 [f"{never_executed}/{total_tests} ({findings['never_executed_tests']['pct']}%)"])
+    _print_check(
+        "Test artifacts never executed",
+        "finding" if never_executed > 0 else "pass",
+        never_executed,
+        [f"{never_executed}/{total_tests} ({findings['never_executed_tests']['pct']}%)"],
+    )
 
     return findings
 
@@ -163,6 +167,7 @@ def track_1_kb_integrity(db: KnowledgeDB) -> dict:
 # ===================================================================
 # TRACK 2: Assertion Validity Audit
 # ===================================================================
+
 
 def track_2_assertion_validity(db: KnowledgeDB) -> dict:
     """Validate that assertions reference real, matching code."""
@@ -176,10 +181,10 @@ def track_2_assertion_validity(db: KnowledgeDB) -> dict:
         WHERE assertions IS NOT NULL AND assertions != 'null' AND assertions != '[]'
     """).fetchall()
 
-    stale_files = []       # assertion file doesn't exist
-    dead_patterns = []     # file exists but pattern not found
-    overly_broad = []      # pattern matches >50 times
-    duplicate_pairs = {}   # (file, pattern) -> [spec_ids]
+    stale_files = []  # assertion file doesn't exist
+    dead_patterns = []  # file exists but pattern not found
+    overly_broad = []  # pattern matches >50 times
+    duplicate_pairs = {}  # (file, pattern) -> [spec_ids]
     retired_with_assertions = []  # retired specs still carrying assertions
 
     for spec in specs_with_assertions:
@@ -227,40 +232,52 @@ def track_2_assertion_validity(db: KnowledgeDB) -> dict:
                     if match_count == 0:
                         dead_patterns.append(f"SPEC-{spec_id}: '{a_pattern}' not in {a_file}")
                     elif match_count > 50:
-                        overly_broad.append(
-                            f"SPEC-{spec_id}: '{a_pattern}' matches {match_count}x in {a_file}"
-                        )
+                        overly_broad.append(f"SPEC-{spec_id}: '{a_pattern}' matches {match_count}x in {a_file}")
                 except Exception:
                     pass  # Binary file or encoding issue — skip
 
     # Filter duplicates to only those shared across >1 spec
     actual_dupes = {k: v for k, v in duplicate_pairs.items() if len(v) > 1}
-    dupe_details = [f"({f}, '{p}'): {', '.join(f'SPEC-{s}' for s in sids)}"
-                    for (f, p), sids in list(actual_dupes.items())[:20]]
+    dupe_details = [
+        f"({f}, '{p}'): {', '.join(f'SPEC-{s}' for s in sids)}" for (f, p), sids in list(actual_dupes.items())[:20]
+    ]
 
     findings["stale_file_references"] = {"count": len(stale_files), "items": stale_files}
-    _print_check("Stale file references (file doesn't exist)",
-                 "finding" if stale_files else "pass", len(stale_files), stale_files)
+    _print_check(
+        "Stale file references (file doesn't exist)",
+        "finding" if stale_files else "pass",
+        len(stale_files),
+        stale_files,
+    )
 
     findings["dead_patterns"] = {"count": len(dead_patterns), "items": dead_patterns}
-    _print_check("Dead patterns (file exists, pattern not found)",
-                 "finding" if dead_patterns else "pass", len(dead_patterns), dead_patterns)
+    _print_check(
+        "Dead patterns (file exists, pattern not found)",
+        "finding" if dead_patterns else "pass",
+        len(dead_patterns),
+        dead_patterns,
+    )
 
     findings["overly_broad_patterns"] = {"count": len(overly_broad), "items": overly_broad}
-    _print_check("Overly broad patterns (>50 matches)",
-                 "finding" if overly_broad else "pass", len(overly_broad), overly_broad)
+    _print_check(
+        "Overly broad patterns (>50 matches)", "finding" if overly_broad else "pass", len(overly_broad), overly_broad
+    )
 
     findings["duplicate_assertion_pairs"] = {"count": len(actual_dupes), "items": dupe_details}
-    _print_check("Duplicate (file, pattern) across specs",
-                 "finding" if actual_dupes else "pass", len(actual_dupes), dupe_details)
+    _print_check(
+        "Duplicate (file, pattern) across specs", "finding" if actual_dupes else "pass", len(actual_dupes), dupe_details
+    )
 
     findings["retired_with_assertions"] = {
-        "count": len(retired_with_assertions), "spec_ids": retired_with_assertions,
+        "count": len(retired_with_assertions),
+        "spec_ids": retired_with_assertions,
     }
-    _print_check("Retired specs still carrying assertions",
-                 "finding" if retired_with_assertions else "pass",
-                 len(retired_with_assertions),
-                 [f"SPEC-{s}" for s in retired_with_assertions[:10]])
+    _print_check(
+        "Retired specs still carrying assertions",
+        "finding" if retired_with_assertions else "pass",
+        len(retired_with_assertions),
+        [f"SPEC-{s}" for s in retired_with_assertions[:10]],
+    )
 
     return findings
 
@@ -268,6 +285,7 @@ def track_2_assertion_validity(db: KnowledgeDB) -> dict:
 # ===================================================================
 # TRACK 3: Configuration Drift Detection (live API)
 # ===================================================================
+
 
 def track_3_config_drift(db: KnowledgeDB) -> dict:
     """Compare code defaults vs live API state, staging vs production."""
@@ -298,10 +316,14 @@ def track_3_config_drift(db: KnowledgeDB) -> dict:
             deployed_version = r.headers.get("x-product-version", "unknown")
             match = source_version == deployed_version
             status = "MATCH" if match else "MISMATCH"
-            version_checks.append({
-                "env": env_name, "source": source_version,
-                "deployed": deployed_version, "status": status,
-            })
+            version_checks.append(
+                {
+                    "env": env_name,
+                    "source": source_version,
+                    "deployed": deployed_version,
+                    "status": status,
+                }
+            )
             icon = "PASS" if match else "FIND"
             print(f"  [{icon}] {env_name} version: source={source_version}, deployed={deployed_version}")
         except Exception as e:
@@ -316,7 +338,8 @@ def track_3_config_drift(db: KnowledgeDB) -> dict:
     if staging_ver and prod_ver:
         match = staging_ver == prod_ver
         findings["env_version_parity"] = {
-            "staging": staging_ver, "production": prod_ver,
+            "staging": staging_ver,
+            "production": prod_ver,
             "status": "MATCH" if match else "MISMATCH",
         }
         icon = "PASS" if match else "FIND"
@@ -343,6 +366,7 @@ def track_3_config_drift(db: KnowledgeDB) -> dict:
 # TRACK 4: Source File Consistency
 # ===================================================================
 
+
 def track_4_file_consistency(db: KnowledgeDB) -> dict:
     """Verify that files referenced in KB records still exist."""
     _print_header("Track 4: Source File Consistency")
@@ -361,9 +385,12 @@ def track_4_file_consistency(db: KnowledgeDB) -> dict:
         if not full.exists():
             missing_test_files.append(tf)
     findings["missing_test_files"] = {"count": len(missing_test_files), "files": missing_test_files}
-    _print_check("Test artifacts with missing test_file",
-                 "finding" if missing_test_files else "pass",
-                 len(missing_test_files), missing_test_files)
+    _print_check(
+        "Test artifacts with missing test_file",
+        "finding" if missing_test_files else "pass",
+        len(missing_test_files),
+        missing_test_files,
+    )
 
     # 4b. Protected Behavior assertion files exist
     pb_specs = conn.execute("""
@@ -377,13 +404,14 @@ def track_4_file_consistency(db: KnowledgeDB) -> dict:
             assertions = json.loads(spec["assertions"])
         except (json.JSONDecodeError, TypeError):
             continue
-        for a in (assertions if isinstance(assertions, list) else []):
+        for a in assertions if isinstance(assertions, list) else []:
             f = a.get("file", "")
             if f and not (PROJECT_ROOT / f).exists():
                 pb_missing.append(f"PB {spec['id']}: {f}")
     findings["pb_missing_files"] = {"count": len(pb_missing), "items": pb_missing}
-    _print_check("Protected Behavior assertion files missing",
-                 "finding" if pb_missing else "pass", len(pb_missing), pb_missing)
+    _print_check(
+        "Protected Behavior assertion files missing", "finding" if pb_missing else "pass", len(pb_missing), pb_missing
+    )
 
     # 4c. Admin SPA dist freshness
     dist_freshness = []
@@ -407,13 +435,11 @@ def track_4_file_consistency(db: KnowledgeDB) -> dict:
         )
         if src_latest > dist_latest and dist_latest > 0:
             delta_hours = (src_latest - dist_latest) / 3600
-            dist_freshness.append(
-                f"{spa}: src is {delta_hours:.1f}h newer than dist (stale build)"
-            )
+            dist_freshness.append(f"{spa}: src is {delta_hours:.1f}h newer than dist (stale build)")
     findings["dist_freshness"] = {"count": len(dist_freshness), "items": dist_freshness}
-    _print_check("Admin SPA dist freshness",
-                 "finding" if dist_freshness else "pass",
-                 len(dist_freshness), dist_freshness)
+    _print_check(
+        "Admin SPA dist freshness", "finding" if dist_freshness else "pass", len(dist_freshness), dist_freshness
+    )
 
     # 4d. test_coverage referencing missing test files
     cov_files = conn.execute("""
@@ -427,11 +453,15 @@ def track_4_file_consistency(db: KnowledgeDB) -> dict:
         if not full.exists():
             missing_cov_files.append(tf)
     findings["missing_coverage_files"] = {
-        "count": len(missing_cov_files), "files": missing_cov_files,
+        "count": len(missing_cov_files),
+        "files": missing_cov_files,
     }
-    _print_check("test_coverage entries with missing test_file",
-                 "finding" if missing_cov_files else "pass",
-                 len(missing_cov_files), missing_cov_files)
+    _print_check(
+        "test_coverage entries with missing test_file",
+        "finding" if missing_cov_files else "pass",
+        len(missing_cov_files),
+        missing_cov_files,
+    )
 
     return findings
 
@@ -439,6 +469,7 @@ def track_4_file_consistency(db: KnowledgeDB) -> dict:
 # ===================================================================
 # TRACK 5: Process Efficiency Metrics
 # ===================================================================
+
 
 def track_5_efficiency(db: KnowledgeDB) -> dict:
     """Aggregate metrics revealing process overhead or waste."""
@@ -457,15 +488,26 @@ def track_5_efficiency(db: KnowledgeDB) -> dict:
     """).fetchall()
     churn_items = [f"SPEC-{r['id']}: {r['versions']} versions" for r in high_churn]
     findings["high_churn_specs"] = {"count": len(high_churn), "items": churn_items}
-    _print_check("Specs with >5 versions (high churn)",
-                 "finding" if high_churn else "pass", len(high_churn), churn_items)
+    _print_check(
+        "Specs with >5 versions (high churn)", "finding" if high_churn else "pass", len(high_churn), churn_items
+    )
 
     # 5b. KB table sizes (row counts)
     tables = [
-        "specifications", "test_procedures", "operational_procedures",
-        "assertion_runs", "session_prompts", "environment_config",
-        "documents", "test_coverage", "tests", "test_plans",
-        "test_plan_phases", "work_items", "backlog_snapshots", "testable_elements",
+        "specifications",
+        "test_procedures",
+        "operational_procedures",
+        "assertion_runs",
+        "session_prompts",
+        "environment_config",
+        "documents",
+        "test_coverage",
+        "tests",
+        "test_plans",
+        "test_plan_phases",
+        "work_items",
+        "backlog_snapshots",
+        "testable_elements",
     ]
     table_sizes = {}
     for t in tables:
@@ -489,10 +531,12 @@ def track_5_efficiency(db: KnowledgeDB) -> dict:
         "record_scripts": len(record_scripts),
         "total": len(session_scripts) + len(record_scripts),
     }
-    _print_check("One-off script accumulation (session + record)",
-                 "finding" if len(session_scripts) + len(record_scripts) > 80 else "pass",
-                 len(session_scripts) + len(record_scripts),
-                 [f"{len(session_scripts)} session scripts, {len(record_scripts)} record scripts"])
+    _print_check(
+        "One-off script accumulation (session + record)",
+        "finding" if len(session_scripts) + len(record_scripts) > 80 else "pass",
+        len(session_scripts) + len(record_scripts),
+        [f"{len(session_scripts)} session scripts, {len(record_scripts)} record scripts"],
+    )
 
     # 5d. WI resolution rate
     resolved = conn.execute("""
@@ -503,11 +547,15 @@ def track_5_efficiency(db: KnowledgeDB) -> dict:
     """).fetchone()[0]
     total_wis = conn.execute("SELECT COUNT(*) FROM current_work_items").fetchone()[0]
     findings["wi_resolution"] = {
-        "open": open_count, "resolved": resolved, "total": total_wis,
+        "open": open_count,
+        "resolved": resolved,
+        "total": total_wis,
         "resolution_rate": round(resolved / total_wis * 100, 1) if total_wis else 0,
     }
-    print(f"  [INFO] WI resolution rate: {findings['wi_resolution']['resolution_rate']}% "
-          f"({resolved}/{total_wis}, {open_count} open)")
+    print(
+        f"  [INFO] WI resolution rate: {findings['wi_resolution']['resolution_rate']}% "
+        f"({resolved}/{total_wis}, {open_count} open)"
+    )
 
     # 5e. Spec status distribution
     summary = db.get_summary()
@@ -523,14 +571,14 @@ def track_5_efficiency(db: KnowledgeDB) -> dict:
 # Main
 # ===================================================================
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Project Integrity Scan")
-    parser.add_argument("--live", action="store_true",
-                        help="Include Track 3 (live API calls to staging/production)")
-    parser.add_argument("--track", nargs="+", type=int, default=None,
-                        help="Run specific tracks only (e.g., --track 1 2)")
-    parser.add_argument("--json", action="store_true",
-                        help="Save JSON report to integrity-results/")
+    parser.add_argument("--live", action="store_true", help="Include Track 3 (live API calls to staging/production)")
+    parser.add_argument(
+        "--track", nargs="+", type=int, default=None, help="Run specific tracks only (e.g., --track 1 2)"
+    )
+    parser.add_argument("--json", action="store_true", help="Save JSON report to integrity-results/")
     args = parser.parse_args()
 
     tracks_to_run = set(args.track) if args.track else {1, 2, 3, 4, 5}

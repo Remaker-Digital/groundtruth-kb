@@ -291,7 +291,7 @@ def test_release_candidate_skill_documents_mem_and_da_evidence() -> None:
 
 
 def test_acting_prime_builder_rule_maps_prime_skill_labels_to_assigned_role() -> None:
-    rule = _read(".claude/rules/acting-prime-builder.md")
+    rule = _one_line(_read(".claude/rules/acting-prime-builder.md"))
 
     assert "DELIB-0830" in rule
     assert "DELIB-0831" in rule
@@ -317,8 +317,8 @@ def test_acting_prime_builder_rule_maps_prime_skill_labels_to_assigned_role() ->
     assert "fully-conformant adopter" in rule
     assert "supported and sustained by GroundTruth-KB" in rule
     assert "to be treated as one" in rule
-    assert "Release-readiness work should preserve and enforce GT-KB" in rule
-    assert "documented, and regression-tested where possible" in rule
+    assert "require production-release work to include governed release-readiness evidence" in rule
+    assert "cited in rules, regression-tested, and visible" in rule
     assert "DELIB-0835" in rule
     assert "GOV-ARTIFACT-APPROVAL-001" in rule
     assert "PB-ARTIFACT-APPROVAL-001" in rule

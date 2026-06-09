@@ -42,6 +42,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -57,17 +58,15 @@ PAGES = [
         "handle": "about",
         "body_html": (
             '<div class="agent-red-page about-page">'
-
             '<div class="hero-section">'
             "<h1>Great Customer Service Shouldn't Require a Massive Team</h1>"
             "<p>Agent Red helps e-commerce businesses deliver exceptional support at scale "
             "&mdash; without scaling costs. Built on open-source AI, priced transparently, "
             "and designed to earn your trust every month.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Our Mission</h2>"
-            '<blockquote><p><strong>To make world-class customer service accessible to every '
+            "<blockquote><p><strong>To make world-class customer service accessible to every "
             "e-commerce business &mdash; regardless of team size or budget.</strong></p></blockquote>"
             "<p>Most support automation tools are built for enterprises with enterprise budgets. "
             "The businesses that need automation most &mdash; growing e-commerce stores stretched "
@@ -76,7 +75,6 @@ PAGES = [
             "and priced it so that a store doing a few hundred conversations a month can afford the same "
             "AI capability that enterprise retailers use.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>How We Got Here</h2>"
             "<h3>The Problem</h3>"
@@ -86,7 +84,6 @@ PAGES = [
             "(frustrating), or buy an enterprise platform (overkill).</p>"
             "<p>We saw a gap: there was no AI customer service platform that was genuinely powerful, "
             "honestly priced, and built for the e-commerce mid-market.</p>"
-
             "<h3>The Foundation</h3>"
             "<p>Instead of building from scratch, we started with a public, open-source multi-agent "
             "AI platform &mdash; the AGNTCY project. Six specialized AI agents working together: "
@@ -95,14 +92,12 @@ PAGES = [
             "<p>The evaluation data is real: 98% intent accuracy, sub-2-second response times, "
             "100% content safety, 3,071 requests per second throughput. Not marketing claims &mdash; "
             "measured results from production workloads.</p>"
-
             "<h3>The Commercial Product</h3>"
             "<p>Agent Red is the commercial layer on top of that open-source foundation. We added "
             "multi-tenant infrastructure, usage-based billing, enterprise integrations, white-label "
             "capability, Persistent Customer Memory, and professional support &mdash; the things "
             "a business needs to run this in production with confidence.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>What We Believe</h2>"
             "<ul>"
@@ -116,7 +111,6 @@ PAGES = [
             "Transparent pricing for affiliates and promoters.</li>"
             "</ul>"
             "</div>"
-
             '<div class="section">'
             "<h2>Verified Performance</h2>"
             "<table>"
@@ -130,7 +124,6 @@ PAGES = [
             "<tr><td>Uptime SLA</td><td><strong>99.95%</strong></td><td>Azure infrastructure</td></tr>"
             "</tbody></table>"
             "</div>"
-
             '<div class="section">'
             "<h2>The Company</h2>"
             "<p>Agent Red is a product of <strong>Remaker Digital</strong>, a DBA of VanDusen &amp; Palmeter, "
@@ -140,7 +133,6 @@ PAGES = [
             "<p>Production infrastructure runs on Microsoft Azure (East US 2 region). All customer data "
             "is stored in the United States. GDPR and CCPA compliant.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Get in Touch</h2>"
             "<ul>"
@@ -150,7 +142,6 @@ PAGES = [
             "<li><strong>General:</strong> hello@agentred.io</li>"
             "</ul>"
             "</div>"
-
             "</div>"
         ),
     },
@@ -159,49 +150,40 @@ PAGES = [
         "handle": "features",
         "body_html": (
             '<div class="agent-red-page features-page">'
-
             '<div class="hero-section">'
             "<h1>Six AI Agents. One Exceptional Support Experience.</h1>"
             "<p>Every feature is built to do one thing: help you serve customers better "
             "while spending less. No complexity, no compromises.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Six Specialized AI Agents</h2>"
             "<p>Simple chatbots use one model for everything. Agent Red deploys six "
             "purpose-built agents that each excel at a specific job.</p>"
-
             "<h3>1. Intent Classification</h3>"
             "<p><strong>Understand Every Customer Instantly</strong></p>"
             "<p>Analyzes incoming messages and identifies what customers need in milliseconds. "
             "17 intent categories, 98% accuracy, confidence scoring, multi-language support.</p>"
-
             "<h3>2. Knowledge Retrieval</h3>"
             "<p><strong>Find the Right Answer, Every Time</strong></p>"
             "<p>Searches your product catalog, FAQs, policies, and order data using semantic search. "
             "Real-time Shopify sync. 100% retrieval accuracy.</p>"
-
             "<h3>3. Response Generation</h3>"
             "<p><strong>Natural Responses That Sound Like You</strong></p>"
             "<p>Crafts personalized, natural responses in your brand voice. Powered by GPT-4o. "
             "Memory-informed &mdash; draws from the customer's full interaction history.</p>"
-
             "<h3>4. Critic/Supervisor</h3>"
             "<p><strong>Quality Control for Every Response</strong></p>"
             "<p>Reviews every response before it reaches your customer. Blocks 100% of inappropriate "
             "content with zero false negatives. Checks accuracy, safety, and brand alignment.</p>"
-
             "<h3>5. Escalation Detection</h3>"
             "<p><strong>Smart Handoffs to Your Team</strong></p>"
             "<p>Recognizes when a human is needed &mdash; emotional situations, complex issues, VIP "
             "customers. Hands off with full context. 100% precision and recall.</p>"
-
             "<h3>6. Analytics</h3>"
             "<p><strong>Insights That Drive Improvement</strong></p>"
             "<p>Tracks what customers ask, how issues resolve, and where to improve. Real-time "
             "dashboard with trend analysis and custom reports.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Integrations</h2>"
             "<ul>"
@@ -212,7 +194,6 @@ PAGES = [
             "<li><strong>Google Analytics</strong> (Add-on) &mdash; Track support impact on conversions.</li>"
             "</ul>"
             "</div>"
-
             '<div class="section">'
             "<h2>Persistent Customer Memory</h2>"
             "<p>Every conversation builds on the last. Agent Red maintains a persistent memory for each "
@@ -234,7 +215,6 @@ PAGES = [
             "<td>Enterprise add-on</td></tr>"
             "</tbody></table>"
             "</div>"
-
             '<div class="section">'
             "<h2>Customization</h2>"
             "<ul>"
@@ -244,7 +224,6 @@ PAGES = [
             "<li><strong>White-Label</strong> (Enterprise) &mdash; Complete branding removal, custom domain, CSS theming.</li>"
             "</ul>"
             "</div>"
-
             '<div class="section">'
             "<h2>Security</h2>"
             "<ul>"
@@ -255,7 +234,6 @@ PAGES = [
             "<li>Role-based access control + audit logging</li>"
             "</ul>"
             "</div>"
-
             "</div>"
         ),
     },
@@ -264,13 +242,11 @@ PAGES = [
         "handle": "pricing",
         "body_html": (
             '<div class="agent-red-page pricing-page">'
-
             '<div class="hero-section">'
             "<h1>Transparent Pricing. Every Cost Visible.</h1>"
             "<p>Platform fee + AI usage. You see exactly what you pay for &mdash; the platform "
             "that runs your support, and the AI conversations that serve your customers.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>How Pricing Works</h2>"
             "<p><strong>Component 1: Platform Fee</strong> &mdash; Your monthly plan covers infrastructure, "
@@ -279,10 +255,8 @@ PAGES = [
             "allowance. Need more? Pay-as-you-go overage or pre-purchase packs at a discount.</p>"
             "<p>Our AI costs less than $0.01 per conversation to run &mdash; and we pass that efficiency to you.</p>"
             "</div>"
-
             '<div class="section pricing-cards">'
             "<h2>Plans</h2>"
-
             '<div class="pricing-card">'
             "<h3>Starter &mdash; $149/month</h3>"
             "<p><em>$124/month billed annually ($1,490/year &mdash; save $298)</em></p>"
@@ -298,7 +272,6 @@ PAGES = [
             "</ul>"
             "<p>Overage: $0.04/conversation</p>"
             "</div>"
-
             '<div class="pricing-card popular">'
             "<h3>Professional &mdash; $399/month</h3>"
             "<p><strong>MOST POPULAR</strong></p>"
@@ -317,7 +290,6 @@ PAGES = [
             "</ul>"
             "<p>Overage: $0.025/conversation</p>"
             "</div>"
-
             '<div class="pricing-card">'
             "<h3>Enterprise &mdash; $999/month</h3>"
             "<p><em>$832/month billed annually ($9,990/year &mdash; save $1,998)</em></p>"
@@ -336,7 +308,6 @@ PAGES = [
             "<p>Overage: $0.015/conversation</p>"
             "</div>"
             "</div>"
-
             '<div class="section">'
             "<h2>Conversation Packs (Pre-Purchase &amp; Save)</h2>"
             "<p>Pre-purchase conversation blocks at a discount. Valid for 90 days. Available on all tiers.</p>"
@@ -348,7 +319,6 @@ PAGES = [
             "<tr><td>20,000 conversations</td><td>$249</td><td>$0.012/conv</td></tr>"
             "</tbody></table>"
             "</div>"
-
             '<div class="section">'
             "<h2>Add-On Modules</h2>"
             "<table>"
@@ -362,7 +332,6 @@ PAGES = [
             "<tr><td>Custom Integration Dev</td><td>$299</td><td>Enterprise only</td></tr>"
             "</tbody></table>"
             "</div>"
-
             '<div class="section">'
             "<h2>Special Programs</h2>"
             "<ul>"
@@ -371,29 +340,22 @@ PAGES = [
             "<li><strong>Agency Partners:</strong> 20% off for clients + recurring referral commission</li>"
             "</ul>"
             "</div>"
-
             '<div class="section">'
             "<h2>Pricing FAQ</h2>"
-
             "<h3>What counts as an AI conversation?</h3>"
             "<p>A complete customer interaction resolved by Agent Red without human intervention. "
             "Conversations that escalate to your human team are <strong>not counted</strong>.</p>"
-
             "<h3>What happens when I exceed my included conversations?</h3>"
             "<p>Agent Red notifies you at 80% and 100% of your allowance. Beyond that, you pay the "
             "overage rate for your tier, or pre-purchase conversation packs at a discount.</p>"
-
             "<h3>Can I change plans?</h3>"
             "<p>Yes. Upgrade instantly (prorated). Downgrade at end of billing cycle. "
             "No penalties, no lock-in.</p>"
-
             "<h3>Is there a free trial?</h3>"
             "<p>Yes. 14 days free with full Professional features. No credit card required.</p>"
-
             "<h3>Do you offer refunds?</h3>"
             "<p>30-day money-back guarantee on all plans. No questions asked.</p>"
             "</div>"
-
             "</div>"
         ),
     },
@@ -402,13 +364,11 @@ PAGES = [
         "handle": "integrations",
         "body_html": (
             '<div class="agent-red-page integrations-page">'
-
             '<div class="hero-section">'
             "<h1>Connects to Your Entire Stack</h1>"
             "<p>Agent Red integrates natively with the tools you already use. Real-time data sync "
             "means your AI always has the latest information.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Shopify (All Tiers)</h2>"
             "<p><strong>Native Shopify Integration &mdash; 15-minute setup</strong></p>"
@@ -421,7 +381,6 @@ PAGES = [
             "<li>Inventory availability checks</li>"
             "</ul>"
             "</div>"
-
             '<div class="section">'
             "<h2>Zendesk (Professional+)</h2>"
             "<p><strong>Seamless Escalation &mdash; 30-minute setup</strong></p>"
@@ -434,21 +393,18 @@ PAGES = [
             "<li>Agent routing by issue type</li>"
             "</ul>"
             "</div>"
-
             '<div class="section">'
             "<h2>Mailchimp (Add-on, $49/mo)</h2>"
             "<p><strong>Marketing Intelligence &mdash; 20-minute setup</strong></p>"
             "<p>Access customer marketing data for personalized support. Know which campaigns "
             "they've engaged with and their subscription preferences.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Google Analytics (Add-on, $49/mo)</h2>"
             "<p><strong>Unified Analytics &mdash; 15-minute setup</strong></p>"
             "<p>Track customer service interactions alongside your other analytics. "
             "GA4 event tracking, conversion attribution, and custom dimensions.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Coming Soon</h2>"
             "<ul>"
@@ -460,7 +416,6 @@ PAGES = [
             "<p>Need a specific integration? <a href='/pages/contact'>Contact us</a> &mdash; "
             "we build custom connectors for Enterprise customers.</p>"
             "</div>"
-
             "</div>"
         ),
     },
@@ -469,33 +424,26 @@ PAGES = [
         "handle": "contact",
         "body_html": (
             '<div class="agent-red-page contact-page">'
-
             '<div class="hero-section">'
             "<h1>Let's Talk</h1>"
             "<p>Whether you have a question about pricing, need help with setup, or want to "
             "explore a partnership &mdash; we're here. We respond to every inquiry within 24 hours.</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Reach the Right Team</h2>"
-
             "<h3>Sales</h3>"
             "<p>Pricing questions, demos, custom plans, volume discounts</p>"
             "<p><strong>sales@agentred.io</strong> &mdash; Response within 24 hours</p>"
-
             "<h3>Support</h3>"
             "<p>Technical issues, setup help, account questions</p>"
             "<p><strong>support@agentred.io</strong> &mdash; Response based on your plan SLA</p>"
-
             "<h3>Partnerships &amp; Affiliates</h3>"
             "<p>Affiliate program, agency partnerships, technology partnerships</p>"
             "<p><strong>partners@agentred.io</strong> &mdash; Response within 48 hours</p>"
-
             "<h3>General Inquiries</h3>"
             "<p>Press, careers, feedback, general questions</p>"
             "<p><strong>hello@agentred.io</strong> &mdash; Response within 48 hours</p>"
             "</div>"
-
             '<div class="section">'
             "<h2>Before You Reach Out</h2>"
             "<ul>"
@@ -504,7 +452,6 @@ PAGES = [
             '<li><strong>Integration setup?</strong> <a href="/pages/integrations">Integration guides</a></li>'
             "</ul>"
             "</div>"
-
             '<div class="section">'
             "<h2>Partner Program</h2>"
             "<p>We work with agencies, Shopify Partners, e-commerce consultancies, and content creators.</p>"
@@ -517,7 +464,6 @@ PAGES = [
             "</ul>"
             "<p>Email <strong>partners@agentred.io</strong> to apply.</p>"
             "</div>"
-
             "</div>"
         ),
     },

@@ -1,9 +1,11 @@
 """One-shot script: insert S136 handoff prompt into Knowledge DB."""
+
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db"))
 from db import KnowledgeDB
 
-db_path = os.path.join(os.path.dirname(__file__), '..', 'groundtruth.db')
+db_path = os.path.join(os.path.dirname(__file__), "..", "groundtruth.db")
 db = KnowledgeDB(db_path)
 
 prompt = r"""Continue work on Agent Red Customer Experience commercial project.
@@ -44,7 +46,16 @@ context = {
     "continuing": "SPEC-1652 quality cycle",
     "completed_subsystems": ["Dashboard", "Navbar", "Sidebar"],
     "next_subsystem": "Inbox",
-    "remaining_subsystems": ["Configuration", "Widget", "Knowledge Base", "Quick Actions", "Billing", "Team", "Integrations", "Memory/Privacy"],
+    "remaining_subsystems": [
+        "Configuration",
+        "Widget",
+        "Knowledge Base",
+        "Quick Actions",
+        "Billing",
+        "Team",
+        "Integrations",
+        "Memory/Privacy",
+    ],
     "pending_deployment": "SPEC-1654 standalone dist rebuilt, not yet deployed to staging",
 }
 

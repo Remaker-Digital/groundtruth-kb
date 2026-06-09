@@ -1,4 +1,5 @@
 """S115 verification script — checks all 6 post-execution conditions."""
+
 import sys, io, json
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -32,9 +33,7 @@ else:
 
 # === CHECK 3: Total test artifacts ===
 print("\n=== CHECK 3: Total Test Artifacts ===")
-test_count_row = conn.execute(
-    "SELECT COUNT(DISTINCT id) FROM tests"
-).fetchone()
+test_count_row = conn.execute("SELECT COUNT(DISTINCT id) FROM tests").fetchone()
 total_tests = test_count_row[0]
 print(f"  Total distinct test IDs: {total_tests}")
 if total_tests == 2633:

@@ -41,6 +41,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -299,6 +300,7 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
         print("Seeding knowledge base...")
         print()
         from scripts.seed_knowledge_base import TOTAL_ARTICLES, load_to_cosmos
+
         await load_to_cosmos(tenant_id=TENANT_ID)
         print()
 

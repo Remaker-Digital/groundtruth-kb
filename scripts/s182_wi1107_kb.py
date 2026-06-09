@@ -7,6 +7,7 @@ and records 26 test artifacts (TEST-10371..10396).
 """
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db
 

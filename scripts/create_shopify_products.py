@@ -42,6 +42,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

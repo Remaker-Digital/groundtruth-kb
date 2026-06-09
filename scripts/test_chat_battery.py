@@ -26,6 +26,7 @@ if sys.platform == "win32":
 # ---------------------------------------------------------------------------
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 # Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
@@ -50,9 +51,7 @@ async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list
     async with aiohttp.ClientSession() as session:
         # Create conversation if needed
         if not conv_id:
-            async with session.post(
-                f"{API}/api/chat/conversations", headers=headers, json={}
-            ) as resp:
+            async with session.post(f"{API}/api/chat/conversations", headers=headers, json={}) as resp:
                 data = await resp.json()
                 conv_id = data["conversation_id"]
 
@@ -118,7 +117,7 @@ async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list
                                 if "text" in d and "sequence" in d:
                                     tokens.append(d["text"])
                                 elif "stage" in d:
-                                    stages.append(f"{d['stage']}:{d.get('status','?')}")
+                                    stages.append(f"{d['stage']}:{d.get('status', '?')}")
                                 elif "detail" in d:
                                     tokens.append(f"[ERROR: {d['detail']}]")
                             except json.JSONDecodeError:
@@ -129,7 +128,7 @@ async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list
                                 if "text" in d and "sequence" in d:
                                     tokens.append(d["text"])
                                 elif "stage" in d:
-                                    stages.append(f"{d['stage']}:{d.get('status','?')}")
+                                    stages.append(f"{d['stage']}:{d.get('status', '?')}")
                                 elif "detail" in d:
                                     tokens.append(f"[ERROR: {d['detail']}]")
                             except json.JSONDecodeError:
@@ -272,7 +271,19 @@ async def main():
         {
             "mentions_starter": lambda r, l: "starter" in l,
             "makes_recommendation": lambda r, l: any(
-                w in l for w in ["recommend", "suggest", "ideal", "good fit", "perfect", "great fit", "great for", "best", "right for", "suit"]
+                w in l
+                for w in [
+                    "recommend",
+                    "suggest",
+                    "ideal",
+                    "good fit",
+                    "perfect",
+                    "great fit",
+                    "great for",
+                    "best",
+                    "right for",
+                    "suit",
+                ]
             ),
             "not_empty": lambda r, l: len(r) > 50,
         },
@@ -333,9 +344,7 @@ async def main():
         resp,
         {
             "doesnt_fabricate_weather": lambda r, l: "sunny" not in l and "rain" not in l and "degrees" not in l,
-            "stays_helpful": lambda r, l: any(
-                w in l for w in ["help", "assist", "agent red", "customer", "question"]
-            ),
+            "stays_helpful": lambda r, l: any(w in l for w in ["help", "assist", "agent red", "customer", "question"]),
             "not_empty": lambda r, l: len(r) > 20,
         },
     )

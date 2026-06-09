@@ -67,14 +67,12 @@ def _check_config(project_root: Path) -> dict[str, Any]:
 
     if config.allowed_request_operations:
         raise BoundaryCheckError(
-            "allowed_request_operations must be empty in this slice "
-            f"(got {list(config.allowed_request_operations)})"
+            f"allowed_request_operations must be empty in this slice (got {list(config.allowed_request_operations)})"
         )
 
     if set(config.allowed_read_operations) - SUPPORTED_READ_OPERATIONS:
         raise BoundaryCheckError(
-            "allowed_read_operations contains unsupported operations "
-            f"(supported: {sorted(SUPPORTED_READ_OPERATIONS)})"
+            f"allowed_read_operations contains unsupported operations (supported: {sorted(SUPPORTED_READ_OPERATIONS)})"
         )
 
     return {
@@ -88,9 +86,7 @@ def _check_config(project_root: Path) -> dict[str, Any]:
     }
 
 
-def _collect_function_sqlite_connects(
-    module_source: str, function_names: tuple[str, ...]
-) -> list[dict[str, Any]]:
+def _collect_function_sqlite_connects(module_source: str, function_names: tuple[str, ...]) -> list[dict[str, Any]]:
     """Return ``sqlite3.connect`` call sites inside any of the named functions.
 
     The check is AST-driven: it walks function bodies (including nested
@@ -144,8 +140,7 @@ def _check_no_raw_read_on_summary_path() -> dict[str, Any]:
             f"{finding['function']}:{finding['lineno']} -> {finding['snippet']}" for finding in findings
         )
         raise BoundaryCheckError(
-            "raw groundtruth.db sqlite3.connect() remains on the migrated "
-            f"summary path: {formatted}"
+            f"raw groundtruth.db sqlite3.connect() remains on the migrated summary path: {formatted}"
         )
 
     return {

@@ -32,28 +32,39 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
         encoding="utf-8",
     )
     if single_harness:
-        (root / "harness-state" / "role-assignments.json").write_text(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "harnesses": {"B": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "claude"}},
-                }
-            ),
-            encoding="utf-8",
-        )
+        harnesses = [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder", "loyal-opposition"],
+                "event_driven_hooks": True,
+            }
+        ]
     else:
-        (root / "harness-state" / "role-assignments.json").write_text(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "harnesses": {
-                        "B": {"role": ["prime-builder"], "harness_type": "claude"},
-                        "A": {"role": ["loyal-opposition"], "harness_type": "codex"},
-                    },
-                }
-            ),
-            encoding="utf-8",
-        )
+        harnesses = [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder"],
+                "event_driven_hooks": True,
+            },
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "event_driven_hooks": True,
+            },
+        ]
+    (root / "harness-state" / "harness-registry.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": harnesses}),
+        encoding="utf-8",
+    )
     return root
 
 
@@ -163,7 +174,7 @@ def test_doctor_warn_when_non_windows_host_applicable(tmp_path: Path, monkeypatc
 
 
 def test_doctor_warns_when_role_map_missing(tmp_path: Path) -> None:
-    """No role-assignments.json -> WARN (applicability undeterminable)."""
+    """No harness-registry.json -> WARN (applicability undeterminable)."""
     from groundtruth_kb.project.doctor import _check_single_harness_dispatcher_when_required
 
     check = _check_single_harness_dispatcher_when_required(tmp_path)

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Git pre-commit guardrail â€” Hardcoded Credential & FQDN Scanner.
 
@@ -29,44 +29,36 @@ import sys
 PATTERNS = [
     # Azure Container Apps FQDNs
     (
-        re.compile(
-            r'''["']https?://agent-red-[a-z0-9-]+\.[a-z0-9-]+\.[a-z0-9]+\.azurecontainerapps\.io[^"']*["']'''
-        ),
+        re.compile(r"""["']https?://agent-red-[a-z0-9-]+\.[a-z0-9-]+\.[a-z0-9]+\.azurecontainerapps\.io[^"']*["']"""),
         "Hardcoded Azure Container Apps FQDN",
     ),
     # Redis Cache FQDNs
     (
-        re.compile(
-            r'''["']https?://[a-z0-9-]+\.redis\.cache\.windows\.net[^"']*["']'''
-        ),
+        re.compile(r"""["']https?://[a-z0-9-]+\.redis\.cache\.windows\.net[^"']*["']"""),
         "Hardcoded Azure Redis FQDN",
     ),
     # Cosmos DB FQDNs
     (
-        re.compile(
-            r'''["']https?://[a-z0-9-]+\.documents\.azure\.com[^"']*["']'''
-        ),
+        re.compile(r"""["']https?://[a-z0-9-]+\.documents\.azure\.com[^"']*["']"""),
         "Hardcoded Cosmos DB FQDN",
     ),
     # Key Vault FQDNs
     (
-        re.compile(
-            r'''["']https?://[a-z0-9-]+\.vault\.azure\.net[^"']*["']'''
-        ),
+        re.compile(r"""["']https?://[a-z0-9-]+\.vault\.azure\.net[^"']*["']"""),
         "Hardcoded Key Vault FQDN",
     ),
     # Agent Red API keys (SPEC-1845: includes ar_user_ pattern)
     (
-        re.compile(r'''["']ar_(spa|tenant|widget|user)_[A-Za-z0-9_]{16,}["']'''),
+        re.compile(r"""["']ar_(spa|tenant|widget|user)_[A-Za-z0-9_]{16,}["']"""),
         "Hardcoded API key (ar_* prefix)",
     ),
     (
-        re.compile(r'''["']ar_spa_plat_[A-Za-z0-9]{16,}["']'''),
+        re.compile(r"""["']ar_spa_plat_[A-Za-z0-9]{16,}["']"""),
         "Hardcoded platform admin API key",
     ),
     # Azure connection strings
     (
-        re.compile(r'''["']AccountEndpoint=https://[^"']+;AccountKey=[^"']+["']'''),
+        re.compile(r"""["']AccountEndpoint=https://[^"']+;AccountKey=[^"']+["']"""),
         "Hardcoded Azure connection string",
     ),
 ]
@@ -185,4 +177,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

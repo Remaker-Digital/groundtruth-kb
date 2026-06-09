@@ -49,8 +49,7 @@ def main():
                 "type": "process",
                 "status": "verified",
                 "description": (
-                    "Claude must request owner approval before modifying any "
-                    "automation script listed in GOV-17."
+                    "Claude must request owner approval before modifying any automation script listed in GOV-17."
                 ),
             },
         ],
@@ -84,17 +83,14 @@ def main():
                 "type": "functional",
                 "status": "specified",
                 "description": (
-                    "scripts/test_pipeline.py runs all test phases without "
-                    "any human or Claude interaction."
+                    "scripts/test_pipeline.py runs all test phases without any human or Claude interaction."
                 ),
             },
             {
                 "id": "SPEC-1616-A2",
                 "type": "functional",
                 "status": "specified",
-                "description": (
-                    "Exit code 0 = all PASS/WARN, exit code 1 = any FAIL."
-                ),
+                "description": ("Exit code 0 = all PASS/WARN, exit code 1 = any FAIL."),
             },
             {
                 "id": "SPEC-1616-A3",
@@ -132,17 +128,14 @@ def main():
                 "id": "SPEC-1617-A1",
                 "type": "functional",
                 "status": "specified",
-                "description": (
-                    "One DEFECT WI is created per failed phase in the test pipeline."
-                ),
+                "description": ("One DEFECT WI is created per failed phase in the test pipeline."),
             },
             {
                 "id": "SPEC-1617-A2",
                 "type": "functional",
                 "status": "specified",
                 "description": (
-                    "DEFECT WIs include diagnostic information: phase, name, "
-                    "detail, environment, version."
+                    "DEFECT WIs include diagnostic information: phase, name, detail, environment, version."
                 ),
             },
         ],
@@ -175,18 +168,14 @@ def main():
                 "id": "SPEC-1618-A1",
                 "type": "functional",
                 "status": "specified",
-                "description": (
-                    "Phase 0 fails immediately if Python < 3.12, pytest, "
-                    "or Playwright are not available."
-                ),
+                "description": ("Phase 0 fails immediately if Python < 3.12, pytest, or Playwright are not available."),
             },
             {
                 "id": "SPEC-1618-A2",
                 "type": "functional",
                 "status": "specified",
                 "description": (
-                    "For --phase live/all: Phase 0 validates .env.local "
-                    "credentials and /health endpoint reachability."
+                    "For --phase live/all: Phase 0 validates .env.local credentials and /health endpoint reachability."
                 ),
             },
         ],
@@ -220,18 +209,14 @@ def main():
                 "type": "functional",
                 "status": "specified",
                 "description": (
-                    "All subprocess output appears on stdout in real time, "
-                    "line by line, as subprocesses execute."
+                    "All subprocess output appears on stdout in real time, line by line, as subprocesses execute."
                 ),
             },
             {
                 "id": "SPEC-1619-A2",
                 "type": "functional",
                 "status": "specified",
-                "description": (
-                    "Output is simultaneously captured for log files and "
-                    "result parsing."
-                ),
+                "description": ("Output is simultaneously captured for log files and result parsing."),
             },
         ],
         changed_by=CHANGED_BY,
@@ -263,8 +248,7 @@ def main():
                 "type": "functional",
                 "status": "specified",
                 "description": (
-                    "GOV-14 (UI test maintenance) is automated as git diff "
-                    "analysis in test_pipeline.py Phase 8."
+                    "GOV-14 (UI test maintenance) is automated as git diff analysis in test_pipeline.py Phase 8."
                 ),
             },
             {
@@ -459,8 +443,8 @@ def main():
     # GOV-13: assign to test plan phase
     plan_phases = {
         "integration": "PHASE-002",  # Integration tests
-        "unit": "PHASE-001",         # Unit tests
-        "assertion": "PHASE-004",    # KB assertion checks
+        "unit": "PHASE-001",  # Unit tests
+        "assertion": "PHASE-004",  # KB assertion checks
     }
 
     for t in tests:
@@ -491,6 +475,7 @@ def main():
                 existing_ids = phase.get("test_ids") or []
                 if isinstance(existing_ids, str):
                     import json
+
                     existing_ids = json.loads(existing_ids)
                 if t["id"] not in existing_ids:
                     existing_ids.append(t["id"])

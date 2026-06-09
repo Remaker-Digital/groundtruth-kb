@@ -221,9 +221,7 @@ def render(rows: list[sqlite3.Row], inventory_path: Path) -> str:
             "## Potentially Consequential Items",
             "",
             "Heuristics:",
-            "- Title contains one of: `"
-            + "`, `".join(CONSEQUENTIAL_KEYWORDS)
-            + "`.",
+            "- Title contains one of: `" + "`, `".join(CONSEQUENTIAL_KEYWORDS) + "`.",
             f"- WI id appears as a substring in any `bridge/` thread filename "
             f"with mtime within {BRIDGE_LOOKBACK_DAYS} days of `{BRIDGE_WINDOW_END}`.",
             "",
@@ -244,9 +242,7 @@ def render(rows: list[sqlite3.Row], inventory_path: Path) -> str:
             kw = ", ".join(item["title_keywords"]) if item["title_keywords"] else "—"
             bt = ", ".join(item["bridge_threads"]) if item["bridge_threads"] else "—"
             title = item["title"].replace("|", "\\|")
-            lines.append(
-                f"| `{item['wi_id']}` | {title} | `{item['transition']}` | {kw} | {bt} |"
-            )
+            lines.append(f"| `{item['wi_id']}` | {title} | `{item['transition']}` | {kw} | {bt} |")
     else:
         lines.append("(No items matched the heuristics.)")
 

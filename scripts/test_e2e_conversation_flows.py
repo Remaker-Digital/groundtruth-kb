@@ -33,6 +33,7 @@ if sys.platform == "win32":
 # ---------------------------------------------------------------------------
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 # Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
@@ -49,6 +50,7 @@ INVALID_WIDGET_KEY = "pk_live_invalid_key_00000000"
 # ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
+
 
 async def _post(session, path, json_body=None, headers=None, widget_key=WIDGET_KEY):
     """POST with widget key auth."""
@@ -97,10 +99,14 @@ async def send_and_stream(session, conv_id, content, timeout=45):
     import aiohttp
 
     # 1. Send the customer message
-    status, msg_data = await _post(session, "/api/chat/message", {
-        "conversation_id": conv_id,
-        "content": content,
-    })
+    status, msg_data = await _post(
+        session,
+        "/api/chat/message",
+        {
+            "conversation_id": conv_id,
+            "content": content,
+        },
+    )
     if status != 200 or not msg_data.get("accepted"):
         return f"(message rejected: status={status} data={msg_data})", [], None, msg_data
 
@@ -235,33 +241,28 @@ async def test_1_conversation_lifecycle(session):
     record("1d: Has created_at", "created_at" in create_data)
 
     # 1e-g. Send message + SSE stream (triggers pipeline)
-    response, stages, state, msg_data = await send_and_stream(
-        session, conv_id, "What is Agent Red?"
-    )
+    response, stages, state, msg_data = await send_and_stream(session, conv_id, "What is Agent Red?")
     record("1e: Message accepted", msg_data.get("accepted", False))
-    record("1f: AI responded via SSE", len(response) > 50,
-           f"len={len(response)}")
-    record("1g: Pipeline stages present", len(stages) >= 4,
-           f"stages={' -> '.join(stages)}")
+    record("1f: AI responded via SSE", len(response) > 50, f"len={len(response)}")
+    record("1g: Pipeline stages present", len(stages) >= 4, f"stages={' -> '.join(stages)}")
 
     # 1h-j. Get conversation state
     status, state_data = await get_conversation(session, conv_id)
     record("1h: Get state succeeds", status == 200)
     msgs = state_data.get("messages", [])
-    record("1i: State has customer + AI messages", len(msgs) >= 2,
-           f"msgs={len(msgs)}")
+    record("1i: State has customer + AI messages", len(msgs) >= 2, f"msgs={len(msgs)}")
     record("1j: Status is active", state_data.get("status") == "active")
 
     # 1k-l. End conversation with feedback
     status, end_data = await end_conversation(
-        session, conv_id,
+        session,
+        conv_id,
         feedback_rating=5,
         feedback_text="Great conversation!",
         reason="resolved",
     )
     record("1k: End conversation succeeds", status == 200)
-    record("1l: End returns terminal status",
-           end_data.get("status") in ("completed", "ended", "closed"))
+    record("1l: End returns terminal status", end_data.get("status") in ("completed", "ended", "closed"))
 
     return conv_id
 
@@ -279,11 +280,15 @@ async def test_2_conversation_with_initial_message(session):
 
     # The initial message is stored; now SSE triggers the pipeline
     await asyncio.sleep(0.5)
-    response, stages, _, _ = await send_and_stream.__wrapped__(session, conv_id) \
-        if hasattr(send_and_stream, '__wrapped__') else (None, [], None, None)
+    response, stages, _, _ = (
+        await send_and_stream.__wrapped__(session, conv_id)
+        if hasattr(send_and_stream, "__wrapped__")
+        else (None, [], None, None)
+    )
 
     # Actually, let's stream directly since the initial message was already sent
     import aiohttp
+
     tokens = []
     try:
         sse_timeout = aiohttp.ClientTimeout(total=45)
@@ -329,13 +334,14 @@ async def test_2_conversation_with_initial_message(session):
                 response = msg.get("content", "")
                 break
 
-    record("2b: AI responded to initial message", len(response) > 50,
-           f"len={len(response)}")
+    record("2b: AI responded to initial message", len(response) > 50, f"len={len(response)}")
 
     content = response.lower()
-    record("2c: Response mentions pricing",
-           "price" in content or "$" in content or "plan" in content,
-           f"resp={content[:150]}")
+    record(
+        "2c: Response mentions pricing",
+        "price" in content or "$" in content or "plan" in content,
+        f"resp={content[:150]}",
+    )
 
 
 async def test_3_multi_turn_context_retention(session):
@@ -345,42 +351,58 @@ async def test_3_multi_turn_context_retention(session):
     conv_id, _ = await create_conversation(session)
 
     # Turn 1: Establish topic
-    resp1, stages1, _, _ = await send_and_stream(
-        session, conv_id, "I'm interested in the Starter plan"
-    )
-    record("3a: Turn 1 responded", len(resp1) > 20,
-           f"len={len(resp1)}")
+    resp1, stages1, _, _ = await send_and_stream(session, conv_id, "I'm interested in the Starter plan")
+    record("3a: Turn 1 responded", len(resp1) > 20, f"len={len(resp1)}")
 
     # Turn 2: Follow-up referencing previous context
     await asyncio.sleep(1)
     resp2, _, _, _ = await send_and_stream(
-        session, conv_id,
+        session,
+        conv_id,
         "How many conversations are included in that plan?",
     )
     lower2 = resp2.lower()
-    record("3b: Turn 2 references Starter context",
-           "1,000" in lower2 or "1000" in lower2 or "starter" in lower2,
-           f"resp={lower2[:150]}")
+    record(
+        "3b: Turn 2 references Starter context",
+        "1,000" in lower2 or "1000" in lower2 or "starter" in lower2,
+        f"resp={lower2[:150]}",
+    )
 
     # Turn 3: Another follow-up
     await asyncio.sleep(1)
     resp3, _, _, _ = await send_and_stream(
-        session, conv_id,
+        session,
+        conv_id,
         "What happens if I go over that limit?",
     )
     lower3 = resp3.lower()
-    record("3c: Turn 3 addresses follow-up",
-           len(resp3) > 20 and any(w in lower3 for w in [
-               "overage", "pack", "additional", "extra", "$0.04", "beyond",
-               "conversation", "limit", "exceed", "more", "plan", "upgrade",
-           ]),
-           f"resp={lower3[:150]}")
+    record(
+        "3c: Turn 3 addresses follow-up",
+        len(resp3) > 20
+        and any(
+            w in lower3
+            for w in [
+                "overage",
+                "pack",
+                "additional",
+                "extra",
+                "$0.04",
+                "beyond",
+                "conversation",
+                "limit",
+                "exceed",
+                "more",
+                "plan",
+                "upgrade",
+            ]
+        ),
+        f"resp={lower3[:150]}",
+    )
 
     # Check full state — at least 2 AI responses (3rd may not persist before state query)
     _, state = await get_conversation(session, conv_id)
     ai_msgs = [m for m in state.get("messages", []) if m.get("role") in ("ai", "assistant")]
-    record("3d: Has 2+ AI responses", len(ai_msgs) >= 2,
-           f"ai_msgs={len(ai_msgs)}")
+    record("3d: Has 2+ AI responses", len(ai_msgs) >= 2, f"ai_msgs={len(ai_msgs)}")
 
 
 async def test_4_edge_case_messages(session):
@@ -391,35 +413,36 @@ async def test_4_edge_case_messages(session):
 
     # 4a: Very short message
     resp, _, _, msg_data = await send_and_stream(session, conv_id, "Hi")
-    record("4a: Short message accepted + responded",
-           msg_data.get("accepted") and len(resp) > 5)
+    record("4a: Short message accepted + responded", msg_data.get("accepted") and len(resp) > 5)
 
     # 4b: Message with special characters
     await asyncio.sleep(1)
     resp, _, _, msg_data = await send_and_stream(
-        session, conv_id,
+        session,
+        conv_id,
         "What about <script>alert('xss')</script> & HTML entities? $100 + 50% = ?",
     )
     record("4b: Special chars accepted", msg_data.get("accepted"))
-    record("4c: No script injection in response",
-           "<script>" not in resp and "alert(" not in resp)
+    record("4c: No script injection in response", "<script>" not in resp and "alert(" not in resp)
 
     # 4d: Unicode message
     await asyncio.sleep(1)
-    resp, _, _, msg_data = await send_and_stream(
-        session, conv_id, "Hello! Can you help me? Thanks!")
-    record("4d: Unicode accepted + responded",
-           msg_data.get("accepted") and len(resp) > 5)
+    resp, _, _, msg_data = await send_and_stream(session, conv_id, "Hello! Can you help me? Thanks!")
+    record("4d: Unicode accepted + responded", msg_data.get("accepted") and len(resp) > 5)
 
     # 4e: Long message
     await asyncio.sleep(1)
     long_msg = "I need help with " + ("my store setup and configuration. " * 100)
     long_msg = long_msg[:3900]
-    status, msg_data = await _post(session, "/api/chat/message", {
-        "conversation_id": conv_id, "content": long_msg,
-    })
-    record("4e: Long message (3900 chars) accepted",
-           status == 200 and msg_data.get("accepted"))
+    status, msg_data = await _post(
+        session,
+        "/api/chat/message",
+        {
+            "conversation_id": conv_id,
+            "content": long_msg,
+        },
+    )
+    record("4e: Long message (3900 chars) accepted", status == 200 and msg_data.get("accepted"))
 
 
 async def test_5_widget_key_authentication(session):
@@ -428,11 +451,12 @@ async def test_5_widget_key_authentication(session):
 
     # 5a: Create with invalid key
     status, _ = await _post(
-        session, "/api/chat/conversations", {},
+        session,
+        "/api/chat/conversations",
+        {},
         widget_key=INVALID_WIDGET_KEY,
     )
-    record("5a: Invalid key rejected on create", status in (401, 403),
-           f"status={status}")
+    record("5a: Invalid key rejected on create", status in (401, 403), f"status={status}")
 
     # 5b: Create with no key
     async with session.post(
@@ -440,8 +464,7 @@ async def test_5_widget_key_authentication(session):
         headers={"Content-Type": "application/json"},
         json={},
     ) as resp:
-        record("5b: No key rejected on create", resp.status in (401, 403),
-               f"status={resp.status}")
+        record("5b: No key rejected on create", resp.status in (401, 403), f"status={resp.status}")
 
     # 5c: Valid key creates successfully
     status, data = await _post(session, "/api/chat/conversations", {})
@@ -452,7 +475,8 @@ async def test_5_widget_key_authentication(session):
 
         # 5d: Send message with invalid key
         status, _ = await _post(
-            session, "/api/chat/message",
+            session,
+            "/api/chat/message",
             {"conversation_id": conv_id, "content": "test"},
             widget_key=INVALID_WIDGET_KEY,
         )
@@ -460,29 +484,31 @@ async def test_5_widget_key_authentication(session):
 
         # 5e: Get state with invalid key
         status, _ = await _get(
-            session, f"/api/chat/conversations/{conv_id}",
+            session,
+            f"/api/chat/conversations/{conv_id}",
             widget_key=INVALID_WIDGET_KEY,
         )
         record("5e: Invalid key rejected on get state", status in (401, 403))
 
         # 5f: End with invalid key
         status, _ = await _post(
-            session, f"/api/chat/conversations/{conv_id}/end", {},
+            session,
+            f"/api/chat/conversations/{conv_id}/end",
+            {},
             widget_key=INVALID_WIDGET_KEY,
         )
         record("5f: Invalid key rejected on end", status in (401, 403))
 
         # 5g: SSE stream with invalid key
         import aiohttp
+
         try:
             async with session.get(
                 f"{API}/api/chat/stream/{conv_id}",
                 headers={"X-Widget-Key": INVALID_WIDGET_KEY},
                 timeout=aiohttp.ClientTimeout(total=5),
             ) as resp:
-                record("5g: Invalid key rejected on stream",
-                       resp.status in (401, 403),
-                       f"status={resp.status}")
+                record("5g: Invalid key rejected on stream", resp.status in (401, 403), f"status={resp.status}")
         except Exception:
             record("5g: Invalid key rejected on stream", True, "Connection refused/closed")
 
@@ -492,9 +518,7 @@ async def test_6_conversation_state_persistence(session):
     print("\n[6/12] State persistence...")
 
     conv_id, _ = await create_conversation(session)
-    response, stages, state, _ = await send_and_stream(
-        session, conv_id, "What features does Agent Red offer?"
-    )
+    response, stages, state, _ = await send_and_stream(session, conv_id, "What features does Agent Red offer?")
 
     # Retrieve state
     status, data = await get_conversation(session, conv_id)
@@ -506,22 +530,27 @@ async def test_6_conversation_state_persistence(session):
 
     record("6b: Has customer message", len(customer_msgs) >= 1)
     record("6c: Has AI response", len(ai_msgs) >= 1)
-    record("6d: Messages in chronological order",
-           all(messages[i].get("timestamp", "") <= messages[i + 1].get("timestamp", "")
-               for i in range(len(messages) - 1)) if len(messages) > 1 else True)
-    record("6e: Turn count >= 1",
-           data.get("turn_count", 0) >= 1,
-           f"turns={data.get('turn_count')}")
-    record("6f: Message count matches array",
-           data.get("message_count", 0) == len(messages),
-           f"count={data.get('message_count')}, array={len(messages)}")
+    record(
+        "6d: Messages in chronological order",
+        all(messages[i].get("timestamp", "") <= messages[i + 1].get("timestamp", "") for i in range(len(messages) - 1))
+        if len(messages) > 1
+        else True,
+    )
+    record("6e: Turn count >= 1", data.get("turn_count", 0) >= 1, f"turns={data.get('turn_count')}")
+    record(
+        "6f: Message count matches array",
+        data.get("message_count", 0) == len(messages),
+        f"count={data.get('message_count')}, array={len(messages)}",
+    )
 
     # Verify the AI response content matches what was streamed
     if ai_msgs:
         stored_resp = ai_msgs[-1].get("content", "")
-        record("6g: Stored response matches SSE stream",
-               len(stored_resp) > 50 and stored_resp[:50] in response[:100] if response else True,
-               f"stored={len(stored_resp)}, streamed={len(response)}")
+        record(
+            "6g: Stored response matches SSE stream",
+            len(stored_resp) > 50 and stored_resp[:50] in response[:100] if response else True,
+            f"stored={len(stored_resp)}, streamed={len(response)}",
+        )
 
 
 async def test_7_nonexistent_conversation(session):
@@ -533,9 +562,14 @@ async def test_7_nonexistent_conversation(session):
     status, _ = await get_conversation(session, fake_id)
     record("7a: Get nonexistent returns 404", status == 404)
 
-    status, _ = await _post(session, "/api/chat/message", {
-        "conversation_id": fake_id, "content": "Hello",
-    })
+    status, _ = await _post(
+        session,
+        "/api/chat/message",
+        {
+            "conversation_id": fake_id,
+            "content": "Hello",
+        },
+    )
     record("7b: Message to nonexistent returns 404", status == 404)
 
     status, _ = await end_conversation(session, fake_id)
@@ -553,21 +587,24 @@ async def test_8_ended_conversation_behavior(session):
     # Read ended conversation
     status, data = await get_conversation(session, conv_id)
     record("8a: Can still read ended conversation", status == 200)
-    record("8b: Status shows ended",
-           data.get("status") in ("completed", "ended", "closed"),
-           f"status={data.get('status')}")
+    record(
+        "8b: Status shows ended", data.get("status") in ("completed", "ended", "closed"), f"status={data.get('status')}"
+    )
 
     # Send to ended
-    status, data = await _post(session, "/api/chat/message", {
-        "conversation_id": conv_id, "content": "Another question",
-    })
-    record("8c: Message to ended returns 409", status == 409,
-           f"status={status}")
+    status, data = await _post(
+        session,
+        "/api/chat/message",
+        {
+            "conversation_id": conv_id,
+            "content": "Another question",
+        },
+    )
+    record("8c: Message to ended returns 409", status == 409, f"status={status}")
 
     # Re-end
     status, _ = await end_conversation(session, conv_id)
-    record("8d: Re-ending returns 409", status == 409,
-           f"status={status}")
+    record("8d: Re-ending returns 409", status == 409, f"status={status}")
 
 
 async def test_9_escalation_flow(session):
@@ -576,22 +613,37 @@ async def test_9_escalation_flow(session):
 
     conv_id, _ = await create_conversation(session)
     response, stages, state, _ = await send_and_stream(
-        session, conv_id,
+        session,
+        conv_id,
         "I need to speak with a human agent right now. This is urgent and the AI is not helping.",
     )
 
     lower = response.lower()
-    record("9a: Escalation acknowledged",
-           any(w in lower for w in [
-               "understand", "human", "agent", "team", "support",
-               "connect", "transfer", "escalat", "help",
-           ]),
-           f"resp={lower[:150]}")
+    record(
+        "9a: Escalation acknowledged",
+        any(
+            w in lower
+            for w in [
+                "understand",
+                "human",
+                "agent",
+                "team",
+                "support",
+                "connect",
+                "transfer",
+                "escalat",
+                "help",
+            ]
+        ),
+        f"resp={lower[:150]}",
+    )
 
     _, state_data = await get_conversation(session, conv_id)
-    record("9b: Conversation state accessible",
-           state_data.get("status") in ("active", "escalated"),
-           f"status={state_data.get('status')}")
+    record(
+        "9b: Conversation state accessible",
+        state_data.get("status") in ("active", "escalated"),
+        f"status={state_data.get('status')}",
+    )
 
 
 async def test_10_concurrent_conversations(session):
@@ -602,9 +654,7 @@ async def test_10_concurrent_conversations(session):
     tasks = [create_conversation(session) for _ in range(3)]
     convs = await asyncio.gather(*tasks, return_exceptions=True)
     valid_convs = [(cid, data) for cid, data in convs if isinstance(cid, str)]
-    record("10a: Created 3 concurrent conversations",
-           len(valid_convs) == 3,
-           f"created={len(valid_convs)}")
+    record("10a: Created 3 concurrent conversations", len(valid_convs) == 3, f"created={len(valid_convs)}")
 
     ids = [cid for cid, _ in valid_convs]
     record("10b: All have unique IDs", len(set(ids)) == len(ids))
@@ -618,19 +668,20 @@ async def test_10_concurrent_conversations(session):
         responses = []
         for i in range(2):
             resp, _, _, _ = await send_and_stream(
-                session, valid_convs[i][0], questions[i],
+                session,
+                valid_convs[i][0],
+                questions[i],
             )
             if len(resp) > 10:
                 responses.append(resp)
             await asyncio.sleep(3)
 
-        record("10c: At least 1 concurrent conversation got responses",
-               len(responses) >= 1,
-               f"resp_count={len(responses)}")
+        record(
+            "10c: At least 1 concurrent conversation got responses", len(responses) >= 1, f"resp_count={len(responses)}"
+        )
 
         if len(responses) == 2:
-            record("10d: Responses are different",
-                   responses[0] != responses[1])
+            record("10d: Responses are different", responses[0] != responses[1])
 
 
 async def test_11_stream_status_endpoint(session):
@@ -641,14 +692,15 @@ async def test_11_stream_status_endpoint(session):
 
     status, data = await _get(session, f"/api/chat/stream/{conv_id}/status")
     record("11a: Stream status returns 200", status == 200)
-    record("11b: Has expected fields",
-           all(k in data for k in ["conversation_id", "is_streaming", "tab_count", "can_connect"]),
-           f"keys={list(data.keys())}")
-    record("11c: Not streaming initially",
-           data.get("is_streaming") is False,
-           f"is_streaming={data.get('is_streaming')}")
-    record("11d: Can connect",
-           data.get("can_connect") is True)
+    record(
+        "11b: Has expected fields",
+        all(k in data for k in ["conversation_id", "is_streaming", "tab_count", "can_connect"]),
+        f"keys={list(data.keys())}",
+    )
+    record(
+        "11c: Not streaming initially", data.get("is_streaming") is False, f"is_streaming={data.get('is_streaming')}"
+    )
+    record("11d: Can connect", data.get("can_connect") is True)
 
 
 async def test_12_pipeline_stages(session):
@@ -656,38 +708,30 @@ async def test_12_pipeline_stages(session):
     print("\n[12/12] Pipeline stages verification...")
 
     conv_id, _ = await create_conversation(session)
-    response, stages, _, _ = await send_and_stream(
-        session, conv_id, "How much does Agent Red cost?"
-    )
+    response, stages, _, _ = await send_and_stream(session, conv_id, "How much does Agent Red cost?")
 
     # Expected stages: IC -> KR -> RG -> CR
     stage_names = [s.split(":")[0] for s in stages]
-    record("12a: Intent classifier ran",
-           "intent-classifier" in stage_names,
-           f"stages={stage_names}")
-    record("12b: Knowledge retrieval ran",
-           "knowledge-retrieval" in stage_names)
-    record("12c: Response generator ran",
-           "response-generator" in stage_names)
-    record("12d: Critic supervisor ran",
-           "critic-supervisor" in stage_names)
+    record("12a: Intent classifier ran", "intent-classifier" in stage_names, f"stages={stage_names}")
+    record("12b: Knowledge retrieval ran", "knowledge-retrieval" in stage_names)
+    record("12c: Response generator ran", "response-generator" in stage_names)
+    record("12d: Critic supervisor ran", "critic-supervisor" in stage_names)
 
     # Check all stages completed
     completed_stages = [s for s in stages if "completed" in s]
-    record("12e: All stages completed",
-           len(completed_stages) >= 4,
-           f"completed={len(completed_stages)}")
+    record("12e: All stages completed", len(completed_stages) >= 4, f"completed={len(completed_stages)}")
 
     # Response should mention pricing
     lower = response.lower()
-    record("12f: Response has pricing data",
-           "$" in response or "price" in lower or "plan" in lower,
-           f"resp={lower[:150]}")
+    record(
+        "12f: Response has pricing data", "$" in response or "price" in lower or "plan" in lower, f"resp={lower[:150]}"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 async def main():
     import aiohttp

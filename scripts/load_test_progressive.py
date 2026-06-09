@@ -259,26 +259,18 @@ def _run_round(
                 if row.get("Name") == "Aggregated":
                     result.total_requests = int(row.get("Request Count", 0))
                     result.total_failures = int(row.get("Failure Count", 0))
-                    result.avg_response_time = float(
-                        row.get("Average Response Time", 0)
-                    )
+                    result.avg_response_time = float(row.get("Average Response Time", 0))
                     result.p50 = float(row.get("50%", 0))
                     result.p75 = float(row.get("75%", 0))
                     result.p90 = float(row.get("90%", 0))
                     result.p95 = float(row.get("95%", 0))
                     result.p99 = float(row.get("99%", 0))
-                    result.max_response_time = float(
-                        row.get("Max Response Time", 0)
-                    )
-                    result.rps = float(
-                        row.get("Requests/s", 0)
-                    )
+                    result.max_response_time = float(row.get("Max Response Time", 0))
+                    result.rps = float(row.get("Requests/s", 0))
 
                     total = result.total_requests
                     if total > 0:
-                        result.error_rate_pct = (
-                            result.total_failures / total * 100
-                        )
+                        result.error_rate_pct = result.total_failures / total * 100
                     break
 
         result.raw_csv = stats_csv
@@ -295,10 +287,7 @@ def _run_round(
                 occurrences = int(row.get("Occurrences", 0))
                 if "429" in error_msg:
                     result.status_429_count += occurrences
-                elif any(
-                    str(code) in error_msg
-                    for code in [500, 502, 503, 504]
-                ):
+                elif any(str(code) in error_msg for code in [500, 502, 503, 504]):
                     result.status_5xx_count += occurrences
 
     _print_round_summary(result)
@@ -361,24 +350,13 @@ def _print_summary_table(results: list[RoundResult]) -> str:
     # Find where P95 exceeds SLA thresholds
     for r in results:
         if r.p95 > 2000:
-            lines.append(
-                f"  [!] P95 SLA violation at {r.users} users "
-                f"({r.name}): {r.p95:.0f}ms > 2,000ms"
-            )
+            lines.append(f"  [!] P95 SLA violation at {r.users} users ({r.name}): {r.p95:.0f}ms > 2,000ms")
         if r.p99 > 5000:
-            lines.append(
-                f"  [!] P99 SLA violation at {r.users} users "
-                f"({r.name}): {r.p99:.0f}ms > 5,000ms"
-            )
+            lines.append(f"  [!] P99 SLA violation at {r.users} users ({r.name}): {r.p99:.0f}ms > 5,000ms")
         if r.error_rate_pct > 5:
-            lines.append(
-                f"  [!] Error rate > 5% at {r.users} users "
-                f"({r.name}): {r.error_rate_pct:.1f}%"
-            )
+            lines.append(f"  [!] Error rate > 5% at {r.users} users ({r.name}): {r.error_rate_pct:.1f}%")
         if r.status_429_count > 0:
-            pct_429 = (
-                r.status_429_count / max(r.total_requests, 1) * 100
-            )
+            pct_429 = r.status_429_count / max(r.total_requests, 1) * 100
             lines.append(
                 f"  [R] Rate-limited at {r.users} users "
                 f"({r.name}): {r.status_429_count} / "
@@ -388,18 +366,12 @@ def _print_summary_table(results: list[RoundResult]) -> str:
     # Peak throughput
     if results:
         peak = max(results, key=lambda r: r.rps)
-        lines.append(
-            f"\n  Peak throughput: {peak.rps:.1f} RPS at {peak.users} "
-            f"users ({peak.name})"
-        )
+        lines.append(f"\n  Peak throughput: {peak.rps:.1f} RPS at {peak.users} users ({peak.name})")
 
         # Find inflection point (where error rate first exceeds 1%)
         for r in results:
             if r.error_rate_pct > 1.0 and r.total_requests > 10:
-                lines.append(
-                    f"  Error inflection: {r.users} users ({r.name}) — "
-                    f"{r.error_rate_pct:.1f}% error rate"
-                )
+                lines.append(f"  Error inflection: {r.users} users ({r.name}) — {r.error_rate_pct:.1f}% error rate")
                 break
 
         # Find latency inflection (where P95 doubles from baseline)
@@ -407,11 +379,7 @@ def _print_summary_table(results: list[RoundResult]) -> str:
         for r in results:
             if baseline_p95 is None and r.total_requests > 10:
                 baseline_p95 = r.p95
-            elif (
-                baseline_p95
-                and r.p95 > baseline_p95 * 2
-                and r.total_requests > 10
-            ):
+            elif baseline_p95 and r.p95 > baseline_p95 * 2 and r.total_requests > 10:
                 lines.append(
                     f"  Latency inflection: {r.users} users ({r.name}) — "
                     f"P95 {r.p95:.0f}ms (2x baseline {baseline_p95:.0f}ms)"
@@ -428,9 +396,7 @@ def _print_summary_table(results: list[RoundResult]) -> str:
 
 def main() -> None:
     """Run progressive load tests."""
-    parser = argparse.ArgumentParser(
-        description="Progressive load test runner for Agent Red"
-    )
+    parser = argparse.ArgumentParser(description="Progressive load test runner for Agent Red")
     parser.add_argument(
         "--env",
         choices=["staging", "local"],

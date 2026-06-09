@@ -135,7 +135,9 @@ def fix_2_document_lost_specs(db: KnowledgeDB, *, apply: bool = False) -> dict:
         content += "## Conclusion\n"
         content += "All 7 lost v1 topics are either SUPERSEDED (covered by other specs/VR baselines), "
         content += "CONTRADICTED (intentionally reversed), or PARTIALLY_LOST (testing methodology detail). "
-        content += "No new specs are needed. Future sessions should create new spec IDs instead of reusing existing ones."
+        content += (
+            "No new specs are needed. Future sessions should create new spec IDs instead of reusing existing ones."
+        )
 
         db.insert_document(
             id="DOC-s159-drift-audit",
@@ -177,12 +179,10 @@ def fix_3_review_stale_tests(db: KnowledgeDB, *, apply: bool = False) -> dict:
 
         # Get earliest and latest titles
         first = conn.execute(
-            "SELECT title FROM specifications WHERE id = ? ORDER BY version LIMIT 1",
-            (spec_id,)
+            "SELECT title FROM specifications WHERE id = ? ORDER BY version LIMIT 1", (spec_id,)
         ).fetchone()
         latest = conn.execute(
-            "SELECT title FROM specifications WHERE id = ? ORDER BY version DESC LIMIT 1",
-            (spec_id,)
+            "SELECT title FROM specifications WHERE id = ? ORDER BY version DESC LIMIT 1", (spec_id,)
         ).fetchone()
 
         if not first or not latest:
@@ -201,10 +201,7 @@ def fix_3_review_stale_tests(db: KnowledgeDB, *, apply: bool = False) -> dict:
             continue  # Title changed but similar meaning
 
         # Get tests linked to this spec
-        tests = conn.execute(
-            "SELECT id, title FROM current_tests WHERE spec_id = ?",
-            (spec_id,)
-        ).fetchall()
+        tests = conn.execute("SELECT id, title FROM current_tests WHERE spec_id = ?", (spec_id,)).fetchall()
 
         for t in tests:
             test_title = (t["title"] or "").lower()
@@ -217,20 +214,24 @@ def fix_3_review_stale_tests(db: KnowledgeDB, *, apply: bool = False) -> dict:
             old_match = len(test_words & first_words) / max(len(test_words), 1)
 
             if old_match > current_match and current_match < 0.2:
-                stale_tests.append({
-                    "test_id": t["id"],
-                    "test_title": t["title"],
-                    "spec_id": spec_id,
-                    "old_spec_title": first["title"],
-                    "current_spec_title": latest["title"],
-                    "old_match": f"{old_match:.0%}",
-                    "current_match": f"{current_match:.0%}",
-                })
+                stale_tests.append(
+                    {
+                        "test_id": t["id"],
+                        "test_title": t["title"],
+                        "spec_id": spec_id,
+                        "old_spec_title": first["title"],
+                        "current_spec_title": latest["title"],
+                        "old_match": f"{old_match:.0%}",
+                        "current_match": f"{current_match:.0%}",
+                    }
+                )
 
     print(f"  Fix 3: Tests likely targeting old spec meaning: {len(stale_tests)}")
     for item in stale_tests[:10]:
-        print(f"         {item['test_id']} on {item['spec_id']}: "
-              f"matches old={item['old_match']} current={item['current_match']}")
+        print(
+            f"         {item['test_id']} on {item['spec_id']}: "
+            f"matches old={item['old_match']} current={item['current_match']}"
+        )
         print(f"           Test: {(item['test_title'] or '')[:50]}")
         print(f"           Old:  {(item['old_spec_title'] or '')[:50]}")
         print(f"           Now:  {(item['current_spec_title'] or '')[:50]}")
@@ -242,19 +243,17 @@ def fix_3_review_stale_tests(db: KnowledgeDB, *, apply: bool = False) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="S159 Drift Remediation")
-    parser.add_argument("--apply", action="store_true",
-                        help="Actually execute fixes (default is dry-run)")
-    parser.add_argument("--fix", nargs="+", type=int, default=None,
-                        help="Run specific fixes only (e.g., --fix 1 2)")
+    parser.add_argument("--apply", action="store_true", help="Actually execute fixes (default is dry-run)")
+    parser.add_argument("--fix", nargs="+", type=int, default=None, help="Run specific fixes only (e.g., --fix 1 2)")
     args = parser.parse_args()
 
     fixes = set(args.fix) if args.fix else {1, 2, 3}
 
     mode = "APPLY" if args.apply else "DRY-RUN"
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  S159 Drift Remediation [{mode}]")
     print(f"  Fixes: {sorted(fixes)}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     db = KnowledgeDB()
     results = {}
@@ -266,12 +265,12 @@ def main():
     if 3 in fixes:
         results["fix_3"] = fix_3_review_stale_tests(db, apply=args.apply)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     total = sum(v.get("remapped", 0) + v.get("topics_analyzed", 0) for v in results.values())
     print(f"  Total actions: {total}")
     if not args.apply:
         print(f"  Mode: DRY-RUN (re-run with --apply to execute)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     db.close()
 

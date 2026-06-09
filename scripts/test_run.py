@@ -16,6 +16,7 @@ Exit codes:
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -155,9 +156,7 @@ def trigger_run(base_url: str, api_key: str, suite: str, env: str) -> str | None
         return None
 
 
-def poll_until_complete(
-    base_url: str, api_key: str, run_id: str
-) -> dict:
+def poll_until_complete(base_url: str, api_key: str, run_id: str) -> dict:
     """Poll /api/superadmin/tests/{run_id}/status until terminal state."""
     url = f"https://{base_url}/api/superadmin/tests/{run_id}/status"
     start = time.time()
@@ -247,9 +246,7 @@ def print_summary(data: dict) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Trigger a test suite and wait for results."
-    )
+    parser = argparse.ArgumentParser(description="Trigger a test suite and wait for results.")
     parser.add_argument(
         "environment",
         choices=["staging", "production"],

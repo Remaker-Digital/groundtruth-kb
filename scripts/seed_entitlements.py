@@ -39,11 +39,13 @@ async def main() -> None:
         description="Seed entitlement v1 documents into platform_config",
     )
     parser.add_argument(
-        "--execute", action="store_true",
+        "--execute",
+        action="store_true",
         help="Actually write to Cosmos DB (default: dry run)",
     )
     parser.add_argument(
-        "--database", default="agentred-staging",
+        "--database",
+        default="agentred-staging",
         help="Cosmos DB database name (default: agentred-staging)",
     )
     args = parser.parse_args()
@@ -76,9 +78,11 @@ async def main() -> None:
         # Initialize Cosmos client
         os.environ.setdefault("COSMOS_DB_DATABASE", args.database)
         from src.multi_tenant.cosmos_client import get_cosmos_manager
+
         manager = get_cosmos_manager()
         await manager.initialize()
         from src.multi_tenant.repositories.platform import PlatformConfigRepository
+
         repo = PlatformConfigRepository()
 
     success = 0

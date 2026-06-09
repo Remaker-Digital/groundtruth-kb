@@ -10,6 +10,7 @@ Usage:
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,10 +22,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load .env.local for Cosmos credentials
 from scripts._env import load_env_local
+
 load_env_local()
 
 # Suppress verbose Azure SDK logging
 import logging
+
 logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
 logging.getLogger("azure.cosmos").setLevel(logging.WARNING)
 
@@ -71,9 +74,14 @@ async def main(env: str, dry_run: bool) -> None:
             return None
 
     async def upsert(domain: str, tid: str, dtype: str) -> None:
-        await domain_index_container.upsert_item({
-            "id": domain, "domain": domain, "tenant_id": tid, "domain_type": dtype,
-        })
+        await domain_index_container.upsert_item(
+            {
+                "id": domain,
+                "domain": domain,
+                "tenant_id": tid,
+                "domain_type": dtype,
+            }
+        )
 
     created = 0
     skipped = 0

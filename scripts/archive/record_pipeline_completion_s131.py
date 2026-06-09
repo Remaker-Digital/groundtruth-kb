@@ -66,6 +66,7 @@ def main():
     spec = kdb.get_spec("SPEC-1615")
     if spec and spec.get("assertions"):
         import json as _json
+
         assertions = _json.loads(spec["assertions"]) if isinstance(spec["assertions"], str) else spec["assertions"]
         for a in assertions:
             a["status"] = "implemented"
@@ -95,10 +96,7 @@ def main():
         {
             "id": "SPEC-1615-A2",
             "status": "PASS",
-            "detail": (
-                "Pipeline reported SUCCESS with per-phase timing, image tag, "
-                "environment, and log file path."
-            ),
+            "detail": ("Pipeline reported SUCCESS with per-phase timing, image tag, environment, and log file path."),
         },
         {
             "id": "SPEC-1615-A3",

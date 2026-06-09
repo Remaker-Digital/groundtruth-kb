@@ -7,6 +7,7 @@ Usage:
     python scripts/create_test_stubs.py          # dry run
     python scripts/create_test_stubs.py --execute # write to DB
 """
+
 import sys, io, json
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -60,6 +61,7 @@ SECTION_TO_PHASE = {
     "GOVERNANCE": "PHASE-002",
     "GENERAL": "PHASE-002",
 }
+
 
 # Override phase for special spec types/titles
 def infer_phase(spec):
@@ -123,9 +125,7 @@ print(f"Total untested specs: {len(untested)} (active: {len(active)})")
 
 # Find the highest existing test ID to continue the sequence
 conn = kdb._get_conn()
-max_test_row = conn.execute(
-    "SELECT id FROM tests ORDER BY rowid DESC LIMIT 1"
-).fetchone()
+max_test_row = conn.execute("SELECT id FROM tests ORDER BY rowid DESC LIMIT 1").fetchone()
 if max_test_row:
     # Extract numeric part from "TEST-NNNN"
     max_num = int(max_test_row[0].replace("TEST-", ""))

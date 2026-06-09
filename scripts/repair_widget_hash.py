@@ -29,6 +29,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 from scripts._env import load_env_local
+
 load_env_local()
 
 ENVIRONMENTS = {
@@ -43,8 +44,9 @@ ENVIRONMENTS = {
 }
 
 
-def api_call(fqdn: str, path: str, api_key: str, method: str = "GET",
-             body: dict | None = None) -> tuple[int, dict | str]:
+def api_call(
+    fqdn: str, path: str, api_key: str, method: str = "GET", body: dict | None = None
+) -> tuple[int, dict | str]:
     url = f"https://{fqdn}{path}"
     headers = {"Accept": "application/json", "X-API-Key": api_key}
     data = None

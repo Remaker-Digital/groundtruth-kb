@@ -3,6 +3,7 @@
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -17,10 +18,7 @@ def run_grep(pattern: str, filepath: str) -> tuple[bool, str]:
     if not full_path.exists():
         return False, f"File not found: {filepath}"
     try:
-        result = subprocess.run(
-            ["grep", "-c", pattern, str(full_path)],
-            capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(["grep", "-c", pattern, str(full_path)], capture_output=True, text=True, timeout=10)
         count = int(result.stdout.strip()) if result.stdout.strip() else 0
         return count >= 1, f"grep -c '{pattern}' {filepath} => {count}"
     except Exception as e:
@@ -29,6 +27,7 @@ def run_grep(pattern: str, filepath: str) -> tuple[bool, str]:
 
 def run_glob(pattern: str) -> tuple[bool, str]:
     import glob
+
     matches = glob.glob(str(PROJECT_DIR / pattern), recursive=True)
     return len(matches) >= 1, f"glob '{pattern}' => {len(matches)} file(s)"
 
@@ -155,12 +154,14 @@ def main():
         all_pass = True
         for pattern, filepath, desc in checks:
             passed, detail = run_grep(pattern, filepath)
-            results.append({
-                "type": "grep",
-                "description": desc,
-                "passed": passed,
-                "detail": detail,
-            })
+            results.append(
+                {
+                    "type": "grep",
+                    "description": desc,
+                    "passed": passed,
+                    "detail": detail,
+                }
+            )
             if not passed:
                 all_pass = False
 

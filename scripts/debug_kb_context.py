@@ -23,6 +23,7 @@ if sys.platform == "win32":
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 COSMOS_ENDPOINT = os.environ["COSMOS_DB_ENDPOINT"]
@@ -63,14 +64,69 @@ async def get_kb_articles():
 def simulate_keyword_search(articles, query):
     """Simulate the keyword scoring from pipeline.py fallback."""
     _STOP = {
-        "a", "an", "the", "is", "are", "was", "were", "be", "been",
-        "being", "have", "has", "had", "do", "does", "did", "will",
-        "would", "could", "should", "may", "might", "can", "shall",
-        "of", "in", "to", "for", "with", "on", "at", "by", "from",
-        "and", "or", "but", "not", "no", "so", "if", "as", "it",
-        "its", "this", "that", "what", "which", "who", "how",
-        "your", "you", "my", "me", "i", "we", "our", "they",
-        "their", "them", "he", "she", "his", "her",
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "shall",
+        "of",
+        "in",
+        "to",
+        "for",
+        "with",
+        "on",
+        "at",
+        "by",
+        "from",
+        "and",
+        "or",
+        "but",
+        "not",
+        "no",
+        "so",
+        "if",
+        "as",
+        "it",
+        "its",
+        "this",
+        "that",
+        "what",
+        "which",
+        "who",
+        "how",
+        "your",
+        "you",
+        "my",
+        "me",
+        "i",
+        "we",
+        "our",
+        "they",
+        "their",
+        "them",
+        "he",
+        "she",
+        "his",
+        "her",
     }
     query_words = {w for w in query.lower().split() if w not in _STOP and len(w) > 1}
     if not query_words:
@@ -128,9 +184,9 @@ async def call_gpt4o(messages, label=""):
         api_version=OPENAI_API_VERSION,
     )
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"TEST: {label}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Messages ({len(messages)}):")
     for m in messages:
         role = m["role"]
@@ -169,15 +225,17 @@ async def main():
     scored = simulate_keyword_search(articles, query)
     print(f"\nTop {len(scored)} keyword matches:")
     for score, art in scored:
-        print(f"  score={score:.2f}  [{art.get('entry_type','')}] {art['title']} ({len(art.get('content',''))} chars)")
+        print(
+            f"  score={score:.2f}  [{art.get('entry_type', '')}] {art['title']} ({len(art.get('content', ''))} chars)"
+        )
 
     # Format for pipeline
     knowledge_context = format_for_pipeline(scored)
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("FORMATTED KNOWLEDGE CONTEXT (this is what GPT-4o sees):")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(knowledge_context)
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total length: {len(knowledge_context)} chars")
 
     # Now test different prompt strategies with GPT-4o
@@ -208,10 +266,13 @@ async def main():
         "═══════════════════════════════════════════"
     )
 
-    await call_gpt4o([
-        {"role": "system", "content": system_with_kb},
-        {"role": "user", "content": query},
-    ], "Strategy 1: KB in system message (current v1.13.9)")
+    await call_gpt4o(
+        [
+            {"role": "system", "content": system_with_kb},
+            {"role": "user", "content": query},
+        ],
+        "Strategy 1: KB in system message (current v1.13.9)",
+    )
 
     # Strategy 2: KB in user message
     user_with_kb = (
@@ -220,17 +281,19 @@ async def main():
         "details from these articles in your response:\n\n"
         f"{knowledge_context}"
     )
-    await call_gpt4o([
-        {"role": "system", "content": system_base},
-        {"role": "user", "content": user_with_kb},
-    ], "Strategy 2: KB in user message")
+    await call_gpt4o(
+        [
+            {"role": "system", "content": system_base},
+            {"role": "user", "content": user_with_kb},
+        ],
+        "Strategy 2: KB in user message",
+    )
 
     # Strategy 3: Only the most relevant article (avoid confusion from many articles)
     if scored:
         best_score, best_article = scored[0]
         single_context = (
-            f"[{best_article.get('entry_type', '').upper()}] "
-            f"{best_article['title']}\n{best_article['content']}"
+            f"[{best_article.get('entry_type', '').upper()}] {best_article['title']}\n{best_article['content']}"
         )
         system_single = (
             f"{system_base}\n\n"
@@ -238,19 +301,21 @@ async def main():
             f"{single_context}\n\n"
             "Use the specific details from this knowledge to answer the customer."
         )
-        await call_gpt4o([
-            {"role": "system", "content": system_single},
-            {"role": "user", "content": query},
-        ], "Strategy 3: Single best article only")
+        await call_gpt4o(
+            [
+                {"role": "system", "content": system_single},
+                {"role": "user", "content": query},
+            ],
+            "Strategy 3: Single best article only",
+        )
 
     # Strategy 4: Structured markdown with explicit enumeration
     # Manually build a clean pricing table from the raw articles
-    system_structured = (
-        f"{system_base}\n\n"
-        "PRODUCT PRICING (verified, accurate data):\n\n"
-    )
+    system_structured = f"{system_base}\n\nPRODUCT PRICING (verified, accurate data):\n\n"
     # Find pricing-related articles
-    pricing_articles = [a for s, a in scored if "pric" in a.get("title", "").lower() or "cost" in a.get("title", "").lower()]
+    pricing_articles = [
+        a for s, a in scored if "pric" in a.get("title", "").lower() or "cost" in a.get("title", "").lower()
+    ]
     if pricing_articles:
         for art in pricing_articles:
             system_structured += f"---\n{art['title']}:\n{art['content']}\n\n"
@@ -259,22 +324,31 @@ async def main():
 
     system_structured += "\nUse ALL the pricing details above when answering."
 
-    await call_gpt4o([
-        {"role": "system", "content": system_structured},
-        {"role": "user", "content": query},
-    ], "Strategy 4: Pricing-focused articles with header")
+    await call_gpt4o(
+        [
+            {"role": "system", "content": system_structured},
+            {"role": "user", "content": query},
+        ],
+        "Strategy 4: Pricing-focused articles with header",
+    )
 
     # Strategy 5: Direct instruction + knowledge as assistant pretend
-    await call_gpt4o([
-        {"role": "system", "content": system_base},
-        {"role": "user", "content": (
-            "Before answering, review this knowledge base data:\n\n"
-            f"{knowledge_context}\n\n"
-            "---\n\n"
-            f"Now answer this customer question using ALL the specific details "
-            f"from the knowledge above: {query}"
-        )},
-    ], "Strategy 5: KB as user context with explicit 'review first' instruction")
+    await call_gpt4o(
+        [
+            {"role": "system", "content": system_base},
+            {
+                "role": "user",
+                "content": (
+                    "Before answering, review this knowledge base data:\n\n"
+                    f"{knowledge_context}\n\n"
+                    "---\n\n"
+                    f"Now answer this customer question using ALL the specific details "
+                    f"from the knowledge above: {query}"
+                ),
+            },
+        ],
+        "Strategy 5: KB as user context with explicit 'review first' instruction",
+    )
 
 
 if __name__ == "__main__":

@@ -24,7 +24,9 @@ def get_deleted_test_files() -> list[str]:
     """Return list of staged-for-deletion test_*.py files."""
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=D"],
-        capture_output=True, text=True, cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
     )
     deleted = []
     for line in result.stdout.strip().splitlines():

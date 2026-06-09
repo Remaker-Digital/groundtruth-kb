@@ -147,9 +147,7 @@ def inspect_handoff(handoff_path: Path) -> HandoffInspection:
             total_bytes=total,
             sha256=None,
         )
-    raise ValueError(
-        f"Handoff path must be a .zip file or a directory: {handoff_path}"
-    )
+    raise ValueError(f"Handoff path must be a .zip file or a directory: {handoff_path}")
 
 
 def validate_handoff_format(inspection: HandoffInspection) -> list[str]:
@@ -169,12 +167,8 @@ def validate_handoff_format(inspection: HandoffInspection) -> list[str]:
         warnings.append("Missing project/index.html (D1 mandatory).")
     if not any(p.endswith(".css") and "project/" in p for p in paths):
         warnings.append("Missing project/*.css design-token source (D1 mandatory).")
-    if not any(
-        (p.endswith(".jsx") or p.endswith(".tsx")) and "project/" in p for p in paths
-    ):
-        warnings.append(
-            "Missing at least one project/*.{jsx,tsx} component file (D1 mandatory)."
-        )
+    if not any((p.endswith(".jsx") or p.endswith(".tsx")) and "project/" in p for p in paths):
+        warnings.append("Missing at least one project/*.{jsx,tsx} component file (D1 mandatory).")
     _ = _contains  # reserved for future optional checks
     return warnings
 
@@ -308,8 +302,7 @@ def archive(
 
     conn = db._get_conn()
     exists = conn.execute(
-        "SELECT id FROM current_deliberations "
-        "WHERE source_ref = ? AND content_hash = ?",
+        "SELECT id FROM current_deliberations WHERE source_ref = ? AND content_hash = ?",
         (ref, content_hash),
     ).fetchone()
     if exists:
@@ -334,8 +327,7 @@ def archive(
         origin_repo="Remaker-Digital/agent-red-customer-engagement",
         changed_by="archive_claude_design_handoff.py",
         change_reason=(
-            "PROC-CD-DA-ARCHIVAL-001 (archive-claude-design-handoff) — "
-            "Claude Design handoff inspection archive."
+            "PROC-CD-DA-ARCHIVAL-001 (archive-claude-design-handoff) — Claude Design handoff inspection archive."
         ),
     )
     return ArchiveResult(
@@ -354,27 +346,30 @@ def archive(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Archive a Claude Design handoff into the Deliberation Archive."
-    )
+    parser = argparse.ArgumentParser(description="Archive a Claude Design handoff into the Deliberation Archive.")
     parser.add_argument(
-        "--handoff-path", required=True,
+        "--handoff-path",
+        required=True,
         help="Path to the handoff zip or directory.",
     )
     parser.add_argument(
-        "--date", required=True,
+        "--date",
+        required=True,
         help="Handoff date in ISO format, e.g., 2026-04-18.",
     )
     parser.add_argument(
-        "--session-id", required=True,
+        "--session-id",
+        required=True,
         help="Session id that inspected the handoff, e.g., S302.",
     )
     parser.add_argument(
-        "--owner-decision", default=None,
+        "--owner-decision",
+        default=None,
         help="Triage outcome / owner decision text (becomes a DA section).",
     )
     parser.add_argument(
-        "--notes", default=None,
+        "--notes",
+        default=None,
         help=(
             "Canonical owner-supplied inspection-text channel for the handoff. "
             "Accepts owner-supplied inspection markdown (pre-read by the caller "
@@ -383,11 +378,13 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--source-ref", default=None,
+        "--source-ref",
+        default=None,
         help="Override source_ref (default: claude-design-handoff:<date>:<name>).",
     )
     parser.add_argument(
-        "--apply", action="store_true",
+        "--apply",
+        action="store_true",
         help="Insert the DA row. Omit for a dry run.",
     )
     return parser

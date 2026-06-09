@@ -58,22 +58,15 @@ ENVIRONMENTS = {
             or os.environ.get("STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY", "")
             or os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
         ),
-        "widget_key": (
-            os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
-            or os.environ.get("PREVIEW_WIDGET_KEY", "")
-        ),
+        "widget_key": (os.environ.get("STAGING_REMAKER_WIDGET_KEY", "") or os.environ.get("PREVIEW_WIDGET_KEY", "")),
         "tenant_id": "remaker-digital-001",
     },
     "production": {
         "base_url": os.environ.get("PROD_URL", ""),  # SPEC-0058: No hardcoded FQDNs
         "api_key": (
-            os.environ.get("PRODUCTION_REMAKER_USER_KEY", "")
-            or os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
+            os.environ.get("PRODUCTION_REMAKER_USER_KEY", "") or os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
         ),
-        "widget_key": (
-            os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "")
-            or os.environ.get("PREVIEW_WIDGET_KEY", "")
-        ),
+        "widget_key": (os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or os.environ.get("PREVIEW_WIDGET_KEY", "")),
         "tenant_id": "remaker-digital-001",
     },
 }
@@ -402,33 +395,23 @@ class SeedClient:
 
     def admin_get(self, path: str) -> httpx.Response:
         self._throttle()
-        return self.client.get(
-            f"{self.base_url}{path}", headers=self._admin_headers()
-        )
+        return self.client.get(f"{self.base_url}{path}", headers=self._admin_headers())
 
     def admin_post(self, path: str, json_data: dict) -> httpx.Response:
         self._throttle()
-        return self.client.post(
-            f"{self.base_url}{path}", headers=self._admin_headers(), json=json_data
-        )
+        return self.client.post(f"{self.base_url}{path}", headers=self._admin_headers(), json=json_data)
 
     def admin_put(self, path: str, json_data: dict) -> httpx.Response:
         self._throttle()
-        return self.client.put(
-            f"{self.base_url}{path}", headers=self._admin_headers(), json=json_data
-        )
+        return self.client.put(f"{self.base_url}{path}", headers=self._admin_headers(), json=json_data)
 
     def admin_delete(self, path: str) -> httpx.Response:
         self._throttle()
-        return self.client.delete(
-            f"{self.base_url}{path}", headers=self._admin_headers()
-        )
+        return self.client.delete(f"{self.base_url}{path}", headers=self._admin_headers())
 
     def widget_post(self, path: str, json_data: dict) -> httpx.Response:
         self._throttle()
-        return self.client.post(
-            f"{self.base_url}{path}", headers=self._widget_headers(), json=json_data
-        )
+        return self.client.post(f"{self.base_url}{path}", headers=self._widget_headers(), json=json_data)
 
     def close(self):
         self.client.close()
@@ -673,22 +656,25 @@ def phase_6_conversations(client: SeedClient) -> list[str]:
 
     created_ids = []
     for scenario in CONVERSATION_SCENARIOS:
-        r = client.widget_post("/api/chat/conversations", {
-            "initialMessage": scenario["initial_message"],
-            "pageUrl": scenario.get("page_url"),
-            "metadata": {
-                "browser": "Chrome 122",
-                "device": "Desktop",
-                "locale": "en-US",
-                "screen": "1920x1080",
+        r = client.widget_post(
+            "/api/chat/conversations",
+            {
+                "initialMessage": scenario["initial_message"],
+                "pageUrl": scenario.get("page_url"),
+                "metadata": {
+                    "browser": "Chrome 122",
+                    "device": "Desktop",
+                    "locale": "en-US",
+                    "screen": "1920x1080",
+                },
             },
-        })
+        )
         if r.status_code in (200, 201):
             data = r.json()
             conv_id = data.get("conversationId") or data.get("conversation_id", "")
             created_ids.append(conv_id)
             msg_preview = scenario["initial_message"][:50]
-            print(f"  OK    Conversation {conv_id[:12]}... \"{msg_preview}...\"")
+            print(f'  OK    Conversation {conv_id[:12]}... "{msg_preview}..."')
 
             # Wait for AI response (the pipeline processes asynchronously)
             time.sleep(3)
@@ -696,10 +682,13 @@ def phase_6_conversations(client: SeedClient) -> list[str]:
         elif r.status_code == 429:
             print(f"  WAIT  Rate limited — pausing 60s")
             time.sleep(60)
-            r = client.widget_post("/api/chat/conversations", {
-                "initialMessage": scenario["initial_message"],
-                "pageUrl": scenario.get("page_url"),
-            })
+            r = client.widget_post(
+                "/api/chat/conversations",
+                {
+                    "initialMessage": scenario["initial_message"],
+                    "pageUrl": scenario.get("page_url"),
+                },
+            )
             if r.status_code in (200, 201):
                 data = r.json()
                 conv_id = data.get("conversationId") or data.get("conversation_id", "")
@@ -741,7 +730,9 @@ def phase_7_verify(client: SeedClient) -> dict:
     r = client.admin_get("/api/admin/knowledge?limit=100")
     if r.status_code == 200:
         data = r.json()
-        count = data.get("totalCount") or data.get("total_count") or len(data.get("articles") or data.get("items") or [])
+        count = (
+            data.get("totalCount") or data.get("total_count") or len(data.get("articles") or data.get("items") or [])
+        )
         results["kb"] = count
         print(f"  OK    KB articles: {count}")
     else:
@@ -755,7 +746,9 @@ def phase_7_verify(client: SeedClient) -> dict:
         if isinstance(data, list):
             count = len(data)
         else:
-            count = data.get("totalCount") or data.get("total_count") or len(data.get("actions") or data.get("items") or [])
+            count = (
+                data.get("totalCount") or data.get("total_count") or len(data.get("actions") or data.get("items") or [])
+            )
         results["quick_actions"] = count
         print(f"  OK    Quick actions: {count}")
     else:
@@ -777,7 +770,11 @@ def phase_7_verify(client: SeedClient) -> dict:
     r = client.admin_get("/api/admin/conversations?limit=100")
     if r.status_code == 200:
         data = r.json()
-        count = data.get("totalCount") or data.get("total_count") or len(data.get("conversations") or data.get("items") or [])
+        count = (
+            data.get("totalCount")
+            or data.get("total_count")
+            or len(data.get("conversations") or data.get("items") or [])
+        )
         results["conversations"] = count
         print(f"  OK    Conversations: {count}")
     else:
@@ -841,6 +838,7 @@ def main():
             sys.exit(1)
         try:
             from scripts._self_provision import provision_test_tenant
+
             result = provision_test_tenant(
                 base_url=env_config["base_url"],
                 spa_key=spa_key,
@@ -958,6 +956,7 @@ def run_seed(
             return False
         try:
             from scripts._self_provision import provision_test_tenant
+
             result = provision_test_tenant(
                 base_url=env_config["base_url"],
                 spa_key=_spa,
@@ -1000,8 +999,7 @@ def run_seed(
 
         phase_7_verify(client)
 
-        print(f"\n  SEED COMPLETE: {len(team)} team, {len(kb)} KB, "
-              f"{len(qa)} QA, {len(convos)} conversations")
+        print(f"\n  SEED COMPLETE: {len(team)} team, {len(kb)} KB, {len(qa)} QA, {len(convos)} conversations")
         return True
 
     except Exception as e:

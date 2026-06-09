@@ -40,6 +40,7 @@ def _safe_print(*args, **kwargs) -> None:
     except (OSError, ValueError):
         pass
 
+
 # ---------------------------------------------------------------------------
 # Project root and imports from sibling scripts
 # ---------------------------------------------------------------------------
@@ -50,6 +51,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 # Load .env.local BEFORE importing ENVIRONMENTS — the dict reads os.environ.get()
 # at module definition time, so env vars must be set before the import.
 from scripts._env import load_env_local  # noqa: E402
+
 load_env_local()
 
 from upgrade_verification import api_call, widget_call, ENVIRONMENTS  # noqa: E402
@@ -57,6 +59,7 @@ from upgrade_verification import api_call, widget_call, ENVIRONMENTS  # noqa: E4
 # Optional: httpx for Phase D SSE streaming
 try:
     import httpx
+
     _HTTPX_AVAILABLE = True
 except ImportError:
     _HTTPX_AVAILABLE = False
@@ -66,10 +69,10 @@ except ImportError:
 # Result model
 # ---------------------------------------------------------------------------
 class AssertionResult(NamedTuple):
-    id: str           # e.g., "A.1", "D.9"
+    id: str  # e.g., "A.1", "D.9"
     description: str  # human-readable gate name
-    status: str       # PASS, FAIL, SKIP, WARN
-    detail: str       # specifics
+    status: str  # PASS, FAIL, SKIP, WARN
+    detail: str  # specifics
 
 
 def _pass(aid: str, desc: str, detail: str = "") -> AssertionResult:
@@ -113,19 +116,23 @@ def phase_a(new_version: str) -> list[AssertionResult]:
     # A.1 — Version bump confirmed
     try:
         from scripts._subprocess_stream import stream_subprocess as _stream
+
         r_s = _stream(
-            [sys.executable, "-c",
-             "from src.multi_tenant.api_versioning import PRODUCT_VERSION; print(PRODUCT_VERSION)"],
-            cwd=PROJECT_ROOT, timeout=15, prefix="  [A.1] ",
+            [
+                sys.executable,
+                "-c",
+                "from src.multi_tenant.api_versioning import PRODUCT_VERSION; print(PRODUCT_VERSION)",
+            ],
+            cwd=PROJECT_ROOT,
+            timeout=15,
+            prefix="  [A.1] ",
         )
-        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
-                                        stdout=r_s.stdout, stderr="")
+        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode, stdout=r_s.stdout, stderr="")
         actual = r.stdout.strip()
         if actual == new_version:
             results.append(_pass("A.1", "Version bump confirmed", f"PRODUCT_VERSION={actual}"))
         else:
-            results.append(_fail("A.1", "Version bump confirmed",
-                                 f"Expected {new_version}, got {actual}"))
+            results.append(_fail("A.1", "Version bump confirmed", f"Expected {new_version}, got {actual}"))
     except Exception as e:
         results.append(_fail("A.1", "Version bump confirmed", str(e)))
 
@@ -151,30 +158,35 @@ def phase_a(new_version: str) -> list[AssertionResult]:
     if pb_pass == pb_total:
         results.append(_pass("A.2", "Protected Behaviors", f"{pb_pass}/{pb_total} assertions"))
     else:
-        results.append(_fail("A.2", "Protected Behaviors",
-                             f"{pb_pass}/{pb_total}: " + "; ".join(pb_failures)))
+        results.append(_fail("A.2", "Protected Behaviors", f"{pb_pass}/{pb_total}: " + "; ".join(pb_failures)))
 
     # A.3 — No uncommitted changes
     try:
         r_s = _stream(
             ["git", "diff", "--stat", "src/", "admin/", "widget/"],
-            cwd=PROJECT_ROOT, timeout=15, prefix="  [A.3] ",
+            cwd=PROJECT_ROOT,
+            timeout=15,
+            prefix="  [A.3] ",
         )
-        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
-                                        stdout=r_s.stdout, stderr="")
+        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode, stdout=r_s.stdout, stderr="")
         if r.stdout.strip() == "":
             results.append(_pass("A.3", "No uncommitted changes", "Clean working tree"))
         else:
-            results.append(_fail("A.3", "No uncommitted changes",
-                                 f"Modified files: {r.stdout.strip()[:200]}"))
+            results.append(_fail("A.3", "No uncommitted changes", f"Modified files: {r.stdout.strip()[:200]}"))
     except Exception as e:
         results.append(_fail("A.3", "No uncommitted changes", str(e)))
 
     # A.4 and A.5 are manual (test harness and lint) — report as SKIP when running automated
-    results.append(_skip("A.4", "Unit/integration tests",
-                         "Run manually: .\\scripts\\run-tests-thermal-safe.ps1 -SkipLive"))
-    results.append(_skip("A.5", "TypeScript lint",
-                         "Run manually: cd admin && npx eslint --ext .tsx,.ts shared/ standalone/ provider/ shopify/ --max-warnings 50"))
+    results.append(
+        _skip("A.4", "Unit/integration tests", "Run manually: .\\scripts\\run-tests-thermal-safe.ps1 -SkipLive")
+    )
+    results.append(
+        _skip(
+            "A.5",
+            "TypeScript lint",
+            "Run manually: cd admin && npx eslint --ext .tsx,.ts shared/ standalone/ provider/ shopify/ --max-warnings 50",
+        )
+    )
 
     return results
 
@@ -193,19 +205,15 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
     if status == 200 and pv == expected_bare:
         results.append(_pass("C.1", "Version header matches", f"X-Product-Version: {pv}"))
     elif status == 200:
-        results.append(_fail("C.1", "Version header matches",
-                             f"Expected {new_version}, got '{pv}'"))
+        results.append(_fail("C.1", "Version header matches", f"Expected {new_version}, got '{pv}'"))
     else:
-        results.append(_fail("C.1", "Version header matches",
-                             f"GET /health returned HTTP {status}"))
+        results.append(_fail("C.1", "Version header matches", f"GET /health returned HTTP {status}"))
 
     # C.2 — Health endpoint
     if status == 200 and isinstance(body, dict) and body.get("status") == "healthy":
-        results.append(_pass("C.2", "Health endpoint healthy",
-                             f"product_version={body.get('product_version', '?')}"))
+        results.append(_pass("C.2", "Health endpoint healthy", f"product_version={body.get('product_version', '?')}"))
     else:
-        results.append(_fail("C.2", "Health endpoint healthy",
-                             f"HTTP {status}, body={str(body)[:200]}"))
+        results.append(_fail("C.2", "Health endpoint healthy", f"HTTP {status}, body={str(body)[:200]}"))
 
     # C.3 — Ready endpoint
     rs, rb, rh = api_call(fqdn, "/ready")
@@ -218,8 +226,7 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
             if nats_connected:
                 results.append(_pass("C.3", "Ready endpoint", f"status=ready, nats=connected"))
             else:
-                results.append(_warn("C.3", "Ready endpoint",
-                                     "status=ready but nats.connected=false (lazy init)"))
+                results.append(_warn("C.3", "Ready endpoint", "status=ready but nats.connected=false (lazy init)"))
         else:
             results.append(_fail("C.3", "Ready endpoint", f"status={ready_status}"))
     else:
@@ -243,8 +250,7 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
     if s == 200 and isinstance(b, str) and len(b) > 1000:
         results.append(_pass("C.7", "Widget.js accessible", f"{len(b)} bytes"))
     elif s == 200:
-        results.append(_fail("C.7", "Widget.js accessible",
-                             f"Only {len(b) if isinstance(b, str) else '?'} bytes"))
+        results.append(_fail("C.7", "Widget.js accessible", f"Only {len(b) if isinstance(b, str) else '?'} bytes"))
     else:
         results.append(_fail("C.7", "Widget.js accessible", f"HTTP {s}"))
 
@@ -282,41 +288,60 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
     if snapshot_path.exists():
         try:
             from scripts._subprocess_stream import stream_subprocess as _stream
+
             r_s = _stream(
-                [sys.executable, str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
-                 "phase-c", "--env", env_name,
-                 "--snapshot", str(snapshot_path),
-                 "--new-version", new_version],
-                cwd=PROJECT_ROOT, timeout=600, prefix="  [C.10] ",
+                [
+                    sys.executable,
+                    str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
+                    "phase-c",
+                    "--env",
+                    env_name,
+                    "--snapshot",
+                    str(snapshot_path),
+                    "--new-version",
+                    new_version,
+                ],
+                cwd=PROJECT_ROOT,
+                timeout=600,
+                prefix="  [C.10] ",
             )
-            r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
-                                            stdout=r_s.stdout, stderr="")
+            r = subprocess.CompletedProcess(args="", returncode=r_s.returncode, stdout=r_s.stdout, stderr="")
             # Parse actual PASS/FAIL counts from output (e.g., "35 PASS, 0 FAIL")
             import re as _re
+
             m = _re.search(r"(\d+)\s+PASS,\s+(\d+)\s+FAIL", r.stdout)
             if m:
                 pass_count = int(m.group(1))
                 fail_count = int(m.group(2))
                 if fail_count == 0:
-                    results.append(_pass("C.10", "Upgrade verification (35 assertions)",
-                                         f"phase-c {pass_count} PASS, 0 FAIL"))
+                    results.append(
+                        _pass("C.10", "Upgrade verification (35 assertions)", f"phase-c {pass_count} PASS, 0 FAIL")
+                    )
                 else:
                     detail = r.stdout[-500:] if r.stdout else r.stderr[-500:]
-                    results.append(_fail("C.10", "Upgrade verification (35 assertions)",
-                                         f"{pass_count} PASS, {fail_count} FAIL: {detail.strip()[:200]}"))
+                    results.append(
+                        _fail(
+                            "C.10",
+                            "Upgrade verification (35 assertions)",
+                            f"{pass_count} PASS, {fail_count} FAIL: {detail.strip()[:200]}",
+                        )
+                    )
             elif r.returncode == 0:
-                results.append(_pass("C.10", "Upgrade verification (35 assertions)",
-                                     "phase-c exit 0"))
+                results.append(_pass("C.10", "Upgrade verification (35 assertions)", "phase-c exit 0"))
             else:
                 detail = r.stdout[-500:] if r.stdout else r.stderr[-500:]
-                results.append(_fail("C.10", "Upgrade verification (35 assertions)",
-                                     detail.strip()))
+                results.append(_fail("C.10", "Upgrade verification (35 assertions)", detail.strip()))
         except Exception as e:
             results.append(_fail("C.10", "Upgrade verification (35 assertions)", str(e)))
     else:
-        results.append(_skip("C.10", "Upgrade verification (35 assertions)",
-                             f"No Phase A snapshot at {snapshot_path}. "
-                             f"Run: python scripts/upgrade_verification.py phase-a --env {env_name}"))
+        results.append(
+            _skip(
+                "C.10",
+                "Upgrade verification (35 assertions)",
+                f"No Phase A snapshot at {snapshot_path}. "
+                f"Run: python scripts/upgrade_verification.py phase-a --env {env_name}",
+            )
+        )
 
     # Rate limit cooldown — Phases C.1–C.10 consume 15+ API calls.
     # Starter tier allows 10 rpm; wait for budget to replenish before regression tests.
@@ -339,10 +364,12 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
     return results
 
 
-def _run_regression_tier(fqdn: str, api_key: str, widget_key: str,
-                         tier: str, aid: str, expected_min: int) -> AssertionResult:
+def _run_regression_tier(
+    fqdn: str, api_key: str, widget_key: str, tier: str, aid: str, expected_min: int
+) -> AssertionResult:
     """Run a pytest tier against the live environment."""
     import re as _re
+
     env = os.environ.copy()
     env["PROD_URL"] = f"https://{fqdn}"
     env["PREVIEW_WIDGET_KEY"] = widget_key
@@ -353,14 +380,26 @@ def _run_regression_tier(fqdn: str, api_key: str, widget_key: str,
     env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     try:
         from scripts._subprocess_stream import stream_subprocess as _stream
+
         r_s = _stream(
-            [sys.executable, "-m", "pytest",
-             "tests/regression/test_upgrade_regression.py",
-             "-x", "-q", "-m", tier, "--tb=short", "--no-header"],
-            cwd=PROJECT_ROOT, env=env, timeout=120, prefix=f"  [{aid}] ",
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests/regression/test_upgrade_regression.py",
+                "-x",
+                "-q",
+                "-m",
+                tier,
+                "--tb=short",
+                "--no-header",
+            ],
+            cwd=PROJECT_ROOT,
+            env=env,
+            timeout=120,
+            prefix=f"  [{aid}] ",
         )
-        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
-                                        stdout=r_s.stdout, stderr="")
+        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode, stdout=r_s.stdout, stderr="")
         # Parse pytest output using regex (handles "18 passed," with trailing comma)
         output = r.stdout + "\n" + r.stderr
         passed = 0
@@ -409,19 +448,28 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     agent_key = None
 
     # D.1 — Create smoke tenant
-    s, b, h = api_call(fqdn, "/api/superadmin/tenants", spa_api_key, method="POST",
-                       body={
-                           "merchantName": smoke_name,
-                           "superadminEmail": smoke_email,
-                           "tier": "starter",
-                       })
+    s, b, h = api_call(
+        fqdn,
+        "/api/superadmin/tenants",
+        spa_api_key,
+        method="POST",
+        body={
+            "merchantName": smoke_name,
+            "superadminEmail": smoke_email,
+            "tier": "starter",
+        },
+    )
     if s in (200, 201) and isinstance(b, dict):
         tenant_id = b.get("tenantId") or b.get("tenant_id")
         admin_key = b.get("superadminApiKey") or b.get("superadmin_api_key")
         widget_key = b.get("widgetKey") or b.get("widget_key")
-        results.append(_pass("D.1", "Create smoke tenant",
-                             f"tenant={tenant_id}, key={'yes' if admin_key else 'NO'}, "
-                             f"widget={'yes' if widget_key else 'NO'}"))
+        results.append(
+            _pass(
+                "D.1",
+                "Create smoke tenant",
+                f"tenant={tenant_id}, key={'yes' if admin_key else 'NO'}, widget={'yes' if widget_key else 'NO'}",
+            )
+        )
     else:
         detail = str(b)[:300] if b else f"HTTP {s}"
         results.append(_fail("D.1", "Create smoke tenant", f"HTTP {s}: {detail}"))
@@ -467,25 +515,28 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     conv_count = b1.get("totalCount", -1) if isinstance(b1, dict) else -1
     kb_count = b2.get("totalCount", b2.get("total", -1)) if isinstance(b2, dict) else -1
     if conv_count == 0 and kb_count == 0:
-        results.append(_pass("D.5", "Clean initial state",
-                             f"conversations={conv_count}, kb={kb_count}"))
+        results.append(_pass("D.5", "Clean initial state", f"conversations={conv_count}, kb={kb_count}"))
     else:
-        results.append(_warn("D.5", "Clean initial state",
-                             f"conversations={conv_count}, kb={kb_count} (expected 0)"))
+        results.append(_warn("D.5", "Clean initial state", f"conversations={conv_count}, kb={kb_count} (expected 0)"))
 
     # D.6 — Create draft config
     s, b, _ = api_call(fqdn, "/api/config/reset", admin_key, method="POST")
-    s2, b2, _ = api_call(fqdn, "/api/config", admin_key, method="PUT",
-                         body={"fields": {
-                             "brand_name": "Preflight Smoke Test",
-                             "brand_voice": "Professional and helpful",
-                         }})
+    s2, b2, _ = api_call(
+        fqdn,
+        "/api/config",
+        admin_key,
+        method="PUT",
+        body={
+            "fields": {
+                "brand_name": "Preflight Smoke Test",
+                "brand_voice": "Professional and helpful",
+            }
+        },
+    )
     if s in (200, 201) and s2 in (200, 201):
-        results.append(_pass("D.6", "Config draft created",
-                             f"reset={s}, update={s2}"))
+        results.append(_pass("D.6", "Config draft created", f"reset={s}, update={s2}"))
     else:
-        results.append(_fail("D.6", "Config draft created",
-                             f"reset={s}, update={s2}: {str(b2)[:200]}"))
+        results.append(_fail("D.6", "Config draft created", f"reset={s}, update={s2}: {str(b2)[:200]}"))
 
     # D.7 — Activate configuration
     s, b, _ = api_call(fqdn, "/api/config/draft/activate", admin_key, method="POST")
@@ -493,8 +544,7 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     if s in (200, 201):
         results.append(_pass("D.7", "Config activated", f"HTTP {s}"))
     elif s == 500:
-        results.append(_warn("D.7", "Config activated",
-                             "HTTP 500 (known first-activation behavior — checking D.8)"))
+        results.append(_warn("D.7", "Config activated", "HTTP 500 (known first-activation behavior — checking D.8)"))
     else:
         results.append(_fail("D.7", "Config activated", f"HTTP {s}: {str(b)[:200]}"))
 
@@ -504,11 +554,9 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
         is_active = b.get("is_active") or b.get("isActive")
         is_configured = b.get("is_configured") or b.get("isConfigured")
         if is_active and is_configured:
-            results.append(_pass("D.8", "Activation verified",
-                                 f"is_active={is_active}, is_configured={is_configured}"))
+            results.append(_pass("D.8", "Activation verified", f"is_active={is_active}, is_configured={is_configured}"))
         else:
-            results.append(_fail("D.8", "Activation verified",
-                                 f"is_active={is_active}, is_configured={is_configured}"))
+            results.append(_fail("D.8", "Activation verified", f"is_active={is_active}, is_configured={is_configured}"))
     else:
         results.append(_fail("D.8", "Activation verified", f"HTTP {s}"))
 
@@ -516,16 +564,13 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     s, b = widget_call(fqdn, widget_key)
     if s == 201 and isinstance(b, dict):
         conv_id = b.get("conversation_id") or b.get("conversationId")
-        results.append(_pass("D.9", "Widget key works",
-                             f"conversation_id={conv_id}"))
+        results.append(_pass("D.9", "Widget key works", f"conversation_id={conv_id}"))
     elif s == 503:
         results.append(_skip("D.9", "Widget key works", "HTTP 503 — NATS not warmed"))
     elif s == 401:
-        results.append(_fail("D.9", "Widget key works",
-                             "HTTP 401 — widget key rejected (dual-write failure?)"))
+        results.append(_fail("D.9", "Widget key works", "HTTP 401 — widget key rejected (dual-write failure?)"))
     elif s == 403:
-        results.append(_fail("D.9", "Widget key works",
-                             "HTTP 403 — config not activated"))
+        results.append(_fail("D.9", "Widget key works", "HTTP 403 — config not activated"))
     else:
         results.append(_fail("D.9", "Widget key works", f"HTTP {s}: {str(b)[:200]}"))
 
@@ -533,8 +578,7 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     if not conv_id:
         results.append(_skip("D.10", "AI pipeline (SSE)", "No conversation_id from D.9"))
     elif not _HTTPX_AVAILABLE:
-        results.append(_skip("D.10", "AI pipeline (SSE)",
-                             "httpx not installed. pip install httpx"))
+        results.append(_skip("D.10", "AI pipeline (SSE)", "httpx not installed. pip install httpx"))
     else:
         results.append(_verify_sse(fqdn, conv_id, widget_key))
 
@@ -545,19 +589,23 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
         if count >= 1:
             results.append(_pass("D.11", "Conversation in inbox", f"totalCount={count}"))
         else:
-            results.append(_warn("D.11", "Conversation in inbox",
-                                 f"totalCount={count} (expected >=1)"))
+            results.append(_warn("D.11", "Conversation in inbox", f"totalCount={count} (expected >=1)"))
     else:
         results.append(_fail("D.11", "Conversation in inbox", f"HTTP {s}"))
 
     # D.12 — Create KB entry
-    s, b, _ = api_call(fqdn, "/api/admin/knowledge", admin_key, method="POST",
-                       body={
-                           "title": "Preflight Test Article",
-                           "content": "Preflight smoke test knowledge base article.",
-                           "entry_type": "faq",
-                           "status": "published",
-                       })
+    s, b, _ = api_call(
+        fqdn,
+        "/api/admin/knowledge",
+        admin_key,
+        method="POST",
+        body={
+            "title": "Preflight Test Article",
+            "content": "Preflight smoke test knowledge base article.",
+            "entry_type": "faq",
+            "status": "published",
+        },
+    )
     if s in (200, 201):
         results.append(_pass("D.12", "KB entry created", f"HTTP {s}"))
     else:
@@ -575,17 +623,20 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
         results.append(_fail("D.13", "KB entry visible", f"HTTP {s}"))
 
     # D.14 — Create team member (escalation_agent)
-    s, b, _ = api_call(fqdn, "/api/admin/team", admin_key, method="POST",
-                       body={
-                           "email": f"escalation-{today}@preflight.internal",
-                           "displayName": "Preflight Agent",
-                           "role": "escalation_agent",
-                       })
+    s, b, _ = api_call(
+        fqdn,
+        "/api/admin/team",
+        admin_key,
+        method="POST",
+        body={
+            "email": f"escalation-{today}@preflight.internal",
+            "displayName": "Preflight Agent",
+            "role": "escalation_agent",
+        },
+    )
     if s in (200, 201) and isinstance(b, dict):
-        agent_key = (b.get("userApiKey") or b.get("user_api_key")
-                     or b.get("api_key") or b.get("apiKey"))
-        results.append(_pass("D.14", "Team member created",
-                             f"HTTP {s}, key={'yes' if agent_key else 'NO'}"))
+        agent_key = b.get("userApiKey") or b.get("user_api_key") or b.get("api_key") or b.get("apiKey")
+        results.append(_pass("D.14", "Team member created", f"HTTP {s}, key={'yes' if agent_key else 'NO'}"))
     else:
         results.append(_fail("D.14", "Team member created", f"HTTP {s}: {str(b)[:200]}"))
 
@@ -593,11 +644,9 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     if agent_key:
         s, b, _ = api_call(fqdn, "/api/config", agent_key)
         if s == 403:
-            results.append(_pass("D.15", "RBAC blocks non-admin",
-                                 "escalation_agent → /api/config → 403"))
+            results.append(_pass("D.15", "RBAC blocks non-admin", "escalation_agent → /api/config → 403"))
         else:
-            results.append(_fail("D.15", "RBAC blocks non-admin",
-                                 f"Expected 403, got HTTP {s}"))
+            results.append(_fail("D.15", "RBAC blocks non-admin", f"Expected 403, got HTTP {s}"))
     else:
         results.append(_skip("D.15", "RBAC blocks non-admin", "No agent key from D.14"))
 
@@ -605,11 +654,9 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     if agent_key:
         s, b, _ = api_call(fqdn, "/api/admin/conversations", agent_key)
         if s == 200:
-            results.append(_pass("D.16", "RBAC allows inbox",
-                                 "escalation_agent → /api/admin/conversations → 200"))
+            results.append(_pass("D.16", "RBAC allows inbox", "escalation_agent → /api/admin/conversations → 200"))
         else:
-            results.append(_fail("D.16", "RBAC allows inbox",
-                                 f"Expected 200, got HTTP {s}"))
+            results.append(_fail("D.16", "RBAC allows inbox", f"Expected 200, got HTTP {s}"))
     else:
         results.append(_skip("D.16", "RBAC allows inbox", "No agent key from D.14"))
 
@@ -630,9 +677,9 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
     fail_count = sum(1 for r in results if r.status == "FAIL")
     skip_count = sum(1 for r in results if r.status == "SKIP")
     warn_count = sum(1 for r in results if r.status == "WARN")
-    results.append(_pass("D.18", "Phase D summary",
-                         f"{pass_count} PASS, {fail_count} FAIL, "
-                         f"{skip_count} SKIP, {warn_count} WARN"))
+    results.append(
+        _pass("D.18", "Phase D summary", f"{pass_count} PASS, {fail_count} FAIL, {skip_count} SKIP, {warn_count} WARN")
+    )
 
     return results
 
@@ -640,22 +687,28 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
 def _verify_sse(fqdn: str, conv_id: str, widget_key: str) -> AssertionResult:
     """Send a message and verify SSE stream produces AI tokens."""
     # First send a message
-    s, b, _ = api_call(fqdn, "/api/chat/message", method="POST",
-                       body={"conversation_id": conv_id,
-                             "content": "Hello, what products do you offer?"})
+    s, b, _ = api_call(
+        fqdn,
+        "/api/chat/message",
+        method="POST",
+        body={"conversation_id": conv_id, "content": "Hello, what products do you offer?"},
+    )
     # Widget key auth for message endpoint — use header
     from urllib.request import Request, urlopen
     from urllib.error import HTTPError
+
     msg_url = f"https://{fqdn}/api/chat/message"
     msg_headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
         "X-Widget-Key": widget_key,
     }
-    msg_body = json.dumps({
-        "conversation_id": conv_id,
-        "content": "Hello, what products do you offer?",
-    }).encode()
+    msg_body = json.dumps(
+        {
+            "conversation_id": conv_id,
+            "content": "Hello, what products do you offer?",
+        }
+    ).encode()
     try:
         req = Request(msg_url, data=msg_body, headers=msg_headers, method="POST")
         with urlopen(req, timeout=15) as resp:
@@ -674,8 +727,7 @@ def _verify_sse(fqdn: str, conv_id: str, widget_key: str) -> AssertionResult:
             if resp.status_code == 503:
                 return _skip("D.10", "AI pipeline (SSE)", "HTTP 503 — NATS not warmed")
             if resp.status_code != 200:
-                return _fail("D.10", "AI pipeline (SSE)",
-                             f"Stream HTTP {resp.status_code}")
+                return _fail("D.10", "AI pipeline (SSE)", f"Stream HTTP {resp.status_code}")
             for line in resp.iter_lines():
                 if "event: token" in line or "event:token" in line:
                     got_token = True
@@ -738,8 +790,7 @@ def print_results(phase_name: str, phase_label: str, results: list[AssertionResu
     _safe_print(f"  Total: {', '.join(summary_parts)}")
 
 
-def save_report(results: dict[str, list[AssertionResult]], env_name: str,
-                new_version: str, verdict: str) -> Path:
+def save_report(results: dict[str, list[AssertionResult]], env_name: str, new_version: str, verdict: str) -> Path:
     """Save structured JSON report."""
     results_dir = PROJECT_ROOT / "scripts" / "pre-flight-results"
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -758,9 +809,7 @@ def save_report(results: dict[str, list[AssertionResult]], env_name: str,
 
     for phase, phase_results in results.items():
         report["phases"][phase] = [
-            {"id": r.id, "description": r.description,
-             "status": r.status, "detail": r.detail}
-            for r in phase_results
+            {"id": r.id, "description": r.description, "status": r.status, "detail": r.detail} for r in phase_results
         ]
         counts = {}
         for r in phase_results:
@@ -776,14 +825,12 @@ def save_report(results: dict[str, list[AssertionResult]], env_name: str,
 # CLI
 # ---------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(
-        description="Pre-Flight Deployment Checklist — automated verification")
-    parser.add_argument("--env", required=True, choices=["staging", "production"],
-                        help="Target environment")
-    parser.add_argument("--new-version", required=True,
-                        help="Expected product version (e.g., 1.59.1)")
-    parser.add_argument("--phase", default=None, choices=["A", "B", "C", "D"],
-                        help="Run only this phase (default: all phases)")
+    parser = argparse.ArgumentParser(description="Pre-Flight Deployment Checklist — automated verification")
+    parser.add_argument("--env", required=True, choices=["staging", "production"], help="Target environment")
+    parser.add_argument("--new-version", required=True, help="Expected product version (e.g., 1.59.1)")
+    parser.add_argument(
+        "--phase", default=None, choices=["A", "B", "C", "D"], help="Run only this phase (default: all phases)"
+    )
     args = parser.parse_args()
 
     env_cfg = ENVIRONMENTS[args.env]
@@ -793,10 +840,7 @@ def main():
 
     # SPA superadmin key for Phase D — from ENVIRONMENTS dict (S163 naming)
     # SPEC-1667: Phase D needs ar_spa_plat_* key, NOT ar_user_* key.
-    spa_api_key = (
-        env_cfg.get("spa_api_key", "")
-        or os.environ.get("SPA_CONSOLE_API_KEY", "")
-    )
+    spa_api_key = env_cfg.get("spa_api_key", "") or os.environ.get("SPA_CONSOLE_API_KEY", "")
 
     _safe_print(f"\n{'#' * 60}")
     _safe_print(f"  Pre-Flight Deployment Checklist")
@@ -838,9 +882,7 @@ def main():
             _safe_print(f"\n  WARNING: SUPERADMIN_PREVIEW_API_KEY not set.")
             _safe_print(f"  Phase D requires the SPA superadmin key to provision tenants.")
             _safe_print(f"  Set it: export SUPERADMIN_PREVIEW_API_KEY=ar_user_rema_...")
-            all_results["D"] = [
-                _fail("D.0", "SPA key required",
-                      "Set STAGING_SPA_KEY or SPA_CONSOLE_API_KEY env var")]
+            all_results["D"] = [_fail("D.0", "SPA key required", "Set STAGING_SPA_KEY or SPA_CONSOLE_API_KEY env var")]
         else:
             results_d = phase_d(fqdn, spa_api_key)
             all_results["D"] = results_d
@@ -859,6 +901,7 @@ def main():
     # DEFECT auto-creation (SPEC-1617): one per failed phase
     if "VERIFIED" not in verdict:
         from scripts._defect_reporter import create_defect
+
         for phase_name, phase_results in all_results.items():
             fails = [r for r in phase_results if r.status == "FAIL"]
             if fails:

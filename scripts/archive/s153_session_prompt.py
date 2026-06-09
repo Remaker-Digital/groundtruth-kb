@@ -1,5 +1,7 @@
 """Generate S154 session handoff prompt."""
+
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 from db import KnowledgeDB
 

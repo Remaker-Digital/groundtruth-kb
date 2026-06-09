@@ -38,10 +38,7 @@ def next_wi_id() -> str:
 
     kdb = KnowledgeDB()
     conn = kdb._get_conn()
-    row = conn.execute(
-        "SELECT MAX(CAST(SUBSTR(id, 4) AS INTEGER)) "
-        "FROM work_items WHERE id LIKE 'WI-%'"
-    ).fetchone()
+    row = conn.execute("SELECT MAX(CAST(SUBSTR(id, 4) AS INTEGER)) FROM work_items WHERE id LIKE 'WI-%'").fetchone()
     max_id = row[0] if row and row[0] else 0
     return f"WI-{max_id + 1:04d}"
 

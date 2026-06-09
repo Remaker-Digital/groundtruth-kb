@@ -94,7 +94,7 @@ def main() -> int:
         session_id="S327",
         source_ref="owner_conversation:2026-05-02-S327-backlog-source-of-truth-directive",
     )
-    delib_id = result.get('id') if result else DELIB_ID
+    delib_id = result.get("id") if result else DELIB_ID
     print(f"insert_deliberation id={delib_id} version={result.get('version') if result else '?'}", flush=True)
 
     # Link DELIB to the three Slice 1 specs.

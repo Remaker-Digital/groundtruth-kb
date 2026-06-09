@@ -43,23 +43,23 @@ def load_test_environment() -> bool:
 def check_prerequisites() -> bool:
     """Check that all prerequisites are met."""
     print("🔍 Checking prerequisites...")
-    
+
     # Check USE_REAL_APIS
     if os.environ.get("USE_REAL_APIS", "false").lower() != "true":
         print("❌ USE_REAL_APIS must be set to 'true' for integration testing")
         return False
-    
+
     # Check Stripe credentials
     stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
     if not stripe_key.startswith("sk_test_"):
         print("❌ STRIPE_SECRET_KEY must be a test mode key (sk_test_...)")
         return False
-    
+
     webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
     if not webhook_secret.startswith("whsec_"):
         print("❌ STRIPE_WEBHOOK_SECRET must be set")
         return False
-    
+
     print("✅ Prerequisites check passed")
     return True
 
@@ -67,14 +67,16 @@ def check_prerequisites() -> bool:
 def build_pytest_command(test_pattern: Optional[str] = None) -> List[str]:
     """Build the pytest command with appropriate options."""
     cmd = [
-        "python", "-m", "pytest",
+        "python",
+        "-m",
+        "pytest",
         "tests/integration_real_services.py",
         "-v",  # Verbose output
         "-s",  # Don't capture output
         "--tb=short",  # Short traceback format
         "--color=yes",  # Colored output
     ]
-    
+
     # Add test pattern filtering
     if test_pattern:
         if test_pattern == "config":
@@ -89,7 +91,7 @@ def build_pytest_command(test_pattern: Optional[str] = None) -> List[str]:
             cmd.extend(["-k", "EndToEnd"])
         else:
             cmd.extend(["-k", test_pattern])
-    
+
     return cmd
 
 
@@ -97,9 +99,9 @@ def run_tests(test_pattern: Optional[str] = None) -> int:
     """Run the integration tests."""
     print(f"\n🧪 Running integration tests{f' (pattern: {test_pattern})' if test_pattern else ''}...")
     print("=" * 60)
-    
+
     cmd = build_pytest_command(test_pattern)
-    
+
     try:
         result = subprocess.run(cmd, check=False)
         return result.returncode
@@ -133,7 +135,7 @@ def main() -> int:
     """Main function."""
     print("🚀 Agent Red Integration Test Runner")
     print("=" * 40)
-    
+
     # Parse command line arguments
     test_pattern = None
     if len(sys.argv) > 1:
@@ -141,18 +143,18 @@ def main() -> int:
             print_usage()
             return 0
         test_pattern = sys.argv[1]
-    
+
     # Load environment
     if not load_test_environment():
         return 1
-    
+
     # Check prerequisites
     if not check_prerequisites():
         return 1
-    
+
     # Run tests
     exit_code = run_tests(test_pattern)
-    
+
     # Print summary
     print("\n" + "=" * 60)
     if exit_code == 0:
@@ -166,7 +168,7 @@ def main() -> int:
         print("2. Verify Stripe test account setup")
         print("3. Ensure webhook endpoints are configured")
         print("4. Run: python scripts/setup-integration-testing.py")
-    
+
     return exit_code
 
 

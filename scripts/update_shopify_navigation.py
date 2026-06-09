@@ -39,6 +39,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -126,6 +127,7 @@ mutation menuUpdate($id: ID!, $title: String!, $items: [MenuItemUpdateInput!]!) 
 # Main logic
 # ---------------------------------------------------------------------------
 
+
 async def update_navigation(*, dry_run: bool = True) -> None:
     """Query current menu state, build desired nav, and optionally apply."""
 
@@ -139,7 +141,6 @@ async def update_navigation(*, dry_run: bool = True) -> None:
         sys.exit(1)
 
     async with ShopifyGraphQLClient(store_url, access_token) as client:
-
         # --- Step 1: Find the main-menu ---
         logger.info("Querying existing menus...")
         menus_data = await client.execute(GET_MENUS_QUERY)
@@ -185,10 +186,12 @@ async def update_navigation(*, dry_run: bool = True) -> None:
 
         for nav_item in DESIRED_NAV:
             if nav_item["type"] == "FRONTPAGE":
-                new_items.append({
-                    "title": nav_item["title"],
-                    "type": "FRONTPAGE",
-                })
+                new_items.append(
+                    {
+                        "title": nav_item["title"],
+                        "type": "FRONTPAGE",
+                    }
+                )
             elif nav_item["type"] == "PAGE":
                 handle = nav_item["handle"]
                 page = page_by_handle.get(handle)
@@ -196,18 +199,22 @@ async def update_navigation(*, dry_run: bool = True) -> None:
                     missing_pages.append(handle)
                     logger.warning("Page with handle '%s' not found - skipping", handle)
                     continue
-                new_items.append({
-                    "title": nav_item["title"],
-                    "type": "PAGE",
-                    "resourceId": page["id"],
-                    "url": f"/pages/{handle}",
-                })
+                new_items.append(
+                    {
+                        "title": nav_item["title"],
+                        "type": "PAGE",
+                        "resourceId": page["id"],
+                        "url": f"/pages/{handle}",
+                    }
+                )
             elif nav_item["type"] == "HTTP":
-                new_items.append({
-                    "title": nav_item["title"],
-                    "type": "HTTP",
-                    "url": nav_item["url"],
-                })
+                new_items.append(
+                    {
+                        "title": nav_item["title"],
+                        "type": "HTTP",
+                        "url": nav_item["url"],
+                    }
+                )
 
         if missing_pages:
             logger.warning(

@@ -80,9 +80,7 @@ def _build_file_to_spec_map(conn) -> dict[str, str]:
     """).fetchall()
 
     mapping = {}
-    all_specs = conn.execute(
-        "SELECT id, title FROM current_specifications WHERE status != 'retired'"
-    ).fetchall()
+    all_specs = conn.execute("SELECT id, title FROM current_specifications WHERE status != 'retired'").fetchall()
 
     for row in files:
         tf = row["test_file"]
@@ -263,9 +261,7 @@ def report_summary(db: KnowledgeDB) -> None:
           AND t.expected_outcome NOT LIKE 'PASS confirms%'
     """).fetchone()[0]
 
-    spec1100 = conn.execute(
-        "SELECT COUNT(*) FROM current_tests WHERE spec_id = 'SPEC-1100'"
-    ).fetchone()[0]
+    spec1100 = conn.execute("SELECT COUNT(*) FROM current_tests WHERE spec_id = 'SPEC-1100'").fetchone()[0]
 
     bare_pass = conn.execute("""
         SELECT COUNT(*) FROM current_tests t
@@ -276,26 +272,26 @@ def report_summary(db: KnowledgeDB) -> None:
 
     print(f"\n  === Post-Fix Quality Summary ===")
     print(f"  Total non-retired linked tests: {total}")
-    print(f"  Behavioral expected_outcomes:   {behavioral} ({behavioral/total*100:.1f}%)")
+    print(f"  Behavioral expected_outcomes:   {behavioral} ({behavioral / total * 100:.1f}%)")
     print(f"  Remaining bare 'pass':          {bare_pass}")
     print(f"  Remaining in SPEC-1100:         {spec1100}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="S159 Test-Spec Alignment Audit")
-    parser.add_argument("--apply", action="store_true",
-                        help="Actually execute fixes (default is dry-run)")
-    parser.add_argument("--fix", nargs="+", choices=["a", "b", "c"], default=None,
-                        help="Run specific fixes only (e.g., --fix a b)")
+    parser.add_argument("--apply", action="store_true", help="Actually execute fixes (default is dry-run)")
+    parser.add_argument(
+        "--fix", nargs="+", choices=["a", "b", "c"], default=None, help="Run specific fixes only (e.g., --fix a b)"
+    )
     args = parser.parse_args()
 
     fixes = set(args.fix) if args.fix else {"a", "b", "c"}
 
     mode = "APPLY" if args.apply else "DRY-RUN"
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  S159 Test-Spec Alignment Audit [{mode}]")
     print(f"  Fixes: {sorted(fixes)}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     db = KnowledgeDB()
     results = {}
@@ -309,15 +305,12 @@ def main():
 
     report_summary(db)
 
-    print(f"\n{'='*60}")
-    total = sum(
-        v.get("remapped", 0) + v.get("enriched", 0)
-        for v in results.values()
-    )
+    print(f"\n{'=' * 60}")
+    total = sum(v.get("remapped", 0) + v.get("enriched", 0) for v in results.values())
     print(f"  Total test artifacts updated: {total}")
     if not args.apply:
         print(f"  Mode: DRY-RUN (re-run with --apply to execute)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     db.close()
 

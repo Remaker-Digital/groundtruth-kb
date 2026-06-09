@@ -98,9 +98,7 @@ def provision_test_tenant(
         )
 
     if resp.status_code != 201:
-        raise RuntimeError(
-            f"Test provisioning failed: HTTP {resp.status_code} — {resp.text[:500]}"
-        )
+        raise RuntimeError(f"Test provisioning failed: HTTP {resp.status_code} — {resp.text[:500]}")
 
     data = resp.json()
     user_key = data.get("userApiKey", "")
@@ -138,6 +136,7 @@ def cleanup_test_tenant(
         with httpx.Client(timeout=timeout) as client:
             # Set expiry to now to block further access
             from datetime import datetime, timezone
+
             now_iso = datetime.now(timezone.utc).isoformat()
             resp = client.patch(
                 f"{base_url}/api/superadmin/tenants/{tenant_id}/expiry",
@@ -170,12 +169,13 @@ def provision_test_tenants(
     for i in range(count):
         try:
             t = provision_test_tenant(
-                base_url, spa_key,
+                base_url,
+                spa_key,
                 tier=tier,
                 expires_at=expires_at,
             )
             tenants.append(t)
         except RuntimeError as e:
             # Log but continue — partial provisioning is acceptable
-            print(f"WARNING: Failed to provision test tenant {i+1}/{count}: {e}")
+            print(f"WARNING: Failed to provision test tenant {i + 1}/{count}: {e}")
     return tenants

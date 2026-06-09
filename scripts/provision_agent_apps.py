@@ -74,34 +74,48 @@ def provision_app(
     app_name = f"agent-red-{name}"
     image = f"{ACR_REGISTRY}/{IMAGE_PREFIX}-{name}:{tag}"
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Provisioning {app_name}")
     print(f"  Image:    {image}")
     print(f"  Port:     {port}")
     print(f"  CPU/Mem:  {cpu} / {memory}")
     print(f"  Replicas: {env_config['min_replicas']}-{env_config['max_replicas']}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     cmd = [
-        "az", "containerapp", "create",
-        "--name", app_name,
-        "--resource-group", RESOURCE_GROUP,
-        "--environment", env_config["container_app_env"],
-        "--image", image,
-        "--registry-server", ACR_REGISTRY,
-        "--target-port", str(port),
-        "--ingress", "internal",
-        "--min-replicas", str(env_config["min_replicas"]),
-        "--max-replicas", str(env_config["max_replicas"]),
-        "--cpu", cpu,
-        "--memory", memory,
+        "az",
+        "containerapp",
+        "create",
+        "--name",
+        app_name,
+        "--resource-group",
+        RESOURCE_GROUP,
+        "--environment",
+        env_config["container_app_env"],
+        "--image",
+        image,
+        "--registry-server",
+        ACR_REGISTRY,
+        "--target-port",
+        str(port),
+        "--ingress",
+        "internal",
+        "--min-replicas",
+        str(env_config["min_replicas"]),
+        "--max-replicas",
+        str(env_config["max_replicas"]),
+        "--cpu",
+        cpu,
+        "--memory",
+        memory,
         "--env-vars",
         f"AGENT_PORT={port}",
         f"AGNTCY_NATS_ENDPOINT={nats_endpoint}",
         f"NATS_URL={nats_endpoint}",
         "AGNTCY_TRANSPORT_TYPE=slim",
         "LOG_LEVEL=INFO",
-        "--subscription", SUBSCRIPTION,
+        "--subscription",
+        SUBSCRIPTION,
     ]
 
     try:
@@ -116,13 +130,21 @@ def provision_app(
             if "already exists" in result.stderr or "Conflict" in result.stderr:
                 print(f"  App exists, updating revision...")
                 update_cmd = [
-                    "az", "containerapp", "update",
-                    "--name", app_name,
-                    "--resource-group", RESOURCE_GROUP,
-                    "--image", image,
-                    "--min-replicas", str(env_config["min_replicas"]),
-                    "--max-replicas", str(env_config["max_replicas"]),
-                    "--subscription", SUBSCRIPTION,
+                    "az",
+                    "containerapp",
+                    "update",
+                    "--name",
+                    app_name,
+                    "--resource-group",
+                    RESOURCE_GROUP,
+                    "--image",
+                    image,
+                    "--min-replicas",
+                    str(env_config["min_replicas"]),
+                    "--max-replicas",
+                    str(env_config["max_replicas"]),
+                    "--subscription",
+                    SUBSCRIPTION,
                 ]
                 update_result = subprocess.run(
                     update_cmd,
@@ -150,7 +172,9 @@ def provision_app(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Provision agent Container Apps")
     parser.add_argument(
-        "--env", choices=["staging", "production"], default="staging",
+        "--env",
+        choices=["staging", "production"],
+        default="staging",
         help="Target environment",
     )
     parser.add_argument("--tag", type=str, default=None, help="Image tag")
@@ -186,9 +210,9 @@ def main() -> None:
         results.append((name, ok))
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Provisioning Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     passed = sum(1 for _, ok in results if ok)
     failed = sum(1 for _, ok in results if not ok)
     for name, ok in results:

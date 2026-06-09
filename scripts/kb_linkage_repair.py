@@ -43,10 +43,7 @@ def phase1_fix_class_as_path():
     cur = conn.cursor()
 
     # Find all missing test_file paths
-    cur.execute(
-        'SELECT DISTINCT test_file FROM current_tests '
-        'WHERE test_file IS NOT NULL AND test_file != ""'
-    )
+    cur.execute('SELECT DISTINCT test_file FROM current_tests WHERE test_file IS NOT NULL AND test_file != ""')
     all_paths = [r[0] for r in cur.fetchall()]
 
     fixes = {}  # old_path -> (new_path, class_name)
@@ -68,9 +65,7 @@ def phase1_fix_class_as_path():
 
     for old_path, (new_path, class_name) in fixes.items():
         # Get all test records with this path
-        cur.execute(
-            "SELECT * FROM current_tests WHERE test_file = ?", (old_path,)
-        )
+        cur.execute("SELECT * FROM current_tests WHERE test_file = ?", (old_path,))
         tests = cur.fetchall()
 
         for test in tests:
@@ -110,11 +105,11 @@ def phase2_link_unlinked_specs():
     cur = conn.cursor()
 
     # Get implemented specs with no tests
-    cur.execute('''
+    cur.execute("""
         SELECT id, title FROM current_specifications
         WHERE status = 'implemented'
         AND id NOT IN (SELECT DISTINCT spec_id FROM current_tests)
-    ''')
+    """)
     no_test_specs = cur.fetchall()
 
     test_files = list(REPO.glob("tests/**/*.py"))
@@ -179,10 +174,7 @@ def phase3_fix_missing_paths():
     cur = conn.cursor()
 
     # Get all distinct missing paths that aren't class-as-path fixable
-    cur.execute(
-        'SELECT DISTINCT test_file FROM current_tests '
-        'WHERE test_file IS NOT NULL AND test_file != ""'
-    )
+    cur.execute('SELECT DISTINCT test_file FROM current_tests WHERE test_file IS NOT NULL AND test_file != ""')
     all_paths = [r[0] for r in cur.fetchall()]
 
     truly_missing = []
@@ -253,13 +245,13 @@ def phase4_report_orphaned_spec_ids():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute('''
+    cur.execute("""
         SELECT spec_id, COUNT(*) as cnt
         FROM current_tests
         WHERE spec_id NOT IN (SELECT id FROM current_specifications)
         GROUP BY spec_id
         ORDER BY cnt DESC
-    ''')
+    """)
     rows = cur.fetchall()
 
     total_orphaned = sum(r["cnt"] for r in rows)

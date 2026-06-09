@@ -5,6 +5,7 @@ Record DOC-141: Shopify Production Deployment Guide in Knowledge DB.
 """
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db
 

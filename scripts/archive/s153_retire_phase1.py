@@ -5,7 +5,9 @@ from future consideration.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 from db import KnowledgeDB
 
@@ -127,7 +129,8 @@ print("CATEGORY 1: CONTRADICTED BY IMPLEMENTATION")
 print("=" * 60)
 for sid, reason in contradicted.items():
     db.update_spec(
-        sid, changed_by=SESSION,
+        sid,
+        changed_by=SESSION,
         change_reason=f"OBSOLETE — Contradicted by implementation: {reason}",
         status="retired",
     )
@@ -140,7 +143,8 @@ print("CATEGORY 2: WI APPROVALS")
 print("=" * 60)
 for sid, reason in wi_approvals.items():
     db.update_spec(
-        sid, changed_by=SESSION,
+        sid,
+        changed_by=SESSION,
         change_reason=f"OBSOLETE — {reason}. Owner directive: WI approvals are not specifications.",
         status="retired",
     )
@@ -153,7 +157,8 @@ print("CATEGORY 3: BUSINESS/CREATIVE DECISIONS")
 print("=" * 60)
 for sid, reason in business_creative.items():
     db.update_spec(
-        sid, changed_by=SESSION,
+        sid,
+        changed_by=SESSION,
         change_reason=f"OBSOLETE — {reason}. Owner directive: business/creative decisions should not be specs.",
         status="retired",
     )

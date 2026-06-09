@@ -1,11 +1,15 @@
 """Inventory all pytest-collectible tests by directory and file."""
+
 import subprocess, sys, io, collections
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 r = subprocess.run(
     [sys.executable, "-m", "pytest", "--collect-only", "-qq"],
-    capture_output=True, text=True, encoding="utf-8", errors="replace"
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
 )
 # Merge stdout and stderr (pytest may write to either)
 all_output = r.stdout + "\n" + r.stderr
@@ -29,14 +33,22 @@ for d, c in dirs.most_common():
 
 # Identify what the thermal-safe harness covers vs doesn't
 harness_dirs = {
-    "tests/multi_tenant", "tests/unit", "tests/migrations",
-    "tests/agents", "tests/chat", "tests/persistent_memory",
-    "tests/evaluation", "tests/integrations",
+    "tests/multi_tenant",
+    "tests/unit",
+    "tests/migrations",
+    "tests/agents",
+    "tests/chat",
+    "tests/persistent_memory",
+    "tests/evaluation",
+    "tests/integrations",
 }
 harness_files = {
-    "tests/test_conftest_smoke.py", "tests/test_cross_module.py",
-    "tests/test_env_loader.py", "tests/test_error_handling.py",
-    "tests/test_forgot_password.py", "tests/test_health.py",
+    "tests/test_conftest_smoke.py",
+    "tests/test_cross_module.py",
+    "tests/test_env_loader.py",
+    "tests/test_error_handling.py",
+    "tests/test_forgot_password.py",
+    "tests/test_health.py",
     "tests/test_multi_tenant_isolation_e2e.py",
     "tests/security/test_adversarial.py",
 }

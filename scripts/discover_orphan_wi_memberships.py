@@ -370,8 +370,7 @@ def _render_review_packet(inventory: dict[str, Any]) -> str:
         for rec in unrec:
             title_short = (rec["title"] or "")[:80].replace("|", "\\|")
             lines.append(
-                f"| `{rec['id']}` | {title_short} | "
-                f"`{rec.get('origin') or '—'}` | `{rec.get('priority') or '—'}` |"
+                f"| `{rec['id']}` | {title_short} | `{rec.get('origin') or '—'}` | `{rec.get('priority') or '—'}` |"
             )
     else:
         lines.append("_No unrecoverable orphans._")
@@ -424,9 +423,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write("\n")
         return 0
 
-    output_dir = args.output_dir or (
-        _REPO_ROOT / ".gtkb-state" / "orphan-wi-discovery" / run_id
-    )
+    output_dir = args.output_dir or (_REPO_ROOT / ".gtkb-state" / "orphan-wi-discovery" / run_id)
     paths = emit_outputs(inventory, output_dir)
 
     sys.stdout.write(

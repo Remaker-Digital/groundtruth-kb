@@ -20,11 +20,11 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
-for _n in ["azure", "azure.core.pipeline.policies.http_logging_policy",
-           "urllib3", "httpx", "openai", "httpcore"]:
+for _n in ["azure", "azure.core.pipeline.policies.http_logging_policy", "urllib3", "httpx", "openai", "httpcore"]:
     logging.getLogger(_n).setLevel(logging.WARNING)
 
 DEFAULT_TENANT_ID = "remaker-digital-001"
@@ -92,6 +92,7 @@ async def run(tenant_id: str, query: str, top_k: int = 10) -> None:
         return
 
     from openai import AsyncAzureOpenAI
+
     openai_client = AsyncAzureOpenAI(
         azure_endpoint=endpoint,
         api_key=api_key,
@@ -136,7 +137,7 @@ async def run(tenant_id: str, query: str, top_k: int = 10) -> None:
             tags = r.get("tags", [])
             entry_id = str(r.get("id", "?"))
 
-            P(f"  [{i+1}] {title}")
+            P(f"  [{i + 1}] {title}")
             eid = entry_id[:40] + ("..." if len(entry_id) > 40 else "")
             P(f"      ID:              {eid}")
             P(f"      Type:            {entry_type}")
@@ -252,16 +253,12 @@ async def main() -> None:
     parser = argparse.ArgumentParser(
         description="Diagnose Knowledge Retrieval quality for a tenant",
     )
-    parser.add_argument("--tenant-id", default=DEFAULT_TENANT_ID,
-                        help=f"Tenant ID (default: {DEFAULT_TENANT_ID})")
-    parser.add_argument("--query", default=DEFAULT_QUERY,
-                        help="Search query (default: What is your pricing?)")
-    parser.add_argument("--top-k", type=int, default=10,
-                        help="Number of results to retrieve (default: 10)")
+    parser.add_argument("--tenant-id", default=DEFAULT_TENANT_ID, help=f"Tenant ID (default: {DEFAULT_TENANT_ID})")
+    parser.add_argument("--query", default=DEFAULT_QUERY, help="Search query (default: What is your pricing?)")
+    parser.add_argument("--top-k", type=int, default=10, help="Number of results to retrieve (default: 10)")
     args = parser.parse_args()
     await run(tenant_id=args.tenant_id, query=args.query, top_k=args.top_k)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

@@ -123,11 +123,13 @@ def fix_2_dead_pattern_assertions(db: KnowledgeDB, *, apply: bool = False) -> di
                 live_assertions.append(a)  # Keep if we can't read the file
 
         if removed_count > 0:
-            fixed_specs.append({
-                "spec_id": spec_id,
-                "removed": removed_count,
-                "remaining": len(live_assertions),
-            })
+            fixed_specs.append(
+                {
+                    "spec_id": spec_id,
+                    "removed": removed_count,
+                    "remaining": len(live_assertions),
+                }
+            )
             total_removed += removed_count
             if apply:
                 db.update_spec(
@@ -234,11 +236,11 @@ def fix_4_tighten_broad_patterns(db: KnowledgeDB, *, apply: bool = False) -> dic
                 candidates.append(m.group(1) or m.group(2))
 
             # Extract CamelCase words from title
-            for m in re.finditer(r'[A-Z][a-z]+(?:[A-Z][a-z]+)+', title):
+            for m in re.finditer(r"[A-Z][a-z]+(?:[A-Z][a-z]+)+", title):
                 candidates.append(m.group())
 
             # Extract snake_case identifiers from title
-            for m in re.finditer(r'[a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)+', title):
+            for m in re.finditer(r"[a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)+", title):
                 candidates.append(m.group())
 
             # Try each candidate — pick the first that matches 1-50 times
@@ -255,12 +257,14 @@ def fix_4_tighten_broad_patterns(db: KnowledgeDB, *, apply: bool = False) -> dic
                 new_a = dict(a)
                 new_a["pattern"] = best
                 new_assertions.append(new_a)
-                tightened.append({
-                    "spec_id": spec_id,
-                    "old_pattern": a_pattern,
-                    "new_pattern": best,
-                    "old_matches": match_count,
-                })
+                tightened.append(
+                    {
+                        "spec_id": spec_id,
+                        "old_pattern": a_pattern,
+                        "new_pattern": best,
+                        "old_matches": match_count,
+                    }
+                )
                 updated = True
             else:
                 new_assertions.append(a)  # Keep original if no better pattern found
@@ -277,7 +281,9 @@ def fix_4_tighten_broad_patterns(db: KnowledgeDB, *, apply: bool = False) -> dic
     if not apply and tightened:
         print(f"         (dry-run — use --apply to execute)")
     for item in tightened[:10]:
-        print(f"         SPEC-{item['spec_id']}: '{item['old_pattern']}' ({item['old_matches']}x) -> '{item['new_pattern']}'")
+        print(
+            f"         SPEC-{item['spec_id']}: '{item['old_pattern']}' ({item['old_matches']}x) -> '{item['new_pattern']}'"
+        )
     if len(tightened) > 10:
         print(f"         ... and {len(tightened) - 10} more")
     return {"count": len(tightened), "details": tightened}
@@ -331,19 +337,17 @@ def report_missing_test_files(db: KnowledgeDB) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="S159 Integrity Scan Remediation")
-    parser.add_argument("--apply", action="store_true",
-                        help="Actually execute fixes (default is dry-run)")
-    parser.add_argument("--fix", nargs="+", type=int, default=None,
-                        help="Run specific fixes only (e.g., --fix 1 2)")
+    parser.add_argument("--apply", action="store_true", help="Actually execute fixes (default is dry-run)")
+    parser.add_argument("--fix", nargs="+", type=int, default=None, help="Run specific fixes only (e.g., --fix 1 2)")
     args = parser.parse_args()
 
     fixes_to_run = set(args.fix) if args.fix else {1, 2, 3, 4}
 
     mode = "APPLY" if args.apply else "DRY-RUN"
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  S159 Integrity Scan Remediation [{mode}]")
     print(f"  Fixes: {sorted(fixes_to_run)}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     db = KnowledgeDB()
     results = {}
@@ -361,9 +365,9 @@ def main():
     results["report_orphaned"] = report_orphaned_tests(db)
     results["report_missing_files"] = report_missing_test_files(db)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     total_actions = 0
     if "fix_1" in results:
         total_actions += results["fix_1"]["count"]

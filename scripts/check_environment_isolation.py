@@ -155,10 +155,7 @@ def check_dockerignore(root: Path) -> list[Finding]:
                     code="DOCKERIGNORE_MISSING_RULE",
                     severity="error",
                     path=".dockerignore",
-                    message=(
-                        f"missing required denylist entry for GT-KB "
-                        f"governance/runtime surface: {required}"
-                    ),
+                    message=(f"missing required denylist entry for GT-KB governance/runtime surface: {required}"),
                 )
             )
     return findings
@@ -199,10 +196,7 @@ def check_dockerfile(root: Path) -> list[Finding]:
                     code="DOCKERFILE_FORBIDDEN_COPY",
                     severity="error",
                     path=f"Dockerfile:{lineno}",
-                    message=(
-                        f"COPY source '{source}' imports a GT-KB "
-                        "governance/runtime surface"
-                    ),
+                    message=(f"COPY source '{source}' imports a GT-KB governance/runtime surface"),
                 )
             )
     return findings
@@ -225,10 +219,7 @@ _WINDOWS_DRIVE_LETTER_PATTERN = re.compile(r"^[A-Za-z]:[/\\]")
 
 def _is_host_path(host: str) -> bool:
     return (
-        host.startswith(".")
-        or host.startswith("/")
-        or "/" in host
-        or bool(_WINDOWS_DRIVE_LETTER_PATTERN.match(host))
+        host.startswith(".") or host.startswith("/") or "/" in host or bool(_WINDOWS_DRIVE_LETTER_PATTERN.match(host))
     )
 
 
@@ -257,10 +248,7 @@ def check_compose(root: Path) -> list[Finding]:
                     code="COMPOSE_HOST_BIND_OUT_OF_APP",
                     severity="error",
                     path=f"docker-compose.yml:{lineno}",
-                    message=(
-                        f"host bind '{host}:{container}' must stay within "
-                        "the app repository (use './<path>')"
-                    ),
+                    message=(f"host bind '{host}:{container}' must stay within the app repository (use './<path>')"),
                 )
             )
             continue
@@ -274,21 +262,14 @@ def check_compose(root: Path) -> list[Finding]:
                     code="COMPOSE_SOURCE_BIND_NOT_READONLY",
                     severity="error",
                     path=f"docker-compose.yml:{lineno}",
-                    message=(
-                        f"repo-local bind '{host}:{container}' must be "
-                        "mounted read-only (':ro')"
-                    ),
+                    message=(f"repo-local bind '{host}:{container}' must be mounted read-only (':ro')"),
                 )
             )
     return findings
 
 
-_EDITABLE_GTKB_PATTERN = re.compile(
-    r"^\s*-e\s+.*groundtruth[-_]kb", re.IGNORECASE
-)
-_RELEASED_GTKB_PATTERN = re.compile(
-    r"^\s*groundtruth[-_]kb\b", re.IGNORECASE
-)
+_EDITABLE_GTKB_PATTERN = re.compile(r"^\s*-e\s+.*groundtruth[-_]kb", re.IGNORECASE)
+_RELEASED_GTKB_PATTERN = re.compile(r"^\s*groundtruth[-_]kb\b", re.IGNORECASE)
 
 
 def detect_gtkb_mode(root: Path) -> tuple[str, list[Finding]]:
@@ -352,36 +333,22 @@ def _render_text(report: EnvironmentReport) -> str:
     lines.append("Environment Isolation Report")
     lines.append("-" * 28)
     lines.append(f"  cwd:                          {report.cwd}")
-    lines.append(
-        f"  repo_root:                    "
-        f"{report.repo_root or '(not a git repository)'}"
-    )
-    lines.append(
-        f"  git_remote:                   {report.git_remote or '(none)'}"
-    )
-    lines.append(
-        f"  git_branch:                   {report.git_branch or '(unknown)'}"
-    )
-    lines.append(
-        f"  default_gtkb_dependency_mode: {report.default_gtkb_dependency_mode}"
-    )
+    lines.append(f"  repo_root:                    {report.repo_root or '(not a git repository)'}")
+    lines.append(f"  git_remote:                   {report.git_remote or '(none)'}")
+    lines.append(f"  git_branch:                   {report.git_branch or '(unknown)'}")
+    lines.append(f"  default_gtkb_dependency_mode: {report.default_gtkb_dependency_mode}")
     lines.append("")
     if report.findings:
         lines.append("Findings:")
         for finding in report.findings:
-            lines.append(
-                f"  [{finding.severity.upper()}] {finding.code} "
-                f"{finding.path}: {finding.message}"
-            )
+            lines.append(f"  [{finding.severity.upper()}] {finding.code} {finding.path}: {finding.message}")
     else:
         lines.append("No environment-isolation findings.")
     return "\n".join(lines)
 
 
 def main(argv: Iterable[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Agent Red Phase 3 environment-boundary checker."
-    )
+    parser = argparse.ArgumentParser(description="Agent Red Phase 3 environment-boundary checker.")
     parser.add_argument(
         "--json",
         dest="as_json",

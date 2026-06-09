@@ -95,9 +95,7 @@ def rewrite_line(line: str, subdir_status: dict[str, str]) -> str:
     for root in CLUSTER_ROOTS:
         # Match: leading boundary + root + (slash OR end-of-token boundary)
         # Avoid matching inside identifiers like `myadmin` or `xsrc`.
-        pattern = re.compile(
-            r"(?<![a-zA-Z0-9_/])" + re.escape(root) + r"(?=[/\s'\"`,)\]:*]|$)"
-        )
+        pattern = re.compile(r"(?<![a-zA-Z0-9_/])" + re.escape(root) + r"(?=[/\s'\"`,)\]:*]|$)")
         line = pattern.sub(f"{APPLICATION_PREFIX}/{root}", line)
 
     # Rule 3: tests/<subdir> migration-status-aware
@@ -116,10 +114,7 @@ def rewrite_line(line: str, subdir_status: dict[str, str]) -> str:
         if status == "fully_staying":
             return match.group(0)
         # split: duplicate inline. If suffix starts with '/' or '*', keep it.
-        return (
-            f"{prefix}tests/{subdir}{suffix} "
-            f"{APPLICATION_PREFIX}/tests/{subdir}{suffix}"
-        )
+        return f"{prefix}tests/{subdir}{suffix} {APPLICATION_PREFIX}/tests/{subdir}{suffix}"
 
     line = re.sub(
         r"(^|[^a-zA-Z0-9_/])tests/([a-zA-Z][a-zA-Z0-9_]*)(/?[*]*)",
@@ -169,12 +164,8 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     print(f"Mode: {'DRY-RUN (no writes)' if dry_run else 'APPLY (writes)'}")
     print(f"subdir status: {len(subdir_status)} subdirs classified")
-    print(
-        f"  fully_migrated: {sum(1 for v in subdir_status.values() if v == 'fully_migrated')}"
-    )
-    print(
-        f"  fully_staying:  {sum(1 for v in subdir_status.values() if v == 'fully_staying')}"
-    )
+    print(f"  fully_migrated: {sum(1 for v in subdir_status.values() if v == 'fully_migrated')}")
+    print(f"  fully_staying:  {sum(1 for v in subdir_status.values() if v == 'fully_staying')}")
     print(f"  split:          {sum(1 for v in subdir_status.values() if v == 'split')}")
     print()
 

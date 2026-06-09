@@ -2,7 +2,9 @@
 """S168: Record UI restructure specs, WIs, and tests.
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db as kdb
 
@@ -24,11 +26,7 @@ d.insert_spec(
     ),
     priority="medium",
     scope="admin_ui",
-    assertions=[{
-        "type": "grep",
-        "file": "admin/standalone/pages/Configuration.tsx",
-        "pattern": "Agent identity"
-    }],
+    assertions=[{"type": "grep", "file": "admin/standalone/pages/Configuration.tsx", "pattern": "Agent identity"}],
 )
 print("SPEC-1716 recorded")
 
@@ -49,11 +47,7 @@ d.insert_spec(
     ),
     priority="medium",
     scope="admin_ui",
-    assertions=[{
-        "type": "grep",
-        "file": "admin/standalone/pages/KnowledgeBase.tsx",
-        "pattern": "Policy overrides"
-    }],
+    assertions=[{"type": "grep", "file": "admin/standalone/pages/KnowledgeBase.tsx", "pattern": "Policy overrides"}],
 )
 print("SPEC-1717 recorded")
 
@@ -75,29 +69,37 @@ d.insert_spec(
     ),
     priority="medium",
     scope="admin_ui",
-    assertions=[{
-        "type": "grep",
-        "file": "admin/shared/hooks/useAutoSaveDraft.ts",
-        "pattern": "useAutoSaveDraft"
-    }],
+    assertions=[{"type": "grep", "file": "admin/shared/hooks/useAutoSaveDraft.ts", "pattern": "useAutoSaveDraft"}],
 )
 print("SPEC-1718 recorded")
 
 # Work Items
 for wi_id, title, desc, status in [
-    ("WI-1234", "Group Brand & Persona + Custom Instructions into Agent identity section",
-     "SPEC-1716: Wrap Brand & Persona and Custom Instructions into a single Agent identity Paper block on Configuration page.",
-     "fixed"),
-    ("WI-1235", "Move Policies to Knowledge Base page as Policy overrides",
-     "SPEC-1717: Remove Policies section from Configuration page and add Policy overrides section to Knowledge Base page with auto-save.",
-     "fixed"),
-    ("WI-1236", "Replace Save draft inputs button with auto-save on focusout",
-     "SPEC-1718: Remove manual save button from Configuration, Widget, and MemoryPrivacy pages. Add useAutoSaveDraft hook and AutoSaveIndicator component.",
-     "fixed"),
+    (
+        "WI-1234",
+        "Group Brand & Persona + Custom Instructions into Agent identity section",
+        "SPEC-1716: Wrap Brand & Persona and Custom Instructions into a single Agent identity Paper block on Configuration page.",
+        "fixed",
+    ),
+    (
+        "WI-1235",
+        "Move Policies to Knowledge Base page as Policy overrides",
+        "SPEC-1717: Remove Policies section from Configuration page and add Policy overrides section to Knowledge Base page with auto-save.",
+        "fixed",
+    ),
+    (
+        "WI-1236",
+        "Replace Save draft inputs button with auto-save on focusout",
+        "SPEC-1718: Remove manual save button from Configuration, Widget, and MemoryPrivacy pages. Add useAutoSaveDraft hook and AutoSaveIndicator component.",
+        "fixed",
+    ),
 ]:
     d.insert_work_item(
-        id=wi_id, title=title, description=desc,
-        component="admin_ui", origin="new",
+        id=wi_id,
+        title=title,
+        description=desc,
+        component="admin_ui",
+        origin="new",
         resolution_status=status,
         change_reason="Owner directive during manual UI testing",
         changed_by="claude-s168",
@@ -106,48 +108,135 @@ for wi_id, title, desc, status in [
 
 # Tests
 tests = [
-    ("TEST-9667", "SPEC-1716", "Agent identity section exists in Configuration page",
-     "structural", "Configuration.tsx contains Agent identity section header",
-     "test_configuration.py", "TestConfigSectionOrder", "test_agent_identity_section_exists"),
-    ("TEST-9668", "SPEC-1716", "Agent identity contains Brand & persona sub-section",
-     "structural", "Agent identity Paper contains Brand & persona subheading",
-     "test_configuration.py", "TestConfigSectionOrder", "test_agent_identity_has_brand_persona"),
-    ("TEST-9669", "SPEC-1716", "Agent identity contains Custom instructions sub-section",
-     "structural", "Agent identity Paper contains Custom instructions subheading",
-     "test_configuration.py", "TestConfigSectionOrder", "test_agent_identity_has_custom_instructions"),
-    ("TEST-9670", "SPEC-1717", "Knowledge Base page has Policy overrides section",
-     "structural", "KnowledgeBase.tsx contains Policy overrides section header",
-     "test_knowledge_base.py", "TestPolicyOverrides", "test_policy_overrides_section_exists"),
-    ("TEST-9671", "SPEC-1717", "Policy overrides section contains return window field",
-     "structural", "Policy overrides contains NumberInput for return window",
-     "test_knowledge_base.py", "TestPolicyOverrides", "test_policy_overrides_has_return_window"),
-    ("TEST-9672", "SPEC-1717", "Policy overrides auto-saves via useAutoSaveDraft",
-     "structural", "KnowledgeBase.tsx uses useAutoSaveDraft hook for policy section",
-     "test_knowledge_base.py", "TestPolicyOverrides", "test_policy_overrides_uses_auto_save"),
-    ("TEST-9673", "SPEC-1718", "AutoSaveIndicator component renders Saved text",
-     "structural", "AutoSaveIndicator shows checkmark Saved when saveCount > 0",
-     "test_auto_save.py", "TestAutoSave", "test_indicator_renders_saved"),
-    ("TEST-9674", "SPEC-1718", "useAutoSaveDraft debounces blur events",
-     "structural", "useAutoSaveDraft hook uses setTimeout for debouncing",
-     "test_auto_save.py", "TestAutoSave", "test_hook_debounces_blur"),
-    ("TEST-9675", "SPEC-1718", "Configuration page has no Save draft inputs button",
-     "structural", "Configuration.tsx does not contain Save draft inputs button text",
-     "test_configuration.py", "TestAutoSave", "test_no_save_button_on_config"),
-    ("TEST-9676", "SPEC-1718", "Widget page has no Save draft inputs button",
-     "structural", "Widget.tsx does not contain Save draft inputs button",
-     "test_widget.py", "TestAutoSave", "test_no_save_button_on_widget"),
-    ("TEST-9677", "SPEC-1718", "MemoryPrivacy page has no Save draft inputs button",
-     "structural", "MemoryPrivacy.tsx does not contain Save draft inputs button",
-     "test_memory_privacy.py", "TestAutoSave", "test_no_save_button_on_memory"),
-    ("TEST-9678", "SPEC-1718", "Configuration page has AutoSaveIndicator",
-     "structural", "Configuration.tsx renders AutoSaveIndicator component",
-     "test_configuration.py", "TestAutoSave", "test_config_has_auto_save_indicator"),
+    (
+        "TEST-9667",
+        "SPEC-1716",
+        "Agent identity section exists in Configuration page",
+        "structural",
+        "Configuration.tsx contains Agent identity section header",
+        "test_configuration.py",
+        "TestConfigSectionOrder",
+        "test_agent_identity_section_exists",
+    ),
+    (
+        "TEST-9668",
+        "SPEC-1716",
+        "Agent identity contains Brand & persona sub-section",
+        "structural",
+        "Agent identity Paper contains Brand & persona subheading",
+        "test_configuration.py",
+        "TestConfigSectionOrder",
+        "test_agent_identity_has_brand_persona",
+    ),
+    (
+        "TEST-9669",
+        "SPEC-1716",
+        "Agent identity contains Custom instructions sub-section",
+        "structural",
+        "Agent identity Paper contains Custom instructions subheading",
+        "test_configuration.py",
+        "TestConfigSectionOrder",
+        "test_agent_identity_has_custom_instructions",
+    ),
+    (
+        "TEST-9670",
+        "SPEC-1717",
+        "Knowledge Base page has Policy overrides section",
+        "structural",
+        "KnowledgeBase.tsx contains Policy overrides section header",
+        "test_knowledge_base.py",
+        "TestPolicyOverrides",
+        "test_policy_overrides_section_exists",
+    ),
+    (
+        "TEST-9671",
+        "SPEC-1717",
+        "Policy overrides section contains return window field",
+        "structural",
+        "Policy overrides contains NumberInput for return window",
+        "test_knowledge_base.py",
+        "TestPolicyOverrides",
+        "test_policy_overrides_has_return_window",
+    ),
+    (
+        "TEST-9672",
+        "SPEC-1717",
+        "Policy overrides auto-saves via useAutoSaveDraft",
+        "structural",
+        "KnowledgeBase.tsx uses useAutoSaveDraft hook for policy section",
+        "test_knowledge_base.py",
+        "TestPolicyOverrides",
+        "test_policy_overrides_uses_auto_save",
+    ),
+    (
+        "TEST-9673",
+        "SPEC-1718",
+        "AutoSaveIndicator component renders Saved text",
+        "structural",
+        "AutoSaveIndicator shows checkmark Saved when saveCount > 0",
+        "test_auto_save.py",
+        "TestAutoSave",
+        "test_indicator_renders_saved",
+    ),
+    (
+        "TEST-9674",
+        "SPEC-1718",
+        "useAutoSaveDraft debounces blur events",
+        "structural",
+        "useAutoSaveDraft hook uses setTimeout for debouncing",
+        "test_auto_save.py",
+        "TestAutoSave",
+        "test_hook_debounces_blur",
+    ),
+    (
+        "TEST-9675",
+        "SPEC-1718",
+        "Configuration page has no Save draft inputs button",
+        "structural",
+        "Configuration.tsx does not contain Save draft inputs button text",
+        "test_configuration.py",
+        "TestAutoSave",
+        "test_no_save_button_on_config",
+    ),
+    (
+        "TEST-9676",
+        "SPEC-1718",
+        "Widget page has no Save draft inputs button",
+        "structural",
+        "Widget.tsx does not contain Save draft inputs button",
+        "test_widget.py",
+        "TestAutoSave",
+        "test_no_save_button_on_widget",
+    ),
+    (
+        "TEST-9677",
+        "SPEC-1718",
+        "MemoryPrivacy page has no Save draft inputs button",
+        "structural",
+        "MemoryPrivacy.tsx does not contain Save draft inputs button",
+        "test_memory_privacy.py",
+        "TestAutoSave",
+        "test_no_save_button_on_memory",
+    ),
+    (
+        "TEST-9678",
+        "SPEC-1718",
+        "Configuration page has AutoSaveIndicator",
+        "structural",
+        "Configuration.tsx renders AutoSaveIndicator component",
+        "test_configuration.py",
+        "TestAutoSave",
+        "test_config_has_auto_save_indicator",
+    ),
 ]
 
 for t_id, spec_id, title, t_type, expected, t_file, t_class, t_func in tests:
     d.insert_test(
-        id=t_id, title=title, spec_id=spec_id,
-        test_type=t_type, expected_outcome=expected,
+        id=t_id,
+        title=title,
+        spec_id=spec_id,
+        test_type=t_type,
+        expected_outcome=expected,
         changed_by="claude-s168",
         change_reason=f"New test for {spec_id}",
         test_file=f"tests/e2e_mock/{t_file}",

@@ -52,9 +52,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
                 pointer_target = (root_resolved / overlay_dir_rel).resolve()
                 pointer_target.relative_to(overlays_root.resolve())
             except (OSError, ValueError):
-                pointer_errors.append(
-                    f"current overlay pointer overlay_dir {overlay_dir_rel!r} escapes overlay root"
-                )
+                pointer_errors.append(f"current overlay pointer overlay_dir {overlay_dir_rel!r} escapes overlay root")
     errors.extend(pointer_errors)
 
     for overlay_dir in gtkb_overlay.iter_overlay_dirs(root_resolved):
@@ -82,14 +80,14 @@ def check_project(project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
         except gtkb_overlay.OverlayPolicyError as exc:
             overlay_entry["valid"] = False
             overlay_entry["errors"].append(str(exc))
-            errors.append(
-                f"overlay {overlay_dir.relative_to(root_resolved).as_posix()}: {exc}"
-            )
+            errors.append(f"overlay {overlay_dir.relative_to(root_resolved).as_posix()}: {exc}")
         overlays.append(overlay_entry)
 
     return {
         "project_root": str(root_resolved),
-        "overlay_root": str(overlays_root.relative_to(root_resolved).as_posix()) if overlays_root.exists() else str(gtkb_overlay.OVERLAY_ROOT_RELATIVE.as_posix()),
+        "overlay_root": str(overlays_root.relative_to(root_resolved).as_posix())
+        if overlays_root.exists()
+        else str(gtkb_overlay.OVERLAY_ROOT_RELATIVE.as_posix()),
         "overlay_count": len(overlays),
         "pointer_present": pointer is not None,
         "pointer_errors": pointer_errors,

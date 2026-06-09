@@ -96,7 +96,7 @@ def _text_panel(builder: PanelBuilder, title: str, grid: dict[str, int], content
 
 FRESHNESS_QUERY = (
     "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) "
-    "* 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;"
+    '* 24 * 60 AS INTEGER) AS "Refreshed (m ago)" FROM refresh_runs;'
 )
 FRESHNESS_REFID = "F"
 
@@ -307,7 +307,9 @@ def _table_panel(
     )
 
 
-def _row(builder: PanelBuilder, title: str, y: int, *, collapsed: bool = False, panels: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _row(
+    builder: PanelBuilder, title: str, y: int, *, collapsed: bool = False, panels: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     return {
         "id": builder.next_id(),
         "type": "row",

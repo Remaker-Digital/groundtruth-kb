@@ -2,8 +2,10 @@
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db"))
 from db import KnowledgeDB
 
 kdb = KnowledgeDB()
@@ -25,7 +27,7 @@ Next: S120 is an audit session (every 5th). Tasks: commit triage, KB integrity, 
 Alternatively: owner may direct production deployment of v1.61.0 changes."""
 
 kdb.insert_session_prompt(
-    session_id='S119',
+    session_id="S119",
     prompt_text=prompt,
 )
-print('Session handoff prompt inserted')
+print("Session handoff prompt inserted")

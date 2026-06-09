@@ -5,6 +5,7 @@ Loads credentials from .env.local internally — no secrets on CLI.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import json
 import os
 import sys
@@ -12,6 +13,7 @@ import urllib.request
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 
 def load_env():
     """Load .env.local into os.environ."""
@@ -26,19 +28,23 @@ def load_env():
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
 
+
 def api_get(url: str, headers: dict) -> dict:
     """GET request, return parsed JSON."""
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=15) as resp:
         return json.loads(resp.read())
 
+
 def main():
     load_env()
     base = os.environ.get("STAGING_URL", "").rstrip("/")
     spa_key = os.environ.get("STAGING_SPA_KEY", "") or os.environ.get("SPA_PLATFORM_ADMIN_KEY", "")
-    tenant_key = (os.environ.get("STAGING_REMAKER_USER_KEY", "")
-                  or os.environ.get("STAGING_REMAKER_TENANT_KEY", "")
-                  or os.environ.get("STAGING_REMAKER_API_KEY", ""))
+    tenant_key = (
+        os.environ.get("STAGING_REMAKER_USER_KEY", "")
+        or os.environ.get("STAGING_REMAKER_TENANT_KEY", "")
+        or os.environ.get("STAGING_REMAKER_API_KEY", "")
+    )
 
     if not base:
         print("ERROR: STAGING_URL not set in .env.local")
@@ -73,9 +79,17 @@ def main():
                         break
             masked_count = 0
             raw_count = 0
-            PII_FIELDS = ["customer_email", "contact_email", "email",
-                          "shopify_shop_domain", "shop_domain", "brand_name",
-                          "customerEmail", "shopifyShopDomain", "brandName"]
+            PII_FIELDS = [
+                "customer_email",
+                "contact_email",
+                "email",
+                "shopify_shop_domain",
+                "shop_domain",
+                "brand_name",
+                "customerEmail",
+                "shopifyShopDomain",
+                "brandName",
+            ]
             for t in tenants:
                 for field in PII_FIELDS:
                     val = t.get(field, "")
@@ -119,9 +133,21 @@ def main():
             events = data if isinstance(data, list) else data.get("events", data.get("items", []))
             pii_leak = False
             sanitized_markers = 0
-            DENY_FIELDS = {"email", "customer_email", "phone", "name", "display_name",
-                           "messages", "content", "body", "api_key", "widget_key",
-                           "totp_seed", "session_token", "shopify_domain"}
+            DENY_FIELDS = {
+                "email",
+                "customer_email",
+                "phone",
+                "name",
+                "display_name",
+                "messages",
+                "content",
+                "body",
+                "api_key",
+                "widget_key",
+                "totp_seed",
+                "session_token",
+                "shopify_domain",
+            }
             for evt in events:
                 details = evt.get("details", evt.get("payload", {}))
                 if isinstance(details, dict):
@@ -130,7 +156,9 @@ def main():
                             pii_leak = True
                             print(f"  [LEAK] Denied field '{k}' found in audit event!")
                     for v in details.values():
-                        if isinstance(v, str) and any(m in v for m in ["[EMAIL]", "[API_KEY]", "[PHONE]", "[STRIPE_KEY]", "[redacted:"]):
+                        if isinstance(v, str) and any(
+                            m in v for m in ["[EMAIL]", "[API_KEY]", "[PHONE]", "[STRIPE_KEY]", "[redacted:"]
+                        ):
                             sanitized_markers += 1
             if pii_leak:
                 results["pillar4"] = "FAIL"
@@ -140,7 +168,9 @@ def main():
                 print("[WARN] Pillar 4: No audit events to verify")
             else:
                 results["pillar4"] = "PASS"
-                print(f"[PASS] Pillar 4: {len(events)} events checked, 0 PII leaks, {sanitized_markers} sanitized markers")
+                print(
+                    f"[PASS] Pillar 4: {len(events)} events checked, 0 PII leaks, {sanitized_markers} sanitized markers"
+                )
             if events:
                 sample = events[0]
                 print(f"  Sample event_type: {sample.get('event_type', '?')}")
@@ -156,14 +186,15 @@ def main():
             print("  Found STAGING_REMAKER_TENANT_KEY, retrying...")
 
     # --- Summary ---
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"ZK Pillar Verification — v{results['version']}")
     print(f"  Pillar 3 (PII masking):        {results['pillar3']}")
     print(f"  Pillar 4 (Audit sanitization): {results['pillar4']}")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
 
     if results["pillar3"] == "FAIL" or results["pillar4"] == "FAIL":
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -71,6 +71,7 @@ TENANTS: dict[str, dict[str, str]] = {
 # Production deploy gates
 # ---------------------------------------------------------------------------
 
+
 def check_owner_approval() -> bool:
     """Check if owner has approved production deployment (GOV-16).
 
@@ -107,13 +108,21 @@ def get_current_image(env_name: str) -> str | None:
     try:
         result = subprocess.run(
             [
-                "az", "containerapp", "show",
-                "--name", config["container_app"],
-                "--resource-group", config["resource_group"],
-                "--query", "properties.template.containers[0].image",
-                "--output", "tsv",
+                "az",
+                "containerapp",
+                "show",
+                "--name",
+                config["container_app"],
+                "--resource-group",
+                config["resource_group"],
+                "--query",
+                "properties.template.containers[0].image",
+                "--output",
+                "tsv",
             ],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -133,12 +142,19 @@ def rollback_to_image(env_name: str, image: str) -> bool:
     try:
         result = subprocess.run(
             [
-                "az", "containerapp", "update",
-                "--name", config["container_app"],
-                "--resource-group", config["resource_group"],
-                "--image", image,
+                "az",
+                "containerapp",
+                "update",
+                "--name",
+                config["container_app"],
+                "--resource-group",
+                config["resource_group"],
+                "--image",
+                image,
             ],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         return result.returncode == 0
     except Exception:

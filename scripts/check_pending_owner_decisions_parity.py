@@ -71,10 +71,10 @@ def _summarize_pending(body: str) -> str:
         if stripped.startswith("- id: "):
             if current_id:
                 entries.append((current_id, current_question))
-            current_id = stripped[len("- id: "):].strip()
+            current_id = stripped[len("- id: ") :].strip()
             current_question = ""
         elif stripped.startswith("question: "):
-            current_question = _unquote(stripped[len("question: "):].strip())
+            current_question = _unquote(stripped[len("question: ") :].strip())
     if current_id:
         entries.append((current_id, current_question))
 
@@ -88,8 +88,8 @@ def _summarize_pending(body: str) -> str:
 
 def _unquote(value: str) -> str:
     """Strip surrounding double quotes from a YAML-flat scalar."""
-    if value.startswith("\"") and value.endswith("\"") and len(value) >= 2:
-        return value[1:-1].replace("\\\"", "\"").replace("\\\\", "\\")
+    if value.startswith('"') and value.endswith('"') and len(value) >= 2:
+        return value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
     return value
 
 

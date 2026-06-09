@@ -23,11 +23,13 @@ db.update_spec(
     "require_platform_admin() router guard, reverse guard, seed script. "
     "Deployed to production (revision 0000093) and staging. Verified.",
     status="implemented",
-    assertions=[{
-        "type": "grep",
-        "pattern": "require_platform_admin",
-        "file": "src/multi_tenant/middleware.py",
-    }],
+    assertions=[
+        {
+            "type": "grep",
+            "pattern": "require_platform_admin",
+            "file": "src/multi_tenant/middleware.py",
+        }
+    ],
 )
 print("[OK] SPEC-1667 -> implemented")
 
@@ -38,11 +40,13 @@ db.update_spec(
     "per-endpoint require_role(SUPERADMIN) guards. Tenant keys get 403 on "
     "superadmin endpoints. SPA keys get blocked from tenant endpoints.",
     status="implemented",
-    assertions=[{
-        "type": "grep",
-        "pattern": "is_platform_admin",
-        "file": "src/multi_tenant/auth.py",
-    }],
+    assertions=[
+        {
+            "type": "grep",
+            "pattern": "is_platform_admin",
+            "file": "src/multi_tenant/auth.py",
+        }
+    ],
 )
 print("[OK] SPEC-1668 -> implemented")
 

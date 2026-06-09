@@ -10,7 +10,9 @@ sys.path.insert(0, str(Path("groundtruth-kb/src").resolve()))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
-PACKET_PATH = Path(".groundtruth/formal-artifact-approvals/2026-05-12-dcl-single-harness-dispatcher-desktop-task-001.json")
+PACKET_PATH = Path(
+    ".groundtruth/formal-artifact-approvals/2026-05-12-dcl-single-harness-dispatcher-desktop-task-001.json"
+)
 
 
 def main() -> None:

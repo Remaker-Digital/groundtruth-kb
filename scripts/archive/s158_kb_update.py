@@ -4,6 +4,7 @@
 """
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db  # noqa: E402
 
@@ -38,9 +39,7 @@ for spec_id, title in specs:
 # Record test artifacts
 # -------------------------------------------------------------------
 
-max_id = conn.execute(
-    'SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) FROM tests WHERE id LIKE "TEST-%"'
-).fetchone()[0]
+max_id = conn.execute('SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) FROM tests WHERE id LIKE "TEST-%"').fetchone()[0]
 next_id = (max_id or 0) + 1
 print(f"Starting test IDs from TEST-{next_id}")
 
@@ -198,14 +197,8 @@ print(f"\nTotal: {next_id - (max_id + 1)} test artifacts recorded (TEST-{max_id 
 # Summary
 # -------------------------------------------------------------------
 
-total_specs = conn.execute(
-    "SELECT COUNT(DISTINCT id) FROM specifications"
-).fetchone()[0]
-impl = conn.execute(
-    "SELECT COUNT(DISTINCT id) FROM specifications WHERE status = 'implemented'"
-).fetchone()[0]
-total_tests = conn.execute(
-    "SELECT COUNT(DISTINCT id) FROM tests"
-).fetchone()[0]
+total_specs = conn.execute("SELECT COUNT(DISTINCT id) FROM specifications").fetchone()[0]
+impl = conn.execute("SELECT COUNT(DISTINCT id) FROM specifications WHERE status = 'implemented'").fetchone()[0]
+total_tests = conn.execute("SELECT COUNT(DISTINCT id) FROM tests").fetchone()[0]
 
 print(f"\nKB summary: {total_specs} specs ({impl} implemented), {total_tests} test artifacts")

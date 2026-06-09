@@ -20,9 +20,7 @@ from db import KnowledgeDB  # noqa: E402
 
 
 CHANGED_BY = "prime-builder/codex"
-CHANGE_REASON = (
-    "Owner-approved GTKB-CORE-001 Phase 0 governance and compatibility formalization."
-)
+CHANGE_REASON = "Owner-approved GTKB-CORE-001 Phase 0 governance and compatibility formalization."
 DELIB_ID = "DELIB-0875"
 SOURCE_REF = "owner_conversation:2026-04-22-core-spec-intake-approved"
 SOURCE_PATHS = [

@@ -14,6 +14,7 @@ Exit codes:
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -146,10 +147,7 @@ def _run(cmd: str, timeout: int = 120) -> tuple[int, str]:
 
 def verify_acr_tag(repo: str, tag: str) -> bool:
     """Check that an image tag exists in ACR before deploying."""
-    cmd = (
-        f'az acr repository show-tags --name {ACR_NAME} '
-        f'--repository {repo} --query "[?@==\'{tag}\']" -o tsv'
-    )
+    cmd = f"az acr repository show-tags --name {ACR_NAME} --repository {repo} --query \"[?@=='{tag}']\" -o tsv"
     code, output = _run(cmd, timeout=30)
     if code != 0:
         log(f"  WARNING: Could not verify ACR tag (az CLI issue)")
@@ -213,13 +211,7 @@ def enforce_scaling(app_name: str, environment: str) -> bool:
 
 def deploy_container(app_name: str, image: str) -> bool:
     """Deploy a container image to Azure Container Apps."""
-    cmd = (
-        f"az containerapp update "
-        f"--name {app_name} "
-        f"--resource-group {RESOURCE_GROUP} "
-        f"--image {image} "
-        f"--output none"
-    )
+    cmd = f"az containerapp update --name {app_name} --resource-group {RESOURCE_GROUP} --image {image} --output none"
     log(f"  Deploying {image} → {app_name}...")
     code, output = _run(cmd, timeout=180)
     if code != 0:
@@ -290,13 +282,14 @@ def verify_container_health(app_name: str) -> dict:
         f"az containerapp revision list --name {app_name} "
         f"--resource-group {RESOURCE_GROUP} "
         f'--query "sort_by(@, &name) | [-1].{{image:properties.template.containers[0].image, '
-        f'health:properties.healthState, running:properties.runningState, '
+        f"health:properties.healthState, running:properties.runningState, "
         f'name:name}}" -o json'
     )
     code, output = _run(cmd, timeout=30)
     if code == 0 and output:
         try:
             import json as _json
+
             return _json.loads(output.strip())
         except Exception:
             pass
@@ -356,7 +349,9 @@ def verify_chat_conversation(fqdn: str, environment: str) -> bool:
         if environment == "staging":
             widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
         elif environment == "production":
-            widget_key = os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or os.environ.get("PRODUCTION_WIDGET_KEY", "")
+            widget_key = os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or os.environ.get(
+                "PRODUCTION_WIDGET_KEY", ""
+            )
 
     if not widget_key:
         log("  [FAIL] Chat smoke test: no widget key configured")
@@ -423,15 +418,14 @@ def verify_chat_conversation(fqdn: str, environment: str) -> bool:
                     has_tokens = True
                 elif evt.get("code"):
                     has_error = True
-                    error_detail = f'{evt["code"]}: {evt.get("message", "")[:80]}'
+                    error_detail = f"{evt['code']}: {evt.get('message', '')[:80]}"
                 elif "conversation_id" in evt and "turn_count" in evt:
                     has_done = True
             except _json.JSONDecodeError:
                 pass
 
         # 4. Verify pipeline completion
-        required_stages = ["intent-classifier", "knowledge-retrieval",
-                           "response-generator", "critic-supervisor"]
+        required_stages = ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"]
         missing = [s for s in required_stages if s not in stages_completed]
 
         if has_error:
@@ -494,10 +488,15 @@ def record_deployment_event(
     try:
         url = f"https://{fqdn}/api/superadmin/deployments/record"
         body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=body, method="POST", headers={
-            "Content-Type": "application/json",
-            "X-API-Key": api_key,
-        })
+        req = urllib.request.Request(
+            url,
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": api_key,
+            },
+        )
         with urllib.request.urlopen(req, timeout=10) as resp:
             log(f"  Deployment event recorded ({resp.status})")
     except Exception as exc:

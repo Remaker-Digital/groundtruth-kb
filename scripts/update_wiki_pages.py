@@ -21,7 +21,9 @@ def write_wiki(name: str, content: str) -> None:
 # 1. Home.md
 # ---------------------------------------------------------------------------
 def write_home():
-    write_wiki("Home.md", r"""# Agent Red Customer Experience
+    write_wiki(
+        "Home.md",
+        r"""# Agent Red Customer Experience
 
 **AI-powered customer service for Shopify** -- a commercial SaaS product built on the [AGNTCY](https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service) open-source customer service platform.
 
@@ -113,7 +115,8 @@ Production is running v1.80.0 (SPA Multi-Admin Hierarchy + Login Notifications +
 
 *&copy; 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last updated: 2026-03-08*
-""")
+""",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -185,15 +188,10 @@ def write_changelog():
 def write_project_status():
     existing = (WIKI / "Project-Status.md").read_text(encoding="utf-8")
     # Update version references
-    updated = existing.replace(
-        "> Last updated: 2026-03-08 (S157)",
-        "> Last updated: 2026-03-08 (S158)"
-    ).replace(
-        "v1.79.2 (ACR ca4n, revision 0000093, deployed 2026-03-08)",
-        "v1.80.0 (ACR ca4q, deployed 2026-03-08)"
-    ).replace(
-        "v1.79.2 (ACR ca4n, 3 tenants, scales to zero)",
-        "v1.80.0 (ACR ca4q, 3 tenants, scales to zero)"
+    updated = (
+        existing.replace("> Last updated: 2026-03-08 (S157)", "> Last updated: 2026-03-08 (S158)")
+        .replace("v1.79.2 (ACR ca4n, revision 0000093, deployed 2026-03-08)", "v1.80.0 (ACR ca4q, deployed 2026-03-08)")
+        .replace("v1.79.2 (ACR ca4n, 3 tenants, scales to zero)", "v1.80.0 (ACR ca4q, 3 tenants, scales to zero)")
     )
     write_wiki("Project-Status.md", updated)
 
@@ -202,7 +200,9 @@ def write_project_status():
 # 4. Provider-Console.md — complete rewrite with 20 pages
 # ---------------------------------------------------------------------------
 def write_provider_console():
-    write_wiki("Provider-Console.md", r"""# Provider Console
+    write_wiki(
+        "Provider-Console.md",
+        r"""# Provider Console
 
 > Last updated: 2026-03-08 (S158, v1.80.0 production)
 
@@ -426,14 +426,17 @@ This is because aggregate API responses may have empty objects for tenants with 
 ---
 
 *&copy; 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-""")
+""",
+    )
 
 
 # ---------------------------------------------------------------------------
 # 5. SPA-Operations-Guide.md — NEW: novice-friendly SPA operator guide
 # ---------------------------------------------------------------------------
 def write_spa_operations_guide():
-    write_wiki("SPA-Operations-Guide.md", r"""# SPA Operations Guide
+    write_wiki(
+        "SPA-Operations-Guide.md",
+        r"""# SPA Operations Guide
 
 > A step-by-step guide for platform administrators (SPA operators) managing the Agent Red Provider Console.
 
@@ -801,14 +804,17 @@ If a merchant contacts you because they cannot log in:
 
 *&copy; 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last updated: 2026-03-08*
-""")
+""",
+    )
 
 
 # ---------------------------------------------------------------------------
 # 6. _Sidebar.md — add new pages
 # ---------------------------------------------------------------------------
 def write_sidebar():
-    write_wiki("_Sidebar.md", r"""**[[Home]]**
+    write_wiki(
+        "_Sidebar.md",
+        r"""**[[Home]]**
 
 ---
 
@@ -894,7 +900,8 @@ def write_sidebar():
 - [[Website Integrations]]
 - [[Website About]]
 - [[Website Contact]]
-""")
+""",
+    )
 
 
 # ---------------------------------------------------------------------------

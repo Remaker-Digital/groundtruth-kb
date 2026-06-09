@@ -55,20 +55,42 @@ SCAN_GLOBS = ("*.py", "*.md", "*.json", "*.toml", "*.yaml", "*.yml")
 # historical context), memory/ (operational state), independent-progress-assessments/
 # (review reports), docs/ (published documentation).
 SCAN_ROOTS = (
-    "scripts", "src", "tests", "config", "tools",
-    ".claude/rules", ".claude/skills",
+    "scripts",
+    "src",
+    "tests",
+    "config",
+    "tools",
+    ".claude/rules",
+    ".claude/skills",
 )
 SCAN_ROOT_FILES = ("CLAUDE.md", "AGENTS.md")
 
 # Per WRAPUP -011 §2.1: expanded SKIP_DIRS for W1 perf bound.
-SKIP_DIRS = frozenset({
-    ".git", "__pycache__", "node_modules",
-    ".groundtruth-chroma", ".tmp.driveupload",
-    "test-results", "test_host", "tmp", "logs", "archive",
-    "agent-red.wiki", "docs-site", "drafts", "img",
-    ".pytest_cache", ".ruff_cache", ".mypy_cache",
-    "dist", "build", "vendor", "playwright-report",
-})
+SKIP_DIRS = frozenset(
+    {
+        ".git",
+        "__pycache__",
+        "node_modules",
+        ".groundtruth-chroma",
+        ".tmp.driveupload",
+        "test-results",
+        "test_host",
+        "tmp",
+        "logs",
+        "archive",
+        "agent-red.wiki",
+        "docs-site",
+        "drafts",
+        "img",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "dist",
+        "build",
+        "vendor",
+        "playwright-report",
+    }
+)
 
 TMP_ARTIFACT_AGE_SECONDS = 24 * 60 * 60  # 24 hours
 TMP_ARTIFACT_SUFFIXES = (".tmp", ".bak", ".orig")
@@ -85,9 +107,7 @@ def _finding(check: str, severity: str, message: str, **details: Any) -> dict:
 
 def _run_git(args: list[str], project_root: Path) -> str:
     try:
-        result = subprocess.run(
-            ["git"] + args, capture_output=True, text=True, cwd=project_root, timeout=15
-        )
+        result = subprocess.run(["git"] + args, capture_output=True, text=True, cwd=project_root, timeout=15)
         return result.stdout if result.returncode == 0 else ""
     except (subprocess.TimeoutExpired, OSError):
         return ""
@@ -335,11 +355,15 @@ def determine_exit_code(findings: list[dict]) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument(
-        "--report-format", choices=("json", "markdown"), default="json",
+        "--report-format",
+        choices=("json", "markdown"),
+        default="json",
         help="Output format (default: json)",
     )
     parser.add_argument(
-        "--write-report", default=None, help="Write report to this path (atomic)",
+        "--write-report",
+        default=None,
+        help="Write report to this path (atomic)",
     )
     args = parser.parse_args(argv)
 

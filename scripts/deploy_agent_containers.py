@@ -70,11 +70,16 @@ def _build_yaml(agent_name: str, module_path: str, env: str, openai_key: str) ->
                         "name": container_name,
                         "image": GATEWAY_IMAGE,
                         "command": [
-                            "tini", "--",
-                            "uvicorn", module_path,
-                            "--host", "0.0.0.0",
-                            "--port", str(AGENT_PORT),
-                            "--log-level", "info",
+                            "tini",
+                            "--",
+                            "uvicorn",
+                            module_path,
+                            "--host",
+                            "0.0.0.0",
+                            "--port",
+                            str(AGENT_PORT),
+                            "--log-level",
+                            "info",
                         ],
                         "resources": {"cpu": 0.5, "memory": "1Gi"},
                         "env": [
@@ -97,47 +102,73 @@ def _deploy_agent(agent_name: str, module_path: str, env: str, openai_key: str) 
     config = _build_yaml(agent_name, module_path, env, openai_key)
 
     # Write YAML to temp file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False, prefix=f"agent-{agent_name}-"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, prefix=f"agent-{agent_name}-") as f:
         yaml.dump(config, f, default_flow_style=False)
         yaml_path = f.name
 
     try:
         # Check if Container App already exists
         check = subprocess.run(
-            ["az", "containerapp", "show",
-             "--name", app_name,
-             "--resource-group", RESOURCE_GROUP,
-             "--query", "name", "-o", "tsv"],
-            capture_output=True, text=True,
+            [
+                "az",
+                "containerapp",
+                "show",
+                "--name",
+                app_name,
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--query",
+                "name",
+                "-o",
+                "tsv",
+            ],
+            capture_output=True,
+            text=True,
         )
 
         if check.returncode == 0 and check.stdout.strip():
             # Update existing
             print(f"  Updating existing Container App: {app_name}")
             result = subprocess.run(
-                ["az", "containerapp", "update",
-                 "--name", app_name,
-                 "--resource-group", RESOURCE_GROUP,
-                 "--yaml", yaml_path,
-                 "--query",
-                 "{name:name, fqdn:properties.configuration.ingress.fqdn}",
-                 "-o", "json"],
-                capture_output=True, text=True,
+                [
+                    "az",
+                    "containerapp",
+                    "update",
+                    "--name",
+                    app_name,
+                    "--resource-group",
+                    RESOURCE_GROUP,
+                    "--yaml",
+                    yaml_path,
+                    "--query",
+                    "{name:name, fqdn:properties.configuration.ingress.fqdn}",
+                    "-o",
+                    "json",
+                ],
+                capture_output=True,
+                text=True,
             )
         else:
             # Create new
             print(f"  Creating new Container App: {app_name}")
             result = subprocess.run(
-                ["az", "containerapp", "create",
-                 "--name", app_name,
-                 "--resource-group", RESOURCE_GROUP,
-                 "--yaml", yaml_path,
-                 "--query",
-                 "{name:name, fqdn:properties.configuration.ingress.fqdn}",
-                 "-o", "json"],
-                capture_output=True, text=True,
+                [
+                    "az",
+                    "containerapp",
+                    "create",
+                    "--name",
+                    app_name,
+                    "--resource-group",
+                    RESOURCE_GROUP,
+                    "--yaml",
+                    yaml_path,
+                    "--query",
+                    "{name:name, fqdn:properties.configuration.ingress.fqdn}",
+                    "-o",
+                    "json",
+                ],
+                capture_output=True,
+                text=True,
             )
 
         if result.returncode != 0:
@@ -156,15 +187,23 @@ def _deploy_agent(agent_name: str, module_path: str, env: str, openai_key: str) 
 def _verify_agent(app_name: str) -> dict:
     """Verify an agent Container App is healthy."""
     result = subprocess.run(
-        ["az", "containerapp", "show",
-         "--name", app_name,
-         "--resource-group", RESOURCE_GROUP,
-         "--query",
-         "{name:name, fqdn:properties.configuration.ingress.fqdn, "
-         "running:properties.runningStatus, "
-         "replicas:properties.template.scale.minReplicas}",
-         "-o", "json"],
-        capture_output=True, text=True,
+        [
+            "az",
+            "containerapp",
+            "show",
+            "--name",
+            app_name,
+            "--resource-group",
+            RESOURCE_GROUP,
+            "--query",
+            "{name:name, fqdn:properties.configuration.ingress.fqdn, "
+            "running:properties.runningStatus, "
+            "replicas:properties.template.scale.minReplicas}",
+            "-o",
+            "json",
+        ],
+        capture_output=True,
+        text=True,
     )
     if result.returncode != 0:
         return {"name": app_name, "status": "not_found"}
@@ -175,6 +214,7 @@ def _verify_agent(app_name: str) -> dict:
     # Try health endpoint
     if fqdn:
         import urllib.request
+
         try:
             url = f"https://{fqdn}/health"
             req = urllib.request.Request(url, method="GET")
@@ -209,13 +249,21 @@ def main():
     if not openai_key and not args.verify_only:
         # Read from staging Container App
         result = subprocess.run(
-            ["az", "containerapp", "show",
-             "--name", "agent-red-staging",
-             "--resource-group", RESOURCE_GROUP,
-             "--query",
-             "properties.template.containers[0].env[?name=='AZURE_OPENAI_API_KEY'].value | [0]",
-             "-o", "tsv"],
-            capture_output=True, text=True,
+            [
+                "az",
+                "containerapp",
+                "show",
+                "--name",
+                "agent-red-staging",
+                "--resource-group",
+                RESOURCE_GROUP,
+                "--query",
+                "properties.template.containers[0].env[?name=='AZURE_OPENAI_API_KEY'].value | [0]",
+                "-o",
+                "tsv",
+            ],
+            capture_output=True,
+            text=True,
         )
         openai_key = result.stdout.strip()
 

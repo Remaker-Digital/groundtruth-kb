@@ -107,7 +107,9 @@ def check_health(kb_path: str | None = None) -> dict:
 
     # Source type distribution
     source_types = {}
-    for row in conn.execute("SELECT source_type, COUNT(*) as cnt FROM current_deliberations GROUP BY source_type").fetchall():
+    for row in conn.execute(
+        "SELECT source_type, COUNT(*) as cnt FROM current_deliberations GROUP BY source_type"
+    ).fetchall():
         source_types[row["source_type"]] = row["cnt"]
 
     # Candidate sources
@@ -210,7 +212,9 @@ def print_report(metrics: dict) -> None:
 
     pop = metrics["population"]
     print(f"\n1. Population Coverage: [{pop['status']}]")
-    print(f"   {pop['total_deliberations']} deliberations / {pop['candidate_sources']} candidates = {pop['coverage']:.1%}")
+    print(
+        f"   {pop['total_deliberations']} deliberations / {pop['candidate_sources']} candidates = {pop['coverage']:.1%}"
+    )
     print(f"   (LO reports: {pop['lo_reports']}, bridge threads: {pop['bridge_threads']})")
 
     link = metrics["linkage"]
@@ -220,7 +224,9 @@ def print_report(metrics: dict) -> None:
 
     conf = metrics["conflict_quarantine"]
     print(f"\n3. Conflict Quarantine: [{conf['status']}]")
-    print(f"   {conf['informational_outcome']} informational / {conf['total_deliberations']} total = {conf['quarantine_rate']:.1%}")
+    print(
+        f"   {conf['informational_outcome']} informational / {conf['total_deliberations']} total = {conf['quarantine_rate']:.1%}"
+    )
 
     red = metrics["redaction_survivors"]
     print(f"\n4. Redaction Survivors: [{red['status']}]")

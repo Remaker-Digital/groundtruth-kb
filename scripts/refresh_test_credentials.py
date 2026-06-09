@@ -57,11 +57,18 @@ def _az_get_secret(vault: str, secret_name: str) -> str | None:
     try:
         result = subprocess.run(
             [
-                "az", "keyvault", "secret", "show",
-                "--vault-name", vault,
-                "--name", secret_name,
-                "--query", "value",
-                "-o", "tsv",
+                "az",
+                "keyvault",
+                "secret",
+                "show",
+                "--vault-name",
+                vault,
+                "--name",
+                secret_name,
+                "--query",
+                "value",
+                "-o",
+                "tsv",
             ],
             capture_output=True,
             text=True,
@@ -131,6 +138,7 @@ def _fetch_widget_key(base_url: str, api_key: str) -> str | None:
     tenant_id = "remaker-digital-001"  # default primary tenant
     try:
         from scripts.upgrade_verification import ENVIRONMENTS
+
         for env_cfg in ENVIRONMENTS.values():
             if base_url and env_cfg.get("fqdn", "") in base_url:
                 tenant_id = env_cfg.get("tenant_id", tenant_id)
@@ -201,12 +209,16 @@ def _verify_credentials(base_url: str, api_key: str, widget_key: str) -> dict[st
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Refresh test credentials from Key Vault")
-    parser.add_argument("--env", choices=["staging", "prod"], default="staging",
-                        help="Environment to pull credentials from (default: staging)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would change without writing")
-    parser.add_argument("--verify", action="store_true",
-                        help="Only run preflight probe on current .env.local credentials")
+    parser.add_argument(
+        "--env",
+        choices=["staging", "prod"],
+        default="staging",
+        help="Environment to pull credentials from (default: staging)",
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Show what would change without writing")
+    parser.add_argument(
+        "--verify", action="store_true", help="Only run preflight probe on current .env.local credentials"
+    )
     args = parser.parse_args()
 
     env_config = ENVIRONMENTS[args.env]

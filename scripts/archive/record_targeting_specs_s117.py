@@ -9,6 +9,7 @@ Creates:
 """
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db  # noqa: E402
 
@@ -41,11 +42,27 @@ kdb.insert_spec(
     changed_by="S117",
     change_reason="Targeting rules cluster WI-0813+0814. Critical bug: shouldShowOnPage does not parse +/- prefixes.",
     assertions=[
-        {"id": "SPEC-1504-A1", "description": "shouldShowOnPage strips + prefix before building regex", "type": "specified"},
-        {"id": "SPEC-1504-A2", "description": "shouldShowOnPage strips - prefix before building regex", "type": "specified"},
+        {
+            "id": "SPEC-1504-A1",
+            "description": "shouldShowOnPage strips + prefix before building regex",
+            "type": "specified",
+        },
+        {
+            "id": "SPEC-1504-A2",
+            "description": "shouldShowOnPage strips - prefix before building regex",
+            "type": "specified",
+        },
         {"id": "SPEC-1504-A3", "description": "Exclude rules take precedence over include rules", "type": "specified"},
-        {"id": "SPEC-1504-A4", "description": "Only-exclude rules show widget everywhere except matches", "type": "specified"},
-        {"id": "SPEC-1504-A5", "description": "Only-include rules show widget only on matching pages", "type": "specified"},
+        {
+            "id": "SPEC-1504-A4",
+            "description": "Only-exclude rules show widget everywhere except matches",
+            "type": "specified",
+        },
+        {
+            "id": "SPEC-1504-A5",
+            "description": "Only-include rules show widget only on matching pages",
+            "type": "specified",
+        },
         {"id": "SPEC-1504-A6", "description": "Regex metacharacters are escaped in glob patterns", "type": "specified"},
     ],
 )
@@ -95,7 +112,11 @@ kdb.insert_spec(
     changed_by="S117",
     change_reason="Targeting rules cluster WI-0815. Standalone admin has no page rules UI.",
     assertions=[
-        {"id": "SPEC-1506-A1", "description": "Page visibility rules section visible on Widget page", "type": "specified"},
+        {
+            "id": "SPEC-1506-A1",
+            "description": "Page visibility rules section visible on Widget page",
+            "type": "specified",
+        },
         {"id": "SPEC-1506-A2", "description": "Add rule button visible", "type": "specified"},
         {"id": "SPEC-1506-A3", "description": "Empty state message when no rules configured", "type": "specified"},
     ],
@@ -124,7 +145,11 @@ kdb.insert_spec(
     assertions=[
         {"id": "SPEC-1507-A1", "description": "mouseleave listener registered on documentElement", "type": "specified"},
         {"id": "SPEC-1507-A2", "description": "Trigger fires at most once (listener removed)", "type": "specified"},
-        {"id": "SPEC-1507-A3", "description": "widget_exit_intent_enabled field in API config response", "type": "specified"},
+        {
+            "id": "SPEC-1507-A3",
+            "description": "widget_exit_intent_enabled field in API config response",
+            "type": "specified",
+        },
     ],
 )
 print("  Created SPEC-1507 (exit-intent trigger, 3 assertions)")
@@ -149,7 +174,11 @@ kdb.insert_spec(
     assertions=[
         {"id": "SPEC-1508-A1", "description": "scroll listener registered on window", "type": "specified"},
         {"id": "SPEC-1508-A2", "description": "Trigger fires at most once (listener removed)", "type": "specified"},
-        {"id": "SPEC-1508-A3", "description": "widget_scroll_depth_trigger field in API config response", "type": "specified"},
+        {
+            "id": "SPEC-1508-A3",
+            "description": "widget_scroll_depth_trigger field in API config response",
+            "type": "specified",
+        },
     ],
 )
 print("  Created SPEC-1508 (scroll-depth trigger, 3 assertions)")
@@ -162,25 +191,88 @@ print("\n=== Phase 1b: Recording Test Artifacts ===")
 
 # Config Pipeline Tests (live httpx)
 tests = [
-    ("TEST-2677", "SPEC-1504", "widget_page_rules present in admin config API response", "e2e",
-     "tests/security/test_config_pipeline_live.py", "TestPageRulesPipeline", "test_page_rules_in_admin_config"),
-    ("TEST-2678", "SPEC-1505", "widget_page_rules present in widget-facing config API response", "e2e",
-     "tests/security/test_config_pipeline_live.py", "TestPageRulesPipeline", "test_page_rules_in_widget_config"),
-    ("TEST-2679", "SPEC-1507", "widget_exit_intent_enabled in config API response", "e2e",
-     "tests/security/test_config_pipeline_live.py", "TestPageRulesPipeline", "test_exit_intent_field_in_config"),
-    ("TEST-2680", "SPEC-1508", "widget_scroll_depth_trigger in config API response", "e2e",
-     "tests/security/test_config_pipeline_live.py", "TestPageRulesPipeline", "test_scroll_depth_field_in_config"),
+    (
+        "TEST-2677",
+        "SPEC-1504",
+        "widget_page_rules present in admin config API response",
+        "e2e",
+        "tests/security/test_config_pipeline_live.py",
+        "TestPageRulesPipeline",
+        "test_page_rules_in_admin_config",
+    ),
+    (
+        "TEST-2678",
+        "SPEC-1505",
+        "widget_page_rules present in widget-facing config API response",
+        "e2e",
+        "tests/security/test_config_pipeline_live.py",
+        "TestPageRulesPipeline",
+        "test_page_rules_in_widget_config",
+    ),
+    (
+        "TEST-2679",
+        "SPEC-1507",
+        "widget_exit_intent_enabled in config API response",
+        "e2e",
+        "tests/security/test_config_pipeline_live.py",
+        "TestPageRulesPipeline",
+        "test_exit_intent_field_in_config",
+    ),
+    (
+        "TEST-2680",
+        "SPEC-1508",
+        "widget_scroll_depth_trigger in config API response",
+        "e2e",
+        "tests/security/test_config_pipeline_live.py",
+        "TestPageRulesPipeline",
+        "test_scroll_depth_field_in_config",
+    ),
     # Admin UI Live Tests (Playwright)
-    ("TEST-2681", "SPEC-1506", "Page visibility rules section visible on Widget page", "e2e",
-     "tests/e2e_live/test_widget_live.py", "TestPageRulesUI", "test_page_rules_section_visible"),
-    ("TEST-2682", "SPEC-1506", "Add rule button visible in page rules section", "e2e",
-     "tests/e2e_live/test_widget_live.py", "TestPageRulesUI", "test_add_rule_button_visible"),
-    ("TEST-2683", "SPEC-1506", "Empty state message when no rules configured", "e2e",
-     "tests/e2e_live/test_widget_live.py", "TestPageRulesUI", "test_empty_state_message"),
-    ("TEST-2684", "SPEC-1507", "Exit-intent toggle visible in Behavior section", "e2e",
-     "tests/e2e_live/test_widget_live.py", "TestPageRulesUI", "test_exit_intent_toggle_visible"),
-    ("TEST-2685", "SPEC-1508", "Scroll-depth control visible in Behavior section", "e2e",
-     "tests/e2e_live/test_widget_live.py", "TestPageRulesUI", "test_scroll_depth_control_visible"),
+    (
+        "TEST-2681",
+        "SPEC-1506",
+        "Page visibility rules section visible on Widget page",
+        "e2e",
+        "tests/e2e_live/test_widget_live.py",
+        "TestPageRulesUI",
+        "test_page_rules_section_visible",
+    ),
+    (
+        "TEST-2682",
+        "SPEC-1506",
+        "Add rule button visible in page rules section",
+        "e2e",
+        "tests/e2e_live/test_widget_live.py",
+        "TestPageRulesUI",
+        "test_add_rule_button_visible",
+    ),
+    (
+        "TEST-2683",
+        "SPEC-1506",
+        "Empty state message when no rules configured",
+        "e2e",
+        "tests/e2e_live/test_widget_live.py",
+        "TestPageRulesUI",
+        "test_empty_state_message",
+    ),
+    (
+        "TEST-2684",
+        "SPEC-1507",
+        "Exit-intent toggle visible in Behavior section",
+        "e2e",
+        "tests/e2e_live/test_widget_live.py",
+        "TestPageRulesUI",
+        "test_exit_intent_toggle_visible",
+    ),
+    (
+        "TEST-2685",
+        "SPEC-1508",
+        "Scroll-depth control visible in Behavior section",
+        "e2e",
+        "tests/e2e_live/test_widget_live.py",
+        "TestPageRulesUI",
+        "test_scroll_depth_control_visible",
+    ),
 ]
 
 for test_id, spec_id, title, test_type, test_file, test_class, test_function in tests:

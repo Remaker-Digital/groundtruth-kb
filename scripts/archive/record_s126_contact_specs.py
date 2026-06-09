@@ -37,11 +37,17 @@ def main() -> None:
         status="specified",
         section="database",
         type="requirement",
-        assertions=json.dumps([
-            {"type": "glob", "pattern": "**/cosmos_schema.py", "contains": "ContactMessageDocument"},
-            {"type": "glob", "pattern": "**/admin_contact_api.py", "contains": "contact_messages"},
-            {"type": "grep", "pattern": "status.*new.*read.*resolved.*archived", "file_pattern": "**/cosmos_schema.py"},
-        ]),
+        assertions=json.dumps(
+            [
+                {"type": "glob", "pattern": "**/cosmos_schema.py", "contains": "ContactMessageDocument"},
+                {"type": "glob", "pattern": "**/admin_contact_api.py", "contains": "contact_messages"},
+                {
+                    "type": "grep",
+                    "pattern": "status.*new.*read.*resolved.*archived",
+                    "file_pattern": "**/cosmos_schema.py",
+                },
+            ]
+        ),
         changed_by=CHANGED_BY,
         change_reason=REASON,
     )
@@ -67,10 +73,12 @@ def main() -> None:
         status="specified",
         section="tenant_administration",
         type="requirement",
-        assertions=json.dumps([
-            {"type": "grep", "pattern": "contact.messages", "file_pattern": "**/superadmin_api.py"},
-            {"type": "grep", "pattern": "export.*csv", "file_pattern": "**/superadmin_api.py"},
-        ]),
+        assertions=json.dumps(
+            [
+                {"type": "grep", "pattern": "contact.messages", "file_pattern": "**/superadmin_api.py"},
+                {"type": "grep", "pattern": "export.*csv", "file_pattern": "**/superadmin_api.py"},
+            ]
+        ),
         changed_by=CHANGED_BY,
         change_reason=REASON,
     )
@@ -98,11 +106,17 @@ def main() -> None:
         status="specified",
         section="provider_administration",
         type="requirement",
-        assertions=json.dumps([
-            {"type": "glob", "pattern": "**/provider/pages/ContactMessages.tsx"},
-            {"type": "grep", "pattern": "ContactMessages", "file_pattern": "**/provider/index.tsx"},
-            {"type": "grep", "pattern": "contact-messages", "file_pattern": "**/provider/layouts/ProviderLayout.tsx"},
-        ]),
+        assertions=json.dumps(
+            [
+                {"type": "glob", "pattern": "**/provider/pages/ContactMessages.tsx"},
+                {"type": "grep", "pattern": "ContactMessages", "file_pattern": "**/provider/index.tsx"},
+                {
+                    "type": "grep",
+                    "pattern": "contact-messages",
+                    "file_pattern": "**/provider/layouts/ProviderLayout.tsx",
+                },
+            ]
+        ),
         changed_by=CHANGED_BY,
         change_reason=REASON,
     )
@@ -126,10 +140,12 @@ def main() -> None:
         status="specified",
         section="database",
         type="requirement",
-        assertions=json.dumps([
-            {"type": "grep", "pattern": "contact_messages", "file_pattern": "**/cosmos_collections.py"},
-            {"type": "glob", "pattern": "**/create_contact_messages_container.py"},
-        ]),
+        assertions=json.dumps(
+            [
+                {"type": "grep", "pattern": "contact_messages", "file_pattern": "**/cosmos_collections.py"},
+                {"type": "glob", "pattern": "**/create_contact_messages_container.py"},
+            ]
+        ),
         changed_by=CHANGED_BY,
         change_reason=REASON,
     )
@@ -154,9 +170,11 @@ def main() -> None:
         status="specified",
         section="tenant_administration",
         type="requirement",
-        assertions=json.dumps([
-            {"type": "grep", "pattern": "new.*read.*resolved.*archived", "file_pattern": "**/superadmin_api.py"},
-        ]),
+        assertions=json.dumps(
+            [
+                {"type": "grep", "pattern": "new.*read.*resolved.*archived", "file_pattern": "**/superadmin_api.py"},
+            ]
+        ),
         changed_by=CHANGED_BY,
         change_reason=REASON,
     )

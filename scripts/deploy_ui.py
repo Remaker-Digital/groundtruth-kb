@@ -20,6 +20,7 @@ Usage:
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -183,7 +184,10 @@ def build_component(name: str) -> dict:
     size = _dir_size(dist_dir)
     logger.info(
         "[%s] Built in %.1fs  hash=%s  size=%s",
-        name, duration, content_hash, _human_size(size),
+        name,
+        duration,
+        content_hash,
+        _human_size(size),
     )
     return {
         "name": name,
@@ -269,10 +273,7 @@ def deploy_ui(
         if not comp["dist_dir"].is_dir():
             missing.append(name)
     if missing:
-        raise FileNotFoundError(
-            f"Missing dist directories for: {missing}. "
-            f"Run 'deploy_ui.py build' first."
-        )
+        raise FileNotFoundError(f"Missing dist directories for: {missing}. Run 'deploy_ui.py build' first.")
 
     # Construct image tag
     ui_hash = get_combined_ui_hash()
@@ -394,7 +395,9 @@ def verify_deployment(env: str) -> dict:
         if env == "staging":
             widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
         elif env == "production":
-            widget_key = os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or os.environ.get("PRODUCTION_WIDGET_KEY", "")
+            widget_key = os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or os.environ.get(
+                "PRODUCTION_WIDGET_KEY", ""
+            )
 
     if widget_key:
         config_url = f"{base_url}/api/config?page_type=all"
@@ -415,7 +418,9 @@ def verify_deployment(env: str) -> dict:
     else:
         # No widget key = hard fail (not a skip). Widget verification is mandatory.
         results["widget_config_auth"] = {
-            "url": f"{base_url}/api/config", "status": 0, "ok": False,
+            "url": f"{base_url}/api/config",
+            "status": 0,
+            "ok": False,
             "error": "No widget key configured (set DEPLOY_SMOKE_WIDGET_KEY or environment-specific key)",
         }
         logger.warning("  [FAIL] widget_config_auth — no widget key configured")
@@ -451,7 +456,8 @@ def main(argv: list[str] | None = None) -> int:
     # --- build ---
     p_build = sub.add_parser("build", help="Build UI components locally")
     p_build.add_argument(
-        "--only", choices=list(COMPONENTS.keys()),
+        "--only",
+        choices=list(COMPONENTS.keys()),
         help="Build a single component instead of all",
     )
 

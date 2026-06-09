@@ -166,10 +166,7 @@ D2_STEPS = [
             "menu, rich card, reactions, rating, handoff-to-human, tweaks panel "
             "each require their own spec + WI + test)."
         ),
-        "verify": (
-            "Worked-example row archived in DA via D7 as the seed record for "
-            "this bridge."
-        ),
+        "verify": ("Worked-example row archived in DA via D7 as the seed record for this bridge."),
     },
 ]
 
@@ -202,9 +199,7 @@ D3_STEPS = [
             "Apply tokens via ``data-*`` attributes on the widget root. Do NOT "
             "modify component source; adopted tokens live in the theme layer."
         ),
-        "verify": (
-            "Chromatic baseline captured; no DOM structure changes in the diff."
-        ),
+        "verify": ("Chromatic baseline captured; no DOM structure changes in the diff."),
     },
     {
         "step": 4,
@@ -212,9 +207,7 @@ D3_STEPS = [
             "Run the Chromatic baseline diff. Existing flows MUST show zero "
             "visual regressions (token adoption is additive; behavior unchanged)."
         ),
-        "verify": (
-            "Chromatic diff review gate per D6 passes; no unreviewed visual deltas."
-        ),
+        "verify": ("Chromatic diff review gate per D6 passes; no unreviewed visual deltas."),
     },
     {
         "step": 5,
@@ -223,9 +216,7 @@ D3_STEPS = [
             "adoption still passes through a bridge before merge. No "
             "``widget/src/**`` writes occur from this runbook alone."
         ),
-        "verify": (
-            "Bridge entry exists for the token adoption; Codex review complete."
-        ),
+        "verify": ("Bridge entry exists for the token adoption; Codex review complete."),
     },
 ]
 
@@ -261,10 +252,7 @@ D4_STEPS = [
     },
     {
         "step": 4,
-        "action": (
-            "WI enters the backlog. Backlog prioritization determines "
-            "implementation order."
-        ),
+        "action": ("WI enters the backlog. Backlog prioritization determines implementation order."),
         "verify": "Backlog snapshot includes the WI.",
     },
     {
@@ -326,10 +314,7 @@ D6_STEPS = [
             "to a future bridge ``agent-red-chromatic-pr-gate-NNN``. This "
             "bridge does NOT modify ``.github/workflows/**``."
         ),
-        "verify": (
-            "Git diff stat shows zero ``.github/workflows/**`` writes in this "
-            "bridge's commit."
-        ),
+        "verify": ("Git diff stat shows zero ``.github/workflows/**`` writes in this bridge's commit."),
     },
     {
         "step": 4,
@@ -348,9 +333,7 @@ D6_STEPS = [
             "All six D5 invariants (I1–I6) MUST continue to pass. Any "
             "regression blocks merge."
         ),
-        "verify": (
-            "Assertion summary shows ``GOV-CD-PRESERVATION`` PASS; no regressions."
-        ),
+        "verify": ("Assertion summary shows ``GOV-CD-PRESERVATION`` PASS; no regressions."),
     },
 ]
 
@@ -368,10 +351,7 @@ D7_STEPS = [
             "and emits one DA row per logical decision (handoff inspection + any "
             "mid-handoff owner decisions)."
         ),
-        "verify": (
-            "Script exit code 0; DA row ids printed; ``search_deliberations`` "
-            "returns the new row(s)."
-        ),
+        "verify": ("Script exit code 0; DA row ids printed; ``search_deliberations`` returns the new row(s)."),
     },
     {
         "step": 2,
@@ -385,10 +365,7 @@ D7_STEPS = [
             "``changed_by='archive_claude_design_handoff.py'`` and a "
             "``change_reason`` naming the D7 procedure id."
         ),
-        "verify": (
-            "Row fields visible via ``KnowledgeDB.get_deliberation`` match the "
-            "schema."
-        ),
+        "verify": ("Row fields visible via ``KnowledgeDB.get_deliberation`` match the schema."),
     },
     {
         "step": 3,
@@ -410,10 +387,7 @@ D7_STEPS = [
             "metadata + inspection observations. The handoff zip itself stays "
             "on OneDrive as the authoritative source."
         ),
-        "verify": (
-            "Inspection content contains no raw credential patterns; only "
-            "metadata + observations."
-        ),
+        "verify": ("Inspection content contains no raw credential patterns; only metadata + observations."),
     },
     {
         "step": 5,
@@ -491,9 +465,7 @@ D5_ASSERTIONS = [
     {
         "type": "file_exists",
         "file": "tests/unit/test_widget_otp_verification.py",
-        "description": (
-            "I2: OTP verification regression suite exists (email + phone gates)."
-        ),
+        "description": ("I2: OTP verification regression suite exists (email + phone gates)."),
     },
     {
         "type": "file_exists",
@@ -527,10 +499,17 @@ D5_ASSERTIONS = [
 # ---------------------------------------------------------------------------
 
 
-def _insert_spec_if_absent(db: KnowledgeDB, *, id: str, title: str,
-                           description: str, type: str, status: str,
-                           assertions: list[dict] | None = None,
-                           tags: list[str] | None = None) -> str:
+def _insert_spec_if_absent(
+    db: KnowledgeDB,
+    *,
+    id: str,
+    title: str,
+    description: str,
+    type: str,
+    status: str,
+    assertions: list[dict] | None = None,
+    tags: list[str] | None = None,
+) -> str:
     """Insert a spec if it doesn't already exist. Returns action verb."""
     if db.get_spec(id) is not None:
         return "skipped"
@@ -548,9 +527,9 @@ def _insert_spec_if_absent(db: KnowledgeDB, *, id: str, title: str,
     return "created"
 
 
-def _insert_procedure_if_absent(db: KnowledgeDB, *, id: str, title: str,
-                                steps: list[dict],
-                                type: str = "operational") -> str:
+def _insert_procedure_if_absent(
+    db: KnowledgeDB, *, id: str, title: str, steps: list[dict], type: str = "operational"
+) -> str:
     if db.get_op_procedure(id) is not None:
         return "skipped"
     db.insert_op_procedure(
@@ -569,15 +548,21 @@ def main() -> int:
     actions: list[tuple[str, str, str]] = []
 
     # D1 — specification (protocol)
-    actions.append((
-        D1_ID, "specification (protocol)",
-        _insert_spec_if_absent(
-            db,
-            id=D1_ID, title=D1_TITLE, description=D1_DESCRIPTION,
-            type="protocol", status="implemented",
-            tags=["claude-design", "handoff-format", "bridge-intake"],
-        ),
-    ))
+    actions.append(
+        (
+            D1_ID,
+            "specification (protocol)",
+            _insert_spec_if_absent(
+                db,
+                id=D1_ID,
+                title=D1_TITLE,
+                description=D1_DESCRIPTION,
+                type="protocol",
+                status="implemented",
+                tags=["claude-design", "handoff-format", "bridge-intake"],
+            ),
+        )
+    )
 
     # D2–D4 — procedures
     for pid, ptitle, psteps in [
@@ -585,40 +570,64 @@ def main() -> int:
         (D3_ID, D3_TITLE, D3_STEPS),
         (D4_ID, D4_TITLE, D4_STEPS),
     ]:
-        actions.append((
-            pid, "procedure",
-            _insert_procedure_if_absent(
-                db, id=pid, title=ptitle, steps=psteps,
-            ),
-        ))
+        actions.append(
+            (
+                pid,
+                "procedure",
+                _insert_procedure_if_absent(
+                    db,
+                    id=pid,
+                    title=ptitle,
+                    steps=psteps,
+                ),
+            )
+        )
 
     # D5 — governance (protected_behavior) with 6 assertions
-    actions.append((
-        D5_ID, "governance (protected_behavior)",
-        _insert_spec_if_absent(
-            db,
-            id=D5_ID, title=D5_TITLE, description=D5_DESCRIPTION,
-            type="protected_behavior", status="implemented",
-            assertions=D5_ASSERTIONS,
-            tags=["claude-design", "preservation-contract", "gov-preservation"],
-        ),
-    ))
+    actions.append(
+        (
+            D5_ID,
+            "governance (protected_behavior)",
+            _insert_spec_if_absent(
+                db,
+                id=D5_ID,
+                title=D5_TITLE,
+                description=D5_DESCRIPTION,
+                type="protected_behavior",
+                status="implemented",
+                assertions=D5_ASSERTIONS,
+                tags=["claude-design", "preservation-contract", "gov-preservation"],
+            ),
+        )
+    )
 
     # D6 — procedure
-    actions.append((
-        D6_ID, "procedure",
-        _insert_procedure_if_absent(
-            db, id=D6_ID, title=D6_TITLE, steps=D6_STEPS,
-        ),
-    ))
+    actions.append(
+        (
+            D6_ID,
+            "procedure",
+            _insert_procedure_if_absent(
+                db,
+                id=D6_ID,
+                title=D6_TITLE,
+                steps=D6_STEPS,
+            ),
+        )
+    )
 
     # D7 — procedure (the companion script lives in scripts/archive_claude_design_handoff.py)
-    actions.append((
-        D7_ID, "procedure",
-        _insert_procedure_if_absent(
-            db, id=D7_ID, title=D7_TITLE, steps=D7_STEPS,
-        ),
-    ))
+    actions.append(
+        (
+            D7_ID,
+            "procedure",
+            _insert_procedure_if_absent(
+                db,
+                id=D7_ID,
+                title=D7_TITLE,
+                steps=D7_STEPS,
+            ),
+        )
+    )
 
     print("Claude Design GUI-Refresh Intake — KB artifact insertion")
     print("=" * 64)

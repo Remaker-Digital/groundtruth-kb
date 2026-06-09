@@ -148,6 +148,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -336,12 +337,15 @@ async def phase_0_clean_partition(dry_run: bool) -> None:
             else:
                 print(f"  [ERROR] {name}: {err_msg[:120]}")
 
-    phase_results["0_clean_partition"] = f"OK — deleted {total_deleted} doc(s) across {len(TENANT_CONTAINERS)} containers"
+    phase_results["0_clean_partition"] = (
+        f"OK — deleted {total_deleted} doc(s) across {len(TENANT_CONTAINERS)} containers"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Phase 1: Create Cosmos DB containers
 # ---------------------------------------------------------------------------
+
 
 async def phase_1_containers(dry_run: bool) -> None:
     """Create all 12 Cosmos DB containers with indexes.
@@ -425,6 +429,7 @@ async def phase_1_containers(dry_run: bool) -> None:
 # Phase 2: Create tenant document
 # ---------------------------------------------------------------------------
 
+
 async def phase_2_tenant(dry_run: bool) -> None:
     """Create the TenantDocument with API key and widget key."""
     print()
@@ -506,6 +511,7 @@ async def phase_2_tenant(dry_run: bool) -> None:
     # SPEC-1851: Sync domain_index for O(1) Shopify domain lookups
     try:
         from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+
         domain_index = DomainIndexRepository()
         await domain_index.upsert(SHOP_DOMAIN, TENANT_ID, "shopify")
         print("  [OK] Domain index synced.")
@@ -519,6 +525,7 @@ async def phase_2_tenant(dry_run: bool) -> None:
 # ---------------------------------------------------------------------------
 # Phase 3: Create preferences document
 # ---------------------------------------------------------------------------
+
 
 async def phase_3_preferences(dry_run: bool) -> None:
     """Create PreferencesDocument v1 with draft config (all merchant fields empty)."""
@@ -653,6 +660,7 @@ async def phase_3_preferences(dry_run: bool) -> None:
 # Phase 4: Create team members
 # ---------------------------------------------------------------------------
 
+
 async def phase_4_team(dry_run: bool) -> None:
     """Create superadmin TeamMemberDocument with per-user API key."""
     print()
@@ -721,14 +729,13 @@ async def phase_4_team(dry_run: bool) -> None:
             else:
                 print(f"    [ERROR] {e}")
 
-    phase_results["4_team"] = (
-        f"{'DRY RUN' if dry_run else 'OK'} — {len(TEAM_MEMBERS)} members"
-    )
+    phase_results["4_team"] = f"{'DRY RUN' if dry_run else 'OK'} — {len(TEAM_MEMBERS)} members"
 
 
 # ---------------------------------------------------------------------------
 # Phase 5: Seed knowledge base
 # ---------------------------------------------------------------------------
+
 
 async def phase_5_knowledge_base(dry_run: bool, embed: bool) -> None:
     """Seed 48 KB articles via seed_knowledge_base module."""
@@ -763,6 +770,7 @@ async def phase_5_knowledge_base(dry_run: bool, embed: bool) -> None:
 # ---------------------------------------------------------------------------
 # Phase 6: Platform config (tier defaults)
 # ---------------------------------------------------------------------------
+
 
 async def phase_6_platform_config(dry_run: bool) -> None:
     """Seed platform_config with tier defaults + comprehensive entitlements v1.
@@ -800,11 +808,11 @@ async def phase_6_platform_config(dry_run: bool) -> None:
             updated_by="seed_tenant.py",
         )
 
-        print(f"    {tier_name}: {tier_values['included_conversations']} convos, "
-              f"{tier_values['rate_limit_rpm']} rpm")
+        print(f"    {tier_name}: {tier_values['included_conversations']} convos, {tier_values['rate_limit_rpm']} rpm")
 
         if not dry_run:
             from src.multi_tenant.repository import PlatformConfigRepository
+
             repo = PlatformConfigRepository()
             try:
                 await repo.set_config(doc)
@@ -847,6 +855,7 @@ async def phase_6_platform_config(dry_run: bool) -> None:
 
         if not dry_run:
             from src.multi_tenant.repository import PlatformConfigRepository
+
             repo = PlatformConfigRepository()
             try:
                 await repo.set_config(doc)
@@ -871,6 +880,7 @@ async def phase_6_platform_config(dry_run: bool) -> None:
 
     if not dry_run:
         from src.multi_tenant.repository import PlatformConfigRepository
+
         repo = PlatformConfigRepository()
         try:
             await repo.set_config(sentinel_doc)
@@ -889,6 +899,7 @@ async def phase_6_platform_config(dry_run: bool) -> None:
 # ---------------------------------------------------------------------------
 # Phase 7: Demo data (optional)
 # ---------------------------------------------------------------------------
+
 
 async def phase_7_demo_data(dry_run: bool, demo: bool) -> None:
     """Seed demo conversations, profiles, and memory vectors."""
@@ -909,6 +920,7 @@ async def phase_7_demo_data(dry_run: bool, demo: bool) -> None:
 
     try:
         from scripts.seed_demo_data import seed as seed_demo
+
         await seed_demo(dry_run=False, seed_kb=False)
         phase_results["7_demo_data"] = "OK — conversations, profiles, memory"
     except Exception as e:
@@ -919,6 +931,7 @@ async def phase_7_demo_data(dry_run: bool, demo: bool) -> None:
 # ---------------------------------------------------------------------------
 # Phase 8: Summary
 # ---------------------------------------------------------------------------
+
 
 def phase_8_summary() -> None:
     """Print seed summary — SPEC-1673: raw keys are NEVER displayed."""
@@ -982,6 +995,7 @@ def phase_8_summary() -> None:
 # ---------------------------------------------------------------------------
 # Main orchestrator
 # ---------------------------------------------------------------------------
+
 
 async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
     """Apply a vertical preset after preferences are created (SPEC-1878).
@@ -1052,16 +1066,18 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
         created_ids = []
         for i, qa in enumerate(qa_list):
             action_id = str(_uuid.uuid4())
-            existing_qa.append({
-                "id": action_id,
-                "label": qa.get("label", ""),
-                "prompt_template": qa.get("message", ""),
-                "icon": qa.get("icon", ""),
-                "is_active": True,
-                "sort_order": i * 10,
-                "created_at": now,
-                "updated_at": now,
-            })
+            existing_qa.append(
+                {
+                    "id": action_id,
+                    "label": qa.get("label", ""),
+                    "prompt_template": qa.get("message", ""),
+                    "icon": qa.get("icon", ""),
+                    "is_active": True,
+                    "sort_order": i * 10,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
             created_ids.append(action_id)
         prefs_dict["quick_actions"] = existing_qa
         qa_created = len(created_ids)
@@ -1084,6 +1100,7 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
 
         # Upsert the merged preferences document
         from src.multi_tenant.cosmos_schema import PreferencesDocument
+
         updated_prefs = PreferencesDocument(**prefs_dict)
         await repo.upsert(TENANT_ID, updated_prefs)
         print(f"  Config fields merged: {len(config_fields)}")
@@ -1166,8 +1183,11 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
                     existing_b = await binding_repo.get_binding(TENANT_ID, skill_def.skill_id)
                     if existing_b is None:
                         await binding_repo.upsert_binding(
-                            TENANT_ID, agent_id, skill_def.skill_id,
-                            mode=skill_def.mode, enabled=True,
+                            TENANT_ID,
+                            agent_id,
+                            skill_def.skill_id,
+                            mode=skill_def.mode,
+                            enabled=True,
                         )
                 agents_enabled += 1
                 print(f"  [OK] Agent {agent_id}: overlay + {len(agent_def.skills)} bindings")
@@ -1180,8 +1200,7 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
             print(f"  Agents enabled:       {agents_enabled} (skipped: {agents_skipped})")
 
         phase_results["3b_preset"] = (
-            f"OK — {preset_id}: config={len(config_fields)}, "
-            f"qa={qa_created}, kb={kb_created}, agents={agents_enabled}"
+            f"OK — {preset_id}: config={len(config_fields)}, qa={qa_created}, kb={kb_created}, agents={agents_enabled}"
         )
     except Exception as e:
         print(f"  [ERROR] {e}")

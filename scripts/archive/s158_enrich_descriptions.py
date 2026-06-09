@@ -116,7 +116,7 @@ def title_to_description(title: str, source_ctx: str) -> str:
     desc = title.strip()
 
     # Make it a complete sentence if it isn't one
-    if not desc.endswith((".","!","?")):
+    if not desc.endswith((".", "!", "?")):
         desc = desc + "."
 
     # Add source context if available

@@ -298,20 +298,34 @@ SPECS = [
 
 def make_approval_packet(spec: dict) -> dict:
     full_content = json.dumps(
-        {"id": spec["id"], "type": spec["type"], "title": spec["title"],
-         "description": spec["description"], "tags": spec.get("tags", []),
-         "assertions": spec.get("assertions", []), "scope": spec.get("scope", "")},
-        indent=2, sort_keys=True,
+        {
+            "id": spec["id"],
+            "type": spec["type"],
+            "title": spec["title"],
+            "description": spec["description"],
+            "tags": spec.get("tags", []),
+            "assertions": spec.get("assertions", []),
+            "scope": spec.get("scope", ""),
+        },
+        indent=2,
+        sort_keys=True,
     )
     sha256 = hashlib.sha256(full_content.encode("utf-8")).hexdigest()
     return {
-        "artifact_type": "specification", "artifact_id": spec["id"], "action": "insert",
+        "artifact_type": "specification",
+        "artifact_id": spec["id"],
+        "action": "insert",
         "source_ref": "owner_conversation:2026-04-29-S321-triad-completeness-directive",
-        "full_content": full_content, "full_content_sha256": sha256,
-        "approval_mode": "acknowledge", "presented_to_user": True, "transcript_captured": True,
+        "full_content": full_content,
+        "full_content_sha256": sha256,
+        "approval_mode": "acknowledge",
+        "presented_to_user": True,
+        "transcript_captured": True,
         "explicit_change_request": "Owner directive 2026-04-29 (S321): retroactive spec/test creation; GT-KB independent test suite; Agent Red as conformant contained app; mechanical enforcement of triad completeness.",
-        "changed_by": CHANGED_BY, "change_reason": CHANGE_REASON,
-        "approved_by": "owner", "acknowledged_by": "owner",
+        "changed_by": CHANGED_BY,
+        "change_reason": CHANGE_REASON,
+        "approved_by": "owner",
+        "acknowledged_by": "owner",
     }
 
 
@@ -329,11 +343,17 @@ def main() -> int:
         packet_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
         try:
             api.insert_spec(
-                id=spec_id, title=spec["title"], status="specified",
-                changed_by=CHANGED_BY, change_reason=CHANGE_REASON,
-                description=spec.get("description"), type=spec["type"],
-                tags=spec.get("tags"), assertions=spec.get("assertions"),
-                scope=spec.get("scope"), validate_assertions=False,
+                id=spec_id,
+                title=spec["title"],
+                status="specified",
+                changed_by=CHANGED_BY,
+                change_reason=CHANGE_REASON,
+                description=spec.get("description"),
+                type=spec["type"],
+                tags=spec.get("tags"),
+                assertions=spec.get("assertions"),
+                scope=spec.get("scope"),
+                validate_assertions=False,
             )
             inserted.append(spec_id)
             print(f"      OK")

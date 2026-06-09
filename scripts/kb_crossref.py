@@ -14,7 +14,7 @@ from collections import defaultdict
 from pathlib import Path
 
 # Windows UTF-8 safety
-sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
+sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", errors="replace", buffering=1)
 
 # Per S307 hardcoded-path directive: discover repo root from script location.
 # scripts/ lives at the repo root; docs/ and tools/knowledge-db are siblings.
@@ -42,6 +42,7 @@ def load_kb_entries():
     """Load KB entries with their titles, descriptions, and status."""
     sys.path.insert(0, KB_PATH)
     from db import KnowledgeDB
+
     db = KnowledgeDB()
     entries = db.list_specs()
     db.close()
@@ -53,18 +54,95 @@ def extract_keywords(text):
     text = text.lower()
     # Remove common words
     stop_words = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "shall", "can", "must", "need", "for", "of",
-        "in", "on", "at", "to", "from", "with", "by", "as", "or", "and", "not",
-        "but", "if", "then", "than", "that", "this", "which", "what", "when",
-        "where", "how", "all", "each", "every", "both", "few", "more", "most",
-        "other", "some", "such", "no", "nor", "only", "own", "same", "so",
-        "very", "just", "also", "into", "about", "up", "out", "its", "it",
-        "implement", "approved", "implementation", "add", "update", "create",
-        "ensure", "include", "provide", "support", "display", "show",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "shall",
+        "can",
+        "must",
+        "need",
+        "for",
+        "of",
+        "in",
+        "on",
+        "at",
+        "to",
+        "from",
+        "with",
+        "by",
+        "as",
+        "or",
+        "and",
+        "not",
+        "but",
+        "if",
+        "then",
+        "than",
+        "that",
+        "this",
+        "which",
+        "what",
+        "when",
+        "where",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "only",
+        "own",
+        "same",
+        "so",
+        "very",
+        "just",
+        "also",
+        "into",
+        "about",
+        "up",
+        "out",
+        "its",
+        "it",
+        "implement",
+        "approved",
+        "implementation",
+        "add",
+        "update",
+        "create",
+        "ensure",
+        "include",
+        "provide",
+        "support",
+        "display",
+        "show",
     }
-    words = re.findall(r'\b[a-z][a-z0-9_-]+\b', text)
+    words = re.findall(r"\b[a-z][a-z0-9_-]+\b", text)
     return set(w for w in words if w not in stop_words and len(w) > 2)
 
 
@@ -87,13 +165,15 @@ def match_spec_to_kb(spec_text, kb_entries):
         if len(overlap) >= 2:
             score = len(overlap) / max(len(spec_keywords), 1)
             if score >= 0.15:  # At least 15% keyword overlap
-                matches.append({
-                    "kb_id": entry.get("id", "?"),
-                    "kb_title": entry.get("title", "?")[:100],
-                    "kb_status": entry.get("status", "?"),
-                    "overlap_keywords": sorted(list(overlap))[:10],
-                    "score": round(score, 3),
-                })
+                matches.append(
+                    {
+                        "kb_id": entry.get("id", "?"),
+                        "kb_title": entry.get("title", "?")[:100],
+                        "kb_status": entry.get("status", "?"),
+                        "overlap_keywords": sorted(list(overlap))[:10],
+                        "score": round(score, 3),
+                    }
+                )
 
     # Sort by score descending, return top matches
     matches.sort(key=lambda x: -x["score"])
@@ -110,8 +190,8 @@ def main():
     print(f"  {len(kb_entries)} KB entries loaded")
 
     print("\nCross-referencing specs against KB...")
-    covered = []      # Specs that map to at least one KB entry
-    uncovered = []     # Specs with no KB match (new specifications)
+    covered = []  # Specs that map to at least one KB entry
+    uncovered = []  # Specs with no KB match (new specifications)
     kb_decomposition = defaultdict(list)  # KB ID -> list of related specs
 
     for i, spec in enumerate(all_specs):
@@ -120,26 +200,32 @@ def main():
 
         matches = match_spec_to_kb(spec["text"], kb_entries)
         if matches:
-            covered.append({
-                "spec_id": spec["spec_id"],
-                "text": spec["text"][:200],
-                "domain": spec["domain"],
-                "best_kb_match": matches[0],
-                "all_kb_matches": matches,
-            })
-            for m in matches:
-                kb_decomposition[m["kb_id"]].append({
+            covered.append(
+                {
                     "spec_id": spec["spec_id"],
-                    "text": spec["text"][:150],
-                    "score": m["score"],
-                })
+                    "text": spec["text"][:200],
+                    "domain": spec["domain"],
+                    "best_kb_match": matches[0],
+                    "all_kb_matches": matches,
+                }
+            )
+            for m in matches:
+                kb_decomposition[m["kb_id"]].append(
+                    {
+                        "spec_id": spec["spec_id"],
+                        "text": spec["text"][:150],
+                        "score": m["score"],
+                    }
+                )
         else:
-            uncovered.append({
-                "spec_id": spec["spec_id"],
-                "text": spec["text"],
-                "domain": spec["domain"],
-                "source_type": spec["source_type"],
-            })
+            uncovered.append(
+                {
+                    "spec_id": spec["spec_id"],
+                    "text": spec["text"],
+                    "domain": spec["domain"],
+                    "source_type": spec["source_type"],
+                }
+            )
 
     # KB entries that have NO matching specs
     covered_kb_ids = set(kb_decomposition.keys())
@@ -147,8 +233,8 @@ def main():
     orphan_kb = all_kb_ids - covered_kb_ids
 
     print(f"\n  Results:")
-    print(f"    Specs with KB match: {len(covered)} ({len(covered)/len(all_specs)*100:.1f}%)")
-    print(f"    Specs with NO KB match (new): {len(uncovered)} ({len(uncovered)/len(all_specs)*100:.1f}%)")
+    print(f"    Specs with KB match: {len(covered)} ({len(covered) / len(all_specs) * 100:.1f}%)")
+    print(f"    Specs with NO KB match (new): {len(uncovered)} ({len(uncovered) / len(all_specs) * 100:.1f}%)")
     print(f"    KB entries with matching specs: {len(covered_kb_ids)}/{len(all_kb_ids)}")
     print(f"    KB entries with NO matching specs: {len(orphan_kb)}")
 
@@ -165,7 +251,7 @@ def main():
     if decomp_sizes:
         print(f"\n  KB decomposition stats:")
         print(f"    KB entries decomposed: {len(decomp_sizes)}")
-        print(f"    Avg specs per KB entry: {sum(decomp_sizes)/len(decomp_sizes):.1f}")
+        print(f"    Avg specs per KB entry: {sum(decomp_sizes) / len(decomp_sizes):.1f}")
         print(f"    Max specs per KB entry: {max(decomp_sizes)}")
         print(f"    Min specs per KB entry: {min(decomp_sizes)}")
 
@@ -180,8 +266,7 @@ def main():
             "uncovered_by_domain": dict(sorted(uncovered_by_domain.items(), key=lambda x: -x[1])),
         },
         "kb_decomposition": {
-            kb_id: sorted(specs, key=lambda x: -x["score"])
-            for kb_id, specs in sorted(kb_decomposition.items())
+            kb_id: sorted(specs, key=lambda x: -x["score"]) for kb_id, specs in sorted(kb_decomposition.items())
         },
         "uncovered_specs": uncovered,
         "orphan_kb_entries": sorted(list(orphan_kb)),

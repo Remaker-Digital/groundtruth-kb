@@ -85,29 +85,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # `-005` (the original migration script proposal).
 REPLACEMENTS: list[tuple[str, str]] = [
     # --- Uppercase drive E: ---
-    (r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement",
-     r"E:\GT-KB"),
-    ("E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement",
-     "E:/GT-KB"),
-    (r"E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
-     r"E:\\GT-KB"),
+    (r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement", r"E:\GT-KB"),
+    ("E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement", "E:/GT-KB"),
+    (r"E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement", r"E:\\GT-KB"),
     # --- Lowercase drive e: (per -002 F2a) ---
-    (r"e:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement",
-     r"e:\GT-KB"),
-    ("e:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement",
-     "e:/GT-KB"),
-    (r"e:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
-     r"e:\\GT-KB"),
+    (r"e:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement", r"e:\GT-KB"),
+    ("e:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement", "e:/GT-KB"),
+    (r"e:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement", r"e:\\GT-KB"),
     # --- Double-slash-prefix form (per -004 F2) ---
     # Claude permissions in .claude/settings.local.json use //e/... to express
     # absolute paths.
-    ("//E/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement",
-     "//E/GT-KB"),
-    ("//e/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement",
-     "//e/GT-KB"),
+    ("//E/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement", "//E/GT-KB"),
+    ("//e/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement", "//e/GT-KB"),
     # --- Claude auto-memory mangled form ---
-    ("E--Claude-Playground-CLAUDE-PROJECTS-Agent-Red-Customer-Engagement",
-     "E--GT-KB"),
+    ("E--Claude-Playground-CLAUDE-PROJECTS-Agent-Red-Customer-Engagement", "E--GT-KB"),
 ]
 
 # Patterns surfaced by --verify Section B for human audit only. These bare
@@ -162,26 +153,26 @@ EXCLUDE_GLOBS: list[str] = [
     "build/**",
     ".next/**",
     # NEW per -004 F3: historical/generated copies outside active surface
-    ".claude/worktrees/**",            # embedded git worktrees with own copies
-    "scripts/archive/**",              # historical handoff/migration scripts
-    "scripts/pre-flight-results/**",   # generated pre-flight check output
+    ".claude/worktrees/**",  # embedded git worktrees with own copies
+    "scripts/archive/**",  # historical handoff/migration scripts
+    "scripts/pre-flight-results/**",  # generated pre-flight check output
     ".claude/hooks/.codex-bridge-*.json",  # auto-generated bridge state
     # NEW per -014 F1: runtime/log surfaces that mutate during scans.
     # Exact rooted paths only (per -014 F2: avoid interior-** under the
     # current is_excluded engine).
-    "logs/**",                                                  # top-level runtime logs
+    "logs/**",  # top-level runtime logs
     "independent-progress-assessments/bridge-automation/logs/**",  # bridge poller logs
     # Recursive-copy artifact under bridge-automation (a sub-tree mirror of
     # the same logs path, observed in the -013 dry-run).
     "independent-progress-assessments/bridge-automation/independent-progress-assessments/**",
-    "memory/grafana/logs/**",                                   # grafana runtime logs
-    "tools/grafana/grafana-13.0.1/data/log/**",                 # bundled grafana log subtree
-    "widget/node_modules/**",                                   # nested storybook cache
-    "docs-site/.docusaurus/**",                                 # docusaurus build cache
-    ".claude/_drift-backup-2026-04-23-S304/**",                 # S304 incident-recovery snapshot
-    ".claude/hooks/.codex-bridge-*.log",                        # bridge worker log (companion to .json above)
-    ".claude/hooks/.prime-bridge-*",                            # prime-bridge runtime cache (logs + state)
-    "scripts/migration-dryrun-report.txt",                      # this script's own output (self-reflexive)
+    "memory/grafana/logs/**",  # grafana runtime logs
+    "tools/grafana/grafana-13.0.1/data/log/**",  # bundled grafana log subtree
+    "widget/node_modules/**",  # nested storybook cache
+    "docs-site/.docusaurus/**",  # docusaurus build cache
+    ".claude/_drift-backup-2026-04-23-S304/**",  # S304 incident-recovery snapshot
+    ".claude/hooks/.codex-bridge-*.log",  # bridge worker log (companion to .json above)
+    ".claude/hooks/.prime-bridge-*",  # prime-bridge runtime cache (logs + state)
+    "scripts/migration-dryrun-report.txt",  # this script's own output (self-reflexive)
     # NEW per post-verify-008 (Phase 0): self-protection. Without these, the
     # script would rewrite its own REPLACEMENTS table during --execute and
     # silently destroy the verifier's audit/re-run mechanism. See module
@@ -196,14 +187,39 @@ EXCLUDE_GLOBS: list[str] = [
 
 # Binary file extensions to never process.
 BINARY_EXTENSIONS: set[str] = {
-    ".db", ".sqlite", ".sqlite3", ".sqlite-shm", ".sqlite-wal",
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp",
-    ".pdf", ".zip", ".tar", ".gz", ".7z",
-    ".exe", ".dll", ".so", ".dylib",
-    ".pyc", ".pyo",
-    ".ttf", ".otf", ".woff", ".woff2",
-    ".mp3", ".mp4", ".wav", ".ogg",
-    ".whl", ".egg",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".sqlite-shm",
+    ".sqlite-wal",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".ico",
+    ".webp",
+    ".pdf",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".7z",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".pyc",
+    ".pyo",
+    ".ttf",
+    ".otf",
+    ".woff",
+    ".woff2",
+    ".mp3",
+    ".mp4",
+    ".wav",
+    ".ogg",
+    ".whl",
+    ".egg",
 }
 
 
@@ -217,12 +233,9 @@ def safety_check() -> None:
         if marker in repo_root_str:
             print("REFUSING TO RUN", file=sys.stderr)
             print(f"  Script invoked from: {repo_root_str}", file=sys.stderr)
-            print(f"  Path contains source marker: '{marker}'",
-                  file=sys.stderr)
-            print("  This script must run from the destination tree "
-                  "(e.g. E:\\GT-KB\\).", file=sys.stderr)
-            print("  If this is intentional, edit SOURCE_PATH_MARKERS "
-                  "in the script.", file=sys.stderr)
+            print(f"  Path contains source marker: '{marker}'", file=sys.stderr)
+            print("  This script must run from the destination tree (e.g. E:\\GT-KB\\).", file=sys.stderr)
+            print("  If this is intentional, edit SOURCE_PATH_MARKERS in the script.", file=sys.stderr)
             sys.exit(2)
 
 
@@ -300,8 +313,7 @@ def cmd_dry_run() -> int:
     for rel in sorted(candidates):
         path = REPO_ROOT / rel
         try:
-            content = path.read_text(encoding="utf-8",
-                                     errors="surrogateescape")
+            content = path.read_text(encoding="utf-8", errors="surrogateescape")
         except OSError as e:
             report_lines.append(f"SKIP (read failed): {rel.as_posix()}: {e}")
             continue
@@ -345,8 +357,7 @@ def cmd_dry_run() -> int:
 def cmd_execute() -> int:
     """Apply mode: walk, apply replacements, mutate working tree."""
     candidates = walk_repo()
-    print(f"Executing on {len(candidates)} candidate files...",
-          file=sys.stderr)
+    print(f"Executing on {len(candidates)} candidate files...", file=sys.stderr)
 
     files_changed = 0
     total_changes = 0
@@ -354,35 +365,31 @@ def cmd_execute() -> int:
     for rel in sorted(candidates):
         path = REPO_ROOT / rel
         try:
-            content = path.read_text(encoding="utf-8",
-                                     errors="surrogateescape")
+            content = path.read_text(encoding="utf-8", errors="surrogateescape")
         except OSError as e:
-            print(f"SKIP (read failed): {rel.as_posix()}: {e}",
-                  file=sys.stderr)
+            print(f"SKIP (read failed): {rel.as_posix()}: {e}", file=sys.stderr)
             continue
 
         new_content, counts = apply_replacements(content)
         if new_content == content:
             continue
 
-        path.write_text(new_content, encoding="utf-8",
-                        errors="surrogateescape")
+        path.write_text(new_content, encoding="utf-8", errors="surrogateescape")
         files_changed += 1
         n = sum(counts.values())
         total_changes += n
         print(f"  {n:4d}  {rel.as_posix()}", file=sys.stderr)
 
-    print(f"Done: {files_changed} files, {total_changes} replacements",
-          file=sys.stderr)
+    print(f"Done: {files_changed} files, {total_changes} replacements", file=sys.stderr)
     return 0
 
 
 def cmd_verify() -> int:
     """Verify mode. Two-section scan:
-      Section A (BLOCKER): residuals of any REPLACEMENTS pattern.
-                           Nonzero -> exit code 1.
-      Section B (AUDIT):   bare ambiguous tokens for human review.
-                           Reported only.
+    Section A (BLOCKER): residuals of any REPLACEMENTS pattern.
+                         Nonzero -> exit code 1.
+    Section B (AUDIT):   bare ambiguous tokens for human review.
+                         Reported only.
     """
     candidates = walk_repo()
     print(f"Verifying across {len(candidates)} files...", file=sys.stderr)
@@ -393,8 +400,7 @@ def cmd_verify() -> int:
     for rel in sorted(candidates):
         path = REPO_ROOT / rel
         try:
-            content = path.read_text(encoding="utf-8",
-                                     errors="surrogateescape")
+            content = path.read_text(encoding="utf-8", errors="surrogateescape")
         except OSError:
             continue
 
@@ -413,16 +419,13 @@ def cmd_verify() -> int:
         print(f"FOUND {len(blockers)} blocker rows:\n", file=sys.stderr)
         for rel, find, n in blockers:
             preview = find[:60] + ("..." if len(find) > 60 else "")
-            print(f"  {n:4d}  {rel.as_posix()}: '{preview}'",
-                  file=sys.stderr)
+            print(f"  {n:4d}  {rel.as_posix()}: '{preview}'", file=sys.stderr)
     else:
         print("OK: no blocker residuals.", file=sys.stderr)
 
-    print("\n=== Section B: AUDIT findings (informational) ===",
-          file=sys.stderr)
+    print("\n=== Section B: AUDIT findings (informational) ===", file=sys.stderr)
     if audits:
-        print(f"FOUND {len(audits)} audit rows (human review):\n",
-              file=sys.stderr)
+        print(f"FOUND {len(audits)} audit rows (human review):\n", file=sys.stderr)
         for rel, token, n in audits:
             print(f"  {n:4d}  {rel.as_posix()}: '{token}'", file=sys.stderr)
     else:
@@ -432,15 +435,11 @@ def cmd_verify() -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="GT-KB root directory migration find/replace.")
+    parser = argparse.ArgumentParser(description="GT-KB root directory migration find/replace.")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--dry-run", action="store_true",
-                       help="Preview changes; write report; no mutations.")
-    group.add_argument("--execute", action="store_true",
-                       help="Apply changes to working tree.")
-    group.add_argument("--verify", action="store_true",
-                       help="Two-section scan for residuals + audit tokens.")
+    group.add_argument("--dry-run", action="store_true", help="Preview changes; write report; no mutations.")
+    group.add_argument("--execute", action="store_true", help="Apply changes to working tree.")
+    group.add_argument("--verify", action="store_true", help="Two-section scan for residuals + audit tokens.")
     args = parser.parse_args()
 
     safety_check()

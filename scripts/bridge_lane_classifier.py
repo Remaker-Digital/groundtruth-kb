@@ -27,9 +27,7 @@ LANE_IMPLEMENTATION = "implementation"
 LANE_VERIFICATION = "verification"
 LANE_GOVERNANCE = "governance"
 
-CANONICAL_LANES = frozenset(
-    {LANE_REVIEW, LANE_IMPLEMENTATION, LANE_VERIFICATION, LANE_GOVERNANCE}
-)
+CANONICAL_LANES = frozenset({LANE_REVIEW, LANE_IMPLEMENTATION, LANE_VERIFICATION, LANE_GOVERNANCE})
 
 # --- Normalized bridge-kind vocabulary ---------------------------------------
 # Real bridge files use many bridge_kind spellings (inventoried by the -002
@@ -170,9 +168,7 @@ def classify_lane(ctx: LaneClassificationInput) -> str:
     """
     # 1. Governance override.
     if (
-        ctx.formal_artifact_mutation
-        or ctx.owner_decision_sensitive
-        or ctx.mutates_membase
+        ctx.formal_artifact_mutation or ctx.owner_decision_sensitive or ctx.mutates_membase
     ) and not ctx.explicit_batch_safe:
         return LANE_GOVERNANCE
     current_kind = _normalize_kind(ctx.current_bridge_kind)

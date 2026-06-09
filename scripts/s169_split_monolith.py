@@ -6,6 +6,7 @@ Moves endpoints, models, and helpers from the 5,085-line monolith into
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import os
 import sys
 
@@ -63,15 +64,15 @@ logger = logging.getLogger(__name__)
 '''
 
 tenants = TENANTS_HEADER
-tenants += get_lines(133, 168)   # TenantSummaryItem, TenantDirectoryResponse, TenantDistributionSummary
+tenants += get_lines(133, 168)  # TenantSummaryItem, TenantDirectoryResponse, TenantDistributionSummary
 tenants += "\n"
-tenants += get_lines(527, 536)   # TierOverrideResponse + VALID_TIERS
+tenants += get_lines(527, 536)  # TierOverrideResponse + VALID_TIERS
 tenants += "\n"
-tenants += get_lines(606, 665)   # CreateTenantRequest, CreateTenantResponse
+tenants += get_lines(606, 665)  # CreateTenantRequest, CreateTenantResponse
 tenants += "\n"
-tenants += get_lines(820, 827)   # ResendWelcomeEmailResponse
+tenants += get_lines(820, 827)  # ResendWelcomeEmailResponse
 tenants += "\n"
-tenants += get_lines(940, 965)   # SetExpiryRequest, SetExpiryResponse
+tenants += get_lines(940, 965)  # SetExpiryRequest, SetExpiryResponse
 tenants += "\n"
 # Endpoints (section headers + endpoint code)
 tenants += get_lines(401, 1071)  # All tenant endpoints
@@ -122,9 +123,11 @@ logger = logging.getLogger(__name__)
 '''
 
 dashboard = DASHBOARD_HEADER
-dashboard += get_lines(170, 388)   # All dashboard models (Deployment, Dashboard, Billing, SLA, Queue, Compliance, Secret, Integration)
+dashboard += get_lines(
+    170, 388
+)  # All dashboard models (Deployment, Dashboard, Billing, SLA, Queue, Compliance, Secret, Integration)
 dashboard += "\n"
-dashboard += get_lines(1074, 1933) # All dashboard endpoints
+dashboard += get_lines(1074, 1933)  # All dashboard endpoints
 
 path = os.path.join(PKG, "_dashboard.py")
 with open(path, "w", encoding="utf-8") as f:

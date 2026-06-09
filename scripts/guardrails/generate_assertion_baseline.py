@@ -31,12 +31,12 @@ DEFAULT_BASELINE = PROJECT_ROOT / "scripts" / "guardrails" / "assertion-baseline
 
 # Patterns that count as assertions
 _ASSERTION_PATTERNS = [
-    re.compile(r"^\s*assert\s+", re.MULTILINE),                    # bare assert
-    re.compile(r"^\s*self\.assert\w+\s*\(", re.MULTILINE),         # unittest-style
-    re.compile(r"\bpytest\.raises\s*\(", re.MULTILINE),            # pytest.raises
-    re.compile(r"\bpytest\.warns\s*\(", re.MULTILINE),             # pytest.warns
-    re.compile(r"\bpytest\.approx\s*\(", re.MULTILINE),            # pytest.approx
-    re.compile(r"^\s*with\s+raises\s*\(", re.MULTILINE),           # from pytest import raises; with raises(...)
+    re.compile(r"^\s*assert\s+", re.MULTILINE),  # bare assert
+    re.compile(r"^\s*self\.assert\w+\s*\(", re.MULTILINE),  # unittest-style
+    re.compile(r"\bpytest\.raises\s*\(", re.MULTILINE),  # pytest.raises
+    re.compile(r"\bpytest\.warns\s*\(", re.MULTILINE),  # pytest.warns
+    re.compile(r"\bpytest\.approx\s*\(", re.MULTILINE),  # pytest.approx
+    re.compile(r"^\s*with\s+raises\s*\(", re.MULTILINE),  # from pytest import raises; with raises(...)
 ]
 
 
@@ -67,7 +67,8 @@ def scan_tests(tests_dir: Path) -> dict[str, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate assertion count baseline")
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=DEFAULT_BASELINE,
         help=f"Output file (default: {DEFAULT_BASELINE})",

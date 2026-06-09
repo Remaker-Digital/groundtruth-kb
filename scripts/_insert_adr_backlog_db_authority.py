@@ -88,12 +88,7 @@ The standing backlog is physically implemented as the `backlog_items` table in `
 - `bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-006.md` — Codex GO authorizing this Slice 1.
 """
 
-PACKET_PATH = (
-    REPO_ROOT
-    / ".groundtruth"
-    / "formal-artifact-approvals"
-    / "2026-05-02-backlog-slice1-adr.json"
-)
+PACKET_PATH = REPO_ROOT / ".groundtruth" / "formal-artifact-approvals" / "2026-05-02-backlog-slice1-adr.json"
 
 
 def main() -> int:

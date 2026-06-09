@@ -33,6 +33,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts._env import load_env_local
+
 load_env_local()
 
 # ---------------------------------------------------------------------------
@@ -53,7 +54,10 @@ CONVERSATIONS = [
         "status": "active",
         "messages": [
             {"role": "customer", "content": "What new products or promotions do you have today?"},
-            {"role": "assistant", "content": "Welcome! We currently have several exciting promotions running. Our Summer Sale offers 20% off all outdoor furniture, and we have a Back to School promotion with 15% off electronics. Plus, free shipping on orders over $75!"},
+            {
+                "role": "assistant",
+                "content": "Welcome! We currently have several exciting promotions running. Our Summer Sale offers 20% off all outdoor furniture, and we have a Back to School promotion with 15% off electronics. Plus, free shipping on orders over $75!",
+            },
         ],
         "page_url": "https://testcustomer.com/",
     },
@@ -62,7 +66,10 @@ CONVERSATIONS = [
         "status": "active",
         "messages": [
             {"role": "customer", "content": "Is this product currently in stock and available for shipping?"},
-            {"role": "assistant", "content": "Let me check the availability for you. Yes, this product is currently in stock and ready to ship! Standard shipping takes 3-5 business days, or you can choose express shipping for 1-2 business day delivery."},
+            {
+                "role": "assistant",
+                "content": "Let me check the availability for you. Yes, this product is currently in stock and ready to ship! Standard shipping takes 3-5 business days, or you can choose express shipping for 1-2 business day delivery.",
+            },
         ],
         "page_url": "https://testcustomer.com/products/widget-pro",
     },
@@ -71,7 +78,10 @@ CONVERSATIONS = [
         "status": "active",
         "messages": [
             {"role": "customer", "content": "Can you help me compare the products in this collection?"},
-            {"role": "assistant", "content": "Of course! Let me break down the key differences between the products in our Summer Collection. Each item has unique features suited for different needs. Would you like me to compare specific products, or shall I give you an overview of the top picks?"},
+            {
+                "role": "assistant",
+                "content": "Of course! Let me break down the key differences between the products in our Summer Collection. Each item has unique features suited for different needs. Would you like me to compare specific products, or shall I give you an overview of the top picks?",
+            },
         ],
         "page_url": "https://testcustomer.com/collections/summer",
     },
@@ -80,7 +90,10 @@ CONVERSATIONS = [
         "status": "active",
         "messages": [
             {"role": "customer", "content": "Do you have any discount codes or promotions I can use on my order?"},
-            {"role": "assistant", "content": "Great question! Currently, you can use code SUMMER20 for 20% off outdoor furniture, or BACK15 for 15% off electronics. Also, your order qualifies for free shipping since it's over $75!"},
+            {
+                "role": "assistant",
+                "content": "Great question! Currently, you can use code SUMMER20 for 20% off outdoor furniture, or BACK15 for 15% off electronics. Also, your order qualifies for free shipping since it's over $75!",
+            },
         ],
         "page_url": "https://testcustomer.com/cart",
     },
@@ -88,8 +101,14 @@ CONVERSATIONS = [
         "name": "QA-search",
         "status": "active",
         "messages": [
-            {"role": "customer", "content": "I searched but couldn't find exactly what I need. Can you help me refine my search?"},
-            {"role": "assistant", "content": "I'd be happy to help you find what you're looking for! Could you tell me a bit more about what you need? For example, the type of product, your preferred price range, or any specific features you're looking for?"},
+            {
+                "role": "customer",
+                "content": "I searched but couldn't find exactly what I need. Can you help me refine my search?",
+            },
+            {
+                "role": "assistant",
+                "content": "I'd be happy to help you find what you're looking for! Could you tell me a bit more about what you need? For example, the type of product, your preferred price range, or any specific features you're looking for?",
+            },
         ],
         "page_url": "https://testcustomer.com/search?q=blue+widget",
     },
@@ -98,19 +117,27 @@ CONVERSATIONS = [
         "status": "active",
         "messages": [
             {"role": "customer", "content": "Are there any products related to this blog post?"},
-            {"role": "assistant", "content": "Yes! Based on this blog post about summer trends, I can recommend several related products from our Summer Collection. These include our popular outdoor furniture sets, seasonal decor items, and patio accessories. Would you like me to show you specific items?"},
+            {
+                "role": "assistant",
+                "content": "Yes! Based on this blog post about summer trends, I can recommend several related products from our Summer Collection. These include our popular outdoor furniture sets, seasonal decor items, and patio accessories. Would you like me to show you specific items?",
+            },
         ],
         "page_url": "https://testcustomer.com/blogs/news/summer-trends",
     },
-
     # Escalation-triggered (6) -- status: escalated
     {
         "name": "ESC-service",
         "status": "escalated",
         "escalation_category": "service",
         "messages": [
-            {"role": "customer", "content": "I received a broken item and I want to speak to a human about getting it replaced"},
-            {"role": "assistant", "content": "I'm very sorry to hear about the damaged item. I'm connecting you with a service representative who can help with a replacement right away."},
+            {
+                "role": "customer",
+                "content": "I received a broken item and I want to speak to a human about getting it replaced",
+            },
+            {
+                "role": "assistant",
+                "content": "I'm very sorry to hear about the damaged item. I'm connecting you with a service representative who can help with a replacement right away.",
+            },
             {"role": "system", "content": "Conversation escalated to human agent (category: service)"},
         ],
     },
@@ -119,8 +146,14 @@ CONVERSATIONS = [
         "status": "escalated",
         "escalation_category": "support",
         "messages": [
-            {"role": "customer", "content": "This is completely unacceptable, I demand to speak with a supervisor immediately"},
-            {"role": "assistant", "content": "I understand your frustration and I sincerely apologize. Let me connect you with a support supervisor right away."},
+            {
+                "role": "customer",
+                "content": "This is completely unacceptable, I demand to speak with a supervisor immediately",
+            },
+            {
+                "role": "assistant",
+                "content": "I understand your frustration and I sincerely apologize. Let me connect you with a support supervisor right away.",
+            },
             {"role": "system", "content": "Conversation escalated to human agent (category: support)"},
         ],
     },
@@ -129,8 +162,14 @@ CONVERSATIONS = [
         "status": "escalated",
         "escalation_category": "sales",
         "messages": [
-            {"role": "customer", "content": "I'm interested in a bulk order of 500 units, I need to discuss pricing with sales"},
-            {"role": "assistant", "content": "A bulk order of 500 units is great! For orders of this size, I'll connect you with our sales team who can provide custom pricing and delivery options."},
+            {
+                "role": "customer",
+                "content": "I'm interested in a bulk order of 500 units, I need to discuss pricing with sales",
+            },
+            {
+                "role": "assistant",
+                "content": "A bulk order of 500 units is great! For orders of this size, I'll connect you with our sales team who can provide custom pricing and delivery options.",
+            },
             {"role": "system", "content": "Conversation escalated to human agent (category: sales)"},
         ],
     },
@@ -139,8 +178,14 @@ CONVERSATIONS = [
         "status": "escalated",
         "escalation_category": "account",
         "messages": [
-            {"role": "customer", "content": "I need to update my account billing information and there's a discrepancy in my charges"},
-            {"role": "assistant", "content": "I understand you need help with billing. For security, I'll connect you with our account team to handle the billing update and review the discrepancy."},
+            {
+                "role": "customer",
+                "content": "I need to update my account billing information and there's a discrepancy in my charges",
+            },
+            {
+                "role": "assistant",
+                "content": "I understand you need help with billing. For security, I'll connect you with our account team to handle the billing update and review the discrepancy.",
+            },
             {"role": "system", "content": "Conversation escalated to human agent (category: account)"},
         ],
     },
@@ -149,8 +194,14 @@ CONVERSATIONS = [
         "status": "escalated",
         "escalation_category": "technical_assistance",
         "messages": [
-            {"role": "customer", "content": "I'm getting error 502 when trying to use the integration API and need technical help"},
-            {"role": "assistant", "content": "I see you're experiencing a 502 error with our API. Let me connect you with our technical support team who can investigate this issue."},
+            {
+                "role": "customer",
+                "content": "I'm getting error 502 when trying to use the integration API and need technical help",
+            },
+            {
+                "role": "assistant",
+                "content": "I see you're experiencing a 502 error with our API. Let me connect you with our technical support team who can investigate this issue.",
+            },
             {"role": "system", "content": "Conversation escalated to human agent (category: technical_assistance)"},
         ],
     },
@@ -164,16 +215,21 @@ CONVERSATIONS = [
             {"role": "system", "content": "Conversation escalated to human agent (category: general_inquiry)"},
         ],
     },
-
     # General multi-turn (2) -- status: active
     {
         "name": "GENERAL-1",
         "status": "active",
         "messages": [
             {"role": "customer", "content": "What's your return policy?"},
-            {"role": "assistant", "content": "We accept returns within 30 days of purchase. Items must be in original condition with tags attached. Refunds are processed within 5-7 business days. For defective items, we cover return shipping costs."},
+            {
+                "role": "assistant",
+                "content": "We accept returns within 30 days of purchase. Items must be in original condition with tags attached. Refunds are processed within 5-7 business days. For defective items, we cover return shipping costs.",
+            },
             {"role": "customer", "content": "Can you give me more details about that?"},
-            {"role": "assistant", "content": "Sure! Here are the full details of our return policy: You have 30 days from the date of delivery to initiate a return. Items must be unworn, unwashed, and in their original packaging with all tags attached. Once we receive your return, we'll process your refund within 5-7 business days to your original payment method. If you received a defective or damaged item, we'll provide a prepaid return label at no charge."},
+            {
+                "role": "assistant",
+                "content": "Sure! Here are the full details of our return policy: You have 30 days from the date of delivery to initiate a return. Items must be unworn, unwashed, and in their original packaging with all tags attached. Once we receive your return, we'll process your refund within 5-7 business days to your original payment method. If you received a defective or damaged item, we'll provide a prepaid return label at no charge.",
+            },
         ],
     },
     {
@@ -181,12 +237,17 @@ CONVERSATIONS = [
         "status": "active",
         "messages": [
             {"role": "customer", "content": "Can you tell me about your shipping options?"},
-            {"role": "assistant", "content": "We offer several shipping options: Standard shipping (3-5 business days), Express shipping (1-2 business days), and international shipping (7-14 business days). We ship to over 50 countries!"},
+            {
+                "role": "assistant",
+                "content": "We offer several shipping options: Standard shipping (3-5 business days), Express shipping (1-2 business days), and international shipping (7-14 business days). We ship to over 50 countries!",
+            },
             {"role": "customer", "content": "How much does express shipping cost?"},
-            {"role": "assistant", "content": "Express shipping costs $12.99 for orders under $75, and it's free for orders over $150. Standard shipping is free for all orders over $75. The exact cost will be calculated at checkout based on your location and package weight."},
+            {
+                "role": "assistant",
+                "content": "Express shipping costs $12.99 for orders under $75, and it's free for orders over $150. Standard shipping is free for all orders over $75. The exact cost will be calculated at checkout based on your location and package weight.",
+            },
         ],
     },
-
     # Manually escalated with category (2) -- status: escalated, has assigned_to
     {
         "name": "MANUAL-ESC-1",
@@ -195,7 +256,10 @@ CONVERSATIONS = [
         "assigned_to": True,  # Will be resolved to actual agent ID
         "messages": [
             {"role": "customer", "content": "I have a question about my recent order"},
-            {"role": "assistant", "content": "I'd be happy to help with your order! Could you provide your order number so I can look it up for you?"},
+            {
+                "role": "assistant",
+                "content": "I'd be happy to help with your order! Could you provide your order number so I can look it up for you?",
+            },
             {"role": "system", "content": "Conversation manually escalated by admin (category: service)"},
         ],
     },
@@ -206,11 +270,13 @@ CONVERSATIONS = [
         "assigned_to": True,
         "messages": [
             {"role": "customer", "content": "I need help with a product I purchased"},
-            {"role": "assistant", "content": "I'm sorry to hear you're having trouble. Let me connect you with our support team for personalized assistance."},
+            {
+                "role": "assistant",
+                "content": "I'm sorry to hear you're having trouble. Let me connect you with our support team for personalized assistance.",
+            },
             {"role": "system", "content": "Conversation manually escalated by admin (category: support)"},
         ],
     },
-
     # Unassigned escalated (2) -- status: escalated, no assigned_to
     {
         "name": "UNASSIGNED-1",
@@ -231,14 +297,16 @@ CONVERSATIONS = [
             {"role": "system", "content": "Conversation escalated (unassigned)"},
         ],
     },
-
     # Archive candidate (1) -- status: resolved (ended)
     {
         "name": "ARCHIVE-1",
         "status": "resolved",
         "messages": [
             {"role": "customer", "content": "Thank you, that answers my question!"},
-            {"role": "assistant", "content": "You're welcome! If you have any other questions in the future, don't hesitate to ask. Have a great day!"},
+            {
+                "role": "assistant",
+                "content": "You're welcome! If you have any other questions in the future, don't hesitate to ask. Have a great day!",
+            },
         ],
     },
 ]
@@ -305,10 +373,12 @@ async def seed_conversations(dry_run: bool = True) -> None:
             messages_with_ts = []
             for j, msg in enumerate(conv["messages"]):
                 ts = started + timedelta(seconds=j * 30)
-                messages_with_ts.append({
-                    **msg,
-                    "timestamp": ts.isoformat(),
-                })
+                messages_with_ts.append(
+                    {
+                        **msg,
+                        "timestamp": ts.isoformat(),
+                    }
+                )
 
             # Determine assigned_to
             assigned_to = None
@@ -320,7 +390,7 @@ async def seed_conversations(dry_run: bool = True) -> None:
                 "tenant_id": TENANT_ID,
                 "conversation_id": conv_id,
                 "status": conv["status"],
-                "customer_id": f"visitor-{i+1:03d}",
+                "customer_id": f"visitor-{i + 1:03d}",
                 "is_billable": True,
                 "message_count": len(conv["messages"]),
                 "turn_count": sum(1 for m in conv["messages"] if m["role"] == "customer"),
@@ -341,10 +411,12 @@ async def seed_conversations(dry_run: bool = True) -> None:
 
             try:
                 await container.create_item(doc)
-                print(f"  [PASS] [{i+1}/{len(CONVERSATIONS)}] {conv['name']}: {conv['status']} (id={conv_id[:12]}...)")
+                print(
+                    f"  [PASS] [{i + 1}/{len(CONVERSATIONS)}] {conv['name']}: {conv['status']} (id={conv_id[:12]}...)"
+                )
                 created += 1
             except Exception as e:
-                print(f"  [FAIL] [{i+1}/{len(CONVERSATIONS)}] {conv['name']}: {e}")
+                print(f"  [FAIL] [{i + 1}/{len(CONVERSATIONS)}] {conv['name']}: {e}")
 
         print(f"\n[RESULT] Conversations created: {created}/{len(CONVERSATIONS)}")
 
@@ -360,6 +432,7 @@ async def seed_conversations(dry_run: bool = True) -> None:
 
 def main() -> None:
     import argparse
+
     parser = argparse.ArgumentParser(description="Seed conversation documents into Cosmos DB")
     parser.add_argument("--execute", action="store_true", help="Actually insert (without = dry run)")
     args = parser.parse_args()

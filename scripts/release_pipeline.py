@@ -71,6 +71,7 @@ def log(level: str, msg: str) -> None:
 # Step runner
 # ---------------------------------------------------------------------------
 
+
 class StepResult:
     def __init__(self, step: int, name: str, status: str, duration: float, detail: str = ""):
         self.step = step
@@ -115,6 +116,7 @@ def run_subprocess(cmd: list[str], timeout: int = 600, cwd: Path | None = None) 
 # Step 1: Offline tests
 # ---------------------------------------------------------------------------
 
+
 def step_1_offline_tests(args: argparse.Namespace) -> StepResult:
     """Run offline unit/integration test suite (fail-fast gate)."""
     t0 = time.time()
@@ -122,13 +124,13 @@ def step_1_offline_tests(args: argparse.Namespace) -> StepResult:
 
     if args.skip_offline:
         log("FAIL", "  Offline tests not run — not proven")
-        return StepResult(1, "Offline Tests", "FAIL", time.time() - t0,
-                          "not run (--skip-offline) — absence of proof is failure")
+        return StepResult(
+            1, "Offline Tests", "FAIL", time.time() - t0, "not run (--skip-offline) — absence of proof is failure"
+        )
 
     # Use PowerShell test harness
     r = run_subprocess(
-        ["powershell", "-ExecutionPolicy", "Bypass", "-File",
-         "scripts/run-tests-thermal-safe.ps1", "-SkipLive"],
+        ["powershell", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-tests-thermal-safe.ps1", "-SkipLive"],
         timeout=600,
     )
 
@@ -142,27 +144,25 @@ def step_1_offline_tests(args: argparse.Namespace) -> StepResult:
 
     if r.returncode == 0 and failed_count == 0:
         log("PASS", f"  Offline tests: {passed_count} passed, 0 failed")
-        return StepResult(1, "Offline Tests", "PASS", dt,
-                          f"{passed_count}P/0F")
+        return StepResult(1, "Offline Tests", "PASS", dt, f"{passed_count}P/0F")
     else:
         # ADOPT-1/AVOID-2: Zero tolerance — any failure blocks the release.
         # No "known failure" exceptions. Fix the test or fix the code.
         log("FAIL", f"  Offline tests: {passed_count} passed, {failed_count} failed")
-        return StepResult(1, "Offline Tests", "FAIL", dt,
-                          f"{passed_count}P/{failed_count}F")
+        return StepResult(1, "Offline Tests", "FAIL", dt, f"{passed_count}P/{failed_count}F")
 
 
 # ---------------------------------------------------------------------------
 # Step 2: Deploy to staging
 # ---------------------------------------------------------------------------
 
+
 def step_2_deploy_staging(args: argparse.Namespace) -> StepResult:
     """Run the deploy pipeline for staging."""
     t0 = time.time()
     log("INFO", "Step 2: Deploy to staging")
 
-    cmd = [sys.executable, "scripts/deploy_pipeline.py",
-           "--env", "staging", "--version", args.version]
+    cmd = [sys.executable, "scripts/deploy_pipeline.py", "--env", "staging", "--version", args.version]
     if args.dry_run:
         cmd.append("--dry-run")
 
@@ -181,6 +181,7 @@ def step_2_deploy_staging(args: argparse.Namespace) -> StepResult:
 # Step 3: E2E tests against staging (excluding Shopify)
 # ---------------------------------------------------------------------------
 
+
 def step_3_e2e_tests(args: argparse.Namespace) -> StepResult:
     """Run E2E test pipeline against staging (all phases, excluding Shopify)."""
     t0 = time.time()
@@ -188,16 +189,14 @@ def step_3_e2e_tests(args: argparse.Namespace) -> StepResult:
 
     if args.dry_run:
         log("INFO", "  [DRY RUN] Would run: test_pipeline.py --env staging")
-        return StepResult(3, "E2E Tests", "FAIL", time.time() - t0,
-                          "not run (dry run) — absence of proof is failure")
+        return StepResult(3, "E2E Tests", "FAIL", time.time() - t0, "not run (dry run) — absence of proof is failure")
 
     # 65s cooldown after deploy to allow rate limit windows to expire
     log("INFO", "  ... 65s post-deploy cooldown ...")
     time.sleep(65)
 
     version_num = args.version.lstrip("v")
-    cmd = [sys.executable, "scripts/test_pipeline.py",
-           "--env", "staging", "--version", version_num]
+    cmd = [sys.executable, "scripts/test_pipeline.py", "--env", "staging", "--version", version_num]
 
     r = run_subprocess(cmd, timeout=600)
     dt = time.time() - t0
@@ -221,13 +220,13 @@ def step_3_e2e_tests(args: argparse.Namespace) -> StepResult:
 # Step 4: Deploy to production
 # ---------------------------------------------------------------------------
 
+
 def step_4_deploy_production(args: argparse.Namespace) -> StepResult:
     """Run the deploy pipeline for production (non-disruptive upgrade)."""
     t0 = time.time()
     log("INFO", "Step 4: Deploy to production")
 
-    cmd = [sys.executable, "scripts/deploy_pipeline.py",
-           "--env", "production", "--version", args.version]
+    cmd = [sys.executable, "scripts/deploy_pipeline.py", "--env", "production", "--version", args.version]
     if args.dry_run:
         cmd.append("--dry-run")
 
@@ -246,6 +245,7 @@ def step_4_deploy_production(args: argparse.Namespace) -> StepResult:
 # Step 5: Production health verification
 # ---------------------------------------------------------------------------
 
+
 def step_5_verify_both(args: argparse.Namespace) -> StepResult:
     """Verify both staging and production are operational."""
     t0 = time.time()
@@ -253,8 +253,9 @@ def step_5_verify_both(args: argparse.Namespace) -> StepResult:
 
     if args.dry_run:
         log("INFO", "  [DRY RUN] Would verify staging + production health")
-        return StepResult(5, "Verify Environments", "FAIL", time.time() - t0,
-                          "not run (dry run) — absence of proof is failure")
+        return StepResult(
+            5, "Verify Environments", "FAIL", time.time() - t0, "not run (dry run) — absence of proof is failure"
+        )
 
     sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
     from upgrade_verification import ENVIRONMENTS, api_call
@@ -319,7 +320,9 @@ def step_5_verify_both(args: argparse.Namespace) -> StepResult:
             with urllib.request.urlopen(widget_req, timeout=10) as resp:
                 bundle_size = len(resp.read())
                 if resp.status != 200 or bundle_size < 1000:
-                    errors.append(f"{env_name}: widget.js not served correctly (status={resp.status}, size={bundle_size})")
+                    errors.append(
+                        f"{env_name}: widget.js not served correctly (status={resp.status}, size={bundle_size})"
+                    )
                 else:
                     log("PASS", f"  {env_name}: widget.js served ({bundle_size} bytes)")
 
@@ -388,16 +391,14 @@ def step_5_verify_both(args: argparse.Namespace) -> StepResult:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Fully Autonomous Release Pipeline — single invocation, no human/Claude interaction",
     )
-    parser.add_argument("--version", required=True,
-                        help="Image version tag (e.g., v1.80.0)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validate without executing destructive actions")
-    parser.add_argument("--skip-offline", action="store_true",
-                        help="Skip offline test suite (Step 1)")
+    parser.add_argument("--version", required=True, help="Image version tag (e.g., v1.80.0)")
+    parser.add_argument("--dry-run", action="store_true", help="Validate without executing destructive actions")
+    parser.add_argument("--skip-offline", action="store_true", help="Skip offline test suite (Step 1)")
     parser.add_argument(
         "--change-class",
         choices=["A", "B", "C"],
@@ -418,8 +419,11 @@ def main() -> int:
     results: list[StepResult] = []
 
     log("INFO", f"Release Pipeline: {args.version}")
-    log("INFO", f"  Change Class: {args.change_class}"
-        f" ({'UI-only' if args.change_class == 'A' else 'admin/config' if args.change_class == 'B' else 'widget/auth/chat — FULL GATES'})")
+    log(
+        "INFO",
+        f"  Change Class: {args.change_class}"
+        f" ({'UI-only' if args.change_class == 'A' else 'admin/config' if args.change_class == 'B' else 'widget/auth/chat — FULL GATES'})",
+    )
     log("INFO", f"  staging -> E2E -> production -> verify")
     if args.dry_run:
         log("INFO", "  *** DRY RUN MODE ***")
@@ -443,9 +447,9 @@ def main() -> int:
     # Summary
     total_time = time.time() - start_time
     log("INFO", "")
-    log("INFO", f"{'='*60}")
+    log("INFO", f"{'=' * 60}")
     log("INFO", f"  RELEASE PIPELINE SUMMARY — {args.version}")
-    log("INFO", f"{'='*60}")
+    log("INFO", f"{'=' * 60}")
 
     for r in results:
         status_icon = {"PASS": "+", "FAIL": "X"}
@@ -453,9 +457,9 @@ def main() -> int:
         log("INFO", f"  [{icon}] Step {r.step}: {r.name:<25} {r.status:>5}  {r.duration:6.1f}s  {r.detail}")
 
     all_passed = all(r.passed for r in results)
-    log("INFO", f"{'='*60}")
+    log("INFO", f"{'=' * 60}")
     log("INFO", f"  RESULT: {'SUCCESS' if all_passed else 'FAILED'}  ({total_time:.0f}s total)")
-    log("INFO", f"{'='*60}")
+    log("INFO", f"{'=' * 60}")
 
     # Write log
     log_dir = PROJECT_ROOT / "logs"

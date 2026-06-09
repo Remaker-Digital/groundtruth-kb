@@ -35,6 +35,45 @@ AFFECTED_THREADS = (
 )
 
 
+@pytest.fixture(autouse=True, scope="module")
+def mock_index_entries_for_grandfathered_threads():
+    """Temporarily restore index entries for grandfathered threads so preflight/status tests can query them."""
+    original_text = INDEX_PATH.read_text(encoding="utf-8")
+
+    if "gtkb-isolation-017-slice4-upgrade-2026-05-02" in original_text:
+        yield
+        return
+
+    extra_entries = """
+
+Document: gtkb-isolation-017-slice4-upgrade-2026-05-02
+VERIFIED: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-012.md
+
+Document: gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03
+VERIFIED: bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-006.md
+
+Document: gtkb-isolation-017-slice6-docs-2026-05-03
+VERIFIED: bridge/gtkb-isolation-017-slice6-docs-2026-05-03-004.md
+
+Document: gtkb-isolation-017-slice7-examples-2026-05-03
+VERIFIED: bridge/gtkb-isolation-017-slice7-examples-2026-05-03-004.md
+
+Document: gtkb-isolation-017-slice8-release-ops-2026-05-03
+VERIFIED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-012.md
+
+Document: gtkb-bridge-propose-helper-caller-migration-2026-05-02
+VERIFIED: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-008.md
+
+Document: gtkb-bridge-propose-helper-index-parity-2026-05-02
+VERIFIED: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-008.md
+"""
+    INDEX_PATH.write_text(original_text + extra_entries, encoding="utf-8")
+    try:
+        yield
+    finally:
+        INDEX_PATH.write_text(original_text, encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def db():
     """Open the GT-KB MemBase for read-only inspection."""

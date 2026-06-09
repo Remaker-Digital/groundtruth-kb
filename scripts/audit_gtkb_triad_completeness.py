@@ -233,8 +233,7 @@ def _deliberation_gap_severity(row: sqlite3.Row) -> str:
 
 def _is_agent_red_candidate(row: sqlite3.Row) -> bool:
     text = " ".join(
-        str(row[key] or "")
-        for key in ("title", "description", "scope", "section", "tags", "source_paths")
+        str(row[key] or "") for key in ("title", "description", "scope", "section", "tags", "source_paths")
     ).lower()
     if "agent red" not in text and "agent_red" not in text and "agent-red" not in text:
         return False

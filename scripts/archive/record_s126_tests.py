@@ -585,6 +585,7 @@ print(f"\nDone. {len(tests)} test artifacts recorded.")
 
 # Summary by spec
 from collections import Counter
+
 spec_counts = Counter(t["spec_id"] for t in tests)
 print("\nTests per specification:")
 for spec_id, count in sorted(spec_counts.items()):

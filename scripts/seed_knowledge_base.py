@@ -150,7 +150,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["billing", "conversations", "metering", "usage"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 2: CORE FEATURES (split into focused chunks)
     # ===================================================================
@@ -293,7 +292,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["features", "explainability", "transparency", "trace"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 3: SHOPIFY & SETUP
     # ===================================================================
@@ -366,7 +364,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["onboarding", "wizard", "setup", "configuration"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 4: WIDGET CUSTOMIZATION
     # ===================================================================
@@ -409,7 +406,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["widget", "technical", "performance", "architecture"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 5: BILLING & USAGE
     # ===================================================================
@@ -438,7 +434,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["billing", "dashboard", "transparency", "alerts"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 6: SECURITY & PRIVACY
     # ===================================================================
@@ -485,7 +480,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["security", "retention", "data", "archival", "backup"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 7: SUPPORT & SLA
     # ===================================================================
@@ -515,7 +509,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["support", "sla", "uptime", "latency", "performance"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 8: COMPETITIVE ADVANTAGES
     # ===================================================================
@@ -548,7 +541,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["competitive", "advantage", "differentiator"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 9: ADD-ONS
     # ===================================================================
@@ -566,7 +558,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["addons", "modules", "pricing", "integrations"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 10: CONFIGURATION
     # ===================================================================
@@ -585,7 +576,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["configuration", "ai", "behavior", "tuning", "merchant"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 11: ABOUT
     # ===================================================================
@@ -602,7 +592,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["company", "about", "remaker", "legal"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 12: Q&A PAIRS — question-format entries for better vector
     # retrieval alignment (customer questions → direct answers)
@@ -768,7 +757,6 @@ SEED_ARTICLES: list[dict] = [
         "tags": ["addons", "modules", "pricing", "qa"],
         "is_active": True,
     },
-
     # ===================================================================
     # SECTION 13: REMAKER DIGITAL STORE PRODUCT DATA
     # ===================================================================
@@ -904,7 +892,7 @@ def print_summary() -> None:
     # Article listing
     print("Articles:")
     print(f"  {'#':<4} {'Type':<10} {'Chars':<7} {'Title'}")
-    print(f"  {'='*4} {'='*10} {'='*7} {'='*50}")
+    print(f"  {'=' * 4} {'=' * 10} {'=' * 7} {'=' * 50}")
     for i, article in enumerate(SEED_ARTICLES, 1):
         print(f"  {i:<4} {article['entry_type']:<10} {len(article['content']):<7} {article['title']}")
     print()
@@ -999,6 +987,7 @@ async def load_to_cosmos(
             if not vectorizer._configured:
                 # Try to configure with Azure OpenAI
                 from src.chat.pipeline import _create_openai_client
+
                 openai_client = _create_openai_client()
                 vectorizer.configure(kb_repo=repo, openai_client=openai_client)
 
@@ -1006,8 +995,7 @@ async def load_to_cosmos(
             print(f"Embedding complete: {embedded} articles embedded")
         except Exception as e:
             print(f"Embedding failed: {e}")
-            print("Articles loaded but not embedded. Run with Azure OpenAI "
-                  "credentials to enable vector search.")
+            print("Articles loaded but not embedded. Run with Azure OpenAI credentials to enable vector search.")
 
 
 async def main() -> None:

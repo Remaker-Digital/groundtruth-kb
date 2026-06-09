@@ -35,6 +35,7 @@ sys.path.insert(0, project_root)
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 from src.multi_tenant.cosmos_schema import (
@@ -178,9 +179,7 @@ async def verify_containers() -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Initialize Cosmos DB containers for Agent Red"
-    )
+    parser = argparse.ArgumentParser(description="Initialize Cosmos DB containers for Agent Red")
     parser.add_argument(
         "--dry-run",
         action="store_true",

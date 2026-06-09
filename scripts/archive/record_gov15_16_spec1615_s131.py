@@ -57,8 +57,7 @@ def main():
             {
                 "id": "GOV-15-A2",
                 "description": (
-                    "When tests fail, Claude must report failures with "
-                    "diagnostic information before proposing fixes"
+                    "When tests fail, Claude must report failures with diagnostic information before proposing fixes"
                 ),
                 "type": "manual",
                 "status": "verified",
@@ -161,8 +160,7 @@ def main():
             {
                 "id": "SPEC-1615-A3",
                 "description": (
-                    "Pipeline failures trigger creation of DEFECT work items "
-                    "targeting the automation itself"
+                    "Pipeline failures trigger creation of DEFECT work items targeting the automation itself"
                 ),
                 "type": "manual",
                 "status": "specified",
@@ -178,10 +176,7 @@ def main():
             },
             {
                 "id": "SPEC-1615-A5",
-                "description": (
-                    "The pipeline supports targeting staging or production "
-                    "environment via parameter"
-                ),
+                "description": ("The pipeline supports targeting staging or production environment via parameter"),
                 "type": "e2e",
                 "status": "specified",
             },

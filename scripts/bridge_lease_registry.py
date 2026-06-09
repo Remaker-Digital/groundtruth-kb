@@ -77,8 +77,7 @@ class LeaseHandle:
 def _validate_slug(doc_slug: str) -> None:
     if not isinstance(doc_slug, str) or not _SLUG_PATTERN.fullmatch(doc_slug):
         raise ValueError(
-            f"invalid bridge document slug {doc_slug!r}: expected kebab-case "
-            f"[a-z0-9] segments joined by single hyphens"
+            f"invalid bridge document slug {doc_slug!r}: expected kebab-case [a-z0-9] segments joined by single hyphens"
         )
 
 
@@ -152,9 +151,7 @@ def _remove_lease_if_token(path: Path, expected_token: str) -> bool:
     return True
 
 
-def _try_create(
-    path: Path, doc_slug: str, action: str, ttl_seconds: int
-) -> LeaseHandle | None:
+def _try_create(path: Path, doc_slug: str, action: str, ttl_seconds: int) -> LeaseHandle | None:
     """Attempt the atomic exclusive create. Returns a handle on success, or
     ``None`` when the lease file already exists."""
     token = uuid.uuid4().hex
@@ -243,9 +240,7 @@ def refresh_lease(handle: LeaseHandle) -> None:
         return
     record["heartbeat_at"] = _now().isoformat()
     tmp_path = handle.path.with_name(handle.path.name + ".tmp")
-    tmp_path.write_text(
-        json.dumps(record, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    tmp_path.write_text(json.dumps(record, indent=2, sort_keys=True), encoding="utf-8")
     os.replace(tmp_path, handle.path)
 
 
@@ -298,13 +293,9 @@ def document_lease(
 
     Raises ``LeaseUnavailable`` when a fresh lease is already held.
     """
-    handle = acquire_lease(
-        doc_slug, action=action, state_dir=state_dir, ttl_seconds=ttl_seconds
-    )
+    handle = acquire_lease(doc_slug, action=action, state_dir=state_dir, ttl_seconds=ttl_seconds)
     if handle is None:
-        raise LeaseUnavailable(
-            f"a fresh lease is already held for bridge document {doc_slug!r}"
-        )
+        raise LeaseUnavailable(f"a fresh lease is already held for bridge document {doc_slug!r}")
     try:
         yield handle
     finally:

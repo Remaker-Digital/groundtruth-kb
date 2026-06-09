@@ -7,6 +7,7 @@ and 39 test artifacts (TEST-10332..10370).
 """
 
 import sys
+
 sys.path.insert(0, "tools/knowledge-db")
 import db
 
@@ -145,10 +146,18 @@ test_id_start = 10332
 tests = [
     # TestContainerEntryPoints (14 tests = 7 modules x 2 tests)
     ("test_entry_point_importable[intent_classifier_app]", "SPEC-1794", "Entry point importable: intent-classifier"),
-    ("test_entry_point_importable[knowledge_retrieval_app]", "SPEC-1794", "Entry point importable: knowledge-retrieval"),
+    (
+        "test_entry_point_importable[knowledge_retrieval_app]",
+        "SPEC-1794",
+        "Entry point importable: knowledge-retrieval",
+    ),
     ("test_entry_point_importable[response_generator_app]", "SPEC-1794", "Entry point importable: response-generator"),
     ("test_entry_point_importable[escalation_handler_app]", "SPEC-1794", "Entry point importable: escalation-handler"),
-    ("test_entry_point_importable[analytics_collector_app]", "SPEC-1794", "Entry point importable: analytics-collector"),
+    (
+        "test_entry_point_importable[analytics_collector_app]",
+        "SPEC-1794",
+        "Entry point importable: analytics-collector",
+    ),
     ("test_entry_point_importable[critic_supervisor_app]", "SPEC-1794", "Entry point importable: critic-supervisor"),
     ("test_entry_point_importable[co_pilot_app]", "SPEC-1797", "Entry point importable: co-pilot"),
     ("test_entry_point_has_fastapi_app[intent_classifier_app]", "SPEC-1794", "FastAPI app: intent-classifier"),

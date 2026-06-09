@@ -15,6 +15,11 @@ from scripts.verify_antigravity_dispatch import (
 )
 
 
+@pytest.fixture(autouse=True)
+def clear_registry_env(monkeypatch):
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+
+
 def _write_registry(root: Path, record: dict) -> None:
     state = root / "harness-state"
     state.mkdir()

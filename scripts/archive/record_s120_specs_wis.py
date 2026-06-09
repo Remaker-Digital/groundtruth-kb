@@ -1,4 +1,5 @@
 import sys, os, json
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "knowledge-db"))
 import db as db_mod
 

@@ -1,7 +1,9 @@
 """S157: Update DOC-141 with production deployment record."""
+
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 import sys
-sys.path.insert(0, 'tools/knowledge-db')
+
+sys.path.insert(0, "tools/knowledge-db")
 import db
 
 CONTENT = """# Shopify Production Deployment Guide
@@ -133,13 +135,13 @@ No tenant was ever seeded via seed_tenant.py with proper API key hashes.
 
 kdb = db.KnowledgeDB()
 kdb.update_document(
-    'DOC-141',
-    'Claude',
-    'S157: Add deployment history table, document 2-file environment switch, known Cosmos API key issue',
-    title='Shopify Production Deployment Guide',
+    "DOC-141",
+    "Claude",
+    "S157: Add deployment history table, document 2-file environment switch, known Cosmos API key issue",
+    title="Shopify Production Deployment Guide",
     content=CONTENT,
-    doc_type='operational_guide',
-    session_id='S157'
+    doc_type="operational_guide",
+    session_id="S157",
 )
-print('DOC-141 updated to v3')
+print("DOC-141 updated to v3")
 kdb.close()

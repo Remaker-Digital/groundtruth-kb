@@ -448,9 +448,7 @@ def create_work_items(kdb: db.KnowledgeDB) -> list[str]:
         wi_id = f"WI-{next_num:04d}"
 
         # Check idempotency by title match
-        already_exists = any(
-            w["title"] == feat["title"] for w in existing
-        )
+        already_exists = any(w["title"] == feat["title"] for w in existing)
         if already_exists:
             print(f"  SKIP (title exists): {feat['title'][:60]}")
             # Still track the ID for the backlog

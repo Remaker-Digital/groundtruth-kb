@@ -11,8 +11,8 @@ import os
 import re
 import sqlite3
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db', 'knowledge.db')
-PROJECT_ROOT = os.path.join(os.path.dirname(__file__), '..')
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db", "knowledge.db")
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 # Direct spec_id -> (file, pattern) mapping
 DIRECT_MAPPINGS = {
@@ -117,13 +117,16 @@ def main():
     c = conn.cursor()
 
     # Get uncovered specs
-    uncovered = set(r[0] for r in c.execute('''
+    uncovered = set(
+        r[0]
+        for r in c.execute("""
         SELECT DISTINCT s.id FROM specifications s
         INNER JOIN (SELECT id, MAX(version) as mv FROM specifications GROUP BY id) l
         ON s.id = l.id AND s.version = l.mv
         WHERE s.id NOT IN (SELECT DISTINCT spec_id FROM assertion_runs)
         AND s.status = 'specified'
-    ''').fetchall())
+    """).fetchall()
+    )
 
     print(f"Uncovered specified specs: {len(uncovered)}")
 
@@ -144,7 +147,7 @@ def main():
             continue
 
         try:
-            with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
         except Exception:
             skipped_no_file += 1
@@ -156,87 +159,100 @@ def main():
             continue
 
         # Get latest spec version
-        row = c.execute(
-            'SELECT MAX(version) FROM specifications WHERE id = ?', (spec_id,)
-        ).fetchone()
+        row = c.execute("SELECT MAX(version) FROM specifications WHERE id = ?", (spec_id,)).fetchone()
         if not row or not row[0]:
             continue
 
         spec_version = row[0]
-        assertion_json = json.dumps([{
-            "type": "grep", "file": filepath, "pattern": pattern
-        }])
+        assertion_json = json.dumps([{"type": "grep", "file": filepath, "pattern": pattern}])
 
         # Check if spec already has assertions
         current = c.execute(
-            'SELECT * FROM specifications WHERE id = ? AND version = ?',
-            (spec_id, spec_version)
+            "SELECT * FROM specifications WHERE id = ? AND version = ?", (spec_id, spec_version)
         ).fetchone()
         if not current:
             continue
 
-        col_names = [col[1] for col in c.execute('PRAGMA table_info(specifications)').fetchall()]
+        col_names = [col[1] for col in c.execute("PRAGMA table_info(specifications)").fetchall()]
         cd = dict(zip(col_names, current))
 
-        if not cd.get('assertions') or not cd['assertions'].strip():
+        if not cd.get("assertions") or not cd["assertions"].strip():
             new_version = spec_version + 1
-            c.execute('''
+            c.execute(
+                """
                 INSERT INTO specifications (id, version, title, description, priority, scope,
                     section, handle, tags, status, assertions, changed_by, changed_at,
                     change_reason, type)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?)
-            ''', (
-                spec_id, new_version, cd['title'], cd['description'],
-                cd['priority'], cd['scope'], cd['section'],
-                cd['handle'], cd['tags'], cd['status'],
-                assertion_json, 'claude',
-                'S150: Add grep assertion (direct mapping)',
-                cd['type']
-            ))
+            """,
+                (
+                    spec_id,
+                    new_version,
+                    cd["title"],
+                    cd["description"],
+                    cd["priority"],
+                    cd["scope"],
+                    cd["section"],
+                    cd["handle"],
+                    cd["tags"],
+                    cd["status"],
+                    assertion_json,
+                    "claude",
+                    "S150: Add grep assertion (direct mapping)",
+                    cd["type"],
+                ),
+            )
 
         # Get final version and record assertion run
-        final_version = c.execute(
-            'SELECT MAX(version) FROM specifications WHERE id = ?', (spec_id,)
-        ).fetchone()[0]
+        final_version = c.execute("SELECT MAX(version) FROM specifications WHERE id = ?", (spec_id,)).fetchone()[0]
 
         matches_count = len(re.findall(pattern, content, re.IGNORECASE))
-        result_json = json.dumps([{
-            "type": "grep",
-            "description": f"Source file contains '{pattern}'",
-            "passed": True,
-            "detail": f"Found {matches_count} match(es), need >= 1"
-        }])
+        result_json = json.dumps(
+            [
+                {
+                    "type": "grep",
+                    "description": f"Source file contains '{pattern}'",
+                    "passed": True,
+                    "detail": f"Found {matches_count} match(es), need >= 1",
+                }
+            ]
+        )
 
-        c.execute('''
+        c.execute(
+            """
             INSERT INTO assertion_runs (spec_id, spec_version, run_at, overall_passed, results, triggered_by)
             VALUES (?, ?, datetime('now'), 1, ?, ?)
-        ''', (spec_id, final_version, result_json, 'S150-batch-r2'))
+        """,
+            (spec_id, final_version, result_json, "S150-batch-r2"),
+        )
 
         inserted += 1
 
     conn.commit()
 
     # Final coverage
-    total_specs = c.execute('SELECT COUNT(DISTINCT id) FROM specifications').fetchone()[0]
-    covered = c.execute('SELECT COUNT(DISTINCT spec_id) FROM assertion_runs').fetchone()[0]
+    total_specs = c.execute("SELECT COUNT(DISTINCT id) FROM specifications").fetchone()[0]
+    covered = c.execute("SELECT COUNT(DISTINCT spec_id) FROM assertion_runs").fetchone()[0]
     coverage = 100 * covered / total_specs
 
     print(f"\nInserted {inserted} new assertions (round 2)")
-    print(f"Already covered: {skipped_not_uncovered}, Missing file: {skipped_no_file}, No pattern: {skipped_no_pattern}")
+    print(
+        f"Already covered: {skipped_not_uncovered}, Missing file: {skipped_no_file}, No pattern: {skipped_no_pattern}"
+    )
     print(f"Coverage: {covered}/{total_specs} = {coverage:.1f}%")
 
     # Remaining
-    remaining = c.execute('''
+    remaining = c.execute("""
         SELECT COUNT(DISTINCT s.id) FROM specifications s
         INNER JOIN (SELECT id, MAX(version) as mv FROM specifications GROUP BY id) l
         ON s.id = l.id AND s.version = l.mv
         WHERE s.id NOT IN (SELECT DISTINCT spec_id FROM assertion_runs)
         AND s.status NOT IN ('retired')
-    ''').fetchone()[0]
+    """).fetchone()[0]
     print(f"Remaining uncovered: {remaining}")
 
     conn.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -59,16 +59,9 @@ def _gt_command() -> str:
 
 
 def test_rule_files_have_no_live_role_assignments_mirror_authority() -> None:
-    """Only enumerated operating-role provenance may still cite the retired mirror."""
+    """The retired mirror must not be cited in rule files."""
     for relpath in PROTECTED_TARGETS:
-        if relpath == ".claude/rules/operating-role.md":
-            continue
         assert MIRROR not in _read(relpath), f"{relpath} still cites retired {MIRROR}"
-
-    operating_role = _read(".claude/rules/operating-role.md")
-    assert operating_role.count(MIRROR) == len(OPERATING_ROLE_ALLOWED_MIRROR_SNIPPETS)
-    for snippet in OPERATING_ROLE_ALLOWED_MIRROR_SNIPPETS:
-        assert snippet in operating_role
 
 
 def test_rule_files_cite_canonical_role_reader_entrypoint() -> None:

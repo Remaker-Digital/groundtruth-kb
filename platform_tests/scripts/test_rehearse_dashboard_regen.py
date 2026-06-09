@@ -71,14 +71,26 @@ def _make_minimal_legacy_root(tmp_path: Path) -> Path:
         + "\n",
         encoding="utf-8",
     )
-    (legacy / "harness-state" / "role-assignments.json").write_text(
+    (legacy / "harness-state" / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "A": {"harness_type": "codex", "role": "loyal-opposition"},
-                    "B": {"harness_type": "claude", "role": "prime-builder"},
-                },
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "role": ["loyal-opposition"],
+                        "status": "active",
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "role": ["prime-builder"],
+                        "status": "active",
+                    },
+                ],
             }
         )
         + "\n",

@@ -31,6 +31,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load .env.local (shared loader — R7 refactoring)
 from scripts._env import load_env_local
+
 load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -58,10 +59,7 @@ async def run(tenant_id: str, execute: bool = False) -> None:
     print("  Querying active KB entries...", flush=True)
     entries = await repo.query(
         tenant_id=tenant_id,
-        query_text=(
-            "SELECT c.id, c.title, c.content, c.content_hash, c.created_at "
-            "FROM c WHERE c.is_active = true"
-        ),
+        query_text=("SELECT c.id, c.title, c.content, c.content_hash, c.created_at FROM c WHERE c.is_active = true"),
     )
 
     total = len(entries)
@@ -104,7 +102,7 @@ async def run(tenant_id: str, execute: bool = False) -> None:
         print("  [DRY RUN] Duplicate groups:", flush=True)
         for h, group in sorted(dup_groups.items(), key=lambda x: x[1][0].get("title", "")):
             title = group[0].get("title", "(no title)")
-            print(f"    {title[:55]} — {len(group)} copies (keeping 1, removing {len(group)-1})")
+            print(f"    {title[:55]} — {len(group)} copies (keeping 1, removing {len(group) - 1})")
         print()
         print(f"  Run with --execute to soft-delete {dup_entry_count} duplicate entries.")
         print()

@@ -19,7 +19,7 @@ from collections import defaultdict, Counter
 from pathlib import Path
 
 # Windows UTF-8 safety
-sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
+sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", errors="replace", buffering=1)
 
 # Per S307 hardcoded-path directive: discover repo root from script location.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -57,6 +57,7 @@ def load_kb_specs():
     sys.path.insert(0, KB_PATH)
     try:
         from db import KnowledgeDB
+
         db = KnowledgeDB()
         all_kb = db.list_specs()
         db.close()
@@ -180,9 +181,9 @@ def main():
             "domain_distribution": dict(domain_counts.most_common()),
             "source_type_distribution": dict(source_counts.most_common()),
             "phase": "Phase 1 — Transcript Extraction",
-            "note": "871 specs from owner directives + approved proposals. NOT yet deduplicated — owner review handles semantic grouping. NOT yet cross-referenced with implementation (Phase 2)."
+            "note": "871 specs from owner directives + approved proposals. NOT yet deduplicated — owner review handles semantic grouping. NOT yet cross-referenced with implementation (Phase 2).",
         },
-        "domains": {}
+        "domains": {},
     }
 
     for domain, domain_specs in domain_groups.items():

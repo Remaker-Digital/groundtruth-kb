@@ -445,14 +445,14 @@ def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
     assert parity_index < adapter_index < harness_parity_index < pytest_index
-    assert "tests/scripts/test_codex_hook_parity.py" in commands[pytest_index]
-    assert "tests/scripts/test_standing_backlog_harvest.py" in commands[pytest_index]
-    assert "tests/scripts/test_session_self_initialization.py" in commands[pytest_index]
-    assert "tests/scripts/test_collect_dev_environment_inventory.py" in commands[pytest_index]
-    assert "tests/scripts/test_check_dev_environment_inventory_drift.py" in commands[pytest_index]
-    assert "tests/scripts/test_gtkb_dashboard_control_plane.py" in commands[pytest_index]
-    assert "tests/hooks/test_workstream_focus.py" in commands[pytest_index]
-    assert "tests/integrations/test_usage_consumption.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_codex_hook_parity.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_standing_backlog_harvest.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_session_self_initialization.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_collect_dev_environment_inventory.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_check_dev_environment_inventory_drift.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_gtkb_dashboard_control_plane.py" in commands[pytest_index]
+    assert "platform_tests/hooks/test_workstream_focus.py" in commands[pytest_index]
+    assert "applications/Agent_Red/tests/integrations/test_usage_consumption.py" in commands[pytest_index]
 
 
 def test_python_gate_runs_environment_isolation_before_pytest(monkeypatch):
@@ -473,7 +473,7 @@ def test_python_gate_runs_environment_isolation_before_pytest(monkeypatch):
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
     assert parity_index < harness_parity_index < env_index < pytest_index
-    assert "tests/scripts/test_check_environment_isolation.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_check_environment_isolation.py" in commands[pytest_index]
 
 
 def test_python_gate_runs_session_overlay_policy_before_pytest(monkeypatch):
@@ -496,7 +496,7 @@ def test_python_gate_runs_session_overlay_policy_before_pytest(monkeypatch):
     # strictly before the pytest suite so drift in .groundtruth/session/overlays/
     # fails the gate before any test collection can touch it.
     assert env_index < overlay_index < pytest_index
-    assert "tests/scripts/test_gtkb_overlay.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_gtkb_overlay.py" in commands[pytest_index]
 
 
 def test_python_gate_runs_scoped_service_boundary_before_pytest(monkeypatch):
@@ -524,7 +524,7 @@ def test_python_gate_runs_scoped_service_boundary_before_pytest(monkeypatch):
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
     assert scoped_index < pytest_index
-    assert "tests/scripts/test_gtkb_scoped_client.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_gtkb_scoped_client.py" in commands[pytest_index]
 
 
 # ---------------------------------------------------------------------------
@@ -567,6 +567,7 @@ def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypa
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
+    monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory_drift", fake_inventory_drift)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
@@ -619,6 +620,7 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
+    monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
 
