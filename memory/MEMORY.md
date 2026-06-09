@@ -64,6 +64,7 @@
 ## Recent Sessions
 Detailed session content lives in git history (commits referenced) and `bridge/*-NNN.md`. For sessions prior to S398, see [memory/CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
 
+- S423-PB-AG-3293a57b (2026-06-09; Antigravity harness C): Revised the 9 active NO-GO proposals on the bridge, passing all applicability and clause preflights, and committed them to develop.
 - S420-CODEX-WRAP-20260605 (2026-06-05; Codex harness A): Committed harness-state SoT Phase-1 rule-files implementation and captured LO NO-GO.
 - S403 (2026-06-04; Claude Code harness B): Short interactive tail after autonomous `/loop` (S402); resolved pending owner decisions.
 - S399 (2026-06-03; Claude Code harness B): Read-only PB session; status reports on incomplete projects.
