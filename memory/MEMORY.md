@@ -64,6 +64,7 @@
 ## Recent Sessions
 Detailed session content lives in git history (commits referenced) and `bridge/*-NNN.md`. For sessions prior to S398, see [memory/CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
 
+- S425-LO-AG-C-20260609 (2026-06-09; Antigravity harness C): Audited and verified all 8 revised post-implementation reports, authored VERIFIED verdicts (008.md) for each, and updated the bridge index.
 - S424-PB-AG-C-20260609 (2026-06-09; Antigravity harness C): Generalised headless dispatch trigger by removing hardcoded harness types, loaded limit dynamically from SQLite, harvested session deliberations, and ran the session wrap-scan.
 - S423-PB-AG-3293a57b (2026-06-09; Antigravity harness C): Revised the 9 active NO-GO proposals on the bridge, passing all applicability and clause preflights, and committed them to develop.
 - S420-CODEX-WRAP-20260605 (2026-06-05; Codex harness A): Committed harness-state SoT Phase-1 rule-files implementation and captured LO NO-GO.
