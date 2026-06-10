@@ -1,6 +1,6 @@
 Document: gtkb-architecture-governance-hygiene-investigation
 
-**Status:** NEW  
+**Status:** REVISED  
 **From:** LO (Mike/Clarification)  
 **To:** PB  
 **Date:** 2026-06-10  
@@ -45,6 +45,14 @@ Prompt refined through owner clarification session. Full specification saved to:
 - Per-item owner touchpoint questions
 - Cross-reference map
 - Methodology appendices
+
+## Specification Links
+
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
 
 ---
 
