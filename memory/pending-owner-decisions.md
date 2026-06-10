@@ -174,86 +174,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: resolved
   question_hash: 5516604829acbf8b
   notes: ""
-- id: DECISION-0526
-  asked_at: 2026-05-11T18:11:25.911082Z
-  question: "Approve adding a new Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session bridge surfacing)?"
-  options:
-    - "Approve"
-    - "Approve hook only; defer canonicalization"
-    - "Reject — try a different mechanism"
-    - "Defer to next session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c9d93f881394cd5a
-  resolved_at: 2026-05-11T18:11:25.911082Z
-  answer: "User has answered your questions: \"Approve adding a new Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session bridge surfacing)?\"=\"Approve\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0529
-  asked_at: 2026-05-11T18:47:10.883235Z
-  question: "Pre-commit hook hard-blocked the consolidating commit: `.claude/rules/bridge-essential.md` is a protected narrative artifact and the parallel session modified it (Two-Axis Bridge Automation Model section updated to reflect implemented Claude-native AXIS 2) without filing a `formal-artifact-approval` packet. The destructive-gate hook is now also blocking `git restore --staged .claude/...` to unstage it. Three options:"
-  options:
-    - "Authorize unstage; commit other 8 items"
-    - "Create approval packet inline + commit all 9"
-    - "Abort commit; revert bridge-essential.md to pre-edit state"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 99e7fa621057d7d2
-  resolved_at: 2026-05-11T18:47:10.883235Z
-  answer: "User has answered your questions: \"Pre-commit hook hard-blocked the consolidating commit: `.claude/rules/bridge-essential.md` is a protected narrative artifact and the parallel session modified it (Two-Axis Bridge Automation Model section updated to reflect implemented Claude-native AXIS 2) without filing a `formal-artifact-approval` packet. The destructive-gate hook is now also blocking `git restore --staged .claude/...` to unstage it. Three options:\"=\"Create approval packet inline + commit all 9\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0530
-  asked_at: 2026-05-11T18:47:10.883235Z
-  question: "Approve narrative-artifact edit to `.claude/rules/bridge-essential.md` (parallel session's update to the Two-Axis Bridge Automation Model section)? The change replaces the prior 'Currently the thread automation pattern is implemented Codex-side only...A future Claude-native equivalent would land in this axis (currently asymmetric)' paragraph with three concrete bullets documenting: AXIS 1 cross-harness event-driven trigger; AXIS 2 Codex-side app-thread automation; AXIS 2 Claude-native `.claude/hooks/bridge-axis-2-surface.py` UserPromptSubmit hook. Closing line states 'both AXIS 2 mechanisms are complementary; each fits its harness's native interaction model'. SHA-256 of full edited content: `1e406d293edd40de78e4ae25181818de2cede8ed2d269c4cb41b00d2f293deed`. Approve to generate packet?"
-  options:
-    - "Approve edit; generate packet"
-    - "Reject edit; abort and revert"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 4da1687dec4e3a19
-  resolved_at: 2026-05-11T18:47:10.883235Z
-  answer: "User has answered your questions: \"Approve narrative-artifact edit to `.claude/rules/bridge-essential.md` (parallel session's update to the Two-Axis Bridge Automation Model section)? The change replaces the prior 'Currently the thread automation pattern is implemented Codex-side only...A future Claude-native equivalent would land in this axis (currently asymmetric)' paragraph with three concrete bullets documenting: AXIS 1 cross-harness event-driven trigger; AXIS 2 Codex-side app-thread automation; AXIS 2 Claude-native `.claude/hooks/bridge-axis-2-surface.py` UserPromptSubmit hook. Closing line states 'both AXIS 2 mechanisms are complementary; each fits its harness's native interaction model'. SHA-256 of full edited content: `1e406d293edd40de78e4ae25181818de2cede8ed2d269c4cb41b00d2f293deed`. Approve to generate packet?\"=\"Approve edit; generate packet\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0531
-  asked_at: 2026-05-11T18:55:23.306255Z
-  question: "What's the next move given the AXIS 2 surface showing 53 actionable entries?"
-  options:
-    - "File AXIS 2 post-impl + close thread"
-    - "Triage the 53-entry queue + action top items"
-    - "Stop here — wrap S341"
-    - "Implement mcp-stable-harness-surface Slice 1"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7f8389f6118bab78
-  resolved_at: 2026-05-11T18:55:23.306255Z
-  answer: "User has answered your questions: \"What's the next move given the AXIS 2 surface showing 53 actionable entries?\"=\"Implement mcp-stable-harness-surface Slice 1\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0524
-  asked_at: 2026-05-11T17:17:30.188077Z
-  question: "Want me to continue with the deferred items (init-keyword/startup-symmetry implementation, artifact-recorder Slice 1,..."
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: d97e1ff99fed036f
-  resolved_at: 2026-05-11T19:02:24.918595Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0527
-  asked_at: 2026-05-11T18:11:25.911082Z
-  question: "Want me to continue with another batch (next-priority deferred items: mcp-stable implementation, init-keyword/startup..."
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 2e077c9bbd9b3085
-  resolved_at: 2026-05-11T19:02:24.918622Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0528
-  asked_at: 2026-05-11T18:25:12.963255Z
-  question: "Want me to continue, or close this session here?"
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: c620f8b2a876c200
-  resolved_at: 2026-05-11T19:02:24.918628Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0532
   asked_at: 2026-05-11T19:54:41.281255Z
   question: "OWNER ACTION REQUIRED — how should the 7 S341 backlog candidates be filed into the canonical backlog? `memory/work_list.md` is a protected narrative artifact (per `config/governance/narrative-artifact-approval.toml`); adding items requires a formal-artifact-approval packet under `GOV-ARTIFACT-APPROVAL-001`. The auto-memory entry I just wrote is the wrong location — it's discoverable to Claude sessions on this workstation but NOT to Codex or non-Claude harnesses, so it doesn't fulfill the \"future-session\" intent of your directive."
@@ -7512,6 +7432,97 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-05T22:07:00.790670Z
   answer: "Your questions have been answered: \"I've confirmed a SECOND active harness-B Prime /loop session (lineage 56a13045) is concurrently driving the exact same mirror-retirement thread. While I worked this session: it filed -005 (DCL-only amend), Codex NO-GO'd it at -006, and the working tree/INDEX/pending-decisions files changed in real time between my reads. The bridge claim mechanism is correctly serializing us (no corruption), but we've collided all session and my drafting keeps being redundant. I've already: confirmed the AMEND path via your AUQ, durably recorded it as DELIB-MIRROR-RETIREMENT-AMEND-PATH-2026-06-05 (which closes the -006 F2 'no durable decision evidence' gap and notes BOTH specs must be amended per -006 F1), and released my claim so the parallel session is unblocked. How should I proceed?\"=\"Stand down this session (recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1102
+  asked_at: 2026-06-10T18:39:18.115432Z
+  question: "How should v2's content be incorporated into the Fable Investigation advisory, given v2 overlaps ~30 of my 60 findings, adds ~12-15 distinct ones, and factually conflicts with 3 adversarially-verified v1 findings?"
+  options:
+    - "Verified-merge (Recommended)"
+    - "Full-union, no re-verify"
+    - "v1-only, v2 cross-ref"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1a39f5c7128ca724
+  resolved_at: 2026-06-10T18:39:18.115432Z
+  answer: "Your questions have been answered: \"How should v2's content be incorporated into the Fable Investigation advisory, given v2 overlaps ~30 of my 60 findings, adds ~12-15 distinct ones, and factually conflicts with 3 adversarially-verified v1 findings?\"=\"Verified-merge (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1103
+  asked_at: 2026-06-10T18:39:18.115432Z
+  question: "What is the scope of the Fable Investigation project — which findings seed it? (Context: 60 verified v1 findings + ~12-15 v2-distinct candidates pending spot-verification + 14 demoted near-misses; the backlog-flooding finding HYG-015 argues against indiscriminate item creation.)"
+  options:
+    - "Full milestone, internal waves (Recommended)"
+    - "Phased subset first"
+    - "Triage-first, then charter"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: efa82ac8e7c912b2
+  resolved_at: 2026-06-10T18:39:18.115432Z
+  answer: "Your questions have been answered: \"What is the scope of the Fable Investigation project — which findings seed it? (Context: 60 verified v1 findings + ~12-15 v2-distinct candidates pending spot-verification + 14 demoted near-misses; the backlog-flooding finding HYG-015 argues against indiscriminate item creation.)\"=\"Full milestone, internal waves (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1104
+  asked_at: 2026-06-10T18:39:18.115432Z
+  question: "At what granularity should Fable Investigation work items be created? (Context: ~75 findings total after the v2 merge; the visible backlog is already flooded with ~758 advisory-routing stubs per HYG-015; the cross-reference map defines 6 natural remediation clusters.)"
+  options:
+    - "Hybrid clusters (Recommended)"
+    - "One WI per finding"
+    - "One WI per wave"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1ddd156665e8709f
+  resolved_at: 2026-06-10T18:39:18.115432Z
+  answer: "Your questions have been answered: \"At what granularity should Fable Investigation work items be created? (Context: ~75 findings total after the v2 merge; the visible backlog is already flooded with ~758 advisory-routing stubs per HYG-015; the cross-reference map defines 6 natural remediation clusters.)\"=\"Hybrid clusters (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1105
+  asked_at: 2026-06-10T18:39:18.115432Z
+  question: "The original investigation protocol promised a per-finding Tier-1 AUQ disposition pass before any conversion. With a full-milestone charter and cluster WIs now decided, what owner-approval protocol applies to the findings themselves?"
+  options:
+    - "Cluster-level AUQs (Recommended)"
+    - "Keep per-finding Tier-1 first"
+    - "Tier-1 only for high-complexity"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 09e357296626ffef
+  resolved_at: 2026-06-10T18:39:18.115432Z
+  answer: "Your questions have been answered: \"The original investigation protocol promised a per-finding Tier-1 AUQ disposition pass before any conversion. With a full-milestone charter and cluster WIs now decided, what owner-approval protocol applies to the findings themselves?\"=\"Cluster-level AUQs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1106
+  asked_at: 2026-06-10T18:39:18.115432Z
+  question: "What architecture should make this investigation repeatable at the lowest token cost? (Context: this run cost ~3.4M subagent tokens; Phase 0-1 censuses are fully deterministic; gt hygiene sweep currently has only 3 patterns, all Agent-Red-shaped — HYG-051; 9 hygiene-adjacent skills already exist.)"
+  options:
+    - "Layered: CLI core + skill (Recommended)"
+    - "Skill-only packaging"
+    - "Deterministic-only expansion"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f3e4f5fc77f493bf
+  resolved_at: 2026-06-10T18:39:18.115432Z
+  answer: "Your questions have been answered: \"What architecture should make this investigation repeatable at the lowest token cost? (Context: this run cost ~3.4M subagent tokens; Phase 0-1 censuses are fully deterministic; gt hygiene sweep currently has only 3 patterns, all Agent-Red-shaped — HYG-051; 9 hygiene-adjacent skills already exist.)\"=\"Layered: CLI core + skill (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1107
+  asked_at: 2026-06-10T18:39:18.115432Z
+  question: "How should the advisory be packaged on the bridge? (Protocol context: ADVISORY status exists for owner-initiated advisory reports but the protocol assigns ADVISORY authorship to Loyal Opposition; this session runs as Prime Builder under your direct instruction. ADVISORY is non-dispatchable and awaits Prime acknowledgement + disposition — which matches the intended use.)"
+  options:
+    - "ADVISORY, owner-directed (Recommended)"
+    - "NEW proposal instead"
+    - "Two artifacts"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 145edaf50a6d0fd4
+  resolved_at: 2026-06-10T18:39:18.115432Z
+  answer: "Your questions have been answered: \"How should the advisory be packaged on the bridge? (Protocol context: ADVISORY status exists for owner-initiated advisory reports but the protocol assigns ADVISORY authorship to Loyal Opposition; this session runs as Prime Builder under your direct instruction. ADVISORY is non-dispatchable and awaits Prime acknowledgement + disposition — which matches the intended use.)\"=\"ADVISORY, owner-directed (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1108
+  asked_at: 2026-06-10T18:39:18.115432Z
+  question: "When are the MemBase project record and the ~18-22 cluster work items actually created? (Backlog capture itself needs no approval barrier per GOV-STANDING-BACKLOG-001, but creation timing affects the audit trail and whether Prime Builder inherits a ready-made project or builds it from the advisory.)"
+  options:
+    - "This session creates them (Recommended)"
+    - "Propose-only; PB creates later"
+    - "Project now, WIs per wave"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 43c2886f001d9416
+  resolved_at: 2026-06-10T18:39:18.115432Z
+  answer: "Your questions have been answered: \"When are the MemBase project record and the ~18-22 cluster work items actually created? (Backlog capture itself needs no approval barrier per GOV-STANDING-BACKLOG-001, but creation timing affects the audit trail and whether Prime Builder inherits a ready-made project or builds it from the advisory.)\"=\"This session creates them (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
@@ -13797,3 +13808,83 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-11T17:32:45.152523Z
   answer: "User has answered your questions: \"Which next batch should I work on?\"=\"Batch-commit bridge filings first\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0526
+  asked_at: 2026-05-11T18:11:25.911082Z
+  question: "Approve adding a new Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session bridge surfacing)?"
+  options:
+    - "Approve"
+    - "Approve hook only; defer canonicalization"
+    - "Reject — try a different mechanism"
+    - "Defer to next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c9d93f881394cd5a
+  resolved_at: 2026-05-11T18:11:25.911082Z
+  answer: "User has answered your questions: \"Approve adding a new Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session bridge surfacing)?\"=\"Approve\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0529
+  asked_at: 2026-05-11T18:47:10.883235Z
+  question: "Pre-commit hook hard-blocked the consolidating commit: `.claude/rules/bridge-essential.md` is a protected narrative artifact and the parallel session modified it (Two-Axis Bridge Automation Model section updated to reflect implemented Claude-native AXIS 2) without filing a `formal-artifact-approval` packet. The destructive-gate hook is now also blocking `git restore --staged .claude/...` to unstage it. Three options:"
+  options:
+    - "Authorize unstage; commit other 8 items"
+    - "Create approval packet inline + commit all 9"
+    - "Abort commit; revert bridge-essential.md to pre-edit state"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 99e7fa621057d7d2
+  resolved_at: 2026-05-11T18:47:10.883235Z
+  answer: "User has answered your questions: \"Pre-commit hook hard-blocked the consolidating commit: `.claude/rules/bridge-essential.md` is a protected narrative artifact and the parallel session modified it (Two-Axis Bridge Automation Model section updated to reflect implemented Claude-native AXIS 2) without filing a `formal-artifact-approval` packet. The destructive-gate hook is now also blocking `git restore --staged .claude/...` to unstage it. Three options:\"=\"Create approval packet inline + commit all 9\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0530
+  asked_at: 2026-05-11T18:47:10.883235Z
+  question: "Approve narrative-artifact edit to `.claude/rules/bridge-essential.md` (parallel session's update to the Two-Axis Bridge Automation Model section)? The change replaces the prior 'Currently the thread automation pattern is implemented Codex-side only...A future Claude-native equivalent would land in this axis (currently asymmetric)' paragraph with three concrete bullets documenting: AXIS 1 cross-harness event-driven trigger; AXIS 2 Codex-side app-thread automation; AXIS 2 Claude-native `.claude/hooks/bridge-axis-2-surface.py` UserPromptSubmit hook. Closing line states 'both AXIS 2 mechanisms are complementary; each fits its harness's native interaction model'. SHA-256 of full edited content: `1e406d293edd40de78e4ae25181818de2cede8ed2d269c4cb41b00d2f293deed`. Approve to generate packet?"
+  options:
+    - "Approve edit; generate packet"
+    - "Reject edit; abort and revert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4da1687dec4e3a19
+  resolved_at: 2026-05-11T18:47:10.883235Z
+  answer: "User has answered your questions: \"Approve narrative-artifact edit to `.claude/rules/bridge-essential.md` (parallel session's update to the Two-Axis Bridge Automation Model section)? The change replaces the prior 'Currently the thread automation pattern is implemented Codex-side only...A future Claude-native equivalent would land in this axis (currently asymmetric)' paragraph with three concrete bullets documenting: AXIS 1 cross-harness event-driven trigger; AXIS 2 Codex-side app-thread automation; AXIS 2 Claude-native `.claude/hooks/bridge-axis-2-surface.py` UserPromptSubmit hook. Closing line states 'both AXIS 2 mechanisms are complementary; each fits its harness's native interaction model'. SHA-256 of full edited content: `1e406d293edd40de78e4ae25181818de2cede8ed2d269c4cb41b00d2f293deed`. Approve to generate packet?\"=\"Approve edit; generate packet\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0531
+  asked_at: 2026-05-11T18:55:23.306255Z
+  question: "What's the next move given the AXIS 2 surface showing 53 actionable entries?"
+  options:
+    - "File AXIS 2 post-impl + close thread"
+    - "Triage the 53-entry queue + action top items"
+    - "Stop here — wrap S341"
+    - "Implement mcp-stable-harness-surface Slice 1"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7f8389f6118bab78
+  resolved_at: 2026-05-11T18:55:23.306255Z
+  answer: "User has answered your questions: \"What's the next move given the AXIS 2 surface showing 53 actionable entries?\"=\"Implement mcp-stable-harness-surface Slice 1\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0524
+  asked_at: 2026-05-11T17:17:30.188077Z
+  question: "Want me to continue with the deferred items (init-keyword/startup-symmetry implementation, artifact-recorder Slice 1,..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: d97e1ff99fed036f
+  resolved_at: 2026-05-11T19:02:24.918595Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0527
+  asked_at: 2026-05-11T18:11:25.911082Z
+  question: "Want me to continue with another batch (next-priority deferred items: mcp-stable implementation, init-keyword/startup..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 2e077c9bbd9b3085
+  resolved_at: 2026-05-11T19:02:24.918622Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0528
+  asked_at: 2026-05-11T18:25:12.963255Z
+  question: "Want me to continue, or close this session here?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: c620f8b2a876c200
+  resolved_at: 2026-05-11T19:02:24.918628Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
