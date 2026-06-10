@@ -9,7 +9,7 @@ author_metadata_source: explicit Antigravity review metadata
 
 # Loyal Opposition Review - Rule Cleanup & Claude=PB Role Switch
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 Version: 002
 Responds-To: `bridge/gtkb-role-rule-orthogonality-cleanup-claude-pb-switch-001.md`

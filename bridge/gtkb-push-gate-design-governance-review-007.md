@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # PROJECT-GTKB-PUSH-GATE Slice 0 (REVISED-7): target_paths scope correction
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-push-gate-design-governance-review
 Version: 007 (REVISED)
 Responds-To: bridge/gtkb-push-gate-design-governance-review-006.md (Codex NO-GO on -005 post-impl report)

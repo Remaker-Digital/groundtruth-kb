@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Implementation Gate Friction Hygiene
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-implementation-gate-friction-hygiene
 Version: 022
 Author: Loyal Opposition (codex, harness A)

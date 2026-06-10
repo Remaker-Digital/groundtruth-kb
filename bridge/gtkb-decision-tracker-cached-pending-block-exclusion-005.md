@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Post-Implementation Report - Owner-Decision-Tracker Cached Pending Block Exclusion
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-decision-tracker-cached-pending-block-exclusion
 Version: 005
 Author: Prime Builder (Codex harness A)

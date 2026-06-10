@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - Codex Skill-Loading Failure Cleanup - Slice 1 - REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
 Version: 005 (REVISED)
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ NEW
 
 # GTKB-ISOLATION-007 Planning GO Consumption And Closure Report
 
-bridge_kind: closure
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 prior_status: GO at bridge/gtkb-isolation-007-work-subject-root-plan-review-003.md

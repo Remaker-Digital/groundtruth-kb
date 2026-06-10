@@ -9,7 +9,7 @@ author_metadata_source: explicit Prime Builder metadata supplied to bridge-propo
 
 # Ollama Routing Model-Version Fixture Cleanup Proposal
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-routing-model-version-fixture-cleanup
 Version: 001
 Project Authorization: PAUTH-PROJECT-GTKB-OLLAMA-LO-FOLLOWUP-WI-4386-MODEL-SOT-FIXTURE-CLEANUP

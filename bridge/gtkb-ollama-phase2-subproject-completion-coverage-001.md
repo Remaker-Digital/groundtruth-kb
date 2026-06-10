@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Ollama Phase 2+ Compatibility Subproject Completion Coverage
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-phase2-subproject-completion-coverage
 Version: 001
 Project: PROJECT-GTKB-OLLAMA-INTEGRATION-OLLAMA-PHASE-2-COMPLETION

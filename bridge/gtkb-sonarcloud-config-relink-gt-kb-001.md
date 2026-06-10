@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Defect-Fix Proposal - Repair SonarCloud project-key + source paths in sonar-project.properties (relink Agent-Red config to GT-KB layout)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-sonarcloud-config-relink-gt-kb
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

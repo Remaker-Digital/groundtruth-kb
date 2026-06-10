@@ -279,10 +279,10 @@ def test_marker_overwritten_on_redeclaration(
     state = wsf._read_lifecycle_guard(tmp_path)
     state["discard_next_user_prompt"] = True
     wsf._write_lifecycle_guard(state, tmp_path)
-    wsf._consume_discard_first_prompt_gate("::init gtkb lo", tmp_path, session_id="sess-2")
+    wsf._consume_discard_first_prompt_gate("::init gtkb lo", tmp_path, session_id="sess-1")
     second = json.loads(_marker_path(tmp_path).read_text(encoding="utf-8"))
     assert second["role"] == "loyal-opposition"
-    assert second["session_id"] == "sess-2"
+    assert second["session_id"] == "sess-1"
     assert second["written_at"] >= first["written_at"]
 
 
@@ -375,3 +375,139 @@ def test_marker_env_fallbacks_equals_canonical_marker_order() -> None:
 
     module = _load_module()
     assert tuple(module._SESSION_ID_ENV_FALLBACKS) == tuple(MARKER_CONTINUITY_ORDER)
+
+
+# ---------------------------------------------------------------------------
+# Specification-derived tests for concurrency lock & clobber rejection
+# ---------------------------------------------------------------------------
+
+
+def test_marker_atomic_lock_acquisition_retries(
+    wsf: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify that _write_session_role_marker retries/fails when lock is held,
+    and succeeds once the lock is released or absent.
+    """
+    marker_path = tmp_path / ".claude" / "session" / "active-session-role.json"
+    lock_path = marker_path.with_suffix(".lock")
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Create a lock file to simulate another process holding it.
+    lock_path.write_text("12345")
+
+    # We monkeypatch time.sleep to avoid waiting 0.5 seconds in tests.
+    sleep_calls = []
+    monkeypatch.setattr("time.sleep", sleep_calls.append)
+
+    # Call should return False because lock is permanently held.
+    res = wsf._write_session_role_marker(
+        role_profile="prime-builder",
+        session_id="session-current",
+        session_id_source="payload",
+        project_root=tmp_path,
+    )
+    assert res is False
+    assert len(sleep_calls) == 5  # 5 retry attempts
+
+    # 2. Release the lock and try again. It should succeed.
+    lock_path.unlink()
+    res2 = wsf._write_session_role_marker(
+        role_profile="prime-builder",
+        session_id="session-current",
+        session_id_source="payload",
+        project_root=tmp_path,
+    )
+    assert res2 is True
+    assert not lock_path.exists()
+    assert marker_path.exists()
+
+
+def test_marker_clobber_rejection(
+    wsf: ModuleType,
+    tmp_path: Path,
+) -> None:
+    """Verify that _write_session_role_marker rejects writing if a valid, unexpired
+    marker from a different session id exists, but accepts if matches or expired.
+    """
+    marker_path = tmp_path / ".claude" / "session" / "active-session-role.json"
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Write an unexpired marker for session-old (timestamp now).
+    wsf._write_session_role_marker(
+        role_profile="prime-builder",
+        session_id="session-old",
+        session_id_source="payload",
+        project_root=tmp_path,
+    )
+
+    # 2. Try to write a marker for session-new (different session_id). Should be rejected.
+    res = wsf._write_session_role_marker(
+        role_profile="loyal-opposition",
+        session_id="session-new",
+        session_id_source="payload",
+        project_root=tmp_path,
+    )
+    assert res is False
+    # Ensure old marker remains.
+    body = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert body["session_id"] == "session-old"
+
+    # 3. Try to write for session-old again (same session_id). Should succeed.
+    res_same = wsf._write_session_role_marker(
+        role_profile="loyal-opposition",
+        session_id="session-old",
+        session_id_source="payload",
+        project_root=tmp_path,
+    )
+    assert res_same is True
+    body = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert body["role"] == "loyal-opposition"
+
+    # 4. Modify existing marker to be expired (e.g., age > 1800s, like 2000s ago).
+    import datetime
+    from datetime import UTC
+
+    expired_time = (datetime.datetime.now(UTC) - datetime.timedelta(seconds=2000)).isoformat().replace("+00:00", "Z")
+    body["written_at"] = expired_time
+    body["session_id"] = "session-old"
+    marker_path.write_text(json.dumps(body), encoding="utf-8")
+
+    # 5. Write for session-new now that the old marker is expired. Should succeed.
+    res_expired = wsf._write_session_role_marker(
+        role_profile="prime-builder",
+        session_id="session-new",
+        session_id_source="payload",
+        project_root=tmp_path,
+    )
+    assert res_expired is True
+    body = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert body["session_id"] == "session-new"
+
+
+def test_marker_lock_cleanup_on_exception(
+    wsf: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify that lock file is cleaned up even if writing the marker raises an exception."""
+    marker_path = tmp_path / ".claude" / "session" / "active-session-role.json"
+    lock_path = marker_path.with_suffix(".lock")
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Monkeypatch Path.write_text to raise an exception.
+    def mock_write_text(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(Path, "write_text", mock_write_text)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        wsf._write_session_role_marker(
+            role_profile="prime-builder",
+            session_id="session-err",
+            session_id_source="payload",
+            project_root=tmp_path,
+        )
+
+    assert not lock_path.exists()

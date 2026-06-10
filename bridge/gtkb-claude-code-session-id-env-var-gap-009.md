@@ -2,7 +2,7 @@ REVISED
 
 # Add CLAUDE_CODE_SESSION_ID to bridge work-intent session-id resolution (REVISED-4)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 author_identity: Prime Builder
 author_harness_id: B

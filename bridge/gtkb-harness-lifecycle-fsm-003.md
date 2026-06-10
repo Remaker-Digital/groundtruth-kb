@@ -1,6 +1,6 @@
 # Post-Implementation Report — Harness Lifecycle Finite State Machine (WI-3339)
 
-bridge_kind: prime_implementation_report
+bridge_kind: implementation_report
 Version: 003 (NEW)
 
 target_paths: ["groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py", "groundtruth-kb/tests/test_harness_lifecycle.py"]

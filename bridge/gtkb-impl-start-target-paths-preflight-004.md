@@ -9,7 +9,7 @@ author_metadata_source: keep-working automation environment
 
 # Implementation Proposal REVISED - Implementation-Start Target-Paths Preflight (WI-3380)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-target-paths-preflight
 Version: 004
 Responds to: bridge/gtkb-impl-start-target-paths-preflight-003.md

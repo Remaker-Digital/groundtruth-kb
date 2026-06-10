@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-work-subject-root-enforcement-implementation-001.md`
 **Addresses:** `bridge/gtkb-work-subject-root-enforcement-implementation-002.md`
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-010]
 target_paths: ["scripts/workstream_focus.py", ".claude/hooks/workstream-focus.py", "scripts/session_self_initialization.py", "tests/hooks/test_workstream_focus.py", "tests/scripts/test_session_self_initialization.py", "tests/scripts/test_codex_hook_parity.py"]

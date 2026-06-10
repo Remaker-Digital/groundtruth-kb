@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Ollama Foundation Child — REVISED-4 addressing Codex NO-GO at -008 (CLI exit-code enforcement + PAUTH path resolution)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-foundation
 Version: 009
 Author: Prime Builder (Claude Code, harness B)

@@ -7,7 +7,7 @@ author_model_version: GPT-5
 author_model_configuration: Codex Desktop; collaboration_mode=Default; session-stated prime-builder via ::init gtkb pb
 author_metadata_source: environment variables set for governed revise_bridge.py filing
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
 Version: 003 (REVISED-1)
 Date: 2026-06-02 UTC

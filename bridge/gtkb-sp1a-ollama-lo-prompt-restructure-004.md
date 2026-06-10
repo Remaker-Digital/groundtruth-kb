@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Verdict — SP-1a: Ollama LO Prompt Restructure
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-sp1a-ollama-lo-prompt-restructure
 Version: 004
 Verdict: GO

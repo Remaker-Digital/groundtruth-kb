@@ -7,7 +7,7 @@ author_metadata_source: Codex auto-dispatch session
 
 # Loyal Opposition Verification - Inventory Regen Chore Commit 2026-05-29 - 006
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-inventory-regen-chore-commit-2026-05-29
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

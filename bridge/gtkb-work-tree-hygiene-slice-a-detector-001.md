@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Implementation Proposal - Work-Tree Hygiene Slice A Detector
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-tree-hygiene-slice-a-detector
 Version: 001
 Author: Codex Prime Builder, harness A

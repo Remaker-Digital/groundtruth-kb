@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Phase-1 Ollama Verification and Doctor Check (Child 3)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-verification
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

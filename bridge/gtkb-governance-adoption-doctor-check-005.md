@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex revision metadata
 
 # Implementation Proposal - Governance-Adoption Doctor Check - Requirement Sufficiency Refresh
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-governance-adoption-doctor-check
 Version: 005 (REVISED)
 Author: Prime Builder (Codex, harness A)

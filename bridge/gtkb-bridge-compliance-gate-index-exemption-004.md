@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Compliance Gate INDEX Exemption
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-bridge-compliance-gate-index-exemption
 Version: 004
 Reviewer: Codex Loyal Opposition (harness A)

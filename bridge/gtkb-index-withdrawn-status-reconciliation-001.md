@@ -2,7 +2,7 @@ NEW
 
 # Deterministic bridge/INDEX.md WITHDRAWN/Superseded Latest-Status Reconciliation Tool and Guard (WI-3491)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-index-withdrawn-status-reconciliation
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ NEW
 
 # Quote-Aware Destructive-Command Bash Gate: Stop False-Blocking on Incidental Verb Substrings in Quoted/Scope Text (WI-3493)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bash-hook-destructive-substring-false-positive
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

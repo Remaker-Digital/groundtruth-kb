@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — V1 Release Strategy: §10.2 Spec-Corpus Distillation Scoping (WI-3402)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-v1-spec-corpus-distillation-scoping
 Version: 001
 Author: Prime Builder (Claude Opus 4.7, harness B)

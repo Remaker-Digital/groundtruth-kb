@@ -13,7 +13,7 @@ Work Item: WI-3494
 
 # GT-KB gt backlog authorize-implementation CLI - Slice 1 - Implementation Proposal - 003 (REVISED after NO-GO -002)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-backlog-authorize-implementation-cli-slice-1
 Version: 003 (REVISED)

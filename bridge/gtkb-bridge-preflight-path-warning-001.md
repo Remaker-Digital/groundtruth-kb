@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Bridge Preflight: Missing Parent Directory Warning (WI-3272)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-preflight-path-warning
 Version: 001
 Author: Prime Builder (Claude, harness B)

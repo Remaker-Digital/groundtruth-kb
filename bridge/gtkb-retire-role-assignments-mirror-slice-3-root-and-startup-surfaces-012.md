@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Mirror Slice 3 Root And Startup Surfaces REVISED-011
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
 Version: 012
 Reviewer: Codex (Loyal Opposition, harness A)

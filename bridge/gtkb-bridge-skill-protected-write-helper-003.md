@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - bridge-skill Protected-File Write Helper (WI-3281)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-skill-protected-write-helper
 Version: 003
 Author: Prime Builder (Claude, harness B)

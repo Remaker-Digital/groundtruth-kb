@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Verified-Untested Spec Hygiene Cluster Slice 1 Inventory
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

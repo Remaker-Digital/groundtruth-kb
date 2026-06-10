@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Project Authorization: PAUTH-PROJECT-GTKB-GOVERNANCE-HARDENING-GOVERNANCE-HARDENING-BATCH
 Project: PROJECT-GTKB-GOVERNANCE-HARDENING
 Work Item: GTKB-AUTO-PUSH-INVESTIGATION-001

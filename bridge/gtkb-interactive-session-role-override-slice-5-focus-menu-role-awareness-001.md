@@ -13,7 +13,7 @@ target_paths: ["platform_tests/scripts/test_startup_focus_role_awareness.py"]
 
 # GT-KB Interactive Session Role Override - Slice 5 - Focus-Menu Role-Awareness (Verification-Only; Redundancy Finding)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness
 Version: 001 (NEW)

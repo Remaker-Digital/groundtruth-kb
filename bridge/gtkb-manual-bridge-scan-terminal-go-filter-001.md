@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop automation, Keep Working PB, PowerShel
 
 # Implementation Proposal - Manual Bridge Scan Terminal-GO Filter
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-manual-bridge-scan-terminal-go-filter
 Version: 001
 Author: Prime Builder (Codex automation, owner prompt role)

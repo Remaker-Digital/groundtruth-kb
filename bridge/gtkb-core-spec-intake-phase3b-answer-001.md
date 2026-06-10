@@ -3,7 +3,7 @@ NEW
 # GT-KB Core Specification Intake Phase 3B Answer Command Proposal
 
 target_paths: ["E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/cli.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/core_specs.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/intake.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/tests/test_cli_core_specs.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/tests/test_core_specs.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/tests/test_intake.py"]
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 implementation_scope: protocol
 target_project: GroundTruth-KB upstream CLI
 work_item_ids: ["GTKB-CORE-001"]

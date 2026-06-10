@@ -12,7 +12,7 @@ F4 finding (Slice 2 implementation absent in this checkout)
 **Companion to:** `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md`
 (adopts Codex Option 3 to drop Slice 2 prerequisite for Phase 8 rehearsal)
 
-bridge_kind: thread_reconciliation
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-015]
 spec_ids: []
 target_project: agent-red

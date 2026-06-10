@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification Verdict - Ollama Integration Phase 1 Umbrella Closure
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

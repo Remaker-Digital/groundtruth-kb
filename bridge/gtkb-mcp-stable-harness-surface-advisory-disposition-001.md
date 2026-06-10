@@ -2,7 +2,7 @@ NEW
 
 # Prime Disposition - GT-KB MCP Stable Harness Surface Advisory (WI-3297)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-mcp-stable-harness-surface-advisory-disposition
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

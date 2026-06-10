@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop
 
 # Loyal Opposition Verification - Legacy GOV WI Cleanup - 008
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-legacy-gov-wi-cleanup
 Version: 008
 Date: 2026-05-29 UTC

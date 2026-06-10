@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Project Completion Scanner WI-AUTO Regex Fix
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

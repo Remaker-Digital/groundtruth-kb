@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Implementation Proposal - Project-Completion Scanner Addressing-Thread Fix (v4: D4 implements-gate; D3 corrected) (WI-3365) (REVISED-4)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-completion-scanner-addressing-thread-fix
 Version: 009 (REVISED)
 Author: Prime Builder (Claude Code, harness B)

@@ -7,7 +7,7 @@ author_model_version: gpt-5-codex
 author_model_configuration: Codex desktop automation; Prime Builder; Keep Working PB
 author_metadata_source: explicit Codex automation session metadata; corrected revision 002
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-hygiene-cli-utf8-portability-slice-2-guidance
 Version: 002
 Revises: bridge/gtkb-hygiene-cli-utf8-portability-slice-2-guidance-001.md

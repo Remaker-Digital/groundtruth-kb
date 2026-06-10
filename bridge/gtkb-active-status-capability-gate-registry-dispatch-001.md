@@ -6,7 +6,7 @@ author_model: GPT-5 Codex
 author_model_version: 2026-06-02
 author_model_configuration: reasoning=high
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-active-status-capability-gate-registry-dispatch
 Project Authorization: PAUTH-WI-4213-ACTIVE-STATUS-CAPABILITY-GATE
 Project: PROJECT-GTKB-ROLE-STATUS-ORTHOGONALITY-DISPATCH

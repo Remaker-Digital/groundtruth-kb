@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Ollama Shim And Routing Child - Parser-Format Fix For Requirement Sufficiency
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 005
 Author: Prime Builder (Claude Code, harness B)

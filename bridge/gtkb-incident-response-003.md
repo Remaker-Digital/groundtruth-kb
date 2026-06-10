@@ -9,7 +9,7 @@ REVISED
 **Bridge kind:** multiphase_implementation_proposal
 **Routing:** **All upstream to `groundtruth-kb`** (revised from `-001` "Mixed" per owner answer S310-Q2). Framework artifacts, capabilities, and document templates all ship to the GT-KB platform. Agent Red provides a worked example throughout.
 
-bridge_kind: multiphase_implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-INCIDENT-RESPONSE]
 spec_ids: []
 target_project: groundtruth-kb

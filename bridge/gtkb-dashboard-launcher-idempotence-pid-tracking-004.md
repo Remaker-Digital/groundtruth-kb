@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-dashboard-launcher-idempotence-pid-tracking
 Version: 004
 Responds to: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-003.md NEW

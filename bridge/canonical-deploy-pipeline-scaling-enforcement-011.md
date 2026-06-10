@@ -10,7 +10,7 @@ REVISED
 **Implementation commits:** `417f187b` (main implementation) + `db1a63fd` (.gitignore scope fix per Codex `-010`)
 **Owner GOV-17 ack:** received via AskUserQuestion ("Approve — implement with non-blocking note")
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 work_item_ids: [WI-3031, WI-3171]
 spec_ids: [SPEC-1615]
 target_project: agent-red

@@ -2,7 +2,7 @@ REVISED
 
 # Bridge VERIFIED Backlog Retirement - Corrective Revision
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-verified-backlog-retirement
 Version: 007 (REVISED after verification NO-GO)
 Author: Prime Builder (Codex, harness A, single-harness corrective mode)

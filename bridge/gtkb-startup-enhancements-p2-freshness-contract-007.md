@@ -2,7 +2,7 @@ NEW
 
 # GT-KB Bridge Prime Builder Blocker Note - Startup Enhancements P2 Freshness Contract
 
-bridge_kind: prime_builder_deferral_note
+bridge_kind: prime_proposal
 Document: gtkb-startup-enhancements-p2-freshness-contract
 Version: 007 (NEW; Prime Builder blocker deferral note)
 Responds to NO-GO: bridge/gtkb-startup-enhancements-p2-freshness-contract-006.md

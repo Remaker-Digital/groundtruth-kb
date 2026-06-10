@@ -2,7 +2,7 @@ NEW
 
 # Restore GT-KB Systems-and-Tools Companion Doc to Its In-Root Platform Home (WI-3487)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-restore-systems-and-tools-doc
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

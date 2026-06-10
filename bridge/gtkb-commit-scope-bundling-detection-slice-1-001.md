@@ -5,7 +5,7 @@ Date: 2026-05-14
 Session: S350
 Source: GTKB-COMMIT-SCOPE-BUNDLING-DETECTION-001 (Pre-commit predicate to detect cross-scope bundling via mismatched approval-packet manifest)
 Recommended commit type: feat
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 target_paths: ["scripts/check_commit_scope_bundling.py", "platform_tests/scripts/test_check_commit_scope_bundling.py"]
 ---
 

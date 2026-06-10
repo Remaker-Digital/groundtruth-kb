@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Deterministic Handoff-Prompt Service Impl REVISED-2
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-handoff-prompt-deterministic-service-impl
 Version: 011
 Author: Loyal Opposition (Codex, harness A)

@@ -9,7 +9,7 @@ author_metadata_source: bridge auto-dispatch prompt and durable harness registry
 
 # Loyal Opposition Review - Slice 2A Read-Discipline Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

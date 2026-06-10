@@ -10,7 +10,7 @@ target_paths: ["groundtruth.db", ".groundtruth/formal-artifact-approvals/2026-05
 
 # GT-KB ADR-0001 MemBase Storage-Gap Migration - Post-Implementation Report - 007
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 Document: gtkb-adr-0001-membase-migration
 Version: 007 (NEW; post-implementation report)

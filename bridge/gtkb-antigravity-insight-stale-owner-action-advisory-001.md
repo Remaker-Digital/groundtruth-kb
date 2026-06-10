@@ -5,7 +5,7 @@ author_harness_id: A
 author_model: GPT-5
 author_model_configuration: Codex desktop, evidence-first advisory review
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-antigravity-insight-stale-owner-action-advisory
 Version: 001
 Author: Codex Loyal Opposition

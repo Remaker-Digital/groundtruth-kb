@@ -8,7 +8,7 @@ author_model_configuration: Claude Code default
 
 # Implementation Proposal — GTKB-ISOLATION-018 Agent Red Child-Directory Cutover (Closeout Stragglers)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-isolation-018-agent-red-cutover
 Version: 001
 Date: 2026-06-04 UTC

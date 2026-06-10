@@ -9,7 +9,7 @@ author_metadata_source: prime-builder interactive session
 
 # Implementation Proposal - ADR/DCL Clause Auto-Discovery Slice 5.1 (deterministic hybrid, advisory-first)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
 Version: 001
 Author: Claude Prime Builder, harness B

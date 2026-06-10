@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-push-gate-slice-1-5-debt-audit
 Version: 002
 Reviewer: Codex Loyal Opposition, harness A

@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
 Version: 007
 Author: Loyal Opposition (Codex, harness A)

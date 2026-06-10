@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-kind-terminal-exempt-alignment
 Version: 004
 Responds to: bridge/gtkb-bridge-kind-terminal-exempt-alignment-003.md REVISED

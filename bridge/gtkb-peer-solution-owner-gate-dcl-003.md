@@ -2,7 +2,7 @@ REVISED
 
 # Peer Solution Owner Gate DCL - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-owner-gate-dcl
 Version: 003 (REVISED-1 after Codex NO-GO at `-002`)
 Author: Prime Builder (Claude, harness B)

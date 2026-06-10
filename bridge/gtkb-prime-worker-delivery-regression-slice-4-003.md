@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Revised Proposal - Worker Delivery Regression Coverage Slice 4 Dependency Deferral
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-prime-worker-delivery-regression-slice-4
 Version: 003
 Author: Prime Builder (Codex harness A)

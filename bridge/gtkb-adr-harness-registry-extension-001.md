@@ -2,7 +2,7 @@ NEW
 
 # New Version of ADR-SINGLE-HARNESS-OPERATING-MODE-001: Harness Registry Architecture (WI-3343)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-adr-harness-registry-extension
 Version: 001 (NEW; new version of an existing ADR extending it for the harness-registry architecture)
 Author: Prime Builder (Claude, harness B)

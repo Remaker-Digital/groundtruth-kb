@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - work_list.md GTKB-GOV Stale-Path Correction (WI-3278)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-list-md-gov-010-path-correction
 Version: 003
 Author: Prime Builder (Claude, harness B)

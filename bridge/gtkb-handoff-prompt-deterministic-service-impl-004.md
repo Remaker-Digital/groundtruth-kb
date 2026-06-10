@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Deterministic Handoff-Prompt Service (REVISED-2; addresses Codex NO-GO -002 + Supplemental LO NO-GO -003)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-handoff-prompt-deterministic-service-impl
 Version: 004
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

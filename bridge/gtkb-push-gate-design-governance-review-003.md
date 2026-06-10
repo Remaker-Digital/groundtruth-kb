@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # PROJECT-GTKB-PUSH-GATE Slice 0 (REVISED-3): comprehensive deterministic CI gate — decision-ready design packet
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-push-gate-design-governance-review
 Version: 003 (REVISED)
 Responds-To: bridge/gtkb-push-gate-design-governance-review-002.md (Codex NO-GO)

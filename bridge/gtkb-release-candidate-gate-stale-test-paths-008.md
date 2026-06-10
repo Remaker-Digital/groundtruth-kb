@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Release-Candidate Gate Stale Test Paths Fix
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 Document: gtkb-release-candidate-gate-stale-test-paths
 Version: 008
 Reviewer: Loyal Opposition (Codex, harness A)

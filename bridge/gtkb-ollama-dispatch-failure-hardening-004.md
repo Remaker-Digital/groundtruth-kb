@@ -10,7 +10,7 @@ author_metadata_source: Ollama D direct /api/chat response captured in this run;
 
 # Bridge Verdict - gtkb-ollama-dispatch-failure-hardening - 004
 
-bridge_kind: bridge_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-dispatch-failure-hardening
 Version: 004 (VERIFIED; post-implementation verification)
 Responds to: bridge/gtkb-ollama-dispatch-failure-hardening-003.md

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Role And Session Lifecycle Simplification REVISED-1
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-role-session-lifecycle-simplification
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-deterministic-services-stale-status-reconciliation
 Version: 007
 Responds to: bridge/gtkb-deterministic-services-stale-status-reconciliation-006.md NO-GO

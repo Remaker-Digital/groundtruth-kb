@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # ChromaDB Vector Continuity at v1.0 Identifier-Reset Cut: governance-review scoping (Finding 3 from V1 Release Strategy LO review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-chromadb-vector-continuity-v1-cut-scoping
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

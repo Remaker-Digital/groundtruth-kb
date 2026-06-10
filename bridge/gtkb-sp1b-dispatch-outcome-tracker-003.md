@@ -9,7 +9,7 @@ NEW
 **Version:** 003
 **In response to:** owner directive (2026-06-08 11:28) converting LO SP-1b ADVISORY -001 (WITHDRAWN) and withdrawal notice -002 to PB implementation proposals.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 implementation_scope: dispatch_post_dispatch_outcome_tracking
 
 Project: PROJECT-GTKB-OLLAMA-LO-OPERATIONS

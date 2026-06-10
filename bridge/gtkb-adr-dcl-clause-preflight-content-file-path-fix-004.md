@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-adr-dcl-clause-preflight-content-file-path-fix
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

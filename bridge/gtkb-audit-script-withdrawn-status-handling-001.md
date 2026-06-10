@@ -1,6 +1,6 @@
 # Implementation Proposal - Audit Script WITHDRAWN Status Handling Fix (S342)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-audit-script-withdrawn-status-handling
 Version: 001
 Status: NEW

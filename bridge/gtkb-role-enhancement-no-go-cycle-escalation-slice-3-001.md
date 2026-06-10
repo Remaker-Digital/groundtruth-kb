@@ -9,7 +9,7 @@ author_metadata_source: Codex automation context
 
 # Implementation Proposal - Role Enhancement NO-GO Cycle Escalation Slice 3
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
 Version: 001
 Date: 2026-06-07 UTC

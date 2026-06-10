@@ -12,7 +12,7 @@ Work Item: WI-3355
 
 # Phantom PROJECT-PROJECT-* Reconciliation via Deterministic CLI (WI-3355)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-phantom-project-prefix-reconciliation
 Version: 001 (NEW)

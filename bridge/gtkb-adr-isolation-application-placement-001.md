@@ -9,7 +9,7 @@ NEW
 **Bridge kind:** governance_proposal
 **Routing:** Upstream (`groundtruth-kb`). The ADR is platform-wide; supersedes a Phase 9 plan paragraph that was authored before the IDP filesystem topology question was settled.
 
-bridge_kind: governance_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-009, GTKB-ISOLATION-016, GTKB-ISOLATION-017]
 spec_ids: []
 target_project: groundtruth-kb (ADR) + agent-red (Phase 9 plan annotation)

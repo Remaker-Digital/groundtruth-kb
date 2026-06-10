@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Spec-to-Test Mapping Helper Slice 2
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-verify-skill-spec-to-test-mapping
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

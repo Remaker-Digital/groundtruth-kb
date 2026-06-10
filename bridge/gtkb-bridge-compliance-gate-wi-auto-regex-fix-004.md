@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # VERIFIED - Bridge Compliance Gate WI-AUTO Regex Fix
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 Document: gtkb-bridge-compliance-gate-wi-auto-regex-fix
 Version: 004
 Author: Loyal Opposition (Codex harness A)

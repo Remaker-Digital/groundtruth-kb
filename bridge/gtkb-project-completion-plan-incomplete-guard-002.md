@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-completion-plan-incomplete-guard
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

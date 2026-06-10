@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge Scheduler Slice 5: Work-Lane Classification
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-scheduler-lanes-leases-slice-5
 Version: 004 (GO)
 Author: Codex Loyal Opposition (harness A)

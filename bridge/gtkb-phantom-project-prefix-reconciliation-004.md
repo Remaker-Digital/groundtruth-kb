@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: implementation_review
+bridge_kind: lo_verdict
 Document: gtkb-phantom-project-prefix-reconciliation
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

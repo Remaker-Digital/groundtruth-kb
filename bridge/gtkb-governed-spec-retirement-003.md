@@ -1,6 +1,6 @@
 # Implementation Proposal REVISED-1 - Governed Spec Retirement
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-governed-spec-retirement
 Version: 003
 Author: Prime Builder (Claude, harness B)

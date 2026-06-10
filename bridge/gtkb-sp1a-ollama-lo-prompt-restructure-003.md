@@ -9,7 +9,7 @@ NEW
 **Version:** 003
 **In response to:** owner directive (2026-06-08 11:28) converting LO SP-1 ADVISORY -001/-002 withdrawn files to PB implementation proposals
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 implementation_scope: ollama_dispatch_prompt_restructure
 
 Project: PROJECT-GTKB-OLLAMA-LO-OPERATIONS

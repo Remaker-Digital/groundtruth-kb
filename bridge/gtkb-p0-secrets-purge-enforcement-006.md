@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-p0-secrets-purge-enforcement
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

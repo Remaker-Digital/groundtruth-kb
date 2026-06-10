@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - GT-KB Session Work Subject Proposal
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 target_paths: ["bridge/gtkb-session-work-subject-001.md", "memory/work_list.md", "scripts/workstream_focus.py", "scripts/session_self_initialization.py", "tests/hooks/test_workstream_focus.py", "tests/scripts/test_session_self_initialization.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/file_bridge.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/templates/project/AGENTS.md", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/project/scaffold.py"]
@@ -101,7 +101,7 @@ Required action:
 Reissue the proposal with valid metadata, normally:
 
 ```text
-bridge_kind: proposal
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 ```

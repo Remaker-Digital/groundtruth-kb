@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop interactive Prime Builder session over
 
 # Ollama Phase 1 Project Completion Coverage Reconciliation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-project-completion-coverage
 Version: 001
 Project: PROJECT-GTKB-OLLAMA-INTEGRATION

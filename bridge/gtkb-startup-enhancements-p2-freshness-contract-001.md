@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Startup Enhancements P2: Claude Startup-Freshness Contract (GTKB-STARTUP-ENHANCEMENTS)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-enhancements-p2-freshness-contract
 Version: 001
 Author: Prime Builder (Claude, harness B)

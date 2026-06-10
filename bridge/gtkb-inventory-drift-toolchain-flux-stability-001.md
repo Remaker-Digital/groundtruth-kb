@@ -6,7 +6,7 @@ author_model: GPT-5 Codex
 author_model_version: 2026-06-02
 author_model_configuration: reasoning=high
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-inventory-drift-toolchain-flux-stability
 Project Authorization: PAUTH-WI-4217-INVENTORY-DRIFT-TOOLCHAIN-FLUX
 Project: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY

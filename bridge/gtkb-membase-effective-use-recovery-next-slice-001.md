@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - MemBase Effective Use Recovery: Next Slice (GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-membase-effective-use-recovery-next-slice
 Version: 001
 Author: Prime Builder (Claude, harness B)

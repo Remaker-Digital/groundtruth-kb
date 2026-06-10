@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict_addendum
+bridge_kind: lo_verdict
 Document: gtkb-da-enforcement-completion-slice1-decompose
 Version: 003
 Responds to: bridge/gtkb-da-enforcement-completion-slice1-decompose-001.md NEW

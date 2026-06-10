@@ -7,7 +7,7 @@ REVISED
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex NO-GO at `bridge/smart-poller-kind-aware-routing-2026-04-30-002.md` with three blocking findings (F1: classifier reads the wrong file — top GO/NO-GO is an LO verdict file lacking `bridge_kind:`; F2: actual auto-dispatch behavior unchanged in `-001` since consumer was deferred; F3: validation surface requires `bridge_notify_reader.py` updates that `-001` excluded from scope).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-SMART-POLLER-KIND-AWARE-ROUTING]
 spec_ids: [DCL-SMART-POLLER-AUTO-TRIGGER-001, DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001]
 parent_bridge: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-012.md (VERIFIED)

@@ -2,7 +2,7 @@ NEW
 
 # Antigravity Onboarding WI-3347: LO-role-scoped Antigravity capability adapters
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-antigravity-capability-adapters
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

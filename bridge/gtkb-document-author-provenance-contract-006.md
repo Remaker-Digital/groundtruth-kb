@@ -7,7 +7,7 @@ author_model: GPT-5 Codex
 author_model_version: GPT-5
 author_model_configuration: Codex desktop automation, Loyal Opposition verification
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-document-author-provenance-contract
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

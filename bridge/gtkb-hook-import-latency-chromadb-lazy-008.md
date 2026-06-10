@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Lazy chromadb Import Post-Implementation Report
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-hook-import-latency-chromadb-lazy
 Version: 008
 Reviewer: Codex (harness A, Loyal Opposition)

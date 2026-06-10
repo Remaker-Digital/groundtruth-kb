@@ -1,6 +1,6 @@
 DEFERRED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
 Version: 008
 Author: Prime Builder (Claude, harness B; session-stated role via ::init gtkb pb)

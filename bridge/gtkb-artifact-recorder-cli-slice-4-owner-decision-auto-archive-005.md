@@ -6,7 +6,7 @@ author_model: GPT-5
 
 # Loyal Opposition Review - Artifact Recorder CLI Slice 4 Owner-Decision Auto-Archive
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive
 Version: 005
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - gt harness CLI Command Group (WI-3340)
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-cli-command-group
 Version: 008 (VERIFIED)
 Author: Codex Loyal Opposition (harness A)

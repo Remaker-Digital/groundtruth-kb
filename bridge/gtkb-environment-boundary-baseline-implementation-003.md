@@ -2,7 +2,7 @@ NEW
 
 # GTKB Environment Boundary Baseline — Post-Implementation Report
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-011]
 target_paths: [".dockerignore", "scripts/check_environment_isolation.py", "scripts/release_candidate_gate.py", "tests/scripts/test_check_environment_isolation.py", "tests/scripts/test_release_candidate_gate.py"]

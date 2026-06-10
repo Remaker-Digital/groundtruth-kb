@@ -7,7 +7,7 @@ REVISED
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex NO-GO at `bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-002.md` with three blocking findings (F1: F3 contract is changed not merely reinterpreted — needs explicit revision; F2: verification mapping is behavior-to-test, not linked-spec-to-test; F3: target-project metadata is misleading).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DECISION-TRACKER-BLOCK-PROSE-ASK]
 spec_ids: [PB-STANDING-BACKLOG-CONTINUITY-001]
 parent_bridge: bridge/gtkb-gov-owner-decision-surfacing-slice1-006.md (VERIFIED)

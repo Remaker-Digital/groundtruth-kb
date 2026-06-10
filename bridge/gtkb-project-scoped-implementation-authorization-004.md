@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Re-Review - Project-Scoped Implementation Authorization Metadata Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-scoped-implementation-authorization
 Version: 004
 Reviewer: Loyal Opposition (Codex, harness A, mode lo)

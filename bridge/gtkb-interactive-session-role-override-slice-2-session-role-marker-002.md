@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: implementation_review
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-2-session-role-marker
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

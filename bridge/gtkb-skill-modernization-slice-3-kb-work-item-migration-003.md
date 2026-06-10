@@ -12,7 +12,7 @@ Work Item: WI-3455
 
 # Skill Modernization Slice 3 — kb-work-item → gt CLI Thin Wrapper — Implementation Proposal (REVISED)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-skill-modernization-slice-3-kb-work-item-migration
 Version: 003 (REVISED)

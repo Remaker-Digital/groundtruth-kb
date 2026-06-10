@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - /verify Skill + Spec-to-Test Mapping Helper (WI-3261)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-verify-skill-spec-to-test-mapping
 Version: 001
 Author: Prime Builder (Claude, harness B)

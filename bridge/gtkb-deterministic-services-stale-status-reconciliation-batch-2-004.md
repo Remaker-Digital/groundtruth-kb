@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

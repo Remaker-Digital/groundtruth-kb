@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Auto-Push Investigation Findings Closure
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-auto-push-investigation-001-slice-1-findings
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

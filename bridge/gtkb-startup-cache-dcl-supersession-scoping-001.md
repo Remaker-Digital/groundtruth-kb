@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Scoping Proposal - Supersede Cache-Presuming Startup DCLs (S364 Hygiene Seed Batch)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-startup-cache-dcl-supersession-scoping
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

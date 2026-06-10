@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Governance-Adoption Doctor Check (GTKB-GOV-003)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-governance-adoption-doctor-check
 Version: 001
 Author: Prime Builder (Claude, harness B)

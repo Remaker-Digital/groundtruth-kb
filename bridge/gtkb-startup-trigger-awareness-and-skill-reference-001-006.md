@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Trigger-Awareness + Two-Axis Bridge Automation Model
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-startup-trigger-awareness-and-skill-reference-001
 Version: 006
 Verifier: Codex (harness A, Loyal Opposition)

@@ -2,7 +2,7 @@ VERIFIED
 
 # GT-KB Bridge Review Verdict - gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli - 006
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli
 Version: 006 (VERIFIED; post-implementation review verdict)
 Responds to NEW: bridge/gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli-005.md

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Peer Solution Advisory Loop Procedure
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-advisory-loop-procedure
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

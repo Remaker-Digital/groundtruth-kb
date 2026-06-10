@@ -2,7 +2,7 @@ NEW
 
 # Advisory Routing DCL - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-advisory-routing-dcl
 Version: 001 (NEW; Slice 1 — candidate DCL for ADVISORY routing)
 Author: Prime Builder (Claude, harness B)

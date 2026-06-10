@@ -8,7 +8,7 @@ author_model_configuration: Codex bridge auto-dispatch; durable Loyal Opposition
 
 # Loyal Opposition Review - Ollama Phase 2 Verified Staging Finalization Gate
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-phase2-verified-staging-finalization-gate
 Version: 002
 Reviewer: Codex Loyal Opposition, harness A

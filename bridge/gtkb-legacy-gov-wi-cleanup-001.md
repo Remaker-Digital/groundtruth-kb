@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Legacy GOV WI Cleanup (GTKB-GOV-CODE-QUALITY-BASELINE / GOV-DA-ENFORCEMENT / GOV-004)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-legacy-gov-wi-cleanup
 Version: 001
 Author: Prime Builder (Claude, harness B)

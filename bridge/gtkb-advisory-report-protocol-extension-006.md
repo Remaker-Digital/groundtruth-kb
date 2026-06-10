@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Advisory Report Protocol Extension Slice 1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-advisory-report-protocol-extension
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

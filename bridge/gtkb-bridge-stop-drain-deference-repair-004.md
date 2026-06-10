@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-stop-drain-deference-repair
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

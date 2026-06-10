@@ -8,7 +8,7 @@ author_metadata_source: Codex bridge automation
 
 # Loyal Opposition Verification - Phase-2 Implements-Link Backfill Implementation - 004
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-implements-link-backfill-phase2-implementation
 Version: 004
 Reviewer: Codex Loyal Opposition (harness A)

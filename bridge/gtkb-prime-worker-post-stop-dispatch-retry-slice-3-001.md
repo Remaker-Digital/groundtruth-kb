@@ -1,6 +1,6 @@
 # Implementation Proposal — Post-Stop Dispatch Retry Pass (Slice 3 of 4)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

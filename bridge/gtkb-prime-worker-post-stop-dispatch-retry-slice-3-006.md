@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Post-Stop Dispatch Reconciliation Hook Order Slice 3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

@@ -11,7 +11,7 @@ NEW
 - `bridge/gtkb-isolation-016-phase8-wave2-implementation-004.md` (GO scoping)
 - `bridge/gtkb-isolation-016-phase8-wave2-slice1-001.md` (Slice 1 NEW; this slice depends on its VERIFIED)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

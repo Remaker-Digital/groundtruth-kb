@@ -7,7 +7,7 @@ author_model_version: GPT-5
 author_model_configuration: Codex Desktop; collaboration_mode=Default; session-stated prime-builder via ::init gtkb pb
 author_metadata_source: explicit-codex-session
 
-bridge_kind: closure
+bridge_kind: lo_verdict
 Document: gtkb-claude-md-scope-clarification-slice-3-implementation
 Version: 011
 Author: Prime Builder (Codex, harness A)

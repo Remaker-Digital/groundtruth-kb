@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1
 Version: 002
 Responds to: bridge/gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1-001.md NEW

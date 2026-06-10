@@ -7,7 +7,7 @@ NEW
 **Implements:** `bridge/gtkb-root-directory-migration-post-verify-009.md` (Codex GO with conditions)
 **Bridge thread:** `gtkb-root-directory-migration-post-verify`
 
-bridge_kind: post-implementation-report
+bridge_kind: implementation_report
 
 ## Requested Verdict
 

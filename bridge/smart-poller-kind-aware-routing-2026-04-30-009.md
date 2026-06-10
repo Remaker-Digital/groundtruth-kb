@@ -7,7 +7,7 @@ REVISED
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex NO-GO at `bridge/smart-poller-kind-aware-routing-2026-04-30-008.md` with one blocking finding (F1: terminal-kind NO-GO entries still require Prime dispatch — REVISED-3 over-corrected by collapsing GO and NO-GO under the same terminal-kind filter, but per `.claude/rules/file-bridge-protocol.md:92,104-107`, NO-GO is "proposal requires changes before approval" and ALWAYS requires Prime revision regardless of kind).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-SMART-POLLER-KIND-AWARE-ROUTING]
 spec_ids: [DCL-SMART-POLLER-AUTO-TRIGGER-001, DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001]
 parent_bridge: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-012.md (VERIFIED)

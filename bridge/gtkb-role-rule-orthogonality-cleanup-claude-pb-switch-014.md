@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 Version: 014
 Author: Loyal Opposition (Antigravity, harness C)

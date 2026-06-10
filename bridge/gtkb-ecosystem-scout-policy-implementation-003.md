@@ -68,3 +68,12 @@ As this is a documentation-only change, verification focuses on:
 |---------|-----------|--------------|
 | REQ-ECOSYSTEM-SCOUT-PROCEDURE | `groundtruth-kb/src/groundtruth_kb/project/doctor.py` | `gt doctor` documentation sweep |
 | REQ-CAPABILITY-IMPORT-POLICY | `groundtruth-kb/src/groundtruth_kb/project/doctor.py` | `gt doctor` rule file compliance check |
+
+## target_paths
+
+- `docs/procedures/gtkb-ecosystem-scout.md`
+- `.claude/rules/gtkb-capability-import-policy.md`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient

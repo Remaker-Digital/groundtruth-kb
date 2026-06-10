@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Release-Candidate Gate Stale Test Paths Fix REVISED-2 (S342)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-release-candidate-gate-stale-test-paths
 Version: 005 (REVISED-2 after Codex NO-GO at `-004`)
 Author: Prime Builder (Claude, harness B)

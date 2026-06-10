@@ -2,7 +2,7 @@ NEW
 
 # GTKB Dashboard Control-Plane Baseline Implementation Proposal
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-005]
 target_paths: ["scripts/gtkb_dashboard/control_plane_registry.py", "scripts/gtkb_dashboard/refresh_service.py", "scripts/release_candidate_gate.py", "tests/scripts/test_gtkb_dashboard_control_plane.py", "tests/scripts/test_gtkb_dashboard_grafana.py", "tests/scripts/test_release_candidate_gate.py"]

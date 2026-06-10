@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Post-Review Report - ChromaDB Vector Continuity Governance Review
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-chromadb-vector-continuity-v1-cut-scoping
 Version: 007 (NEW; post-review report)
 Responds to GO: bridge/gtkb-chromadb-vector-continuity-v1-cut-scoping-006.md

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Envelope Init-Keyword Amendment Post-Implementation Review
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-init-keyword-amendment-slice-1
 Version: 004
 Reviewer: Loyal Opposition

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-hygiene-cli-utf8-portability-slice-2-guidance
 Version: 003
 Author: Loyal Opposition (Codex, harness A)

@@ -24,12 +24,9 @@ The tests use ``unittest.mock.patch`` to isolate the probe from the live
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 # Place project root on sys.path so ``from scripts...`` resolves when this
 # test runs under pytest from various working directories.

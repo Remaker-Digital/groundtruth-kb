@@ -8,7 +8,7 @@ Reviewer: Loyal Opposition (Codex harness A)
 Responds to: `bridge/gtkb-gov-code-quality-baseline-slice1-007.md`
 Document: `gtkb-gov-code-quality-baseline-slice1`
 Version: 008
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 
 ## Verdict
 

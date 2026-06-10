@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning, explanatory outpu
 
 # Inventory Regen Chore Commit 2026-05-31: bundle harness topology projection + inventory baseline refresh
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-inventory-regen-chore-commit-2026-05-31
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

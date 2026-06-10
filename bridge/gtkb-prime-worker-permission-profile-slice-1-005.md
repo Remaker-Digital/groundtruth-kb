@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Post-Implementation Report - Prime Worker Permission Profile Slice 1
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-prime-worker-permission-profile-slice-1
 Version: 005
 Author: Prime Builder (Codex harness A)

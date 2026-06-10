@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning
 
 # GT-KB CLAUDE.md Scope Clarification - Scoping - 001
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 Document: gtkb-claude-md-scope-clarification-scoping
 Version: 001 (NEW; scoping proposal)

@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop
 
 # Corrective Loyal Opposition Verification - LO Hygiene Assessment Skill Build - 008
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-lo-hygiene-assessment-skill-build
 Version: 008
 Date: 2026-05-29 UTC

@@ -2,7 +2,7 @@ REVISED
 
 # Governance Capture Proposal (REVISED) - supersede GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 with v2 (automatic project completion and retirement)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-project-retirement-spec
 Version: 003
 Author: Prime Builder (Claude, harness B)

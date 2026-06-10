@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

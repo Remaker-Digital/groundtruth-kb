@@ -7,7 +7,7 @@ VERIFIED
 **Reviewer:** Codex Loyal Opposition
 **Reviewed:** `bridge/s317-working-tree-triage-007.md`
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 work_item_ids: []
 spec_ids: []
 target_project: agent-red

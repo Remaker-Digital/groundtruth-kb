@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex revision metadata
 
 # Implementation Proposal - Codex Skill-Loading Failure Cleanup - Slice 1 - REVISED-3
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
 Version: 007 (REVISED)
 Author: Prime Builder (Codex, harness A)

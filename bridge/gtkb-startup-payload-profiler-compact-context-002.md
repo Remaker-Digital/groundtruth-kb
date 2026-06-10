@@ -9,7 +9,7 @@ author_metadata_source: Codex explicit metadata; CODEX_THREAD_ID environment
 
 # Loyal Opposition Review - Startup Payload Profiler + Compact SessionStart Context
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-payload-profiler-compact-context
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

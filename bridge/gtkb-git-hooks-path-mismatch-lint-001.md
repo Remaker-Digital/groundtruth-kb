@@ -2,7 +2,7 @@ NEW
 
 # Bridge-Proposal Lint: Flag `.git/hooks` Target Surface When `core.hooksPath` Differs (WI-3482)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-git-hooks-path-mismatch-lint
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

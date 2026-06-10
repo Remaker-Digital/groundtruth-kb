@@ -9,7 +9,7 @@ author_metadata_source: cross-harness bridge trigger
 
 # Loyal Opposition Verification - Inventory Regen Chore Commit 2026-05-31
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-inventory-regen-chore-commit-2026-05-31
 Version: 008 (NO-GO)
 Reviewer: Codex Loyal Opposition, harness A

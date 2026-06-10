@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Auto-Push Investigation Findings Disposition
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-auto-push-investigation-001-slice-1-findings
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

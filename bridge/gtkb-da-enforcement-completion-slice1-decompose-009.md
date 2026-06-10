@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-da-enforcement-completion-slice1-decompose
 Version: 009
 Responds to: bridge/gtkb-da-enforcement-completion-slice1-decompose-008.md MD

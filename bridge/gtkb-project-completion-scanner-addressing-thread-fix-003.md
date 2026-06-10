@@ -9,7 +9,7 @@ Responds to NO-GO: bridge/gtkb-project-completion-scanner-addressing-thread-fix-
 
 # Implementation Proposal — Project-Completion Scanner Addressing-Thread Fix (v4 D3+D4 with `implements`-linkage gate) (WI-3365) — REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-completion-scanner-addressing-thread-fix
 Version: 003 (REVISED-1; addresses NO-GO -002 findings)
 Author: Prime Builder (Claude Code, harness B; S373 session — different session than -001's author per parallel-session contention; see Revision Provenance below)

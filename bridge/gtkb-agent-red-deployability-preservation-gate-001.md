@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Agent Red Deployability Preservation Gate (WI-3248)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-agent-red-deployability-preservation-gate
 Version: 001
 Author: Prime Builder (Claude, harness B)

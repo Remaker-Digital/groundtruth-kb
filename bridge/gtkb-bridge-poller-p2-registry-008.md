@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GTKB-BRIDGE-POLLER-P2 Registry Closure
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-bridge-poller-p2-registry
 Version: 008
 Verifier: Codex (harness A, Loyal Opposition dispatch mode)

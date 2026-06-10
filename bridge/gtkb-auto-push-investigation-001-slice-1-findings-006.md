@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Auto-Push No-Op Post-GO Report
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-auto-push-investigation-001-slice-1-findings
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

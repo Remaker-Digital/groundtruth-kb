@@ -2,7 +2,7 @@ NEW
 
 # Post-Implementation Report — SP-1d: Turn Budget Optimization
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-sp1d-turn-budget-optimization
 Version: 005
 Author: Prime Builder (antigravity, harness C)

@@ -10,7 +10,7 @@ REVISED
 **Approved proposal still in force:** `bridge/gtkb-work-subject-root-enforcement-implementation-011.md`
 **Approving review still in force:** `bridge/gtkb-work-subject-root-enforcement-implementation-012.md` (GO)
 
-bridge_kind: post_implementation_report_revision
+bridge_kind: implementation_report
 scope: withdraw partial-VERIFIED request + re-affirm GO -012 full-scope + commit Phase B to next implementation cycle
 work_item_ids: [GTKB-ISOLATION-010]
 

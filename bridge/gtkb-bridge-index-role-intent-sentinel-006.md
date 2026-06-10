@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Bridge INDEX Role-Intent Sentinel
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-index-role-intent-sentinel
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

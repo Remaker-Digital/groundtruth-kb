@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Phase-1 Ollama Governance Implementation Child
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1-governance-impl
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ NEW
 
 # GT-KB Bridge Implementation Report Filing Skill - Slice 1 NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-impl-report-skill-001
 Version: 001 (NEW; Slice 1 - /bridge impl-report helper and tests)
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Cross-Harness Trigger Dispatch-State Lag - REVISED-1
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-dispatch-state-lag
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

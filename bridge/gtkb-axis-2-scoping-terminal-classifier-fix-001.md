@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Implementation Proposal — AXIS-2 Classifier: Exclude Scoping-Terminal Threads With Successor In Flight (WI-3442)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-axis-2-scoping-terminal-classifier-fix
 Version: 001
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Implementation-Start Authorization Gate Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-implementation-start-authorization-gate
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition mode)

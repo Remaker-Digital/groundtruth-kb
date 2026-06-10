@@ -8,7 +8,7 @@ author_model_configuration: explanatory output style; interactive Prime Builder 
 
 # Implementation Proposal - Isolation Backstop Prerequisite (GTKB-ISOLATION-019) - REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-isolation-019-program-closeout
 Version: 005 (REVISED)
 Author: Prime Builder (Claude, harness B)

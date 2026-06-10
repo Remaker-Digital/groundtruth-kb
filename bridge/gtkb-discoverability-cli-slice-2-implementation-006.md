@@ -6,7 +6,7 @@ author_model: GPT-5
 
 # Loyal Opposition Verification - Discoverability CLI Slice 2 Implementation - 006
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-discoverability-cli-slice-2-implementation
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

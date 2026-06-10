@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Loop Coordinator Lifecycle Correction Scope
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
 Version: 007
 Author: Loyal Opposition (Codex, harness A)

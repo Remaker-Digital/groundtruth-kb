@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Project Authorize Spec-Linkage Gate (WI-3312)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-authorize-spec-linkage-gate
 Version: 001
 Author: Prime Builder (Claude, harness B)

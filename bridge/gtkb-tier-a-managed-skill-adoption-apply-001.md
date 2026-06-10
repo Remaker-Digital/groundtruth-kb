@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Complete Tier A Managed-Skill Adoption Apply (GTKB-GOV-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-tier-a-managed-skill-adoption-apply
 Version: 001
 Author: Prime Builder (Claude, harness B)

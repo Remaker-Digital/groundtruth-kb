@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Doctor `_check_bridge_dispatch_liveness` recipient-key fix (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-doctor-dispatch-liveness-recipient-key-fix
 Version: 002
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

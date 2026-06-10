@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: proposal_review
+bridge_kind: lo_verdict
 Document: gtkb-projects-remove-item-cli-slice-1
 Version: 004
 Responds to: bridge/gtkb-projects-remove-item-cli-slice-1-003.md REVISED

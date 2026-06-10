@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Impl-Auth and Impl-Start-Gate Parser Hygiene
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ NEW
 
 # Post-Implementation Report - Manual Bridge Scan Terminal-GO Filter
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-manual-bridge-scan-terminal-go-filter
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

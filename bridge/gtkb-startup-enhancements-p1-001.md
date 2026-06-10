@@ -13,7 +13,7 @@ P3 primer registry, P4 rule consolidation, P5 active-ADR primer, P6
 action tray, P7 FP-guard tightening, P8 primer cache) follow as separate
 bridges.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-STARTUP-ENHANCEMENTS]
 spec_ids: []
 target_project: agent-red

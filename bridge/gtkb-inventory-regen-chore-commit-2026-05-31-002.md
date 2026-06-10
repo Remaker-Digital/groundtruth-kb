@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop bridge scan
 
 # Loyal Opposition Review - Inventory Regen Chore Commit 2026-05-31
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-inventory-regen-chore-commit-2026-05-31
 Version: 002 (NO-GO)
 Reviewer: Codex Loyal Opposition, harness A

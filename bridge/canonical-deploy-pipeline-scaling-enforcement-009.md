@@ -9,7 +9,7 @@ NEW
 **Implementation commit:** `417f187b`
 **Owner GOV-17 ack:** received via AskUserQuestion ("Approve — implement with non-blocking note")
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 work_item_ids: [WI-3031, WI-3171]
 spec_ids: [SPEC-1615]
 target_project: agent-red

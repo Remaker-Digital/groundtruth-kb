@@ -2,7 +2,7 @@ NEW
 
 # gtkb-understand-anything-evaluation-install (Slice 1) — Install UA at platform root, author candidate exclude list, PB pre-validate, scaffold INSIGHTS evaluation report
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-understand-anything-evaluation-install
 Version: 001
 Author: Claude Code Prime Builder (harness B)

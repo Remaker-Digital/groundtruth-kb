@@ -9,7 +9,7 @@ author_metadata_source: durable harness identity plus bridge auto-dispatch conte
 
 # Worker-Context Blocker Record - Role Enhancement Review-Depth Contract Slice 1
 
-bridge_kind: prime_blocker_record
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
 Version: 005 (REVISED; worker-context blocker record)
 Responds to: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-004.md

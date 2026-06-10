@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Agent Red Deployability Preservation Gate - Slice 1 (Partial): RC-Gate / Python-Gate / Frontend / Test-Collection Proofs (WI-3248)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-agent-red-deployability-preservation-gate
 Version: 003
 Author: Prime Builder (Claude, harness B)

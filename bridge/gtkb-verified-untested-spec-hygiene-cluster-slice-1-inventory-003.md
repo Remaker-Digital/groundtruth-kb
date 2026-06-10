@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - Verified-Untested Spec Hygiene Cluster Slice 1 Inventory - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory
 Version: 003 (REVISED)
 Author: Prime Builder (Codex, harness A)

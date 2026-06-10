@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Worker-Context-Aware AUQ Enforcement Slice 2
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-context-aware-auq-slice-2
 Version: 012
 Author: Loyal Opposition (Codex, harness A)

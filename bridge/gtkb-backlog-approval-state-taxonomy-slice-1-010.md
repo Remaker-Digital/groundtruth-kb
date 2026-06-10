@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Backlog Approval State Taxonomy Slice 1 - Post-Implementation Report REVISED-2
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-backlog-approval-state-taxonomy-slice-1
 Version: 010
 Status: REVISED

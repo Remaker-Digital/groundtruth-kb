@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Headless Gemini LO Dispatch Verification REVISED-12: ambient-PATH-only (rule-exception clause 2a)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 013 (REVISED proposal; backs out REVISED-11 expanduser-derivation in favor of rule-exception clause 2a)
 Responds-To: bridge/gtkb-headless-gemini-lo-dispatch-verification-012.md (Codex NO-GO: runtime home-directory PATH enrichment remains a prohibited live dependency)

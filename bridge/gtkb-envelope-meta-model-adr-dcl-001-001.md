@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Envelope Meta-Model ADR + DCL
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-envelope-meta-model-adr-dcl-001
 Version: 001
 Author: Prime Builder (Codex automation, owner prompt role)

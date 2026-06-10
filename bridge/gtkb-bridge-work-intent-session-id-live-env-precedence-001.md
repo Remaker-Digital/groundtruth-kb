@@ -2,7 +2,7 @@ NEW
 
 # Bridge work-intent session-id live-env precedence repair (WI-4377)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-work-intent-session-id-live-env-precedence
 Version: 001
 Author: Prime Builder (Codex, harness A)

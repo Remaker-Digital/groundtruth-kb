@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-role-enhancement-isolation-dependency-reframe
 Version: 004
 Author: Prime Builder (Claude, harness B)

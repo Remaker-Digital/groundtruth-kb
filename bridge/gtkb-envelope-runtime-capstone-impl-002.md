@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: implementation_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-runtime-capstone-impl
 Version: 002
 Responds to: bridge/gtkb-envelope-runtime-capstone-impl-001.md

@@ -12,7 +12,7 @@ REVISED
 `bridge/gtkb-startup-enhancements-p1-002.md` (F1 backup + preservation
 check before non-git rewrite).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-STARTUP-ENHANCEMENTS]
 spec_ids: []
 target_project: agent-red

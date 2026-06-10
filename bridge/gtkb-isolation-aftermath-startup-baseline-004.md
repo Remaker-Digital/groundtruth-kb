@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Withdrawal - Isolation Aftermath Startup Baseline
 
-bridge_kind: prime_withdrawal_notice
+bridge_kind: lo_verdict
 Document: gtkb-isolation-aftermath-startup-baseline
 Version: 004 (WITHDRAWN; supersedes NO-GO at `-003` and obsoleted GO at `-002`)
 Author: Prime Builder (Claude, harness B)

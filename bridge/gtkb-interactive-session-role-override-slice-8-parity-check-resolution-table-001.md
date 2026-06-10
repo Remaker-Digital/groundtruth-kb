@@ -13,7 +13,7 @@ target_paths: ["scripts/check_codex_hook_parity.py", "platform_tests/scripts/tes
 
 # GT-KB Interactive Session Role Override - Slice 8 - Parity-Check Resolution-Table Contract Enforcement
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-8-parity-check-resolution-table
 Version: 001 (NEW; first Slice-8 proposal)

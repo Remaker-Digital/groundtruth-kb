@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Advisory Report Template Spec REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-advisory-report-template-spec
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

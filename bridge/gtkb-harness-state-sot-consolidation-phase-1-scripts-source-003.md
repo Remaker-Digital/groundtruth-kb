@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Scripts-Source REVISED-1 — addresses Codex -002 (F1 config authority cleanup in-scope; F2 honest Codex-parity audit + follow-on WI-4370)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-scripts-source
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

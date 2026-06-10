@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - In-Source Provenance Anchors + Orphan-Citation Doctor (GTKB-IN-SOURCE-PROVENANCE-ANCHORS-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-in-source-provenance-anchors-001-prop
 Version: 001
 Author: Prime Builder (Claude, harness B)

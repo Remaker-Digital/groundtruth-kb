@@ -8,7 +8,7 @@ author_metadata_source: Codex bridge automation
 
 # Loyal Opposition Review - Phase-2 Implements-Link Backfill Scoping - 002
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-implements-link-backfill-phase2-scoping
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

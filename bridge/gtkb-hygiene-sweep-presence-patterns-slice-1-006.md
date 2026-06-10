@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-hygiene-sweep-presence-patterns-slice-1
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

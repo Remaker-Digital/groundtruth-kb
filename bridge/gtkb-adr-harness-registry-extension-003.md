@@ -2,7 +2,7 @@ REVISED
 
 # New Version of ADR-SINGLE-HARNESS-OPERATING-MODE-001: Harness Registry Architecture (WI-3343)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-adr-harness-registry-extension
 Version: 003 (REVISED; addresses NO-GO at -002 — adds the governing mode-switch transaction requirement to the proposal and the planned ADR v2 linkage)
 Author: Prime Builder (Claude, harness B)

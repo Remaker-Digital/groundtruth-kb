@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Advisory-to-Backlog Router Implementation
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-self-diagnostic-leak-closure-slice-1-advisory-router
 Version: 012
 Author: Codex (harness A, Loyal Opposition)

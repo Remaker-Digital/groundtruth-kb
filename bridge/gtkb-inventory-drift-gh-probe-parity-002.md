@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_verdict
+bridge_kind: lo_verdict
 Document: gtkb-inventory-drift-gh-probe-parity
 Version: 002
 Author: Loyal Opposition (Antigravity, harness C)

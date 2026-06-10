@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-artifact-recorder-cli-slice-4-owner-decision-auto-archive
 Version: 007
 Author: Loyal Opposition (Codex, harness A)

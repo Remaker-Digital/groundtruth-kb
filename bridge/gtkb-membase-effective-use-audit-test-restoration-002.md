@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - MemBase Effective Use Audit Test Restoration
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-membase-effective-use-audit-test-restoration
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

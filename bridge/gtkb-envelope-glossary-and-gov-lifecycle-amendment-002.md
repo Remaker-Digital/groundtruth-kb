@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Envelope Glossary and Gov Lifecycle Amendment (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-glossary-and-gov-lifecycle-amendment
 Version: 002
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

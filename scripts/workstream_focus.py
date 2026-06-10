@@ -1131,16 +1131,60 @@ def _write_session_role_marker(
     be written. The caller decides whether to record a fail-soft event in the
     lifecycle guard.
     """
+    import time
+
     marker_path = _session_role_marker_path(project_root)
-    body = {
-        "role": role_profile,
-        "session_id": session_id,
-        "session_id_source": session_id_source,
-        "written_at": _now_iso(),
-        "source": "init_keyword",
-    }
+    lock_path = marker_path.with_suffix(".lock")
+
+    # Ensure parent directory exists before attempting lock creation
     try:
         marker_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return False
+
+    acquired = False
+    for attempt in range(5):
+        try:
+            with open(lock_path, "x") as f:
+                f.write(str(os.getpid()))
+            acquired = True
+            break
+        except FileExistsError:
+            time.sleep(0.1)
+        except OSError:
+            try:
+                marker_path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+            time.sleep(0.1)
+
+    if not acquired:
+        return False
+
+    try:
+        if marker_path.is_file():
+            try:
+                existing_data = json.loads(marker_path.read_text(encoding="utf-8"))
+                if isinstance(existing_data, dict):
+                    existing_session_id = existing_data.get("session_id")
+                    existing_written_at = existing_data.get("written_at")
+                    if existing_session_id and existing_written_at:
+                        if existing_session_id != session_id:
+                            parsed_dt = _parse_iso8601(existing_written_at)
+                            if parsed_dt:
+                                age = (datetime.now(UTC) - parsed_dt).total_seconds()
+                                if age <= 1800:
+                                    return False
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        body = {
+            "role": role_profile,
+            "session_id": session_id,
+            "session_id_source": session_id_source,
+            "written_at": _now_iso(),
+            "source": "init_keyword",
+        }
         marker_path.write_text(
             json.dumps(body, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -1148,6 +1192,12 @@ def _write_session_role_marker(
         )
     except OSError:
         return False
+    finally:
+        try:
+            if lock_path.is_file():
+                lock_path.unlink()
+        except OSError:
+            pass
     return True
 
 

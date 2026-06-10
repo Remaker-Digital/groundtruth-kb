@@ -6,7 +6,7 @@ NEW
 **Date:** 2026-04-23
 **Session:** S305
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: governance + documentation
 work_item_ids: []
 target_paths: ["CLAUDE-REFERENCE.md", "memory/MEMORY.md", "docs/gtkb-idp-concept.md"]

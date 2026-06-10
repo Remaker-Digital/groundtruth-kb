@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - bridge-skill Protected-File Write Helper
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-bridge-skill-protected-write-helper
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

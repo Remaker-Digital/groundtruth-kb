@@ -6,7 +6,7 @@ Version: 001
 Author: Prime Builder (Claude Code, harness B)
 Date: 2026-05-14
 Session: S351
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 ## Motivation
 

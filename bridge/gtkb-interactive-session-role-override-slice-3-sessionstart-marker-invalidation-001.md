@@ -13,7 +13,7 @@ target_paths: [".claude/hooks/session_start_dispatch.py", ".codex/gtkb-hooks/ses
 
 # GT-KB Interactive Session Role Override - Slice 3 - SessionStart Marker Invalidation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-3-sessionstart-marker-invalidation
 Version: 001 (NEW)

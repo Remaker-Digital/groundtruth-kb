@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - LO File-Safety PreToolUse Enforcement (WI-3308)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-file-safety-pretooluse-enforcement
 Version: 001
 Author: Prime Builder (Claude, harness B)

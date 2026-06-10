@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Implementation Acknowledgment + Worker-Context Blocker Record - Bridge-Mode Config Transactions Slice 1
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-mode-config-transactions-slice-1
 Version: 007
 Author: Prime Builder (Claude, harness B)

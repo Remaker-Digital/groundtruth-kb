@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - LO File Safety Rule Clarification
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-lo-file-safety-rule-clarification-001
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

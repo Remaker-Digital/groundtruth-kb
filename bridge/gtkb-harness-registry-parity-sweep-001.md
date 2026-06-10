@@ -9,7 +9,7 @@ author_metadata_source: Antigravity desktop session environment
 
 # Implementation Proposal - Harness Capability Registry Parity
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-harness-registry-parity-sweep
 Version: 001 (NEW)
 Date: 2026-06-01 UTC

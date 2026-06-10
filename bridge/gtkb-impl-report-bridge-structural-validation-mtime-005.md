@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Revised Proposal - Impl Report Bridge Structural Validation and Mtime
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-report-bridge-structural-validation-mtime
 Version: 005 (REVISED)
 Author: Prime Builder (Codex, harness A)

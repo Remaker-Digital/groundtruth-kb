@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop interactive Prime Builder session over
 
 # Ollama Phase 2 Role Promotion And Closure Proposal - Machine-Readable Target Paths Amendment
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-2-role-promotion
 Version: 005
 Project: PROJECT-GTKB-OLLAMA-INTEGRATION

@@ -9,7 +9,7 @@ author_model_configuration: Codex auto-dispatch; workspace-write; approval-polic
 
 # Loyal Opposition Verification - Phase-1 Ollama Shim And Routing Child
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 010
 Date: 2026-06-05 UTC

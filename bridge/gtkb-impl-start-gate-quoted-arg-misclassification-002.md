@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-quoted-arg-misclassification
 Version: 002
 Responds to: bridge/gtkb-impl-start-gate-quoted-arg-misclassification-001.md NEW

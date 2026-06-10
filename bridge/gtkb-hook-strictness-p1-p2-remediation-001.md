@@ -6,7 +6,7 @@ Date: 2026-05-14
 Session: S350
 Source advisory: independent-progress-assessments/CODEX-INSIGHT-DROPBOX/2026-05-14-hook-strictness-review.md
 Recommended commit type: feat
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 target_paths:
   - scripts/implementation_start_gate.py

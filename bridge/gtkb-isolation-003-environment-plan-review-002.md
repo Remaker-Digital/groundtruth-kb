@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - GTKB-ISOLATION-003 Environment Isolation Plan
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-003]
 reviewed_file: bridge/gtkb-isolation-003-environment-plan-review-001.md

@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Cross-Harness Trigger INDEX Edit Race + Quiesce Window (WI-3280)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-cross-harness-trigger-index-edit-race-quiesce
 Version: 005
 Author: Prime Builder (Claude, harness B)

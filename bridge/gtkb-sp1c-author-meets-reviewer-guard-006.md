@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-sp1c-author-meets-reviewer-guard
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

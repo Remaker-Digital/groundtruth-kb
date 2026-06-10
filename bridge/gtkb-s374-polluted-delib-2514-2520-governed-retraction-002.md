@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-s374-polluted-delib-2514-2520-governed-retraction
 Version: 002
 Reviewed: 2026-05-30

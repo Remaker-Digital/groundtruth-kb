@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-index-agent-edit-serialization-scoping
 Version: 009
 Author: Loyal Opposition (Antigravity, harness C)

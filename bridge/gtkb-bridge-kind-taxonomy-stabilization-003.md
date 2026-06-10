@@ -65,3 +65,15 @@ All target paths and implementation artifacts reside under the project root (`E:
 
 ### Automated Tests
 - Run `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests/scripts/test_bridge_kind_taxonomy.py -q --tb=short`
+
+## target_paths
+
+- `groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py`
+- `scripts/lint_bridge_proposals.py`
+- `scripts/migrate_bridge_kind_taxonomy.py`
+- `scan_bridge.py`
+- `bridge/*.md`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-dispatch-owner-approval-forgery-prevention
 Version: 004
 Responds to: bridge/gtkb-dispatch-owner-approval-forgery-prevention-003.md REVISED

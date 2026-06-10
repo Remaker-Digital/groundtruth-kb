@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - W2 Agent-Red GOV Trio v2 Supersession (GTKB-GOVERNANCE-CORRECTION-S358-W2)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s358-w2-agent-red-gov-trio-v2
 Version: 003
 Author: Prime Builder (Claude, harness B)

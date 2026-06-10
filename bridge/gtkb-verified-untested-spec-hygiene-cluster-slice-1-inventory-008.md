@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Verified-Untested Spec Hygiene Cluster Slice 1 Inventory
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

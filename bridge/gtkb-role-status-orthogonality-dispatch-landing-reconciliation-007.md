@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 Version: 007
 Responds to: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-006.md NO-GO

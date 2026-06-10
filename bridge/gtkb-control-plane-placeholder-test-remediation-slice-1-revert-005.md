@@ -2,7 +2,7 @@ REVISED
 
 # Revised Proposal - Control-Plane Placeholder-Test Remediation Slice 1 (read-only inventory, re-scoped to governance review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-control-plane-placeholder-test-remediation-slice-1-revert
 Version: 005
 Author: Prime Builder (Claude Code, harness B)

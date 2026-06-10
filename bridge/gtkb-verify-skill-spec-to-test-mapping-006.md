@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Spec-to-Test Mapping Helper Slice 2 REVISED-2
 
-bridge_kind: proposal_verdict
+bridge_kind: lo_verdict
 Document: gtkb-verify-skill-spec-to-test-mapping
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

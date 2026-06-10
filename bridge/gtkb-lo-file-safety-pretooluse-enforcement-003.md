@@ -1,6 +1,6 @@
 WITHDRAWN
 
-bridge_kind: withdrawal_verdict
+bridge_kind: lo_verdict
 
 # Proposal Withdrawn - LO File-Safety PreToolUse Enforcement (WI-3308)
 

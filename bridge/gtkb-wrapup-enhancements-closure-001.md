@@ -13,7 +13,7 @@ author_model: Opus 4.7
 author_model_version: claude-opus-4-7[1m]
 author_model_configuration: Claude Code CLI explanatory output style, 1M context
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Work Item: GTKB-WRAPUP-ENHANCEMENTS
 work_item_ids: [GTKB-WRAPUP-ENHANCEMENTS]
 target_paths: [".gtkb-state/wrapup_enhancements_closure.py", "bridge/INDEX.md"]

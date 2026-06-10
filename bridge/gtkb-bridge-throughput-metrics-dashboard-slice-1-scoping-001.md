@@ -1,6 +1,6 @@
 # Implementation Proposal — Bridge Throughput Metrics Dashboard (Slice 1: Scoping)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

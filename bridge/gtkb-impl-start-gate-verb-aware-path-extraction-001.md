@@ -2,7 +2,7 @@ NEW
 
 # Impl-Start-Gate: verb-aware path extraction (eliminate ~70% of false-positive gate fires from command-text path-token matching)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

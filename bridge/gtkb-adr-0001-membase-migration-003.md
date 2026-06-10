@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-adr-0001-membase-migration
 Version: 003
 Responds to: bridge/gtkb-adr-0001-membase-migration-002.md NO-GO

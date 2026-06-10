@@ -12,7 +12,7 @@ Work Item: WI-3262
 
 # GT-KB Discoverability CLI Slice 2 - `gt backlog status` Scoping
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-discoverability-cli-slice-2-scoping
 Version: 001 (NEW; scoping proposal for Slice 2 of `gtkb-discoverability-cli`)

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
 Version: 002
 Responds to: bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-001.md

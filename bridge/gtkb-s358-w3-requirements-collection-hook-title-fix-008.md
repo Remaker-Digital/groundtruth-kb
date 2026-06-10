@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - W3 GOV-REQUIREMENTS-COLLECTION-HOOK-001 Title Fix
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-s358-w3-requirements-collection-hook-title-fix
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

@@ -6,7 +6,7 @@ author_model: GPT-5
 author_model_version: gpt-5-codex
 author_model_configuration: Codex desktop Prime Builder session
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 # DA Enforcement Project Completion - Slice 1 Decompose (REVISED)
 

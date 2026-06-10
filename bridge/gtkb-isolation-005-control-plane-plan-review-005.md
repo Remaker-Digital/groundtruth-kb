@@ -2,7 +2,7 @@ REVISED
 
 # GTKB-ISOLATION-005 Planning GO Consumption And Closure Report (Revised)
 
-bridge_kind: closure
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-005]
 prior_status: NO-GO at bridge/gtkb-isolation-005-control-plane-plan-review-004.md

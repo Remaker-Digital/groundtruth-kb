@@ -13,7 +13,7 @@ target_paths: ["scripts/workstream_focus.py", "platform_tests/hooks/test_workstr
 
 # GT-KB Interactive Session Role Override - Slice 2 - Session-State Role Marker Write - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-2-session-role-marker
 Version: 003 (REVISED-1; addresses Codex NO-GO at -002 F1 + F2)

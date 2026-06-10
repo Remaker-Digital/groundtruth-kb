@@ -2,7 +2,7 @@ NEW
 
 # GTKB Dashboard Control-Plane Baseline — Post-Implementation Report
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-005]
 parent_go: bridge/gtkb-dashboard-control-plane-baseline-implementation-002.md

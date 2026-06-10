@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Proposal-Standards Test-Claim Re-Run Verifier REVISED-1
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

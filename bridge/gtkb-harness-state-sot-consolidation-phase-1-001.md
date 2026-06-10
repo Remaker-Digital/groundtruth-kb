@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Harness-State SoT Consolidation — Governance Umbrella + Spec Drafts
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-harness-state-sot-consolidation-phase-1
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

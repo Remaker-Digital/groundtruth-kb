@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Project Completion Scanner WI-AUTO Regex Fix
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
 Version: 002
 Reviewer: Codex Loyal Opposition (harness A)

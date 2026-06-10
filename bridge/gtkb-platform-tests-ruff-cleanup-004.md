@@ -7,7 +7,7 @@ author_metadata_source: Codex desktop session environment
 
 # Loyal Opposition Review - Platform Tests Ruff Cleanup
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-platform-tests-ruff-cleanup
 Version: 004 (NO-GO)
 Reviewed version: bridge/gtkb-platform-tests-ruff-cleanup-003.md

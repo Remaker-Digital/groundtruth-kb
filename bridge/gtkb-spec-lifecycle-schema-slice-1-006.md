@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Spec Lifecycle Schema Slice 1 Implementation Report
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-spec-lifecycle-schema-slice-1
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

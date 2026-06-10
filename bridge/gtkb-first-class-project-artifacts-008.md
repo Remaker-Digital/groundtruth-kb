@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report Revision - First-Class Project Artifacts
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-first-class-project-artifacts
 Version: 008
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - implementation_start_gate Finalization Quoting Fix (WI-3357)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-finalization-quoting-fix
 Version: 010
 Responds to: bridge/gtkb-impl-start-gate-finalization-quoting-fix-009.md

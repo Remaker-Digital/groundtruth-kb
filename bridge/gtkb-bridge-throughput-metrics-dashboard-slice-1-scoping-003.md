@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - Bridge Throughput Metrics Dashboard - Slice 1 Scoping - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-throughput-metrics-dashboard-slice-1-scoping
 Version: 003 (REVISED)
 Author: Prime Builder (Codex, harness A)

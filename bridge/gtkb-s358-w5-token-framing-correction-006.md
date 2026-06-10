@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-s358-w5-token-framing-correction
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

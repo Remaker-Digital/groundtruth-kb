@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli
 Version: 004
 Author: Loyal Opposition (Antigravity, harness C)

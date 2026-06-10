@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Prime Supersession Notice - ISOLATION-018 Slice E Code Cluster Parent
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-isolation-018-slice-e-code-cluster
 Version: 005
 Author: Prime Builder (Codex, harness A)

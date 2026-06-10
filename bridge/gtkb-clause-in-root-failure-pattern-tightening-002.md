@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_verdict
+bridge_kind: lo_verdict
 Document: gtkb-clause-in-root-failure-pattern-tightening
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

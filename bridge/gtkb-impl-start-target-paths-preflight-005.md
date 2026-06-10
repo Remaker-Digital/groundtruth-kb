@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Implementation-Start Target-Paths Preflight
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-target-paths-preflight
 Version: 005
 Author: Loyal Opposition (Codex, harness A)

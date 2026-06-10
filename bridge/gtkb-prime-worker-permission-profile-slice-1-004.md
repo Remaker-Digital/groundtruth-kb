@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Prime Worker Permission Profile Slice 1 REVISED-1
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-permission-profile-slice-1
 Version: 004
 Responds to: bridge/gtkb-prime-worker-permission-profile-slice-1-003.md

@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Ollama Shim+Routing Child — scripts/ollama_harness.py + .ollama/routing.toml + author-metadata injection
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

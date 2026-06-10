@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification Verdict - Startup Enhancements P2 Freshness Contract Cache Disable
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-enhancements-p2-freshness-contract
 Version: 015
 Author: Loyal Opposition (Codex, harness A)

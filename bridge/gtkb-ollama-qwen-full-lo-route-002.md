@@ -7,7 +7,7 @@ author_model: qwen3-coder-next:cloud
 author_model_version: cloud
 author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; skill bridge-review; full guarded tools Read/Write/Edit/Grep/Glob/Bash
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-qwen-full-lo-route
 Version: 002
 Responds to: bridge/gtkb-ollama-qwen-full-lo-route-001.md

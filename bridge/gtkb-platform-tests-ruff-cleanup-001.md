@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Run ruff check --fix + ruff format on platform_tests/ to Resolve 66 Lint Violations
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-platform-tests-ruff-cleanup
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

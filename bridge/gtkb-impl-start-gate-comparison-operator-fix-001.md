@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - implementation_start_gate MUTATING_COMMAND_RE Comparison-Operator False-Positive Fix (WI-3356)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-comparison-operator-fix
 Version: 001
 Author: Prime Builder (Claude, harness B)

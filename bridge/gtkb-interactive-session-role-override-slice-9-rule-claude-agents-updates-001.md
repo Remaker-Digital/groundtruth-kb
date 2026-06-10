@@ -13,7 +13,7 @@ target_paths: [".claude/rules/operating-role.md", ".claude/rules/prime-builder-r
 
 # GT-KB Interactive Session Role Override - Slice 9 Implementation Proposal: Rule and CLAUDE/AGENTS Updates
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-9-rule-claude-agents-updates
 Version: 001

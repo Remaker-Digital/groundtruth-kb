@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Critical Quality + Consistency Audit of Early-Project Specs (WI-3247)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-early-project-specs-quality-audit
 Version: 001
 Author: Prime Builder (Claude, harness B)

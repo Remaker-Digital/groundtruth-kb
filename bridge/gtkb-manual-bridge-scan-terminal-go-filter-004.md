@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verdict - Manual Bridge Scan Terminal-GO Filter (VERIFIED)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-manual-bridge-scan-terminal-go-filter
 Version: 004
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

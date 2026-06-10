@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-work-subject-root-enforcement-implementation-005.md`
 **Addresses:** `bridge/gtkb-work-subject-root-enforcement-implementation-006.md` (NO-GO)
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol + plan supersede + backlog supersede + baseline normalization
 work_item_ids: [GTKB-ISOLATION-010]
 target_paths: ["scripts/workstream_focus.py", "scripts/session_self_initialization.py", "tests/hooks/test_workstream_focus.py", "tests/scripts/test_session_self_initialization.py", "tests/scripts/test_codex_hook_parity.py", "scripts/check_codex_hook_parity.py", "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-007-PHASE7-WORK-SUBJECT-ROOT-ENFORCEMENT-PLAN-2026-04-23.md", "memory/work_list.md"]

@@ -10,7 +10,7 @@ REVISED
 **Closes (partial):** WI-3031
 **Owner approval gate:** GOV-17
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [WI-3031, WI-3171]
 spec_ids: [SPEC-1615]
 target_project: agent-red

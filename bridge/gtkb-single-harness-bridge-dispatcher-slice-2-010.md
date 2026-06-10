@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verdict - Single-Harness Bridge Dispatcher (Slice 2) REVISED-1
 
-bridge_kind: verdict
+bridge_kind: lo_verdict
 Document: gtkb-single-harness-bridge-dispatcher-slice-2
 Responds-To: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-009.md
 Verdict: VERIFIED

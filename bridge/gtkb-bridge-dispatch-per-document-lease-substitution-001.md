@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Implementation Proposal - Bridge Dispatch Per-Document Lease Substitution
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-dispatch-per-document-lease-substitution
 Version: 001
 Author: Prime Builder (Claude, harness B)

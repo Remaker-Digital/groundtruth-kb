@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Legacy GOV WI Cleanup Implementation Report
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-legacy-gov-wi-cleanup
 Version: 006
 Responds to: bridge/gtkb-legacy-gov-wi-cleanup-005.md

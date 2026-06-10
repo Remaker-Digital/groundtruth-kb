@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Prime Worker Permission Profile (Slice 1 of 4) — REVISED-1
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-prime-worker-permission-profile-slice-1
 Version: 003
 Responds to: bridge/gtkb-prime-worker-permission-profile-slice-1-002.md

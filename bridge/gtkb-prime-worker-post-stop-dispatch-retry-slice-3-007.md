@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Worker-Context Blocker Record - Post-Stop Dispatch Retry Slice 3 (Parallel-PB Race)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
 Version: 007
 Status: REVISED

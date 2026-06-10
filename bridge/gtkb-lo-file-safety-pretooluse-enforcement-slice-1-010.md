@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - LO File-Safety PreToolUse Enforcement Slice 1
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-lo-file-safety-pretooluse-enforcement-slice-1
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

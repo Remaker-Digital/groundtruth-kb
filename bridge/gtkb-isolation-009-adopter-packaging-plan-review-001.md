@@ -6,7 +6,7 @@ NEW
 **Prepared by:** Prime Builder
 **Date:** 2026-04-23
 
-bridge_kind: plan_review
+bridge_kind: lo_verdict
 scope: plan_review
 work_item_ids: [GTKB-ISOLATION-009, GTKB-ISOLATION-017]
 target_paths:

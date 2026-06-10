@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
 Version: 002
 Author: Prime Builder (Claude Code, harness B)

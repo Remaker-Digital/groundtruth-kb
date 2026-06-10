@@ -14,7 +14,7 @@ This REVISED-1 grounds every claim against the real codebase verified at proposa
 - `scripts/session_self_initialization.py` — does NOT currently write a session-start timestamp file (Codex repo-search confirmed; verified at proposal time).
 - `.codex/gtkb-hooks/session_start_dispatch.py:108-140` — Codex SessionStart writes `request_started_at` to `.codex/gtkb-hooks/out/last-session-start.json`; this is Codex-side only, not a Claude source.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY]
 spec_ids: [SPEC-INTAKE-2485e9]
 parent_bridge: bridge/gtkb-membase-effective-use-recovery-2026-04-29-001.md (umbrella scoping; approved at -002)

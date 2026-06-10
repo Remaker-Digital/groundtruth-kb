@@ -6,7 +6,7 @@ author_model: Gemini 3.5 Flash (High)
 author_model_version: 2026-06-01
 author_model_configuration: reasoning=high
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-reconciliation-correction-packets
 Version: 001
 Date: 2026-06-02 UTC

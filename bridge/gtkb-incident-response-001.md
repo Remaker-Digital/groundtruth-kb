@@ -20,7 +20,7 @@ NEW
   whether the capability is a `::cmd` (latter) or a back-end primitive
   (former).
 
-bridge_kind: multiphase_implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-INCIDENT-RESPONSE]
 spec_ids: []
 target_project: mixed (upstream + agent-red)

@@ -38,9 +38,7 @@ STATUS_ACTIVE = "active"
 STATUS_SUSPENDED = "suspended"
 STATUS_RETIRED = "retired"
 
-HARNESS_STATUSES: frozenset[str] = frozenset(
-    {STATUS_REGISTERED, STATUS_ACTIVE, STATUS_SUSPENDED, STATUS_RETIRED}
-)
+HARNESS_STATUSES: frozenset[str] = frozenset({STATUS_REGISTERED, STATUS_ACTIVE, STATUS_SUSPENDED, STATUS_RETIRED})
 
 # The FR2 transition graph: each status maps to the frozenset of permitted
 # successor states. ``retired`` is terminal (empty successor set).
@@ -60,9 +58,7 @@ def _require_known_status(status: str, *, role: str = "") -> str:
     """
     if status not in HARNESS_STATUSES:
         prefix = f"unknown harness {role} status" if role else "unknown harness status"
-        raise ValueError(
-            f"{prefix} {status!r}; expected one of {sorted(HARNESS_STATUSES)}"
-        )
+        raise ValueError(f"{prefix} {status!r}; expected one of {sorted(HARNESS_STATUSES)}")
     return status
 
 

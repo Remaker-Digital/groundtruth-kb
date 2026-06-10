@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Ollama Foundation Child — REVISED-2 addressing Codex NO-GO at -004 (WI-4317 reader-migration compliance)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-foundation
 Version: 005
 Author: Prime Builder (Claude Code, harness B)

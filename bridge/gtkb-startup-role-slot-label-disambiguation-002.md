@@ -8,7 +8,7 @@ author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; s
 
 # Loyal Opposition Bridge Verdict — Startup Role-Slot Labels Disambiguation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-role-slot-label-disambiguation
 Version: 002 (NO-GO; correction required)
 Author: Ollama Loyal Opposition

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Preflight Path Warning - 006
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-preflight-path-warning
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

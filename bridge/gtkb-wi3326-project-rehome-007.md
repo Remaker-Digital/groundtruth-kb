@@ -10,7 +10,7 @@ author_metadata_source: bridge auto-dispatch prompt and harness registry project
 
 # WI-3326 Project Re-Home - Original Thread Withdrawn As Superseded
 
-bridge_kind: prime_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-wi3326-project-rehome
 Version: 007
 Date: 2026-06-07 UTC

@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 Version: 001

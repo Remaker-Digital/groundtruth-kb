@@ -2,7 +2,7 @@ NEW
 
 # Session Envelope Durability DCL: .claude/session/envelope.json Contract (WI-4293)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-session-envelope-durability-001
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - Worker Packet Authorization Envelope Slice 2: Auto Packet Creation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-worker-packet-auth-envelope-slice-2-auto-packet
 Version: 001 (NEW)
 Author: Prime Builder (Codex, harness A)

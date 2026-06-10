@@ -13,7 +13,7 @@ target_paths: ["config/governance/adr-dcl-clauses.toml", "platform_tests/scripts
 
 # GT-KB CLAUSE-IN-ROOT failure_pattern tightening — path-token-boundary anchor (WI-3508)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-clause-in-root-failure-pattern-tightening
 Version: 001 (NEW)

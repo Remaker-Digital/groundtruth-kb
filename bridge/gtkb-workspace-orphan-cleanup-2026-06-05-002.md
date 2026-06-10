@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-workspace-orphan-cleanup-2026-06-05
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

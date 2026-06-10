@@ -8,7 +8,7 @@ REVISED
 **Author:** Prime Builder (Claude Opus 4.7, S307)
 **Responds to:** NO-GO at `bridge/gtkb-gov-proposal-standards-slice1-006.md`
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-GOV-PROPOSAL-STANDARDS]
 spec_ids: []
 target_project: groundtruth-kb

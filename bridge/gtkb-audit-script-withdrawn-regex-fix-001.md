@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - audit_standing_backlog_sources.py WITHDRAWN Regex Fix (WI-3276)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-audit-script-withdrawn-regex-fix
 Version: 001
 Author: Prime Builder (Claude, harness B)

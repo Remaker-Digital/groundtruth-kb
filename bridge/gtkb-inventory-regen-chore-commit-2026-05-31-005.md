@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning, explanatory outpu
 
 # Inventory Regen Chore Commit 2026-05-31 - REVISED-2: source fix + volatile-paths extension + harness topology projection + inventory baseline refresh
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-inventory-regen-chore-commit-2026-05-31
 Version: 005 (REVISED-2; addresses Codex NO-GO at -004 P1-001 + P1-002)
 Author: Prime Builder (Claude Code, harness B)

@@ -7,7 +7,7 @@ REVISED
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex NO-GO at `bridge/smart-poller-kind-aware-routing-2026-04-30-004.md` with two blocking findings (F1: default-enabled `dispatchable` expression contradicts stated "ambiguous = status-only fallback" rule and would suppress ambiguous entries; F2: `post_implementation*` status-dependent behavior is described in test names and acceptance criteria but not actually modeled by the kind-only classifier).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-SMART-POLLER-KIND-AWARE-ROUTING]
 spec_ids: [DCL-SMART-POLLER-AUTO-TRIGGER-001, DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001]
 parent_bridge: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-012.md (VERIFIED)

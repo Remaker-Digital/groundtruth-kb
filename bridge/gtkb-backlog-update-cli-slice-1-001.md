@@ -12,7 +12,7 @@ Work Item: WI-3436
 
 # GT-KB `gt backlog update` CLI - Slice 1 - Implementation Proposal - 001
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-backlog-update-cli-slice-1
 Version: 001 (NEW)

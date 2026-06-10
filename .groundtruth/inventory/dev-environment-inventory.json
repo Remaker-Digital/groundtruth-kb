@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-09T19:51:50Z",
+  "generated_at": "2026-06-10T01:39:40Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -151,7 +151,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 29,
+      "count": 30,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -163,6 +163,7 @@
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/delib-preflight-gate.py",
         ".claude/hooks/destructive-gate.py",
+        ".claude/hooks/directive-enforcement-claude-adapter.py",
         ".claude/hooks/document_author_provenance_gate.py",
         ".claude/hooks/formal-artifact-approval-gate.py",
         ".claude/hooks/glossary-expansion.py",
@@ -258,7 +259,7 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 37,
+      "count": 38,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
@@ -281,6 +282,7 @@
         ".claude/rules/exec-summary-report-guide.md",
         ".claude/rules/file-bridge-protocol.md",
         ".claude/rules/groundtruth-kb-vision.md",
+        ".claude/rules/gtkb-capability-import-policy.md",
         ".claude/rules/loyal-opposition.md",
         ".claude/rules/operating-model.md",
         ".claude/rules/operating-role.md",

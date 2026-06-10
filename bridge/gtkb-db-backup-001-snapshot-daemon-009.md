@@ -2,7 +2,7 @@ REVISED
 
 # GTKB-DB-BACKUP-001 Snapshot Capability Revised Post-Implementation Report
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-db-backup-001-snapshot-daemon
 Version: 009
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - gt generate-approval-packet CLI - REVISED-2
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-generate-approval-packet-cli
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

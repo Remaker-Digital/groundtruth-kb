@@ -11,7 +11,7 @@ NEW
 
 **Source-set per Codex `-002` F1 prescription:** This slice was deferred from the Slice 5 cluster after Codex `-002` flagged that the original `_release_readiness_split.py` source framing omitted `memory/release-readiness.md` (the live ledger) and `KnowledgeDB.list_documents()` for release-readiness DOC records, and erroneously used the capped `search_deliberations()` instead of the uncapped `list_deliberations()`. Slice 6 implements the corrected source set in full.
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

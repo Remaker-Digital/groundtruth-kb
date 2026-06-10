@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: governance_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-claude-md-scope-clarification-slice-3-reauthorization
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

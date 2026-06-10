@@ -2,7 +2,7 @@ NEW
 
 # Prime Disposition - Bridge Advisory Report Message Type Advisory (WI-3298)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-advisory-report-message-advisory-disposition
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ NEW
 
 # GTKB Scoped Service Boundary Baseline Implementation Proposal
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-004]
 target_paths: ["tools/knowledge-db/groundtruth.toml", "scripts/gtkb_scoped_client.py", "scripts/check_scoped_service_boundary.py", "scripts/release_candidate_gate.py", "scripts/session_self_initialization.py", "tests/scripts/test_gtkb_scoped_client.py", "tests/scripts/test_release_candidate_gate.py", "tests/scripts/test_session_self_initialization.py", "tests/scripts/test_groundtruth_governance_adoption.py"]

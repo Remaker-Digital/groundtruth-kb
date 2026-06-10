@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - CLI Discoverability: gt project doctor --json + gt backlog show (WI-3262)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-cli-discoverability-doctor-json-backlog-show
 Version: 001
 Author: Prime Builder (Claude, harness B)

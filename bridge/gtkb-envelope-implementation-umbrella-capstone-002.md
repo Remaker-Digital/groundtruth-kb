@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-envelope-implementation-umbrella-capstone
 Version: 002
 Responds to: bridge/gtkb-envelope-implementation-umbrella-capstone-001.md MD

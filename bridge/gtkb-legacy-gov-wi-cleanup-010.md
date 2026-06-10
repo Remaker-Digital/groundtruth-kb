@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Legacy GOV WI Cleanup
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-legacy-gov-wi-cleanup
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

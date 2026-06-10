@@ -12,7 +12,7 @@ Work Item: WI-3411
 
 # Idempotent Project-ID Prefix Fix - `_project_id_from_names` Doubled-Prefix Defect
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-project-id-prefix-idempotent-fix
 Version: 001 (NEW)

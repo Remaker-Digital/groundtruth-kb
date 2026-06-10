@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - First-Class Project Artifacts Without Backlog Authority Drift
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-first-class-project-artifacts
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition dispatch mode)

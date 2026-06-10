@@ -2,7 +2,7 @@ NEW
 
 # GTKB-STARTUP-REFRACTOR-001 Slice C — Role-Neutral Startup Index + Role Overlays
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-refractor-slice-c-startup-index-overlays
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

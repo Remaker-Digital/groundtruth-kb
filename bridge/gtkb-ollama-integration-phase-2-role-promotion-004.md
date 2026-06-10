@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop automation; Loyal Opposition durable r
 
 # Loyal Opposition Verdict - Ollama Phase 2 Role Promotion And Closure Revised
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-2-role-promotion
 Version: 004
 Reviewer: Codex Loyal Opposition, harness A

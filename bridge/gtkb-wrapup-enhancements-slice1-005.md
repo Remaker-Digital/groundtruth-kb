@@ -12,7 +12,7 @@ Future macro slice under GTKB-COMMAND-SURFACE CS-5+ may add
 `::wrap-scan` syntactic sugar over the same scripts; the script
 interface remains canonical.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-WRAPUP-ENHANCEMENTS]
 spec_ids: []
 target_project: agent-red

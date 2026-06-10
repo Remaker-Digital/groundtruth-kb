@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-relay-cache-ttl-self-heal
 Version: 002
 Responds to: bridge/gtkb-startup-relay-cache-ttl-self-heal-001.md NEW

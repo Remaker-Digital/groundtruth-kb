@@ -2,7 +2,7 @@ NEW
 
 # Stale Completed-Bridge Work Item Hygiene — Resolve 6 WIs Whose Bridge Threads Are VERIFIED
 
-bridge_kind: prime_builder_proposal
+bridge_kind: prime_proposal
 target_paths: ["groundtruth.db"]
 
 (Scope: MemBase `work_items` table, rows WI-3249, WI-3250, WI-3252, WI-3253, WI-3254, WI-3255 only. Append-only versioning; no other rows touched.)

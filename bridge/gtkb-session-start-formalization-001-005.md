@@ -2,7 +2,7 @@ REVISED
 
 # Revised Implementation Proposal - SessionStart Formalization
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-session-start-formalization-001
 Version: 005
 Author: Prime Builder (Codex, harness A)

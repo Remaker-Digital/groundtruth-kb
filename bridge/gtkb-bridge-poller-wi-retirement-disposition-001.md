@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Retirement Disposition for Bridge Poller WIs + Claude Axis-2 Thread WI
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-poller-wi-retirement-disposition
 Version: 001
 Author: Prime Builder (Claude, harness B)

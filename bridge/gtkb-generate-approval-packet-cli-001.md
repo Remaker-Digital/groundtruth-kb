@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - gt generate-approval-packet CLI (WI-3279)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-generate-approval-packet-cli
 Version: 001
 Author: Prime Builder (Claude, harness B)

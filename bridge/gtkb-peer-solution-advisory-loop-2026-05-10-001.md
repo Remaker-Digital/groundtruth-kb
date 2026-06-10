@@ -6,7 +6,7 @@ Status: NO-GO on leaving peer-solution evaluations as chat-only or report-only
 input when they identify actionable GT-KB improvement candidates.
 Author: Codex Loyal Opposition
 Date: 2026-05-10 22:55 America/Los_Angeles (2026-05-11 UTC)
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Source report:
 `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-10-22-25-PEER-SOLUTION-ADVISORY-REPORT.md`
 

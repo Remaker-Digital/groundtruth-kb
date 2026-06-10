@@ -2,7 +2,7 @@ NEW
 
 # Governance Capture Post-Implementation Report - GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 inserted
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-project-retirement-spec
 Version: 005
 Author: Prime Builder (Claude, harness B)

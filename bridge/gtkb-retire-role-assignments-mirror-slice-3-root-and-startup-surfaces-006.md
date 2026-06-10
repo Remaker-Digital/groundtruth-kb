@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-retire-role-assignments-mirror-slice-3-root-and-startup-surfaces
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

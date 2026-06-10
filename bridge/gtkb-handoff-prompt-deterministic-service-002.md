@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Deterministic Handoff-Prompt Service Design (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-handoff-prompt-deterministic-service
 Version: 002
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

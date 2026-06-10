@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex revision metadata
 
 # Implementation Proposal - Release-Candidate Gate Managed Skill Template - Requirement Sufficiency Refresh
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-release-candidate-gate-managed-skill
 Version: 005 (REVISED)
 Author: Prime Builder (Codex, harness A)

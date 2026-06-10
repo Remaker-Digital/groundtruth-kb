@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: implementation_review
+bridge_kind: lo_verdict
 Document: gtkb-orphan-wi-membership-backfill-slice-2-implementation
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

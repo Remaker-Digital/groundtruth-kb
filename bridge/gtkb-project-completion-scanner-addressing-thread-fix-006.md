@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge auto-dispatch
 
 # Loyal Opposition Verdict - Project Completion Scanner Addressing-Thread Fix - 006
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-completion-scanner-addressing-thread-fix
 Version: 006
 Reviewer: Codex Loyal Opposition (harness A)

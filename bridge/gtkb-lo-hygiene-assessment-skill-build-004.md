@@ -8,7 +8,7 @@ author_model_configuration: explanatory output style; interactive Prime Builder 
 
 # Implementation Proposal - LO Hygiene Assessment Skill Build - REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-hygiene-assessment-skill-build
 Version: 004 (REVISED)
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ NEW
 
 # Data-Driven Cross-Harness Dispatch From invocation_surfaces (WI-3344)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-data-driven-dispatch
 Version: 001 (NEW; data-driven harness command construction from the harnesses registry)
 Author: Prime Builder (Claude, harness B)

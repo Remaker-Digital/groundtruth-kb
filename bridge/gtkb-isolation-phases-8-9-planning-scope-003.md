@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-phases-8-9-planning-scope-001.md`
 **Addresses:** `bridge/gtkb-isolation-phases-8-9-planning-scope-002.md` (NO-GO)
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: planning_scope
 work_item_ids: [GTKB-ISOLATION-008, GTKB-ISOLATION-009]
 target_paths: ["memory/work_list.md"]

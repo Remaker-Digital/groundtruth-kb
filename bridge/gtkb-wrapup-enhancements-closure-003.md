@@ -13,7 +13,7 @@ author_model: Opus 4.8
 author_model_version: claude-opus-4-8[1m]
 author_model_configuration: Claude Code CLI explanatory output style, 1M context
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-wrapup-enhancements-closure
 Version: 003
 Responds-To: `bridge/gtkb-wrapup-enhancements-closure-002.md` (Codex GO)

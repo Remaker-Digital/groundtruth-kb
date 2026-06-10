@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-skill-modernization-slice-3-kb-work-item-migration
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

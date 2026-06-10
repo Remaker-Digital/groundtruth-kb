@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Artifact Recorder CLI Slice 1 Deliberations Record REVISED-2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-artifact-recorder-cli-slice-1-deliberations-record
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition mode)

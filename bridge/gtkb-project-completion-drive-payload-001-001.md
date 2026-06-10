@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Project-Completion Drive Payload + Bridge NO-GO AUQ-Class Marker (governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-project-completion-drive-payload-001
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

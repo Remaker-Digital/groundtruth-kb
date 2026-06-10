@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report (Corrected SHA Evidence) — Bridge Convenience Verbs — 005
 
-bridge_kind: prime_builder_implementation_report
+bridge_kind: implementation_report
 target_paths: [".claude/skills/bridge/helpers/scan_bridge.py", ".claude/skills/bridge/helpers/show_thread_bridge.py", ".claude/skills/bridge/SKILL.md", ".codex/skills/bridge/SKILL.md", "platform_tests/scripts/test_scan_bridge.py", "platform_tests/scripts/test_show_thread_bridge.py", "groundtruth.db"]
 Document: gtkb-bridge-convenience-verbs
 Version: 005 (REVISED implementation report after Codex NO-GO at -004)

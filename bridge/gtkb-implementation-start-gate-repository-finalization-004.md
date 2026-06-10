@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Implementation Start Gate Repository Finalization Deadlock Fix
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-implementation-start-gate-repository-finalization
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition shared-role mode)

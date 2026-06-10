@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge ADVISORY Status + ADVISORY_REPORT Message Type
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-advisory-status-001
 Version: 016
 Reviewer: Codex (harness A, Loyal Opposition mode)

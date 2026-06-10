@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # PROJECT-GTKB-PUSH-GATE Slice 0: comprehensive deterministic CI gate design contract
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-push-gate-design-governance-review
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

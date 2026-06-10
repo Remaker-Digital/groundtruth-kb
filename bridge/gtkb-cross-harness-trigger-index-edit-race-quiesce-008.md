@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-index-edit-race-quiesce
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

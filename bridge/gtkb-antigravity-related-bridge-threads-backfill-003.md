@@ -2,7 +2,7 @@ REVISED
 
 # Antigravity Onboarding: WI-3362 - Backfill related_bridge_threads Linkage for WI-3337..WI-3349
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-antigravity-related-bridge-threads-backfill
 Version: 003 (REVISED; responds to the NO-GO at -002 - re-scopes WI-3362 to a traceability-only metadata backfill and defers automatic closure of INDEX-pruned historical threads to a separate governed slice)
 Author: Prime Builder (Claude, harness B)

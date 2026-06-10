@@ -1,5 +1,5 @@
 VERIFIED
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-chromadb-vector-continuity-v1-cut-scoping
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

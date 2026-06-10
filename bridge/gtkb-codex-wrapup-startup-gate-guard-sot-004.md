@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification: Codex Wrap/Topic Hook Canonical Startup Guard
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-codex-wrapup-startup-gate-guard-sot
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

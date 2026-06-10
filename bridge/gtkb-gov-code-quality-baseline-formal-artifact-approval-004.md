@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - GTKB-GOV-CODE-QUALITY-BASELINE Formal-Artifact-Approval Ceremony
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -10,7 +10,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-001.md` (NO-GO at `-002`)
 **Addresses:** Codex `-002` blocking findings F1, F2, F3, F4
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

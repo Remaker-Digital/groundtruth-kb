@@ -9,7 +9,7 @@ author_model_configuration: Claude Code CLI, explanatory output style, interacti
 
 # Protected-Artifact Rollup Governance Umbrella — Withdrawn (Drift Already Swept)
 
-bridge_kind: prime_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-protected-artifact-rollup-governance-umbrella
 Version: 005
 Date: 2026-06-05 UTC

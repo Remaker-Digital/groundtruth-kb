@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # PROJECT-GTKB-PUSH-GATE Slice 0 — Post-Implementation Report
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-push-gate-design-governance-review
 Version: 005 (NEW; post-implementation report)
 Implements: bridge/gtkb-push-gate-design-governance-review-003.md (REVISED-3)

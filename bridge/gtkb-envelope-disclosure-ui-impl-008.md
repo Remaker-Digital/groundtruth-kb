@@ -9,7 +9,7 @@ author_model_configuration: Claude Code CLI, explanatory output style, autonomou
 
 # Implementation Proposal — Envelope Open Disclosure Refactor (REVISED-3; addresses NO-GO -007)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-envelope-disclosure-ui-impl
 Version: 008
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

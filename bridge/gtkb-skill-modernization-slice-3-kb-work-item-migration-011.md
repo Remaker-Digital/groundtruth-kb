@@ -12,7 +12,7 @@ Work Item: WI-3455
 
 # Skill Modernization Slice 3 - kb-work-item Migration (Half A verb-only) - Post-Implementation Report
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-skill-modernization-slice-3-kb-work-item-migration
 Version: 011 (NEW - post-implementation report)

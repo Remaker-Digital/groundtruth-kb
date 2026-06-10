@@ -2,7 +2,7 @@ NEW
 
 # Role Scope For Release And Operations - Conversion Proposal Slice 0 (Scoping Only)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-scope-release-operations-conversion
 Version: 001
 Author: Prime Builder (Claude, harness B)

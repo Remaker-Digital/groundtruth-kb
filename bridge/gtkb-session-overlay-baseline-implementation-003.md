@@ -2,7 +2,7 @@ NEW
 
 # GTKB Session Overlay Baseline Implementation Report
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-006]
 parent_proposal: bridge/gtkb-session-overlay-baseline-implementation-001.md

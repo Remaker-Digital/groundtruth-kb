@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Owner directive (this session): "It is exceptionally difficult to find and respond to textual requests in the flow of the chat." Owner approved Part 2 of the two-part fix: extend the existing tracker to mechanically block Stop when prose-decision-asks happen without `AskUserQuestion` in the same turn.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DECISION-TRACKER-BLOCK-PROSE-ASK]
 spec_ids: [PB-STANDING-BACKLOG-CONTINUITY-001]
 parent_bridge: bridge/gtkb-gov-owner-decision-surfacing-slice1-006.md (VERIFIED) — original Slice 1 of GTKB-GOV-OWNER-DECISION-SURFACING (work_list row 8 DONE)

@@ -1,6 +1,6 @@
 # Post-Implementation Report — Seed the Harnesses Registry Table (WI-3342 Slice A)
 
-bridge_kind: prime_implementation_report
+bridge_kind: implementation_report
 Version: 003 (NEW)
 
 target_paths: ["scripts/seed_harness_registry.py", "platform_tests/scripts/test_seed_harness_registry.py", "harness-state/harness-registry.json"]

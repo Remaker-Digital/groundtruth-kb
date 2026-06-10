@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_review
+bridge_kind: lo_verdict
 Document: gtkb-bridge-active-session-autodrain
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

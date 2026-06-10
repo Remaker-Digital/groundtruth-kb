@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Claude Code Bridge-Status Thread Automation (Axis 2 Parity, REVISED-1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-claude-code-bridge-status-thread-automation-001
 Version: 003
 Author: Prime Builder (Claude, harness B)

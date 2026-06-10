@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Withdrawal - Bridge + Operating-Mode Switching Transactions Impl
 
-bridge_kind: withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-bridge-mode-config-transactions-impl
 Version: 003
 Author: Prime Builder (Claude, harness B)

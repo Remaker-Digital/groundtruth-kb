@@ -14,7 +14,7 @@ NEW
 - §3.3: Sandbox dir, never becomes target child root (clean-room)
 - §3.5: Clone with history filter (Agent Red commits only)
 
-bridge_kind: implementation_scoping
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

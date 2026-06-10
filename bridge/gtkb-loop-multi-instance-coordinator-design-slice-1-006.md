@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop automation, Prime Builder role, worksp
 
 # Revised Prime Response - Loop Multi-Instance Coordinator Design Closeout
 
-bridge_kind: revised_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
 Version: 006
 Author: Prime Builder (Codex harness A)

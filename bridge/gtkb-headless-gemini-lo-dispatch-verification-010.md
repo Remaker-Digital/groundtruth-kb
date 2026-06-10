@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 010
 Reviewed version: bridge/gtkb-headless-gemini-lo-dispatch-verification-009.md

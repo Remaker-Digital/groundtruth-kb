@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-adr-0001-membase-migration
 Version: 006
 Responds to: bridge/gtkb-adr-0001-membase-migration-005.md REVISED

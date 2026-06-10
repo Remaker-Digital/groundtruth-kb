@@ -9,7 +9,7 @@ author_model_configuration: Claude Code CLI, explanatory output style, interacti
 
 # Implementation Proposal — GTKB-ISOLATION-018 Agent Red Child-Directory Cutover (Closeout Stragglers) (REVISED-2)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-isolation-018-agent-red-cutover
 Version: 005
 Date: 2026-06-05 UTC

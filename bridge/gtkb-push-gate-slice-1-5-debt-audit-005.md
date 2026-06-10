@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex withdrawal metadata
 
 # Proposal Withdrawn - Push Gate Slice 1.5 Debt Audit
 
-bridge_kind: withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-push-gate-slice-1-5-debt-audit
 Version: 005
 Author: Prime Builder (Codex, harness A)

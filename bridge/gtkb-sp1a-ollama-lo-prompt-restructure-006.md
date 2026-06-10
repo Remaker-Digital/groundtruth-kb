@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-sp1a-ollama-lo-prompt-restructure
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

@@ -13,7 +13,7 @@ target_paths: ["groundtruth-kb/src/groundtruth_kb/project/doctor.py", "platform_
 
 # GT-KB Interactive Session Role Override - Slice 7 - Doctor Session-Role Marker Checks
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-7-doctor-marker-checks
 Version: 001 (NEW)

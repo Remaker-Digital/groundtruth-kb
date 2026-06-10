@@ -13,7 +13,7 @@ author_model: Opus 4.7
 author_model_version: claude-opus-4-7[1m]
 author_model_configuration: Claude Code CLI explanatory output style, 1M context
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-pretooluse-restore
 Version: 001
 Session: S414

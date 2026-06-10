@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Implementation Proposal - Bridge Work-Intent Registry Integration into Prime-Side Write Paths
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-intent-registry-prime-write-integration
 Version: 001 (NEW)
 Implements: WI-3414

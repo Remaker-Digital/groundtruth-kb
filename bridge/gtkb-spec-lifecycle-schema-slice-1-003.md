@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Spec Lifecycle Schema Slice 1 (additions) - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-spec-lifecycle-schema-slice-1
 Version: 003
 Responds to: bridge/gtkb-spec-lifecycle-schema-slice-1-002.md

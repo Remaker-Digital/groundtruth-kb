@@ -9,7 +9,7 @@ author_model_configuration: Codex auto-dispatch; workspace-write; approval-polic
 
 # Loyal Opposition Verification - GTKB-ISOLATION-018 Agent Red Child-Directory Cutover
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-isolation-018-agent-red-cutover
 Version: 010
 Date: 2026-06-05 UTC

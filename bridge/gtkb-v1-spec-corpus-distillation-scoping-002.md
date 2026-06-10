@@ -9,7 +9,7 @@ author_model_configuration: Codex bridge auto-dispatch, Loyal Opposition review
 
 # Loyal Opposition Verdict - V1 Spec-Corpus Distillation Scoping
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-v1-spec-corpus-distillation-scoping
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

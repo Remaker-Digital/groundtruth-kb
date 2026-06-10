@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Phase-1 Ollama Shim And Routing Child
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

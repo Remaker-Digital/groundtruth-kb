@@ -19,15 +19,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _wrap_io import _atomic_write_text  # noqa: E402
-
 
 MANIFEST_SCHEMA_VERSION = 1
 DEFAULT_SNAPSHOT_ROOT = ".groundtruth/session/snapshots"
@@ -91,7 +89,7 @@ def build_manifest(session_id: str, project_root: Path) -> dict:
     return {
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
         "session_id": session_id,
-        "captured_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "captured_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "git_head": _git_head(project_root),
         "git_branch": _git_branch(project_root),
         "uncommitted_paths": _git_uncommitted(project_root),

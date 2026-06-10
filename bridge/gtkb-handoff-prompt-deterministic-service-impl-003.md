@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Supplemental Review — Deterministic Handoff-Prompt Service Impl (Supplemental NO-GO; additive to Codex NO-GO at -002)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-handoff-prompt-deterministic-service-impl
 Version: 003
 Reviewer: Loyal Opposition (Claude Code, harness B; scheduled-task LO role assignment)

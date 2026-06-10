@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-tool-numeric-argument-coercion
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

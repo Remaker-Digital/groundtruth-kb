@@ -1,0 +1,17 @@
+{
+  "action": "create",
+  "approval_mode": "auto",
+  "artifact_id": "gtkb-capability-import-policy",
+  "artifact_type": "narrative_artifact",
+  "auto_approval_activated_by": "owner",
+  "auto_approval_scope": "source_ref:gtkb-role-enhancement",
+  "change_reason": "Define policy and rules for capability imports to prevent harness capability drift.",
+  "changed_by": "C",
+  "explicit_change_request": "Mike requests policy for importing harness capabilities",
+  "full_content": "# GT-KB Capability Import Policy\n\nSource: WI-3304 adoption of LO ecosystem advisory.\n\n## 1. Third-Party Provenance and License Validation\n\nBefore any third-party package or repository is imported or integrated into the GT-KB platform:\n1. **Provenance Check:** Validate the source repository's health, maintainer activity, security history, and release signatures.\n2. **License Compatibility:** Ensure the license is compatible with the GT-KB commercial/private distribution model. Specifically:\n   - Permissive licenses (MIT, Apache 2.0, BSD) are pre-approved.\n   - AGPL-3.0 compatibility must be strictly verified. No hostile copyleft packages may be imported into execution-path products.\n3. **Security Auditing:** Run vulnerability scans (e.g., `npm audit`, `pip-audit`, dependency checks) on all new dependencies.\n\n## 2. Strict Containment and Isolation\n\n> [!IMPORTANT]\n> No third-party code, package, or tool may mutate GT-KB governance artifacts, rule files, or databases unless explicitly authorized by the owner via an approved work item and authorization packet.\n\n- Third-party packages must run under strict security sandboxes.\n- Network access by third-party packages must be blocked or isolated to authorized endpoints.\n- Any tool, script, or package that requires system-wide permissions (outside the sandboxed directory) must be explicitly flagged and approved by the owner.\n",
+  "full_content_sha256": "cdfc8e5d6bf3483ce663b41684f3329e3b5a4b88f3619a2dd596f39fc482d1e1",
+  "presented_to_user": true,
+  "source_ref": "gtkb-role-enhancement",
+  "target_path": ".claude/rules/gtkb-capability-import-policy.md",
+  "transcript_captured": true
+}

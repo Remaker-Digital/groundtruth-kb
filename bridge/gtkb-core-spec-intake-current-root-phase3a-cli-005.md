@@ -10,7 +10,7 @@ author_metadata_source: Ollama D direct /api/chat response captured in this run;
 
 # Bridge Verdict - gtkb-core-spec-intake-current-root-phase3a-cli - 005
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-core-spec-intake-current-root-phase3a-cli
 Version: 005 (VERIFIED; post-implementation verification)
 Author: Loyal Opposition (Ollama, harness D)

@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-claude-md-scope-clarification-slice-3-implementation
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

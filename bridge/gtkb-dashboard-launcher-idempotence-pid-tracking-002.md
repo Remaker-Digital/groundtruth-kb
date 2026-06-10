@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-dashboard-launcher-idempotence-pid-tracking
 Version: 002
 Responds to: bridge/gtkb-dashboard-launcher-idempotence-pid-tracking-001.md NEW

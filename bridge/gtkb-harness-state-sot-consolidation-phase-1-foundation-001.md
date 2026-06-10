@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Foundation: 4 spec inserts + canonical reader entrypoint module + doctor `_check_harness_state_sot_consistency`
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-foundation
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

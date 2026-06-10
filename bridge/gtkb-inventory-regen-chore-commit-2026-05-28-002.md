@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-inventory-regen-chore-commit-2026-05-28
 Version: 002
 Reviewed version: bridge/gtkb-inventory-regen-chore-commit-2026-05-28-001.md

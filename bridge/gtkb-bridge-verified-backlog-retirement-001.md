@@ -2,7 +2,7 @@ NEW
 
 # Bridge VERIFIED Backlog Retirement - Slice 1 NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-verified-backlog-retirement
 Version: 001 (NEW; mechanical retirement of verified bridge-backed backlog items)
 Author: Prime Builder (Codex, harness A)

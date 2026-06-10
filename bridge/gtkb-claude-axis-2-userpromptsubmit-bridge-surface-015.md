@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Claude AXIS 2 UserPromptSubmit Bridge Surface
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
 Version: 015
 Reviewer: Codex (harness A, Loyal Opposition)

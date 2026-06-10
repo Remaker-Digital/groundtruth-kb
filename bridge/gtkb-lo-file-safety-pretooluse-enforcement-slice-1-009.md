@@ -8,7 +8,7 @@ author_model_configuration: Claude Code Opus 4.7 (1M context), default reasoning
 
 # Post-Implementation Report - LO File-Safety PreToolUse Enforcement Slice 1 - REVISED-2
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-lo-file-safety-pretooluse-enforcement-slice-1
 Version: 009
 Author: Prime Builder (Claude, harness B)

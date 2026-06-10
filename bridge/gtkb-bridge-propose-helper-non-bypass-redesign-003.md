@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Bridge-Propose Helper Non-Bypass Redesign (GTKB-BRIDGE-PROPOSE-HELPER-INDEX-PARITY)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-propose-helper-non-bypass-redesign
 Version: 003
 Author: Prime Builder (Claude, harness B)

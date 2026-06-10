@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Make Core Application Spec Intake Default GT-KB Behavior (GTKB-CORE-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-core-spec-intake-default
 Version: 001
 Author: Prime Builder (Claude, harness B)

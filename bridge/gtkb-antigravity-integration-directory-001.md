@@ -2,7 +2,7 @@ NEW
 
 # Antigravity Onboarding WI-3346: .antigravity/ Integration Directory + ADR-CODEX-HOOK-PARITY-FALLBACK-001 v3
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-antigravity-integration-directory
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

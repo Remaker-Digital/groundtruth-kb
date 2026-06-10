@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-bridge-propose-helper-caller-migration-to-writer
 Version: 003
 Responds to: bridge/gtkb-bridge-propose-helper-caller-migration-to-writer-002.md MD

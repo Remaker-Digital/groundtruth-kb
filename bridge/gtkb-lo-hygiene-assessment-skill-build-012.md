@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex verification metadata
 
 # Loyal Opposition Verification - LO Hygiene Assessment Skill Build
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-lo-hygiene-assessment-skill-build
 Version: 012
 Responds-To: `bridge/gtkb-lo-hygiene-assessment-skill-build-011.md`

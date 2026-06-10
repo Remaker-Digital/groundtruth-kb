@@ -2,7 +2,7 @@ REVISED
 
 # GTKB Session Overlay Baseline — Revised Post-Implementation Report
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-014]
 target_paths: ["scripts/session_self_initialization.py", "tests/scripts/test_session_self_initialization.py"]

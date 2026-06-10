@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - GitHub AI Harness Ecosystem Conversion Slice 0
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-github-ai-harness-ecosystem-conversion
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

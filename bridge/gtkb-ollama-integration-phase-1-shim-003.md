@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Ollama Shim And Routing Child - Corrected Tool Loop Scope
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 003
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal (REVISED-1) - implementation_start_gate finalization-exemption quote-aware control-marker fix (WI-3357)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-finalization-quoting-fix
 Version: 003
 Responds to: bridge/gtkb-impl-start-gate-finalization-quoting-fix-002.md

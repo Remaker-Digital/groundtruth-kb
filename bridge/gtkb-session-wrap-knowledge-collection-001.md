@@ -1,6 +1,6 @@
 # Implementation Proposal - Session Wrap Knowledge Collection Upgrade
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-session-wrap-knowledge-collection
 Version: 001
 Author: Prime Builder (Codex, harness A)

@@ -12,7 +12,7 @@ NEW
 - `bridge/gtkb-dashboard-industry-alignment-slice1-005.md:122-123` — reaffirmed Slice 2 scope at GO
 - No prior deliberations found searching for `gtkb-dashboard-industry-alignment-slice2` — this is the first review pass on the slice.
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DASHBOARD-002]
 spec_ids: []
 target_project: agent-red

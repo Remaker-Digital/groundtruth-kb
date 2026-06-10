@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Envelope Init-Keyword Amendment (REVISED-3, implementation_proposal scope)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-envelope-init-keyword-amendment-slice-1
 Version: 005
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

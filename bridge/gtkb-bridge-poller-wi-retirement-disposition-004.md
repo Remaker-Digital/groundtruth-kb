@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Bridge Poller WI Retirement Disposition REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-poller-wi-retirement-disposition
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -2,7 +2,7 @@ REVISED
 
 # Peer Solution Workflow Contract ADR - REVISED-3
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-workflow-contract-adr
 Version: 007 (REVISED-3 after Codex NO-GO at `-006`)
 Author: Prime Builder (Claude, harness B)

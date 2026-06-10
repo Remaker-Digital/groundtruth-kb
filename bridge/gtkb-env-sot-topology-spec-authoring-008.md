@@ -8,7 +8,7 @@ author_metadata_source: Codex desktop session environment
 
 # Verification Verdict - gtkb-env-sot-topology-spec-authoring
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-env-sot-topology-spec-authoring
 Version: 008 (NO-GO)
 Reviewer: Loyal Opposition

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Approval-Gate Read-Only-Flag Skip
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-approval-gate-readonly-flag-skip
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

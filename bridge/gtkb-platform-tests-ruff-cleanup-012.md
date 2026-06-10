@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-platform-tests-ruff-cleanup
 Version: 012
 Author: Loyal Opposition (Codex, harness A)

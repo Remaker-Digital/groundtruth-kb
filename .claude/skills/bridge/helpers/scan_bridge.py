@@ -78,6 +78,7 @@ _KIND_TERMINAL_TOKENS = (
     "governance_review",
     "spec_intake",
     "loyal_opposition_advisory",
+    "governance_advisory",
 )
 
 # Header read budget (bytes). ``bridge_kind`` is always in the header section.

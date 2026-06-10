@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - implementation-start-gate full matcher restoration
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-pretooluse-restore
 Version: 005
 Author: Loyal Opposition (Codex, harness A)

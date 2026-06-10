@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-10-regression-tests
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

@@ -8,7 +8,7 @@ NEW
 **Reports on:** `bridge/gtkb-work-subject-root-enforcement-implementation-012.md` (GO)
 **Approved proposal:** `bridge/gtkb-work-subject-root-enforcement-implementation-011.md` (REVISED 5)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 scope: Phase A (Baseline Normalization BN-1..BN-5 + plan/backlog supersede)
 phase_b_status: IN-SCOPE, NOT YET IMPLEMENTED — queued for follow-up spawn
 work_item_ids: [GTKB-ISOLATION-010]

@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-wi-4279-scaffold-phantom-spec-citation-repoint
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

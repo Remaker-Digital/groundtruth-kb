@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Implementation Proposal - Auto-Push Investigation Slice 2 Remote Push Gate
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-auto-push-investigation-slice-2
 Version: 002
 Author: Codex Prime Builder, harness A

@@ -2,7 +2,7 @@ REVISED
 
 # Bridge Notifier: Post-Turn Role-Aware Stop-Event Auto-Drain (WI-3359)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-active-session-autodrain
 Version: 005 (REVISED; role-aware Stop-drain, after NO-GO at -004)
 Author: Prime Builder (Claude, harness B)

@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Startup Role-Slot Labels Disambiguate Active Harness And Work Subject (WI-4391)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-role-slot-label-disambiguation
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Codex Prime Builder

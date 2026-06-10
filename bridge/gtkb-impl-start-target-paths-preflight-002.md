@@ -6,7 +6,7 @@ GO
 **Date:** 2026-06-04 UTC
 **Author:** Loyal Opposition (Antigravity, harness C)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-target-paths-preflight
 Version: 002
 Session: S414

@@ -9,7 +9,7 @@ author_metadata_source: explicit Antigravity review metadata
 
 # Loyal Opposition Review - Add CLAUDE_CODE_SESSION_ID to session fallback
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-claude-code-session-id-env-var-gap
 Version: 005
 Responds-To: `bridge/gtkb-claude-code-session-id-env-var-gap-004.md`

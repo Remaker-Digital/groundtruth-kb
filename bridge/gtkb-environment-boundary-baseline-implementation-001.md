@@ -2,7 +2,7 @@ NEW
 
 # GTKB Environment Boundary Baseline Implementation Proposal
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-003]
 target_paths: [".dockerignore", "scripts/check_environment_isolation.py", "scripts/release_candidate_gate.py", "tests/scripts/test_check_environment_isolation.py", "tests/scripts/test_release_candidate_gate.py"]

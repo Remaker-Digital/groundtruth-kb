@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - ADR/DCL Clause-Test Enforcement Slice 2 (Promote Blocking Clauses) (GTKB-ADR-DCL-CLAUSE-TEST-ENFORCEMENT-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-adr-dcl-clause-test-enforcement-slice-2
 Version: 001
 Author: Prime Builder (Claude, harness B)

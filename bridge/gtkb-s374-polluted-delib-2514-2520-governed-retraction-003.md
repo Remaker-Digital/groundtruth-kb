@@ -1,6 +1,6 @@
 # S374 Governed Retraction of Polluted DELIB-2514..2520 and Companion Approval Packets (REVISED-1)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 target_paths: [".groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2514-v2.json", ".groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2515-v2.json", ".groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2516-v2.json", ".groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2517-v2.json", ".groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2518-v2.json", ".groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2519-v2.json", ".groundtruth/formal-artifact-approvals/2026-05-30-DELIB-2520-v2.json", "groundtruth.db", "memory/MEMORY.md", "bridge/gtkb-s374-polluted-delib-2514-2520-governed-retraction-*.md", "bridge/INDEX.md"]
 

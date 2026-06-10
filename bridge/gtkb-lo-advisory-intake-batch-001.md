@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - LO Advisory Intake Batch Disposition (WI-3296..WI-3307)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-advisory-intake-batch
 Version: 001
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Prime Supersession Notice - ISOLATION-018 Agent Red File Migration Parent Re-Scope
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-isolation-018-agent-red-file-migration
 Version: 010
 Author: Prime Builder (Codex, harness A)

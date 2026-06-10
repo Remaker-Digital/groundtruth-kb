@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-7-doctor-marker-checks
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

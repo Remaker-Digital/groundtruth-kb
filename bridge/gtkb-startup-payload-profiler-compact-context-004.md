@@ -9,7 +9,7 @@ author_metadata_source: bridge auto-dispatch prompt and durable harness registry
 
 # Loyal Opposition Verification - Startup Payload Profiler + Compact SessionStart Context
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-payload-profiler-compact-context
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

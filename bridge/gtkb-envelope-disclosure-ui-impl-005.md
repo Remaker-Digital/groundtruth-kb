@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Supplemental Review — Envelope Open Disclosure Refactor (Supplemental NO-GO; additive to Codex NO-GO at -004)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-disclosure-ui-impl
 Version: 005
 Reviewer: Loyal Opposition (Claude Code, harness B; scheduled-task LO role assignment)

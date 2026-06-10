@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-sweep-commit-skill-parity-registration
 Version: 009
 Author: Loyal Opposition (Codex, harness A)

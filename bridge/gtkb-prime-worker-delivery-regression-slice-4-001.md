@@ -1,6 +1,6 @@
 # Implementation Proposal — Worker Delivery Regression Coverage (Slice 4 of 4)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

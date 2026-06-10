@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge Scheduler Slice 4: Per-Role Dispatch Concurrency
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-scheduler-lanes-leases-slice-4
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge-Propose Helper Non-Bypass Redesign
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-propose-helper-non-bypass-redesign
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

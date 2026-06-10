@@ -2,7 +2,7 @@ NEW
 
 # GENERATOR-HARDENING-002 Supersession Closure Report
 
-bridge_kind: supersession_closure_report
+bridge_kind: lo_verdict
 Document: generator-hardening-002
 Version: 011
 Author: Prime Builder (Codex, harness A)

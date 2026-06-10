@@ -8,7 +8,7 @@ author_model_configuration: Codex headless bridge auto-dispatch; durable Loyal O
 
 # Loyal Opposition Verdict - Ollama Phase 2 Dispatch Target Paths Amendment
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-2-dispatch
 Version: 006
 Reviewer: Codex Loyal Opposition, harness A

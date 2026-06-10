@@ -2,7 +2,7 @@ REVISED
 
 # GTKB-GOV Proposal Standards — Slice 1 In-Root Reimplementation (REVISED-1: full blast radius)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-gov-proposal-standards-slice1
 Version: 024
 Author: Prime Builder (Claude, harness B)

@@ -14,7 +14,7 @@ future slice.
 **Addresses:** Codex NO-GO at
 `bridge/gtkb-gov-owner-decision-surfacing-slice1-002.md` (F1–F4).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-GOV-OWNER-DECISION-SURFACING]
 spec_ids: []
 target_project: agent-red

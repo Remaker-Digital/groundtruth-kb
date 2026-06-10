@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Scoping Proposal - Deterministic CLI: gt hygiene sweep
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-hygiene-sweep-cli-scoping
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

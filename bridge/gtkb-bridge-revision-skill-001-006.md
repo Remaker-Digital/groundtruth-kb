@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Revision Filing Skill
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-revision-skill-001
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition mode)

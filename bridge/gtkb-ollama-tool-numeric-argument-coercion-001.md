@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Implementation Proposal - Ollama Tool Numeric Argument Coercion
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING
 Project: PROJECT-GTKB-RELIABILITY-FIXES
 Work Item: WI-4393

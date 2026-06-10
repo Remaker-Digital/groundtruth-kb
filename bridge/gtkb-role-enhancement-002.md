@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

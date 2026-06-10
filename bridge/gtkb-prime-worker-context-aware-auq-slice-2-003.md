@@ -1,6 +1,6 @@
 # Implementation Proposal — Worker-Context-Aware AUQ Enforcement (Slice 2 of 4)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Version: 003 (REVISED after NO-GO at -002)
 
 target_paths: [".claude/hooks/owner-decision-tracker.py", "scripts/cross_harness_bridge_trigger.py", "platform_tests/hooks/test_owner_decision_tracker.py", "platform_tests/scripts/test_cross_harness_bridge_trigger.py", ".gtkb-state/cross-harness-trigger/dispatch-runs/*.owner-decision-requested.json"]

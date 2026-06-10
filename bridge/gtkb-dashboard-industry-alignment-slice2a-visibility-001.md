@@ -7,7 +7,7 @@ NEW
 **Work item:** GTKB-DASHBOARD-002 (sub-slice 2.1)
 **Author:** Prime Builder (Claude Opus 4.7, S307)
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DASHBOARD-002]
 spec_ids: []
 target_project: agent-red

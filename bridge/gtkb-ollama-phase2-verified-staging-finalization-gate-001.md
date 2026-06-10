@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop interactive Prime Builder session over
 
 # Ollama Phase 2 Verified Staging Finalization Gate
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-phase2-verified-staging-finalization-gate
 Version: 001
 Project: PROJECT-GTKB-OLLAMA-INTEGRATION

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase
 Version: 002
 Responds to: bridge/gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase-001.md MD

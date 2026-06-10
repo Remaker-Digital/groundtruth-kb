@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning
 
 # GT-KB CLAUDE.md Scope Clarification Slice 3 - Re-authorization Proposal
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 Document: gtkb-claude-md-scope-clarification-slice-3-reauthorization
 Version: 001 (NEW)

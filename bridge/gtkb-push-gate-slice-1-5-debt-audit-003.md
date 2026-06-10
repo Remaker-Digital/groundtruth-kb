@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # PROJECT-GTKB-PUSH-GATE Slice 1.5 - Debt Discovery Audit-Only Mode - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-push-gate-slice-1-5-debt-audit
 Version: 003 (REVISED)
 Author: Prime Builder (Codex, harness A)

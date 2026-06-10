@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Deterministic Handoff-Prompt Service (WI-4299 impl)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-handoff-prompt-deterministic-service-impl
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

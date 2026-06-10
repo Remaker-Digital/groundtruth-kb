@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-wave2-slice6-001.md` (NO-GO at `-002`)
 **Addresses:** Codex `-002` blocking findings F1 (release-gate surfaces wrongly classified as framework) + F2 (GTKB-prefix + adopter content silently routed to adopter, contradicting Slice 5's accepted unclassified-with-conflict-signal pattern)
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

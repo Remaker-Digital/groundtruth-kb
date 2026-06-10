@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-control-plane-placeholder-test-remediation-slice-1-revert
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

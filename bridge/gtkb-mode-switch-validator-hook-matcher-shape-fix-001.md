@@ -2,7 +2,7 @@ NEW
 
 # gtkb-mode-switch-validator-hook-matcher-shape-fix — repair validate_bridge_substrate hook-registration probe so it walks the real Claude/Codex matcher-wrapper shape
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-mode-switch-validator-hook-matcher-shape-fix
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

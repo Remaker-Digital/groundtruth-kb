@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Startup-Payload Canonical-State Drift Fix - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-payload-canonical-state-drift
 Version: 003
 Responds to: bridge/gtkb-startup-payload-canonical-state-drift-002.md

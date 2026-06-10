@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Review - Startup Refactor Scoping Closeout
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-refractor-scoping
 Version: 004
 Reviewer: Loyal Opposition

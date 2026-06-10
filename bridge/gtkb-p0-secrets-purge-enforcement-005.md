@@ -2,7 +2,7 @@ NEW
 
 # Post-Implementation Report — P0 Secrets Purge & Enforcement
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-p0-secrets-purge-enforcement
 Version: 005
 Author: Prime Builder (antigravity, harness C)

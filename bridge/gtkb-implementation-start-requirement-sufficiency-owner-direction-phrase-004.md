@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-implementation-start-requirement-sufficiency-owner-direction-phrase
 Version: 004
 Author: Loyal Opposition (Antigravity, harness C)

@@ -9,7 +9,7 @@ author_metadata_source: Ollama D direct /api/chat response captured 2026-06-07; 
 
 # Bridge Verdict - gtkb-transcript-scan-dispatch-role-sot - 008
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-transcript-scan-dispatch-role-sot
 Version: 008 (VERIFIED; post-implementation verification)
 Responds to: bridge/gtkb-transcript-scan-dispatch-role-sot-007.md

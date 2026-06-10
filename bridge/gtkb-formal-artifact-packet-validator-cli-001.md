@@ -2,7 +2,7 @@ NEW
 
 # GT-KB Formal-Artifact Packet Validator CLI - Slice 1 NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-formal-artifact-packet-validator-cli
 Version: 001 (NEW; Slice 1 — helper script + tests + first-proposal reference)
 Author: Prime Builder (Claude, harness B)

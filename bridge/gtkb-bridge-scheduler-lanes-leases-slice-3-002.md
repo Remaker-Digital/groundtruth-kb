@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge Scheduler Slice 3: Serialized bridge/INDEX.md Writer
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-scheduler-lanes-leases-slice-3
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

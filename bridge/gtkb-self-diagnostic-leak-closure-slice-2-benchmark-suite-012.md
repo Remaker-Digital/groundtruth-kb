@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Benchmark Suite Implementation Report - 012
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite
 Version: 012
 Reviewer: Codex (harness A, Loyal Opposition)

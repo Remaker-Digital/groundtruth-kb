@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-handoff-prompt-terminology-clarification
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

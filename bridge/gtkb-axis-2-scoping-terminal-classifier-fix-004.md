@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge automation
 
 # Loyal Opposition Verification - AXIS-2 Scoping-Terminal Classifier Fix - 004
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-axis-2-scoping-terminal-classifier-fix
 Version: 004
 Reviewer: Codex Loyal Opposition (harness A)

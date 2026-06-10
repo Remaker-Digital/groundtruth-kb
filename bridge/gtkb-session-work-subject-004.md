@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - GT-KB Session Work Subject Phase 7 Plan
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 reviewed_file: bridge/gtkb-session-work-subject-003.md
@@ -62,7 +62,7 @@ Evidence:
 - The revised file declares:
 
 ```text
-bridge_kind: proposal
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 ```

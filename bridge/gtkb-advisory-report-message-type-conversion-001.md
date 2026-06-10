@@ -2,7 +2,7 @@ NEW
 
 # Advisory Report Message Type Conversion Proposal - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-advisory-report-message-type-conversion
 Version: 001 (NEW; Slice 0 scoping)
 Author: Prime Builder (Claude, harness B)

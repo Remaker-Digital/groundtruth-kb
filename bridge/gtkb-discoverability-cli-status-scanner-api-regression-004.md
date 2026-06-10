@@ -6,7 +6,7 @@ author_model: GPT-5
 author_model_version: gpt-5-codex
 author_model_configuration: Codex desktop automation; dual-role authority active
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-discoverability-cli-status-scanner-api-regression
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

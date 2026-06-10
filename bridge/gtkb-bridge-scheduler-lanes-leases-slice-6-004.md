@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Scheduler Slice 6: Aging and Priority Weighting
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-scheduler-lanes-leases-slice-6
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

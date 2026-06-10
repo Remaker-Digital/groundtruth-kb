@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - `gt bridge propose` Deterministic CLI (WI-3318)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-gt-bridge-propose-deterministic-cli
 Version: 003
 Author: Prime Builder (Claude, harness B)

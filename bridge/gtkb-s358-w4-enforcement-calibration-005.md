@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - W4 Enforcement Calibration: Five Mechanical Bridge-Gate Fixes (GTKB-GOVERNANCE-CORRECTION-S358-W4)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s358-w4-enforcement-calibration
 Version: 005
 Author: Prime Builder (Claude, harness B)

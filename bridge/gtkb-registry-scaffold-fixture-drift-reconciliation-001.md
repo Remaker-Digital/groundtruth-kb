@@ -7,7 +7,7 @@ author_model_version: GPT-5
 author_model_configuration: Codex Desktop; collaboration_mode=Default; session-stated prime-builder via ::init gtkb pb
 author_metadata_source: explicit-codex-session
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-registry-scaffold-fixture-drift-reconciliation
 Version: 001
 Date: 2026-06-02 UTC

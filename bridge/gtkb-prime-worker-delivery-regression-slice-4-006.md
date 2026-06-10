@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex review metadata
 
 # Loyal Opposition Review - Worker Delivery Regression Coverage Slice 4
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-delivery-regression-slice-4
 Version: 006
 Responds-To: `bridge/gtkb-prime-worker-delivery-regression-slice-4-005.md`

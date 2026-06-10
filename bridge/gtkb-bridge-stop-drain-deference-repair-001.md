@@ -2,7 +2,7 @@ NEW
 
 # Repair bridge-stop-drain Deference Gaps: Owner-Decision Recency Window and Missing Wrap-Up-Command Deference (WI-3363)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-stop-drain-deference-repair
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

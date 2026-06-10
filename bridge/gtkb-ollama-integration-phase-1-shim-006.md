@@ -9,7 +9,7 @@ author_model_configuration: Codex headless bridge auto-dispatch; durable role lo
 
 # Loyal Opposition Verdict - Ollama Shim Parser-Format Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

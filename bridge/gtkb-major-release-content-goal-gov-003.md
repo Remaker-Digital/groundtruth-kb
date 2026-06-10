@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-major-release-content-goal-gov
 Version: 003
 Project: PROJECT-GTKB-V1-RELEASE-STRATEGY-001

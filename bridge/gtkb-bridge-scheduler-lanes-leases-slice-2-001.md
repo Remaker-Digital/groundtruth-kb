@@ -2,7 +2,7 @@ NEW
 
 # Bridge Scheduler Slice 2: Per-Document Lease Registry
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-scheduler-lanes-leases-slice-2
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

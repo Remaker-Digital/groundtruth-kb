@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Loyal Opposition Verification - LO Hygiene Assessment Skill Build - 010
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-lo-hygiene-assessment-skill-build
 Version: 010
 Date: 2026-06-03 UTC

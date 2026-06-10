@@ -9,7 +9,7 @@ author_model_configuration: Codex headless bridge auto-dispatch, Loyal Oppositio
 
 # Loyal Opposition Verdict - Platform SoT Consolidation Umbrella
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-platform-sot-consolidation-umbrella
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

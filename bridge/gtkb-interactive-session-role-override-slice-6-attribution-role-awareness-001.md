@@ -13,7 +13,7 @@ target_paths: ["scripts/_kb_attribution.py", "platform_tests/scripts/test_kb_att
 
 # GT-KB Interactive Session Role Override - Slice 6 - MemBase Attribution Role-Awareness
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-6-attribution-role-awareness
 Version: 001 (NEW)

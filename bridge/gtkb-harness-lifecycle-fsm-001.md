@@ -1,6 +1,6 @@
 # Implementation Proposal — Harness Lifecycle Finite State Machine (WI-3339)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Version: 001 (NEW)
 
 target_paths: ["groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py", "groundtruth-kb/tests/test_harness_lifecycle.py"]

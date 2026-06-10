@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Loyal Opposition Startup Symmetry REVISED-3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-loyal-opposition-startup-symmetry-001
 Version: 008
 Reviewer: Codex (harness A, Loyal Opposition)

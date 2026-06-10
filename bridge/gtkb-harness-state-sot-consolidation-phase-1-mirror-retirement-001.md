@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Mirror-Retirement: delete harness-state/role-assignments.json + remove its drift-registry/inventory references (Child 4, final)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

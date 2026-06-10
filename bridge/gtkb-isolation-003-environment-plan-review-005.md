@@ -2,7 +2,7 @@ REVISED
 
 # GTKB-ISOLATION-003 Planning GO Acceptance + Closure Report (REVISED-1)
 
-bridge_kind: closure
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-003]
 references:

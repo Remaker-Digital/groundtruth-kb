@@ -2,7 +2,7 @@ NEW
 
 # GTKB Session Overlay Baseline Implementation Proposal
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-006]
 target_paths: [".gitignore", "scripts/gtkb_overlay.py", "scripts/check_session_overlay_policy.py", "scripts/release_candidate_gate.py", "scripts/session_self_initialization.py", "tests/scripts/test_gtkb_overlay.py", "tests/scripts/test_release_candidate_gate.py", "tests/scripts/test_session_self_initialization.py"]

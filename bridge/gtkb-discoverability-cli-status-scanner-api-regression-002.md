@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop automation; dual-role authority active
 
 # Loyal Opposition Review - Discoverability CLI Status Scanner API Regression
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-discoverability-cli-status-scanner-api-regression
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

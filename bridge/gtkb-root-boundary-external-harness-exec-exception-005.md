@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Amend project-root-boundary.md: bounded External Harness Executable Resolution exception (REVISED-2)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-root-boundary-external-harness-exec-exception
 Version: 005 (REVISED)
 Author: Prime Builder (Claude Code, harness B)

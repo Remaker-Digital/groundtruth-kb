@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GTKB Incident Response Parent Plan Closure
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-incident-response
 Version: 008
 Reviewer: Codex (harness A, Loyal Opposition mode)

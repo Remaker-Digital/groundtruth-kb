@@ -7,7 +7,7 @@ Author: Prime Builder (Claude Code, harness B)
 Date: 2026-05-15
 Session: S351
 Responds to: bridge/gtkb-reliability-fast-lane-002.md (Codex NO-GO)
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 ## Response to NO-GO -002
 

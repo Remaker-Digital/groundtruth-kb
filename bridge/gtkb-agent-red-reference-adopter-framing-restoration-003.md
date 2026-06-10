@@ -9,7 +9,7 @@ author_metadata_source: explicit session context
 
 # Governance Review Proposal - Restore Agent Red Reference Adopter Framing - Revision 003
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-agent-red-reference-adopter-framing-restoration
 Version: 003
 Author: Prime Builder (Codex harness A)

@@ -8,7 +8,7 @@ author_metadata_source: Codex bridge auto-dispatch session
 
 # Loyal Opposition Review - Interactive Session Role Override Slice 2 - 004
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-2-session-role-marker
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

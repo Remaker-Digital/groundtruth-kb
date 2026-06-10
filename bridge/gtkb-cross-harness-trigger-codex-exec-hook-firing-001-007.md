@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - Cross-Harness Trigger Codex-Exec Hook Firing
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
 Version: 007
 Author: Prime Builder (Codex, harness A)

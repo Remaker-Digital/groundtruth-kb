@@ -2,7 +2,7 @@ NEW
 
 # Advisory Report Dashboard Counters Spec - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-advisory-report-dashboard-counters-spec
 Version: 001 (NEW; Slice 1 — dashboard counter specification)
 Author: Prime Builder (Claude, harness B)

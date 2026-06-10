@@ -7,7 +7,7 @@ REVISED
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex NO-GO at `bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-002.md` with four blocking findings (F1: test mapping omits linked governing specs; F2: CLI defaults are fail-open for coverage gaps; F3: waiver validation accepts text instead of verified owner approval; F4: target classification conflicts with root-boundary rule).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-PLATFORM-SPEC-COVERAGE-ARCHITECTURE]
 spec_ids: [DCL-VERIFIED-BRIDGE-HISTORY-001, DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001]
 parent_bridge: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-005.md (umbrella REVISED-2; approved at -006)

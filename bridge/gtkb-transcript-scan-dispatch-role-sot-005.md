@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Cross-Harness Dispatch Prompt Uses Harness Registry Role SoT (WI-4390)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-transcript-scan-dispatch-role-sot
 Version: 005 (REVISED after authorization-shape NO-GO)
 Author: Codex Prime Builder

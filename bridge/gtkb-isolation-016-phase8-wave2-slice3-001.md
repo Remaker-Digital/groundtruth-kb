@@ -13,7 +13,7 @@ NEW
 - `bridge/gtkb-isolation-016-phase8-wave2-slice2-006.md` (Slice 2 VERIFIED — `_inventory.py` lane)
 - `bridge/gtkb-isolation-016-phase8-wave2-slice2-004.md` GO recommendation: "Proceed to the next bridge slice for driver wire-up"
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 target_project: agent-red
 implementation_scope: scripts/rehearse_isolation.py + tests

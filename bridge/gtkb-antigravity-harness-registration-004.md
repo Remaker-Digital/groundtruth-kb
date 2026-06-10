@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-antigravity-harness-registration
 Version: 004
 Author: Loyal Opposition (Antigravity C / Codex A Proxy)

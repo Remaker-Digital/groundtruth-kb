@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Envelope Open Disclosure Refactor (WI-4298 impl, scoped to open surface)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-envelope-disclosure-ui-impl
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Formal-Artifact Packet Validator CLI Slice 1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-formal-artifact-packet-validator-cli
 Version: 003
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Envelope Meta-Model ADR + DCL Proposal (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-meta-model-adr-dcl-001
 Version: 002
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

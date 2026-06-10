@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - LO File-Safety PreToolUse Enforcement Slice 1 REVISED-2
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-lo-file-safety-pretooluse-enforcement-slice-1
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

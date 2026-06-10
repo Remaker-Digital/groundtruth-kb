@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-index-agent-edit-serialization-scoping
 Version: 004
 Author: Prime Builder (Antigravity, harness C)

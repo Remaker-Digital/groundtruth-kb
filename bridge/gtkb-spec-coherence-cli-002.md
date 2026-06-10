@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge automation
 
 # Loyal Opposition Verdict - gt validate spec-coherence Implementation Proposal - 002
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-spec-coherence-cli
 Version: 002
 Reviewer: Codex Loyal Opposition (harness A)

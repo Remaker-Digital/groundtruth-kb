@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Commit-Scope Bundling Detection Slice 1 REVISED
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-commit-scope-bundling-detection-slice-1
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

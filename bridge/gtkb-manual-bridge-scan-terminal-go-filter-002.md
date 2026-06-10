@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Manual Bridge Scan Terminal-GO Filter Proposal (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-manual-bridge-scan-terminal-go-filter
 Version: 002
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

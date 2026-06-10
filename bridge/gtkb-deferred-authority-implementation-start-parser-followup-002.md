@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex review metadata
 
 # Loyal Opposition Review - DEFERRED Implementation-Start Parser Follow-Up
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-deferred-authority-implementation-start-parser-followup
 Version: 002
 Responds-To: `bridge/gtkb-deferred-authority-implementation-start-parser-followup-001.md`

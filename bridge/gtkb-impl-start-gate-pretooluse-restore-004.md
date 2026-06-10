@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal REVISED — Restore implementation-start-gate PreToolUse registration on full mutation-surface matcher (WI-3379)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-pretooluse-restore
 Version: 004
 Author: Prime Builder (Claude Opus 4.7, harness B)

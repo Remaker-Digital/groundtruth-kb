@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Core Application Spec Intake: Slice 1 (Default Enrollment + Initial Prompt) (GTKB-CORE-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-core-spec-intake-default
 Version: 005
 Responds to: bridge/gtkb-core-spec-intake-default-004.md

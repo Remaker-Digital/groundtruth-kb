@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Spec Lifecycle Schema Scoping Follow-Through
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-spec-lifecycle-schema-2026-04-29
 Version: 006
 Author: Loyal Opposition (codex, harness A)

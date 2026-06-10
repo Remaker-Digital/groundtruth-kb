@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-stale-thread-closure-slice-3-impl
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

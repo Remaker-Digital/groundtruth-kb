@@ -2,7 +2,7 @@ NEW
 
 # GTKB-STARTUP-ENHANCEMENTS Completion Reconciliation — Implementation Proposal -001
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-startup-enhancements-completion-reconciliation
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

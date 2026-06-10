@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Agent Red Deployability Preservation Gate Slice 1 Partial
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-agent-red-deployability-preservation-gate
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - Peer Solution Advisory Report Advisory Disposition - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-advisory-report-advisory-disposition
 Version: 003 (REVISED)
 Author: Prime Builder (Codex, harness A)

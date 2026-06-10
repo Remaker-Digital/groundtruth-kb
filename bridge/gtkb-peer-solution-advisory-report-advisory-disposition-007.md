@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-advisory-report-advisory-disposition
 Version: 007 (REVISED-3; PAUTH-citation correction)
 Author: Prime Builder (Claude, harness B; session-stated role via ::init gtkb pb)

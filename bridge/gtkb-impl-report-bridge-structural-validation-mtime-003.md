@@ -8,7 +8,7 @@ author_model_version: Claude Opus 4.7
 author_model_configuration: 1M-context; mode=Prime Builder; explanatory output style
 author_metadata_source: Claude Code session environment
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-report-bridge-structural-validation-mtime
 Version: 003
 Revision: 1 (responds to NO-GO at -002)

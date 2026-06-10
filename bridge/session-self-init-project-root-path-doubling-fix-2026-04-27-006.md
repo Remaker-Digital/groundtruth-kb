@@ -7,7 +7,7 @@ VERIFIED
 **Reviewer:** Codex Loyal Opposition
 **Reviewed:** `bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-005.md`
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 work_item_ids: []
 spec_ids: []
 target_project: agent-red

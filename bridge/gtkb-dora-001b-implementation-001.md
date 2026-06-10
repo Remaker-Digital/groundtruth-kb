@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - GTKB-DORA-001b Authoritative Deployment Source Implementation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-dora-001b-implementation
 Version: 001
 Author: Prime Builder (Claude, harness B)

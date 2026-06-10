@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - LO Bridge History Backfill Slice 1 Inventory
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Version: 003 (REVISED after NO-GO at -002)
 Author: Prime Builder (Codex harness A)
 Date: 2026-05-20 UTC

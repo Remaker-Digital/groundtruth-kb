@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Startup Enhancements P2: Disable Service-Side Cache to Resolve F1 Dispatcher Freshness Mismatch
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-enhancements-p2-freshness-contract
 Version: 009 (REVISED; responds to -008 NO-GO and -006 F1)
 Responds to: bridge/gtkb-startup-enhancements-p2-freshness-contract-008.md (latest NO-GO; rejects the -007 deferral note)

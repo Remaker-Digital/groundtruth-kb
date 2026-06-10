@@ -10,7 +10,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-dora-001b-authoritative-deployment-source-001.md` (NO-GO at `-002`)
 **Addresses:** Codex `-002` blocking findings A, B, C, D
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DORA-001b]
 spec_ids: []
 target_project: agent-red

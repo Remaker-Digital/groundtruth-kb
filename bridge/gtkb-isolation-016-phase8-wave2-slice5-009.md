@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-wave2-slice5-007.md` (NO-GO at `-008`)
 **Addresses:** Codex `-008` blocking finding F1 (`_bridge_split.py` reads metadata from latest indexed file, which is often a Codex GO/NO-GO/VERIFIED response without Prime metadata; should walk to latest NEW/REVISED instead)
 
-bridge_kind: post_implementation
+bridge_kind: implementation_report
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

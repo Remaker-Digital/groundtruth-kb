@@ -14,7 +14,7 @@ adopt via `gt project upgrade` once the dispatcher hook in CS-2 is
 upstream-routed). Architecture is GT-KB-wide; the registry-tracking
 mechanism is the same in every adopter.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-COMMAND-SURFACE]
 spec_ids: []
 target_project: agent-red

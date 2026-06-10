@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-deterministic-services-stale-status-reconciliation
 Version: 002
 Responds to: bridge/gtkb-deterministic-services-stale-status-reconciliation-001.md NEW

@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl
 Version: 005
 Responds to: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-004.md NO-GO

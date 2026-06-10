@@ -1,7 +1,7 @@
 REVISED
 
 Status: REVISED
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Author: prime-builder (Claude harness B)
 Date: 2026-05-15
 Session: S353+

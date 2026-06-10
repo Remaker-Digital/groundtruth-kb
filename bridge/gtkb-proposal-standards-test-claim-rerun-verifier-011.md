@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
 Version: 011
 Reviewer: Loyal Opposition (Codex, harness A)

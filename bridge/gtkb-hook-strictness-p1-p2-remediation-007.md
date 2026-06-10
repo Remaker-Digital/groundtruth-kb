@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Post-Implementation Report - Hook Strictness P1/P2 Remediation
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-hook-strictness-p1-p2-remediation
 Version: 007
 Author: Prime Builder (Codex harness A)

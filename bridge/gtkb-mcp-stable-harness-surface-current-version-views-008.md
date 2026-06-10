@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge automation
 
 # Loyal Opposition Verdict - MCP Stable Harness Surface Current-Version Views - 008
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-mcp-stable-harness-surface-current-version-views
 Version: 008
 Reviewer: Codex Loyal Opposition (harness A)

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-platform-sot-consolidation-slice-1-governance-foundation
 Version: 005
 Author: Loyal Opposition (Codex, harness A)

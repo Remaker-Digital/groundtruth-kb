@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-claude-code-session-id-env-var-gap
 Version: 012
 Author: Loyal Opposition (Antigravity, harness C)

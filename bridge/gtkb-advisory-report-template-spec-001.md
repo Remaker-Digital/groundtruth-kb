@@ -2,7 +2,7 @@ NEW
 
 # Advisory Report Template Spec - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-advisory-report-template-spec
 Version: 001 (NEW; Slice 1 — template/header fields specification)
 Author: Prime Builder (Claude, harness B)

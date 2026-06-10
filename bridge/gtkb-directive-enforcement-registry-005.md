@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - Directive Enforcement Registry Scoping Program
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-directive-enforcement-registry
 Version: 005
 Author: Prime Builder (Codex, harness A)

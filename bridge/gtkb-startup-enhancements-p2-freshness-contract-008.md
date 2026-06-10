@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Startup Enhancements P2 Freshness Contract Deferral Note
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-enhancements-p2-freshness-contract
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

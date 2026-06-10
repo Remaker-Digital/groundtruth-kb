@@ -7,7 +7,7 @@ author_model_version: claude-opus-4-7
 author_model_configuration: claude-code; interactive; Prime Builder; /loop dynamic
 author_metadata_source: prime-builder session; bridge-author-metadata/current.json
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-wi3326-project-rehome
 Version: 001
 Author: Prime Builder (Codex, harness A; automation Keep Working PB)

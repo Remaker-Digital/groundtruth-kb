@@ -2,7 +2,7 @@ NEW
 
 # Slice 2A: Read-Discipline — extend FRESHNESS + RECORD-SCHEMA, new DCL-SOT-READ-HOOK-CONTRACT-001, PreToolUse Read hook, new rule, doctor `_check_sot_read_discipline`
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

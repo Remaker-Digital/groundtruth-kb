@@ -14,7 +14,7 @@ NEW
 - 2026-04-26 GOV-17 ack: Track 1 may modify `scripts/deploy_pipeline.py`
 - 2026-04-26 source-shape: Source A primary, Source C reconcile, Source B deferred to GTKB-DORA-001c
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DORA-001b]
 spec_ids: []
 target_project: agent-red

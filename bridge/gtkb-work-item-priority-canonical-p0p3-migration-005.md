@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Defect-Fix Proposal REVISED-2 - Canonicalize work_items.priority field values to P0/P1/P2/P3 schema (data hygiene migration)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-item-priority-canonical-p0p3-migration
 Version: 005 (REVISED-2)
 Reviewed-against: bridge/gtkb-work-item-priority-canonical-p0p3-migration-004.md (NO-GO)

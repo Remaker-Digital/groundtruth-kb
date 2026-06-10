@@ -12,7 +12,7 @@ Work Item: WI-3303
 
 # Implementation Proposal - LO Hygiene Assessment Skill Build
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-hygiene-assessment-skill-build
 Version: 002 (REVISED)
 Author: Prime Builder (Codex, harness A)

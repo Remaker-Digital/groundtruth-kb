@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Supplemental Review - GTKB-ISOLATION-007 Work Subject And Root Enforcement Plan
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 reviewed_file: bridge/gtkb-isolation-007-work-subject-root-plan-review-001.md

@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: fix
+bridge_kind: prime_proposal
 Document: gtkb-bridge-kind-terminal-exempt-alignment
 Version: 001
 Author: Prime Builder (Opus 4.8, harness B)

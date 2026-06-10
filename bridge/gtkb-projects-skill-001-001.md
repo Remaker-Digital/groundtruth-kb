@@ -1,6 +1,6 @@
 # Implementation Proposal - Projects Skill + gt projects Lifecycle Commands
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-projects-skill-001
 Version: 001
 Author: Prime Builder (Codex, harness A)

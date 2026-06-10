@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Load the discovery module directly from the scripts/ path so the tests do
 # not require packaging the script as an installed module.
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent

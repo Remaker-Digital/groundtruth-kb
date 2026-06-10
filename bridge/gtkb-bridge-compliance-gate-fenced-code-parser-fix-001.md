@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Bridge Compliance Gate Fenced-Code Parser Fix (GTKB-BRIDGE-COMPLIANCE-GATE-FENCED-CODE-PARSER-FIX)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-compliance-gate-fenced-code-parser-fix
 Version: 001
 Author: Prime Builder (Claude, harness B)

@@ -108,6 +108,7 @@ _KIND_TERMINAL_TOKENS: Final[tuple[str, ...]] = (
     "governance_review",
     "spec_intake",  # also matched by candidate_spec_intake above; explicit for symmetry
     "loyal_opposition_advisory",
+    "governance_advisory",
 )
 
 _KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
@@ -120,6 +121,7 @@ _KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
     "post_implementation",  # catches post_implementation_report, post_implementation_report_revision, post-implementation-report (after kebab-norm)
     "post_impl",  # catches post_impl_report
     "implementation_report",
+    "prime_proposal",
 )
 
 # Bare "proposal", "review", "verification", and unrecognized kinds → ambiguous

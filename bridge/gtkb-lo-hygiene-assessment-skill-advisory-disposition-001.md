@@ -2,7 +2,7 @@ NEW
 
 # Prime Disposition - LO Hygiene Assessment Skill Advisory (WI-3303)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-hygiene-assessment-skill-advisory-disposition
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

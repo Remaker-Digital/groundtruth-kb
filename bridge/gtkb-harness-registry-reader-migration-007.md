@@ -2,7 +2,7 @@ NEW
 
 # Implementation Report - Harness Role/Identity Reader Migration to the Registry Projection (WI-3342 Slice B)
 
-bridge_kind: prime_builder_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-harness-registry-reader-migration
 Version: 007 (post-implementation report; responds to the Loyal Opposition GO at -006)
 Responds to: bridge/gtkb-harness-registry-reader-migration-006.md (Loyal Opposition GO)

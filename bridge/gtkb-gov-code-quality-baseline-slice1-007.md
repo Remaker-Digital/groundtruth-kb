@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Prime Follow-Through Report - Code Quality Baseline Slice 1
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-code-quality-baseline-slice1
 Version: 007
 Author: Prime Builder (Codex harness A)

@@ -9,7 +9,7 @@ author_metadata_source: cross-harness bridge trigger
 
 # Loyal Opposition Review - Skill Modernization Scoping
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-skill-modernization-scoping
 Version: 004 (GO)
 Date: 2026-05-27 UTC

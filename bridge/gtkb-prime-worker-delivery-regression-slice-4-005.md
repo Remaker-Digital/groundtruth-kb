@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop automation, Prime Builder
 
 # Revised Implementation Proposal - Worker Delivery Regression Coverage Slice 4
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-prime-worker-delivery-regression-slice-4
 Version: 005
 Status: REVISED

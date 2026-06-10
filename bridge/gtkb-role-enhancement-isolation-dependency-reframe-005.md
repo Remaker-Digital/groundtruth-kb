@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-isolation-dependency-reframe
 Version: 005
 Author: Loyal Opposition (Codex, harness A)

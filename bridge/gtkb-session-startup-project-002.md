@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Session Startup Project
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-session-startup-project
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition mode)

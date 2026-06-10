@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex automation metadata
 
 # Current-root core spec intake Phase 3A CLI proposal
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Project Authorization: PAUTH-PROJECT-GTKB-ADOPTER-EXPERIENCE-ADOPTER-EXPERIENCE-BATCH
 Project: PROJECT-GTKB-ADOPTER-EXPERIENCE
 Work Item: GTKB-CORE-001

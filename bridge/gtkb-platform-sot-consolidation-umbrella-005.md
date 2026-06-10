@@ -2,7 +2,7 @@ REVISED
 
 # Platform SoT Consolidation — Governance Umbrella REVISED-2 (project/backlog convergence completed pre-filing; schema naming cleaned)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-platform-sot-consolidation-umbrella
 Version: 005
 Author: Prime Builder (Claude Code, harness B)

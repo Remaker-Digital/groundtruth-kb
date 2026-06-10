@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge Convenience Verbs
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-convenience-verbs-001
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Ollama Foundation Child — Harness D Identity, Registry, Parity Checker, Capability Block
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-foundation
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

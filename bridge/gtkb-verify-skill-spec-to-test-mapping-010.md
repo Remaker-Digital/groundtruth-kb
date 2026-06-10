@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-verify-skill-spec-to-test-mapping
 Version: 010
 Author: Loyal Opposition (Antigravity, harness C)

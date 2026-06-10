@@ -6,7 +6,7 @@ Status: NO-GO on leaving public GitHub AI harness, skill, plugin, automation,
 semantic-context, and workflow-engine research as chat-only or ad hoc input.
 Author: Codex Loyal Opposition
 Date: 2026-05-11 11:00 America/Los_Angeles
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Source report:
 `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-11-11-00-GITHUB-AI-HARNESS-ECOSYSTEM-ADVISORY.md`
 

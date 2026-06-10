@@ -2,7 +2,7 @@ NEW
 
 # GTKB-ISOLATION-005 Planning-GO Closure Report
 
-bridge_kind: closure
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-005]
 references_go: bridge/gtkb-isolation-005-control-plane-plan-review-002.md

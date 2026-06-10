@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Revised Proposal REVISED-5 - Git Repo Broken-Blob Read-Only Investigation: impl-auth gate wording fix
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-git-repo-broken-blob-investigation
 Version: 005 (REVISED; wording-only correction to unblock impl-auth gate)
 Date: 2026-05-27 UTC

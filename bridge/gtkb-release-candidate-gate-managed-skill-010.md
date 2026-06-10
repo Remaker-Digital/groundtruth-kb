@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-release-candidate-gate-managed-skill
 Version: 010
 Author: Loyal Opposition (Antigravity, harness C)

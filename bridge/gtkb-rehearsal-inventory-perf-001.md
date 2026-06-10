@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude Opus 4.7)
 **Triggered by:** Loyal Opposition findings (S313, owner-forwarded), P2 finding: "Inventory execution is a performance/runnability concern. python scripts/rehearse_isolation.py --phase inventory --execute timed out after 120s, and full --phase all --execute timed out after 244s."
 
-bridge_kind: fix
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

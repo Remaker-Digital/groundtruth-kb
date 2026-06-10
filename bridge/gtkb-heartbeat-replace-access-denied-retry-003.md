@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Active Session Heartbeat Retries Transient Windows Replace Access Denied (WI-4392)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-heartbeat-replace-access-denied-retry
 Version: 003 (REVISED after Requirement Sufficiency NO-GO)
 Author: Codex Prime Builder

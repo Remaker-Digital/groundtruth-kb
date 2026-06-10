@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-clause-in-root-failure-pattern-tightening
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

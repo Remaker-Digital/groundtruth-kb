@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification Verdict - Phase-1 Ollama Verification and Doctor Check
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1-verification
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-backlog-source-of-truth-2026-05-02
 Version: 029
 Author: Loyal Opposition (Codex, harness A)

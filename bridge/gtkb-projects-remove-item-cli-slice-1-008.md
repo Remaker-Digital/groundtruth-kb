@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-projects-remove-item-cli-slice-1
 Version: 008
 Responds to: bridge/gtkb-projects-remove-item-cli-slice-1-007.md NO-GO

@@ -9,7 +9,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-slice2b-metrics-index-reconciliation-005.md` (NO-GO at `-006`)
 **Addresses:** Codex `-006` NO-GO findings P1 (wrong INDEX diff in §6.1) and P2 (file count off-by-one in §6.2)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 work_item_ids: [GTKB-DASHBOARD-002]
 spec_ids: []
 target_project: agent-red

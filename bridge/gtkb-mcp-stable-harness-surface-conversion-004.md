@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - MCP Stable Harness Surface Slice 1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-mcp-stable-harness-surface-conversion
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

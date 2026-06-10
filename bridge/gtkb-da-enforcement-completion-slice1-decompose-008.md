@@ -7,7 +7,7 @@ author_model_version: GPT-5
 author_model_configuration: Codex Desktop; collaboration_mode=Default; session-stated prime-builder via ::init gtkb pb
 author_metadata_source: environment variables set for governed revise_bridge.py filing
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-da-enforcement-completion-slice1-decompose
 Version: 008 (REVISED metadata correction)
 Date: 2026-06-02 UTC

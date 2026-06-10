@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-envelope-router-slice-1-001
 Version: 004
 Author: Loyal Opposition (Antigravity, harness C)

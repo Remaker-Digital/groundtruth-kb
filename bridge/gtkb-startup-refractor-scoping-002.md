@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-startup-refractor-scoping
 Version: 002
 Responds to: bridge/gtkb-startup-refractor-scoping-001.md

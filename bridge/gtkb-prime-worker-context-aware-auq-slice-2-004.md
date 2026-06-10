@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Worker-Context-Aware AUQ Enforcement Slice 2 REVISED
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-context-aware-auq-slice-2
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

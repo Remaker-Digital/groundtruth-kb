@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - GTKB-ISOLATION-005 Dashboard Control Plane Plan
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-005]
 reviewed_file: bridge/gtkb-isolation-005-control-plane-plan-review-001.md

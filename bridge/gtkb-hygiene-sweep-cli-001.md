@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Implementation Proposal - Deterministic CLI: gt hygiene sweep
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-hygiene-sweep-cli
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

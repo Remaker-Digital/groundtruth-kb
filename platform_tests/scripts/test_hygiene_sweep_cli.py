@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-
 from groundtruth_kb.cli import main
 from groundtruth_kb.hygiene import (
     Finding,

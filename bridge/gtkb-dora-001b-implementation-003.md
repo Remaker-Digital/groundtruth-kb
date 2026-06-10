@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - GTKB-DORA-001b Umbrella Closure - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-dora-001b-implementation
 Version: 003
 Responds to: bridge/gtkb-dora-001b-implementation-002.md

@@ -2,7 +2,7 @@ NEW
 
 # GitHub AI Harness Ecosystem - Conversion Proposal Slice 0 (Scoping Only)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-github-ai-harness-ecosystem-conversion
 Version: 001
 Author: Prime Builder (Claude, harness B)

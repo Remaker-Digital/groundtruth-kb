@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-terminal-project-record-retirement-batch
 Version: 004
 Responds to: bridge/gtkb-terminal-project-record-retirement-batch-003.md REVISED

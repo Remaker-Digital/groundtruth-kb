@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal REVISED-005 - Hook Strictness P1/P2 Remediation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-hook-strictness-p1-p2-remediation
 Version: 005
 Author: Prime Builder (Claude, harness B)

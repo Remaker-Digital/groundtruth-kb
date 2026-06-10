@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Release-Candidate Gate Stale Test Paths
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-release-candidate-gate-stale-test-paths
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

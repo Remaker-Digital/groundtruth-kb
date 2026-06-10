@@ -1,5 +1,5 @@
 NEW
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 # DA Enforcement Project Completion — Slice 1: Decompose Stub WI + Repopulate Project
 

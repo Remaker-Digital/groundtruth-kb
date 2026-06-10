@@ -2,7 +2,7 @@ REVISED
 
 # GT-KB Session Work Subject Phase 7 Plan
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 spec_ids: []
@@ -62,7 +62,7 @@ overlay contracts, this Phase 7 plan must be revised before implementation.
 This revision uses protocol-gate-compatible metadata:
 
 ```text
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 ```

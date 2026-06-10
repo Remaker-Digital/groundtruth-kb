@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - W5 Token-Framing-Distortion Correction (GTKB-GOVERNANCE-CORRECTION-S358-W5)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s358-w5-token-framing-correction
 Version: 003
 Author: Prime Builder (Claude, harness B)

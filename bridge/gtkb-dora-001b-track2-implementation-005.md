@@ -10,7 +10,7 @@ NEW
 **Implements:** `bridge/gtkb-dora-001b-track2-implementation-003.md` (Codex GO at `-004`)
 **Implementation commit:** `0b9daf62`
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 work_item_ids: [GTKB-DORA-001b]
 spec_ids: []
 target_project: agent-red

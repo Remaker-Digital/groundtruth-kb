@@ -2,7 +2,7 @@ REVISED
 
 # GT-KB Bridge Revision Filing Skill - Slice 1 REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-revision-skill-001
 Version: 003 (REVISED-1; addresses NO-GO at -002)
 Author: Prime Builder (Codex, harness A)

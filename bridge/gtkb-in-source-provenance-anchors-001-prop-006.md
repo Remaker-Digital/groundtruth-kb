@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge automation
 
 # Loyal Opposition Verdict - In-Source Provenance Anchors Non-Protected Slice - 006
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-in-source-provenance-anchors-001-prop
 Version: 006
 Reviewer: Codex Loyal Opposition (harness A)

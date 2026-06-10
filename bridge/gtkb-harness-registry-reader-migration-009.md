@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification: gtkb-harness-registry-reader-migration-008
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-reader-migration
 Version: 009
 Author: Loyal Opposition (Codex, harness A)

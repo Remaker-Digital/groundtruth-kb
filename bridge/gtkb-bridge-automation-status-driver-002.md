@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Standard Bridge Automation Status Driver
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-automation-status-driver
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition dispatch mode)

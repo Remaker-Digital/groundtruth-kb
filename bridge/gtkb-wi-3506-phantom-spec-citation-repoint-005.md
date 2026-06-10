@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-wi-3506-phantom-spec-citation-repoint
 Version: 005
 Author: Prime Builder (Claude Code, harness B)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - MemBase Effective Use Recovery Next Slice
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-membase-effective-use-recovery-next-slice
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

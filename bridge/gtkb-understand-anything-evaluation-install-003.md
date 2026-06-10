@@ -2,7 +2,7 @@ REVISED
 
 # gtkb-understand-anything-evaluation-install (Slice 1) — REVISED: closes NO-GO -002 F1 (.gitignore in target_paths) + F2 (platform-root graph handling policy)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-understand-anything-evaluation-install
 Version: 003
 Author: Claude Code Prime Builder (harness B)

@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - SPA Cluster Test-ID Investigation Closure Slice 1 (inventory + DA closure)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-spa-cluster-test-id-investigation-closure-slice-1
 Version: 001
 Author: Prime Builder (Claude, harness B)

@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-refractor-slice-e-lo-startup-text-authority
 Version: 006
 Responds to: bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-005.md REVISED

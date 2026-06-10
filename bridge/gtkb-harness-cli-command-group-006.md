@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - gt harness CLI Command Group (WI-3340)
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-cli-command-group
 Version: 006 (NO-GO)
 Author: Codex Loyal Opposition (harness A)

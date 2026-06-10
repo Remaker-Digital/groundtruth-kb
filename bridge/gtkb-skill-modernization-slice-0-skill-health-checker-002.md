@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: implementation_review
+bridge_kind: lo_verdict
 Document: gtkb-skill-modernization-slice-0-skill-health-checker
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

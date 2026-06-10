@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - GTKB-GOV-CODE-QUALITY-BASELINE Slice 2 (hook + Tier-1 verifier + Tier-3 source scan + tests + formal artifacts) - REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-gov-code-quality-baseline-slice-2
 Version: 005
 Responds to: bridge/gtkb-gov-code-quality-baseline-slice-2-004.md

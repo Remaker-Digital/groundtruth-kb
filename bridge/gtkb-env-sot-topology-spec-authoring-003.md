@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Capture env-SoT Topology Principle as ADR + DCL + Revised GOV (REVISED-3: PAUTH+DELIB sequencing + single-per-app restoration)
 
-bridge_kind: spec_intake
+bridge_kind: prime_proposal
 Document: gtkb-env-sot-topology-spec-authoring
 Version: 003 (REVISED)
 Responds-To: bridge/gtkb-env-sot-topology-spec-authoring-002.md (Codex NO-GO on -001)

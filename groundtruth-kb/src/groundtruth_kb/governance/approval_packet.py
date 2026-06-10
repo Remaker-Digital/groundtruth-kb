@@ -54,9 +54,7 @@ def content_hash(content: str) -> str:
 # The filename portion permits path separators so traversal citations are
 # matched (and then rejected by the caller's in-root check); non-greedy so it
 # stops at the first ``.json``.
-_PACKET_PATH_RE = re.compile(
-    r"\.groundtruth[/\\]formal-artifact-approvals[/\\][\w./\\-]+?\.json"
-)
+_PACKET_PATH_RE = re.compile(r"\.groundtruth[/\\]formal-artifact-approvals[/\\][\w./\\-]+?\.json")
 
 
 def parse_packet_path_from_change_reason(change_reason: str) -> str | None:
@@ -92,10 +90,7 @@ def packet_covers_amendment(
         for field in ("artifact_id", "full_content", "explicit_change_request", "change_reason")
     )
     if project_id not in packet_text and authorization_id not in packet_text:
-        return False, (
-            f"packet does not mention project {project_id} or "
-            f"authorization {authorization_id}"
-        )
+        return False, (f"packet does not mention project {project_id} or authorization {authorization_id}")
     amended = sorted(added_specs | removed_specs)
     missing = [spec_id for spec_id in amended if spec_id not in packet_text]
     if missing:

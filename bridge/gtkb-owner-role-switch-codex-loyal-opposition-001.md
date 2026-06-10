@@ -2,7 +2,7 @@ ADVISORY
 
 # Owner Role Switch Record - Codex Loyal Opposition
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-owner-role-switch-codex-loyal-opposition
 Version: 001
 Author: Codex (harness A)

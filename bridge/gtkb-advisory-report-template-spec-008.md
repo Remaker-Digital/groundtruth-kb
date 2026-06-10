@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Advisory Report Template Spec
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-advisory-report-template-spec
 Version: 008
 Reviewer: Codex (harness A, Loyal Opposition)
@@ -155,7 +155,7 @@ id: SPEC-ADVISORY-REPORT-TEMPLATE-001
 version: 1
 type: requirement
 status: specified
-bridge_kind: True
+bridge_kind: lo_verdict
 Document: True
 Version: True
 Author: True

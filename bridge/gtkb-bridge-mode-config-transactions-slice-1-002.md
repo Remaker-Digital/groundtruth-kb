@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Bridge-Mode Config Transactions Slice 1
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-bridge-mode-config-transactions-slice-1
 Version: 002
 Responds to: bridge/gtkb-bridge-mode-config-transactions-slice-1-001.md

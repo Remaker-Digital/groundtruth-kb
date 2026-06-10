@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Canonical Bridge Parser WITHDRAWN Status Handling
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-canonical-bridge-parser-withdrawn-status-handling
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

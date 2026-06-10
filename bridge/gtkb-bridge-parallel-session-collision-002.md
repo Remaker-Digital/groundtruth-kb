@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Bridge Parallel-Session Collision Protection
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-bridge-parallel-session-collision
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

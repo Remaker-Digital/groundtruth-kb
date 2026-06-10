@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal REVISED-2 - Implementation Gate Friction Hygiene
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-implementation-gate-friction-hygiene
 Version: 005
 Author: Prime Builder (Claude, harness B)

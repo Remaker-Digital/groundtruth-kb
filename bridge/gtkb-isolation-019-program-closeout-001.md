@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Isolation Program Closeout + Backstop (GTKB-ISOLATION-019)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-isolation-019-program-closeout
 Version: 001
 Author: Prime Builder (Claude, harness B)

@@ -1,0 +1,21 @@
+from pathlib import Path
+
+ALLOWLISTED_FILENAMES = {".gitkeep", ".ds_store", "thumbs.db", "desktop.ini"}
+
+
+def is_allowlisted_file(path: Path) -> bool:
+    """Return True if the file at path matches the narrow leftover allowlist.
+
+    Allowlisted files do not trigger occupancy on their own.
+    """
+    name_lower = path.name.lower()
+    if name_lower in ALLOWLISTED_FILENAMES:
+        return True
+    if name_lower == "readme.md":
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                first_line = f.readline().strip()
+            return first_line.startswith("<!-- gtkb-application-slot-cleanup-marker -->")
+        except Exception:
+            return False
+    return False

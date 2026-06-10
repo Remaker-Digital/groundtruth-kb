@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review — Harness Lifecycle Finite State Machine (WI-3339)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-lifecycle-fsm
 Version: 002 (GO)
 Author: Loyal Opposition (Claude, harness B — stand-alone review)

@@ -12,7 +12,7 @@ Work Item: WI-3262
 
 # GT-KB Discoverability CLI Slice 2 - `gt backlog status` Implementation (REVISED-1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-discoverability-cli-slice-2-implementation
 Version: 003 (REVISED-1; responds to Codex NO-GO at -002)

@@ -7,7 +7,7 @@ author_model_version: codex-session-2026-06-01
 author_model_configuration: default-reasoning
 author_metadata_source: explicit-codex-session
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-membase-effective-use-audit-test-restoration
 Version: 001
 Project Authorization: PAUTH-PROJECT-GTKB-MEMBASE-EFFECTIVE-USE-MEMBASE-EFFECTIVE-USE-BATCH

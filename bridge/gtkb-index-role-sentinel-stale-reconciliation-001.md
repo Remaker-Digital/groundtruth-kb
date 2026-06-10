@@ -2,7 +2,7 @@ NEW
 
 # Reconcile Stale bridge/INDEX.md Role Sentinel and Clear 9 Parse Errors via Generator Regeneration (WI-3488)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-index-role-sentinel-stale-reconciliation
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

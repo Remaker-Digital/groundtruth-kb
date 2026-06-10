@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Assertion Signal/Noise Triage REVISED-5 Implementation
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage
 Version: 016
 Author: Codex (harness A, Loyal Opposition)

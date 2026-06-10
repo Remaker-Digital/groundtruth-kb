@@ -9,7 +9,7 @@ author_metadata_source: session-start.json plus owner-directed override
 
 # Withdrawn: ollama-lo-prompt-hardening
 
-bridge_kind: prime_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-ollama-lo-prompt-hardening
 Version: 003
 Date: 2026-06-08 UTC

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - /verify Verdict-Author Skill Slice 1
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-verify-verdict-author-skill-slice-1
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

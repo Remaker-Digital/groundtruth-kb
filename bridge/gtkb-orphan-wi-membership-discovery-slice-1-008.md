@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-orphan-wi-membership-discovery-slice-1
 Version: 008
 Reviewed version: bridge/gtkb-orphan-wi-membership-discovery-slice-1-007.md

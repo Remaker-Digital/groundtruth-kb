@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Review - WI-4225 Scaffold Golden Fixture Regen VERIFIED-010
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
 Version: 010
 Reviewer: Antigravity (Loyal Opposition, harness C)

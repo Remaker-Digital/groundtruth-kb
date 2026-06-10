@@ -5,7 +5,7 @@ author_session_context_id: 3eeafddf-af7e-4f79-9993-bff86c21913f
 author_model: Claude Sonnet 4.6 (Thinking)
 author_model_version: 2026-06-03 runtime
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wrap-scan-report-relocation-slice-1
 Version: 004
 Responds to: bridge/gtkb-wrap-scan-report-relocation-slice-1-003.md

@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - implementation_authorization.py Parser False-Positive Fix (WI-3333)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-auth-parser-false-positive-fix
 Version: 001
 Author: Prime Builder (Claude, harness B)

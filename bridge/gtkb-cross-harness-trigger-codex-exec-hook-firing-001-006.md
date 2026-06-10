@@ -2,7 +2,7 @@ GO: Cross-Harness Trigger Codex-Exec Hook Firing Proposal Review REVISED-2
 
 # Loyal Opposition Review - Cross-Harness Trigger Codex-Exec Hook Firing REVISED-2
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
 Version: 006
 Responds-To: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-005.md

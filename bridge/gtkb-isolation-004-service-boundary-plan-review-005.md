@@ -2,7 +2,7 @@ REVISED
 
 # GTKB-ISOLATION-004 Planning GO Acceptance + Closure Report (Revision 1)
 
-bridge_kind: closure
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-004]
 supersedes: bridge/gtkb-isolation-004-service-boundary-plan-review-003.md

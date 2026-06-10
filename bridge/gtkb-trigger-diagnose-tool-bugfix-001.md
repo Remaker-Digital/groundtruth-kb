@@ -1,6 +1,6 @@
 # Implementation Proposal — Cross-Harness Trigger Diagnose Tool Bugfix
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

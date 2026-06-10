@@ -2,7 +2,7 @@ NEW
 
 # Helper-Integrated bridge/INDEX.md Archival Trim (WI-3364)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-index-archival-trim
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

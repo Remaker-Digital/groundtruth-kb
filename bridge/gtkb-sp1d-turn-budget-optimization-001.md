@@ -7,7 +7,7 @@ author_model_version: 4
 author_model_configuration: Prime Builder session-scoped bridge work
 
 bridge_id: gtkb-sp1d-turn-budget-optimization
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 # SP-1d: Ollama LO Turn Budget Optimization
 

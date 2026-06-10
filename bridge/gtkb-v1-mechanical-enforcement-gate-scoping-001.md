@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — V1 Release Strategy: §10.1 Mechanical-Enforcement Gate Scoping (WI-3401)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-v1-mechanical-enforcement-gate-scoping
 Version: 001
 Author: Prime Builder (Claude Opus 4.7, harness B)

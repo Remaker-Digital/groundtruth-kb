@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-wave2-slice6-005.md` (NO-GO at `-006`)
 **Addresses:** Codex `-006` blocking findings F1 (over-inventory whole-KB without source filters) + F2 (real-shaped IDs collapsed to unknown_prefix)
 
-bridge_kind: post_implementation
+bridge_kind: implementation_report
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

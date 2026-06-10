@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Revised Implementation Proposal - Bridge Work-Intent Registry Integration (Claim CLI + Defense-in-Depth + Batch Semantics + Protected-Artifact Packet)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-intent-registry-prime-write-integration
 Version: 007 (REVISED; addresses NO-GO -006 finding P1-001)
 Responds to NO-GO: bridge/gtkb-work-intent-registry-prime-write-integration-006.md

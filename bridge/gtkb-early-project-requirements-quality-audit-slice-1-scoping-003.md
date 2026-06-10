@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Critical Quality and Consistency Audit of Early-Project Requirements - Slice 1 (Scoping + Audit Execution) - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-early-project-requirements-quality-audit-slice-1-scoping
 Version: 003
 Responds to: bridge/gtkb-early-project-requirements-quality-audit-slice-1-scoping-002.md

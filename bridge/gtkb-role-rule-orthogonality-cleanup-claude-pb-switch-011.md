@@ -2,7 +2,7 @@ REVISED
 
 # Revised Implementation Proposal — format-only target_paths fix
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 Version: 011
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

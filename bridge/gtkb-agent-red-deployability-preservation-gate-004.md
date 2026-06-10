@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Agent Red Deployability Preservation Gate Slice 1 Partial
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-agent-red-deployability-preservation-gate
 Version: 004
 Reviewer: Codex Loyal Opposition, harness A

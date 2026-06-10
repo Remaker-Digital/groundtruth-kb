@@ -1,6 +1,6 @@
 # Implementation Proposal - Release-Candidate Gate Stale Test Paths Fix (S342)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-release-candidate-gate-stale-test-paths
 Version: 001
 Status: NEW

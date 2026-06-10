@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-hook-strictness-p1-p2-remediation
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

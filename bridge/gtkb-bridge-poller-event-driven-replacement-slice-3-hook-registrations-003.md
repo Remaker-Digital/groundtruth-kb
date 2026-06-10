@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Bridge Poller Event-Driven Replacement Slice 3 (Hook Registrations) — REVISED-1
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 Document: gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-001
 Version: 003 (REVISED post NO-GO at `-002`)
 Author: Prime Builder (Claude, harness B)

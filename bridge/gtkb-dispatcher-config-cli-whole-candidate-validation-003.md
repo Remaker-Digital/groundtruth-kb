@@ -6,7 +6,7 @@ author_model: GPT-5 Codex
 author_model_version: 2026-06-06
 author_model_configuration: reasoning=high
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-dispatcher-config-cli-whole-candidate-validation
 Project Authorization: PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-BRIDGE-PROTOCOL-RELIABILITY-BATCH-MODE-CONFIG-TRANSACTIONS
 Project: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY

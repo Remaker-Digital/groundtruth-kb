@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Impl Report Bridge Structural Validation and Mtime
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-report-bridge-structural-validation-mtime
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

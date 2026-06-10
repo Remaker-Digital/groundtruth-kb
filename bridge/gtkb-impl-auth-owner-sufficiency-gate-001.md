@@ -8,7 +8,7 @@ author_model_configuration: default
 
 # Implementation Proposal - Implementation-Start Owner Sufficiency Clarification Gate
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-auth-owner-sufficiency-gate
 Version: 001
 Date: 2026-06-02 UTC

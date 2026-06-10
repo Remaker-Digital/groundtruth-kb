@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - implementation_start_gate MUTATING_COMMAND_RE Python Format-Spec False-Positive Fix - REVISED-2 (WI-3317)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-format-spec-fix
 Version: 005
 Responds to: bridge/gtkb-impl-start-gate-format-spec-fix-004.md

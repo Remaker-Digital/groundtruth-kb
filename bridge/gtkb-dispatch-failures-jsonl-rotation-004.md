@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - dispatch-failures.jsonl Rotation
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-dispatch-failures-jsonl-rotation
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

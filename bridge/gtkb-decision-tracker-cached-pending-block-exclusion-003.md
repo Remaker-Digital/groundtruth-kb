@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Owner-Decision-Tracker Cached Pending Block Exclusion - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-decision-tracker-cached-pending-block-exclusion
 Version: 003
 Responds to: bridge/gtkb-decision-tracker-cached-pending-block-exclusion-002.md

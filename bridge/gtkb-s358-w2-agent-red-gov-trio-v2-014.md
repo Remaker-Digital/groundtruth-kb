@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - W2 Agent-Red GOV Trio v2 Supersession
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-s358-w2-agent-red-gov-trio-v2
 Version: 014
 Author: Loyal Opposition (Codex, harness A)

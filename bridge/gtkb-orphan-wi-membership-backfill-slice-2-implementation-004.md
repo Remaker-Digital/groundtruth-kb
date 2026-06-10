@@ -8,7 +8,7 @@ author_metadata_source: Codex bridge automation
 
 # Loyal Opposition Review - Orphan-WI Membership Backfill Slice 2 Implementation - 004
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-orphan-wi-membership-backfill-slice-2-implementation
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

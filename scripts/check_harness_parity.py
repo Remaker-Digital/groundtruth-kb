@@ -39,7 +39,7 @@ CAPABILITY_FLOOR_REQUIRED_FIELDS = (
 CANONICAL_TOOL_SUBSET = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 
 
-def _load_known_harnesses_from_projection() -> tuple[str, ...]:
+def _load_known_harnesses_from_projection(project_root: Path | None = None) -> tuple[str, ...]:
     """Derive KNOWN_HARNESSES from registry projection per REQ-HARNESS-REGISTRY-001 FR5.
 
     Uses scripts.harness_projection_reader (stdlib-only, fail-safe) to satisfy
@@ -47,7 +47,9 @@ def _load_known_harnesses_from_projection() -> tuple[str, ...]:
     are forbidden under the planted-detector fixture in
     platform_tests/scripts/test_harness_registry_reader_migration.py.
     """
-    projection = load_harness_projection(PROJECT_ROOT)
+    if project_root is None:
+        project_root = PROJECT_ROOT
+    projection = load_harness_projection(project_root)
     names = tuple(
         sorted(
             str(record.get("harness_name"))
@@ -201,9 +203,9 @@ def _normalize_role(role: str | None) -> str | None:
     return ROLE_ALIASES.get(normalized, normalized)
 
 
-def _normalize_harness(value: str) -> str:
+def _normalize_harness(value: str, known_harnesses: tuple[str, ...]) -> str:
     normalized = str(value or "").strip().lower()
-    if normalized not in (*KNOWN_HARNESSES, "all"):
+    if normalized not in (*known_harnesses, "all"):
         raise ValueError(f"unsupported harness: {value}")
     return normalized
 
@@ -284,10 +286,10 @@ def load_registry(project_root: Path) -> tuple[dict[str, Any], Path]:
     return _load_toml(registry_path), registry_path
 
 
-def _selected_harnesses(harness: str) -> list[str]:
-    normalized = _normalize_harness(harness)
+def _selected_harnesses(harness: str, known_harnesses: tuple[str, ...]) -> list[str]:
+    normalized = _normalize_harness(harness, known_harnesses)
     if normalized == "all":
-        return list(KNOWN_HARNESSES)
+        return list(known_harnesses)
     return [normalized]
 
 
@@ -376,7 +378,11 @@ def _status_for_surface(
         source_path = project_root / adapter_source
         if not source_path.is_file():
             return CapabilityResult(**common, state="MISSING", note=f"Adapter source is absent: {adapter_source}")
-        expected_marker = "GTKB-API-SKILL-ADAPTER" if manifest_adapters and harness in manifest_adapters else "GTKB-CODEX-SKILL-ADAPTER"
+        expected_marker = (
+            "GTKB-API-SKILL-ADAPTER"
+            if manifest_adapters and harness in manifest_adapters
+            else "GTKB-CODEX-SKILL-ADAPTER"
+        )
         source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"), expected_marker)
         declared_source_hash = str(harness_config.get("source_sha256") or "").strip()
         metadata = _adapter_metadata(adapter_text, expected_marker)
@@ -558,8 +564,9 @@ def check_harness_parity(
     include_all: bool = False,
 ) -> ParityReport:
     project_root = project_root.resolve()
+    known_harnesses = _load_known_harnesses_from_projection(project_root)
     selected_role = _normalize_role(role)
-    selected_harnesses = _selected_harnesses(harness)
+    selected_harnesses = _selected_harnesses(harness, known_harnesses)
     errors: list[str] = []
 
     try:

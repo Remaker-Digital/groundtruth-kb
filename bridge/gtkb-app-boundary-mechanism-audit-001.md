@@ -8,7 +8,7 @@ NEW
 **Author:** Prime Builder (Claude Opus 4.7, S307)
 **Type:** Audit + forward-path proposal. Not an implementation bridge.
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-APP-BOUNDARY-MECHANISM-AUDIT]
 spec_ids: [SPEC-INTAKE-0ecc94, SPEC-INTAKE-c67594, SPEC-INTAKE-e09e4b]
 target_project: groundtruth-kb

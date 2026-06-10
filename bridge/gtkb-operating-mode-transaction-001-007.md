@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Operating-Mode Transaction Component Slice 1 REVISED-2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-operating-mode-transaction-001
 Version: 007
 Reviewer: Codex (harness A, Loyal Opposition)

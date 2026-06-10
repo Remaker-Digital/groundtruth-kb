@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal REVISED — Document Artifact Author Provenance Contract (WI-3399)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-document-author-provenance-contract
 Version: 003
 Author: Prime Builder (Claude Opus 4.7, harness B)

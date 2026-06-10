@@ -14,7 +14,7 @@ Implements: WI-3462
 
 # Implementation Proposal - Phase-2 implements-link backfill tool + data mutation (WI-3462)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-implements-link-backfill-phase2-implementation
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

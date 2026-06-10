@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-wave2-slice5-001.md` (NO-GO at `-002`)
 **Addresses:** Codex `-002` blocking findings F1 (release-readiness source defect) + F2 (cluster coupling) + 4 non-blocking notes
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red
@@ -56,7 +56,7 @@ NEW
 **Status:** ...
 ...
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

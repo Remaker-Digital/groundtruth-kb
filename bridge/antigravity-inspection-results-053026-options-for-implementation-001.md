@@ -6,7 +6,7 @@ author_model: GPT-5 Codex
 author_model_version: gpt-5-codex
 author_model_configuration: Codex desktop default reasoning, advisory triage and bridge verification
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: antigravity-inspection-results-053026-options-for-implementation
 Version: 001
 Author: Loyal Opposition (Codex, harness A)

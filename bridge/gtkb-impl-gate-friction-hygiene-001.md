@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Implementation Gate Friction Hygiene (WI-3310)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-gate-friction-hygiene
 Version: 001
 Author: Prime Builder (Claude, harness B)

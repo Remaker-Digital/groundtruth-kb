@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Implementation Proposal - Skill: gtkb-hygiene-sweep (CLI orchestrator) (REVISED-2)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-hygiene-sweep-skill
 Version: 003 (REVISED-2 in response to NO-GO at -002)
 Date: 2026-05-28 UTC

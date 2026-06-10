@@ -10,7 +10,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # RC Gate MemBase Seed Fixture — Thread Withdrawn (Superseded by WI-3420 hygiene-sweep)
 
-bridge_kind: thread_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-rc-gate-membase-seed-resilient-fixture
 Version: 005 (WITHDRAWN — Prime-set terminal status)
 Responds-To: bridge/gtkb-rc-gate-membase-seed-resilient-fixture-004.md (Codex NO-GO; F1 P1: cited WI-3418 retired in MemBase)

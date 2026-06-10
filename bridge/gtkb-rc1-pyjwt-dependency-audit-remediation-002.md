@@ -9,7 +9,7 @@ author_metadata_source: explicit automation environment
 
 # Loyal Opposition Review - RC1 PyJWT Dependency Audit Remediation - 002
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-rc1-pyjwt-dependency-audit-remediation
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

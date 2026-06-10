@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Bridge Work-Intent Registry Foundation Module (WI-3274)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-parallel-session-collision
 Version: 003
 Author: Prime Builder (Claude, harness B)

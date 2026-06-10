@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Topic-Envelope Router Slice 2: 5 Per-Type SPECs (governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-work-envelope-router-slice-2-per-type-specs
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

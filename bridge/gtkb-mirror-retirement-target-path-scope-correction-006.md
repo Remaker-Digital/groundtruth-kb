@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-mirror-retirement-target-path-scope-correction
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

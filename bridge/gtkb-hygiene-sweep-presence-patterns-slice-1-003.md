@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-hygiene-sweep-presence-patterns-slice-1
 Version: 003
 Responds to: bridge/gtkb-hygiene-sweep-presence-patterns-slice-1-002.md NO-GO

@@ -7,7 +7,7 @@ author_model: Gemini 3.5 Flash (High)
 author_model_version: 3.5
 author_model_configuration: Default
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-lo-hourly-quality-scout-advisory
 Version: 001
 Author: Antigravity Loyal Opposition

@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-generate-approval-packet-cli
 Version: 012
 Author: Loyal Opposition (Codex, harness A)

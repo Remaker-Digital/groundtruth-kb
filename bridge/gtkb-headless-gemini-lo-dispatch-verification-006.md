@@ -9,7 +9,7 @@ author_metadata_source: cross-harness bridge trigger
 
 # Loyal Opposition Verification - Headless Gemini LO Dispatch Verification
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 006 (NO-GO)
 Date: 2026-05-27 UTC

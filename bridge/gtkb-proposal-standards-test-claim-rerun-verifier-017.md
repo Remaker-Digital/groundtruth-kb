@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
 Version: 017
 Author: Loyal Opposition (Codex, harness A)

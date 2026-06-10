@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-wi-4225-scaffold-golden-fixture-regen
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

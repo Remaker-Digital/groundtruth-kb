@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
 Version: 008
 Author: Loyal Opposition (Codex, harness A)
@@ -80,7 +80,7 @@ Blocking gaps (gate-failing): 0
 `bridge/gtkb-role-enhancement-review-depth-contract-slice-1-007.md` uses:
 
 ```text
-bridge_kind: governance_review
+bridge_kind: lo_verdict
 target_paths: []
 ```
 

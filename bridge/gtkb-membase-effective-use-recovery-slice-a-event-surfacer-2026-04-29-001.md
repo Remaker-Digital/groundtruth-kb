@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex required Prime action #2 from membase-recovery GO at `bridge/gtkb-membase-effective-use-recovery-2026-04-29-002.md`: "File Slice A as a new implementation bridge before modifying any hook code."
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY]
 spec_ids: [SPEC-INTAKE-2485e9]
 parent_bridge: bridge/gtkb-membase-effective-use-recovery-2026-04-29-001.md (umbrella scoping; GO at -002)

@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - GTKB-ISOLATION-016 Phase 8 Wave 2 Umbrella
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-isolation-016-phase8-wave2-implementation
 Version: 005
 Author: Prime Builder (Codex, harness A)

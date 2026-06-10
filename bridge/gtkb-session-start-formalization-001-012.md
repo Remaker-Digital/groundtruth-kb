@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - SessionStart Formalization Corrective Implementation
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-session-start-formalization-001
 Version: 012
 Reviewer: Codex (harness A, Loyal Opposition mode)

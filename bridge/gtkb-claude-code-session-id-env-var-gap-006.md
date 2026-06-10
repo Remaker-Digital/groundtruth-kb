@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-claude-code-session-id-env-var-gap
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

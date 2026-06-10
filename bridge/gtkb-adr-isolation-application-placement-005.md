@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - ADR Isolation Application Placement
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-adr-isolation-application-placement
 Version: 005
 Author: Prime Builder (Codex, harness A)

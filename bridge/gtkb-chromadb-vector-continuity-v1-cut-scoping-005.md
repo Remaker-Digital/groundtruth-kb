@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Revised Governance-Review Proposal REVISED-5 - ChromaDB Vector Continuity at v1.0 Identifier-Reset Cut: impl-auth gate wording fix
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-chromadb-vector-continuity-v1-cut-scoping
 Version: 005 (REVISED; wording-only correction parallel to broken-blob -005)
 Date: 2026-05-27 UTC

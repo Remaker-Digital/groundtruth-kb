@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-backlog-canonical-pivot-spec-promotion
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

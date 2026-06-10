@@ -11,7 +11,7 @@ REVISED
 **Approving review in force:** `bridge/gtkb-work-subject-root-enforcement-implementation-012.md` (GO)
 **Prior withdrawal/re-affirmation GO:** `bridge/gtkb-work-subject-root-enforcement-implementation-016.md`
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 scope: full -011 scope (Phase A BN-1..BN-5 + plan/backlog supersede AND Phase B Phase 7 foundation implementation slice)
 work_item_ids: [GTKB-ISOLATION-010]
 

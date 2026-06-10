@@ -1,6 +1,6 @@
 # Implementation Proposal — Harness Registry Hot-Path Projection and Generator (WI-3338)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Version: 001 (NEW)
 
 target_paths: ["groundtruth-kb/src/groundtruth_kb/harness_projection.py", "scripts/harness_projection_reader.py", "harness-state/harness-registry.json", "groundtruth-kb/tests/test_harness_projection.py", "platform_tests/scripts/test_harness_projection_reader.py"]

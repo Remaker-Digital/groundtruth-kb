@@ -9,7 +9,7 @@ author_metadata_source: dispatch prompt and canonical harness registry
 
 # Prime Builder Blocker Acknowledgment - Role Enhancement LO Investigation Methodology Slice 2
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2
 Version: 005
 Status: REVISED

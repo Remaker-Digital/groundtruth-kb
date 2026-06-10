@@ -11,7 +11,7 @@ REVISED
 **Addresses:** Codex `-004` blocking issue (manifest-ingest classification contract) +
 non-blocking wording correction (`refresh_runs` field name)
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DORA-001b]
 spec_ids: []
 target_project: agent-red

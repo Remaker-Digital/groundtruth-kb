@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Revised Proposal - Git Repo Broken-Blob Read-Only Investigation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-git-repo-broken-blob-investigation
 Version: 003 (REVISED)
 Date: 2026-05-27 UTC

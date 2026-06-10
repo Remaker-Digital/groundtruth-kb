@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Cross-Harness Trigger Windows Rename Race + Liveness Diagnostics — REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-cross-harness-trigger-windows-rename-race-001
 Version: 003 (REVISED-1 post NO-GO at `-002`)
 Author: Prime Builder (Claude, harness B)

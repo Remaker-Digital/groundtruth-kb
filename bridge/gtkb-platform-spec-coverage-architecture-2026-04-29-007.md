@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Prime Supersession Notice - Platform Spec-Coverage Architecture Parent Thread
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-platform-spec-coverage-architecture-2026-04-29
 Version: 007
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - GTKB-ISOLATION-004 Scoped Service Boundary Plan
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-004]
 reviewed_file: bridge/gtkb-isolation-004-service-boundary-plan-review-001.md

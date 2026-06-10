@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # WI-3423 PAUTH Creation Spec-Intake (governance pre-step for platform-tests-ruff cleanup)
 
-bridge_kind: spec_intake
+bridge_kind: prime_proposal
 Document: gtkb-wi-3423-pauth-creation
 Version: 001 (NEW)
 Responds-To: bridge/gtkb-platform-tests-ruff-cleanup-004.md (Codex NO-GO; required Codex's "Preferred path" Option 1: split PAUTH creation into separate spec_intake bridge thread)

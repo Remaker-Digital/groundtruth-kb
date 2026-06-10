@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # Loyal Opposition Review - W1 Retirement-Machinery Authorization Envelope Correction
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-s358-w1-retirement-machinery-correction
 Version: 019
 Author: Loyal Opposition (Codex harness A)

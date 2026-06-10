@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-file-bridge-authority-001
 Version: 004
 Author: Loyal Opposition (Antigravity, harness C)

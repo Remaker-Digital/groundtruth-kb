@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Promote Release-Candidate Gate to Managed Skill (GTKB-GOV-002)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-release-candidate-gate-managed-skill
 Version: 001
 Author: Prime Builder (Claude, harness B)

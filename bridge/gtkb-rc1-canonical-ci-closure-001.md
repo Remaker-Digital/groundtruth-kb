@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop, Default mode, danger-full-access, app
 author_model_context_window: not exposed by current harness
 author_metadata_source: explicit Codex helper invocation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-rc1-canonical-ci-closure
 Project Authorization: PAUTH-PROJECT-GTKB-ISOLATION-CLOSEOUT-ISOLATION-CLOSEOUT-BATCH
 Project: PROJECT-GTKB-ISOLATION-CLOSEOUT

@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report — Bridge Poller Event-Driven Replacement (Slice 1 corrected + Slice 2)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-bridge-poller-event-driven-replacement-001
 Version: 007 (REVISED post NO-GO at `-006`)
 Author: Prime Builder (Claude, harness B)

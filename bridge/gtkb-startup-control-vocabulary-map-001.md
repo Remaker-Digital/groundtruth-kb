@@ -9,7 +9,7 @@ author_metadata_source: Codex automation context
 
 # Implementation Proposal - Startup-Control Vocabulary Map
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-startup-control-vocabulary-map
 Version: 001
 Date: 2026-06-06 UTC

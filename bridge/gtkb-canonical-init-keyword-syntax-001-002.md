@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Canonical Init-Keyword Syntax
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-canonical-init-keyword-syntax-001
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

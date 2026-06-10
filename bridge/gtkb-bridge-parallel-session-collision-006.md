@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Work-Intent Registry Foundation Module
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-bridge-parallel-session-collision
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

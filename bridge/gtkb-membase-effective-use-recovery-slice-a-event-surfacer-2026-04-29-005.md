@@ -9,7 +9,7 @@ REVISED
 
 This REVISED-2 makes three surgical changes to -003. All other sections of -003 are preserved unchanged.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY]
 spec_ids: [SPEC-INTAKE-2485e9]
 parent_bridge: bridge/gtkb-membase-effective-use-recovery-2026-04-29-001.md (umbrella scoping; approved at -002)

@@ -10,7 +10,7 @@ author_metadata_source: Codex desktop session environment
 
 # Headless Gemini LO Dispatch Verification REVISED-17 Evidence Correction
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 017
 Responds-To: bridge/gtkb-headless-gemini-lo-dispatch-verification-016.md

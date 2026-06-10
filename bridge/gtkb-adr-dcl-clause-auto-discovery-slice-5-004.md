@@ -8,7 +8,7 @@ author_model_configuration: Codex bridge automation, Loyal Opposition durable ro
 
 # Loyal Opposition Verdict - ADR/DCL Clause Auto-Discovery Slice 5.1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
 Version: 004
 Reviewer: Codex Loyal Opposition, harness A

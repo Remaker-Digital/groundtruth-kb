@@ -8,7 +8,7 @@ author_metadata_source: Codex auto-dispatch session
 
 # Loyal Opposition Verification - Project-Completion Scanner Addressing-Thread Fix - 012
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-completion-scanner-addressing-thread-fix
 Version: 012
 Author: Loyal Opposition (Codex, harness A)

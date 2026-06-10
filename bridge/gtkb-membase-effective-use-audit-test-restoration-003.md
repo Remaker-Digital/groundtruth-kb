@@ -1,6 +1,6 @@
 WITHDRAWN
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-membase-effective-use-audit-test-restoration
 Version: 003
 Author: Prime Builder (Codex, harness A, session-stated `::init gtkb pb`)

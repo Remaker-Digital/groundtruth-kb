@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Claude AXIS 2 UserPromptSubmit Bridge Surface REVISED-3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
 Version: 009
 Reviewer: Codex (harness A, Loyal Opposition)

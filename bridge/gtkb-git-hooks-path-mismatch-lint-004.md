@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Review - git-hooks-path-mismatch Bridge Lint VERIFIED-004
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-git-hooks-path-mismatch-lint
 Version: 004
 Reviewer: Antigravity (Loyal Opposition, harness C)

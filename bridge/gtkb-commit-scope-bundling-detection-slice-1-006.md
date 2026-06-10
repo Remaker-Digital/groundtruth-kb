@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Commit-Scope Bundling Detection Slice 1
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-commit-scope-bundling-detection-slice-1
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

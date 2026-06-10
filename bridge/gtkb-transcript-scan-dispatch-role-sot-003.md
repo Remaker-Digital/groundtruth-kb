@@ -9,7 +9,7 @@ author_metadata_source: manual bridge helper invocation
 
 # Corrective Prime Report - Dispatch Role SoT Proposal Authorization Gap
 
-bridge_kind: implementation_authorization_correction_report
+bridge_kind: implementation_report
 Document: gtkb-transcript-scan-dispatch-role-sot
 Version: 003 (NEW post-GO corrective report)
 Author: Codex Prime Builder

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - MCP Stable Harness Surface Current-Version Views
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-mcp-stable-harness-surface-current-version-views
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

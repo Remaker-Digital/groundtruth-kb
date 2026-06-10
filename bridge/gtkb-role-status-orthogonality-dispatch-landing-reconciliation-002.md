@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

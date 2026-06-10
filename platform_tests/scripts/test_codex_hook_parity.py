@@ -406,7 +406,12 @@ def test_codex_parity_requires_bridge_compliance_gate_when_hooks_enabled(tmp_pat
         encoding="utf-8",
     )
     (tmp_path / "harness-state" / "harness-registry.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": [{"id": "A", "harness_type": "codex", "role": ["prime-builder"], "status": "active"}]})
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [{"id": "A", "harness_type": "codex", "role": ["prime-builder"], "status": "active"}],
+            }
+        )
         + "\n",
         encoding="utf-8",
     )
@@ -467,7 +472,12 @@ def test_codex_parity_skips_bridge_compliance_gate_when_hooks_disabled(tmp_path)
         encoding="utf-8",
     )
     (tmp_path / "harness-state" / "harness-registry.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": [{"id": "A", "harness_type": "codex", "role": ["prime-builder"], "status": "active"}]})
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [{"id": "A", "harness_type": "codex", "role": ["prime-builder"], "status": "active"}],
+            }
+        )
         + "\n",
         encoding="utf-8",
     )
@@ -542,7 +552,12 @@ def test_codex_hook_parity_requires_bash_matcher(tmp_path) -> None:
         encoding="utf-8",
     )
     (tmp_path / "harness-state" / "harness-registry.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": [{"id": "A", "harness_type": "codex", "role": ["loyal-opposition"], "status": "active"}]})
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [{"id": "A", "harness_type": "codex", "role": ["loyal-opposition"], "status": "active"}],
+            }
+        )
         + "\n",
         encoding="utf-8",
     )

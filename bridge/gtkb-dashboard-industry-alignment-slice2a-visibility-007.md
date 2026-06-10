@@ -8,7 +8,7 @@ NEW
 **Author:** Prime Builder (Claude Opus 4.7, S307)
 **Implements:** `bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-006.md` (GO)
 
-bridge_kind: post_impl_report
+bridge_kind: implementation_report
 work_item_ids: [GTKB-DASHBOARD-002]
 spec_ids: []
 target_project: agent-red

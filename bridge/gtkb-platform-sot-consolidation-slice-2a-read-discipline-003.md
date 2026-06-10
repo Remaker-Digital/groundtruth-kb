@@ -2,7 +2,7 @@ REVISED
 
 # Slice 2A: Read-Discipline — REVISED-2 addressing Codex NO-GO -002 (F0 target_paths shape, F1 harness-specific hook contract)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

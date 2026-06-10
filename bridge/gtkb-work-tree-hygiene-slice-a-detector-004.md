@@ -9,7 +9,7 @@ author_metadata_source: dispatch prompt 2026-06-05T21-29-49Z plus live harness r
 
 # Loyal Opposition Verification - Work-Tree Hygiene Slice A Detector
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-tree-hygiene-slice-a-detector
 Version: 004
 Reviewer: Codex Loyal Opposition, harness A

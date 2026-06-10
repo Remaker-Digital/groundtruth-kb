@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Advisory Report Dashboard Counters Spec REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-advisory-report-dashboard-counters-spec
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

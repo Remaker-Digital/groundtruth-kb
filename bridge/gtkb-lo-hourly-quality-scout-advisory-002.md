@@ -7,7 +7,7 @@ author_model: GPT-5
 author_model_version: GPT-5
 author_model_configuration: Codex desktop automation
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-lo-hourly-quality-scout-advisory
 Version: 002
 Author: Codex Loyal Opposition

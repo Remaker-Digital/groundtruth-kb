@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Owner directive to implement a slice of the spec-coverage architecture program. Per umbrella section 3 sequencing, this is sub-bridge 3 (full-history VERIFIED runner). Slice 1 (`gov-process-spec-precondition`) already VERIFIED at -008; Slice 2 (relevance closure) still future; this Slice 3 is independent of Slice 2 and can land in parallel.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-PLATFORM-SPEC-COVERAGE-ARCHITECTURE]
 spec_ids: [DCL-VERIFIED-BRIDGE-HISTORY-001, DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001]
 parent_bridge: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-005.md (umbrella REVISED-2; approved at -006)

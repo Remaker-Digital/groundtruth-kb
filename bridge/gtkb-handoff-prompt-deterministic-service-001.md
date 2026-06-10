@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Deterministic Handoff-Prompt Service Design (governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-handoff-prompt-deterministic-service
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

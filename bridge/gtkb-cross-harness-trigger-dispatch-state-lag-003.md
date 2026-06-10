@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Cross-Harness Trigger Dispatch-State Lag - REVISED-1 (WI-3265)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-cross-harness-trigger-dispatch-state-lag
 Version: 003
 Responds to: bridge/gtkb-cross-harness-trigger-dispatch-state-lag-002.md

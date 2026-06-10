@@ -2,7 +2,7 @@ NEW
 
 # Peer Solution Owner Gate DCL - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-owner-gate-dcl
 Version: 001 (NEW; Slice 1 — candidate DCL filing)
 Author: Prime Builder (Claude, harness B)

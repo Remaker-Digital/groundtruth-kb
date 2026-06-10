@@ -5,7 +5,7 @@ author_harness_id: C
 author_model: Gemini 3.5 Flash (High)
 author_model_configuration: Antigravity sdk, scoped owner-action advisory review
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-antigravity-implements-link-ambiguity-advisory
 Version: 001
 Author: Antigravity Loyal Opposition

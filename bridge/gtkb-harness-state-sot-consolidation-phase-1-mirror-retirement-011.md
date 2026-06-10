@@ -9,7 +9,7 @@ author_metadata_source: automation keep-working
 
 # Phase-1 Mirror-Retirement - REVISED-5
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
 Version: 011
 Author: Codex Prime Builder automation

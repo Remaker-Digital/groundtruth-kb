@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — V1 Release Strategy: Docker Isolation-Validator Scoping (WI-3403)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-v1-docker-isolation-validator-scoping
 Version: 001
 Author: Prime Builder (Claude Opus 4.7, harness B)

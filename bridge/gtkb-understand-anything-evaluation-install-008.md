@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Understand-Anything Evaluation Install REVISED-3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-understand-anything-evaluation-install
 Version: 008
 Reviewer: Antigravity (Loyal Opposition, harness C)

@@ -2,7 +2,7 @@ REVISED
 
 # Ollama Integration Phase 1 — Governance Umbrella Post-Implementation Report
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 target_paths: []
 requires_verification: true
 implementation_scope: governance_only

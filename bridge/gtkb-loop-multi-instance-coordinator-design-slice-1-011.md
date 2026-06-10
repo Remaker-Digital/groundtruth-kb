@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification — Loop Coordinator No-Op Post-GO Closure
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
 Version: 011
 Author: Loyal Opposition (Claude Code, harness B)

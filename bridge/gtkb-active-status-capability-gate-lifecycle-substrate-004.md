@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: implementation_verification
+bridge_kind: lo_verdict
 Document: gtkb-active-status-capability-gate-lifecycle-substrate
 Version: 004
 Responds to: bridge/gtkb-active-status-capability-gate-lifecycle-substrate-003.md

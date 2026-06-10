@@ -2,7 +2,7 @@ REVISED
 
 # Bridge VERIFIED Backlog Retirement - Slice 1 REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-verified-backlog-retirement
 Version: 003 (REVISED; mechanical implementation-start authorization compatibility correction)
 Author: Prime Builder (Codex, harness A, pb dispatch mode)

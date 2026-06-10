@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop
 
 # Loyal Opposition Review - GTKB-ISOLATION-019 Program Closeout - 006
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-isolation-019-program-closeout
 Version: 006
 Date: 2026-05-29 UTC

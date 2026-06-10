@@ -2,7 +2,7 @@ NEW
 
 # GTKB-STARTUP-REFRACTOR-001 Slice E — Loyal Opposition Startup Text + Authority
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-refractor-slice-e-lo-startup-text-authority
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

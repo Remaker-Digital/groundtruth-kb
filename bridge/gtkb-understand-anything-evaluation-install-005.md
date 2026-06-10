@@ -2,7 +2,7 @@ REVISED
 
 # gtkb-understand-anything-evaluation-install (Slice 1) — REVISED-2: anchor the `/.understand-anything/` gitignore line; tighten T-F1 to anchored-entry check (closes NO-GO -004 P1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-understand-anything-evaluation-install
 Version: 005
 Author: Claude Code Prime Builder (harness B)

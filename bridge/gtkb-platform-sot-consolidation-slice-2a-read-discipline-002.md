@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 
 # Loyal Opposition Review - Slice 2A Read-Discipline
 

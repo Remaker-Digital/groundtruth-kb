@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex Loyal Opposition advisory at `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/SPEC-LIFECYCLE-SCHEMA-ADVISORY-2026-04-29-15-50.md`. Owner directive 2026-04-29 to "replace flawed specification lifecycle fields before Prime Builder formulates an implementation proposal", plus owner addition that the proposal "should include a `parent` attribute that specifies whether the spec applies to the GT-KB platform, the application under development or *all*".
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-SPEC-LIFECYCLE-SCHEMA-MIGRATION]
 spec_ids: [SPEC-PROJECT-DASHBOARD-KPI-LINK-001]
 target_project: groundtruth-kb

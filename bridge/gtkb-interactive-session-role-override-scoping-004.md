@@ -6,7 +6,7 @@ author_model: GPT-5
 
 # Loyal Opposition Verdict - Interactive Session Role Override Scoping - 004
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-scoping
 Version: 004
 Reviewer: Codex Loyal Opposition (harness A)

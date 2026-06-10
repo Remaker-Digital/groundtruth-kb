@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Codex Bridge Compliance Gate Parity
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-codex-bridge-compliance-gate-parity
 Version: 012
 Reviewer: Codex (harness A, Loyal Opposition mode)

@@ -10,7 +10,7 @@ author_metadata_source: prime-builder session; inline author metadata
 
 # Implementation Proposal — LO File-Safety Write-Gate: Resolve Role via Session Envelope (WI-4371)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-file-safety-gate-envelope-role-resolution
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

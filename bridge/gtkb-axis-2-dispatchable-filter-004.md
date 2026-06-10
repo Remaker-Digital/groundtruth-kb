@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-axis-2-dispatchable-filter
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

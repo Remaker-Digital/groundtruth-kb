@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - W3 GOV-REQUIREMENTS-COLLECTION-HOOK-001 Title Fix (GTKB-GOVERNANCE-CORRECTION-S358-W3)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s358-w3-requirements-collection-hook-title-fix
 Version: 009
 Author: Prime Builder (Claude, harness B)

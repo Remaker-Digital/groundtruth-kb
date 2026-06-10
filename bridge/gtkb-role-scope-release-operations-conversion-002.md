@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Role Scope Release Operations Conversion
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-scope-release-operations-conversion
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

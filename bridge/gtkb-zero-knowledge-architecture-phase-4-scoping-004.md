@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Zero-Knowledge Architecture Phase 4 Readiness Report
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-zero-knowledge-architecture-phase-4-scoping
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

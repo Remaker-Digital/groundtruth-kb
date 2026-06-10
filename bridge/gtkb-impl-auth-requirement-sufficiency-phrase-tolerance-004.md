@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-auth-requirement-sufficiency-phrase-tolerance
 Version: 004
 Author: Loyal Opposition (Antigravity, harness C)

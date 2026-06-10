@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-retire-role-assignments-mirror-slice-1-seed-repoint
 Version: 004
 Responds to: bridge/gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-003.md MD

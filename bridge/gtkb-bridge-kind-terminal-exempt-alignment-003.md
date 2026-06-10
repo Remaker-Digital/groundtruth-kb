@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: fix
+bridge_kind: prime_proposal
 Document: gtkb-bridge-kind-terminal-exempt-alignment
 Version: 003
 Responds to: bridge/gtkb-bridge-kind-terminal-exempt-alignment-002.md NO-GO

@@ -40,6 +40,27 @@ import src.multi_tenant.pipeline_resilience as _pipeline_resilience_mod
 import src.multi_tenant.security_hardening as _security_hardening_mod
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _clean_test_environment():
+    """Ensure that real Azure communication services, Key Vault, and Stripe keys are never used in tests.
+
+    Forces dev_mode for EnvelopeEncryptionService by removing MASTER_KEK_KEY_ID,
+    and isolates other environments to prevent live requests.
+    """
+    import os
+    from unittest.mock import patch
+
+    env_overrides = {
+        "AZURE_COMM_CONNECTION_STRING": "",
+        "SMTP_HOST": "",
+        "STRIPE_SECRET_KEY": "",
+        "MASTER_KEK_KEY_ID": "",
+        "AZURE_KEYVAULT_URL": "",
+    }
+    with patch.dict(os.environ, env_overrides):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Tenant context factories — reusable across all test modules
 # ---------------------------------------------------------------------------
@@ -120,6 +141,7 @@ def make_tenant_context(
 # ---------------------------------------------------------------------------
 # Tenant document factories
 # ---------------------------------------------------------------------------
+
 
 def make_tenant_document(
     tenant_id: str = STARTER_TENANT_ID,
@@ -257,19 +279,13 @@ class MockContainerProxy:
 
     async def upsert_item(self, body: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         # Remove existing item with same id if present
-        self.items = [
-            item for item in self.items
-            if item.get("id") != body.get("id")
-        ]
+        self.items = [item for item in self.items if item.get("id") != body.get("id")]
         self.items.append(body)
         return body
 
     async def replace_item(self, item: str, body: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         """Replace an existing item by ID (used by read-modify-write patterns)."""
-        self.items = [
-            doc for doc in self.items
-            if doc.get("id") != (body.get("id") or item)
-        ]
+        self.items = [doc for doc in self.items if doc.get("id") != (body.get("id") or item)]
         self.items.append(body)
         return body
 
@@ -278,6 +294,7 @@ class MockContainerProxy:
             if doc.get("id") == item:
                 return doc
         from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
         raise CosmosResourceNotFoundError(
             status_code=404,
             message=f"Item {item} not found",
@@ -287,7 +304,11 @@ class MockContainerProxy:
         self.items = [doc for doc in self.items if doc.get("id") != item]
 
     async def patch_item(
-        self, item: str, partition_key: str, patch_operations: list, **kwargs: Any,
+        self,
+        item: str,
+        partition_key: str,
+        patch_operations: list,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         for doc in self.items:
             if doc.get("id") == item:
@@ -300,13 +321,17 @@ class MockContainerProxy:
                         doc[path] = doc.get(path, 0) + op["value"]
                 return doc
         from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
         raise CosmosResourceNotFoundError(
             status_code=404,
             message=f"Item {item} not found",
         )
 
     def query_items(
-        self, query: str, parameters: list | None = None, **kwargs: Any,
+        self,
+        query: str,
+        parameters: list | None = None,
+        **kwargs: Any,
     ) -> "MockQueryIterator":
         """Return an async iterator over matching items.
 
@@ -391,11 +416,13 @@ def mock_nats() -> MagicMock:
     """
     nats_mock = MagicMock()
     nats_mock.is_connected = True
-    nats_mock.check_health = AsyncMock(return_value=MagicMock(
-        connected=True,
-        circuit_breaker_state="CLOSED",
-        active_streams=0,
-    ))
+    nats_mock.check_health = AsyncMock(
+        return_value=MagicMock(
+            connected=True,
+            circuit_breaker_state="CLOSED",
+            active_streams=0,
+        )
+    )
     nats_mock.publish = AsyncMock()
     nats_mock.subscribe = AsyncMock()
     nats_mock.provision_tenant_topics = AsyncMock()
@@ -457,7 +484,8 @@ def mock_circuit_breakers() -> MagicMock:
     registry_mock.reset_all = MagicMock()
 
     with patch.object(
-        _pipeline_resilience_mod, "get_circuit_breaker_registry",
+        _pipeline_resilience_mod,
+        "get_circuit_breaker_registry",
         return_value=registry_mock,
     ):
         yield registry_mock
@@ -541,7 +569,8 @@ def _build_tenant_lookup_table(
 
     # SPEC-1644: Partition-scoped resolvers — require tenant_id from caller
     async def verify_api_key_in_partition(
-        tenant_id: str, key_hash: str,
+        tenant_id: str,
+        key_hash: str,
     ) -> dict[str, Any] | None:
         """Partition-scoped: only match if key hash belongs to this tenant."""
         for t in tenants:
@@ -551,7 +580,8 @@ def _build_tenant_lookup_table(
         return None
 
     async def verify_user_key_in_partition(
-        tenant_id: str, key_hash: str,
+        tenant_id: str,
+        key_hash: str,
     ) -> dict[str, Any] | None:
         """Partition-scoped: only match if user key hash is in this tenant."""
         result = user_members.get(key_hash)

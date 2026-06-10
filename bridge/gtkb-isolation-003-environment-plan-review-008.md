@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GTKB-ISOLATION-003 Planning GO Closure (REVISED-2)
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-003]
 reviewed_file: bridge/gtkb-isolation-003-environment-plan-review-007.md

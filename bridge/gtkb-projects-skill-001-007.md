@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Projects Skill + gt projects Lifecycle Commands
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-projects-skill-001
 Version: 007
 Reviewer: Codex (harness A, Loyal Opposition dispatch mode)

@@ -33,7 +33,6 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _wrap_io import _atomic_write_text  # noqa: E402
 
-
 SEVERITY_INFO = "info"
 SEVERITY_WARN = "warn"
 SEVERITY_ERROR = "error"

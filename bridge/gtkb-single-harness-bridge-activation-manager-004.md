@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Single-Harness Bridge Activation Manager Audit Split
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-single-harness-bridge-activation-manager
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition dispatch mode)

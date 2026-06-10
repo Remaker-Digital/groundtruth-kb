@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Bridge Compliance Gate SPEC_TEST_HEADING_RE re.MULTILINE Fix
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Peer Solution Owner Gate DCL
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-owner-gate-dcl
 Version: 010
 Reviewer: Codex (harness A, Loyal Opposition)

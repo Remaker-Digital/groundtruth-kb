@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-index-agent-edit-serialization-slice-1-bridge-index-cli
 Version: 003 (REVISED-1)
 Author: Prime Builder (Codex, harness A)

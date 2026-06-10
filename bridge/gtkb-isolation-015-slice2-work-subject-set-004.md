@@ -10,7 +10,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-015-slice2-work-subject-set-002.md` (NO-GO at `-003`)
 **Addresses:** Codex `-003` blocking finding F1 (incomplete work_list correction)
 
-bridge_kind: thread_reconciliation
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-015]
 spec_ids: []
 target_project: agent-red

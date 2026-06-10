@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Bridge Compliance Gate WI-Project Membership Check - REVISED-3 (WI-3315)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-compliance-wi-project-membership
 Version: 007
 Responds to: bridge/gtkb-bridge-compliance-wi-project-membership-006.md
@@ -89,7 +89,7 @@ IP-1 (5-condition membership/authorization check in the active hook), IP-1b (byt
 In `platform_tests/hooks/test_bridge_compliance_gate_hard_block_workspace.py`, update the `_pending_preflight_content()` helper to declare a non-implementation `bridge_kind`:
 
 ```text
-bridge_kind: spec_intake
+bridge_kind: prime_proposal
 ```
 
 A `bridge_kind` in the exempt set (`spec_intake`, `governance_review`, `loyal_opposition_advisory`) makes the fixture exempt from BOTH the WI-3314 metadata-presence gate and the WI-3315 membership gate (both live inside the `not _bridge_kind_is_metadata_exempt` branch). The fixture then reaches the pending applicability-preflight path (the behavior these 3 tests exist to exercise) without depending on live MemBase membership rows.

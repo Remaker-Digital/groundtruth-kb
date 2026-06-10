@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # Revised Implementation Proposal - Role Enhancement Review-Depth Deferred Status
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement-review-depth-methodology
 Version: 003
 Author: Prime Builder (Codex harness A)

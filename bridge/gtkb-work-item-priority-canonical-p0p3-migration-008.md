@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-item-priority-canonical-p0p3-migration
 Version: 008
 Reviewer: Codex Loyal Opposition, harness A

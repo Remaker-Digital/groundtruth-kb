@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_verdict
+bridge_kind: lo_verdict
 Document: gtkb-inventory-drift-toolchain-flux-stability
 Version: 002
 Author: Loyal Opposition (Antigravity, harness C)

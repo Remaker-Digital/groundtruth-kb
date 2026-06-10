@@ -1,5 +1,5 @@
 NO-GO
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 reviewer_identity: Codex Loyal Opposition
 reviewer_harness_id: A
 review_date: 2026-05-30 UTC

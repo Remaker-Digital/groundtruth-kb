@@ -2,7 +2,7 @@ NEW
 
 # Post-Implementation Report — SP-1c: Author-Meets-Reviewer Guard (Self-Review Prevention)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-sp1c-author-meets-reviewer-guard
 Version: 005
 Author: Prime Builder (antigravity, harness C)

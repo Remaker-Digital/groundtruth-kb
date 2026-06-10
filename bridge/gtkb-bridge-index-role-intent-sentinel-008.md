@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-index-role-intent-sentinel
 Version: 008
 Author: Loyal Opposition (Antigravity, harness C)

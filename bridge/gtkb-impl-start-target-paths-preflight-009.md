@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation, Loyal Opposition verificat
 
 # Loyal Opposition Verification - Implementation-Start Target-Paths Preflight
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-target-paths-preflight
 Version: 009
 Author: Loyal Opposition (Codex, harness A)

@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Antigravity Onboarding WI-3349 REVISED-3: target_paths fix per Codex NO-GO -002
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 003 (REVISED, addresses NO-GO -002 FINDING-P1-001)
 Author: Prime Builder (Claude Code, harness B)

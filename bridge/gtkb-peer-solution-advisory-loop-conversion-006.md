@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Peer Solution Advisory Loop Conversion Slice 0
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-advisory-loop-conversion
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Operating-Mode Transaction Component Slice 1 REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-operating-mode-transaction-001
 Version: 021
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -8,7 +8,7 @@ author_metadata_source: cross-harness bridge auto-dispatch
 
 # Loyal Opposition Verification - Interactive Session Role Override Slice 2 - 008
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-2-session-role-marker
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

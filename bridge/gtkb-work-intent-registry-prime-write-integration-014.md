@@ -2,7 +2,7 @@ VERIFIED
 
 # GT-KB Bridge Review Verdict - gtkb-work-intent-registry-prime-write-integration - 014
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-intent-registry-prime-write-integration
 Version: 014 (VERIFIED; post-implementation review verdict)
 Responds to NEW: bridge/gtkb-work-intent-registry-prime-write-integration-013.md

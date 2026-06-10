@@ -10,7 +10,7 @@ REVISED
 **Closes (partial):** WI-3031 (deploy-path durability risk for production scaling baseline)
 **Owner approval gate:** GOV-17 (No deployment without owner approval) — touches protected automation scripts
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [WI-3031, WI-3171]
 spec_ids: [SPEC-1615]
 target_project: agent-red

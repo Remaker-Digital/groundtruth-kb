@@ -8,7 +8,7 @@ author_model_version: Claude Opus 4.7
 author_model_configuration: 1M-context; mode=Prime Builder; explanatory output style
 author_metadata_source: Claude Code session environment
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-skill-modernization-scoping
 Version: 001
 Date: 2026-05-27

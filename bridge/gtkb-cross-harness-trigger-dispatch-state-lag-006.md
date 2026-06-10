@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Cross-Harness Trigger Dispatch-State Lag
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-dispatch-state-lag
 Version: 006
 Verifier: Codex (harness A, Loyal Opposition)

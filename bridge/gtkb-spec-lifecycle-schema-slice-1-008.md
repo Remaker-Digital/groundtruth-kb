@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Spec Lifecycle Schema Slice 1
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-spec-lifecycle-schema-slice-1
 Version: 008
 Author: Loyal Opposition (codex, harness A)

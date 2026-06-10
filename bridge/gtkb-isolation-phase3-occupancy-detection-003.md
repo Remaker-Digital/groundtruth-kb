@@ -97,3 +97,16 @@ groundtruth-kb\.venv\Scripts\python.exe -m pytest tests/framework/test_occupancy
 | SPEC-ISOLATION-APPLICATION-SLOT-OCCUPANCY-001 | `tests/framework/test_occupancy_detection.py` | `test_non_marker_blocks_register`, `test_allowlisted_readme_succeeds` |
 | SPEC-ISOLATION-APPLICATION-SLOT-CARDINALITY-001 | `tests/framework/test_occupancy_detection.py` | `test_registry_only_conflict` |
 | SPEC-ISOLATION-PLATFORM-DOCTOR-VERDICTS-001 | `tests/framework/test_occupancy_detection.py` | `test_doctor_verdict_matrix` |
+
+## target_paths
+
+- `groundtruth-kb/src/groundtruth_kb/isolation/occupancy_detector.py`
+- `groundtruth-kb/src/groundtruth_kb/isolation/allowlist.py`
+- `groundtruth-kb/src/groundtruth_kb/isolation/strong_markers.py`
+- `groundtruth-kb/src/groundtruth_kb/isolation/registry_check.py`
+- `groundtruth-kb/src/groundtruth_kb/isolation/doctor_verdicts.py`
+- `groundtruth-kb/tests/framework/test_occupancy_detection.py`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient

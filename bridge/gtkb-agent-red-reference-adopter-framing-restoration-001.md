@@ -10,7 +10,7 @@ author_metadata_source: Claude Code session environment
 
 # Governance Review Proposal — Restore Agent Red Reference Adopter Framing — 001
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-agent-red-reference-adopter-framing-restoration
 Version: 001
 Author: Prime Builder (Claude harness B)

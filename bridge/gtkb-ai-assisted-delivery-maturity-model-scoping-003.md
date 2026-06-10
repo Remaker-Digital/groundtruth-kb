@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # Revised Implementation Proposal - AI-Assisted Delivery Maturity Model Disposition Brief
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ai-assisted-delivery-maturity-model-scoping
 Version: 003
 Author: Prime Builder (Codex harness A)

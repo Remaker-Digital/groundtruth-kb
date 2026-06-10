@@ -9,7 +9,7 @@ author_metadata_source: Codex automation context
 
 # Defect-Fix Proposal - Project completion plan-incomplete guard
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-completion-plan-incomplete-guard
 Version: 001 (NEW)
 Date: 2026-06-06 UTC

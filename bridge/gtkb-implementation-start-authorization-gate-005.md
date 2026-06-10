@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report Revision - Implementation Start Authorization Gate
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-implementation-start-authorization-gate
 Version: 005
 Author: Prime Builder (Codex, harness A)

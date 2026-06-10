@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
 Version: 010
 Author: Loyal Opposition (Antigravity, harness C)

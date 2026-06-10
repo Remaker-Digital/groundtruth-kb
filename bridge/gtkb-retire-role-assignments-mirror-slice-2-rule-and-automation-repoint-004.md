@@ -12,7 +12,7 @@ author_session_context_id: 64373424-797b-4404-9825-4dcd7f843d0c
 author_model: Gemini 3.5 Flash
 author_model_version: gemini-3.5-flash
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
 Version: 004
 Responds-To: `bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-003.md` (NEW post-implementation report)

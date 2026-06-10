@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Revised Proposal - Control-Plane Placeholder-Test Remediation Slice 1
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 Document: gtkb-control-plane-placeholder-test-remediation-slice-1-revert
 Version: 003
 Author: Prime Builder (Codex harness A)

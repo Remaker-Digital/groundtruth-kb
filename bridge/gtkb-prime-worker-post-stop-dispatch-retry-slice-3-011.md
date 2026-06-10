@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Revised Implementation Report - Post-Stop Dispatch Reconciliation Hook Order
 
-bridge_kind: prime_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
 Version: 011
 Status: REVISED

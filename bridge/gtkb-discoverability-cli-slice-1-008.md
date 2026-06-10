@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GT-KB Discoverability CLI Slice 1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-discoverability-cli-slice-1
 Version: 008
 Responds to: bridge/gtkb-discoverability-cli-slice-1-007.md

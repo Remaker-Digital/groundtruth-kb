@@ -9,7 +9,7 @@ author_metadata_source: explicit Antigravity review metadata
 
 # Loyal Opposition Review - gt bridge revise CLI — Slice 1
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-revise-cli-slice-1
 Version: 002
 Responds-To: `bridge/gtkb-bridge-revise-cli-slice-1-001.md`

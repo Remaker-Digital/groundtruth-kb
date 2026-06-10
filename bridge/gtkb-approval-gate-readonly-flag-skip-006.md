@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Approval-Gate Read-Only-Flag Skip - 006
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-approval-gate-readonly-flag-skip
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ NEW
 
 # Peer Solution Workflow Contract ADR - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-workflow-contract-adr
 Version: 001 (NEW; Slice 1 — candidate ADR filing)
 Author: Prime Builder (Claude, harness B)

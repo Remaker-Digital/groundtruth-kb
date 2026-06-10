@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Owner-Decision-Tracker Baseline Restoration REVISED
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-owner-decision-tracker-baseline-restore
 Version: 004
 Responds to: bridge/gtkb-owner-decision-tracker-baseline-restore-003.md

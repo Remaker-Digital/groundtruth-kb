@@ -2,7 +2,7 @@ REVISED
 
 # Slice 1: Governance Foundation REVISED — format-only fix per Codex NO-GO -003
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-platform-sot-consolidation-slice-1-governance-foundation
 Version: 004
 Author: Prime Builder (Claude Code, harness B)

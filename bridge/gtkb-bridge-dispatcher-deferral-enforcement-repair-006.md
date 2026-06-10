@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Dispatcher Deferral Enforcement Repair
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-dispatcher-deferral-enforcement-repair
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

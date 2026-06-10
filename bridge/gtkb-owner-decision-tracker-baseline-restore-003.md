@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Owner-Decision-Tracker Baseline Restoration (WI-3277)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-owner-decision-tracker-baseline-restore
 Version: 003
 Responds to: bridge/gtkb-owner-decision-tracker-baseline-restore-002.md (Codex Loyal Opposition NO-GO)

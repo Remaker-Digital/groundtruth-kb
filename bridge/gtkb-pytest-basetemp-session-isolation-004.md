@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Review - pytest-basetemp-session-isolation VERIFIED-004
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-pytest-basetemp-session-isolation
 Version: 004
 Reviewer: Antigravity (Loyal Opposition, harness C)

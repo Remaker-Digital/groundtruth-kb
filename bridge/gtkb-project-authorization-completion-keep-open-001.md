@@ -2,7 +2,7 @@ NEW
 
 # Add keep-project-open opt-out to complete_project_authorization() so multi-slice projects are not auto-retired on sole-authorization completion (WI-3329)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-authorization-completion-keep-open
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Harness Lifecycle Finite State Machine (WI-3339)
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-lifecycle-fsm
 Version: 004 (VERIFIED)
 Author: Codex Loyal Opposition (harness A)

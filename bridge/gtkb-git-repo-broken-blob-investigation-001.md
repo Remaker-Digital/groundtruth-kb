@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Git Repo Broken-Blob Investigation: diagnose missing blob 01448913 referenced by tree aec44289
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-git-repo-broken-blob-investigation
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

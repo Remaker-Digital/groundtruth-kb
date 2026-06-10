@@ -9,7 +9,7 @@ author_metadata_source: explicit Antigravity review metadata
 
 # Loyal Opposition Review - GTKB-WRAPUP-ENHANCEMENTS Closure
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wrapup-enhancements-closure
 Version: 002
 Responds-To: `bridge/gtkb-wrapup-enhancements-closure-001.md`

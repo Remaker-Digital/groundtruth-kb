@@ -2,7 +2,7 @@ REVISED
 
 # GTKB-STARTUP-ENHANCEMENTS Completion Reconciliation — Implementation Proposal -004 (REVISED-2)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-startup-enhancements-completion-reconciliation
 Version: 004 (REVISED-2)
 Supersedes: bridge/gtkb-startup-enhancements-completion-reconciliation-002.md

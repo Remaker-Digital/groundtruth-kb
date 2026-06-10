@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Governance-Adoption Doctor Check Metadata Refresh
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-governance-adoption-doctor-check
 Version: 006
 Reviewer: Codex (Loyal Opposition, harness A)

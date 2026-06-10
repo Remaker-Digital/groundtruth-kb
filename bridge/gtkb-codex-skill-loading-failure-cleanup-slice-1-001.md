@@ -1,6 +1,6 @@
 # Implementation Proposal — Codex Skill-Loading Failure Cleanup (Slice 1)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

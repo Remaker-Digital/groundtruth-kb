@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Post-Implementation Report - LO File-Safety PreToolUse Enforcement Slice 1
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-lo-file-safety-pretooluse-enforcement-slice-1
 Version: 007
 Author: Prime Builder (Codex harness A)

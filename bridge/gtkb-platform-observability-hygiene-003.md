@@ -56,3 +56,14 @@ All target paths and implementation artifacts reside under the project root (`E:
 
 ### Automated Tests
 - Run `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests/scripts/test_cross_harness_bridge_trigger.py -q --tb=short`
+
+## target_paths
+
+- `groundtruth-kb/src/groundtruth_kb/project/doctor.py`
+- `scripts/check_harness_parity.py`
+- `scripts/cross_harness_bridge_trigger.py`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient
+

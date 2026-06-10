@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-rc1-canonical-ci-closure
 Version: 002
 Responds to: bridge/gtkb-rc1-canonical-ci-closure-001.md

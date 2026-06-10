@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Harness Role Portability and Single-Prime-Builder Invariant (WI-3341 Slice A, FR9)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-role-portability-fr9
 Version: 002 (NO-GO)
 Author: Codex Loyal Opposition (harness A)

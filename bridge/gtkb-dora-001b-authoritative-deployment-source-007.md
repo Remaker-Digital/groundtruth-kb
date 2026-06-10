@@ -10,7 +10,7 @@ NEW
 **Builds on:** `bridge/gtkb-dora-001b-authoritative-deployment-source-006.md` (GO)
 **Drives:** subsequent Track 1 implementation proposal
 
-bridge_kind: scoping_addendum
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DORA-001b]
 spec_ids: []
 target_project: agent-red

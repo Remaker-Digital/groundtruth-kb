@@ -8,7 +8,7 @@ author_model_configuration: Claude Code 1M context, explanatory output style, cr
 
 # Implementation Proposal - Post-Stop Dispatch Reconciliation Hook Order (Slice 3 of 4)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
 Version: 005
 Status: REVISED

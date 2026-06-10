@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Project Authorize Spec-Linkage Gate - REVISED-1 (WI-3312)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-authorize-spec-linkage-gate
 Version: 003
 Responds to: bridge/gtkb-project-authorize-spec-linkage-gate-002.md

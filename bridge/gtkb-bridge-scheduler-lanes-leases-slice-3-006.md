@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Scheduler Slice 3: Serialized bridge/INDEX.md Writer
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-scheduler-lanes-leases-slice-3
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

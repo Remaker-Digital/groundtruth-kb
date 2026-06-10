@@ -10,7 +10,7 @@ author_metadata_source: prime-builder session; inline author metadata
 
 # Implementation Proposal — Handoff Prompt vs. Session Prompt Terminology Clarification (WI-4363)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-handoff-prompt-terminology-clarification
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

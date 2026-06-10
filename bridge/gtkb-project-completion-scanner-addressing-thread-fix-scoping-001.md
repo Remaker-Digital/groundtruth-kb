@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning
 
 # Project-Completion Scanner "Addressing Thread" Fix — Design Scoping
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 Document: gtkb-project-completion-scanner-addressing-thread-fix-scoping
 Version: 001 (NEW; design-scoping / governance review)

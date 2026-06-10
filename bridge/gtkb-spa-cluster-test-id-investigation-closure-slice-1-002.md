@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - SPA Cluster Test-ID Investigation Closure Slice 1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-spa-cluster-test-id-investigation-closure-slice-1
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Prime Follow-Through Report - GTKB-DORA-001b Authoritative Deployment Source
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-dora-001b-authoritative-deployment-source
 Version: 009
 Author: Prime Builder (Codex harness A)

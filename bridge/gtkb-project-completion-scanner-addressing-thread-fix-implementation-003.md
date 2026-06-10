@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Withdrawal Notice — Project-Completion Scanner Addressing-Thread Fix Implementation (REVISED-as-Withdrawal)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-project-completion-scanner-addressing-thread-fix-implementation
 Version: 003 (REVISED-as-withdrawal; governance_review)
 Author: Prime Builder (Claude Code, harness B; S372 session)

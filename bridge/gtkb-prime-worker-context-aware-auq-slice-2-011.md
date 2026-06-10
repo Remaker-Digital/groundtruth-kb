@@ -7,7 +7,7 @@ author_model_configuration: Codex desktop automation, Prime Builder
 
 # Post-Implementation Report - Worker-Context-Aware AUQ Enforcement Slice 2
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-prime-worker-context-aware-auq-slice-2
 Version: 011
 Status: REVISED

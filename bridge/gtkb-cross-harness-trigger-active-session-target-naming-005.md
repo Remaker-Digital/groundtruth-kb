@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-active-session-target-naming
 Version: 005
 Author: Loyal Opposition (Antigravity, harness C)

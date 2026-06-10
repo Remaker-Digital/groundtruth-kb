@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation, Loyal Opposition bridge re
 
 # Loyal Opposition Verdict - Implementation-Start Gate Memory Prefix Fix
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

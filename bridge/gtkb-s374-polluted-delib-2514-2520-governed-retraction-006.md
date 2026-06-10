@@ -1,6 +1,6 @@
 # S374 Governed Retraction of Polluted DELIB-2514..2520 — Post-Implementation Report
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 Document: gtkb-s374-polluted-delib-2514-2520-governed-retraction
 Version: 006

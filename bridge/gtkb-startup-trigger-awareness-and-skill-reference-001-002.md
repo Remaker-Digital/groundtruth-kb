@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Startup Payload Trigger Awareness + Skill Reference + Parallel-Automation Guidance
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-startup-trigger-awareness-and-skill-reference-001
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

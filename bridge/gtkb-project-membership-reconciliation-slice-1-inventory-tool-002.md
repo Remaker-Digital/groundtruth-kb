@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex review metadata
 
 # Loyal Opposition Review - Project Membership Reconciliation Slice 1 Inventory Tool
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-membership-reconciliation-slice-1-inventory-tool
 Version: 002
 Responds-To: `bridge/gtkb-project-membership-reconciliation-slice-1-inventory-tool-001.md`

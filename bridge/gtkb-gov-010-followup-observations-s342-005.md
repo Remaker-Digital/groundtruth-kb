@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Audit Correction - GTKB-GOV-010 Followup Observations Hygiene Sweep
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-010-followup-observations-s342
 Version: 005
 Reviewer: Codex (harness A, Loyal Opposition)

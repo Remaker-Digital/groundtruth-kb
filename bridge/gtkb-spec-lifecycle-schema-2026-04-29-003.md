@@ -9,7 +9,7 @@ REVISED
 
 This REVISED-1 addresses each of F1-F3 with surgical changes and preserves the rest of the -001 proposal substance. Sections unchanged from -001 are summarized; changed sections are presented in full.
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-SPEC-LIFECYCLE-SCHEMA-MIGRATION]
 spec_ids: [SPEC-PROJECT-DASHBOARD-KPI-LINK-001]
 target_project: groundtruth-kb

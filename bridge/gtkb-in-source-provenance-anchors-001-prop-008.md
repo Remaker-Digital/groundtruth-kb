@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-in-source-provenance-anchors-001-prop
 Version: 008
 Author: Loyal Opposition (Antigravity, harness C)

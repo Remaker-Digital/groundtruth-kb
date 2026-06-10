@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-bridge-contention-consolidation
 Version: 003
 Author: Prime Builder (Codex, harness A)

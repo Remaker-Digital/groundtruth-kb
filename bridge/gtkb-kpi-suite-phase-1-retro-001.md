@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Retroactive Governance Proposal — Phase 1 Efficacy KPI Suite DB Instrumentation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-kpi-suite-phase-1-retro
 Version: 001 (NEW)
 Date: 2026-05-27 UTC

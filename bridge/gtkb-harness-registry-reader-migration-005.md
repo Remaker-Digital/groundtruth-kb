@@ -2,7 +2,7 @@ REVISED
 
 # Harness Role/Identity Reader Migration to the Registry Projection (WI-3342 Slice B)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-registry-reader-migration
 Version: 005 (REVISED; adds IP-RECON one-time registry/projection reconciliation discovered after the -004 GO)
 Author: Prime Builder (Claude, harness B)

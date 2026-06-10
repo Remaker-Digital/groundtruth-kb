@@ -9,7 +9,7 @@ author_metadata_source: session-start.json plus owner-directed override
 
 # Withdrawn: smart-poller-p1-p2-implementation
 
-bridge_kind: prime_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-smart-poller-p1-p2-implementation
 Version: 003
 Date: 2026-06-08 UTC

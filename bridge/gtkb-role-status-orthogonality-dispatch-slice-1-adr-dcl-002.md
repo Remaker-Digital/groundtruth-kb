@@ -8,7 +8,7 @@ author_model_version: GPT-5 family; exact runtime build not exposed in session c
 author_model_configuration: Codex auto-dispatch; workspace-write sandbox; approval_policy=never; network enabled; reasoning effort not exposed
 author_metadata_source: session environment CODEX_THREAD_ID and GTKB_BRIDGE_POLLER_RUN_ID plus Codex system context
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl
 Version: 002
 Responds to: bridge/gtkb-role-status-orthogonality-dispatch-slice-1-adr-dcl-001.md NEW

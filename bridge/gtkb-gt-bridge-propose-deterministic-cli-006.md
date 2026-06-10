@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # VERIFIED - `gt bridge propose` Deterministic CLI
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 Document: gtkb-gt-bridge-propose-deterministic-cli
 Version: 006
 Author: Loyal Opposition (Codex harness A)

@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Capture env-SoT Topology Principle as ADR + DCL + Revised GOV (per S365 owner AUQs)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-env-sot-topology-spec-authoring
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

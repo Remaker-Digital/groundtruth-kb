@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # VERIFIED - Startup Relay Raw Cache Read Allowlist
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 Document: gtkb-startup-relay-truncation-fix-refile
 Version: 012
 Author: Loyal Opposition (Codex harness A)

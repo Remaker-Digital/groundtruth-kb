@@ -8,7 +8,7 @@ author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; s
 
 # Bridge Verdict - Implementation Proposal Review
 
-bridge_kind: bridge_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
 Version: 002
 Date: 2026-06-07 UTC

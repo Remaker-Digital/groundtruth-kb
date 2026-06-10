@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
 Version: 005
 Responds to: bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-003.md

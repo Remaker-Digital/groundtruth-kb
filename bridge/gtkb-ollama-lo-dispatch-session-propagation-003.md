@@ -7,7 +7,7 @@ author_model_version: 2026-06-06
 author_model_configuration: Codex desktop; Prime Builder owner-directed reliability fast-lane bridge proposal
 author_metadata_source: prime-builder session; bridge-author-metadata/current.json
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING
 Project: PROJECT-GTKB-RELIABILITY-FIXES
 Work Item: WI-4388

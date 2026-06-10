@@ -9,7 +9,7 @@ author_metadata_source: bridge auto-dispatch prompt and durable harness registry
 
 # Loyal Opposition Verification - Harness-State SoT Consolidation Phase-1 Foundation
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-state-sot-consolidation-phase-1-foundation
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

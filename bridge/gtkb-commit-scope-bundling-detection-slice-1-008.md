@@ -6,7 +6,7 @@ author_model: Codex
 author_model_version: GPT-5
 author_model_configuration: Codex Desktop default reasoning
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-commit-scope-bundling-detection-slice-1
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

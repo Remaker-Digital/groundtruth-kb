@@ -6,7 +6,7 @@ author_model: GPT-5
 
 # Loyal Opposition Verdict - Interactive Session Role Override Slice 6 Attribution Role-Awareness
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-6-attribution-role-awareness
 Version: 002
 Reviewer: Codex Loyal Opposition (harness A)

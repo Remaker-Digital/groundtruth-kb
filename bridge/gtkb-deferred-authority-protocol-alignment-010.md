@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex revision metadata
 
 # Bridge Revision - DEFERRED Authority And Protocol Alignment
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-deferred-authority-protocol-alignment
 Version: 010
 Responds-To: `bridge/gtkb-deferred-authority-protocol-alignment-009.md`

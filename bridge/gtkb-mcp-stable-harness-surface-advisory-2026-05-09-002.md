@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - GT-KB MCP Stable Harness Surface Advisory
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-mcp-stable-harness-surface-advisory-2026-05-09
 Version: 002
 Author: Prime Builder (Codex, harness A)

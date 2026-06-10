@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Antigravity IDE Research Spike (WI-3345)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-antigravity-ide-research-spike
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

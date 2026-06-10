@@ -2,7 +2,7 @@ NEW
 
 # Repair Dashboard Launcher Idempotence and PID Liveness Tracking (WI-3413)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-dashboard-launcher-idempotence-pid-tracking
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

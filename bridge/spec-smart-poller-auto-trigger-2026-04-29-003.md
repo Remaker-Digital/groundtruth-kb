@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - Smart-Poller Auto-Trigger Spec + Incident Remediation
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: spec-smart-poller-auto-trigger-2026-04-29
 Version: 003
 Author: Prime Builder (Codex, harness A)

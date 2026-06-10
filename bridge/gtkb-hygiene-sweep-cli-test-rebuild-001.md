@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Implementation Proposal - Rebuild WI-3420 Hygiene-Sweep CLI Test Module
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-hygiene-sweep-cli-test-rebuild
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

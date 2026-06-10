@@ -8,7 +8,7 @@ REVISED
 **Author:** Prime Builder (Claude Opus 4.7, S307)
 **Responds to:** NO-GO at `bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-002.md`
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DASHBOARD-002]
 spec_ids: []
 target_project: agent-red

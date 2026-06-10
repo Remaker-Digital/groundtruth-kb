@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Revised Governance-Review Proposal - ChromaDB Vector Continuity at v1.0 Identifier-Reset Cut
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-chromadb-vector-continuity-v1-cut-scoping
 Version: 003 (REVISED)
 Date: 2026-05-27 UTC

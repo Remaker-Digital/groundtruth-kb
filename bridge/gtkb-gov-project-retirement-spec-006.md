@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification: gtkb-gov-project-retirement-spec-005
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-project-retirement-spec
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

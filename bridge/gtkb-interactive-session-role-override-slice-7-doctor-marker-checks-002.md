@@ -6,7 +6,7 @@ author_model: GPT-5
 
 # Loyal Opposition Verdict - Interactive Session Role Override Slice 7 Doctor Marker Checks
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-7-doctor-marker-checks
 Version: 002
 Reviewer: Codex Loyal Opposition (harness A)

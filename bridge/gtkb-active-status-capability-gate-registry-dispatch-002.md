@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-active-status-capability-gate-registry-dispatch
 Version: 002
 Responds to: bridge/gtkb-active-status-capability-gate-registry-dispatch-001.md MD

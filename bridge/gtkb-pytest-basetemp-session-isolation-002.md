@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-pytest-basetemp-session-isolation
 Version: 002
 Responds to: bridge/gtkb-pytest-basetemp-session-isolation-001.md NEW

@@ -72,5 +72,17 @@ Role-awareness is implemented in `groundtruth_kb.mcp_surface.roles.current_role`
 ### Automated Tests
 - Run: `groundtruth-kb\.venv\Scripts\python.exe -m pytest groundtruth-kb/tests/ -k mcp_surface` (or equivalent test command)
 
+## target_paths
+
+- `groundtruth-kb/src/groundtruth_kb/mcp_surface/server.py`
+- `groundtruth-kb/src/groundtruth_kb/mcp_surface/roles.py`
+- `groundtruth-kb/src/groundtruth_kb/mcp_surface/boundary.py`
+- `groundtruth-kb/src/groundtruth_kb/mcp_surface/authority.py`
+- `groundtruth-kb/tests/test_mcp_surface_foundation.py`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient
+
 ---
 Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Ollama Harness Integration — Governance Umbrella + Spec Drafts
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-ollama-integration-phase-1
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

@@ -7,7 +7,7 @@ author_model_version: gpt-5
 author_model_configuration: Codex API; bridge auto-dispatch; Loyal Opposition; workspace-write; approval-policy never
 author_metadata_source: bridge auto-dispatch prompt and durable harness registry
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

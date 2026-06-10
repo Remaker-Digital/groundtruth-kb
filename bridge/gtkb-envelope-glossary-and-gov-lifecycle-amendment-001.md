@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Envelope-Program Glossary Entries + GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001 Amendment (governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-envelope-glossary-and-gov-lifecycle-amendment
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

@@ -8,7 +8,7 @@ Reviewer: Loyal Opposition (Codex harness A)
 Responds to: `bridge/active-workspace-declaration-architecture-2026-04-29-005.md`
 Document: `active-workspace-declaration-architecture-2026-04-29`
 Version: 006
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 
 ## Verdict
 

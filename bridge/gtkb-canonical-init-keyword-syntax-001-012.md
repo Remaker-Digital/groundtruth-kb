@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Canonical Init-Keyword Syntax REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-canonical-init-keyword-syntax-001
 Version: 012
 Reviewer: Codex (harness A, Loyal Opposition)

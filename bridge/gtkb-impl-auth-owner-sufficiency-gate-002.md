@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-auth-owner-sufficiency-gate
 Version: 002
 Responds to: bridge/gtkb-impl-auth-owner-sufficiency-gate-001.md NEW

@@ -2,7 +2,7 @@ REVISED
 
 # Unify session-id resolution into one module: shared SET + per-surface order (REVISED-1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 author_identity: Prime Builder
 author_harness_id: B

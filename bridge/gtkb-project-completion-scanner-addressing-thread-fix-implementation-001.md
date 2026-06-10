@@ -12,7 +12,7 @@ Work Item: WI-3443
 
 # Project-Completion Scanner D3+D4 Fix + GOV v4 Addressing-Thread Discriminator — Implementation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-project-completion-scanner-addressing-thread-fix-implementation
 Version: 001 (NEW; implementation following Codex GO at scoping-002)

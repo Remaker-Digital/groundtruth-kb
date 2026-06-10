@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning
 
 # GTKB Backlog Canonical-Pivot Spec Promotion (Slice 2A Closure) - REVISED-1
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 target_paths: ["groundtruth.db", ".groundtruth/formal-artifact-approvals/2026-05-30-slice-2a-closure-adr-v4.json", ".groundtruth/formal-artifact-approvals/2026-05-30-slice-2a-closure-dcl-v4.json", ".groundtruth/formal-artifact-approvals/2026-05-30-slice-2a-closure-gov-v5.json", "bridge/gtkb-backlog-canonical-pivot-spec-promotion-*.md", "bridge/INDEX.md"]
 
 Document: gtkb-backlog-canonical-pivot-spec-promotion

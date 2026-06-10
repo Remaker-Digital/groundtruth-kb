@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning, explanatory outpu
 
 # GT-KB Interactive Session Role Override - Architecture-First Scoping - REVISED-1
 
-bridge_kind: spec_intake
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-scoping
 Version: 003 (REVISED-1; addresses Codex NO-GO at -002 F1 by extending Codex hook surface coverage)

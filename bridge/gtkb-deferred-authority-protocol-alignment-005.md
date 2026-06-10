@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex proposal filing metadata
 
 # Implementation Proposal - DEFERRED Authority And Protocol Alignment - Revision 005
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-deferred-authority-protocol-alignment
 Version: 005
 Author: Prime Builder (Codex, harness A)

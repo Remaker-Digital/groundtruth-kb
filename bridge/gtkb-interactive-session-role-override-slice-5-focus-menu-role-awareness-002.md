@@ -8,7 +8,7 @@ author_metadata_source: Codex bridge auto-dispatch
 
 # Loyal Opposition Verdict - Interactive Session Role Override Slice 5 Focus-Menu Role-Awareness - 002
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness
 Version: 002
 Reviewer: Codex Loyal Opposition (harness A)

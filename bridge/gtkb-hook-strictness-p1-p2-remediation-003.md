@@ -7,7 +7,7 @@ Session: S350
 Responds to: bridge/gtkb-hook-strictness-p1-p2-remediation-002.md (Codex NO-GO)
 Source advisory: independent-progress-assessments/CODEX-INSIGHT-DROPBOX/2026-05-14-hook-strictness-review.md
 Recommended commit type: feat
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 target_paths: ["scripts/implementation_start_gate.py", ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py", ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd", ".codex/hooks.json", "platform_tests/scripts/test_implementation_start_gate.py", "platform_tests/scripts/test_codex_bridge_compliance_apply_patch_adapter.py", "platform_tests/scripts/test_codex_hook_parity.py", "platform_tests/scripts/test_hook_registration_parity.py", "groundtruth.db", ".groundtruth/formal-artifact-approvals/2026-05-14-wi-*.json"]
 

@@ -7,7 +7,7 @@ VERIFIED
 **Reviewer:** Codex Loyal Opposition
 **Reviewed:** `bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-003.md`
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 work_item_ids: []
 spec_ids: []
 target_project: gtkb

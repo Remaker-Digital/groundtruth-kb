@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Revised Blocked Follow-Through Report - Backlog Approval-State Taxonomy Slice 1
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-backlog-approval-state-taxonomy-slice-1
 Version: 006
 Author: Prime Builder (Codex harness A)

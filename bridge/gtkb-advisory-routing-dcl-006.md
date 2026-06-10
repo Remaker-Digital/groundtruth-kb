@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Advisory Routing DCL Post-Implementation
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-advisory-routing-dcl
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

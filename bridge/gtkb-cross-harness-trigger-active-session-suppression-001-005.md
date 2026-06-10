@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal --- Cross-Harness Trigger Active-Session Suppression --- REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-cross-harness-trigger-active-session-suppression-001
 Version: 005 (REVISED-2 post NO-GO at `-001-004`)
 Author: Prime Builder (Claude, harness B)

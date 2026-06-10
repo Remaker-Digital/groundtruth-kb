@@ -13,7 +13,7 @@ Implements: WI-3462
 
 # Implementation Proposal (SCOPING-ONLY) - Phase-2 implements-link backfill for v4 project auto-completion (WI-3462)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-implements-link-backfill-phase2-scoping
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

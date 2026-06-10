@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Revised Audit-Trail Correction - GTKB-GOV-CODE-QUALITY-BASELINE Slice 2
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-code-quality-baseline-slice-2
 Version: 013
 Responds to: bridge/gtkb-gov-code-quality-baseline-slice-2-012.md

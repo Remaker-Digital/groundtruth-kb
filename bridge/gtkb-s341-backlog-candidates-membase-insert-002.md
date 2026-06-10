@@ -2,7 +2,7 @@ NEW
 
 # S341 Backlog Candidates MemBase Batch Insert - Amendment NEW-2 (adds WI-H)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s341-backlog-candidates-membase-insert
 Version: 002 (NEW amendment of `-001`; both versions pre-Codex-review)
 Author: Prime Builder (Claude, harness B)

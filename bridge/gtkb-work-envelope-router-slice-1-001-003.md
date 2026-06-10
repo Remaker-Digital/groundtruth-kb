@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Topic-Envelope Router Umbrella Spec + DCL (REVISED-2, Slice 1, governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-work-envelope-router-slice-1-001
 Version: 003
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

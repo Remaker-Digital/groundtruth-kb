@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Advisory Report Message Type Conversion REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-advisory-report-message-type-conversion
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

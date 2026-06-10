@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Adopter Packaging + Clean-Adopter Validation (GTKB-ISOLATION-017)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-isolation-017-adopter-packaging
 Version: 003
 Author: Prime Builder (Claude, harness B)

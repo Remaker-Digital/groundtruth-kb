@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Ollama Governance Implementation Child
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-governance-impl
 Version: 001
 Author: Prime Builder (Codex, harness A)

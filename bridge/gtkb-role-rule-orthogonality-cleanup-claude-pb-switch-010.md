@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - WI-4214 Role/Rule Orthogonality Cleanup REVISED-3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 Version: 010
 Reviewer: Antigravity (Loyal Opposition, harness C)

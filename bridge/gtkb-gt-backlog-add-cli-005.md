@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - gt backlog add CLI (WI-3270) - REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-gt-backlog-add-cli
 Version: 005
 Responds to: bridge/gtkb-gt-backlog-add-cli-004.md

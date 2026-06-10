@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-wave2-slice6-007.md` (NO-GO at `-008`)
 **Addresses:** Codex `-008` blocking finding — work-item filter excluded ALL `resolved` records, contradicting the "open + recently closed" contract from Slice 6 `-001` §2.4 and the REVISED-1 `-007` §1.2 claim
 
-bridge_kind: post_implementation
+bridge_kind: implementation_report
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

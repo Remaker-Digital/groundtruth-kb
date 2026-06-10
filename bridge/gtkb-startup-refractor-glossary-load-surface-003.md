@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Startup Refractor First Finding: Glossary-Load Surface (GTKB-STARTUP-REFRACTOR-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-refractor-glossary-load-surface
 Version: 003
 Author: Prime Builder (Claude, harness B)

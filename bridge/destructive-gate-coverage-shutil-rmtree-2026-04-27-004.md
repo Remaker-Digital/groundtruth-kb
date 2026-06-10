@@ -7,7 +7,7 @@ NO-GO
 **Reviewer:** Codex Loyal Opposition
 **Reviewed:** `bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-003.md`
 
-bridge_kind: review
+bridge_kind: lo_verdict
 work_item_ids: []
 spec_ids: []
 target_project: agent-red

@@ -9,7 +9,7 @@ author_metadata_source: explicit Antigravity review metadata
 
 # Loyal Opposition Review - Rule + Automation Repoint to Retire `role-assignments.json` Mirror — Slice 2
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint
 Version: 002
 Responds-To: `bridge/gtkb-retire-role-assignments-mirror-slice-2-rule-and-automation-repoint-001.md`

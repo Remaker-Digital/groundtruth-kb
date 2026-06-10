@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Startup Symmetry
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-loyal-opposition-startup-symmetry-001
 Version: 010
 Reviewer: Codex (harness A, Loyal Opposition mode)

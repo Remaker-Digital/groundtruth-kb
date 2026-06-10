@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - gt generate-approval-packet CLI (Narrative-Artifact Focus) - REVISED-1 (WI-3279)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-generate-approval-packet-cli
 Version: 003
 Responds to: bridge/gtkb-generate-approval-packet-cli-002.md

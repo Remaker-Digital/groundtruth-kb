@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Isolation Aftermath Startup Baseline
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-isolation-aftermath-startup-baseline
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

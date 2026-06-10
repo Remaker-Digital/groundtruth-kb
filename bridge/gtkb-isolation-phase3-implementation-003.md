@@ -85,3 +85,15 @@ groundtruth-kb\.venv\Scripts\python.exe -m pytest tests/framework/test_platform_
 | SPEC-ISOLATION-APPLICATION-SLOT-CARDINALITY-001 | `tests/framework/test_application_register_validation.py` | `test_cardinality_constraint_registry` |
 | REQ-ISOLATION-APPLICATION-REGISTER-001 | `tests/framework/test_application_register_validation.py` | `test_register_command_success`, `test_register_mismatched_markers_fails` |
 | REQ-ISOLATION-PLATFORM-DOCTOR-001 | `tests/framework/test_platform_doctor_matrix.py` | `test_doctor_reports_occupancy_matrix` |
+
+## target_paths
+
+- `groundtruth-kb/src/groundtruth_kb/cli.py`
+- `groundtruth-kb/src/groundtruth_kb/isolation/validation.py`
+- `applications/registry.toml`
+- `groundtruth-kb/tests/framework/test_application_register_validation.py`
+- `groundtruth-kb/tests/framework/test_platform_doctor_matrix.py`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient

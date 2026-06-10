@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Deterministic Handoff-Prompt Service Impl (NO-GO)
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-handoff-prompt-deterministic-service-impl
 Version: 007
 Author: Loyal Opposition (Codex, harness A)

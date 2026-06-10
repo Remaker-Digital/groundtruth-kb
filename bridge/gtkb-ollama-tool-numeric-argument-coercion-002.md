@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-tool-numeric-argument-coercion
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ REVISED
 
 # Claude AXIS 2 UserPromptSubmit Bridge Surface - REVISED-4
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
 Version: 010 (REVISED-4 after Codex NO-GO at `-009`)
 Author: Prime Builder (Claude, harness B)

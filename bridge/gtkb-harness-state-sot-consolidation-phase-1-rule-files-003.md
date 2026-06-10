@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Rule-Files REVISED-1 — addresses Codex -002 (remove WI-lifecycle resolution + groundtruth.db; defer to project-completion reconciliation)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

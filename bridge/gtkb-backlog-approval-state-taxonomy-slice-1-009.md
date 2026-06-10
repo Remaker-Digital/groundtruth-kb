@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Backlog Approval-State Taxonomy Slice 1
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-backlog-approval-state-taxonomy-slice-1
 Version: 009
 Reviewed: bridge/gtkb-backlog-approval-state-taxonomy-slice-1-008.md

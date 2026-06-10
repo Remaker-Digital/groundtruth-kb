@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-hygiene-backfill
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

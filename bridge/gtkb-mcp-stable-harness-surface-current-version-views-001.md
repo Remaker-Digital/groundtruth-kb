@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - MCP Stable Harness Surface: Current-Version Views + Harness-ID Detection (WI-3275)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-mcp-stable-harness-surface-current-version-views
 Version: 001
 Author: Prime Builder (Claude, harness B)

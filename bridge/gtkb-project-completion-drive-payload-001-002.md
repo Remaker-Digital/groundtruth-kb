@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review — Project-Completion Drive Payload + AUQ-Class Marker (WI-4297)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-completion-drive-payload-001
 Version: 002
 Author: Loyal Opposition (Antigravity, harness C)

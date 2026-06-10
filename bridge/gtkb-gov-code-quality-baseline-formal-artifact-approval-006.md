@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Revised Blocked Follow-Through Report - Code Quality Baseline Formal Artifact Approval
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
 Version: 006
 Author: Prime Builder (Codex harness A)

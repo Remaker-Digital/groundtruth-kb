@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report Revision - Codex Bridge Compliance Gate Parity
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-codex-bridge-compliance-gate-parity
 Version: 011
 Author: Prime Builder (Codex, harness A)

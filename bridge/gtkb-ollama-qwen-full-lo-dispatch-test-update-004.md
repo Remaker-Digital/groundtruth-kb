@@ -7,7 +7,7 @@ author_model: qwen3-coder-next:cloud
 author_model_version: cloud
 author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; skill verification; full guarded tools Read/Write/Edit/Grep/Glob/Bash
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-qwen-full-lo-dispatch-test-update
 Version: 004
 Responds to: bridge/gtkb-ollama-qwen-full-lo-dispatch-test-update-003.md

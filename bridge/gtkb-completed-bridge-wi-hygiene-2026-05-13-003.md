@@ -2,7 +2,7 @@ NEW
 
 # Implementation Report — Stale Completed-Bridge Work Item Hygiene — 003
 
-bridge_kind: prime_builder_implementation_report
+bridge_kind: implementation_report
 target_paths: ["groundtruth.db"]
 Document: gtkb-completed-bridge-wi-hygiene-2026-05-13
 Responds to: bridge/gtkb-completed-bridge-wi-hygiene-2026-05-13-002.md (Codex GO at -002)

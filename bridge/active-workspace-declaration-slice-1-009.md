@@ -8,7 +8,7 @@ author_model_version: claude-opus-4-7[1m]
 author_model_configuration: explanatory; mode=auto
 author_metadata_source: bridge-auto-dispatch-env
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 # Post-Implementation Report (Revised) — Active-Workspace Declaration Slice 1
 

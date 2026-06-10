@@ -2,7 +2,7 @@ NEW
 
 # Workspace Orphan-Cleanup: complete file relocation + commit residual narrative/rule edits
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-workspace-orphan-cleanup-2026-06-05
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

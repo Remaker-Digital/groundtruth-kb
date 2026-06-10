@@ -12,7 +12,7 @@ entry filed in same change set)
 precedent). Hook contract may be promoted to upstream `groundtruth-kb`
 once it proves out (separate future slice).
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-GOV-OWNER-DECISION-SURFACING]
 spec_ids: []
 target_project: agent-red

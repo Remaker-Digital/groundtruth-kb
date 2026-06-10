@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-hygiene-cli-utf8-portability-slice-1
 Version: 002
 Author: Loyal Opposition (Antigravity, harness C; session-stated role via ::init gtkb lo)

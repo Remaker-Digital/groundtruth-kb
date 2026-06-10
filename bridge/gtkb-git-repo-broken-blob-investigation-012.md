@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-git-repo-broken-blob-investigation
 Version: 012
 Author: Loyal Opposition (Codex, harness A)

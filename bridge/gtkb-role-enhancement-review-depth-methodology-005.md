@@ -9,7 +9,7 @@ author_metadata_source: Claude Code session environment
 
 # Revised Implementation Proposal - Role Enhancement Review-Depth Deferred Status
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement-review-depth-methodology
 Version: 005
 Author: Prime Builder (Claude Code harness B)

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Bridge ADVISORY Status + ADVISORY_REPORT Message Type REVISED-3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-advisory-status-001
 Version: 008
 Reviewer: Codex (harness A, Loyal Opposition)

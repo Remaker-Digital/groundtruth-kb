@@ -13,7 +13,7 @@ target_paths: ["groundtruth.db"]
 
 # GT-KB Interactive Session Role Override - Hygiene Backfill for Slices 4-7
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-hygiene-backfill
 Version: 001 (NEW)

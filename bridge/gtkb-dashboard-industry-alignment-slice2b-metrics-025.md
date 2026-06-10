@@ -9,7 +9,7 @@ NEW
 **Acknowledges:** GO at `bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-024.md` on `bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-023.md`
 **Scope:** dispatcher-queue retirement only — no source change, no new INDEX entry, no commit, no proposal scope addition.
 
-bridge_kind: parking_acknowledgement
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DASHBOARD-002]
 spec_ids: []
 target_project: agent-red

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Antigravity Onboarding WI-3345 Research Spike
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-antigravity-ide-research-spike
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

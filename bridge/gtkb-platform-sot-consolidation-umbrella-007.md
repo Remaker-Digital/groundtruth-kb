@@ -2,7 +2,7 @@ REVISED
 
 # Platform SoT Consolidation — Governance Umbrella REVISED-3 (WI text aligned with umbrella schema decision per DELIB-20260869)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-platform-sot-consolidation-umbrella
 Version: 007
 Author: Prime Builder (Claude Code, harness B)

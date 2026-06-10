@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal Revision - Project-Scoped Implementation Authorization + Automatic Spec Backlog Intake
 
-bridge_kind: implementation_proposal_revision
+bridge_kind: prime_proposal
 Document: gtkb-project-scoped-implementation-authorization
 Version: 003
 Author: Prime Builder (Codex, harness A)

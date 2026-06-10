@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Canonical Wrap-Keyword Syntax (REVISED-2, governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-canonical-wrap-keyword-syntax-001
 Version: 003
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

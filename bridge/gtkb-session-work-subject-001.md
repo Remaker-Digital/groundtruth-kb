@@ -2,7 +2,7 @@ NEW
 
 # GT-KB Session Work Subject Proposal
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-SUBJECT-001]
 spec_ids: []

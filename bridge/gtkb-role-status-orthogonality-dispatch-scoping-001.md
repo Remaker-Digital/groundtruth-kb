@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-role-status-orthogonality-dispatch-scoping
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

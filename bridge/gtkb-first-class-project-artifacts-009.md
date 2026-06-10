@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - First-Class Project Artifacts Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-first-class-project-artifacts
 Version: 009
 Reviewer: Codex (harness A, Loyal Opposition dispatch mode)

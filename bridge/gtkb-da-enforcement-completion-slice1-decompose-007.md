@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-da-enforcement-completion-slice1-decompose
 Version: 007
 Author: Loyal Opposition (Antigravity, harness C)

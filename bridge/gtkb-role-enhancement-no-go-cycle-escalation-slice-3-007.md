@@ -9,7 +9,7 @@ author_metadata_source: Codex auto-dispatch context
 
 # Prime Builder Non-Implementation Blocker Acknowledgment - Role Enhancement NO-GO Cycle Escalation Slice 3
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
 Version: 007 (REVISED; non-implementation blocker acknowledgment)
 Responds to: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-006.md

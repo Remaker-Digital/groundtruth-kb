@@ -2,7 +2,7 @@ NEW
 
 # Bridge Convenience Verbs — `/bridge scan` and `/bridge show-thread <slug>`
 
-bridge_kind: prime_builder_proposal
+bridge_kind: prime_proposal
 target_paths: [".claude/skills/bridge/helpers/scan_bridge.py", ".claude/skills/bridge/helpers/show_thread_bridge.py", ".claude/skills/bridge/SKILL.md", ".codex/skills/bridge/SKILL.md", "platform_tests/scripts/test_scan_bridge.py", "platform_tests/scripts/test_show_thread_bridge.py", "groundtruth.db"]
 Document: gtkb-bridge-convenience-verbs-001
 Version: 001

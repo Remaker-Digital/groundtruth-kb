@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Scoping Proposal - Skill: gtkb-hygiene-sweep (CLI orchestrator)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-hygiene-sweep-skill-scoping
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

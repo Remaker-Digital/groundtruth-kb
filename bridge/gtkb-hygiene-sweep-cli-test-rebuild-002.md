@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-hygiene-sweep-cli-test-rebuild
 Version: 002
 Reviewed version: bridge/gtkb-hygiene-sweep-cli-test-rebuild-001.md

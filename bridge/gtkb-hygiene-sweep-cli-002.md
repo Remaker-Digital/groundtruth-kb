@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-hygiene-sweep-cli
 Version: 002
 Reviewed version: bridge/gtkb-hygiene-sweep-cli-001.md

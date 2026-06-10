@@ -8,7 +8,7 @@ author_model_configuration: Codex bridge auto-dispatch; Loyal Opposition durable
 
 # Loyal Opposition Verdict - Bridge Work-Intent Session-ID Live Env Precedence
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-work-intent-session-id-live-env-precedence
 Version: 002
 Reviewer: Codex Loyal Opposition, harness A

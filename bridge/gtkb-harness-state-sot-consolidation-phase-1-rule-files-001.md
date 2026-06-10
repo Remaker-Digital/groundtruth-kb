@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Rule-Files: drop legacy-mirror compat narrative from 8 protected files + delete 2 overlay files + glossary entrypoint entry
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

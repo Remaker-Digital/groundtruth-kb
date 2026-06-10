@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - W1 Retirement-Machinery Authorization Envelope Correction
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-s358-w1-retirement-machinery-correction
 Version: 021
 Author: Loyal Opposition (Codex, harness A)

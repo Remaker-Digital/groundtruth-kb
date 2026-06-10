@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Envelope Init-Keyword Amendment Implementation Proposal Review (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-init-keyword-amendment-slice-1
 Version: 006
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

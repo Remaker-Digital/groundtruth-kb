@@ -1,6 +1,6 @@
 # Implementation Proposal — Owner-Decision-Tracker: Cached Pending Block Exclusion
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

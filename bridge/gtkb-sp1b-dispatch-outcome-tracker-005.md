@@ -2,7 +2,7 @@ NEW
 
 # Post-Implementation Report — SP-1b: Dispatch Outcome Tracker (Post-Dispatch Polling)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-sp1b-dispatch-outcome-tracker
 Version: 005
 Author: Prime Builder (antigravity, harness C)

@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # Implementation Proposal Revision - W1 Retirement-Machinery Authorization Envelope Correction
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s358-w1-retirement-machinery-correction
 Version: 018
 Author: Prime Builder (Codex, harness A)

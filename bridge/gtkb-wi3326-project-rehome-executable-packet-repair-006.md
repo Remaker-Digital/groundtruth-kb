@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wi3326-project-rehome-executable-packet-repair
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

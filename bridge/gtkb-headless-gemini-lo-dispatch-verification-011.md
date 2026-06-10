@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Headless Gemini LO Dispatch Verification REVISED-11: dispatch enriches PATH (root-boundary compliant)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 011 (REVISED proposal; architecture change per S366 owner AUQ after root-boundary NO-GO-010)
 Responds-To: bridge/gtkb-headless-gemini-lo-dispatch-verification-010.md (Codex NO-GO: root-boundary + DELIB durability)

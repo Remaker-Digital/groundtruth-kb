@@ -6,7 +6,7 @@ author_model: GPT-5 Codex
 author_model_version: 2026-06-02
 author_model_configuration: reasoning=high
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-active-status-capability-gate-registry-dispatch
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

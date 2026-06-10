@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
 Version: 003
 Responds to GO: bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-002.md

@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Backlog Approval-State Taxonomy and AUQ Implementation Gate (Slice 1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-backlog-approval-state-taxonomy-slice-1
 Version: 001
 Author: Prime Builder (Claude, harness B)

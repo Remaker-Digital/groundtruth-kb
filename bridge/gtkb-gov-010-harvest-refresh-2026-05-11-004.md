@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GTKB-GOV-010 Harvest Refresh
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-010-harvest-refresh-2026-05-11
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

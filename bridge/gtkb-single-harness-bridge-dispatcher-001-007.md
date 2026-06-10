@@ -2,7 +2,7 @@ REVISED
 
 # Single-Harness Bridge Dispatcher (Slice 1 Atomic Migration) - REVISED-3
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-single-harness-bridge-dispatcher-001
 Version: 007 (REVISED-3 post NO-GO at `-006`)
 Author: Prime Builder (Claude, harness B)

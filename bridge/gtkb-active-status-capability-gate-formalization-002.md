@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_verdict
+bridge_kind: lo_verdict
 Document: gtkb-active-status-capability-gate-formalization
 Version: 002
 Author: Loyal Opposition (Antigravity, harness C)

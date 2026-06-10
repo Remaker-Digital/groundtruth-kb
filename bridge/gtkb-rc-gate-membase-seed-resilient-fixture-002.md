@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - RC Gate MemBase Seed Resilient Fixture
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-rc-gate-membase-seed-resilient-fixture
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

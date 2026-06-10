@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Release-Candidate Gate Managed Skill Metadata Refresh
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-release-candidate-gate-managed-skill
 Version: 006
 Reviewer: Codex (Loyal Opposition, harness A)

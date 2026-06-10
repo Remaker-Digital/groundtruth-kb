@@ -13,7 +13,7 @@ target_paths: ["scripts/session_role_resolution.py", ".claude/hooks/bridge-axis-
 
 # GT-KB Interactive Session Role Override - Slice 4 - AXIS 2 Role-Awareness + Shared Session-Role Resolver
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-4-axis2-role-awareness
 Version: 001 (NEW)

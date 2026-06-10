@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Project VERIFIED-Completion Owner-Confirmed AUQ Trigger - REVISED-1 (WI-3316)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-verified-completion-auq-trigger
 Version: 003
 Responds to: bridge/gtkb-project-verified-completion-auq-trigger-002.md

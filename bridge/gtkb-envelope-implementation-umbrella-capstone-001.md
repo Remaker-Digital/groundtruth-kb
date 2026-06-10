@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Envelope-Program Implementation Umbrella Capstone (governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-envelope-implementation-umbrella-capstone
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

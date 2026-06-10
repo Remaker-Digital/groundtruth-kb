@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Revised Implementation Report - Owner-Decision-Tracker Baseline Restoration - 007
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-owner-decision-tracker-baseline-restore
 Version: 007 (REVISED)
 Status: REVISED

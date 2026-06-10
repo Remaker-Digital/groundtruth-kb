@@ -12,7 +12,7 @@ Work Item: WI-3450
 
 # Orphan-WI Membership Backfill — Slice 2 Scoping
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-orphan-wi-membership-backfill-slice-2-scoping
 Version: 001 (NEW; scoping-only proposal for Slice 2 of the orphan-WI-membership workstream)

@@ -9,7 +9,7 @@ author_metadata_source: prime-builder auto-dispatched worker
 
 # Implementation Proposal REVISED - ADR/DCL Clause Auto-Discovery Slice 5.1 (deterministic hybrid, advisory-first)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-adr-dcl-clause-auto-discovery-slice-5
 Version: 003
 Revises: bridge/gtkb-adr-dcl-clause-auto-discovery-slice-5-001.md

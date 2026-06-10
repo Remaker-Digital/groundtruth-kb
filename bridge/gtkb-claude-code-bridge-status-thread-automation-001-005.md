@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - Claude Code Bridge-Status Thread Automation
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-claude-code-bridge-status-thread-automation-001
 Version: 005
 Author: Prime Builder (Codex, harness A)

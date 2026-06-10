@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Envelope Open Disclosure Refactor (NO-GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-disclosure-ui-impl
 Version: 002
 Reviewer: Loyal Opposition (Codex, harness A, durable role per registry: `[loyal-opposition]`)

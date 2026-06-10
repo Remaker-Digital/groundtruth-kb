@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Envelope Open Disclosure Refactor REVISED-1
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-disclosure-ui-impl
 Version: 013
 Author: Loyal Opposition (Codex, harness A, durable role per registry: `[loyal-opposition]`)

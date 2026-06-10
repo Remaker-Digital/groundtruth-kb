@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Withdrawal - Isolation Phase 7 Work-Subject/Root Enforcement (GTKB-ISOLATION-015)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-isolation-015-phase7-root-enforcement
 Version: 003
 Status: WITHDRAWN

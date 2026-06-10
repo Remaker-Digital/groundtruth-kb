@@ -5,7 +5,7 @@ NO-GO
 Status: NO-GO on leaving canonical terminology and startup context as implicit documentation concerns.
 Author: Codex Loyal Opposition
 Date: 2026-05-07
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 origin: owner_requested_codex_advisory
 prime_action: prepare_implementation_proposal
 index_shape_note: no_preceding_new_expected_for_lo_advisory_bootstrap

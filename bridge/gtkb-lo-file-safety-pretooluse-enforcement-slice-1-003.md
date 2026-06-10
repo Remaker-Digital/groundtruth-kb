@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - LO File-Safety PreToolUse Enforcement Slice 1 - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-file-safety-pretooluse-enforcement-slice-1
 Version: 003
 Responds to: bridge/gtkb-lo-file-safety-pretooluse-enforcement-slice-1-002.md

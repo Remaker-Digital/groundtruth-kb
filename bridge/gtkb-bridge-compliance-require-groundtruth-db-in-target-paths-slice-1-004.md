@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-compliance-require-groundtruth-db-in-target-paths-slice-1
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

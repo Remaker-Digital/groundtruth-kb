@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict_correction
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-target-paths-preflight
 Version: 003
 Responds to: bridge/gtkb-impl-start-target-paths-preflight-002.md GO

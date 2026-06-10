@@ -7,7 +7,7 @@ author_model_version: 2026-06-03 runtime
 author_model_configuration: Codex Desktop default reasoning; bridge proposal authoring
 author_metadata_source: Codex bridge helper explicit metadata
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-membership-reconciliation-slice-1-inventory-tool
 Version: 001
 Author: Prime Builder (Codex, harness A)

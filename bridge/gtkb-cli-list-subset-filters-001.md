@@ -7,7 +7,7 @@ author_model_version: 2026-06-01
 author_model_configuration: Codex desktop Prime Builder; approval_policy=never; sandbox=danger-full-access
 author_metadata_source: explicit-codex-helper-call
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Project Authorization: PAUTH-PROJECT-GTKB-DETERMINISTIC-SERVICES-001-CLI-SUBSET-FILTERS-WI-4220
 Project: PROJECT-GTKB-DETERMINISTIC-SERVICES-001
 Work Item: WI-4220

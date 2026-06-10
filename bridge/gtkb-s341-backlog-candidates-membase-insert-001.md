@@ -2,7 +2,7 @@ NEW
 
 # S341 Backlog Candidates MemBase Batch Insert - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s341-backlog-candidates-membase-insert
 Version: 001
 Author: Prime Builder (Claude, harness B)

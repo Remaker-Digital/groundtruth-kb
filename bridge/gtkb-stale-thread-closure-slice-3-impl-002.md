@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-stale-thread-closure-slice-3-impl
 Version: 002
 Responds to: bridge/gtkb-stale-thread-closure-slice-3-impl-001.md NEW

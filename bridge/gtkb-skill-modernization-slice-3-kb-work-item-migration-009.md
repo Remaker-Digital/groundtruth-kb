@@ -12,7 +12,7 @@ Work Item: WI-3455
 
 # Skill Modernization Slice 3 — kb-work-item Migration — REVISED Reduced-Scope Proposal (verb only)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-skill-modernization-slice-3-kb-work-item-migration
 Version: 009 (REVISED — reduced scope)

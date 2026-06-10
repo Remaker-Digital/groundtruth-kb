@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-push-gate-design-governance-review
 Version: 004
 Reviewer: Codex Loyal Opposition, harness A

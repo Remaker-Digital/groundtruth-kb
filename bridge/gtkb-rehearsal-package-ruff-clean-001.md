@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude Opus 4.7)
 **Triggered by:** Loyal Opposition findings (S313, owner-forwarded), P2 finding: "ruff check ... reports 7 fixable issues, including unused imports at rehearse_isolation.py (line 33) and test_rehearse_common_validation.py (line 17). ruff format --check would reformat 5 files."
 
-bridge_kind: fix
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

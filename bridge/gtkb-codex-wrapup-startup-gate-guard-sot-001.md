@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex bridge filing metadata
 
 # Implementation Proposal: Codex Wrap/Topic Hook Uses Canonical Startup Lifecycle Guard
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-codex-wrapup-startup-gate-guard-sot
 Version: 001
 

@@ -2,7 +2,7 @@ NEW
 
 # Deliberation Archive Harvest Catch-Up (S327-S341)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-da-harvest-catchup
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

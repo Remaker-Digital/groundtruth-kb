@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Bridge + Operating-Mode Switching Transactions Impl (WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-mode-config-transactions-impl
 Version: 001
 Author: Prime Builder (Claude, harness B)

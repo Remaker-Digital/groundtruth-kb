@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Session Envelope Durability Revision
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-session-envelope-durability-001
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

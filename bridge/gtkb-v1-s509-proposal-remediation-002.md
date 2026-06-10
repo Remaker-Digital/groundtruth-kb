@@ -2,7 +2,7 @@ REVISED
 
 # Governance Review — S509 Proposal Remediation Umbrella
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-v1-s509-proposal-remediation
 Version: 002
 Author: Prime Builder (goose, harness E)
@@ -38,7 +38,7 @@ All REVISED proposals must include the following sections:
 ### 3.1 Envelope Metadata (YAML-front-matter style)
 
 \`\`\`yaml
-bridge_kind: implementation_proposal
+bridge_kind: governance_advisory
 Document: <doc-name>
 Version: <NNN>
 Author: Prime Builder (<harness>, harness <ID>)
@@ -50,7 +50,7 @@ author_session_context_id: <session-id>
 author_model: <model-name>
 author_model_configuration: <config-description>
 
-bridge_kind: implementation_proposal
+bridge_kind: governance_advisory
 target_paths:
   - path/to/file1.py
   - path/to/file2.py

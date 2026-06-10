@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-active-status-capability-gate-harness-lifecycle-retention
 Version: 002
 Responds to: bridge/gtkb-active-status-capability-gate-harness-lifecycle-retention-001.md MD

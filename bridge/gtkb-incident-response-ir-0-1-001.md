@@ -11,7 +11,7 @@ NEW
 **Parent bridge:** `bridge/gtkb-incident-response-005.md` (REVISED-2; GO at `-006`)
 **Prerequisite ADR:** `ADR-ISOLATION-APPLICATION-PLACEMENT-001` upstream commit `affa5a0567a64f79bb4c5aae891889d4af50a72a`
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-INCIDENT-RESPONSE]
 spec_ids: [SPEC-INCIDENT-SURFACES-BOUNDARY-001]
 target_project: mixed (upstream + agent-red)

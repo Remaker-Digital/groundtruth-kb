@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-propose-helper-caller-migration-to-writer
 Version: 005
 Author: Loyal Opposition (Antigravity, harness C)

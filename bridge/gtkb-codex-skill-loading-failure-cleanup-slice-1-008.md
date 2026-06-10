@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex review metadata
 
 # Loyal Opposition Review - Codex Skill-Loading Failure Cleanup Slice 1 Revision 3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

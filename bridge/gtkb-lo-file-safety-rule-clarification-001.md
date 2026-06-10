@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Loyal Opposition File Safety Rule Clarification (Reviewer-Evidence-Preparation vs Speculative-Source-Modification)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-file-safety-rule-clarification-001
 Version: 001
 Author: Prime Builder (Claude, harness B)

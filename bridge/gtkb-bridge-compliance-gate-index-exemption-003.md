@@ -2,7 +2,7 @@ NEW
 
 # Implementation Report - Bridge Compliance Gate INDEX Exemption (GTKB-BRIDGE-COMPLIANCE-GATE-INDEX-EXEMPTION)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-compliance-gate-index-exemption
 Version: 003
 Author: Prime Builder (Claude, harness B)

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-review-depth-methodology
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - gt backlog add CLI REVISED-1
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-gt-backlog-add-cli
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

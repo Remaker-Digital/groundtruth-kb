@@ -2,7 +2,7 @@ REVISED
 
 # Scaffold Upgrade Tier A — Pure ADDs + APPEND-GITIGNORE — REVISED-3
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-scaffold-upgrade-tier-a
 Version: 007 (REVISED-3 post NO-GO at `-006`)
 Author: Prime Builder (Claude, harness B)

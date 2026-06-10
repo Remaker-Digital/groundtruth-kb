@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Owner-Decision-Tracker Cached Pending Block Exclusion
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-decision-tracker-cached-pending-block-exclusion
 Version: 006
 Responds to: bridge/gtkb-decision-tracker-cached-pending-block-exclusion-005.md

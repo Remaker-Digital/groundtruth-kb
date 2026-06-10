@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Worker Delivery Regression Slice 4 Deferral Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-delivery-regression-slice-4
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

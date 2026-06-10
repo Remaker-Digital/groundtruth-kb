@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Revised Proposal - Canonicalize work_items.priority to P0/P1/P2/P3
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-item-priority-canonical-p0p3-migration
 Version: 003 (REVISED)
 Date: 2026-05-27 UTC

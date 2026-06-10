@@ -2,7 +2,7 @@ NEW
 
 # Claude AXIS 2 In-Session Bridge Surface via UserPromptSubmit Hook
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
 Version: 001
 Author: Prime Builder (Claude, harness B)

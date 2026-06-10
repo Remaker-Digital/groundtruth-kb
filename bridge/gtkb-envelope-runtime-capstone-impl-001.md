@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Envelope Runtime Capstone Integration (WI-4301)
 
-bridge_kind: impl_proposal
+bridge_kind: prime_proposal
 Document: gtkb-envelope-runtime-capstone-impl
 Version: 001
 Author: Codex (owner-directed implementation kickoff)

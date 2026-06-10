@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - Governance-Adoption Doctor Check (GTKB-GOV-003) - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-governance-adoption-doctor-check
 Version: 003 (REVISED)
 Author: Prime Builder (Codex, harness A)

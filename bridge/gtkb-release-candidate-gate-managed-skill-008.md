@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Release-Candidate Gate Managed Skill
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-release-candidate-gate-managed-skill
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

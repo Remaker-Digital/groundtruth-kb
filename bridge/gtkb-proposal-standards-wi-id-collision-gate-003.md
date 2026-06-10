@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Proposal-Standards Work-Item-ID Collision Gate (Slice 3) - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-proposal-standards-wi-id-collision-gate
 Version: 003
 Responds to: bridge/gtkb-proposal-standards-wi-id-collision-gate-002.md

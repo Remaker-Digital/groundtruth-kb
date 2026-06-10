@@ -2,7 +2,7 @@ NEW
 
 # Unify session-id resolution into a single shared helper (eliminate the duplicated env-var lists)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 author_identity: Prime Builder
 author_harness_id: B

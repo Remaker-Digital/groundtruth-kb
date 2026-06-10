@@ -10,7 +10,7 @@ NEW
 **Builds on:** S311 KB corruption incident (`bridge/gtkb-kb-recovery-s311-001.md`)
 **Target project:** groundtruth-kb upstream (framework capability; Agent Red adopts via `gt project upgrade`)
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DB-BACKUP-001]
 spec_ids: []
 target_project: groundtruth-kb

@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Proposal-Standards Test-Claim Re-Run Verifier (Slice 2) - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
 Version: 003
 Responds to: bridge/gtkb-proposal-standards-test-claim-rerun-verifier-002.md

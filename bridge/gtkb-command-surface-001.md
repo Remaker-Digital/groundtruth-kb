@@ -9,7 +9,7 @@ NEW
 **Bridge kind:** architecture_proposal
 **Routing:** Upstream candidate (`groundtruth-kb`). Architecture is GT-KB-wide and reviewer-feedback-driven; not Agent Red-local. Adopters consume via `gt project upgrade` after upstream slices land.
 
-bridge_kind: architecture_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-COMMAND-SURFACE]
 spec_ids: []
 target_project: groundtruth-kb

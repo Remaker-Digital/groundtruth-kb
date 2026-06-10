@@ -13,7 +13,7 @@ NEW
 - Owner directive 2026-04-26 (S311)
 **Target project:** groundtruth-kb upstream (framework capability; Agent Red adopts)
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-BRIDGE-POLLER-001]
 spec_ids: []
 target_project: groundtruth-kb

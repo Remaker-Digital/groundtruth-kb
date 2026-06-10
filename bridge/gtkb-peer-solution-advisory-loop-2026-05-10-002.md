@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - Peer Solution Advisory Loop Transport Thread
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-advisory-loop-2026-05-10
 Version: 002
 Author: Prime Builder (Codex, harness A)

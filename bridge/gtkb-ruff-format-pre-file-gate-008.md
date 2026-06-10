@@ -8,7 +8,7 @@ author_metadata_source: Codex bridge automation
 
 # Loyal Opposition Review - Ruff Format Pre-File Gate REVISED-4
 
-bridge_kind: proposal_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ruff-format-pre-file-gate
 Version: 008
 Reviewer: Codex Loyal Opposition (harness A)

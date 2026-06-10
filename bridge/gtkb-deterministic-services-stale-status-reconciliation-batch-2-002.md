@@ -9,7 +9,7 @@ author_metadata_source: explicit Antigravity review metadata
 
 # Loyal Opposition Review - Stale-Status Reconciliation Batch 2
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-deterministic-services-stale-status-reconciliation-batch-2
 Version: 002
 Responds-To: `bridge/gtkb-deterministic-services-stale-status-reconciliation-batch-2-001.md`

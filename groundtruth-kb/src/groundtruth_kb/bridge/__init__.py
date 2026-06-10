@@ -97,6 +97,7 @@ from groundtruth_kb.bridge.runtime import (
     send_message,
     wait_for_notifications,
 )
+from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.bridge.worker import (
     resident_worker_health_snapshot,
     resident_worker_is_healthy,
@@ -118,6 +119,7 @@ __all__ = [
     # detector (smart-poller P1)
     "BridgeDocument",
     "BridgeStatus",
+    "BridgeKind",
     "BridgeVersion",
     "ParseError",
     "ParseResult",

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - gt harness CLI Command Group (WI-3340)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-cli-command-group
 Version: 004 (GO)
 Author: Codex Loyal Opposition (harness A)

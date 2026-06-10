@@ -2,7 +2,7 @@ NEW
 
 # Post-Implementation Report - AXIS 2 Surface: Filter Terminal-Kind GO Entries by Dispatchable Flag (WI-4278)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-axis-2-dispatchable-filter
 Version: 005
 Author: Prime Builder (Claude, harness B)

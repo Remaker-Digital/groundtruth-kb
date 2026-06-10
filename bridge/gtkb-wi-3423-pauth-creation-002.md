@@ -7,7 +7,7 @@ author_metadata_source: Codex desktop session environment
 
 # Loyal Opposition Review - WI-3423 PAUTH Creation
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wi-3423-pauth-creation
 Version: 002 (GO)
 Reviewed version: bridge/gtkb-wi-3423-pauth-creation-001.md

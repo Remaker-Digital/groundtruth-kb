@@ -13,7 +13,7 @@ target_paths: [".claude/hooks/session_start_dispatch.py", ".codex/gtkb-hooks/ses
 
 # GT-KB Interactive Session Role Override - Slice 1 - SessionStart Cache Writer - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer
 Version: 003 (REVISED-1; addresses Codex NO-GO at -002 F1 by adding inline-JSON `target_paths` metadata and moving the no-KB/MemBase paragraph out of the `## Implementation Files` section)

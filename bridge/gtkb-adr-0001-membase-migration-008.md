@@ -1,5 +1,5 @@
 VERIFIED
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-adr-0001-membase-migration
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # Revised Implementation Proposal - Zero-Knowledge Architecture Phase 4 Readiness Report
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-zero-knowledge-architecture-phase-4-scoping
 Version: 003
 Author: Prime Builder (Codex harness A)

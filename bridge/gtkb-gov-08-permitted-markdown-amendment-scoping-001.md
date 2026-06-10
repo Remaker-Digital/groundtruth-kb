@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Scoping Proposal - Amend GOV-08 Permitted-Markdown Allowlist (S364 Hygiene Seed Batch)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-08-permitted-markdown-amendment-scoping
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Core Spec Intake Default REVISED-2
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-core-spec-intake-default
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

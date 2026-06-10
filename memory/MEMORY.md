@@ -2,9 +2,7 @@
 
 ## Current Status
 
-- **2026-06-06 (PROJECT-GTKB-OLLAMA-INTEGRATION complete; dispatched-worker finalization): Ollama integration Phase 1 and Phase 2+ are terminal and locally finalized, not pushed.** Phase 1 remains terminal: foundation, shim, verification, governance-impl, and umbrella closure are VERIFIED, with umbrella `gtkb-ollama-integration-phase-1` VERIFIED at `bridge/gtkb-ollama-integration-phase-1-008.md`. Parent project completion coverage is VERIFIED at `bridge/gtkb-ollama-integration-phase-1-project-completion-coverage-007.md`.
-- **2026-06-05 (S419-CODEX-WRAP-20260605 Codex Loyal Opposition wrap; Codex harness A, GPT-5): preserved live handoff state without committing concurrent Prime implementation edits.** Branch `develop` at wrap HEAD `864c4fc8`, ahead of `origin/develop` by 185; not pushed.
-- **2026-06-04/05 (S418 Codex Loyal Opposition wrap; Codex harness A, GPT-5): wrapped a live bridge handoff state after concurrent PB/LO automation advanced several bridge threads.** Branch `develop` at wrap HEAD `e7c0a401`, ahead of `origin/develop` by 177; not pushed.
+- **2026-06-09 (PROJECT-GTKB-RELIABILITY-FIXES & ISOLATION updates terminal): All 10 active Prime Builder bridge threads are VERIFIED and terminal.** Platforms tests for dispatch state recovery, occupancy detection, application register validation, and workstream focus role marker pass successfully (41 tests passed).
 - **Recent Platform Session Memory Archive:** Full detailed session logs are preserved in [memory/CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
 
 ## Feedback Index
@@ -64,6 +62,7 @@
 ## Recent Sessions
 Detailed session content lives in git history (commits referenced) and `bridge/*-NNN.md`. For sessions prior to S398, see [memory/CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
 
+- S426-PB-AG-C-20260609 (2026-06-09; Antigravity harness C): Verified that all active Prime Builder bridge items are completed and terminal-verified, ran targeted tests for all 9 implementations/revisions (41 tests passed), harvested S426 session deliberations, and ran the mutating session wrap-up.
 - S425-LO-AG-C-20260609 (2026-06-09; Antigravity harness C): Audited and verified all 8 revised post-implementation reports, authored VERIFIED verdicts (008.md) for each, and updated the bridge index.
 - S424-PB-AG-C-20260609 (2026-06-09; Antigravity harness C): Generalised headless dispatch trigger by removing hardcoded harness types, loaded limit dynamically from SQLite, harvested session deliberations, and ran the session wrap-scan.
 - S423-PB-AG-3293a57b (2026-06-09; Antigravity harness C): Revised the 9 active NO-GO proposals on the bridge, passing all applicability and clause preflights, and committed them to develop.

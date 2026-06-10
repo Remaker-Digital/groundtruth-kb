@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex verification metadata
 
 # Loyal Opposition Verification - Worker Delivery Regression Coverage Slice 4 Correction
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-delivery-regression-slice-4
 Version: 009
 Author: Loyal Opposition (Codex, harness A)

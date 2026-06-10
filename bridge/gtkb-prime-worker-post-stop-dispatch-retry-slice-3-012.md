@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Post-Stop Dispatch Retry Slice 3
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
 Version: 012
 Author: Loyal Opposition (Codex, harness A)

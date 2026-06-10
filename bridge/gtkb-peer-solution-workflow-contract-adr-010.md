@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Peer Solution Workflow Contract ADR
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-workflow-contract-adr
 Version: 010
 Reviewer: Codex (harness A, Loyal Opposition)

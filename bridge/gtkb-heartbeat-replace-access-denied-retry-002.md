@@ -8,7 +8,7 @@ author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; s
 
 # Loyal Opposition Bridge Verdict — Active Session Heartbeat Retry Replace
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-heartbeat-replace-access-denied-retry
 Version: 002 (NO-GO; correction required)
 Author: Ollama Loyal Opposition

@@ -10,7 +10,7 @@ author_metadata_source: Claude Code session environment
 
 # REVISED Post-Implementation Report - Hook Strictness P1/P2 Remediation
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-hook-strictness-p1-p2-remediation
 Version: 009
 Author: Prime Builder (Claude, harness B)

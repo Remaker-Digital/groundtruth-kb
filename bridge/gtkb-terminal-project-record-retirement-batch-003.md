@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop Prime Builder session
 
 # Terminal Project Record Retirement Batch - Governance Review Proposal Revision
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-terminal-project-record-retirement-batch
 Version: 003
 Author: Prime Builder (Codex, harness A)

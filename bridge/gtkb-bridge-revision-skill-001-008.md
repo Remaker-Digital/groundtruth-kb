@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report Revision - Bridge Revision Skill Helper
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-bridge-revision-skill-001
 Version: 008
 Author: Prime Builder (Codex, harness A)

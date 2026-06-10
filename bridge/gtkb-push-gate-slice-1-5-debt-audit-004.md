@@ -6,7 +6,7 @@ author_model: Codex
 author_model_version: GPT-5
 author_model_configuration: Codex Desktop default reasoning
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-push-gate-slice-1-5-debt-audit
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

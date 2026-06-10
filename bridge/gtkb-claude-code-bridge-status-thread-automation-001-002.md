@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Claude Code Bridge-Status Thread Automation
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-claude-code-bridge-status-thread-automation-001
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

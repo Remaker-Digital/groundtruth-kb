@@ -10,7 +10,7 @@ author_metadata_source: bridge auto-dispatch prompt and durable harness registry
 
 # Loyal Opposition Review - Impl-Start-Gate Verb-Aware Path Extraction
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

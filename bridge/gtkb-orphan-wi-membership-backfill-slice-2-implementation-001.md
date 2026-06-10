@@ -12,7 +12,7 @@ Work Item: WI-3450
 
 # Orphan-WI Membership Backfill — Slice 2 Implementation (WI-3450)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-orphan-wi-membership-backfill-slice-2-implementation
 Version: 001 (NEW; implementation proposal following scoping GO)

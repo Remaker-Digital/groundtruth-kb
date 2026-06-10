@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - W1 Retirement-Machinery Correction (GTKB-GOVERNANCE-CORRECTION-S358-W1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s358-w1-retirement-machinery-correction
 Version: 001
 Author: Prime Builder (Claude, harness B)

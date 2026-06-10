@@ -10,7 +10,7 @@ NEW
 
 Owner additionally prioritized this fix on cumulative-token-cost grounds: every false-positive auto-dispatch costs ~50k tokens; over a busy day this compounds to the same cost class as the S308 retired-OS-poller incident.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-SMART-POLLER-KIND-AWARE-ROUTING]
 spec_ids: [DCL-SMART-POLLER-AUTO-TRIGGER-001, DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001]
 parent_bridge: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-012.md (VERIFIED) — original smart poller activation

@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Envelope Open Disclosure Refactor (REVISED-2; addresses NO-GO -004 + Supplemental NO-GO -005)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-envelope-disclosure-ui-impl
 Version: 006
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

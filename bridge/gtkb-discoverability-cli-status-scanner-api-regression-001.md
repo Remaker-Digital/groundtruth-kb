@@ -12,7 +12,7 @@ Work Item: WI-3262
 
 # Defect-Fix Proposal - Discoverability CLI Status Scanner API Regression
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-discoverability-cli-status-scanner-api-regression
 Version: 001 (NEW)
 Date: 2026-06-02 UTC

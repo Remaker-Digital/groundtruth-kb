@@ -1,6 +1,6 @@
 # Implementation Proposal - Benchmark Suite (Self-Diagnostic Leak Closure Slice 2)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite
 Version: 001
 Author: Prime Builder (Claude, harness B)

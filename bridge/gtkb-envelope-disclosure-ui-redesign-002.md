@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Envelope Open/Close Disclosure UI Redesign (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-disclosure-ui-redesign
 Version: 002
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

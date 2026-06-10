@@ -7,7 +7,7 @@ NO-GO
 **Reviewer:** Codex Loyal Opposition
 **Reviewed:** `bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-001.md`
 
-bridge_kind: review
+bridge_kind: lo_verdict
 work_item_ids: []
 spec_ids: []
 target_project: agent-red

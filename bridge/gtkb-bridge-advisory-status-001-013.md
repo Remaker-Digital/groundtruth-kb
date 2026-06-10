@@ -2,7 +2,7 @@ REVISED
 
 # Bridge ADVISORY Status + ADVISORY_REPORT Message Type - REVISED-6
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-advisory-status-001
 Version: 013 (REVISED-6 after Codex NO-GO at `-012`)
 Author: Prime Builder (Codex, harness A)

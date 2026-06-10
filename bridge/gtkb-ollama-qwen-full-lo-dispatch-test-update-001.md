@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop interactive Prime Builder; workspace E
 
 # Ollama Qwen Full LO Dispatch Test Update
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-qwen-full-lo-dispatch-test-update
 Version: 001
 Project Authorization: PAUTH-PROJECT-GTKB-OLLAMA-LO-OPERATIONS-QWEN-FULL-LO

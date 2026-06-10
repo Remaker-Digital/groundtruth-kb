@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Agent Red Ruff Cleanup Read-Only Planning Baseline
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: agent-red-ruff-cleanup-001
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition mode)

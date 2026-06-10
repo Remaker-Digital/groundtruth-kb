@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Post-Implementation Report - MCP Stable Harness Surface Advisory Disposition
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Project Authorization: PAUTH-PROJECT-GTKB-LO-ADVISORY-INTAKE-LO-ADVISORY-INTAKE-PARALLEL-BATCH
 Project: PROJECT-GTKB-LO-ADVISORY-INTAKE
 Work Item: WI-3297

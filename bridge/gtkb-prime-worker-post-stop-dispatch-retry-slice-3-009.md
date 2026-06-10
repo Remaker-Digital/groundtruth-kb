@@ -8,7 +8,7 @@ author_model_configuration: Claude Code, explanatory output style, cross-harness
 
 # Post-Implementation Report - Post-Stop Dispatch Reconciliation Hook Order (Slice 3 of 4)
 
-bridge_kind: prime_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
 Version: 009
 Status: NEW

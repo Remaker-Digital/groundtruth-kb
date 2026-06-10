@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Project-Scoped Implementation Authorization Corrective Continuation
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-scoped-implementation-authorization
 Version: 010
 Reviewer: Loyal Opposition (Codex, harness A, mode lo)

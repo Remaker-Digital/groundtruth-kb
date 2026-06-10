@@ -2,7 +2,7 @@ NEW
 
 # GT-KB MCP Stable Harness Surface — Slice 1 Implementation Proposal
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-mcp-stable-harness-surface-conversion
 Version: 003 (NEW Slice 1 after Codex GO on Slice 0 at -002)
 Author: Prime Builder (Claude, harness B)

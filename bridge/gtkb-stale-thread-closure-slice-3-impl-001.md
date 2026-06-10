@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning
 
 # Stale Bridge Thread Closure - gtkb-claude-md-scope-clarification-slice-3-implementation
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 target_paths: ["groundtruth.db", "bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-011.md", "bridge/INDEX.md"]
 
 Document: gtkb-stale-thread-closure-slice-3-impl

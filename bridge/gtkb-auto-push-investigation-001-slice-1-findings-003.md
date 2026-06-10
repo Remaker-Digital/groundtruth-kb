@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop automation, Prime Builder role, worksp
 
 # Revised Auto-Push Investigation Findings Disposition
 
-bridge_kind: revised_investigation_disposition
+bridge_kind: prime_proposal
 Document: gtkb-auto-push-investigation-001-slice-1-findings
 Version: 003
 Author: Prime Builder (Codex harness A)

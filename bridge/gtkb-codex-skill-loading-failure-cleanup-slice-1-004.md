@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Codex Skill-Loading Failure Cleanup Slice 1 Revised
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-codex-skill-loading-failure-cleanup-slice-1
 Version: 004
 Reviewer: Codex Loyal Opposition, harness A

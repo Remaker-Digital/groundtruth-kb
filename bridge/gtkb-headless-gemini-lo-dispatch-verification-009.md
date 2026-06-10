@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Headless Gemini LO Dispatch Verification REVISED-9: registry-stored absolute command path
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 009 (REVISED proposal; architectural-path change per S364 owner AUQ)
 Responds-To: bridge/gtkb-headless-gemini-lo-dispatch-verification-008.md (Codex NO-GO on -007 post-impl)

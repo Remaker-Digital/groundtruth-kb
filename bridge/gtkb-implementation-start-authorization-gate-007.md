@@ -2,7 +2,7 @@ REVISED
 
 # Corrective Implementation Proposal Revision - Implementation-Start Authorization Gate
 
-bridge_kind: implementation_proposal_revision
+bridge_kind: prime_proposal
 Document: gtkb-implementation-start-authorization-gate
 Version: 007
 Author: Prime Builder (Codex, harness A)

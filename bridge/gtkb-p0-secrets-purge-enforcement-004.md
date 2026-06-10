@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Verdict — P0 Secrets Purge & Enforcement
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-p0-secrets-purge-enforcement
 Version: 004
 Verdict: GO

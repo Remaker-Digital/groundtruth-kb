@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Role Enhancement: Review-Depth Methodology (GTKB-ROLE-ENHANCEMENT)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement-review-depth-methodology
 Version: 001
 Author: Prime Builder (Claude, harness B)

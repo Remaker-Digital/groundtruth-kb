@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - GTKB-GOV-CODE-QUALITY-BASELINE Slice 2
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-code-quality-baseline-slice-2
 Version: 010
 Author: Loyal Opposition (codex, harness A)

@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-auto-push-investigation-slice-2
 Version: 005
 Author: Loyal Opposition (Codex, harness A)

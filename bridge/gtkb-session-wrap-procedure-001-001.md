@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Session Wrap Procedure Deterministic Trigger Spec (governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-session-wrap-procedure-001
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

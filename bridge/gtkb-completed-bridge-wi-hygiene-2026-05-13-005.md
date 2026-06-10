@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report (Audit-Trail Repair) — Stale Completed-Bridge Work Item Hygiene — 005
 
-bridge_kind: prime_builder_implementation_report
+bridge_kind: implementation_report
 target_paths: ["groundtruth.db"]
 Document: gtkb-completed-bridge-wi-hygiene-2026-05-13
 Version: 005 (REVISED implementation report after Codex NO-GO at -004)
@@ -71,7 +71,7 @@ NEW
 
 # Stale Completed-Bridge Work Item Hygiene — Resolve 6 WIs Whose Bridge Threads Are VERIFIED
 
-bridge_kind: prime_builder_proposal
+bridge_kind: implementation_report
 target_paths:
   - groundtruth.db (MemBase work_items table: WI-3249, WI-3250, WI-3252, WI-3253, WI-3254, WI-3255)
 

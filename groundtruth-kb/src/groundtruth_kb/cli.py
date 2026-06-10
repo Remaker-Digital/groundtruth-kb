@@ -178,6 +178,125 @@ main.add_command(bridge_group)
 main.add_command(session_group)
 
 
+@main.group("application")
+def application_group() -> None:
+    """GT-KB application registration and management."""
+    pass
+
+
+@application_group.command("register")
+@click.argument("name")
+@click.pass_context
+def application_register_cmd(ctx: click.Context, name: str) -> None:
+    """Register a developed application and enforce slot occupancy constraint."""
+    import tomllib
+
+    from groundtruth_kb.isolation.doctor_verdicts import evaluate_isolation_state
+    from groundtruth_kb.isolation.validation import ValidationError, validate_self_completion_preflight
+
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root)
+
+    # 1. Cardinality check: verify if there is any OTHER occupied slot
+    state = evaluate_isolation_state(project_root)
+    other_occupied = [slot for slot in state["occupied_slots"] if slot != name]
+    if other_occupied:
+        other_name = other_occupied[0]
+        other_status = state["slots_status"][other_name]
+        if other_status["trigger"] == "non_allowlisted_content":
+            files_list = ", ".join(other_status["non_allowlisted_files"])
+            click.echo(
+                f"Error: Non-allowlisted content present in applications/{other_name}/: {files_list}. "
+                f"Platform supports only one developed application at a time. "
+                f"Run `gt application unregister {other_name}` to remove {other_name}.",
+                err=True,
+            )
+        else:
+            click.echo(
+                f"Error: Platform supports only one developed application at a time. "
+                f"Run `gt application unregister {other_name}` to remove {other_name}.",
+                err=True,
+            )
+        raise SystemExit(1)
+
+    # 2. Preflight validation check for the slot itself
+    try:
+        validate_self_completion_preflight(project_root, name)
+    except ValidationError as exc:
+        click.echo(f"Error: {str(exc)}", err=True)
+        raise SystemExit(1) from exc
+
+    # 3. Proceed with registration
+    app_dir = project_root / "applications" / name
+    app_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write application.toml if absent
+    toml_path = app_dir / "application.toml"
+    if not toml_path.is_file():
+        content = f'[application]\nname = "{name}"\n'
+        toml_path.write_text(content, encoding="utf-8")
+
+    # Ensure harness-state exists
+    harness_state_dir = app_dir / "harness-state"
+    harness_state_dir.mkdir(parents=True, exist_ok=True)
+
+    # Add to registry.toml
+    registry_path = project_root / "applications" / "registry.toml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+
+    apps = {}
+    if registry_path.is_file():
+        try:
+            with open(registry_path, "rb") as f:
+                data = tomllib.load(f)
+            apps = data.get("applications", {})
+            if not isinstance(apps, dict):
+                apps = {}
+        except Exception:
+            apps = {}
+
+    apps[name] = {"slot": name}
+
+    # Write back registry.toml
+    lines = ["[applications]"]
+    for k in sorted(apps.keys()):
+        lines.append(f'{k} = {{ slot = "{k}" }}')
+    registry_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    click.echo(f"Successfully registered application '{name}' in slot applications/{name}/")
+
+
+@application_group.command("unregister")
+@click.argument("name")
+@click.pass_context
+def application_unregister_cmd(ctx: click.Context, name: str) -> None:
+    """Unregister a developed application slot."""
+    import tomllib
+
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root)
+
+    registry_path = project_root / "applications" / "registry.toml"
+    if registry_path.is_file():
+        try:
+            with open(registry_path, "rb") as f:
+                data = tomllib.load(f)
+            apps = data.get("applications", {})
+            if isinstance(apps, dict) and name in apps:
+                del apps[name]
+                lines = ["[applications]"]
+                for k in sorted(apps.keys()):
+                    lines.append(f'{k} = {{ slot = "{k}" }}')
+                registry_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                click.echo(f"Successfully unregistered application '{name}'")
+                return
+        except Exception as e:
+            click.echo(f"Error reading registry: {e}", err=True)
+            raise SystemExit(1) from e
+
+    click.echo(f"Application '{name}' is not registered.")
+
+
 @main.group("authority")
 def authority_group() -> None:
     """Resolve GT-KB authority/source-of-truth terms."""
@@ -3586,6 +3705,35 @@ def project_doctor(auto_install: bool, profile: str | None, target_dir: str, jso
         profile = manifest.profile if manifest else "local-only"
 
     report = run_doctor(target, profile, auto_install=auto_install)
+
+    from groundtruth_kb.isolation.doctor_verdicts import evaluate_isolation_state
+    from groundtruth_kb.project.doctor import ToolCheck
+
+    iso_state = evaluate_isolation_state(target)
+    if iso_state["verdicts"]:
+        for v in iso_state["verdicts"]:
+            status = "fail" if v["severity"] in {"P0", "P1"} else "warning"
+            required = v["severity"] in {"P0", "P1"}
+            check = ToolCheck(
+                name=f"isolation:{v['verdict'].lower().replace(' ', '-')}",
+                required=required,
+                found=True,
+                status=status,
+                message=f"{v['verdict']} severity {v['severity']}: {v['details']}. {v['remediation']}",
+            )
+            report.checks.append(check)
+    else:
+        check = ToolCheck(
+            name="isolation:application-registry",
+            required=True,
+            found=True,
+            status="pass",
+            message="Application slot cardinality and markers: clean",
+        )
+        report.checks.append(check)
+
+    report._compute_overall()
+
     if json_output:
         click.echo(json.dumps(format_doctor_report_json(report), indent=2, sort_keys=True))
     else:

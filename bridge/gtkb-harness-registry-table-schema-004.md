@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Harnesses Registry Table Schema Metadata Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-table-schema
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

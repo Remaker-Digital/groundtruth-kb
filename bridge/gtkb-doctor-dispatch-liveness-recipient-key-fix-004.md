@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Doctor `_check_bridge_dispatch_liveness` recipient-key fix
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-doctor-dispatch-liveness-recipient-key-fix
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

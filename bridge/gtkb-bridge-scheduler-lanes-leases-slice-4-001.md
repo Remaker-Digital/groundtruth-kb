@@ -2,7 +2,7 @@ NEW
 
 # Bridge Scheduler Slice 4: Per-Role Dispatch Concurrency
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-scheduler-lanes-leases-slice-4
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

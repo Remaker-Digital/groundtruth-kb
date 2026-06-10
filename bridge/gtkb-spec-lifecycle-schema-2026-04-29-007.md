@@ -10,7 +10,7 @@ author_metadata_source: bridge-auto-dispatch-env
 
 # Prime Follow-Through Report — Spec Lifecycle Schema Scoping (Revised)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-spec-lifecycle-schema-2026-04-29
 Version: 007
 Author: Prime Builder (Claude, harness B)

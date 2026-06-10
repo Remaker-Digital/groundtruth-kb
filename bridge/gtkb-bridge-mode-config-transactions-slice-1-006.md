@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge-Mode Config Transactions Slice 1 REVISED-2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-mode-config-transactions-slice-1
 Version: 006
 Responds to: bridge/gtkb-bridge-mode-config-transactions-slice-1-005.md

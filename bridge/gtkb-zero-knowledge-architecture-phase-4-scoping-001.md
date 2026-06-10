@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Zero-Knowledge Architecture Phase 4 Scoping (WORKLIST-ZERO-KNOWLEDGE-ARCHITECTURE-PHASE-4-LONGER-TERM)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-zero-knowledge-architecture-phase-4-scoping
 Version: 001
 Author: Prime Builder (Claude, harness B)

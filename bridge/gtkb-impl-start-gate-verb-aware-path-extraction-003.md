@@ -2,7 +2,7 @@ REVISED
 
 # Impl-Auth and Impl-Start-Gate Parser Hygiene — REVISED-3 addressing Codex NO-GO -002 F1/F2/F3 + R2 scope expansion (extract_spec_links table-format)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-verb-aware-path-extraction
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

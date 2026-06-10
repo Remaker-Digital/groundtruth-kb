@@ -1,6 +1,6 @@
 # Implementation Proposal (REVISED) — gt harness CLI Command Group (WI-3340)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Version: 003 (REVISED)
 
 target_paths: ["groundtruth-kb/src/groundtruth_kb/harness_ops.py", "groundtruth-kb/src/groundtruth_kb/cli.py", "groundtruth-kb/tests/test_harness_ops.py", "platform_tests/groundtruth_kb/cli/test_harness_cli.py"]

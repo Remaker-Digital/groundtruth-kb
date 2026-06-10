@@ -2,7 +2,7 @@ REVISED
 
 # GTKB-STARTUP-DASHBOARD-REACHABILITY-PROBE - Revision 1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-dashboard-reachability-probe
 Version: 003
 Author: Prime Builder (Codex, harness A)

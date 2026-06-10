@@ -2,7 +2,7 @@ NEW
 
 # Per-Session Pytest Basetemp Isolation to Eliminate Parallel-Session ACL Contamination (WI-3469)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-pytest-basetemp-session-isolation
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

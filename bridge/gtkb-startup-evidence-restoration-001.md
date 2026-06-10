@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude Opus 4.7)
 **Triggered by:** Loyal Opposition findings (S313, owner-forwarded), P1 finding: "tests/scripts/test_session_self_initialization.py fails 33/33" + "Windows UnicodeEncodeError when emitting startup JSON".
 
-bridge_kind: fix
+bridge_kind: prime_proposal
 work_item_ids: []
 spec_ids: [GOV-SESSION-SELF-INITIALIZATION-001, PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001]
 target_project: agent-red

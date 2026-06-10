@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-impl-auth-requirement-sufficiency-phrase-tolerance
 Version: 002
 Responds to: bridge/gtkb-impl-auth-requirement-sufficiency-phrase-tolerance-001.md MD

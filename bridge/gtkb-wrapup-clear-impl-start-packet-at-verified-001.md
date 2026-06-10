@@ -2,7 +2,7 @@ NEW
 
 # Wrap-Up Clears Stale Implementation-Start Packet At VERIFIED (WI-3328)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-wrapup-clear-impl-start-packet-at-verified
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

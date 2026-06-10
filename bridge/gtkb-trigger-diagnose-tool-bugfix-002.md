@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Cross-Harness Trigger Diagnose Tool Bugfix
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-trigger-diagnose-tool-bugfix
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

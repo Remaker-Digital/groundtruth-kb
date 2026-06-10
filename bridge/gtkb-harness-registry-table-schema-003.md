@@ -1,6 +1,6 @@
 # Implementation Proposal — Harnesses Registry Table Schema (WI-3337)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Version: 003 (REVISED — authorization-metadata correction)
 
 target_paths: ["groundtruth-kb/src/groundtruth_kb/db.py", "groundtruth-kb/tests/test_db.py"]

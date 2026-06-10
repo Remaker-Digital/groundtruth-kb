@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # Antigravity Onboarding WI-3348: Harness-C registration reconciliation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-antigravity-harness-registration
 Version: 001 (NEW)
 Author: Prime Builder (Codex, harness A)

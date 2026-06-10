@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Peer Solution Advisory Report Advisory Disposition REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-advisory-report-advisory-disposition
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

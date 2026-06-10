@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Active-Workspace Declaration Slice 1
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: active-workspace-declaration-slice-1
 Version: 008
 Author: Loyal Opposition (codex, harness A)

@@ -2,7 +2,7 @@ NEW
 
 # GTKB-ISOLATION-004 Scoped Service Boundary Plan Review Request
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-004]
 target_paths: ["independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-004-PHASE4-SCOPED-SERVICE-BOUNDARY-PLAN-2026-04-23.md", "memory/work_list.md"]

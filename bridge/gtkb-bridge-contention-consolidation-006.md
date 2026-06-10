@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: post_implementation_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-contention-consolidation
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - implementation_start_gate Finalization Quoting Fix REVISED-2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-finalization-quoting-fix
 Version: 006
 Responds to: bridge/gtkb-impl-start-gate-finalization-quoting-fix-005.md

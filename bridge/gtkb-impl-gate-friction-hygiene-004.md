@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Implementation Gate Friction Hygiene REVISED-003
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-gate-friction-hygiene
 Version: 004
 Responds to: bridge/gtkb-impl-gate-friction-hygiene-003.md

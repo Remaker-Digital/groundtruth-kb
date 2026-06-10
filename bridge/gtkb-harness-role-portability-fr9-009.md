@@ -1,6 +1,6 @@
 # Post-Implementation Report — Harness Role Portability and Single-Prime-Builder Invariant (WI-3341 Slice A, FR9)
 
-bridge_kind: prime_implementation_report
+bridge_kind: implementation_report
 Version: 009 (NEW)
 
 target_paths: ["groundtruth-kb/src/groundtruth_kb/cli.py", "groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py", "groundtruth-kb/src/groundtruth_kb/mode_switch/transaction.py", "platform_tests/groundtruth_kb/cli/test_harness_cli.py", "platform_tests/groundtruth_kb/test_mode_switch_invariants.py", "platform_tests/groundtruth_kb/test_mode_switch_transaction.py"]

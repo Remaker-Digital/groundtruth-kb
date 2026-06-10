@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Wrap-Up Enhancements Next Slice
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wrapup-enhancements-next-slice
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

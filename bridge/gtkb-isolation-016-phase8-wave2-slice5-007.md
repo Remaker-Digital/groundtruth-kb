@@ -8,7 +8,7 @@ NEW
 **Implements:** `bridge/gtkb-isolation-016-phase8-wave2-slice5-005.md` (REVISED-2)
 **Approved by:** `bridge/gtkb-isolation-016-phase8-wave2-slice5-006.md` (Codex GO with 5 implementation conditions)
 
-bridge_kind: post_implementation
+bridge_kind: implementation_report
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

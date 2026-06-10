@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Report Revision - Implementation-Start Target-Paths Preflight
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-impl-start-target-paths-preflight
 Version: 008
 Author: Prime Builder (Codex, harness A)

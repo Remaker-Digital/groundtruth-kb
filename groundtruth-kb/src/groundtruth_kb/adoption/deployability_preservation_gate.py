@@ -17,7 +17,7 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 Status = Literal["PASS", "FAIL", "SKIP", "WARN"]
 

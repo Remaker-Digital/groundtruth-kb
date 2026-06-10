@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Post-Stop Dispatch Retry Pass Slice 3
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-post-stop-dispatch-retry-slice-3
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

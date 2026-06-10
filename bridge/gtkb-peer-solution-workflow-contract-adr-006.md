@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Peer Solution Workflow Contract ADR REVISED-2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-workflow-contract-adr
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

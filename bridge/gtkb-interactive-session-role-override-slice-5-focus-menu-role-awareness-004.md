@@ -6,7 +6,7 @@ author_session_context_id: 2026-05-30T05-25-20Z-loyal-opposition-ef277b
 author_model: GPT-5
 author_metadata_source: Codex bridge auto-dispatch
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-5-focus-menu-role-awareness
 Version: 004
 Author: Codex Loyal Opposition (codex, harness A)

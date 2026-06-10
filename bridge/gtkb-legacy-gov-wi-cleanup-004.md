@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Legacy GOV WI Cleanup REVISED-003
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-legacy-gov-wi-cleanup
 Version: 004
 Responds to: bridge/gtkb-legacy-gov-wi-cleanup-003.md

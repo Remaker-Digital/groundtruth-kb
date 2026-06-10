@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review: gtkb-harness-registry-reader-migration-010
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-reader-migration
 Version: 011
 Author: Loyal Opposition (Codex, harness A)

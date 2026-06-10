@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Antigravity related_bridge_threads Backfill (WI-3362)
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-antigravity-related-bridge-threads-backfill
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

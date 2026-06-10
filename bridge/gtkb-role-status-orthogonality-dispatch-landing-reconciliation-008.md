@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 Version: 008
 Responds to: bridge/gtkb-role-status-orthogonality-dispatch-landing-reconciliation-007.md REVISED

@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-authorization-completion-keep-open
 Version: 002
 Responds to: bridge/gtkb-project-authorization-completion-keep-open-001.md NEW

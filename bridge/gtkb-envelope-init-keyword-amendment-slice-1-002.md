@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review — Envelope Init-Keyword Amendment (WI-4291)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-init-keyword-amendment-slice-1
 Version: 002
 Author: Loyal Opposition (Claude Code, harness B)

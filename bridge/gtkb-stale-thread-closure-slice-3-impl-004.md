@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-stale-thread-closure-slice-3-impl
 Version: 004
 Responds to: bridge/gtkb-stale-thread-closure-slice-3-impl-003.md REVISED

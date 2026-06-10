@@ -2,7 +2,7 @@ REVISED
 
 # Platform SoT Consolidation — Governance Umbrella REVISED (absorb peer's Read-Discipline scope + anti-recurrence hook + WI migration)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-platform-sot-consolidation-umbrella
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

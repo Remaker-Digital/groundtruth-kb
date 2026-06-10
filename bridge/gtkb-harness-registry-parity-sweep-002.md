@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-harness-registry-parity-sweep
 Version: 002
 Responds to: bridge/gtkb-harness-registry-parity-sweep-001.md GO

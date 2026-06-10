@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Repair Bridge Dispatcher Deferral Enforcement (GTKB-GOV-008)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-dispatcher-deferral-enforcement-repair
 Version: 001
 Author: Prime Builder (Claude, harness B)

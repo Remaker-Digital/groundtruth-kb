@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Antigravity related_bridge_threads Backfill (WI-3362)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-antigravity-related-bridge-threads-backfill
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

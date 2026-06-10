@@ -11,12 +11,13 @@ from __future__ import annotations
 import importlib.util
 import sys
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from re import IGNORECASE
 from re import compile as re_compile
 from types import ModuleType
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
 

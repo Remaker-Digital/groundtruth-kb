@@ -8,7 +8,7 @@ author_metadata_source: cross-harness bridge auto-dispatch
 
 # Loyal Opposition Verification - Platform Tests Ruff Cleanup
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-platform-tests-ruff-cleanup
 Version: 008 (NO-GO)
 Reviewed version: bridge/gtkb-platform-tests-ruff-cleanup-007.md

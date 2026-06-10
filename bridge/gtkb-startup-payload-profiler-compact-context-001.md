@@ -21,7 +21,7 @@ kb_mutation_in_scope: false
 
 # Startup Payload Profiler + Compact SessionStart Context
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-payload-profiler-compact-context
 Version: 001
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Startup Dashboard Reachability Probe
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-dashboard-reachability-probe
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition mode)

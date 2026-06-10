@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Phase-1 Agent SoT-Read Discipline — Umbrella Withdrawal
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-agent-sot-read-discipline-phase-1
 Version: 002
 Author: Prime Builder (Claude Code, harness B)

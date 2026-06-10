@@ -1,6 +1,6 @@
 # Implementation Proposal — dispatch-failures.jsonl Rotation
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

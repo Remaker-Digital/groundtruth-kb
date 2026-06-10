@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex verification metadata
 
 # Loyal Opposition Verification - Agent Red Reference Adopter Framing Restoration
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-agent-red-reference-adopter-framing-restoration
 Version: 008
 Responds-To: `bridge/gtkb-agent-red-reference-adopter-framing-restoration-007.md`

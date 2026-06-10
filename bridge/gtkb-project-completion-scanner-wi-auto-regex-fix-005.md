@@ -10,7 +10,7 @@ author_metadata_source: Codex desktop automation session
 
 # Revised Implementation Report - Project Completion Scanner WI-AUTO Regex Fix
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
 Version: 005
 Status: REVISED

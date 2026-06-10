@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge auto-dispatch
 
 # Loyal Opposition Verification - Project-ID Prefix Idempotent Fix - 005
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-project-id-prefix-idempotent-fix
 Version: 005
 Reviewer: Codex Loyal Opposition (harness A)

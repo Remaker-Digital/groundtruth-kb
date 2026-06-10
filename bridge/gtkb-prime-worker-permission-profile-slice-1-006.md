@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Prime Worker Permission Profile Slice 1
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-permission-profile-slice-1
 Version: 006
 Responds to: bridge/gtkb-prime-worker-permission-profile-slice-1-005.md

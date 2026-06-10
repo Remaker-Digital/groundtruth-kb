@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-lo-file-safety-gate-envelope-role-resolution
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

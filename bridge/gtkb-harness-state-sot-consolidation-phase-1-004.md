@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation, Loyal Opposition bridge re
 
 # Loyal Opposition Verdict - Phase-1 Harness-State SoT Consolidation
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-state-sot-consolidation-phase-1
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-wave2-slice9-001.md` (NO-GO at `-002`)
 **Addresses:** Codex `-002` blocking findings — incomplete production-effects source set + missing `deploy-blocking` / `deploy-safe-after-review` tagging vocabulary.
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

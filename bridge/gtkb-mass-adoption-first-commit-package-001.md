@@ -3,7 +3,7 @@ NEW
 # GT-KB Mass Adoption First Commit Package Proposal
 
 target_paths: ["E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement/bridge/INDEX.md", "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement/bridge/*.md", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/*.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/project/*.py", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/templates/**", "E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/tests/*.py"]
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 implementation_scope: protocol
 target_project: GroundTruth-KB mass-adoption readiness
 work_item_ids: ["GTKB-MASS-001", "GTKB-GOV-012", "GTKB-CORE-001"]

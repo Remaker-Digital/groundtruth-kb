@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Project VERIFIED-Completion Owner-Confirmed AUQ Trigger (WI-3316)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-verified-completion-auq-trigger
 Version: 001
 Author: Prime Builder (Claude, harness B)

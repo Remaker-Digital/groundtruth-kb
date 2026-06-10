@@ -2,7 +2,7 @@ REVISED
 
 # Phase-2+ Ollama Integration Planning Umbrella - REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-ollama-integration-phase-2
 Version: 003
 Author: Codex Prime Builder automation, harness A

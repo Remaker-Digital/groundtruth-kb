@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Prime Supersession Notice - MemBase Effective Use Recovery Parent Thread
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-membase-effective-use-recovery-2026-04-29
 Version: 003
 Author: Prime Builder (Codex, harness A)

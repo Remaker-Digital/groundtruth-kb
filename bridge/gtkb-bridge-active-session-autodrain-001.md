@@ -2,7 +2,7 @@ NEW
 
 # Bridge Notifier: Active-Session Auto-Drain of Stranded Codex-to-Claude Dispatch (WI-3359)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-active-session-autodrain
 Version: 001 (NEW; close the active-session-suppression dispatch gap)
 Author: Prime Builder (Claude, harness B)

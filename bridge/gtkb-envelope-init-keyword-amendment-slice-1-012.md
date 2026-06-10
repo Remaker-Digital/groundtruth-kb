@@ -6,7 +6,7 @@ VERIFIED
 **Date:** 2026-06-04 UTC
 **Author:** Loyal Opposition (Antigravity, harness C)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-init-keyword-amendment-slice-1
 Version: 012
 Session: S414

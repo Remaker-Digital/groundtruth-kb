@@ -1769,6 +1769,15 @@ def _spawn_harness(
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
+    selected = _selected_oldest_first(items, max_items)
+    sig = _signature(selected)
+    status_file_path = runs_dir / f"{dispatch_id}.exit_code"
+    wrapped_command = [
+        sys.executable,
+        str(project_root / "scripts" / "run_with_status.py"),
+        str(status_file_path),
+    ] + command
+
     meta: dict[str, Any] = {
         "dispatch_id": dispatch_id,
         "recipient": recipient_key,
@@ -1776,11 +1785,14 @@ def _spawn_harness(
         "command_head": command[:2],
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),
+        "signature": sig,
+        "needed_role_label": target.needed_role_label,
+        "status_file_path": str(status_file_path),
     }
     try:
         with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open("w", encoding="utf-8") as err:
             process = subprocess.Popen(
-                command,
+                wrapped_command,
                 cwd=str(project_root),
                 env=env,
                 stdout=out,
@@ -1948,6 +1960,103 @@ def _record_single_harness_topology_skip(state_dir: Path) -> None:
     _write_dispatch_state(state_dir, payload)
 
 
+def _cleanup_stale_tmp_files(state_dir: Path) -> None:
+    """Clean up any *.tmp files in state_dir that are older than 5 minutes (300 seconds).
+
+    Per Observability and Hygiene proposal: ensures concurrent active writes
+    are not disrupted.
+    """
+    if not state_dir.is_dir():
+        return
+    now = time.time()
+    for entry in state_dir.glob("*.tmp"):
+        if not entry.is_file():
+            continue
+        try:
+            mtime = entry.stat().st_mtime
+            if now - mtime > 300:
+                entry.unlink()
+        except OSError:
+            pass
+
+
+def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Path) -> None:
+    """Check prior launch status files and update signature state."""
+    for recipient, recipient_state in list(recipients_state.items()):
+        if not isinstance(recipient_state, dict):
+            continue
+        last_launch = recipient_state.get("last_launch")
+        if not isinstance(last_launch, dict) or not last_launch.get("launched"):
+            continue
+
+        # If already processed, skip
+        if last_launch.get("exit_code_processed"):
+            continue
+
+        dispatch_id = last_launch.get("dispatch_id")
+        if not dispatch_id:
+            continue
+
+        runs_dir = state_dir / DISPATCH_RUNS_SUBDIR
+        status_file = runs_dir / f"{dispatch_id}.exit_code"
+        if not status_file.is_file():
+            continue
+
+        # Read the exit code
+        try:
+            exit_code_str = status_file.read_text(encoding="utf-8").strip()
+            exit_code = int(exit_code_str)
+        except (ValueError, OSError):
+            continue
+
+        # Process the exit code
+        launch_signature = last_launch.get("signature")
+        needed_role = last_launch.get("needed_role_label") or (
+            "loyal-opposition" if "loyal-opposition" in recipient else "prime-builder"
+        )
+
+        # Mark exit code as processed in the state
+        last_launch["exit_code"] = exit_code
+        last_launch["exit_code_processed"] = True
+
+        try:
+            max_retries = int(os.environ.get("OLLAMA_MAX_RETRIES", "3"))
+        except ValueError:
+            max_retries = 3
+
+        if exit_code == 0:
+            # Success! Update signature state for loyal-opposition
+            if needed_role == "loyal-opposition":
+                recipient_state["last_dispatched_signature"] = launch_signature
+                recipient_state["signature"] = launch_signature
+                recipient_state["last_suppressed_signature"] = None
+
+            # Reset failure count and circuit breaker
+            recipient_state["failure_count"] = 0
+            recipient_state["circuit_breaker_tripped"] = False
+        else:
+            # Failure!
+            failure_count = recipient_state.get("failure_count", 0) + 1
+            recipient_state["failure_count"] = failure_count
+            if failure_count >= max_retries:
+                recipient_state["circuit_breaker_tripped"] = True
+
+            # Since it failed, write to dispatch failures log as well
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "ts": _now_iso(),
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient,
+                    "launched": True,
+                    "reason": "subprocess_execution_failed",
+                    "exit_code": exit_code,
+                    "failure_count": failure_count,
+                    "circuit_breaker_tripped": recipient_state.get("circuit_breaker_tripped", False),
+                },
+            )
+
+
 def run_trigger(
     *,
     project_root: Path,
@@ -1970,6 +2079,8 @@ def run_trigger(
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
+
+    _cleanup_stale_tmp_files(state_dir)
 
     # Substrate check: if cross_harness_trigger is not the active substrate,
     # record substrate mismatch skip and exit inertly.
@@ -2060,6 +2171,7 @@ def run_trigger(
     if not isinstance(recipients_state, dict):
         recipients_state = {}
     recipients_state = _migrate_recipients_state_keys(recipients_state, project_root)
+    _process_pending_exit_codes(recipients_state, state_dir)
 
     # IP-3b: resolve dispatch targets from the durable role record. The
     # mapping from actionable-classification to needed-role is fixed:
@@ -2176,6 +2288,8 @@ def run_trigger(
             "last_suppressed_signature": prior_suppressed,
             # Legacy field updated only on real dispatch; carry forward here.
             "signature": prior_legacy_signature,
+            "failure_count": prior.get("failure_count", 0),
+            "circuit_breaker_tripped": prior.get("circuit_breaker_tripped", False),
         }
         if isinstance(prior, dict) and isinstance(prior.get("last_launch"), dict):
             recipient_state["last_launch"] = prior["last_launch"]
@@ -2276,6 +2390,44 @@ def run_trigger(
                         #   - first dispatch ever
                         #   - signature changed since last dispatch
                         #   - prior_suppressed == signature (retry after target exit)
+                        if recipient_state.get("circuit_breaker_tripped"):
+                            recipient_state["last_result"] = "circuit_breaker_active"
+                            results[recipient] = {
+                                "launched": False,
+                                "reason": "circuit_breaker_active",
+                            }
+                            recipients_state[recipient] = recipient_state
+                            continue
+
+                        # Check retry delay check
+                        try:
+                            retry_delay_seconds = int(os.environ.get("OLLAMA_RETRY_DELAY_SECONDS", "300"))
+                        except ValueError:
+                            retry_delay_seconds = 300
+
+                        is_retry_pending = recipient_state.get("failure_count", 0) > 0
+                        is_delay_active = False
+
+                        if is_retry_pending:
+                            prior_updated_at = prior.get("updated_at")
+                            if prior_updated_at:
+                                try:
+                                    updated_time = dt.datetime.fromisoformat(prior_updated_at.replace("Z", "+00:00"))
+                                    elapsed = (dt.datetime.now(dt.UTC) - updated_time).total_seconds()
+                                    if elapsed < retry_delay_seconds:
+                                        is_delay_active = True
+                                except Exception:
+                                    pass
+
+                        if is_delay_active:
+                            recipient_state["last_result"] = "retry_delay_enforced"
+                            results[recipient] = {
+                                "launched": False,
+                                "reason": "retry_delay_enforced",
+                            }
+                            recipients_state[recipient] = recipient_state
+                            continue
+
                         if target.needed_role_label == "loyal-opposition" and dispatched_selected:
                             first_item = dispatched_selected[0]
                             if _should_refuse_self_review(
@@ -2352,12 +2504,11 @@ def run_trigger(
                             )
                         recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                         recipient_state["last_launch"] = launch
-                        if target.needed_role_label != "prime-builder" or dry_run or launch.get("launched"):
-                            recipient_state["last_dispatched_signature"] = dispatched_signature
-                            # Dispatch supersedes any prior suppression.
+                        if not dry_run and launch.get("launched"):
                             recipient_state["last_suppressed_signature"] = None
-                            # Legacy `signature` field updated ONLY on real dispatch.
-                            recipient_state["signature"] = dispatched_signature
+                            if target.needed_role_label == "prime-builder":
+                                recipient_state["last_dispatched_signature"] = dispatched_signature
+                                recipient_state["signature"] = dispatched_signature
                         results[recipient] = launch
 
         recipients_state[recipient] = recipient_state
@@ -2718,6 +2869,12 @@ def _build_argparser() -> argparse.ArgumentParser:
             "distribution. Default diagnose reads only the current segment."
         ),
     )
+    parser.add_argument(
+        "--reset-recipient",
+        type=str,
+        default=None,
+        help="Clear circuit breakers/failure count for a recipient.",
+    )
     return parser
 
 
@@ -2767,6 +2924,33 @@ def main(argv: list[str] | None = None) -> int:
             state_dir = _resolve_diagnose_state_dir(project_root)
         else:
             state_dir = project_root.joinpath(*DEFAULT_STATE_SUBDIR)
+
+        if args.reset_recipient:
+            state = _load_dispatch_state(state_dir, project_root)
+            recipients_state = state.get("recipients") if isinstance(state, dict) else {}
+            if not isinstance(recipients_state, dict):
+                recipients_state = {}
+            target_recipient = args.reset_recipient.strip()
+            reset_count = 0
+            for key in list(recipients_state.keys()):
+                if key == target_recipient or key.startswith(target_recipient + ":"):
+                    if isinstance(recipients_state[key], dict):
+                        recipients_state[key]["failure_count"] = 0
+                        recipients_state[key]["circuit_breaker_tripped"] = False
+                        recipients_state[key]["updated_at"] = _now_iso()
+                        reset_count += 1
+            if reset_count > 0:
+                state["recipients"] = recipients_state
+                _write_dispatch_state(state_dir, state)
+                if args.verbose or not args.stop_hook:
+                    print(
+                        f"Reset circuit breaker and failure count for recipient '{target_recipient}' (updated {reset_count} entries)."
+                    )
+            else:
+                if args.verbose or not args.stop_hook:
+                    print(f"No active entries found matching recipient '{target_recipient}'.")
+            return 0
+
         if args.diagnose:
             # Diagnose mode: read-only liveness summary; no dispatch, no state mutation.
             print(_emit_diagnose_summary(state_dir, include_rotated_failures=args.include_rotated_failures))

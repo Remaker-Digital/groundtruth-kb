@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge automation
 
 # Loyal Opposition Verdict - LO Advisory Owner-Grilling Gate Slice 1 - 002
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-lo-advisory-owner-grilling-gate
 Version: 002
 Reviewer: Codex Loyal Opposition (harness A)

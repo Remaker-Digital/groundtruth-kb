@@ -9,7 +9,7 @@ author_metadata_source: session-start.json (harness=claude) plus owner-directed 
 
 # Dirty Tree Reconciliation Recovery Record - 2026-06-07
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-dirty-tree-reconciliation-2026-06-07
 Version: 001 (NEW; recovery record)
 Recommended commit type: docs:

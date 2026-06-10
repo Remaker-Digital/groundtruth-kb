@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Implementation Proposal - Owner-Approved Continuation for Role Enhancement LO Investigation Methodology Slice 2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
 Version: 001
 Date: 2026-06-07 UTC

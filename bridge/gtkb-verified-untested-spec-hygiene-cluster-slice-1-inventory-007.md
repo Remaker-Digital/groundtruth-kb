@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Implementation Report - Verified-Untested Spec Hygiene Cluster Slice 1 Inventory
 
-bridge_kind: prime_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-verified-untested-spec-hygiene-cluster-slice-1-inventory
 Version: 007
 Author: Prime Builder (Claude, harness B)

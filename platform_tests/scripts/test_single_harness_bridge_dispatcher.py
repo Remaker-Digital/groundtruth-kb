@@ -66,29 +66,9 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
     )
 
     claude_surfaces = {
-        "headless": {
-            "argv": [
-                "claude",
-                "-p",
-                "{{PROMPT}}",
-                "--add-dir",
-                "{{PROJECT_ROOT}}",
-                "--output-format",
-                "json"
-            ]
-        }
+        "headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]}
     }
-    codex_surfaces = {
-        "headless": {
-            "argv": [
-                "codex",
-                "exec",
-                "{{PROMPT}}",
-                "--cd",
-                "{{PROJECT_ROOT}}"
-            ]
-        }
-    }
+    codex_surfaces = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
 
     if single_harness:
         (harness_state / "role-assignments.json").write_text(
@@ -268,15 +248,7 @@ def test_dispatcher_resolves_codex_single_harness_command_handle(tmp_path: Path)
                         "event_driven_hooks": True,
                         "role": ["prime-builder", "loyal-opposition"],
                         "invocation_surfaces": {
-                            "headless": {
-                                "argv": [
-                                    "codex",
-                                    "exec",
-                                    "{{PROMPT}}",
-                                    "--cd",
-                                    "{{PROJECT_ROOT}}"
-                                ]
-                            }
+                            "headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}
                         },
                     }
                 ],
@@ -351,6 +323,7 @@ def test_dispatcher_does_not_suppress_on_active_session_lock(tmp_path: Path) -> 
 def test_dispatcher_suppresses_on_document_lease(tmp_path: Path) -> None:
     """Verify that if a document has a lease held, it is not dispatched by the dispatcher."""
     from bridge_lease_registry import acquire_lease, release_lease
+
     root = _make_synthetic_project(tmp_path, single_harness=True)
     _write_index(root, _index_with_one_new(root))
     state_dir = tmp_path / "state"
@@ -488,17 +461,9 @@ def test_prime_worker_spawn_creates_dispatch_authorization_packet_and_env(
         canonical_mode="pb",
         invocation_surfaces={
             "headless": {
-                "argv": [
-                    "claude",
-                    "-p",
-                    "{{PROMPT}}",
-                    "--add-dir",
-                    "{{PROJECT_ROOT}}",
-                    "--output-format",
-                    "json"
-                ]
+                "argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]
             }
-        }
+        },
     )
     meta = dispatcher._spawn_worker(
         target=target,

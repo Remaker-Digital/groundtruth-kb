@@ -9,7 +9,7 @@ author_model_configuration: Codex headless bridge auto-dispatch, Loyal Oppositio
 
 # Loyal Opposition Verification Verdict - Mode-Switch Validator Hook Matcher Shape Fix
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-mode-switch-validator-hook-matcher-shape-fix
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

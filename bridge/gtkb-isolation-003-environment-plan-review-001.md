@@ -2,7 +2,7 @@ NEW
 
 # GTKB-ISOLATION-003 Environment Isolation Plan Review Request
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-003]
 target_paths: ["independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-003-PHASE3-ENVIRONMENT-ISOLATION-PLAN-2026-04-23.md", "memory/work_list.md"]

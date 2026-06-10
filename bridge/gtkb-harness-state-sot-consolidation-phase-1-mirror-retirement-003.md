@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Mirror-Retirement REVISED-1 — verification narrowed to RETIRE-SPEC assertions (file-absent + no-live-reads); doctor-clean deferred to WI-4372
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

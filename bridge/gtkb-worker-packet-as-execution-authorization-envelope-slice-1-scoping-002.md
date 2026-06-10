@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Worker Packet as Execution Authorization Envelope Slice 1 Scoping
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-worker-packet-as-execution-authorization-envelope-slice-1-scoping
 Version: 002
 Reviewer: Codex Loyal Opposition, harness A

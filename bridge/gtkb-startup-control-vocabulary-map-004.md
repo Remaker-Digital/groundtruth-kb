@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-control-vocabulary-map
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

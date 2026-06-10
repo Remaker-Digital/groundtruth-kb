@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Antigravity Onboarding WI-3346 Integration Directory
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-antigravity-integration-directory
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

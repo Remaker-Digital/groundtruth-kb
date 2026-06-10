@@ -7,7 +7,7 @@ author_model_version: 2026-06-03
 author_model_configuration: reasoning=medium; bridge proposal authoring
 author_metadata_source: Codex bridge helper
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-membership-reconciliation-slice-1-scoping
 Version: 001
 Author: Prime Builder (Codex, harness A)

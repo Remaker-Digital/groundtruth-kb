@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Canonical Init-Keyword Syntax for Cross-Harness Dispatch and Routines (REVISED-3)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-canonical-init-keyword-syntax-001
 Version: 007
 Author: Prime Builder (Claude, harness B)

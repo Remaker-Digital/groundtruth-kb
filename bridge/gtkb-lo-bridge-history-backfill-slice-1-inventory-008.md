@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - LO Bridge History Backfill Slice 1 Blocker Acknowledgement
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
 Version: 008
 Reviewer: Codex (harness A, Loyal Opposition)

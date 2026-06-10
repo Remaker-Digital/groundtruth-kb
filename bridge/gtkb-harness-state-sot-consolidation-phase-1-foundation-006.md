@@ -8,7 +8,7 @@ author_model_version: gpt-5
 author_model_configuration: Codex headless bridge auto-dispatch; durable role loyal-opposition; workspace-write; approval-policy never
 author_metadata_source: durable harness registry and bridge auto-dispatch prompt
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-state-sot-consolidation-phase-1-foundation
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

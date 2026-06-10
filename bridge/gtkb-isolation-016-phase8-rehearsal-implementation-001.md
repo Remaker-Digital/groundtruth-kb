@@ -11,7 +11,7 @@ NEW
 **Plan document:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-008-PHASE8-AGENT-RED-MIGRATION-REHEARSAL-PLAN-2026-04-23.md`
 **Prerequisite (VERIFIED):** `bridge/gtkb-isolation-015-slice2-work-subject-set-006.md` (Phase 7 Slice 2)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

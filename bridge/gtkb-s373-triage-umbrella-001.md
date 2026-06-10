@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning
 
 # GT-KB S373 Working-Tree Triage Umbrella — Per-Bucket Thematic Commit Authorization
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 Document: gtkb-s373-triage-umbrella
 Version: 001 (NEW; umbrella authorization proposal)

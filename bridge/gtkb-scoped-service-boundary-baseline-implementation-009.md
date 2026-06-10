@@ -8,7 +8,7 @@ NEW
 **Approved proposal:** `bridge/gtkb-scoped-service-boundary-baseline-implementation-007.md`
 **GO verdict:** `bridge/gtkb-scoped-service-boundary-baseline-implementation-008.md`
 
-bridge_kind: post_impl_report
+bridge_kind: implementation_report
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-012]
 target_paths: ["groundtruth.toml", "scripts/gtkb_scoped_client.py", "scripts/check_scoped_service_boundary.py", "scripts/release_candidate_gate.py", "scripts/session_self_initialization.py", "tests/scripts/test_gtkb_scoped_client.py", "tests/scripts/test_release_candidate_gate.py", "tests/scripts/test_session_self_initialization.py"]

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - implementation_start_gate Comparison-Operator Fix
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-start-gate-comparison-operator-fix
 Version: 002
 Responds to: bridge/gtkb-impl-start-gate-comparison-operator-fix-001.md

@@ -1,6 +1,6 @@
 # Implementation Proposal REVISED-1 - Advisory-to-Backlog Router (Self-Diagnostic Leak Closure Slice 1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-self-diagnostic-leak-closure-slice-1-advisory-router
 Version: 003
 Author: Prime Builder (Claude, harness B)

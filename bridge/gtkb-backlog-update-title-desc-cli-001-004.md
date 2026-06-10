@@ -10,7 +10,7 @@ author_metadata_source: cross-harness bridge trigger dispatch id plus durable ha
 
 # Loyal Opposition Review - gtkb-backlog-update-title-desc-cli-001 REVISED
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-backlog-update-title-desc-cli-001
 Version: 004
 Reviewer: Loyal Opposition (Codex, harness A)

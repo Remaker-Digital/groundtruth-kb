@@ -8,7 +8,7 @@ author_model_configuration: Claude Code 1M context, explanatory output style, cr
 
 # Post-Implementation Report (Worker-Context Blocker Recording) - Worker-Context-Aware AUQ Enforcement Slice 2
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-prime-worker-context-aware-auq-slice-2
 Version: 007
 Status: REVISED

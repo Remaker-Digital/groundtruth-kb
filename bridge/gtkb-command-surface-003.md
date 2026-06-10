@@ -9,7 +9,7 @@ REVISED
 **Bridge kind:** architecture_proposal
 **Routing:** Upstream candidate (`groundtruth-kb`).
 
-bridge_kind: architecture_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-COMMAND-SURFACE]
 spec_ids: []
 target_project: groundtruth-kb

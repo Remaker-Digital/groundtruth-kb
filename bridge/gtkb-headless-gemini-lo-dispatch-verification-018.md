@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 018
 Author: Loyal Opposition (Antigravity, harness C)

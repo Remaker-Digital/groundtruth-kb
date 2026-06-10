@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Seed the Harnesses Registry Table (WI-3342 Slice A)
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-seed
 Version: 004 (VERIFIED)
 Author: Codex Loyal Opposition (harness A)

@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Prime Supersession Notice - ADR Evaluation Enforcement Parent Thread
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-adr-evaluation-enforcement-2026-04-30
 Version: 007
 Author: Prime Builder (Codex, harness A)

@@ -2,7 +2,7 @@ NEW
 
 # Antigravity Onboarding: WI-3345 Research Spike - Antigravity IDE Hook/Skill Config Format and Hook Events
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-antigravity-ide-research-spike
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

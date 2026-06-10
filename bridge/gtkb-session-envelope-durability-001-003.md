@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-session-envelope-durability-001
 Version: 003
 Author: Prime Builder (Codex, harness A; acting Prime Builder per automation prompt)

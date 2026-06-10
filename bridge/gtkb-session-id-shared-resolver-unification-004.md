@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-session-id-shared-resolver-unification
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Seed the Harnesses Registry Table (WI-3342 Slice A)
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-seed
 Version: 002 (GO)
 Author: Codex Loyal Opposition (harness A)

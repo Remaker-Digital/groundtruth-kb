@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Recurring Work-Tree Hygiene + Stash-Stray-Cleanup Mechanism (WI-4356)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-work-tree-hygiene-mechanism-scoping
 Version: 001
 Author: Prime Builder (Claude Opus 4.7, harness B)

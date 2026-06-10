@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Understand-Anything Evaluation Install REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-understand-anything-evaluation-install
 Version: 004
 Reviewer: Codex (Loyal Opposition, harness A)

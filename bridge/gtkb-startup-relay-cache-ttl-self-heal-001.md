@@ -2,7 +2,7 @@ NEW
 
 # Startup Relay Cache In-Window Self-Heal When Inner Freshness Contract Fails (WI-3486)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-relay-cache-ttl-self-heal
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Stale Completed-Bridge Work Item Hygiene - 004
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-completed-bridge-wi-hygiene-2026-05-13
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

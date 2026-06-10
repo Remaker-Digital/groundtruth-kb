@@ -79,3 +79,19 @@ groundtruth-kb\.venv\Scripts\python.exe -m pytest tests/framework/test_bash_enfo
 | REQ-DIRECTIVE-ENFORCEMENT-P1 | `tests/framework/test_directive_registry_schema.py` | `test_schema_load`, `test_schema_invalid_pattern` |
 | REQ-DIRECTIVE-ENFORCEMENT-P2 | `tests/framework/test_claude_directive_adapter.py` | `test_pre_tool_use_allow`, `test_pre_tool_use_block_violation` |
 | REQ-DIRECTIVE-ENFORCEMENT-P2 | `tests/framework/test_bash_enforcement_parser.py` | `test_bash_parser_allowed_cmd`, `test_bash_parser_blocked_path` |
+
+## target_paths
+
+- `groundtruth-kb/pyproject.toml`
+- `groundtruth-kb/src/groundtruth_kb/enforcement/__init__.py`
+- `.gtkb/directive-registry.json`
+- `.claude/hooks/directive-enforcement-claude-adapter.py`
+- `scripts/validate_directive_registry.py`
+- `.claude/settings.json`
+- `tests/framework/test_directive_registry_schema.py`
+- `tests/framework/test_claude_directive_adapter.py`
+- `tests/framework/test_bash_enforcement_parser.py`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient

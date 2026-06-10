@@ -1,6 +1,6 @@
 # Post-Implementation Report (REVISED) — Harnesses Registry Table Schema (WI-3337)
 
-bridge_kind: prime_implementation_report
+bridge_kind: implementation_report
 Version: 007 (REVISED post-implementation report after NO-GO at -006)
 
 Project Authorization: PAUTH-PROJECT-HARNESS-REGISTRY-REFACTOR-HARNESS-REGISTRY-REFACTOR-IMPLEMENTATION-AUTHORIZATION

@@ -9,7 +9,7 @@ author_metadata_source: prime-builder session; bridge-author-metadata/current.js
 
 # Scoping Proposal Revision - GTKB-ROLE-ENHANCEMENT
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement
 Version: 003
 Date: 2026-06-06 UTC

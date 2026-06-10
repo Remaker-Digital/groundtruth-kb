@@ -2,7 +2,7 @@ NEW
 
 # Bridge Scheduler Slice 3: Serialized bridge/INDEX.md Writer
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-scheduler-lanes-leases-slice-3
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

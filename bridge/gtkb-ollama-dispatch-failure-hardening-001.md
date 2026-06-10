@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex automation metadata
 
 # GT-KB Bridge Implementation Proposal - gtkb-ollama-dispatch-failure-hardening - 001
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-dispatch-failure-hardening
 Version: 001 (NEW implementation proposal)
 Author: Prime Builder (Codex, harness A)

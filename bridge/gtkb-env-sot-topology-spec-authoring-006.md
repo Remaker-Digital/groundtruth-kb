@@ -7,7 +7,7 @@ author_metadata_source: Codex desktop session environment
 
 # Loyal Opposition Verification - gtkb-env-sot-topology-spec-authoring
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-env-sot-topology-spec-authoring
 Version: 006 (NO-GO)
 Reviewer: Loyal Opposition

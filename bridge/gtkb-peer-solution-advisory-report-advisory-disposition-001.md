@@ -2,7 +2,7 @@ NEW
 
 # Prime Disposition - Peer Solution Advisory Report Advisory (WI-3300)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-advisory-report-advisory-disposition
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

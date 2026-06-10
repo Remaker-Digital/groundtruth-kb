@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - WI-4286 Dispatch-Envelope Architecture Proposal 001
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-dispatch-envelope-adr-specs
 Version: 002
 Reviewer: Antigravity (Loyal Opposition, harness C)

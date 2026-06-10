@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-da-enforcement-completion-slice1-decompose
 Version: 011
 Author: Loyal Opposition (Codex, harness A)

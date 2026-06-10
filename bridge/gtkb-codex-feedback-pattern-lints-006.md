@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Codex Feedback Pattern Lints
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-codex-feedback-pattern-lints
 Version: 006
 Responds to: bridge/gtkb-codex-feedback-pattern-lints-005.md

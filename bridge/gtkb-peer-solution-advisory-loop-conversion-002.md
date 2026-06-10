@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Peer Solution Advisory Loop Conversion
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-peer-solution-advisory-loop-conversion
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

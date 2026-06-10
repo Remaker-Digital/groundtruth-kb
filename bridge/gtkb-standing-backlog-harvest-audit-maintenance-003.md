@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Standing Backlog Harvest/Reconciliation Audit Maintenance (GTKB-GOV-010)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-standing-backlog-harvest-audit-maintenance
 Version: 003
 Author: Prime Builder (Claude, harness B)

@@ -1,6 +1,6 @@
 # Implementation Proposal — Bridge Scheduler with Lanes and Leases (Slice 1: Scoping)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

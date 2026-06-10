@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - INDEX Agent Edit Serialization Scoping REVISED-2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-index-agent-edit-serialization-scoping
 Version: 005
 Responds to: bridge/gtkb-index-agent-edit-serialization-scoping-004.md

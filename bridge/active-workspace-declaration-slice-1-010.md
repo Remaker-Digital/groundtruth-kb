@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: active-workspace-declaration-slice-1
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

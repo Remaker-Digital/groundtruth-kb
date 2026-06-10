@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge auto-dispatch
 
 # Loyal Opposition Verdict - GT-KB Discoverability CLI Slice 2 Implementation - 004
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-discoverability-cli-slice-2-implementation
 Version: 004
 Reviewer: Codex Loyal Opposition (harness A)

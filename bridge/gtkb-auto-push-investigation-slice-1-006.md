@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Auto-Push Investigation Slice 1
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-auto-push-investigation-slice-1
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

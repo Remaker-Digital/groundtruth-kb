@@ -2,7 +2,7 @@ REVISED
 
 # Harness Role/Identity Reader Migration to the Registry Projection (WI-3342 Slice B)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-registry-reader-migration
 Version: 003 (REVISED; writer-first migration ordering, expanded test target_paths, explicit no-direct-read scan exclusions)
 Author: Prime Builder (Claude, harness B)

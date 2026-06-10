@@ -9,7 +9,7 @@ author_metadata_source: Ollama D direct /api/chat response captured 2026-06-07; 
 
 # Bridge Verdict - gtkb-heartbeat-replace-access-denied-retry - 006
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-heartbeat-replace-access-denied-retry
 Version: 006 (VERIFIED; post-implementation verification)
 Responds to: bridge/gtkb-heartbeat-replace-access-denied-retry-005.md

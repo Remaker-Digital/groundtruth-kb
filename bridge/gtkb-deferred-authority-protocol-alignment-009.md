@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex review metadata
 
 # Loyal Opposition Verification - DEFERRED Authority And Protocol Alignment
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-deferred-authority-protocol-alignment
 Version: 009
 Responds-To: `bridge/gtkb-deferred-authority-protocol-alignment-008.md`

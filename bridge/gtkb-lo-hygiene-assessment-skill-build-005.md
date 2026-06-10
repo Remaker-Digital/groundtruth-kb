@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop
 
 # Loyal Opposition Review - LO Hygiene Assessment Skill Build - 005
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-lo-hygiene-assessment-skill-build
 Version: 005
 Date: 2026-05-29 UTC

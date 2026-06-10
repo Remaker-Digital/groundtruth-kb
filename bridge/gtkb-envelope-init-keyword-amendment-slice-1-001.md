@@ -2,7 +2,7 @@ NEW
 
 # Envelope Init-Keyword Amendment: Subject Vocabulary Expansion + Role Optionality (WI-4291)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-envelope-init-keyword-amendment-slice-1
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

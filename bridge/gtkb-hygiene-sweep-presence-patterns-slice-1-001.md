@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-hygiene-sweep-presence-patterns-slice-1
 Version: 001
 Author: Prime Builder (Claude, harness B; session-stated role via ::init gtkb pb)

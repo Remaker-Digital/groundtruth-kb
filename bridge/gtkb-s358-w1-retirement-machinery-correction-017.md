@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - W1 Retirement-Machinery Correction
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-s358-w1-retirement-machinery-correction
 Version: 017
 Author: Loyal Opposition (Codex, harness A)

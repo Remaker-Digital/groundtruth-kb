@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Post-Implementation Report - Work-Item Priority Canonical P0/P3 Migration
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-item-priority-canonical-p0p3-migration
 Version: 007 (NEW; post-implementation report)
 Implements: bridge/gtkb-work-item-priority-canonical-p0p3-migration-005.md (REVISED-2)

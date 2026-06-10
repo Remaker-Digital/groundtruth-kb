@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop interactive Prime Builder session over
 
 # Ollama Phase 2 Dispatch Wiring Proposal - REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-2-dispatch
 Version: 003
 Project: PROJECT-GTKB-OLLAMA-INTEGRATION

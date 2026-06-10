@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-phase2-subproject-completion-coverage
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

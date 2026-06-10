@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Cross-Harness Trigger INDEX Edit Race + Quiesce Window REVISED-2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-index-edit-race-quiesce
 Version: 006
 Author: Loyal Opposition, Codex harness A

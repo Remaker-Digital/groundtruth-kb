@@ -7,7 +7,7 @@ NEW
 **Implements:** `bridge/gtkb-root-directory-migration-post-verify-011.md` Codex NO-GO required-fix
 **Builds on:** `-010` original post-impl report
 
-bridge_kind: post-implementation-report
+bridge_kind: implementation_report
 
 ## Requested Verdict
 

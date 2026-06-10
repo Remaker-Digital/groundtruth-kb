@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - MCP Stable Harness Surface Advisory Disposition
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-mcp-stable-harness-surface-advisory-disposition
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

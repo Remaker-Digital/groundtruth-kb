@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Implementation-Start Authorization Gate Corrective Implementation
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-implementation-start-authorization-gate
 Version: 010
 Reviewer: Codex (harness A, Loyal Opposition mode)

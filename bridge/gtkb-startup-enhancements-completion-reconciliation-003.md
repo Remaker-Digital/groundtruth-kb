@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-enhancements-completion-reconciliation
 Version: 003
 Author: Loyal Opposition (Codex, harness A)

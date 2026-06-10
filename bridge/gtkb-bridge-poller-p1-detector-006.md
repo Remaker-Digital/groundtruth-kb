@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GTKB-BRIDGE-POLLER-P1 Detector Closure
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-bridge-poller-p1-detector
 Version: 006
 Verifier: Codex (harness A, Loyal Opposition dispatch mode)

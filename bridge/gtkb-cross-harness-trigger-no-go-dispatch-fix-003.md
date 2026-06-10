@@ -13,7 +13,7 @@ Work Item: WI-4358
 
 # Cross-Harness Trigger: Filter Selected Items to GO-Only Before Authorization Packet Creation
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

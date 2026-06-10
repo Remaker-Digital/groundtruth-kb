@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-advisory-report-message-advisory-disposition
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

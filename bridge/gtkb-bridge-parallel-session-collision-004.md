@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge Work-Intent Registry Foundation Module
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-bridge-parallel-session-collision
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

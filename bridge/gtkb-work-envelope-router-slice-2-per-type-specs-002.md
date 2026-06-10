@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Work Envelope Router Slice 2 Per-Type Specs Proposal (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-envelope-router-slice-2-per-type-specs
 Version: 002
 Reviewer: Loyal Opposition (Antigravity harness C, durable role per registry: `[loyal-opposition]`)

@@ -2,7 +2,7 @@ NEW
 
 # Harness Role/Identity Reader Migration to the Registry Projection (WI-3342 Slice B)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-registry-reader-migration
 Version: 001 (NEW; migrate role/identity readers and writers from the legacy JSON files to the harness-registry projection)
 Author: Prime Builder (Claude, harness B)

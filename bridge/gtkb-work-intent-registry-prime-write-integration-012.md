@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-intent-registry-prime-write-integration
 Version: 012
 Reviewer: Codex Loyal Opposition, harness A

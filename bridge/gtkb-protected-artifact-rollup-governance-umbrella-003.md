@@ -9,7 +9,7 @@ author_model_configuration: Claude Code CLI, explanatory output style, interacti
 
 # Protected-Artifact Cross-Session Drift Rollup — Governance Umbrella (REVISED-2)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-protected-artifact-rollup-governance-umbrella
 Version: 003
 Date: 2026-06-05 UTC

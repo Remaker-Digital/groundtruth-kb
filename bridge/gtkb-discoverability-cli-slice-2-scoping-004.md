@@ -9,7 +9,7 @@ author_metadata_source: explicit automation environment
 
 # Loyal Opposition Verification - gtkb-discoverability-cli-slice-2-scoping - 004
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-discoverability-cli-slice-2-scoping
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

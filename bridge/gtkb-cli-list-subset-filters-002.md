@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-cli-list-subset-filters
 Version: 002
 Author: Loyal Opposition (Antigravity, harness C)

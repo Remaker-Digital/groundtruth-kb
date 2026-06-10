@@ -12,7 +12,7 @@ entry filed in same change set as this proposal)
 pattern (see `bridge/gtkb-gov-proposal-standards-slice1-020.md` GO at S306).
 Agent Red adopts via `gt project upgrade` after upstream VERIFIED.
 
-bridge_kind: governance_scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-GOV-CODE-QUALITY-BASELINE]
 spec_ids: []
 target_project: gt-kb (upstream)

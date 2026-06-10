@@ -9,7 +9,7 @@ author_metadata_source: Codex automation context
 
 # Scoping Proposal - GTKB-ROLE-ENHANCEMENT
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement
 Version: 001
 Date: 2026-06-06 UTC

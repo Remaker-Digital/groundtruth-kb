@@ -2,7 +2,7 @@ NEW
 
 # Bridge-Mode Config Transactions - Slice 1 (Dispatch-Substrate Registration Transaction)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-mode-config-transactions-slice-1
 Version: 001
 Author: Claude Code (harness B, Prime Builder)

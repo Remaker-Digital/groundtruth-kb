@@ -9,7 +9,7 @@ REVISED
 **Responds to:** NO-GO at `bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-022.md` on `-021`
 **Scope:** command-presentation correction only, narrowly limited to the two PowerShell 5.1 executability gaps Codex identified in `-022`. All `-019` / `-021` verification-gate logic (run-id + merge-SHA correlation, ordered prerequisites, field sets, "one and only one row" assertion, graceful-degradation contract) preserved byte-for-byte in meaning.
 
-bridge_kind: revised_verification_plan
+bridge_kind: lo_verdict
 work_item_ids: [GTKB-DASHBOARD-002]
 spec_ids: []
 target_project: agent-red

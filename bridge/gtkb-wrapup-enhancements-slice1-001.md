@@ -9,7 +9,7 @@ NEW
 **Bridge kind:** implementation_proposal
 **Routing:** Agent Red-local. Slice 1 is the smallest, highest-value subset of the 5-scanner suite (S1 synthesis / S2 consistency / S3 loose-ends / S4 continuation guide / S5 hygiene). Subsequent slices follow as separate bridges.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-WRAPUP-ENHANCEMENTS]
 spec_ids: []
 target_project: agent-red

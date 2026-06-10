@@ -8,7 +8,7 @@ author_model_configuration: explanatory output style; interactive Prime Builder 
 
 # Implementation Proposal - Deterministic CLI: gt validate spec-coherence (WI-3424, Layer A)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-spec-coherence-cli
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

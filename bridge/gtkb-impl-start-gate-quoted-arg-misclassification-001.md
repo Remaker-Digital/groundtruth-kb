@@ -2,7 +2,7 @@ NEW
 
 # implementation_start_gate Quoted-Argument Keyword and Protected-Path Token Misclassification Fix (WI-3358)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-quoted-arg-misclassification
 Version: 001 (NEW; reliability fast-lane defect fix)
 Author: Prime Builder (Claude, harness B)

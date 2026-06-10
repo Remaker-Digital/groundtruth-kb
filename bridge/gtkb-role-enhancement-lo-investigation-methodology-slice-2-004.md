@@ -9,7 +9,7 @@ author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; s
 
 # Loyal Opposition Verdict - Role Enhancement LO Investigation Methodology Slice 2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2
 Version: 004
 Author: Loyal Opposition (Ollama, harness D)

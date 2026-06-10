@@ -2,7 +2,7 @@ NEW
 
 # Implementation Report — Bridge Poller Event-Driven Replacement Slice 3 (Hook Registrations)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-001
 Version: 005 (NEW post-implementation report against GO at `-004`)
 Author: Prime Builder (Claude, harness B)

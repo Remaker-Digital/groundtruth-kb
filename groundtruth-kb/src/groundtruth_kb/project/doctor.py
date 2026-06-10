@@ -570,6 +570,7 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
     promotion lands in Phase 2+.
     """
     import tomllib  # noqa: PLC0415 - py3.11+; defer import
+
     from groundtruth_kb.harness_projection import (  # noqa: PLC0415
         HarnessStateError,
         read_capabilities,
@@ -2978,36 +2979,58 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
     age_sec_part = int(age_secs % 60)
     age_display = f"{age_min}m {age_sec_part}s ago"
 
+    # Compute top-level staleness (DCL-DISPATCH-STATE-STALENESS-THRESHOLD-001)
+    top_updated_at_raw = data.get("updated_at")
+    top_updated_at = None
+    if isinstance(top_updated_at_raw, str) and top_updated_at_raw.strip():
+        try:
+            top_updated_at = datetime.fromisoformat(top_updated_at_raw.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    if top_updated_at is None:
+        try:
+            mtime = state_path.stat().st_mtime
+            top_updated_at = datetime.fromtimestamp(mtime, tz=UTC)
+        except OSError:
+            pass
+
+    is_top_stale = False
+    top_age_display = ""
+    if top_updated_at is not None:
+        top_age_secs = (now - top_updated_at).total_seconds()
+        if top_age_secs > 3600:
+            is_top_stale = True
+            top_age_min = int(top_age_secs // 60)
+            top_age_sec_part = int(top_age_secs % 60)
+            top_age_display = f"{top_age_min}m {top_age_sec_part}s ago"
+
     if age_secs < _BRIDGE_FRESH_SECS:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=f"{agent} bridge dispatch: OK (last update {age_display}, state: {state_display})",
+        status: Literal["pass", "fail", "warning", "info"] = "pass"
+        message = f"{agent} bridge dispatch: OK (last update {age_display}, state: {state_display})"
+    elif age_secs < _BRIDGE_WARN_SECS:
+        status = "warning"
+        message = (
+            f"{agent} bridge dispatch: WARN (last update {age_display}, state: {state_display}) "
+            f"— investigate cross-harness event-driven trigger or see {_BRIDGE_DISPATCH_DOC}"
+        )
+    else:
+        status = "fail"
+        message = (
+            f"{agent} bridge dispatch: ALARM (last update {age_display}, state: {state_display}) "
+            f"— check {_BRIDGE_AUTH_DOC} and {_BRIDGE_DISPATCH_DOC}"
         )
 
-    if age_secs < _BRIDGE_WARN_SECS:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"{agent} bridge dispatch: WARN (last update {age_display}, state: {state_display}) "
-                f"— investigate cross-harness event-driven trigger or see {_BRIDGE_DISPATCH_DOC}"
-            ),
-        )
+    if is_top_stale:
+        if status == "pass":
+            status = "warning"
+        message += f" (stale dispatch-state.json: last updated {top_age_display} ago)"
 
     return ToolCheck(
         name=check_name,
         required=False,
         found=True,
-        status="fail",
-        message=(
-            f"{agent} bridge dispatch: ALARM (last update {age_display}, state: {state_display}) "
-            f"— check {_BRIDGE_AUTH_DOC} and {_BRIDGE_DISPATCH_DOC}"
-        ),
+        status=status,
+        message=message,
     )
 
 

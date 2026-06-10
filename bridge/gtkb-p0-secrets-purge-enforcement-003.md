@@ -2,7 +2,7 @@ REVISED
 
 # P0 Secrets Purge & Enforcement - Pre-commit Hook + CI Gate
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-p0-secrets-purge-enforcement
 Version: 003
 Author: Prime Builder (antigravity, harness C)

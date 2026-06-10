@@ -8,7 +8,7 @@ author_model_configuration: Claude Code default reasoning
 
 # Prime Builder Blocker Observation - LO Bridge History Backfill Slice 1 Inventory
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
 Version: 005
 Author: Prime Builder (Claude harness B)

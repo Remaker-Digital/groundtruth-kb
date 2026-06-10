@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-10-regression-tests
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

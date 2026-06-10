@@ -6,7 +6,7 @@ Session: S350
 Source: WI-3270 (Add governed backlog item creation command)
 Project: GTKB-BACKLOG-CAPTURE-001
 Recommended commit type: feat
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 target_paths: ["groundtruth-kb/src/groundtruth_kb/cli_backlog_add.py", "groundtruth-kb/src/groundtruth_kb/cli.py", "platform_tests/scripts/test_cli_backlog_add.py"]
 ---
 

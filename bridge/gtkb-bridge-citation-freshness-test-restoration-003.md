@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-bridge-citation-freshness-test-restoration
 Version: 003
 Responds to: bridge/gtkb-bridge-citation-freshness-test-restoration-002.md MD

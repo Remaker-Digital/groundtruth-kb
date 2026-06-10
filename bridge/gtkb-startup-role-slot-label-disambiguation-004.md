@@ -8,7 +8,7 @@ author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; s
 
 # Startup Role-Slot Labels Disambiguate Active Harness And Work Subject (WI-4391)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-role-slot-label-disambiguation
 Version: 004 (GO after REVISED NO-GO resolution)
 Author: Ollama Loyal Opposition (Harness D)

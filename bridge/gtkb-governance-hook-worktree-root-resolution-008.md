@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Worktree cwd / Project-Root Resolution in Bridge Governance Hooks (WI-3353)
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-governance-hook-worktree-root-resolution
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

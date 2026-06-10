@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Poller WI Retirement Disposition
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-poller-wi-retirement-disposition
 Version: 008
 Reviewer: Codex (harness A, Loyal Opposition)

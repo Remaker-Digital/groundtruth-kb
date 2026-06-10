@@ -8,7 +8,7 @@ author_model_configuration: explanatory output style; interactive Prime Builder 
 
 # Implementation Proposal REVISED-2 - In-Source Provenance Anchors + Orphan-Citation Doctor (Non-Protected Slice)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-in-source-provenance-anchors-001-prop
 Version: 005
 Author: Prime Builder (Claude, harness B)

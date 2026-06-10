@@ -2,7 +2,7 @@ REVISED
 
 # Bridge Scheduler Slice 5: Work-Lane Classification
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-scheduler-lanes-leases-slice-5
 Version: 003 (REVISED; responds to the NO-GO at -002 - redesigns the classifier public contract to a context object, normalizes the bridge-kind vocabulary, and adds an effective-kind rule)
 Author: Prime Builder (Claude, harness B)

@@ -8,21 +8,36 @@ in the git working tree, not in Docker containers.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 import pathlib
 import re
 
 import pytest
 
+
+def get_docs_path() -> pathlib.Path:
+    """Find the docs directory relative to CWD or the test file itself."""
+    for p in [
+        pathlib.Path("applications/Agent_Red/docs"),
+        pathlib.Path("docs"),
+        pathlib.Path(__file__).parents[2] / "docs",
+    ]:
+        if p.exists() and (p / "operations").exists():
+            return p
+    return pathlib.Path("docs")
+
+
+DOCS = get_docs_path()
+OPS = DOCS / "operations"
+ARCHIVE = DOCS / "archive"
+
+
 # Skip entire module when running inside the test host container
 # (no docs/ directory available)
 pytestmark = pytest.mark.skipif(
-    not pathlib.Path("docs").exists(),
+    not DOCS.exists() or not OPS.exists(),
     reason="docs/ directory not available (container environment)",
 )
-
-DOCS = pathlib.Path("docs")
-OPS = DOCS / "operations"
-ARCHIVE = DOCS / "archive"
 
 
 class TestRateLimitProcedureUpdate:
@@ -48,10 +63,12 @@ class TestDeploymentRunbookArchive:
     """SPEC-1701: DEPLOYMENT-RUNBOOK.md MUST be archived."""
 
     def test_runbook_not_in_operations(self):
-        assert not (OPS / "DEPLOYMENT-RUNBOOK.md").exists(),             "Deprecated runbook must be moved out of active operations folder"
+        assert not (OPS / "DEPLOYMENT-RUNBOOK.md").exists(), (
+            "Deprecated runbook must be moved out of active operations folder"
+        )
 
     def test_runbook_in_archive(self):
-        assert (ARCHIVE / "DEPLOYMENT-RUNBOOK.md").exists(),             "Deprecated runbook must be in docs/archive/"
+        assert (ARCHIVE / "DEPLOYMENT-RUNBOOK.md").exists(), "Deprecated runbook must be in docs/archive/"
 
 
 class TestOperationsIndex:
@@ -73,7 +90,7 @@ class TestOperationsIndex:
         text = (OPS / "INDEX.md").read_text(encoding="utf-8")
         md_files = [f.name for f in OPS.iterdir() if f.suffix == ".md" and f.name != "INDEX.md"]
         listed = sum(1 for f in md_files if f in text)
-        assert listed >= len(md_files) * 0.8,             f"INDEX must list at least 80% of ops docs ({listed}/{len(md_files)})"
+        assert listed >= len(md_files) * 0.8, f"INDEX must list at least 80% of ops docs ({listed}/{len(md_files)})"
 
 
 class TestMasterTestResults:
@@ -84,9 +101,12 @@ class TestMasterTestResults:
 
     def test_shows_current_test_count(self):
         text = (DOCS / "tests" / "MASTER-TEST-EXECUTION-RESULTS-1.0.md").read_text(encoding="utf-8")
-        numbers = [int(n.replace(",", "")) for n in re.findall(r"[\d,]+", text)
-                   if n.replace(",", "").isdigit() and int(n.replace(",", "")) > 5000]
-        assert any(n >= 6000 for n in numbers),             "Master results must show 6000+ total tests (current: 6,171)"
+        numbers = [
+            int(n.replace(",", ""))
+            for n in re.findall(r"[\d,]+", text)
+            if n.replace(",", "").isdigit() and int(n.replace(",", "")) > 5000
+        ]
+        assert any(n >= 6000 for n in numbers), "Master results must show 6000+ total tests (current: 6,171)"
 
     def test_shows_current_version(self):
         text = (DOCS / "tests" / "MASTER-TEST-EXECUTION-RESULTS-1.0.md").read_text(encoding="utf-8")
@@ -94,4 +114,4 @@ class TestMasterTestResults:
 
     def test_no_stale_1826_count(self):
         text = (DOCS / "tests" / "MASTER-TEST-EXECUTION-RESULTS-1.0.md").read_text(encoding="utf-8")
-        assert "1,826" not in text and "1826" not in text,             "Stale 1,826 test count must be updated"
+        assert "1,826" not in text and "1826" not in text, "Stale 1,826 test count must be updated"

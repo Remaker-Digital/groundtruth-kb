@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Audit Script WITHDRAWN Status Handling
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-audit-script-withdrawn-status-handling
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

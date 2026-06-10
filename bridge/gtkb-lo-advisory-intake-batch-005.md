@@ -8,7 +8,7 @@ author_model_configuration: explanatory output style; interactive Prime Builder 
 
 # Implementation Proposal - LO Advisory Intake Inventory (WI-3296..WI-3307) - REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-advisory-intake-batch
 Version: 005 (REVISED)
 Author: Prime Builder (Claude, harness B)

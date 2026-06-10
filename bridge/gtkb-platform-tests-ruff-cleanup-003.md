@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Platform Tests Ruff Cleanup (REVISED-3: WI-specific PAUTH for 42-file cleanup)
 
-bridge_kind: spec_intake
+bridge_kind: prime_proposal
 Document: gtkb-platform-tests-ruff-cleanup
 Version: 003 (REVISED)
 Responds-To: bridge/gtkb-platform-tests-ruff-cleanup-002.md (Codex NO-GO)

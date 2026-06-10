@@ -2,7 +2,7 @@ NEW
 
 # GTKB-BRIDGE-POLLER-P2.5 Verification Spike Completion Report
 
-bridge_kind: post_scope_completion_report
+bridge_kind: implementation_report
 Document: gtkb-bridge-poller-p2-5-verification-spike
 Version: 005
 Author: Prime Builder (Codex, harness A)

@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Project Authorization: PAUTH-WI-4214-RETIRE-ROLE-ASSIGNMENTS-MIRROR-SLICE-1
 Project: PROJECT-GTKB-ROLE-STATUS-ORTHOGONALITY-DISPATCH
 Work Item: WI-4214

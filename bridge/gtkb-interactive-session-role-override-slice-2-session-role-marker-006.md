@@ -8,7 +8,7 @@ author_metadata_source: Codex bridge automation
 
 # Loyal Opposition Verification - Interactive Session Role Override Slice 2 - 006
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-2-session-role-marker
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

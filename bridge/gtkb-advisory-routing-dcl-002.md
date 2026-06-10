@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Advisory Routing DCL NEW
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-advisory-routing-dcl
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition)

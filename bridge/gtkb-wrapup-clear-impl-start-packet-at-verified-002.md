@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-wrapup-clear-impl-start-packet-at-verified
 Version: 002
 Responds to: bridge/gtkb-wrapup-clear-impl-start-packet-at-verified-001.md NEW

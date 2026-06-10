@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-parity-sweep
 Version: 005
 Responds to: bridge/gtkb-harness-registry-parity-sweep-004.md REVISED

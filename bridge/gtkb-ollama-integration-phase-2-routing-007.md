@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop interactive Prime Builder session over
 
 # Ollama Phase 2 Routing Expansion Proposal - REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-2-routing
 Version: 007
 Project: PROJECT-GTKB-OLLAMA-INTEGRATION

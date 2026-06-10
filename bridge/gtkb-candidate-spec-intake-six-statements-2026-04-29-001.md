@@ -7,7 +7,7 @@ NEW
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex Loyal Opposition advisory at `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CANDIDATE-SPEC-STATEMENTS-BACKLOG-ADVISORY-2026-04-30.md` — six owner statements about desired GT-KB governance/spec/test/release/archive behavior, framed as candidate specifications. Codex assessed each as "partially correct" (mechanisms exist; mechanical enforcement incomplete) and recommended Prime Builder formulate one proposal converting the statements into candidate spec records for owner review.
 
-bridge_kind: candidate_spec_intake
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-CANDIDATE-SPEC-INTAKE-2026-04-29]
 spec_ids: []  # this bridge proposes new specs; does not implement against existing ones
 target_project: groundtruth-kb (governance specs that apply to the platform)

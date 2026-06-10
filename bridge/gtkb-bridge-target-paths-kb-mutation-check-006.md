@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge target_paths KB-Mutation Completeness Check
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-target-paths-kb-mutation-check
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

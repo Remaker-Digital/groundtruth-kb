@@ -7,7 +7,7 @@ author_metadata_source: Codex bridge auto-dispatch session
 
 # Loyal Opposition Verification - Phantom PROJECT-PROJECT Reconciliation - 008
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-phantom-project-prefix-reconciliation
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

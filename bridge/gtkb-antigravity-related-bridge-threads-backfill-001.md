@@ -2,7 +2,7 @@ NEW
 
 # Antigravity Onboarding: WI-3362 - Backfill related_bridge_threads Linkage for WI-3337..WI-3349
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-antigravity-related-bridge-threads-backfill
 Version: 001 (NEW)
 Author: Prime Builder (Claude, harness B)

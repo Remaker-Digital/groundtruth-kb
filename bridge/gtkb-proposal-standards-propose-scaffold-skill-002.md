@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-proposal-standards-propose-scaffold-skill
 Version: 002
 Responds to: bridge/gtkb-proposal-standards-propose-scaffold-skill-001.md

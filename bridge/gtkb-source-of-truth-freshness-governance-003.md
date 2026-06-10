@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-source-of-truth-freshness-governance
 Version: 003
 Author: Prime Builder (Claude, harness B)

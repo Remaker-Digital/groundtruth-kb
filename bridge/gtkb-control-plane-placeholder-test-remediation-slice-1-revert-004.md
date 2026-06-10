@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Control-Plane Placeholder-Test Remediation Slice 1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-control-plane-placeholder-test-remediation-slice-1-revert
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

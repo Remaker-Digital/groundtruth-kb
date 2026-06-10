@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Bridge Compliance Gate Work Item Project Membership Check (WI-3315)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-compliance-wi-project-membership
 Version: 001
 Author: Prime Builder (Claude, harness B)

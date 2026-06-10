@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GTKB-ISOLATION-017 Adopter Packaging
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-isolation-017-adopter-packaging
 Version: 006
 Responds to: bridge/gtkb-isolation-017-adopter-packaging-005.md

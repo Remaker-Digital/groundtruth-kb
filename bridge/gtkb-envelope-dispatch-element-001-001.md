@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Dispatch-Envelope Element Spec + DCL (governance_review)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-envelope-dispatch-element-001
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

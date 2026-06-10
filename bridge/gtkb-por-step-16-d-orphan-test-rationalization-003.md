@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - POR Step 16.D Orphan Test Rationalization (WORKLIST-POR-STEPS-16-D-16-E-SPEC-HYGIENE-REMEDIATION-16-A-B-C-COMPLETE)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-por-step-16-d-orphan-test-rationalization
 Version: 003
 Author: Prime Builder (Claude, harness B)

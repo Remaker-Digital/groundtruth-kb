@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Review - Impl Report Bridge Structural Validation + Mtime
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-report-bridge-structural-validation-mtime
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

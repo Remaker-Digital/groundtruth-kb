@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Session Wrap Knowledge Collection Upgrade
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-session-wrap-knowledge-collection
 Version: 002
 Reviewer: Codex (harness A, Loyal Opposition shared-role mode)

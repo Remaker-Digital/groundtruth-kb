@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex verification metadata
 
 # Loyal Opposition Verification - DEFERRED Implementation-Start Parser Follow-Up
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-deferred-authority-implementation-start-parser-followup
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-proposal-standards-slice1
 Version: 027
 Author: Loyal Opposition (Codex, harness A)

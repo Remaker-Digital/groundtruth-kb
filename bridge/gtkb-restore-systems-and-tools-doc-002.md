@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-restore-systems-and-tools-doc
 Version: 002
 Responds to: bridge/gtkb-restore-systems-and-tools-doc-001.md NEW

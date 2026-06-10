@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Envelope Open Disclosure Refactor (GO)
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-envelope-disclosure-ui-impl
 Version: 009
 Reviewer: Loyal Opposition (Codex, harness A, durable role per registry: `[loyal-opposition]`)

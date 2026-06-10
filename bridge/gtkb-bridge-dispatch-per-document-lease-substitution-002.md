@@ -6,7 +6,7 @@ author_model: GPT-5
 
 # Loyal Opposition Review - Bridge Dispatch Per-Document Lease Substitution
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-dispatch-per-document-lease-substitution
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

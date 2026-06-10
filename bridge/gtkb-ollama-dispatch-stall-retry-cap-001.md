@@ -1,5 +1,5 @@
 NEW
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 author_identity: Codex Prime Builder
 author_harness_id: A
 author_session_context_id: codex-monitor-ollama-hotfix-20260607T0627Z

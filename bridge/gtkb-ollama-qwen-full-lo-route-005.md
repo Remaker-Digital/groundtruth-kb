@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification — gtkb-ollama-qwen-full-lo-route
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-qwen-full-lo-route
 Version: 005
 Verdict: VERIFIED

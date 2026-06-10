@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING
 Project: PROJECT-GTKB-RELIABILITY-FIXES
 Work Item: WI-3372

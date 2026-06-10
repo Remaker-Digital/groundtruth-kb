@@ -1,5 +1,5 @@
 GO
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-lo-dispatch-session-propagation
 Version: 004
 Reviewer: Ollama Loyal Opposition, harness D

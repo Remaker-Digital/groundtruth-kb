@@ -9,7 +9,7 @@ author_metadata_source: durable harness identity plus bridge auto-dispatch conte
 
 # Terminal Blocker Acknowledgment - Role Enhancement Review-Depth Contract Slice 1
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
 Version: 007 (REVISED; terminal blocker acknowledgment)
 Responds to: bridge/gtkb-role-enhancement-review-depth-contract-slice-1-006.md

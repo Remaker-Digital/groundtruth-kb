@@ -2,7 +2,7 @@ REVISED
 
 # Operating-Mode Transaction Component — Slice 1 (REVISED-5)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-operating-mode-transaction-001
 Version: 012
 Author: Claude Code (harness B, Prime Builder)

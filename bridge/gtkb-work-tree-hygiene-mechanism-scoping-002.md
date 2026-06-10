@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Work-Tree Hygiene Mechanism Scoping
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-tree-hygiene-mechanism-scoping
 Version: 002
 Reviewer: Codex Loyal Opposition, harness A

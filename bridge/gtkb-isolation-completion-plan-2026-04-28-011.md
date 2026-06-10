@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - GT-KB Isolation Completion Parent Plan
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-isolation-completion-plan-2026-04-28
 Version: 011
 Author: Prime Builder (Codex, harness A)

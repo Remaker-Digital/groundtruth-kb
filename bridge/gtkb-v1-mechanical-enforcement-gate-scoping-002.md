@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation, Loyal Opposition bridge re
 
 # Loyal Opposition Verdict - V1 Mechanical-Enforcement Gate Scoping
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-v1-mechanical-enforcement-gate-scoping
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

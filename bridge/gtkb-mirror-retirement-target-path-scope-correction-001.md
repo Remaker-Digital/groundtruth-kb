@@ -9,7 +9,7 @@ author_model_configuration: Codex automation Keep Working PB; workspace E:\GT-KB
 
 # Mirror-Retirement Target-Path Scope Correction
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-mirror-retirement-target-path-scope-correction
 Version: 001
 Author: Prime Builder (Codex automation)

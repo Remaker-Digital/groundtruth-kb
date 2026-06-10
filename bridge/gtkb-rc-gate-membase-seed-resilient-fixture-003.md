@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Defect-Fix Proposal - Repair RC Gate membase-seed step (REVISED: fixture-path reconciliation; supersedes resilient-skip framing)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-rc-gate-membase-seed-resilient-fixture
 Version: 003 (REVISED)
 Date: 2026-05-28 UTC

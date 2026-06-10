@@ -10,7 +10,7 @@ author_metadata_source: prime-builder session; inline author metadata
 
 # Post-Implementation Report — Handoff Prompt Terminology Clarification (WI-4363)
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-handoff-prompt-terminology-clarification
 Version: 003
 Author: Prime Builder (Claude Code, harness B)

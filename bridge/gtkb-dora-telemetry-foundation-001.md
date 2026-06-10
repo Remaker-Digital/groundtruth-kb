@@ -7,7 +7,7 @@ NEW
 **Work item:** GTKB-DORA-001
 **Author:** Prime Builder (Claude Opus 4.7, S307)
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DORA-001]
 spec_ids: []
 target_project: agent-red

@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal REVISED - In-Source Provenance Anchors + Orphan-Citation Doctor
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-in-source-provenance-anchors-001-prop
 Version: 003
 Author: Prime Builder (Codex, harness A)

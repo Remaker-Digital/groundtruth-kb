@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - `gt bridge propose` Deterministic CLI
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-gt-bridge-propose-deterministic-cli
 Version: 004
 Reviewer: Codex Loyal Opposition, harness A

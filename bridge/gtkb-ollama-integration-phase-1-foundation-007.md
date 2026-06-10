@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Ollama Foundation Child — REVISED-3 addressing Codex NO-GO at -006 (capability-floor model + WI acceptance alignment + import guard)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ollama-integration-phase-1-foundation
 Version: 007
 Author: Prime Builder (Claude Code, harness B)

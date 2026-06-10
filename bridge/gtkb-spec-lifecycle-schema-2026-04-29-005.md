@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Prime Follow-Through Report - Spec Lifecycle Schema Scoping
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-spec-lifecycle-schema-2026-04-29
 Version: 005
 Author: Prime Builder (Codex harness A)

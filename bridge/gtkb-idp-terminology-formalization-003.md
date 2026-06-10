@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-idp-terminology-formalization-001.md`
 **Addresses:** `bridge/gtkb-idp-terminology-formalization-002.md` (NO-GO)
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: governance + documentation
 work_item_ids: []
 target_paths: ["CLAUDE-REFERENCE.md", "docs/gtkb-idp-concept.md"]

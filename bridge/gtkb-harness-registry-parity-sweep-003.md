@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-parity-sweep
 Version: 003
 Responds to: bridge/gtkb-harness-registry-parity-sweep-002.md

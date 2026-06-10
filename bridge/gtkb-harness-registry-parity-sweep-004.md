@@ -8,7 +8,7 @@ author_model_configuration: Antigravity desktop session environment
 
 # Implementation Proposal - Harness Capability Registry Parity (REVISED)
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-harness-registry-parity-sweep
 Version: 004 (REVISED)
 Responds to: bridge/gtkb-harness-registry-parity-sweep-003.md NO-GO

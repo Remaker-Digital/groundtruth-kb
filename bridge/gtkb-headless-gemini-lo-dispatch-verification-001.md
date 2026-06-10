@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Antigravity Onboarding WI-3349: End-to-end Gemini CLI headless LO-review dispatch verification (substrate-only scope)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-headless-gemini-lo-dispatch-verification
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

@@ -7,7 +7,7 @@ author_model_configuration: Codex bridge automation
 
 # Loyal Opposition Verdict - External Harness Executable Root-Boundary Exception - 004
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-root-boundary-external-harness-exec-exception
 Version: 004
 Reviewer: Codex Loyal Opposition (harness A)

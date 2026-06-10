@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation, Loyal Opposition bridge ve
 
 # Loyal Opposition Verification - Phase-1 Ollama Shim Chat URL Fix
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 012
 Date: 2026-06-05 UTC

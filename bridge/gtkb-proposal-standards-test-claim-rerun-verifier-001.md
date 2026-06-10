@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Proposal-Standards Test-Claim Re-Run Verifier (Slice 2)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-proposal-standards-test-claim-rerun-verifier
 Version: 001
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Owner-Decision Tracker: Pattern Bounds + Same-Turn AUQ Auto-Resolution
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001
 Version: 001
 Author: Prime Builder (Claude, harness B)

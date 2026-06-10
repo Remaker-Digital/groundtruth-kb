@@ -2,7 +2,7 @@ NEW
 
 # gtkb-backlog-update-title-desc-cli-001 — Extend `gt backlog update` with `--title` and `--description` flags under a disjunctive safety gate
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-backlog-update-title-desc-cli-001
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

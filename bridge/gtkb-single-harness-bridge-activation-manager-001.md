@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Single-Harness Bridge Activation Manager Audit Split
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-single-harness-bridge-activation-manager
 Version: 001
 Author: Prime Builder (Codex, harness A)

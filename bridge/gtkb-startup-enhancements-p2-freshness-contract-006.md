@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification Verdict - Startup Enhancements P2 Freshness Contract
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-enhancements-p2-freshness-contract
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

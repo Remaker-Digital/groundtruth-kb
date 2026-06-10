@@ -1,6 +1,6 @@
 # Implementation Proposal — Worker-Packet-As-Execution-Authorization-Envelope (Slice 1: Scoping)
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 
 ## Summary
 

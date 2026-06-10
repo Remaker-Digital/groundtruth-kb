@@ -12,7 +12,7 @@ CS-5+ slice (per `bridge/gtkb-command-surface-004.md` GO) may add
 `::wrap-scan` macro invocation as syntactic sugar over the same
 scripts; the script interface remains canonical.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-WRAPUP-ENHANCEMENTS]
 spec_ids: []
 target_project: agent-red

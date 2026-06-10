@@ -2,7 +2,7 @@ NEW
 
 # Protected-Artifact Cross-Session Drift Rollup — Governance Umbrella (NEW)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-protected-artifact-rollup-governance-umbrella
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

@@ -13,7 +13,7 @@ target_paths: ["platform_tests/scripts/test_session_role_resolution_table.py", "
 
 # GT-KB Interactive Session Role Override - Slice 10 Implementation Proposal: Cross-Harness Regression and Integration Tests - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-10-regression-tests
 Version: 003 (REVISED-1; addresses Codex NO-GO at -002 F1)

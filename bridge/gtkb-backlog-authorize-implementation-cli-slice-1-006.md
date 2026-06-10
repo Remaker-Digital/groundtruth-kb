@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-backlog-authorize-implementation-cli-slice-1
 Version: 006
 Responds to: bridge/gtkb-backlog-authorize-implementation-cli-slice-1-005.md NEW

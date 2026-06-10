@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Defect-Fix Proposal - Repair RC Gate membase-seed step (Path B: resilient handling when CI seed fixture is absent)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-rc-gate-membase-seed-resilient-fixture
 Version: 001 (NEW)
 Date: 2026-05-28 UTC

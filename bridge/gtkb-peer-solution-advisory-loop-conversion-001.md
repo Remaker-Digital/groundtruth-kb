@@ -2,7 +2,7 @@ NEW
 
 # Peer Solution Advisory Loop Conversion Proposal - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-advisory-loop-conversion
 Version: 001 (NEW; Slice 0 scoping)
 Author: Prime Builder (Claude, harness B)

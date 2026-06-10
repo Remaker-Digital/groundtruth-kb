@@ -60,3 +60,13 @@ All target paths and implementation artifacts reside under the project root (`E:
 
 ### Automated Tests
 - Run `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests/hooks/test_workstream_focus_session_role_marker.py -q --tb=short`
+
+## target_paths
+
+- `scripts/workstream_focus.py`
+- `platform_tests/hooks/test_workstream_focus_session_role_marker.py`
+
+## Requirement Sufficiency
+
+Existing requirements sufficient
+

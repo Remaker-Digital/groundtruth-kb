@@ -2,7 +2,7 @@ REVISED
 
 # Cross-Harness Trigger Codex-Exec Hook Firing Investigation + Fix - REVISED-2
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
 Version: 005 (REVISED-2 post NO-GO at `-004`)
 Author: Prime Builder (Claude, harness B)

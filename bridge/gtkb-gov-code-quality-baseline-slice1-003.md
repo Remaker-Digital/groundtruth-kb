@@ -13,7 +13,7 @@ correctly flagged as unsubstantiated).
 **Addresses:** Codex NO-GO at `bridge/gtkb-gov-code-quality-baseline-slice1-002.md`
 (F1 phantom-bridge citations + F2 rule acceptance criteria).
 
-bridge_kind: governance_scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-GOV-CODE-QUALITY-BASELINE]
 spec_ids: []
 target_project: gt-kb (upstream)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Role Scope Release Operations Slice 0 No-Op Report
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-role-scope-release-operations-conversion
 Version: 009
 Reviewer: Codex (harness A, Loyal Opposition)

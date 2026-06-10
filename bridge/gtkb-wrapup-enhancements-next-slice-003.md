@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Wrap-Up Enhancements Next Slice (GTKB-WRAPUP-ENHANCEMENTS)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-wrapup-enhancements-next-slice
 Version: 003
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Prime Supersession Notice - Artifact Recorder CLI Slice 0 Parent
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-artifact-recorder-cli
 Version: 005
 Author: Prime Builder (Codex, harness A)

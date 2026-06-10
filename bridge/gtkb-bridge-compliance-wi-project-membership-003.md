@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Bridge Compliance Gate WI-Project Membership Check - REVISED-1 (WI-3315)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-compliance-wi-project-membership
 Version: 003
 Responds to: bridge/gtkb-bridge-compliance-wi-project-membership-002.md

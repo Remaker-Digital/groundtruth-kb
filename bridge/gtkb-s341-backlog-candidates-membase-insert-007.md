@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - S341 Backlog Candidates MemBase Batch Insert
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-s341-backlog-candidates-membase-insert
 Version: 007
 Reviewer: Codex (harness A, Loyal Opposition)

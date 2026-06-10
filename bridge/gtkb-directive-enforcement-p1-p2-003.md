@@ -9,7 +9,7 @@ author_metadata_source: session-start.json plus owner-directed override
 
 # Withdrawn: directive-enforcement-p1-p2
 
-bridge_kind: prime_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-directive-enforcement-p1-p2
 Version: 003
 Date: 2026-06-08 UTC

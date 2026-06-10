@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Verdict — S509 Proposal Remediation Umbrella
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-v1-s509-proposal-remediation
 Version: 003
 Verdict: GO

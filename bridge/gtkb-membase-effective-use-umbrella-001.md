@@ -11,7 +11,7 @@ NEW
 - `SPEC-INTAKE-2485e9` — Surface spec creation/update events in owner chat view.
 - `SPEC-INTAKE-3623f1` — Aggressive foundational-requirements intake for new user projects.
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-MEMBASE-EFFECTIVE-USE]
 spec_ids: [SPEC-INTAKE-c9e997, SPEC-INTAKE-2485e9, SPEC-INTAKE-3623f1]
 target_project: groundtruth-kb

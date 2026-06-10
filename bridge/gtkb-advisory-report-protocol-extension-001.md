@@ -2,7 +2,7 @@ NEW
 
 # Advisory Report Protocol Extension - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-advisory-report-protocol-extension
 Version: 001 (NEW; Slice 1 — bridge protocol extension)
 Author: Prime Builder (Claude, harness B)

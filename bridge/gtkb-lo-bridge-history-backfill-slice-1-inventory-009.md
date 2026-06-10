@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI on Windows 11, explanatory output st
 
 # Implementation Proposal - LO Bridge History Backfill Slice 1 Inventory
 
-bridge_kind: prime_implementation_proposal
+bridge_kind: prime_proposal
 Project Authorization: PAUTH-PROJECT-GTKB-LO-REPORT-BACKFILL-LO-REPORT-BACKFILL-SLICE-1-INVENTORY-WI-3162
 Project: PROJECT-GTKB-LO-REPORT-BACKFILL
 Work Item: WI-3162

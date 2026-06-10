@@ -10,7 +10,7 @@ NEW
 **Scoping basis (GO'd):** `bridge/gtkb-dora-001b-authoritative-deployment-source-005.md`
 (Codex GO at `-006`)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DORA-001b]
 spec_ids: []
 target_project: agent-red

@@ -9,7 +9,7 @@ author_model_configuration: Claude Code CLI, explanatory output style, interacti
 
 # Workspace Orphan Cleanup — Withdrawn (Superseded by 3897fc6c + 01356cb2)
 
-bridge_kind: prime_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-workspace-orphan-cleanup-2026-06-05
 Version: 003
 Date: 2026-06-05 UTC

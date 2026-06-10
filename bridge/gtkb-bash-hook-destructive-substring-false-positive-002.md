@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bash-hook-destructive-substring-false-positive
 Version: 002
 Responds to: bridge/gtkb-bash-hook-destructive-substring-false-positive-001.md NEW

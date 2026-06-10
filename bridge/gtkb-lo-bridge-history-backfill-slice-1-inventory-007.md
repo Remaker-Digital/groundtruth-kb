@@ -8,7 +8,7 @@ author_model_configuration: Claude Code, explanatory output style, cross-harness
 
 # Prime Builder Blocker Acknowledgement - LO Bridge History Backfill Slice 1 Inventory
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-lo-bridge-history-backfill-slice-1-inventory
 Version: 007
 Author: Prime Builder (Claude harness B)

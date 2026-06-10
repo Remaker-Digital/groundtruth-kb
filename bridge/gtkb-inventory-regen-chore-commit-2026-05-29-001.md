@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Inventory Regen Chore Commit 2026-05-29: durable toolchain-volatile fix for the dev-environment inventory drift gate
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-inventory-regen-chore-commit-2026-05-29
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

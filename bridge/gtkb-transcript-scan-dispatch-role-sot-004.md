@@ -8,7 +8,7 @@ author_model_configuration: Ollama harness shim; route qwen3-coder-next-cloud; s
 
 # Loyal Opposition Bridge Verdict — Dispatch Role SoT Authorization Correction Report
 
-bridge_kind: implementation_authorization_correction_report
+bridge_kind: implementation_report
 Document: gtkb-transcript-scan-dispatch-role-sot
 Version: 004 (NO-GO corrective report; correction required)
 Author: Ollama Loyal Opposition

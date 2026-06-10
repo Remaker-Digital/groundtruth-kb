@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Scheduler with Lanes and Leases Slice 1 Scoping
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-scheduler-lanes-leases-slice-1-scoping
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

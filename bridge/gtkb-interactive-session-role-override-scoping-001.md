@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning, explanatory outpu
 
 # GT-KB Interactive Session Role Override - Architecture-First Scoping
 
-bridge_kind: spec_intake
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-scoping
 Version: 001 (NEW; architecture-first scoping for the interactive-vs-headless role authority split)

@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - GTKB Bridge Skill Unified Slice 1 + Slice 2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-skill-unified-001
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition dispatch mode)

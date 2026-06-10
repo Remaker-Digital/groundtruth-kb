@@ -8,7 +8,7 @@ author_metadata_source: Codex automation session
 
 # Loyal Opposition Verification - Interactive Session Role Override Slice 1 - 007
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer
 Version: 007
 Author: Loyal Opposition (Codex, harness A)

@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-dispatch-owner-approval-forgery-prevention
 Version: 001
 Author: Prime Builder (Opus 4.8, harness B)

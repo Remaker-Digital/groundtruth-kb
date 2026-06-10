@@ -7,7 +7,7 @@ author_model_version: GPT-5 Codex
 author_model_configuration: Codex Desktop; collaboration_mode=Default
 author_metadata_source: Codex desktop session environment
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-auth-requirement-sufficiency-phrase-tolerance
 Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING
 Project: PROJECT-GTKB-RELIABILITY-FIXES

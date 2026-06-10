@@ -2,7 +2,7 @@ NEW
 
 # GT-KB Mass Adoption Bridge Audit Package Proposal
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 implementation_scope: protocol
 target_project: Agent Red as GT-KB dual-agent adopter
 work_item_ids: [GTKB-MASS-001]

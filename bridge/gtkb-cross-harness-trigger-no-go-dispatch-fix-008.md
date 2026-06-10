@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-no-go-dispatch-fix
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

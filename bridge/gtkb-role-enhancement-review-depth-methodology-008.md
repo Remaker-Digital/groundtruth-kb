@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: implementation_verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-review-depth-methodology
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

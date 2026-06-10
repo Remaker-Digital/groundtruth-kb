@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-role-status-orthogonality-dispatch-landing-reconciliation
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

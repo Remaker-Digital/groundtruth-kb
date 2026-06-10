@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Standing Backlog Harvest/Reconciliation Audit Maintenance
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-standing-backlog-harvest-audit-maintenance
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

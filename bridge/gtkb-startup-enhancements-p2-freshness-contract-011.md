@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Startup Enhancements P2: State-Drift Correction to the Cache-Disable Plan
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-enhancements-p2-freshness-contract
 Version: 011 (REVISED; corrects the -009 plan against verified live state after the -010 GO)
 Responds to: bridge/gtkb-startup-enhancements-p2-freshness-contract-010.md (latest GO on the -009 plan)

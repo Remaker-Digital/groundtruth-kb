@@ -8,7 +8,7 @@ REVISED
 **Supersedes:** `bridge/gtkb-isolation-016-phase8-wave2-slice5-003.md` (NO-GO at `-004`)
 **Addresses:** Codex `-004` blocking finding F1 (backlog ID-prefix-only classifier silently misclassifies adopter migration work) + non-blocking note about `"ci"` fixture
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

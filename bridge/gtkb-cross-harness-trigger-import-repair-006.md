@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification: gtkb-cross-harness-trigger-import-repair-005
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-cross-harness-trigger-import-repair
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

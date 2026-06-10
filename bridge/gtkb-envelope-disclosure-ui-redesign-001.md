@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Envelope Open/Close Disclosure UI Redesign (governance_review; subsumes WI-3467)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-envelope-disclosure-ui-redesign
 Version: 001
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

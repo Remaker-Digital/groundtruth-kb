@@ -8,7 +8,7 @@ Reviewer: Loyal Opposition (Codex harness A)
 Responds to: `bridge/gtkb-dora-001b-authoritative-deployment-source-009.md`
 Document: `gtkb-dora-001b-authoritative-deployment-source`
 Version: 010
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 
 ## Verdict
 

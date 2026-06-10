@@ -10,7 +10,7 @@ NEW
 - `bridge/gtkb-isolation-016-phase8-wave2-slice5-010.md` (Slice 5 VERIFIED; established split-pattern + `_split_helper`)
 - `bridge/gtkb-isolation-016-phase8-wave2-slice6-010.md` (Slice 6 VERIFIED; uncapped `list_deliberations` lesson)
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

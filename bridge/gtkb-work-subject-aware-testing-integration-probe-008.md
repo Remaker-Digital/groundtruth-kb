@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-subject-aware-testing-integration-probe
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

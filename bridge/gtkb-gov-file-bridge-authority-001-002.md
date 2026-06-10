@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Verdict — GOV-FILE-BRIDGE-AUTHORITY-001 Formalization
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-file-bridge-authority-001
 Version: 002
 Verdict: GO

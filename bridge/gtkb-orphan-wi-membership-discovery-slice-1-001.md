@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Defect-Fix Proposal - Discover root cause and recoverability of 58 orphan open WIs lacking project membership (Slice 1: discovery only)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-orphan-wi-membership-discovery-slice-1
 Version: 001 (NEW)
 Date: 2026-05-27 UTC

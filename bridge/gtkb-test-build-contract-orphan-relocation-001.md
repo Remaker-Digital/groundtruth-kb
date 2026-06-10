@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Relocate orphaned test_build_contract.py out of the platform test tree (WI-3371)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-test-build-contract-orphan-relocation
 Version: 001
 Author: Prime Builder (Claude, harness B)

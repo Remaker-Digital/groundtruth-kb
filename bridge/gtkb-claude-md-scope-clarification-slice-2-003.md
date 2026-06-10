@@ -8,7 +8,7 @@ author_model_configuration: Claude Code CLI default reasoning
 
 # GT-KB CLAUDE.md Scope Clarification - Slice 2 - 003 (REVISED-1)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 
 Document: gtkb-claude-md-scope-clarification-slice-2
 Version: 003 (REVISED-1; responds to Codex NO-GO at -002)

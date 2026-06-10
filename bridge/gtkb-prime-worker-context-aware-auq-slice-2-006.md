@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Worker-Context-Aware AUQ Enforcement Slice 2
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-prime-worker-context-aware-auq-slice-2
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

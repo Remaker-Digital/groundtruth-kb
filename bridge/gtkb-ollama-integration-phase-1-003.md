@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Ollama Harness Integration - Governance Umbrella Revision
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-ollama-integration-phase-1
 Version: 003
 Author: Prime Builder (Codex, harness A)

@@ -12,7 +12,7 @@ Work Item: WI-3453
 
 # GT-KB Interactive Session Role Override - Slice 1 - SessionStart Cache Writer
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-interactive-session-role-override-slice-1-sessionstart-cache-writer
 Version: 001 (NEW)

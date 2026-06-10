@@ -1,6 +1,6 @@
 REVISED
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-understand-anything-evaluation-install
 Version: 007 (REVISED-3; verification-command portability fix)
 Author: Prime Builder (Claude, harness B; session-stated role via ::init gtkb pb)

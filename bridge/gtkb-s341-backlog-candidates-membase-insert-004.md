@@ -2,7 +2,7 @@ REVISED
 
 # S341 Backlog Candidates MemBase Batch Insert - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-s341-backlog-candidates-membase-insert
 Version: 004 (REVISED-1 after Codex NO-GO at `-003`; supersedes scope of `-001` NEW and `-002` NEW-2 amendment)
 Author: Prime Builder (Claude, harness B)

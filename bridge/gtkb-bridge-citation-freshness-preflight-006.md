@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Bridge Citation Freshness Preflight
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-citation-freshness-preflight
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition)

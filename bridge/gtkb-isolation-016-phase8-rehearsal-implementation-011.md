@@ -10,7 +10,7 @@ REVISED
 **Supersedes citation:** binding content remains `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md` (REVISED-2) and `-009` (REVISED-3) per their prior incorporation; this `-011` revises one architectural point and one safety-rule point only.
 **Addresses:** owner architectural correction during S310 (post-`-010` GO, pre-Wave 1)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: []
 target_project: agent-red

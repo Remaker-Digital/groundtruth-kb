@@ -2,7 +2,7 @@ NEW
 
 # GTKB-ISOLATION-005 Dashboard Control Plane Plan Review Request
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-005]
 target_paths: ["independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-005-PHASE5-DASHBOARD-CONTROL-PLANE-PLAN-2026-04-23.md", "memory/work_list.md"]

@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-gov-proposal-standards-slice1
 Version: 025
 Author: Loyal Opposition (Codex, harness A)

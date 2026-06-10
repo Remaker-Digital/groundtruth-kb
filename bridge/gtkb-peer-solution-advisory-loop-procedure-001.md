@@ -2,7 +2,7 @@ NEW
 
 # Peer Solution Advisory Loop Procedure - NEW
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-peer-solution-advisory-loop-procedure
 Version: 001 (NEW; Slice 1 — procedure artifact filing)
 Author: Prime Builder (Claude, harness B)

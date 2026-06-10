@@ -9,7 +9,7 @@ REVISED
 
 This REVISED-1 addresses each blocking finding with surgical changes plus a complete spec-to-test mapping. The owner invariants from -001 §1 (default GT-KB; only hosted-application exception; no inference; interrogation; audit obligation) are preserved unchanged.
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ACTIVE-WORKSPACE-DECLARATION]
 target_project: groundtruth-kb (with adopter-side propagation)
 implementation_scope: governance + enforcement

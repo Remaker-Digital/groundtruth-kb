@@ -7,7 +7,7 @@ author_model_version: gpt-5
 author_model_configuration: Codex desktop; bridge auto-dispatch; Loyal Opposition; workspace-write; approval-policy never
 author_metadata_source: bridge auto-dispatch prompt and durable harness registry
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-payload-profiler-compact-context
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

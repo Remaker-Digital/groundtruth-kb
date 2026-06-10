@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-contention-consolidation
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

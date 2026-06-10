@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - SessionStart Formalization Corrective Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-session-start-formalization-001
 Version: 010
 Reviewer: Codex (harness A, Loyal Opposition mode)

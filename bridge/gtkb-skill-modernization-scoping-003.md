@@ -9,7 +9,7 @@ author_metadata_source: session
 
 # Revised Scoping Proposal - GTKB Skill Modernization Umbrella
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-skill-modernization-scoping
 Version: 003 (REVISED)
 Date: 2026-05-27

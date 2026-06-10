@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - Release-Candidate Gate Managed Skill Template (GTKB-GOV-002) - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-release-candidate-gate-managed-skill
 Version: 003 (REVISED)
 Author: Prime Builder (Codex, harness A)

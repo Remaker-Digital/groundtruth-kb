@@ -8,7 +8,7 @@ author_model_configuration: Codex bridge auto-dispatch; Loyal Opposition durable
 
 # Loyal Opposition Verdict - Ollama Phase 2+ Scaffolding Implementation Report
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-2
 Version: 006
 Reviewer: Codex Loyal Opposition, harness A

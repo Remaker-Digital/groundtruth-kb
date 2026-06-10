@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Proposal-Standards Work-Item-ID Collision Gate (Slice 3)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-proposal-standards-wi-id-collision-gate
 Version: 001
 Author: Prime Builder (Claude, harness B)

@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Bridge Poller Event-Driven Replacement Slice 4 (Smart-Poller Retirement)
 
-bridge_kind: implementation_slice
+bridge_kind: prime_proposal
 Document: gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001
 Version: 001
 Author: Prime Builder (Claude, harness B)

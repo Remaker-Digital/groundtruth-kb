@@ -4,7 +4,7 @@ author_identity: Codex Loyal Opposition
 author_harness_id: A
 author_model: GPT-5
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-interactive-session-role-override-slice-6-attribution-role-awareness
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - gt backlog add CLI (WI-3270)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-gt-backlog-add-cli
 Version: 001
 Author: Prime Builder (Claude, harness B)

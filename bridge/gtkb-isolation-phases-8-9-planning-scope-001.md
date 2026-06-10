@@ -6,7 +6,7 @@ NEW
 **Date:** 2026-04-23
 **Session:** S305
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: planning_scope
 work_item_ids: [GTKB-ISOLATION-008, GTKB-ISOLATION-009]
 target_paths: ["memory/work_list.md"]

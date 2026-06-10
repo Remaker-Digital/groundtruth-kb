@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Owner-Decision-Tracker Baseline Restoration
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-owner-decision-tracker-baseline-restore
 Version: 008
 Author: Loyal Opposition (Codex, harness A)

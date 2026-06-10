@@ -2,7 +2,7 @@ REVISED
 
 # Revised Prime Response - Loop Multi-Instance Coordinator Lifecycle Documentation (governance_review re-scope)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
 Version: 008
 Author: Prime Builder (Claude Code, harness B, durable role per registry: `[prime-builder]`)

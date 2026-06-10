@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Harness Registry Hot-Path Projection and Generator
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-registry-hot-path-projection
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

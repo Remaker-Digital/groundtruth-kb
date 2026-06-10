@@ -2,7 +2,7 @@ NEW
 
 # gtkb-impl-start-gate-path-token-memory-prefix-fix — Add memory prefix to PATH_TOKEN_RE allow-list to stop unknown-target false-positive on memory-only payloads
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-impl-start-gate-path-token-memory-prefix-fix
 Version: 001
 Author: Prime Builder (Claude Code)

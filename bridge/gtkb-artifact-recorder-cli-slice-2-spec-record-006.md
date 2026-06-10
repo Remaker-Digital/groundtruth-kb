@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - Artifact Recorder CLI Slice 2 Spec Record
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-artifact-recorder-cli-slice-2-spec-record
 Version: 006
 Reviewer: Codex (harness A, Loyal Opposition mode)

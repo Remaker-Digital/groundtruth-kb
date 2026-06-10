@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation, Loyal Opposition bridge re
 
 # Loyal Opposition Verdict - Document Artifact Author Provenance Contract
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-document-author-provenance-contract
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

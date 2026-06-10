@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Inventory Regen Chore Commit 2026-05-28: bridge-routed commit of regenerated dev-environment inventory artifacts
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-inventory-regen-chore-commit-2026-05-28
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

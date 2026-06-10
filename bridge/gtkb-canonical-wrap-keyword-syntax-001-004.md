@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-canonical-wrap-keyword-syntax-001
 Version: 004
 Author: Loyal Opposition (Antigravity, harness C)

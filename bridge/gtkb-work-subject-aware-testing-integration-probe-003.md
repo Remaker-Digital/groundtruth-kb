@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Defect-Fix Proposal REVISED-1 - Work-subject-aware testing/tool integration probe
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-subject-aware-testing-integration-probe
 Version: 003 (REVISED-1)
 Reviewed-against: bridge/gtkb-work-subject-aware-testing-integration-probe-002.md (NO-GO)

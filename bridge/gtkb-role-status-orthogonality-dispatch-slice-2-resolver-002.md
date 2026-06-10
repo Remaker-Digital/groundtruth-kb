@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-status-orthogonality-dispatch-slice-2-resolver
 Version: 002
 Responds to: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-001.md NEW

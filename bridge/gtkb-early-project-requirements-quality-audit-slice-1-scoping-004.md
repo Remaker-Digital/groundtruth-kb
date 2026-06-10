@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Early Project Requirements Quality Audit Slice 1 REVISED-1
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-early-project-requirements-quality-audit-slice-1-scoping
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

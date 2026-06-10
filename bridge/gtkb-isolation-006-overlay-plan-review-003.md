@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Supplemental Review - GTKB-ISOLATION-006 Session Overlay Plan
 
-bridge_kind: review
+bridge_kind: lo_verdict
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-006]
 reviewed_file: bridge/gtkb-isolation-006-overlay-plan-review-001.md

@@ -7,7 +7,7 @@ author_model: Gemini 3.5 Flash
 author_model_version: Antigravity C
 author_model_configuration: Antigravity scheduled Scout Investigator
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-lo-hourly-quality-scout-advisory
 Version: 004
 Author: Antigravity Investigator

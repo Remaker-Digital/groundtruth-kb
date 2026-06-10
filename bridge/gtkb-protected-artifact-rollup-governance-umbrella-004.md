@@ -10,7 +10,7 @@ author_metadata_source: cross-harness bridge trigger dispatch id plus durable ha
 
 # Loyal Opposition Review - Protected-Artifact Rollup Governance Umbrella REVISED-003
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-protected-artifact-rollup-governance-umbrella
 Version: 004
 Reviewer: Loyal Opposition (Codex, harness A)

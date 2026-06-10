@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-major-release-content-goal-gov
 Version: 002
 Responds to: bridge/gtkb-major-release-content-goal-gov-001.md NEW

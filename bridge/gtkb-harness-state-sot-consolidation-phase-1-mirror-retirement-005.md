@@ -2,7 +2,7 @@ REVISED
 
 # Phase-1 Mirror-Retirement REVISED-2 — bundle DCL-HARNESS-STATE-SOT-ASSERTION-001 v2 correction (owner-authorized) + 5-surface deletion; verification mapped to the corrected live assertions
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement
 Version: 005
 Author: Prime Builder (Claude Code, harness B)

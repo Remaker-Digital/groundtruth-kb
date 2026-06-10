@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Revised Implementation Proposal - Bridge Work-Intent Registry Integration (PAUTH Swap to PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY v3)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-work-intent-registry-prime-write-integration
 Version: 011 (REVISED; addresses NO-GO -010 finding P1-001)
 Responds to NO-GO: bridge/gtkb-work-intent-registry-prime-write-integration-010.md

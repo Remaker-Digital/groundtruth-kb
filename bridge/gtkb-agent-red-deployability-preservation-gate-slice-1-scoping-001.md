@@ -1,6 +1,6 @@
 # Implementation Proposal - Agent Red Deployability and Maintainability Preservation Gate (Slice 1: Scoping)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-agent-red-deployability-preservation-gate-slice-1-scoping
 Version: 001
 Status: NEW

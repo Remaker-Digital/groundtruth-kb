@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-index-role-sentinel-stale-reconciliation
 Version: 002
 Responds to: bridge/gtkb-index-role-sentinel-stale-reconciliation-001.md NEW

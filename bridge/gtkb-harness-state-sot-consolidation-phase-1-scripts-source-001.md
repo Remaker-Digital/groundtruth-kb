@@ -2,7 +2,7 @@ NEW
 
 # Phase-1 Scripts-Source: migrate 5 remaining direct harness-state readers to canonical entrypoint + audit configs/Codex/packet-builders
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-harness-state-sot-consolidation-phase-1-scripts-source
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

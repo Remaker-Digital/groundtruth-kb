@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - project-VERIFIED-completion scanner Work Item regex rejects spec-intake WI-AUTO-* ids (WI-3335)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-completion-scanner-wi-auto-regex-fix
 Version: 001
 Author: Prime Builder (Claude, harness B)

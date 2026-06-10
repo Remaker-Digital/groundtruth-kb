@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-bridge-backlog-reconciliation-audit-cli
 Version: 002
 Responds to: bridge/gtkb-bridge-backlog-reconciliation-audit-cli-001.md MD

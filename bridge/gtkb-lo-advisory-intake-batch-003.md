@@ -8,7 +8,7 @@ author_model_configuration: Codex Desktop default reasoning
 
 # Implementation Proposal - LO Advisory Intake Inventory (WI-3296..WI-3307) - REVISED-1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-lo-advisory-intake-batch
 Version: 003 (REVISED)
 Author: Prime Builder (Codex, harness A)

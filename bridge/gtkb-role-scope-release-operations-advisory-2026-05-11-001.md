@@ -7,7 +7,7 @@ operations responsibilities implicit now that GT-KB has settled on two durable
 agent operating roles.
 Author: Codex Loyal Opposition
 Date: 2026-05-11
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 
 ## Bridge Delivery Note
 

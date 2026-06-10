@@ -2,7 +2,7 @@ NEW
 
 # Repair Cross-Harness Bridge Trigger: ModuleNotFoundError Import Defect and Stale Active-Session Lock Cleanup (WI-3360)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-cross-harness-trigger-import-repair
 Version: 001 (NEW; reliability fast-lane defect fix; split-off from gtkb-bridge-active-session-autodrain per NO-GO F2)
 Author: Prime Builder (Claude, harness B)

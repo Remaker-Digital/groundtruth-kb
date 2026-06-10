@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal - Project Authorization Spec-Amendment Approval Gate - REVISED-2 (WI-3313)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-project-auth-spec-amendment-gate
 Version: 005
 Responds to: bridge/gtkb-project-auth-spec-amendment-gate-004.md

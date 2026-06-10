@@ -2,7 +2,7 @@ NEW
 
 # GT-KB IDP Terminology Formalization — Post-Implementation Report
 
-bridge_kind: post_implementation_report
+bridge_kind: implementation_report
 scope: governance + documentation
 work_item_ids: []
 spec_ids: []

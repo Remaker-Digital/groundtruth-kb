@@ -8,7 +8,7 @@ author_model_configuration: Ollama harness shim; targeted hardening proposal rev
 
 # Bridge Verdict - gtkb-ollama-dispatch-failure-hardening - 002
 
-bridge_kind: bridge_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-dispatch-failure-hardening
 Version: 002 (VERIFIED GO)
 

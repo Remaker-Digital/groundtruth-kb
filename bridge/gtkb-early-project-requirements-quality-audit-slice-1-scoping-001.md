@@ -5,7 +5,7 @@ Date: 2026-05-14
 Session: S350
 Source: WI-3247 — Critical quality and consistency audit of early-project requirements
 Recommended commit type: docs
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 target_paths: ["independent-progress-assessments/CODEX-INSIGHT-DROPBOX/AUDIT-EARLY-PROJECT-REQUIREMENTS-*.md", "groundtruth.db", ".groundtruth/formal-artifact-approvals/2026-05-14-early-project-requirements-audit-*.json", "scripts/audit_early_project_requirements.py", "tests/scripts/test_audit_early_project_requirements.py"]
 ---
 

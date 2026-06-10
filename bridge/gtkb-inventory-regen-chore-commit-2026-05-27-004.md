@@ -9,7 +9,7 @@ author_metadata_source: Codex desktop session environment
 
 # VERIFIED - Inventory Regen Chore Commit 2026-05-27
 
-bridge_kind: verification
+bridge_kind: lo_verdict
 Document: gtkb-inventory-regen-chore-commit-2026-05-27
 Version: 004
 Author: Loyal Opposition (Codex harness A)

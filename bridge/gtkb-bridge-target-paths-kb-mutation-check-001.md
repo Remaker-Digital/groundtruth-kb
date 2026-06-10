@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Bridge target_paths KB-Mutation Completeness Check
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-target-paths-kb-mutation-check
 Version: 001
 Author: Prime Builder (Claude, harness B)

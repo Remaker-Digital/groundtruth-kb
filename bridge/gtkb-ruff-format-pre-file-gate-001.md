@@ -14,7 +14,7 @@ Implements: WI-3473
 
 # Implementation Proposal - Catch `ruff format --check` pre-file: guardrail + bridge-skill checklist (WI-3473)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-ruff-format-pre-file-gate
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

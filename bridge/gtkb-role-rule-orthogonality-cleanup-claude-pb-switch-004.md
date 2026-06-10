@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-rule-orthogonality-cleanup-claude-pb-switch
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

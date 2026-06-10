@@ -33,10 +33,10 @@ import importlib
 import re
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 # --- Fix-class taxonomy -----------------------------------------------------
 

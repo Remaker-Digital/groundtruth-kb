@@ -8,7 +8,7 @@ author_model_configuration: Codex bridge auto-dispatch; durable Loyal Opposition
 
 # Loyal Opposition Verification - Ollama Phase 2 Role Promotion Revision
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-2-role-promotion
 Version: 012
 Reviewer: Codex Loyal Opposition, harness A

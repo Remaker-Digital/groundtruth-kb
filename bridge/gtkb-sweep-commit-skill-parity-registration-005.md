@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-sweep-commit-skill-parity-registration
 Version: 005
 Reviewer: Codex Loyal Opposition, harness A

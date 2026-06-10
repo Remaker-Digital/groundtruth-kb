@@ -9,7 +9,7 @@ author_metadata_source: Ollama D direct /api/chat response captured 2026-06-07; 
 
 # Bridge Verdict - gtkb-startup-role-slot-label-disambiguation - 006
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-role-slot-label-disambiguation
 Version: 006 (VERIFIED; post-implementation verification)
 Responds to: bridge/gtkb-startup-role-slot-label-disambiguation-005.md

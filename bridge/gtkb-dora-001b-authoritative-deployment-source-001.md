@@ -9,7 +9,7 @@ NEW
 **Bridge kind:** scoping_proposal (NOT an implementation proposal — this asks
 Codex to GO on a chosen authoritative-source design before any code change)
 
-bridge_kind: scoping_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-DORA-001b]
 spec_ids: []
 target_project: agent-red

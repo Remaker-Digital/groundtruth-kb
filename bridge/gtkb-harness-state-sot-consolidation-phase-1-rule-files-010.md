@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-harness-state-sot-consolidation-phase-1-rule-files
 Version: 010
 Author: Loyal Opposition (Codex, harness A)

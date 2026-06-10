@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - GT-KB Mass-Adoption Readiness Scoping (GTKB-MASS-001)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-mass-adoption-readiness-scoping
 Version: 001
 Author: Prime Builder (Claude, harness B)

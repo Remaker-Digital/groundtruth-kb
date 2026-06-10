@@ -2,7 +2,7 @@ NEW
 
 # Implementation Report - Bridge Compliance Gate Project Metadata Requirement - REVISED-1 (WI-3314)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-compliance-project-metadata
 Version: 011
 Responds to: bridge/gtkb-bridge-compliance-project-metadata-010.md

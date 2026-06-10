@@ -28,26 +28,22 @@ To resolve LO review findings regarding the fire-and-forget process model and su
 - `REQ-HARNESS-REGISTRY-001` — Harness registration and metadata tracking rules.
 - `DELIB-S509-B1-B5-TRIAGE` — S509 triage deliberation.
 
-## 2. Implementation Scope
+## Implementation Scope
 
 - **Project:** `PROJECT-GTKB-PLATFORM-CORE`
-- **Work Item:** `WI-4328` (or dispatch recovery WI)
-- **Requirement Sufficiency:** Existing requirements sufficient
-- **target_paths:**
-  - `scripts/cross_harness_bridge_trigger.py`
-  - `scripts/run_with_status.py` [NEW]
-  - `tests/framework/test_dispatch_state_recovery.py` [NEW]
+- **Work Item:** `WI-4328`
 
-All target paths reside under the project root (`E:\\GT-KB`), satisfying the in-root requirement of `ADR-ISOLATION-APPLICATION-PLACEMENT-001`.
+## target_paths
 
-## 3. Requirement Sufficiency
+- `scripts/cross_harness_bridge_trigger.py`
+- `scripts/run_with_status.py`
+- `tests/framework/test_dispatch_state_recovery.py`
 
-| Requirement | Source | Satisfied By | Test Coverage |
-|-------------|--------|--------------|---------------|
-| SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 | `bridge/INDEX.md` | `scripts/cross_harness_bridge_trigger.py` | `tests/framework/test_dispatch_state_recovery.py` |
-| REQ-HARNESS-REGISTRY-001 | `bridge/INDEX.md` | `scripts/run_with_status.py` | `tests/framework/test_dispatch_state_recovery.py` |
+## Requirement Sufficiency
 
-## 4. Deliverables
+Existing requirements sufficient
+
+## Deliverables
 
 ### 4.1 Process Execution Wrapper (`scripts/run_with_status.py`) [NEW]
 A lightweight wrapper invoked as:
@@ -67,7 +63,7 @@ It runs the subprocess, intercepts its exit code, writes it to `<status_file_pat
 ### 4.3 Test Suite (`tests/framework/test_dispatch_state_recovery.py`) [NEW]
 Tests dry-runs, wrapper status recording, failure counting, retry timing constraints, and circuit breaker tripping/reset.
 
-## 5. Specification-Derived Verification Plan
+## Specification-Derived Verification Plan
 
 ### Automated Tests
 Run the trigger recovery test suite:

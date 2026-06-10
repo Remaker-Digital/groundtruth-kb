@@ -12,7 +12,7 @@ author_session_context_id: 64373424-797b-4404-9825-4dcd7f843d0c
 author_model: Gemini 3.5 Flash
 author_model_version: gemini-3.5-flash
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: gtkb-startup-refractor-slice-e-lo-startup-text-authority
 Version: 002
 Responds-To: `bridge/gtkb-startup-refractor-slice-e-lo-startup-text-authority-001.md` (NEW proposal)

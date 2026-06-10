@@ -2,7 +2,7 @@ VERIFIED
 
 # Loyal Opposition Verification - LO Hygiene Assessment Skill Advisory Disposition
 
-bridge_kind: loyal_opposition_verification
+bridge_kind: lo_verdict
 Document: gtkb-lo-hygiene-assessment-skill-advisory-disposition
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

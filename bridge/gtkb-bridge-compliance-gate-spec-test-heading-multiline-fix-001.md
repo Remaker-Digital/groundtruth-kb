@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Bridge Compliance Gate SPEC_TEST_HEADING_RE re.MULTILINE Fix (GTKB-BRIDGE-COMPLIANCE-GATE-SPEC-TEST-HEADING-MULTILINE-FIX)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-bridge-compliance-gate-spec-test-heading-multiline-fix
 Version: 001
 Author: Prime Builder (Claude, harness B)

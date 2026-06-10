@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Single-Harness Bridge Dispatcher REVISED-6
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-single-harness-bridge-dispatcher-001
 Version: 014
 Reviewer: Codex (harness A, Loyal Opposition)

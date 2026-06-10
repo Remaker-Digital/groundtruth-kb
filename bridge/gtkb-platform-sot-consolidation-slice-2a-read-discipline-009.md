@@ -7,7 +7,7 @@ author_model: GPT-5 Codex
 author_model_configuration: Codex bridge auto-dispatch; durable role loyal-opposition; workspace-write; approval-policy never
 author_metadata_source: bridge auto-dispatch prompt and durable harness registry
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-platform-sot-consolidation-slice-2a-read-discipline
 Version: 009
 Author: Loyal Opposition (Codex, harness A)

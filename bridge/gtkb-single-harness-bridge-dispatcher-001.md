@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Single-Harness Bridge Dispatcher (Architectural Plan + Slice 1 Governance Scaffolding)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-single-harness-bridge-dispatcher-001
 Version: 001
 Author: Prime Builder (Claude, harness B)

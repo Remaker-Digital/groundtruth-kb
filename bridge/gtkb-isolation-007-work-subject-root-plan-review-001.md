@@ -2,7 +2,7 @@ NEW
 
 # GTKB-ISOLATION-007 Work Subject And Root Enforcement Plan Review Request
 
-bridge_kind: proposal
+bridge_kind: prime_proposal
 scope: protocol
 work_item_ids: [GTKB-ISOLATION-007]
 target_paths: ["independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-007-PHASE7-WORK-SUBJECT-ROOT-ENFORCEMENT-PLAN-2026-04-23.md", "bridge/gtkb-session-work-subject-003.md", "bridge/gtkb-session-work-subject-004.md", "memory/work_list.md"]

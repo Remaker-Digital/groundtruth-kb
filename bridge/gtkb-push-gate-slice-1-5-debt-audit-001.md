@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # PROJECT-GTKB-PUSH-GATE Slice 1.5: debt-discovery audit-only mode (minimum-viable inventory)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-push-gate-slice-1-5-debt-audit
 Version: 001 (NEW)
 Author: Prime Builder (Claude Code, harness B)

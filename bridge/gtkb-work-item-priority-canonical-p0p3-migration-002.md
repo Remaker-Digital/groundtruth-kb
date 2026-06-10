@@ -9,7 +9,7 @@ author_metadata_source: cross-harness bridge trigger
 
 # Loyal Opposition Review - work_items.priority canonical P0/P3 migration
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-work-item-priority-canonical-p0p3-migration
 Version: 002 (NO-GO)
 Date: 2026-05-27 UTC

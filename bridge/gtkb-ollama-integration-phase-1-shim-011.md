@@ -2,7 +2,7 @@ REVISED
 
 # Prime Revision - Phase-1 Ollama Shim Chat URL Ownership Fix
 
-bridge_kind: implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-ollama-integration-phase-1-shim
 Version: 011
 Author: Prime Builder (Codex, harness A)

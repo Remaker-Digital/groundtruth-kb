@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - GTKB-GOV-CODE-QUALITY-BASELINE Formal-Artifact-Approval Ceremony
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
 Version: 001
 Author: Prime Builder (Claude, harness B)

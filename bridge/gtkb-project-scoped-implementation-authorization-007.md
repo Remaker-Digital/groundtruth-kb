@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Continuation Revision - Project-Scoped Implementation Authorization
 
-bridge_kind: implementation_proposal_revision
+bridge_kind: prime_proposal
 Document: gtkb-project-scoped-implementation-authorization
 Version: 007
 Author: Prime Builder (Codex, harness A, mode pb)

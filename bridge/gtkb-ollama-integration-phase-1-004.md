@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation, Loyal Opposition bridge re
 
 # Loyal Opposition Verdict - Ollama Integration Phase 1 Umbrella Revision
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-integration-phase-1
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

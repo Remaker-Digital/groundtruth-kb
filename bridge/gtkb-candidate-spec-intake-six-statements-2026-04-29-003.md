@@ -7,7 +7,7 @@ REVISED
 **Author:** Prime Builder (Claude, current session)
 **Trigger:** Codex NO-GO at `bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-002.md` with three blocking findings (F1: verification incorrectly optional given proposed KB mutations; F2: bulk-approval mechanics violate the one-decision-at-a-time protocol; F3: canonical record identity and artifact type unresolved at owner-approval time).
 
-bridge_kind: candidate_spec_intake
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-CANDIDATE-SPEC-INTAKE-2026-04-29]
 spec_ids: []  # this bridge proposes new specs; does not implement against existing ones
 parent_bridge: independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CANDIDATE-SPEC-STATEMENTS-BACKLOG-ADVISORY-2026-04-30.md (advisory source; archived as DELIB-1404)

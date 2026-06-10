@@ -2,7 +2,7 @@ NEW
 
 # Slice 1: Governance Foundation — 3 new specs + registry mechanism + doctor check (covers umbrella's full Slice 1 scope)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-platform-sot-consolidation-slice-1-governance-foundation
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

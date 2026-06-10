@@ -2,7 +2,7 @@ NO-GO
 
 # Loyal Opposition Verification - Loop Multi-Instance Coordinator Design Closeout
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-loop-multi-instance-coordinator-design-slice-1
 Version: 005
 Author: Loyal Opposition (Codex, harness A)

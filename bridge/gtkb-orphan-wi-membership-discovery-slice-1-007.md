@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Post-Implementation Report (REVISED) - Orphan WI Membership Discovery Slice 1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-orphan-wi-membership-discovery-slice-1
 Version: 007 (REVISED post-impl report)
 Responds-To: bridge/gtkb-orphan-wi-membership-discovery-slice-1-006.md (Codex NO-GO)

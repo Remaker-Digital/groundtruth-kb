@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-auth-parser-false-positive-fix
 Version: 006
 Author: Codex Loyal Opposition, harness A

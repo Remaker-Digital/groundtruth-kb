@@ -9,7 +9,7 @@ author_model_configuration: Codex desktop automation Prime Builder; workspace E:
 
 # Ollama Qwen Full Loyal Opposition Route - Withdrawn As Superseded
 
-bridge_kind: prime_withdrawal
+bridge_kind: lo_verdict
 Document: gtkb-ollama-qwen-full-lo-route
 Version: 003
 Date: 2026-06-06 UTC

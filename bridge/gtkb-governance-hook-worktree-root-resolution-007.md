@@ -2,7 +2,7 @@ NEW
 
 # Post-Implementation Report - Worktree cwd / Project-Root Resolution in Bridge Governance Hooks (WI-3353)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-governance-hook-worktree-root-resolution
 Version: 007
 Author: Prime Builder (Claude, harness B)

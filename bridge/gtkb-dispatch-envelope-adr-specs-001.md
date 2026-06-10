@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-dispatch-envelope-adr-specs
 Version: 001
 Project: PROJECT-GTKB-DISPATCH-ENVELOPES

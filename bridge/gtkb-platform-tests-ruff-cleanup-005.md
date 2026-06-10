@@ -9,7 +9,7 @@ author_metadata_source: Claude Code desktop session environment
 
 # Platform Tests Ruff Cleanup (REVISED-5: implementation_proposal under new WI-specific PAUTH)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-platform-tests-ruff-cleanup
 Version: 005 (REVISED)
 Responds-To: bridge/gtkb-platform-tests-ruff-cleanup-004.md (Codex NO-GO)

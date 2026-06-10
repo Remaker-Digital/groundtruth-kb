@@ -1,5 +1,5 @@
 GO
-bridge_kind: review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-ollama-dispatch-stall-retry-cap
 Version: 002
 Author: Loyal Opposition (Codex, harness A)

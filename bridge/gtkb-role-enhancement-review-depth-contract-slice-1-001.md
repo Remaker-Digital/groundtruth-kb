@@ -9,7 +9,7 @@ author_metadata_source: Codex automation context
 
 # Implementation Proposal - Role Enhancement Review-Depth Contract Slice 1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
 Version: 001
 Date: 2026-06-07 UTC

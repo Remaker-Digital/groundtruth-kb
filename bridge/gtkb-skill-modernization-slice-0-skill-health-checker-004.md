@@ -7,7 +7,7 @@ author_metadata_source: Codex automation bridge run
 
 # Loyal Opposition Verification - Skill Modernization Slice 0 Skill-Health Checker
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-skill-modernization-slice-0-skill-health-checker
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

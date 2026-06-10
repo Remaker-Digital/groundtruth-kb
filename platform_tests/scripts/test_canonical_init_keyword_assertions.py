@@ -110,9 +110,7 @@ def test_claude_strict_drop_writes_dispatch_failures_jsonl() -> None:
     assert "dispatch-failures.jsonl" in src, (
         "SessionStart core missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
     )
-    assert "_audit_log_misdirected_dispatch" in src, (
-        "SessionStart core missing _audit_log_misdirected_dispatch helper."
-    )
+    assert "_audit_log_misdirected_dispatch" in src, "SessionStart core missing _audit_log_misdirected_dispatch helper."
     assert "STRICT_DROP" in src and "_audit_log_misdirected_dispatch(" in src
 
 
@@ -122,9 +120,7 @@ def test_codex_strict_drop_writes_dispatch_failures_jsonl() -> None:
     assert "dispatch-failures.jsonl" in src, (
         "SessionStart core missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
     )
-    assert "_audit_log_misdirected_dispatch" in src, (
-        "SessionStart core missing _audit_log_misdirected_dispatch helper."
-    )
+    assert "_audit_log_misdirected_dispatch" in src, "SessionStart core missing _audit_log_misdirected_dispatch helper."
     assert "STRICT_DROP" in src and "_audit_log_misdirected_dispatch(" in src
 
 
@@ -226,9 +222,7 @@ def test_keyword_env_var_name_parity() -> None:
     trigger_src = _read(TRIGGER_PATH)
     core_src = _read(CORE_PATH)
     env_name = "GTKB_BRIDGE_DISPATCH_KEYWORD"
-    assert env_name in trigger_src, (
-        f"Trigger does not emit env var {env_name!r}; receiver would see no keyword."
-    )
+    assert env_name in trigger_src, f"Trigger does not emit env var {env_name!r}; receiver would see no keyword."
     assert env_name in core_src, (
         f"SessionStart core does not read env var {env_name!r}; receiver keyword check would no-op."
     )

@@ -6,7 +6,7 @@ author_model: Codex
 author_model_version: GPT-5
 author_model_configuration: Codex Desktop default reasoning
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-impl-report-bridge-structural-validation-mtime
 Version: 006
 Author: Loyal Opposition (Codex, harness A)

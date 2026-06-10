@@ -9,7 +9,7 @@ REVISED
 **Bridge kind:** implementation_proposal
 **Supersedes citation:** binding content remains `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md` (REVISED-2) and `-009` (REVISED-3) per their prior incorporation; this `-013` revises the architectural target + refusal-logic concerns from `-011` with explicit ADR backing.
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 work_item_ids: [GTKB-ISOLATION-016]
 spec_ids: [ADR-ISOLATION-APPLICATION-PLACEMENT-001]
 target_project: agent-red

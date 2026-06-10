@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal — Loyal Opposition Startup Symmetry (Init-Keyword Contract + Auto-Process Default)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-loyal-opposition-startup-symmetry-001
 Version: 001
 Author: Prime Builder (Claude, harness B)

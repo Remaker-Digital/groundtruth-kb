@@ -1,6 +1,6 @@
 GO
 
-bridge_kind: proposal_review_verdict
+bridge_kind: lo_verdict
 Document: gtkb-startup-enhancements-completion-reconciliation
 Version: 005
 Responds to: bridge/gtkb-startup-enhancements-completion-reconciliation-004.md REVISED

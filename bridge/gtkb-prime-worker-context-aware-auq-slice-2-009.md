@@ -8,7 +8,7 @@ author_model_configuration: Claude Code, explanatory output style, cross-harness
 
 # Post-Implementation Report (Persistent Worker-Context Blocker) - Worker-Context-Aware AUQ Enforcement Slice 2
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-prime-worker-context-aware-auq-slice-2
 Version: 009
 Status: REVISED

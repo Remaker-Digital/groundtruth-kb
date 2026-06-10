@@ -2,7 +2,7 @@ REVISED
 
 # Revised Post-Implementation Report - GTKB Bridge Skill Unified Slice 1 + Slice 2
 
-bridge_kind: post_implementation_report_revision
+bridge_kind: implementation_report
 Document: gtkb-bridge-skill-unified-001
 Version: 005
 Author: Prime Builder (Codex, harness A)

@@ -9,7 +9,7 @@ author_metadata_source: explicit Codex proposal metadata
 
 # Implementation Proposal - DEFERRED Implementation-Start Parser Follow-Up
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-deferred-authority-implementation-start-parser-followup
 Version: 001
 Recommended commit type: `fix:`

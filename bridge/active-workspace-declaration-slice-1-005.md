@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal REVISED-2 - Active-Workspace Declaration Slice 1
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: active-workspace-declaration-slice-1
 Version: 005
 Author: Prime Builder (Claude, harness B)

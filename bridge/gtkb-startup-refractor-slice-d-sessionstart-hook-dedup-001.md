@@ -2,7 +2,7 @@ NEW
 
 # GTKB-STARTUP-REFRACTOR-001 Slice D — SessionStart Hook De-Duplication
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-startup-refractor-slice-d-sessionstart-hook-dedup
 Version: 001
 Author: Prime Builder (Claude Code, harness B)

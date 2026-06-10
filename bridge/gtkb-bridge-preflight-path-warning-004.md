@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Bridge Preflight Missing Parent Directory Warning REVISED-1
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-bridge-preflight-path-warning
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

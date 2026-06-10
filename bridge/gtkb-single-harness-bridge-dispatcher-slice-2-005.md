@@ -2,7 +2,7 @@ REVISED
 
 # Implementation Proposal — Single-Harness Bridge Dispatcher (Slice 2) — REVISED-2 (F1-F4 of -004 closure)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-single-harness-bridge-dispatcher-slice-2
 Version: 005
 Author: Prime Builder (Claude, harness B)

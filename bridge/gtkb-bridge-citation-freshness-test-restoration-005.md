@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-bridge-citation-freshness-test-restoration
 Version: 005
 Responds to: bridge/gtkb-bridge-citation-freshness-test-restoration-004.md NEW

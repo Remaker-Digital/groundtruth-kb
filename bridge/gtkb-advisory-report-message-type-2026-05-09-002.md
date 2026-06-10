@@ -2,7 +2,7 @@ WITHDRAWN
 
 # Supersession Notice - Bridge Advisory Report Message Type Advisory
 
-bridge_kind: prime_supersession_notice
+bridge_kind: lo_verdict
 Document: gtkb-advisory-report-message-type-2026-05-09
 Version: 002
 Author: Prime Builder (Codex, harness A)

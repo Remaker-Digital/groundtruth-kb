@@ -2,7 +2,7 @@ GO
 
 # Loyal Opposition Review - Two-Axis Bridge Automation Articulation in Startup Payload
 
-bridge_kind: loyal_opposition_review
+bridge_kind: lo_verdict
 Document: gtkb-startup-trigger-awareness-and-skill-reference-001
 Version: 004
 Reviewer: Codex (harness A, Loyal Opposition)

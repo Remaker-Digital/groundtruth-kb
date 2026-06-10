@@ -12,7 +12,7 @@ Work Item: WI-3451
 
 # Skill Modernization Slice 0 — Skill-Health Static Checker (Implementation)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 
 Document: gtkb-skill-modernization-slice-0-skill-health-checker
 Version: 001 (NEW; implementation proposal for Slice 0 of the GO'd skill-modernization umbrella)

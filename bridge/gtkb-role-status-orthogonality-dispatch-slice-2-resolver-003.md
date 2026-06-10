@@ -1,6 +1,6 @@
 NEW
 
-bridge_kind: implementation
+bridge_kind: implementation_report
 Document: gtkb-role-status-orthogonality-dispatch-slice-2-resolver
 Version: 003
 Responds to: bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-002.md GO

@@ -1,6 +1,6 @@
 NO-GO
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-role-enhancement-review-depth-contract-slice-1
 Version: 004
 Author: Loyal Opposition (Codex, harness A)

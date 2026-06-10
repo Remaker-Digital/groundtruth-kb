@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-active-status-capability-gate-harness-lifecycle-retention
 Version: 006
 Author: Loyal Opposition (Antigravity, harness C)

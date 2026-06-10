@@ -2,7 +2,7 @@ NEW
 
 # Governance Capture Proposal - capture GOV-PROJECT-RETIREMENT-001 (backlog project-retirement governance rule)
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-gov-project-retirement-spec
 Version: 001
 Author: Prime Builder (Claude, harness B)

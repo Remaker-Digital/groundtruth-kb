@@ -1,6 +1,6 @@
 VERIFIED
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: gtkb-v1-s509-proposal-remediation
 Version: 005
 Author: Loyal Opposition (Antigravity, harness C)

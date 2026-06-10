@@ -8,7 +8,7 @@ author_model_configuration: Claude Code default reasoning
 
 # Post-Implementation Report (REVISED) - GT-KB Discoverability CLI Slice 1
 
-bridge_kind: prime_builder_post_implementation_report
+bridge_kind: implementation_report
 Document: gtkb-discoverability-cli-slice-1
 Version: 007
 Responds to: bridge/gtkb-discoverability-cli-slice-1-006.md

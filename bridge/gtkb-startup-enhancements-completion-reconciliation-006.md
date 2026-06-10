@@ -8,7 +8,7 @@ author_model_configuration: Codex desktop Prime Builder session
 
 # Startup Enhancements Completion Reconciliation - Post-Implementation Report
 
-bridge_kind: governance_review
+bridge_kind: governance_advisory
 Document: gtkb-startup-enhancements-completion-reconciliation
 Version: 006
 Responds to: bridge/gtkb-startup-enhancements-completion-reconciliation-005.md GO

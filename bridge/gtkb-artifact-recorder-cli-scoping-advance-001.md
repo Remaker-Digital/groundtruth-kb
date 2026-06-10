@@ -2,7 +2,7 @@ NEW
 
 # Implementation Proposal - Advance GTKB-ARTIFACT-RECORDER-CLI Scoping (WI-3263)
 
-bridge_kind: implementation_proposal
+bridge_kind: prime_proposal
 Document: gtkb-artifact-recorder-cli-scoping-advance
 Version: 001
 Author: Prime Builder (Claude, harness B)
