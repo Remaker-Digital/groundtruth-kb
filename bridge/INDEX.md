@@ -1,3 +1,6 @@
+Document: gtkb-architecture-governance-hygiene-investigation
+NEW: bridge/gtkb-architecture-governance-hygiene-investigation-001.md
+
 Document: ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings 
 ADVISORY: bridge/ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings-001.md 
  
