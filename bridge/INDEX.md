@@ -1,5 +1,8 @@
-Document: sp1-dispatch-reliability-prime-handoff
-ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md
+Document: ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings 
+ADVISORY: bridge/ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings-001.md 
+ 
+Document: sp1-dispatch-reliability-prime-handoff 
+ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md 
 
 Document: gtkb-platform-observability-hygiene
 VERIFIED: bridge/gtkb-platform-observability-hygiene-008.md

@@ -62,6 +62,7 @@
 ## Recent Sessions
 Detailed session content lives in git history (commits referenced) and `bridge/*-NNN.md`. For sessions prior to S398, see [memory/CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
 
+- S427-LO-AG-C-20260609 (2026-06-09; Antigravity harness C): Ran horizontal architecture compliance audit (arch-audit skill), combined Codex INSIGHTS-2026-06-09-19-03-arch-audit-findings.md with independent audit, filed ADVISORY bridge report `ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings-001.md` identifying 7 FAILING ADR/DCL specs on GT-KB platform layer (not 10 — corrected Agent Red scope mismatch for ADR-001/002/005/006/007/DCL-002/005 + 3 additional: DCL-STANDING-BACKLOG-DB-SCHEMA-001, DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001, DCL-004). Wrap scanners and harvest ran; bridge committed and pushed.
 - S426-PB-AG-C-20260609 (2026-06-09; Antigravity harness C): Verified that all active Prime Builder bridge items are completed and terminal-verified, ran targeted tests for all 9 implementations/revisions (41 tests passed), harvested S426 session deliberations, and ran the mutating session wrap-up.
 - S425-LO-AG-C-20260609 (2026-06-09; Antigravity harness C): Audited and verified all 8 revised post-implementation reports, authored VERIFIED verdicts (008.md) for each, and updated the bridge index.
 - S424-PB-AG-C-20260609 (2026-06-09; Antigravity harness C): Generalised headless dispatch trigger by removing hardcoded harness types, loaded limit dynamically from SQLite, harvested session deliberations, and ran the session wrap-scan.
