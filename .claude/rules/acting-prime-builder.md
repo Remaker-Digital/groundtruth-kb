@@ -154,7 +154,7 @@ relying on `.codex/hooks.json` as a live interception boundary, and must use
 mechanical fallback (`scripts/check_codex_hook_parity.py` and Claude-side
 hooks where available) when verification fails.
 
-A regression test in `tests/scripts/test_codex_hook_parity.py` (or successor;
+A regression test in `platform_tests/scripts/test_codex_hook_parity.py` (or successor;
 landed via `gtkb-bridge-poller-event-driven-replacement-001` Slice 2) invokes
 `codex exec --skip-git-repo-check "<sentinel prompt>"` against a fixture Stop
 hook and asserts hook firing; failure indicates the v1 fallback stance is

@@ -305,7 +305,7 @@ Do NOT, without explicit owner approval:
   trigger reuses the dispatch-state path
   (`.gtkb-state/bridge-poller/dispatch-state.json`) and the actionable-
   signature scheme byte-identically per
-  `tests/scripts/test_cross_harness_bridge_trigger.py` to preserve the
+  `platform_tests/scripts/test_cross_harness_bridge_trigger.py` to preserve the
   existing audit-trail invariants while changing the substrate.
 
 ## Copyright

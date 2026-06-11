@@ -61,7 +61,7 @@ Owner approval is per-manifest, not per-run; adding new sandbox paths requires:
 
 1. A code change to `_OUTPUT_DIR_ALLOWLIST_PATTERNS` in `scripts/rehearse/_common.py` (which extends the executable allowlist).
 2. An owner-approved manifest update through the bridge protocol (which exercises the new pattern under owner review).
-3. Synchronized update of this rule's allowlist citation to keep rule text and source code aligned (verified by tests/scripts/test_rehearse_isolation.py asserting `_OUTPUT_DIR_ALLOWLIST_DESC` equals the rule-text quotation).
+3. Synchronized update of this rule's allowlist citation to keep rule text and source code aligned (verified by platform_tests/scripts/test_rehearse_isolation.py asserting `_OUTPUT_DIR_ALLOWLIST_DESC` equals the rule-text quotation).
 
 ## External Harness Executable Resolution Exception
 
