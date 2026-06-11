@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-10T01:39:40Z",
+  "generated_at": "2026-06-11T05:17:30Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -74,7 +74,7 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "prime-builder"
+          "loyal-opposition"
         ],
         "status": "verified"
       },
@@ -424,7 +424,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -578,7 +578,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
