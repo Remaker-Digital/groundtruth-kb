@@ -1,4 +1,8 @@
+Document: gtkb-commit-untracked-governance-hooks
+WITHDRAWN: bridge/gtkb-commit-untracked-governance-hooks-002.md
+
 Document: gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition
+NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-002.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-001.md
 
 Document: gtkb-backlog-triage-and-hygiene-stage-1-structural-repair
