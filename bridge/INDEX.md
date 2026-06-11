@@ -1,10 +1,13 @@
 Document: gtkb-fab-23-demoted-cleanup-batch
+GO: bridge/gtkb-fab-23-demoted-cleanup-batch-002.md
 NEW: bridge/gtkb-fab-23-demoted-cleanup-batch-001.md
 
 Document: gtkb-fab-22-architecture-cluster
+GO: bridge/gtkb-fab-22-architecture-cluster-002.md
 NEW: bridge/gtkb-fab-22-architecture-cluster-001.md
 
 Document: gtkb-fab-21-startup-load-cost-reduction
+GO: bridge/gtkb-fab-21-startup-load-cost-reduction-004.md
 REVISED: bridge/gtkb-fab-21-startup-load-cost-reduction-003.md
 NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-002.md
 NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-001.md
@@ -91,10 +94,12 @@ GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
+REVISED: bridge/gtkb-fab-04-storage-reclamation-003.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-002.md
 NEW: bridge/gtkb-fab-04-storage-reclamation-001.md
 
 Document: gtkb-fab-02-secrets-remediation
+REVISED: bridge/gtkb-fab-02-secrets-remediation-005.md
 NO-GO: bridge/gtkb-fab-02-secrets-remediation-004.md
 NEW: bridge/gtkb-fab-02-secrets-remediation-003.md
 GO: bridge/gtkb-fab-02-secrets-remediation-002.md
