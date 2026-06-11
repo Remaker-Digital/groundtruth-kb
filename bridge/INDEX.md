@@ -47,6 +47,7 @@ Document: gtkb-cheap-draft-linter
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
 Document: gtkb-fab-03-membase-backup
+NO-GO: bridge/gtkb-fab-03-membase-backup-002.md
 NEW: bridge/gtkb-fab-03-membase-backup-001.md
 
 Document: gtkb-fab-01-dispatch-substrate-revival
@@ -65,6 +66,7 @@ Document: gtkb-fable-investigation-advisory
 ADVISORY: bridge/gtkb-fable-investigation-advisory-001.md
 
 Document: gtkb-architecture-governance-hygiene-investigation
+WITHDRAWN: bridge/gtkb-architecture-governance-hygiene-investigation-005.md
 NO-GO: bridge/gtkb-architecture-governance-hygiene-investigation-004.md
 REVISED: bridge/gtkb-architecture-governance-hygiene-investigation-003.md
 NO-GO: bridge/gtkb-architecture-governance-hygiene-investigation-002.md
