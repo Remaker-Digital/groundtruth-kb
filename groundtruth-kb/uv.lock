@@ -627,6 +627,7 @@ name = "groundtruth-kb"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
+    { name = "pydantic" },
 ]
 
 [package.optional-dependencies]
@@ -664,6 +665,7 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'bridge'", specifier = ">=1.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.20.1" },
+    { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },

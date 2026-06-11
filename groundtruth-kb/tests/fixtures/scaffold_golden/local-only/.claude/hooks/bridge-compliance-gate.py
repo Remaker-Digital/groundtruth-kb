@@ -1171,6 +1171,73 @@ def _write_audit_result(
     output_path.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def preflight_advisory_for_write(
+    cwd_path: Path,
+    file_path: str,
+    *,
+    bridge_id: str | None = None,
+) -> dict[str, object] | None:
+    """Advisory-only target_paths preflight call path for Write/Edit operations (WI-3380).
+
+    Per ``bridge/gtkb-impl-start-target-paths-preflight-005.md`` (GO), this is a
+    non-blocking integration point: it runs the preflight in
+    ``scripts/impl_start_target_paths_preflight.py`` for a single candidate file
+    path and returns a structured advisory result (or ``None`` when the
+    preflight is unavailable / no implementation-authorization packet is active).
+
+    The function does NOT change ``permissionDecision`` semantics, does NOT emit
+    output, and does NOT mutate state. Callers may incorporate the returned dict
+    into ``additionalContext`` of an existing ``emit_ask``/``emit_deny`` payload
+    to surface scope-drift signal without widening blocking behavior. This
+    slice (per the proposal) defines the call path; downstream slices may wire
+    it into ``main()``.
+
+    Resolution:
+
+    - When ``bridge_id`` is None, the active impl-auth packet's bridge id is
+      used (``load_packet`` -> ``packet["bridge_id"]``). When no packet is
+      active, the function returns ``None``.
+    - The candidate set is the single ``file_path`` argument.
+
+    Returns:
+        None  - preflight could not run (no packet, missing module, error).
+        dict  - the preflight result dict from
+                ``impl_start_target_paths_preflight.run_preflight`` containing
+                ``bridge_id``, ``verdict``, ``exit_code``, ``in_scope``,
+                ``out_of_scope``, ``target_paths``, etc.
+    """
+    try:
+        _scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+        if str(_scripts_dir) not in sys.path:
+            sys.path.insert(0, str(_scripts_dir))
+        from impl_start_target_paths_preflight import run_preflight
+        from implementation_authorization import load_packet
+    except Exception:
+        return None
+
+    project_root = cwd_path
+    resolved_bridge_id = bridge_id
+    if resolved_bridge_id is None:
+        try:
+            packet = load_packet(project_root)
+            resolved_bridge_id = packet.get("bridge_id")
+        except Exception:
+            return None
+        if not resolved_bridge_id:
+            return None
+
+    try:
+        result, _exit_code = run_preflight(
+            project_root,
+            resolved_bridge_id,
+            explicit_candidates=[file_path],
+            use_git_diff=False,
+        )
+    except Exception:
+        return None
+    return result
+
+
 def _audit_only(argv: list[str]) -> int:
     cwd_path = Path.cwd().resolve()
     file_path = ""

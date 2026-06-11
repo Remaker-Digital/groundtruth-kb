@@ -3288,6 +3288,145 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
     )
 
 
+def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
+    """Resolve a registry argv head to a launchable form.
+
+    Mirror of ``scripts/cross_harness_bridge_trigger._normalize_argv_head`` (the
+    doctor package must not import from ``scripts/``, which is not on the package
+    path). HYG-001 (FAB-01): a forward-slash-relative path or a bare ``PATHEXT``
+    command fails ``CreateProcess`` with ``WinError 2`` unless normalized
+    (``os.path.normpath``), resolved against ``project_root`` when relative with
+    a directory component, and run through ``PATHEXT``-aware ``shutil.which``.
+    Additive: returns the normalized head when no resolution succeeds.
+    """
+    if not head:
+        return head
+    normalized = os.path.normpath(head)
+    candidate = normalized
+    if (os.sep in normalized or (os.altsep and os.altsep in normalized)) and not os.path.isabs(normalized):
+        candidate = os.path.normpath(str(project_root / normalized))
+    resolved = shutil.which(candidate)
+    if resolved:
+        return resolved
+    if candidate != normalized:
+        resolved = shutil.which(normalized)
+        if resolved:
+            return resolved
+    return normalized
+
+
+def _check_harness_launchability(target: Path) -> ToolCheck:
+    """FAB-01 / HYG-001: verify each active dispatch target's argv head launches.
+
+    The cross-harness trigger spawns a recipient harness from its
+    ``invocation_surfaces.headless.argv``. On Windows a forward-slash-relative
+    path (e.g. ``groundtruth-kb/.venv/Scripts/python.exe``) or a bare ``PATHEXT``
+    command (e.g. ``gemini`` resolving to ``gemini.cmd``) fails ``CreateProcess``
+    with ``WinError 2`` unless normalized/resolved. The trigger now normalizes
+    the head at spawn (``_normalize_argv_head``); this check exercises that same
+    resolution so a launch regression surfaces here instead of silently
+    degrading to an exit-127 in the dispatch logs (the masking failure mode of
+    HYG-001).
+
+    For every harness that is ``status == active`` AND ``can_receive_dispatch``
+    (a real dispatch target) AND carries a ``headless.argv``, the normalized head
+    must resolve to a launchable executable. ``shutil.which`` models the
+    ``CreateProcess`` executable lookup (``PATHEXT``-aware) that produces
+    ``WinError 2``; resolution failure IS the launch failure. Resolution is used
+    rather than launching ``<head> --version`` so the doctor run does not spawn
+    live harness CLIs (a nested Claude session, a yolo-mode agent) as a side
+    effect.
+
+    Status:
+      - all active dispatch targets resolve → ``pass``
+      - any active dispatch target unresolvable (would-be ``WinError 2``) → ``fail``
+      - no active dispatch targets with a headless argv to check → ``warning``
+    """
+    check_name = "Harness dispatch launchability"
+    from groundtruth_kb.harness_projection import HarnessStateError, read_roles  # noqa: PLC0415
+
+    try:
+        registry = read_roles(project_root=target)
+    except HarnessStateError as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"harness registry unreadable; cannot check launchability: {exc}",
+        )
+    harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
+    if not isinstance(harnesses, list):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="harness registry has no 'harnesses' list; cannot check launchability",
+        )
+
+    checked: list[tuple[str, str, str, bool]] = []
+    for rec in harnesses:
+        if not isinstance(rec, dict):
+            continue
+        status = rec.get("status")
+        if not (isinstance(status, str) and status.strip().lower() == "active"):
+            continue
+        # Dispatch-target axis (FAB-01): can_receive_dispatch, with back-compat
+        # fallback to the deprecated event_driven_hooks alias for legacy records.
+        is_target = rec.get("can_receive_dispatch") is True or (
+            "can_receive_dispatch" not in rec and rec.get("event_driven_hooks") is True
+        )
+        if not is_target:
+            continue
+        surfaces = rec.get("invocation_surfaces")
+        headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+        argv = headless.get("argv") if isinstance(headless, dict) else None
+        if not isinstance(argv, list) or not argv or not isinstance(argv[0], str):
+            continue
+        head = argv[0]
+        if head in ("{{PROMPT}}", "{{PROJECT_ROOT}}"):
+            continue
+        resolved = _normalize_harness_argv_head(head, target)
+        launchable = bool(shutil.which(resolved)) or os.path.isfile(resolved)
+        name = str(rec.get("harness_name") or rec.get("id") or "?")
+        checked.append((name, head, resolved, launchable))
+
+    if not checked:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="no active dispatch targets with a headless argv to check",
+        )
+
+    failures = [c for c in checked if not c[3]]
+    if failures:
+        detail = "; ".join(
+            f"{name} argv head {head!r} unlaunchable (resolved {resolved!r})" for name, head, resolved, _ in failures
+        )
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"{len(failures)}/{len(checked)} active dispatch target(s) have a WinError-2-class "
+                f"unlaunchable argv head: {detail}. See HYG-001 / FAB-01 and "
+                f"{_BRIDGE_DISPATCH_DOC}."
+            ),
+        )
+    names = ", ".join(c[0] for c in checked)
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=f"all {len(checked)} active dispatch target(s) launchable after argv-head normalization ({names})",
+    )
+
+
 _HARNESS_EXEC_SCAN_TARGETS = (
     Path("scripts") / "cross_harness_bridge_trigger.py",
     Path("scripts") / "verify_antigravity_dispatch.py",
@@ -4370,6 +4509,10 @@ def run_doctor(
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
         checks.append(_check_cross_harness_trigger(target))
+        # FAB-01 / HYG-001: exercise launchability of each active dispatch
+        # target's argv head so a WinError-2-class launch regression surfaces
+        # in the doctor rather than as a silent exit-127 in dispatch logs.
+        checks.append(_check_harness_launchability(target))
         checks.append(_check_external_harness_exec_boundary(target))
         # IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
         # (Codex GO at -014): role-set schema validation + single-harness

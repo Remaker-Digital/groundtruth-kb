@@ -1,1 +1,2 @@
 [applications]
+Agent_Red = { slot = "Agent_Red" }

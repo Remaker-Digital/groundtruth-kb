@@ -1,0 +1,844 @@
+# GT-KB Hygiene Investigation Baseline Registry
+#
+# Frozen HYG-001..068 finding corpus from the GT-KB self-investigation
+# (PROJECT-FABLE-INVESTIGATION). This is the canonical frozen-findings record and
+# the baseline for the future delta-mode differ (deferred follow-on).
+#
+# DO NOT silently mutate. Re-baselining (promoting a fresh full-coverage run into a
+# new frozen baseline) is an explicit, owner-gated step. Loaded by
+# scripts/hygiene/hygiene_baseline.py::load_baseline().
+#
+# Bridge: bridge/gtkb-fab-20-hygiene-investigation-skill-004.md (GO)
+# Project Authorization: PAUTH-FAB20-20260610 (WI-4432)
+# Source: HYG-001..060 = independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md
+#         HYG-061..068 = bridge/gtkb-fable-investigation-advisory-001.md (v2 verified-merge)
+#
+# Per-finding schema (see HygieneFinding): id, title, finding_class, impact, effort,
+# confidence, owner_touchpoint_required, decision_complexity, source, fab_cluster.
+# Empty-string fields ("") are loaded as absent (None).
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+schema_version = 1
+baseline_id = "HYG-BASELINE-2026-06-10"
+generated_at = "2026-06-10T00:00:00Z"
+source_reports = [
+    "independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md",
+    "bridge/gtkb-fable-investigation-advisory-001.md",
+]
+
+[[findings]]
+id = "HYG-001"
+title = "Every active dispatch target in the current topology fails launch with WinError 2 - bridge automation is fully dead end-to-end"
+finding_class = "defect"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-01"
+
+[[findings]]
+id = "HYG-002"
+title = "Canonical MemBase (1.39GB groundtruth.db) has zero durable backup: git, Drive, and snapshot channels are all mechanically closed"
+finding_class = "defect"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-03"
+
+[[findings]]
+id = "HYG-003"
+title = "Dispatch economics: 107K trigger invocations in 26 days, 1,041 real launches, 64% of dispatch attempts failed at launch, 1,900+ failure records/day at peak"
+finding_class = "debt"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-10"
+
+[[findings]]
+id = "HYG-004"
+title = "event_driven_hooks flipped false->true for four hook-less harnesses hours after the deadlock advisory - capability flags no longer describe reality"
+finding_class = "drift"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-01"
+
+[[findings]]
+id = "HYG-005"
+title = "Trigger claims work-intent under a 120s TTL and a 'trigger-dispatched-' prefixed id the spawned worker can never renew - producing takeovers and 1,593 contention records in 2 hours"
+finding_class = "defect"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-10"
+
+[[findings]]
+id = "HYG-006"
+title = "Role-suffixed dispatch ids contain ':' so worker stdout/stderr/exit-code files are written into invisible NTFS alternate data streams"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-10"
+
+[[findings]]
+id = "HYG-007"
+title = "Retry/circuit-breaker subsystem uses OLLAMA_* env knobs for all harnesses and the tripped breaker can never auto-reset once launches fail"
+finding_class = "debt"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = ""
+
+[[findings]]
+id = "HYG-008"
+title = "Every Bash tool call pays a measured ~1.0-1.5s floor of 10 sequential fresh-python hook spawns; Write/Edit calls pay up to 12"
+finding_class = "debt"
+impact = "Medium"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-21"
+
+[[findings]]
+id = "HYG-009"
+title = "Landed changes cost a mean 7.2 bridge versions each; the audit trail is 6,014 LLM-authored files (63.8MB) against a ~200-line INDEX design"
+finding_class = "decision-needed"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-22"
+
+[[findings]]
+id = "HYG-010"
+title = "Three god-modules (db.py 5956, cli.py 5386, doctor.py 3910 lines) concentrate cost and carry blanket lint exemptions"
+finding_class = "debt"
+impact = "Medium"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-22"
+
+[[findings]]
+id = "HYG-011"
+title = "Three interpreter contexts and no declared canonical environment: empty root .venv, gt/ruff unreachable, doctor checks PATH-only"
+finding_class = "debt"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-22"
+
+[[findings]]
+id = "HYG-012"
+title = "Root groundtruth.toml declares the platform project as 'Agent Red Customer Experience' and is live-consumed"
+finding_class = "decision-needed"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-12"
+
+[[findings]]
+id = "HYG-013"
+title = ".git is 5.4GB: 4.76GB is four orphaned 1.19GB LFS objects (no LFS patterns, nothing at HEAD), plus 152MB Cursor residue and 6 stray index files; WI-3394's 'broken blob' does not reproduce"
+finding_class = "debt"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-04"
+
+[[findings]]
+id = "HYG-014"
+title = "99.93% of pipeline_events (3.32M rows) is assertion_run telemetry from the now-dead sweep — it is ~90% of the 1.32GB groundtruth.db and has no retention policy"
+finding_class = "decision-needed"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-11"
+
+[[findings]]
+id = "HYG-015"
+title = "765 INSIGHTS files in CODEX-INSIGHT-DROPBOX have spawned 758 open 'Route LO advisory' WIs — ~75% of the visible backlog is undrained mechanical routing items"
+finding_class = "debt"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-18"
+
+[[findings]]
+id = "HYG-016"
+title = "Two divergent session-memory stores are both live (repo memory/MEMORY.md titled 'Agent Red Memory' + user-profile auto-memory), contradicting CLAUDE.md's in-root mandate"
+finding_class = "drift"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-12"
+
+[[findings]]
+id = "HYG-017"
+title = "tools/knowledge-db/ is a stale parallel KB stack (Agent Red shim db.py, 507KB second groundtruth.db, own chroma + web UI) and CLAUDE.md still directs all KB access to it"
+finding_class = "drift"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-06"
+
+[[findings]]
+id = "HYG-018"
+title = "Retired OS-poller automation still on disk (25 files in bridge-automation/) while the auto-loaded bridge-permanent-operations-runbook.md still mandates 3-minute pollers"
+finding_class = "drift"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-05"
+
+[[findings]]
+id = "HYG-019"
+title = "terraform.tfstate (+2 backups) hold non-empty secret values on a cloud-synced local drive"
+finding_class = "defect"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-02"
+
+[[findings]]
+id = "HYG-020"
+title = ".env.local (platform credential SoT) is git-protected but replicates unprotected to Google Drive cloud sync and the G: HDD mirror"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-02"
+
+[[findings]]
+id = "HYG-021"
+title = "memory/pending-owner-decisions.md is 996KB / 13,791 lines holding zero pending decisions — unbounded resolved-entry append with no rotation"
+finding_class = "debt"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-13"
+
+[[findings]]
+id = "HYG-022"
+title = "Agent_Red (the reference adopter) lacks application.toml, failing the doctor's slot-registration contract"
+finding_class = "drift"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-08"
+
+[[findings]]
+id = "HYG-023"
+title = "Where live hooks and scaffold templates diverge, the template is the stale side in all sampled cases — adopters scaffold 10x-outdated enforcement, and scaffold.py still ships the DEPRECATED poller setup prompt"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-22"
+
+[[findings]]
+id = "HYG-024"
+title = "Platform-root pyproject.toml is still Agent Red's config: wrong identity header, broken mutmut paths, CI-breaking addopts"
+finding_class = "drift"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-12"
+
+[[findings]]
+id = "HYG-025"
+title = "38 auto-loaded rule files total 336KB (~80K tokens) per Claude session - exceeding the platform's own 250KB startup-pruning threshold - with canonical-terminology.md alone at 84KB"
+finding_class = "debt"
+impact = "High"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-21"
+
+[[findings]]
+id = "HYG-026"
+title = "Four Cursor/Agent-Red-era rule files auto-load every session and direct work to nonexistent surfaces, one with a live Claude-Playground link"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-05"
+
+[[findings]]
+id = "HYG-027"
+title = "Verbatim-duplicated normative blocks across and within auto-loaded rule files (report-depth pair, mangled codex-review-operating-contract, AUQ section, PB rule pair)"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-05"
+
+[[findings]]
+id = "HYG-028"
+title = "Always-loaded rules/glossary cite retired .ollama/ and tests/scripts/ paths after migrations"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-21"
+
+[[findings]]
+id = "HYG-029"
+title = "Assertion regression signal destroyed: 1365 of 1468 failing specs fail on pre-isolation Agent Red paths"
+finding_class = "defect"
+impact = "High"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-11"
+
+[[findings]]
+id = "HYG-030"
+title = "MemBase tests table disconnected from live test execution since 2026-04-29"
+finding_class = "drift"
+impact = "High"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-11"
+
+[[findings]]
+id = "HYG-031"
+title = "CLAUDE.md Governance Index numbering contradicts canonical MemBase GOV rows (GOV-01..06, 17, 18)"
+finding_class = "drift"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-06"
+
+[[findings]]
+id = "HYG-032"
+title = ".codex/config.toml grants approval_policy='never' + sandbox network access with no recoverable approval evidence, contradicting the recorded owner posture"
+finding_class = "decision-needed"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-15"
+
+[[findings]]
+id = "HYG-033"
+title = "canonical_terms MemBase table is a frozen 2026-05-08 snapshot; markdown glossary is the de facto SoT"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-15"
+
+[[findings]]
+id = "HYG-034"
+title = "Platform session-start code and three platform skills (deploy, seed-tenant, run-tests) silently resolve to Agent Red surfaces, against the 2026-05-04 tooling-reference narrowing"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-12"
+
+[[findings]]
+id = "HYG-035"
+title = "The 'four small demo applications' asserted by AGENTS.md, the glossary, and acting-prime-builder.md resolve to nothing under applications/ — closest match is 5 dirs under groundtruth-kb/examples/, outside the mandated home"
+finding_class = "drift"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-07"
+
+[[findings]]
+id = "HYG-036"
+title = "Live harness registry says Codex=prime-builder/suspended and Claude=prime-builder/suspended with antigravity as the only active Prime — inverting the Codex-is-Loyal-Opposition narrative in every auto-loaded rule surface"
+finding_class = "drift"
+impact = "High"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-15"
+
+[[findings]]
+id = "HYG-037"
+title = "AGENTS.md tells Codex 'Agent Red is not part of GT-KB' while CLAUDE.md and four other rules bind Agent Red inside the project root as reference adopter"
+finding_class = "drift"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-06"
+
+[[findings]]
+id = "HYG-038"
+title = "codex-standing-priorities.md anchors both roles' default idle work to memory/work_list.md, which was deleted at the backlog migration"
+finding_class = "drift"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-05"
+
+[[findings]]
+id = "HYG-039"
+title = "bridge/INDEX.md has no enforced write path; a gate-bypassing writer corrupted it on 2026-06-10"
+finding_class = "defect"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-10"
+
+[[findings]]
+id = "HYG-040"
+title = "Cluster: ~20 open WIs document gate parser false-positive classes with a lossy feedback loop in both directions — fixes don't close WIs, WIs don't drive fixes, sessions route around gates"
+finding_class = "debt"
+impact = "High"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-14"
+
+[[findings]]
+id = "HYG-041"
+title = "destructive-gate and credential-scan are registered only in git-ignored settings.local.json; scanner-safe-writer (documented as the live credential write gate) is registered nowhere"
+finding_class = "drift"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-09"
+
+[[findings]]
+id = "HYG-042"
+title = "Root-boundary Bash parser denies essentially every Bash command containing a forward-slash path, URL, or /dev/null — VERIFIED yesterday with a test suite that dodges the bug"
+finding_class = "defect"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-14"
+
+[[findings]]
+id = "HYG-043"
+title = "All four CI test/quality lanes fail every push on stale paths left by the tests/ restructure"
+finding_class = "defect"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-12"
+
+[[findings]]
+id = "HYG-044"
+title = "Session-start assertion sweep silently dead since 2026-05-13 while CLAUDE.md claims it runs"
+finding_class = "drift"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-11"
+
+[[findings]]
+id = "HYG-045"
+title = "CLAUDE.md's Session Scheduler is dead: scheduler.py is a real 11.5KB implementation but registered in no settings file, and SCHEDULE.md has been frozen since 2026-04-20"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-09"
+
+[[findings]]
+id = "HYG-046"
+title = "Requirement Sufficiency gate: h2-only section parser silently skips h3 headings, literal phrase allowlist grows per-incident entries, and both failure modes report the same misleading 'missing'"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-14"
+
+[[findings]]
+id = "HYG-047"
+title = "Narrative-artifact approval gate's packet discovery cannot be satisfied by a session-native Write tool call, so compliant edits are impossible and sessions bypass the gate via Bash-mediated writes"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-14"
+
+[[findings]]
+id = "HYG-048"
+title = "Mandated deliberation search crashes instead of falling back: collection.count() sits outside the try guard"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-17"
+
+[[findings]]
+id = "HYG-049"
+title = "Doctor's DA harvest coverage FAIL (1.31%) is a numerator-convention mismatch; real coverage is 100%"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-07"
+
+[[findings]]
+id = "HYG-050"
+title = "Four 'registration-missing' hooks are no-op scaffold stubs whose real implementations never landed — including the two capture hooks whose absence drives the DA harvest coverage FAIL"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-09"
+
+[[findings]]
+id = "HYG-051"
+title = "The deterministic hygiene sweep has only 3 patterns, all Agent-Red-residue-shaped, and excludes the directories (.claude, .codex, memory, IPA, archive) where both probe rounds found the dominant drift"
+finding_class = "debt"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-19"
+
+[[findings]]
+id = "HYG-052"
+title = "ADR/DCL machine enforcement: clause registry covers 5 of 97 artifacts; half of DCLs have no assertions"
+finding_class = "debt"
+impact = "Medium"
+effort = "High"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-22"
+
+[[findings]]
+id = "HYG-053"
+title = "229 leaked applications/_test_* sandbox skeletons: shutil.rmtree(ignore_errors=True) silently fails on Windows .git dirs; leak is active (newest 2026-06-09)"
+finding_class = "defect"
+impact = "High"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-08"
+
+[[findings]]
+id = "HYG-054"
+title = "117 scratch dirs / 7.4GB at repo root from ad-hoc per-session --basetemp and uv-cache invocations; WI-4356 stray detector delivered but wired to nothing"
+finding_class = "debt"
+impact = "High"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = ""
+
+[[findings]]
+id = "HYG-055"
+title = "Dispatch runtime evidence has no retention policy: 1.49GB of run logs, 86MB unrotated diagnostic JSONL, while the one rotated log destroys storm forensics"
+finding_class = "debt"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-13"
+
+[[findings]]
+id = "HYG-056"
+title = "Google Drive sync of E: generates ' (N)' duplicate files inside the repo — 62 live duplicates including SQLite wal/shm copies and 10 copies of Codex hook state; .driveignore coverage incomplete"
+finding_class = "debt"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "high"
+source = "v1_report"
+fab_cluster = "FAB-13"
+
+[[findings]]
+id = "HYG-057"
+title = ".claude/worktrees/ holds 12 orphaned working copies (~3.0GB) — none registered with git; registered worktrees live outside the project root"
+finding_class = "debt"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-04"
+
+[[findings]]
+id = "HYG-058"
+title = "~3GB of dead database residue (corrupt-S311 copy, pre-backfill copy, 1.66GB knowledge export) plus literal-variable-mangled files ($null created 2026-06-10, nul, $cache) at repo root"
+finding_class = "debt"
+impact = "Low"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-04"
+
+[[findings]]
+id = "HYG-059"
+title = "Nine deny-ACL .test-tmp/ dirs are unreadable even to the owner, un-gitignored, and spam every git status"
+finding_class = "defect"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = ""
+
+[[findings]]
+id = "HYG-060"
+title = "independent-progress-assessments/ root holds 69 files + 20 dirs against its own organize rule's ~9-file allowlist — ~60 Agent-Red-era reports, renders, and tmp dirs"
+finding_class = "debt"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = true
+decision_complexity = "low"
+source = "v1_report"
+fab_cluster = "FAB-18"
+
+[[findings]]
+id = "HYG-061"
+title = "Antigravity skill adapters drifted: live 22 STALE + 14 MISSING, exit 1 (`check_harness_parity.py --harness antigravity --json`, 2026-06-10T18:42Z); v2's 17/11 counts were stale"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-16"
+
+[[findings]]
+id = "HYG-062"
+title = "Goose harness (E) has zero entries in `config/agent-control/harness-capability-registry.toml` and no headless invocation surface (desktop-only registry entry); nuance: status=suspended"
+finding_class = "drift"
+impact = "Medium"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-16"
+
+[[findings]]
+id = "HYG-063"
+title = "`check_harness_parity.py:26` hardcodes `_FALLBACK_KNOWN_HARNESSES = (\"claude\", \"codex\")` used when registry projection fails"
+finding_class = "debt"
+impact = "Low"
+effort = "Low"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-16"
+
+[[findings]]
+id = "HYG-064"
+title = "Direct spec contradiction: GOV-SOURCE-OF-TRUTH-FRESHNESS-001 v2 names `.claude/hooks/last-user-visible-startup-*.md` a forbidden read pattern while DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001 MANDATES rendering that cached file, without invoking the GOV's declared-TTL exception. (Absorbed reconcilable tensions: GOV-SSI-vs-RELAY, RELAY-vs-FRESH-READ, TOKEN-BUDGET-vs-GOV-SSI)"
+finding_class = "drift"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-15"
+
+[[findings]]
+id = "HYG-065"
+title = "~1,004 open WIs vs only 162 covered by any active project authorization — the doctor's \"930 warn\" backlog-health output is one orphaned-WI WARN per uncovered open item"
+finding_class = "debt"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-18"
+
+[[findings]]
+id = "HYG-066"
+title = "76 skill-health findings across 72 skills (fenced_python 26, db_mutation 32, index_write 18; `check_skill_health.py` exit 1) and the checker is wired into NO gate or doctor check"
+finding_class = "debt"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-19"
+
+[[findings]]
+id = "HYG-067"
+title = "Doctor AUQ-coverage FAIL (92.0%, 46 non-AUQ) is polluted signal: all sampled non-AUQ entries are owner-decision-tracker prose-pattern FALSE POSITIVES already marked resolved in `memory/pending-owner-decisions.md` — the FAIL misdirects toward \"seeding missing decisions\" when the defect is detector precision"
+finding_class = "defect"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-07"
+
+[[findings]]
+id = "HYG-068"
+title = "Doctor isolation suite (`doctor_isolation.py:219-272` writability probe; sibling subject check) is an adopter-context suite run unconditionally against the platform root, producing standing FAILs (product-scope-writable, subject-expected-application) that are miscalibrated by design"
+finding_class = "defect"
+impact = "Medium"
+effort = "Medium"
+confidence = "High"
+owner_touchpoint_required = false
+decision_complexity = ""
+source = "advisory_v2_merge"
+fab_cluster = "FAB-07"

@@ -51,6 +51,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -1055,6 +1056,54 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
     )
 
 
+def _normalize_argv_head(head: str, project_root: Path) -> str:
+    """Normalize and resolve an argv executable head for reliable launch.
+
+    HYG-001 (FAB-01): registry argv heads fail ``CreateProcess`` with
+    ``WinError 2`` in two distinct ways on Windows:
+
+    - **Relative forward-slash paths** (e.g. ``groundtruth-kb/.venv/Scripts/python.exe``):
+      ``CreateProcess`` cannot resolve a relative path whose separators are
+      forward slashes. ``os.path.normpath`` rewrites them to the native
+      separator.
+    - **Bare command names** (e.g. ``gemini``) that exist on disk only as
+      ``gemini.ps1`` / ``gemini.cmd``: ``subprocess`` performs no ``PATHEXT``
+      resolution, so the bare name is not found. ``shutil.which`` is
+      ``PATHEXT``-aware and resolves the launchable variant.
+
+    Strategy: ``normpath`` the head; for a relative path that contains a
+    directory separator, resolve it against ``project_root`` so ``which`` sees
+    the same file the dispatched subprocess (``cwd=project_root``) would; then
+    run ``shutil.which`` to confirm/resolve an absolute launchable path.
+
+    Additive and fail-safe: when no resolution succeeds the normalized head is
+    returned (and the original head if normalization itself is empty), so a
+    host where ``which`` cannot see the command still receives the registry
+    literal rather than a broken value. Normalization never raises.
+    """
+    if not head:
+        return head
+    normalized = os.path.normpath(head)
+    # A relative path with a directory component is resolved against the
+    # project root (the subprocess cwd) so PATHEXT/existence resolution matches
+    # launch context. A bare command name (no separator) is left for PATH
+    # lookup by shutil.which.
+    candidate = normalized
+    if (os.sep in normalized or (os.altsep and os.altsep in normalized)) and not os.path.isabs(normalized):
+        candidate = os.path.normpath(str(project_root / normalized))
+    resolved = shutil.which(candidate)
+    if resolved:
+        return resolved
+    # Fall back to resolving the (un-rooted) normalized form too — covers a
+    # bare PATHEXT command and any host where the rooted candidate is absent
+    # but the command is on PATH.
+    if candidate != normalized:
+        resolved = shutil.which(normalized)
+        if resolved:
+            return resolved
+    return normalized
+
+
 def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) -> list[str] | None:
     """Build the recipient harness invocation command, data-driven from the
     harness-registry projection.
@@ -1098,6 +1147,10 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
             command.append(str(project_root))
         else:
             command.append(element)
+    # HYG-001: normalize/resolve the executable head so a forward-slash-relative
+    # path or a bare PATHEXT command launches under CreateProcess. Applied to
+    # command[0] (the harness executable) before any role overlay appends flags.
+    command[0] = _normalize_argv_head(command[0], project_root)
     if target.command_handle == "claude":
         if "--permission-mode" not in command:
             command.extend(["--permission-mode", "acceptEdits"])
@@ -1410,6 +1463,35 @@ def _quiesce_marker(
     }
 
 
+def _record_can_receive_dispatch(h_info: dict[str, object]) -> bool:
+    """True if a harness record can be a headless dispatch TARGET.
+
+    Reads the honest ``can_receive_dispatch`` axis (FAB-01 / HYG-004), falling
+    back to the deprecated ``event_driven_hooks`` alias for legacy / hand-built
+    records (e.g. test fixtures) that predate the split. Both currently carry
+    the same all-launchable-types value, so the fallback preserves behavior.
+    """
+    if "can_receive_dispatch" in h_info:
+        return h_info.get("can_receive_dispatch") is True
+    return h_info.get("event_driven_hooks") is True
+
+
+def _record_can_fire_events(h_info: dict[str, object]) -> bool:
+    """True if a harness record can FIRE bridge dispatch events (an event source).
+
+    Reads the honest ``can_fire_events`` axis (FAB-01 / HYG-004), falling back to
+    the deprecated ``event_driven_hooks`` alias for legacy / hand-built records
+    that predate the split. The fallback intentionally over-includes (the legacy
+    alias was always-true for launchable types) so legacy fixtures keep their
+    prior behavior; honest callers run against projected records carrying the
+    split field, where only hook-bearing harnesses (Claude Code, Codex CLI)
+    report ``can_fire_events: true``.
+    """
+    if "can_fire_events" in h_info:
+        return h_info.get("can_fire_events") is True
+    return h_info.get("event_driven_hooks") is True
+
+
 def _is_dispatch_ready(
     h_id: str,
     h_info: dict[str, object],
@@ -1487,16 +1569,16 @@ def _resolve_dispatch_targets(
         status = h_info.get("status")
         return isinstance(status, str) and status.strip().lower() == "active"
 
-    def _is_event_capable(h_info: dict[str, object]) -> bool:
-        return h_info.get("event_driven_hooks") is True
-
     role_matching = [
         (h_id, h_info)
         for h_id, h_info in harnesses.items()
         if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
     ]
+    # Dispatch TARGET eligibility reads the receive axis (FAB-01 verification
+    # plan: "_is_event_capable reads can_receive_dispatch"). A target must be
+    # launchable/dispatchable; it does NOT need to fire events itself.
     active_matching = [
-        (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info) and _is_event_capable(h_info)
+        (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info) and _record_can_receive_dispatch(h_info)
     ]
 
     if not active_matching:
@@ -1893,7 +1975,12 @@ def _is_single_harness_topology(project_root: Path) -> bool:
         # zero active event-capable target -> sentinel + audit).
         status = record.get("status")
         is_active = isinstance(status, str) and status.strip().lower() == "active"
-        is_event_capable = record.get("event_driven_hooks") is True
+        # Topology derivation reads the event-FIRING axis (FAB-01 verification
+        # plan: "topology derivation reads can_fire_events"). A single-harness
+        # operating mode is only meaningful when the lone harness can fire the
+        # events that drive in-process dispatch; a receive-only harness is not
+        # treated as an event source.
+        is_event_capable = _record_can_fire_events(record)
         return has_both and is_active and is_event_capable
     return False
 

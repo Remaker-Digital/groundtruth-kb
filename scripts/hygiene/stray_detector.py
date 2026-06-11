@@ -57,6 +57,25 @@ class StashEntry:
 
 
 @dataclass(frozen=True)
+class WorktreeEntry:
+    """A single working-tree directory the caller has observed.
+
+    FAB-04 (HYG-057): harness-spawned ``.claude/worktrees/*`` detached
+    checkouts accumulate as orphans that are not registered with
+    ``git worktree`` and pollute repo-wide greps. ``path`` is repo-relative;
+    ``last_modified`` is a timezone-aware UTC datetime; ``git_registered``
+    distinguishes a live, git-tracked worktree (never a reap candidate) from
+    an orphaned detached checkout. The caller supplies fresh state per
+    GOV-SOURCE-OF-TRUTH-FRESHNESS-001; this detector never inspects the
+    repository itself.
+    """
+
+    path: str
+    last_modified: datetime
+    git_registered: bool
+
+
+@dataclass(frozen=True)
 class ActiveSessionContext:
     """Paths and stash refs currently held by an active session.
 
@@ -117,6 +136,28 @@ class StashFinding:
             "triage_reason": self.triage_reason,
             "candidate_action": self.candidate_action,
             "subject": self.subject,
+        }
+
+
+@dataclass(frozen=True)
+class WorktreeFinding:
+    """Classification of a single working-tree directory."""
+
+    path: str
+    age_hours: float
+    classification: str  # "stale" | "recent" | "active_session" | "registered"
+    git_registered: bool
+    triage_reason: str
+    candidate_action: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "age_hours": round(self.age_hours, 4),
+            "classification": self.classification,
+            "git_registered": self.git_registered,
+            "triage_reason": self.triage_reason,
+            "candidate_action": self.candidate_action,
         }
 
 
@@ -302,6 +343,88 @@ def classify_stash_entries(
 
 
 # ---------------------------------------------------------------------------
+# Worktree classification (FAB-04, HYG-057)
+# ---------------------------------------------------------------------------
+
+
+def classify_worktree_entry(
+    entry: WorktreeEntry,
+    *,
+    now: datetime,
+    active_session: ActiveSessionContext | None = None,
+    threshold_hours: int = STALE_THRESHOLD_HOURS,
+) -> WorktreeFinding:
+    """Classify one working-tree directory without inspecting the repository.
+
+    Precedence: an active-session hold wins over everything (a live session's
+    worktree is never reaped); a git-registered worktree is always preserved
+    (reaping a registered worktree would corrupt git's worktree administration);
+    only an *orphaned* (non-registered) worktree over the staleness threshold is
+    flagged for prune-and-delete. This encodes the HYG-057 recurrence-prevention
+    invariant: harness-spawned ``.claude/worktrees/*`` detached checkouts that
+    are no longer registered and no longer fresh are reap candidates.
+    """
+    age_hours = _hours_between(now, entry.last_modified)
+
+    if active_session is not None and entry.path in active_session.workspace_paths:
+        return WorktreeFinding(
+            path=entry.path,
+            age_hours=age_hours,
+            classification="active_session",
+            git_registered=entry.git_registered,
+            triage_reason="active_session_holds_worktree",
+            candidate_action="skip",
+        )
+
+    if entry.git_registered:
+        return WorktreeFinding(
+            path=entry.path,
+            age_hours=age_hours,
+            classification="registered",
+            git_registered=True,
+            triage_reason="git_registered_worktree",
+            candidate_action="skip",
+        )
+
+    if _is_stale_age(age_hours, threshold_hours):
+        return WorktreeFinding(
+            path=entry.path,
+            age_hours=age_hours,
+            classification="stale",
+            git_registered=False,
+            triage_reason="stale_orphaned_worktree_over_threshold",
+            candidate_action="prune_and_delete_orphaned_worktree",
+        )
+
+    return WorktreeFinding(
+        path=entry.path,
+        age_hours=age_hours,
+        classification="recent",
+        git_registered=False,
+        triage_reason="below_stale_threshold",
+        candidate_action="skip",
+    )
+
+
+def classify_worktree_entries(
+    entries: list[WorktreeEntry],
+    *,
+    now: datetime,
+    active_session: ActiveSessionContext | None = None,
+    threshold_hours: int = STALE_THRESHOLD_HOURS,
+) -> list[WorktreeFinding]:
+    return [
+        classify_worktree_entry(
+            entry,
+            now=now,
+            active_session=active_session,
+            threshold_hours=threshold_hours,
+        )
+        for entry in entries
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Top-level detector entry point
 # ---------------------------------------------------------------------------
 
@@ -311,6 +434,7 @@ def detect_strays(
     now: datetime,
     workspace_entries: list[WorkspaceEntry],
     stash_entries: list[StashEntry],
+    worktree_entries: list[WorktreeEntry] | None = None,
     active_session: ActiveSessionContext | None = None,
     threshold_hours: int = STALE_THRESHOLD_HOURS,
 ) -> dict[str, Any]:
@@ -319,6 +443,11 @@ def detect_strays(
     The return shape is the durable Slice A artifact: callers (later
     CLI/doctor/hook slices) can route it to triage records, work-item
     creation, or owner-AUQ surfaces without re-parsing.
+
+    ``worktree_entries`` is optional and defaults to none, so existing
+    callers that predate the FAB-04 worktree-staleness extension keep their
+    behavior; when supplied, orphaned stale ``.claude/worktrees/*`` checkouts
+    are surfaced as a distinct finding category.
     """
     workspace_findings = classify_workspace_entries(
         workspace_entries,
@@ -328,6 +457,12 @@ def detect_strays(
     )
     stash_findings = classify_stash_entries(
         stash_entries,
+        now=now,
+        active_session=active_session,
+        threshold_hours=threshold_hours,
+    )
+    worktree_findings = classify_worktree_entries(
+        worktree_entries or [],
         now=now,
         active_session=active_session,
         threshold_hours=threshold_hours,
@@ -345,7 +480,13 @@ def detect_strays(
             "stash_stale": sum(1 for f in stash_findings if f.classification == "stale"),
             "stash_recent": sum(1 for f in stash_findings if f.classification == "recent"),
             "stash_active_session": sum(1 for f in stash_findings if f.classification == "active_session"),
+            "worktree_total": len(worktree_findings),
+            "worktree_stale": sum(1 for f in worktree_findings if f.classification == "stale"),
+            "worktree_recent": sum(1 for f in worktree_findings if f.classification == "recent"),
+            "worktree_registered": sum(1 for f in worktree_findings if f.classification == "registered"),
+            "worktree_active_session": sum(1 for f in worktree_findings if f.classification == "active_session"),
         },
         "workspace_findings": [finding.to_dict() for finding in workspace_findings],
         "stash_findings": [finding.to_dict() for finding in stash_findings],
+        "worktree_findings": [finding.to_dict() for finding in worktree_findings],
     }

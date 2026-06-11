@@ -761,6 +761,24 @@ status = "adapter"
 adapter_source = ".claude/skills/grill-me-for-clarification/SKILL.md"
 source_sha256 = "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
 [[capabilities]]
+id = "skill.gtkb-hygiene-investigation"
+kind = "skill"
+canonical_name = "gtkb-hygiene-investigation"
+canonical_purpose = "Run a repeatable full-coverage GT-KB hygiene/architecture investigation via the 4-round probe method with loop-until-dry; render a chunked report and diff against the HYG-001..068 baseline registry."
+canonical_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/gtkb-hygiene-investigation/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+source_sha256 = "d4c755fbe02190b56fa2cc1df81e45db343a897bc699ce98d3b4a20145d0c32c"
+[[capabilities]]
 id = "skill.gtkb-hygiene-sweep"
 kind = "skill"
 canonical_name = "gtkb-hygiene-sweep"

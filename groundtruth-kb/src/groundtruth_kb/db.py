@@ -43,7 +43,9 @@ DB_PATH = Path("./groundtruth.db")
 # The chromadb module itself is imported lazily on first semantic-search use via
 # _load_chromadb(), so `import groundtruth_kb` stays fast for hooks and the CLI.
 try:
-    HAS_CHROMADB = importlib.util.find_spec("chromadb") is not None
+    import sys
+
+    HAS_CHROMADB = importlib.util.find_spec("chromadb") is not None and sys.version_info < (3, 14)
 except (ImportError, ValueError):
     HAS_CHROMADB = False
 

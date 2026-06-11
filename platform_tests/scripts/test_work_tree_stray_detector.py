@@ -32,10 +32,13 @@ from scripts.hygiene.stray_detector import (
     ActiveSessionContext,
     StashEntry,
     WorkspaceEntry,
+    WorktreeEntry,
     classify_stash_entries,
     classify_stash_entry,
     classify_workspace_entries,
     classify_workspace_entry,
+    classify_worktree_entries,
+    classify_worktree_entry,
     detect_strays,
 )
 
@@ -214,6 +217,144 @@ def test_stash_well_past_threshold_is_stale(now: datetime) -> None:
     finding = classify_stash_entry(entry, now=now)
 
     assert finding.classification == "stale"
+
+
+# ---------------------------------------------------------------------------
+# Category 5b: orphaned worktree staleness (FAB-04, HYG-057)
+# ---------------------------------------------------------------------------
+
+
+def test_stale_orphaned_worktree_is_detected(now: datetime) -> None:
+    """A non-registered .claude/worktrees/* dir over threshold is a reap candidate."""
+    entry = WorktreeEntry(
+        path=".claude/worktrees/stale-checkout",
+        last_modified=_hours_ago(now, 30),
+        git_registered=False,
+    )
+
+    finding = classify_worktree_entry(entry, now=now)
+
+    assert finding.classification == "stale"
+    assert finding.git_registered is False
+    assert finding.triage_reason == "stale_orphaned_worktree_over_threshold"
+    assert finding.candidate_action == "prune_and_delete_orphaned_worktree"
+
+
+def test_git_registered_worktree_is_never_reaped(now: datetime) -> None:
+    """A live, git-registered worktree is preserved regardless of age."""
+    entry = WorktreeEntry(
+        path="../external-registered-worktree",
+        last_modified=_hours_ago(now, 500),
+        git_registered=True,
+    )
+
+    finding = classify_worktree_entry(entry, now=now)
+
+    assert finding.classification == "registered"
+    assert finding.triage_reason == "git_registered_worktree"
+    assert finding.candidate_action == "skip"
+
+
+def test_active_session_worktree_excluded_from_stale(now: datetime) -> None:
+    entry = WorktreeEntry(
+        path=".claude/worktrees/in-use",
+        last_modified=_hours_ago(now, 48),
+        git_registered=False,
+    )
+    active = ActiveSessionContext(workspace_paths=frozenset({".claude/worktrees/in-use"}))
+
+    finding = classify_worktree_entry(entry, now=now, active_session=active)
+
+    assert finding.classification == "active_session"
+    assert finding.triage_reason == "active_session_holds_worktree"
+    assert finding.candidate_action == "skip"
+
+
+def test_recent_orphaned_worktree_is_recent(now: datetime) -> None:
+    entry = WorktreeEntry(
+        path=".claude/worktrees/fresh",
+        last_modified=_hours_ago(now, 2),
+        git_registered=False,
+    )
+
+    finding = classify_worktree_entry(entry, now=now)
+
+    assert finding.classification == "recent"
+    assert finding.candidate_action == "skip"
+
+
+def test_worktree_boundary_exactly_at_threshold_is_stale(now: datetime) -> None:
+    entry = WorktreeEntry(
+        path=".claude/worktrees/boundary",
+        last_modified=now - timedelta(hours=STALE_THRESHOLD_HOURS),
+        git_registered=False,
+    )
+
+    finding = classify_worktree_entry(entry, now=now)
+
+    assert finding.classification == "stale"
+
+
+def test_classify_worktree_entries_preserves_order(now: datetime) -> None:
+    entries = [
+        WorktreeEntry(
+            path=f".claude/worktrees/w{i}",
+            last_modified=_hours_ago(now, 24),
+            git_registered=False,
+        )
+        for i in range(4)
+    ]
+
+    findings = classify_worktree_entries(entries, now=now)
+
+    assert [f.path for f in findings] == [f".claude/worktrees/w{i}" for i in range(4)]
+
+
+def test_detect_strays_surfaces_stale_worktree(now: datetime) -> None:
+    """detect_strays carries the worktree category and counts a stale orphan."""
+    worktrees = [
+        WorktreeEntry(
+            path=".claude/worktrees/orphan",
+            last_modified=_hours_ago(now, 30),
+            git_registered=False,
+        ),
+        WorktreeEntry(
+            path="../registered",
+            last_modified=_hours_ago(now, 30),
+            git_registered=True,
+        ),
+        WorktreeEntry(
+            path=".claude/worktrees/fresh",
+            last_modified=_hours_ago(now, 1),
+            git_registered=False,
+        ),
+    ]
+
+    report = detect_strays(
+        now=now,
+        workspace_entries=[],
+        stash_entries=[],
+        worktree_entries=worktrees,
+    )
+
+    # Round-trips through json and reports the stale orphan distinctly.
+    restored = json.loads(json.dumps(report))
+    assert restored["counts"]["worktree_total"] == 3
+    assert restored["counts"]["worktree_stale"] == 1
+    assert restored["counts"]["worktree_registered"] == 1
+    assert restored["counts"]["worktree_recent"] == 1
+    stale = [f for f in restored["worktree_findings"] if f["classification"] == "stale"]
+    assert len(stale) == 1
+    assert stale[0]["path"] == ".claude/worktrees/orphan"
+    assert stale[0]["candidate_action"] == "prune_and_delete_orphaned_worktree"
+
+
+def test_detect_strays_worktree_param_defaults_empty(now: datetime) -> None:
+    """Existing callers that omit worktree_entries keep working (backward compat)."""
+    report = detect_strays(now=now, workspace_entries=[], stash_entries=[])
+
+    assert report["counts"]["worktree_total"] == 0
+    assert report["worktree_findings"] == []
 
 
 # ---------------------------------------------------------------------------

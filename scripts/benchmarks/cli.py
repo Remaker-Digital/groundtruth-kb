@@ -28,6 +28,7 @@ from scripts.benchmarks.common import write_run_outputs
 BENCHMARK_MODULES = [
     "assertion_signal_noise",
     "advisory_latency",
+    "backlog_triage",
     "deliberation_recall",
     "linkage_heatmap",
     "recall_coverage",

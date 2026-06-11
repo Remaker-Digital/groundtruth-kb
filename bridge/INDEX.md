@@ -1,4 +1,5 @@
 Document: gtkb-backlog-triage-and-hygiene-stage-0-analyzer
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-005.md
 GO: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-004.md
 REVISED: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-003.md
 NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-002.md

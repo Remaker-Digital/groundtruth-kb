@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-11T05:17:30Z",
+  "generated_at": "2026-06-11T08:31:53Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -303,7 +303,7 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 36,
+      "count": 37,
       "items": [
         "alternatives-investigation",
         "arch-audit",
@@ -317,6 +317,7 @@
         "deploy",
         "grill-me-for-clarification",
         "gtkb-benchmarks",
+        "gtkb-hygiene-investigation",
         "gtkb-hygiene-sweep",
         "gtkb-propose",
         "gtkb-sweep-commit",
@@ -699,11 +700,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "verified",
-      "version": "26.1.2"
+      "status": "unknown",
+      "version": "unknown"
     },
     "playwright": {
       "classification": "unsupported",

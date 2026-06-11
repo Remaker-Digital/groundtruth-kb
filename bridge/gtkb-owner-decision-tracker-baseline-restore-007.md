@@ -84,6 +84,10 @@ git diff --check
 no output
 ```
 
+## Owner Decisions / Input
+
+- None required. The verification regression fixes under WI-3277 are self-contained and do not introduce new owner decisions.
+
 ## Specification Links
 
 - `SPEC-AUQ-POLICY-ENGINE-001`

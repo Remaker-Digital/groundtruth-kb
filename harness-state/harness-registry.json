@@ -1,8 +1,10 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-11T04:11:22Z",
+  "generated_at": "2026-06-11T07:17:35Z",
   "harnesses": [
     {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "event_driven_hooks": true,
       "harness_name": "codex",
@@ -27,6 +29,8 @@
       "version": 34
     },
     {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "event_driven_hooks": true,
       "harness_name": "claude",
@@ -53,6 +57,8 @@
       "version": 28
     },
     {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "event_driven_hooks": true,
       "harness_name": "antigravity",
@@ -80,6 +86,8 @@
       "version": 14
     },
     {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "event_driven_hooks": true,
       "harness_name": "ollama",
@@ -106,6 +114,8 @@
       "version": 12
     },
     {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "event_driven_hooks": true,
       "harness_name": "goose",
@@ -125,6 +135,8 @@
       "version": 2
     },
     {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "event_driven_hooks": true,
       "harness_name": "openrouter",

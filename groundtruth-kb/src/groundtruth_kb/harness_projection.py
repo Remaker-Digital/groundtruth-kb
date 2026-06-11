@@ -77,9 +77,37 @@ _PROJECTED_FIELDS = (
 # Fields stored as JSON text in the DB, decoded to native objects here.
 _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 
-_EVENT_DRIVEN_HOOK_CAPABLE_TYPES = frozenset(
+# --- Capability axes (FAB-01 / HYG-004) ----------------------------------
+#
+# The single ``event_driven_hooks`` flag historically conflated two distinct
+# capabilities, and once every registered harness type was added to its capable
+# set the flag became always-true — it encoded "is a valid dispatch target",
+# not "can fire bridge dispatch hooks". That conflation masked the dispatch
+# deadlock at the eligibility check (a hook-less harness was a valid dispatch
+# TARGET but could never fire the event that drives a counterpart spawn).
+#
+# The two axes are now derived separately:
+#
+# - ``can_fire_events``: the harness carries live event-firing hook surfaces
+#   (PostToolUse + Stop) that drive the cross-harness trigger. Only Claude Code
+#   and Codex CLI qualify (``.claude/hooks`` + ``.codex/hooks.json``; Codex on
+#   Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001). This is the honest
+#   eligibility axis for "is there an active event source".
+# - ``can_receive_dispatch``: the harness can be spawned headless as a dispatch
+#   target. All registered launchable harness types qualify.
+#
+# ``event_driven_hooks`` is retained as a DEPRECATED back-compat alias equal to
+# ``can_receive_dispatch`` (its de-facto current meaning and value), so legacy
+# readers that have not migrated to the split axes see no value change. New
+# code MUST read ``can_fire_events`` / ``can_receive_dispatch``.
+_EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli"})
+
+_DISPATCH_RECEIVE_CAPABLE_TYPES = frozenset(
     {"claude", "claude-code", "codex", "codex-cli", "ollama", "openrouter", "antigravity", "goose"}
 )
+
+# Deprecated alias preserved for back-compat readers; equals the receive axis.
+_EVENT_DRIVEN_HOOK_CAPABLE_TYPES = _DISPATCH_RECEIVE_CAPABLE_TYPES
 
 
 def _now_iso() -> str:
@@ -111,7 +139,12 @@ def _project_harness_record(row: dict[str, Any]) -> dict[str, Any]:
     for field in _JSON_DECODED_FIELDS:
         record[field] = _decode_json_field(row.get(field))
     harness_type = str(record.get("harness_type") or "").strip().lower()
-    record["event_driven_hooks"] = harness_type in _EVENT_DRIVEN_HOOK_CAPABLE_TYPES
+    # Honest split axes (FAB-01 / HYG-004).
+    record["can_fire_events"] = harness_type in _EVENT_FIRING_CAPABLE_TYPES
+    record["can_receive_dispatch"] = harness_type in _DISPATCH_RECEIVE_CAPABLE_TYPES
+    # Deprecated back-compat alias == can_receive_dispatch (unchanged value for
+    # legacy readers; new code reads the split axes above).
+    record["event_driven_hooks"] = record["can_receive_dispatch"]
     return record
 
 

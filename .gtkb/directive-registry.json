@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "directives": [
+    {
+      "id": "DIR-ROOT-BOUNDARY-001",
+      "name": "Project Root Boundary",
+      "description": "All active files must be within E:\\GT-KB.",
+      "non_negotiable": true,
+      "enforcement_modes": ["tool-call", "bash", "audit"],
+      "patterns": {
+        "allowed_root": "E:\\GT-KB",
+        "blocked_absolute": [
+          "E:\\Claude-Playground\\",
+          "C:\\Users\\",
+          "/etc/",
+          "/home/"
+        ]
+      }
+    },
+    {
+      "id": "DIR-FORMAL-ARTIFACT-APPROVAL-001",
+      "name": "Formal Artifact Approval",
+      "description": "Mutations to ADR, DCL, and SPEC require explicit bridge-verdict evidence.",
+      "non_negotiable": true,
+      "enforcement_modes": ["tool-call", "audit"],
+      "patterns": {
+        "governed_paths": [
+          ".claude/rules/",
+          "docs/adr/",
+          "docs/dcl/",
+          "docs/specs/"
+        ]
+      }
+    }
+  ]
+}
