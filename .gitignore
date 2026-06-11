@@ -183,6 +183,9 @@ groundtruth (*).db*
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+# FAB-02 (HYG-019): the real azurerm backend config names the state Storage
+# account + access context; only the tracked .example template is committed.
+infrastructure/terraform/backend.hcl
 .terraform.lock.hcl
 crash.log
 override.tf

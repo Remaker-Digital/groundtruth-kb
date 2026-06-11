@@ -56,3 +56,24 @@ prime_bridge.db
 
 # --- Drive's own staging directory (Drive normally hides this; redundant) ---
 .tmp.driveupload/
+
+# --- Secret-at-rest replication exclusions (FAB-02 / WI-4414; HYG-019, HYG-020) ---
+# .gitignore already keeps these uncommitted, but .driveignore is an INDEPENDENT
+# replication surface: without these entries Google Drive for Desktop continues
+# uploading the plaintext credential SoT (.env.local) and the Terraform state
+# (6 plaintext secret values) to the owner's Drive cloud account. Excluding them
+# here closes the second (non-git) cloud-replication channel. The *.example
+# templates are non-secret and stay synced via the !*.example re-include.
+.env.local
+.env*
+!*.example
+*.tfstate
+*.tfstate.*
+*.tfvars
+infrastructure/terraform/.terraform/
+# The owner-filled backend config carries backend identifiers; .gitignore keeps
+# it uncommitted, and this entry closes the independent Drive-replication
+# channel so backend.hcl.example / the runbook claim of "never Drive-synced" is
+# mechanically true (FAB-02 -004 NO-GO follow-up). The .example template above
+# stays synced via !*.example (exact-path match here does not touch it).
+infrastructure/terraform/backend.hcl
