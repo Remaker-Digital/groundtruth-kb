@@ -93,7 +93,7 @@ source_sha256 = "codexhash2"
     )
 
 
-def test_role_filter_excludes_prime_builder_only_skills(tmp_path: Path) -> None:
+def test_generates_all_skills_regardless_of_role(tmp_path: Path) -> None:
     module = _load_module()
     _write_skill(tmp_path, "review")
     _write_skill(tmp_path, "build")
@@ -101,16 +101,23 @@ def test_role_filter_excludes_prime_builder_only_skills(tmp_path: Path) -> None:
 
     changed, adapters = module.generate(tmp_path)
 
-    assert adapters == [".agent/skills/review/SKILL.md"]
+    assert sorted(adapters) == sorted(
+        [
+            ".agent/skills/review/SKILL.md",
+            ".agent/skills/build/SKILL.md",
+        ]
+    )
     assert (tmp_path / ".agent" / "skills" / "review" / "SKILL.md").is_file()
-    assert not (tmp_path / ".agent" / "skills" / "build").exists()
+    assert (tmp_path / ".agent" / "skills" / "build" / "SKILL.md").is_file()
     assert ".agent/skills/review/SKILL.md" in changed
+    assert ".agent/skills/build/SKILL.md" in changed
     assert ".agent/skills/MANIFEST.json" in changed
 
 
 def test_marker_block_follows_frontmatter_for_bom_source(tmp_path: Path) -> None:
     module = _load_module()
     _write_skill(tmp_path, "review", bom=True)
+    _write_skill(tmp_path, "build")
     _write_registry(tmp_path)
 
     module.generate(tmp_path)
@@ -126,27 +133,35 @@ def test_marker_block_follows_frontmatter_for_bom_source(tmp_path: Path) -> None
 def test_check_mode_reports_drift_without_writing(tmp_path: Path) -> None:
     module = _load_module()
     _write_skill(tmp_path, "review")
+    _write_skill(tmp_path, "build")
     _write_registry(tmp_path)
 
     changed, _adapters = module.generate(tmp_path, check=True)
 
     assert ".agent/skills/review/SKILL.md" in changed
+    assert ".agent/skills/build/SKILL.md" in changed
     assert not (tmp_path / ".agent").exists()
 
 
 def test_current_adapters_pass_check_mode(tmp_path: Path) -> None:
     module = _load_module()
     _write_skill(tmp_path, "review")
+    _write_skill(tmp_path, "build")
     _write_registry(tmp_path)
     module.generate(tmp_path)
 
     changed, adapters = module.generate(tmp_path, check=True)
 
     assert changed == []
-    assert adapters == [".agent/skills/review/SKILL.md"]
+    assert sorted(adapters) == sorted(
+        [
+            ".agent/skills/review/SKILL.md",
+            ".agent/skills/build/SKILL.md",
+        ]
+    )
 
 
-def test_manifest_lists_only_lo_scoped_adapters(tmp_path: Path) -> None:
+def test_manifest_lists_all_adapters(tmp_path: Path) -> None:
     module = _load_module()
     _write_skill(tmp_path, "review")
     _write_skill(tmp_path, "build")
@@ -155,7 +170,12 @@ def test_manifest_lists_only_lo_scoped_adapters(tmp_path: Path) -> None:
 
     manifest = json.loads((tmp_path / ".agent" / "skills" / "MANIFEST.json").read_text(encoding="utf-8"))
     assert manifest["harness"] == "antigravity"
-    assert [a["adapter_relative_path"] for a in manifest["adapters"]] == [".agent/skills/review/SKILL.md"]
+    assert sorted([a["adapter_relative_path"] for a in manifest["adapters"]]) == sorted(
+        [
+            ".agent/skills/review/SKILL.md",
+            ".agent/skills/build/SKILL.md",
+        ]
+    )
 
 
 def test_update_registry_inserts_antigravity_block(tmp_path: Path) -> None:
@@ -171,14 +191,16 @@ def test_update_registry_inserts_antigravity_block(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert changed is True
-    assert registry_text.count("[capabilities.antigravity]") == 1
+    assert registry_text.count("[capabilities.antigravity]") == 2
     assert 'surface = ".agent/skills/review/SKILL.md"' in registry_text
+    assert 'surface = ".agent/skills/build/SKILL.md"' in registry_text
     parsed = tomllib.loads(registry_text)
     review = next(c for c in parsed["capabilities"] if c["id"] == "skill.review")
     build = next(c for c in parsed["capabilities"] if c["id"] == "skill.build")
     assert review["antigravity"]["status"] == "adapter"
     assert review["antigravity"]["adapter_source"] == ".claude/skills/review/SKILL.md"
-    assert "antigravity" not in build
+    assert build["antigravity"]["status"] == "adapter"
+    assert build["antigravity"]["adapter_source"] == ".claude/skills/build/SKILL.md"
 
 
 def test_update_registry_rewrites_existing_block(tmp_path: Path) -> None:
@@ -194,7 +216,7 @@ def test_update_registry_rewrites_existing_block(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert changed is True
-    assert registry_text.count("[capabilities.antigravity]") == 1
+    assert registry_text.count("[capabilities.antigravity]") == 2
     assert "stalehash" not in registry_text
     parsed = tomllib.loads(registry_text)
     review = next(c for c in parsed["capabilities"] if c["id"] == "skill.review")

@@ -378,12 +378,13 @@ def _status_for_surface(
         source_path = project_root / adapter_source
         if not source_path.is_file():
             return CapabilityResult(**common, state="MISSING", note=f"Adapter source is absent: {adapter_source}")
-        expected_marker = (
-            "GTKB-API-SKILL-ADAPTER"
-            if manifest_adapters and harness in manifest_adapters
-            else "GTKB-CODEX-SKILL-ADAPTER"
-        )
-        source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"), expected_marker)
+        if manifest_adapters and harness in manifest_adapters:
+            expected_marker = "GTKB-API-SKILL-ADAPTER"
+            source_expected_marker = "GTKB-API-SKILL-ADAPTER"
+        else:
+            expected_marker = f"GTKB-{harness.upper()}-SKILL-ADAPTER"
+            source_expected_marker = "GTKB-CODEX-SKILL-ADAPTER"
+        source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"), source_expected_marker)
         declared_source_hash = str(harness_config.get("source_sha256") or "").strip()
         metadata = _adapter_metadata(adapter_text, expected_marker)
         adapter_source_hash = metadata.get("Canonical source sha256", "")
@@ -487,7 +488,7 @@ def _overall_status(results: list[CapabilityResult], extras: list[ExtraResult], 
 
 
 def _harness_lifecycle_class(harness_name: str, project_root: Path = PROJECT_ROOT) -> str | None:
-    """Return 'active' | 'registered_no_role' | 'other' | None from the registry projection.
+    """Return 'active' | 'registered_no_role' | 'suspended' | 'other' | None from the registry projection.
 
     Used by check_harness_parity() to route registered/no-active-role harnesses (status=registered
     AND role=[]) through the capability-floor evaluation path instead of per-capability checks.
@@ -498,6 +499,8 @@ def _harness_lifecycle_class(harness_name: str, project_root: Path = PROJECT_ROO
             continue
         status = record.get("status")
         role = record.get("role") or []
+        if status == "suspended":
+            return "suspended"
         if status == "registered" and role == []:
             return "registered_no_role"
         if status == "active":
@@ -595,6 +598,8 @@ def check_harness_parity(
     registered_floor_harnesses: list[str] = []
     for selected_harness in selected_harnesses:
         lifecycle = _harness_lifecycle_class(selected_harness, project_root)
+        if lifecycle == "suspended":
+            continue
         if lifecycle == "registered_no_role":
             registered_floor_harnesses.append(selected_harness)
         else:

@@ -261,9 +261,9 @@
       "adapter_relative_path": ".api-harness/skills/gtkb-hygiene-investigation/SKILL.md",
       "canonical_name": "gtkb-hygiene-investigation",
       "capability_id": "skill.gtkb-hygiene-investigation",
-      "description": "Run a repeatable, full-coverage GT-KB architecture/hygiene investigation using the proven 4-round probe method (parallel focus-area probes -> gap probe -> completeness critic -> adversarial skeptic) with loop-until-dry and explicit decay disclosure. Emits findings against a structured schema, renders a chunked report via the deterministic report generator, and diffs against the HYG-001..068 baseline registry. Use when the owner asks for a hygiene/architecture investigation, a drift/debt census, or a repeat of the GT-KB self-investigation that produced HYG-001..068.",
+      "description": "Run a repeatable, full-coverage GT-KB architecture/hygiene investigation using the proven 4-round probe method (parallel focus-area probes -> gap probe -> completeness critic -> adversarial skeptic) with loop-until-dry and explicit decay disclosure. Emits findings against a structured schema, renders a chunked report via the deterministic report generator, and uses the frozen HYG-001..068 baseline registry for lookup and reporting; baseline diff/delta mode is deferred to a follow-on bridge. Use when the owner asks for a hygiene/architecture investigation, a drift/debt census, or a repeat of the GT-KB self-investigation that produced HYG-001..068.",
       "source_relative_path": ".claude/skills/gtkb-hygiene-investigation/SKILL.md",
-      "source_sha256": "d4c755fbe02190b56fa2cc1df81e45db343a897bc699ce98d3b4a20145d0c32c"
+      "source_sha256": "d2631ccefbe6309594c3bc6190712115e36c1a8f71b868072f589076e5c612d0"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-hygiene-sweep/SKILL.md",

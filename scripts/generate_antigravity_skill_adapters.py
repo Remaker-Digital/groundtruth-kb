@@ -42,7 +42,6 @@ GENERATED_MARKER = "<!-- GTKB-ANTIGRAVITY-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-ANTIGRAVITY-SKILL-ADAPTER -->"
 MANIFEST_NAME = "MANIFEST.json"
 GENERATOR_NAME = "scripts/generate_antigravity_skill_adapters.py"
-ANTIGRAVITY_ROLE = "loyal-opposition"
 REGISTRY_HARNESS_TABLE = "[capabilities.antigravity]"
 BOM = chr(0xFEFF)  # U+FEFF byte-order mark
 
@@ -66,7 +65,7 @@ class SkillAdapter:
     source_sha256: str
 
 
-def _lo_skill_capabilities(registry: dict) -> list[dict]:
+def _skill_capabilities(registry: dict) -> list[dict]:
     """Skill capabilities in the registry."""
 
     raw = registry.get("capabilities")
@@ -79,9 +78,6 @@ def _lo_skill_capabilities(registry: dict) -> list[dict]:
         if capability.get("kind") != "skill":
             continue
         if not str(capability.get("canonical_source") or "").endswith("/SKILL.md"):
-            continue
-        required_roles = capability.get("required_for_roles")
-        if not isinstance(required_roles, list) or ANTIGRAVITY_ROLE not in required_roles:
             continue
         selected.append(capability)
     return selected
@@ -133,7 +129,7 @@ def build_adapters(project_root: Path) -> list[SkillAdapter]:
     registry_path = project_root / REGISTRY_RELATIVE_PATH
     registry = tomllib.loads(registry_path.read_text(encoding="utf-8"))
     adapters: list[SkillAdapter] = []
-    for capability in _lo_skill_capabilities(registry):
+    for capability in _skill_capabilities(registry):
         source_relative_path = str(capability.get("canonical_source") or "")
         source_text = (project_root / source_relative_path).read_text(encoding="utf-8")
         # source_sha256 is the canonical-body hash, computed identically to the

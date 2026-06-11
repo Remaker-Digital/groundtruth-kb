@@ -6,6 +6,9 @@ Document: gtkb-dispatch-retry-delay-livelock-fix
 GO: bridge/gtkb-dispatch-retry-delay-livelock-fix-002.md
 NEW: bridge/gtkb-dispatch-retry-delay-livelock-fix-001.md
 
+Document: gtkb-delib-2500-review-advisory
+ADVISORY: bridge/gtkb-delib-2500-review-advisory-001.md
+
 Document: gtkb-dashboard-operations-cockpit-advisory
 ADVISORY: bridge/gtkb-dashboard-operations-cockpit-advisory-001.md
 
