@@ -1,7 +1,7 @@
 ---
 name: kb-spec
 description: Create or update a specification in the Knowledge Database. Enforces GOV-01 (spec-first), validates ID format, checks for duplicates, and ensures all required fields are present.
-argument-hint: [new|update] [SPEC-ID]
+argument-hint: "[new|update] [SPEC-ID]"
 allowed-tools: Bash, Read, Grep, Glob
 license: "Proprietary - Remaker Digital"
 compatibility:

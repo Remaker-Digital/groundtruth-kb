@@ -1,7 +1,7 @@
 ---
 name: kb-work-item
 description: Create a work item with automatic test creation and backlog assignment. Enforces GOV-12 (WI triggers tests) and GOV-13 (phase assignment) in a single invocation.
-argument-hint: [title] [--spec SPEC-ID] [--origin regression|defect|new|hygiene]
+argument-hint: "[title] [--spec SPEC-ID] [--origin regression|defect|new|hygiene]"
 allowed-tools: Bash, Read, Grep
 license: "Proprietary - Remaker Digital"
 compatibility:

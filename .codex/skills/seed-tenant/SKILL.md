@@ -2,7 +2,7 @@
 name: seed-tenant
 description: Seed a new tenant in Cosmos DB using the 9-phase seed_tenant.py script. Creates a complete, production-ready tenant environment.
 disable-model-invocation: true
-argument-hint: [--execute] [--demo] [--embed]
+argument-hint: "[--execute] [--demo] [--embed]"
 allowed-tools: Bash, Read
 license: "Proprietary - Remaker Digital"
 compatibility:

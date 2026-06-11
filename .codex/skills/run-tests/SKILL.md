@@ -1,7 +1,7 @@
 ---
 name: run-tests
 description: Run Agent Red tests using the thermal-safe batch runner or the live E2E test pipeline. Supports unit tests, integration tests, and full PLAN-001 E2E phases.
-argument-hint: [unit|live|pipeline] [options]
+argument-hint: "[unit|live|pipeline] [options]"
 allowed-tools: Bash, Read, Grep
 license: "Proprietary - Remaker Digital"
 compatibility:

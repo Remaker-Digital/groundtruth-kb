@@ -144,6 +144,52 @@ def _existing_generated_at(existing_text: str | None) -> str | None:
     return None
 
 
+def _quote_bracketed_argument_hint(line: str) -> str:
+    """WI-4461: quote an unquoted ``argument-hint`` value that begins a YAML
+    flow sequence (``[...]``).
+
+    Strict YAML parsers (Codex's) reject ``argument-hint: [a] [b]`` - the leading
+    ``[`` opens a flow sequence and the second ``[`` is then unexpected. Claude
+    Code's lenient frontmatter parser tolerates it. Quoting turns the value into a
+    plain string scalar both parsers accept; the hint text itself is unchanged.
+    """
+    body = line.rstrip("\n")
+    if not body.startswith("argument-hint:"):
+        return line
+    key, _, value = body.partition(":")
+    value = value.strip()
+    if not value or not value.startswith("["):
+        return line
+    # Only the MULTI-bracket form (`[a] [b]`) is invalid YAML: the leading `[`
+    # opens a flow sequence and a second `[` after the first `]` is unexpected.
+    # A single flow sequence (`[a]`) is valid YAML and is left untouched so the
+    # change is scoped to the genuinely-broken adapters.
+    close = value.find("]")
+    if close == -1 or not value[close + 1 :].strip():
+        return line
+    suffix = "\n" if line.endswith("\n") else ""
+    return f'{key}: "{value}"{suffix}'
+
+
+def _assert_strict_yaml_frontmatter(frontmatter_text: str, path: str) -> None:
+    """WI-4461: fail closed when emitted adapter frontmatter is not strict-YAML-
+    valid - the deterministic parity gate WI-4264 intended.
+
+    ``yaml`` is imported lazily; if it is unavailable the normalization still
+    applies and only the extra strict check is skipped.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return
+    try:
+        yaml.safe_load(frontmatter_text)
+    except yaml.YAMLError as exc:
+        raise SkillFrontmatterError(
+            f"{path}: emitted adapter frontmatter is not strict-YAML-valid (Codex would fail to load it): {exc}"
+        ) from exc
+
+
 def render_adapter(source_text: str, adapter: SkillAdapter, *, generated_at: str) -> str:
     source_text = _strip_generated_block(source_text).lstrip("\ufeff").rstrip() + "\n"
     block = _generated_block(adapter, generated_at)
@@ -151,7 +197,13 @@ def render_adapter(source_text: str, adapter: SkillAdapter, *, generated_at: str
     if lines and lines[0].strip() == "---":
         for index, line in enumerate(lines[1:], start=1):
             if line.strip() == "---":
-                return "".join(lines[: index + 1]) + block + "".join(lines[index + 1 :])
+                # WI-4461: normalize frontmatter to strict-valid YAML before emit
+                # (Codex's parser is stricter than Claude's), then fail closed if
+                # the normalized frontmatter still does not strict-parse.
+                fm_lines = [_quote_bracketed_argument_hint(fl) for fl in lines[1:index]]
+                _assert_strict_yaml_frontmatter("".join(fm_lines), adapter.adapter_relative_path)
+                head = lines[:1] + fm_lines + [lines[index]]
+                return "".join(head) + block + "".join(lines[index + 1 :])
     return block + source_text
 
 

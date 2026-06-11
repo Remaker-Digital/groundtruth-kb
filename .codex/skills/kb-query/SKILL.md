@@ -1,7 +1,7 @@
 ---
 name: kb-query
 description: Query the Knowledge Database for specs, tests, work items, procedures, and documents. Use when looking up project knowledge, checking spec status, finding open work items, or reviewing test coverage.
-argument-hint: [query-type] [filter]
+argument-hint: "[query-type] [filter]"
 allowed-tools: Bash, Read
 license: "Proprietary - Remaker Digital"
 compatibility:
