@@ -38,6 +38,7 @@ Document: gtkb-fab-07-doctor-false-signals
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
 Document: gtkb-fab-06-narrative-corrections
+NO-GO: bridge/gtkb-fab-06-narrative-corrections-002.md
 NEW: bridge/gtkb-fab-06-narrative-corrections-001.md
 
 Document: gtkb-fab-05-rule-file-retirement
