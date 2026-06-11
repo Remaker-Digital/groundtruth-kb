@@ -2,6 +2,7 @@ Document: gtkb-fab-19-hygiene-detector-expansion
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
 
 Document: gtkb-fab-18-backlog-dignity
+NO-GO: bridge/gtkb-fab-18-backlog-dignity-002.md
 NEW: bridge/gtkb-fab-18-backlog-dignity-001.md
 
 Document: gtkb-fab-17-da-chroma-read-path
