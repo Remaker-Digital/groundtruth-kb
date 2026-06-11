@@ -1,3 +1,7 @@
+Document: gtkb-fab-20-hygiene-investigation-skill
+NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-002.md
+NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-001.md
+
 Document: gtkb-fab-19-hygiene-detector-expansion
 NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
@@ -75,6 +79,7 @@ NO-GO: bridge/gtkb-fab-04-storage-reclamation-002.md
 NEW: bridge/gtkb-fab-04-storage-reclamation-001.md
 
 Document: gtkb-fab-02-secrets-remediation
+NEW: bridge/gtkb-fab-02-secrets-remediation-003.md
 GO: bridge/gtkb-fab-02-secrets-remediation-002.md
 NEW: bridge/gtkb-fab-02-secrets-remediation-001.md
 
