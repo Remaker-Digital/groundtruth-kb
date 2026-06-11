@@ -2,6 +2,7 @@ Document: gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-001.md
 
 Document: gtkb-backlog-triage-and-hygiene-stage-1-structural-repair
+NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-1-structural-repair-002.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-1-structural-repair-001.md
 
 Document: gtkb-backlog-triage-and-hygiene-stage-0-analyzer
