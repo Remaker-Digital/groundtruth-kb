@@ -17,6 +17,7 @@ Document: gtkb-fab-14-gate-fp-feedback-loop
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
 
 Document: gtkb-fab-13-retention-policy-umbrella
+NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-002.md
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-001.md
 
 Document: gtkb-fab-12-agent-red-residue-sweep
