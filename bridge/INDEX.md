@@ -26,6 +26,7 @@ Document: gtkb-fab-11-regression-signal-revival
 NEW: bridge/gtkb-fab-11-regression-signal-revival-001.md
 
 Document: gtkb-fab-10-dispatch-telemetry-claim-contract
+GO: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-002.md
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
 
 Document: gtkb-fab-09-safety-gate-registration
