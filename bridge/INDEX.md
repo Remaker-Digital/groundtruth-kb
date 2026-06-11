@@ -23,6 +23,7 @@ Document: gtkb-fab-12-agent-red-residue-sweep
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
 Document: gtkb-fab-11-regression-signal-revival
+NO-GO: bridge/gtkb-fab-11-regression-signal-revival-002.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-001.md
 
 Document: gtkb-fab-10-dispatch-telemetry-claim-contract
