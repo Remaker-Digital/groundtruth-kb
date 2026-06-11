@@ -19,8 +19,11 @@ Codex GO at `-008.md`. The literal-path-binding contract is exercised here:
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
+import stat
+import sys
 import uuid
 from pathlib import Path
 
@@ -228,7 +231,7 @@ def test_tp_cli_refuse_3_existing_adopter_recommends_upgrade(cli_runner) -> None
         assert "gt project upgrade" in msg
     finally:
         if sandbox_path.exists():
-            shutil.rmtree(sandbox_path, ignore_errors=True)
+            _force_rmtree(sandbox_path)
 
 
 def test_tp_cli_installed_context_allows_explicit_adopter_root(
@@ -307,7 +310,7 @@ def in_root_sandbox():
         yield sandbox_path
     finally:
         if sandbox_path.exists():
-            shutil.rmtree(sandbox_path, ignore_errors=True)
+            _force_rmtree(sandbox_path)
 
 
 def test_tp_integ_1_scaffold_emits_phase9_section1_enumeration(in_root_sandbox: Path) -> None:
@@ -456,12 +459,43 @@ def _list_fixture_files(profile: str) -> set[Path]:
     return {f.relative_to(fixture_root) for f in fixture_root.rglob("*") if f.is_file()}
 
 
+def _force_rmtree(path: Path) -> None:
+    """Remove a sandbox tree, clearing read-only bits then retrying; fails loudly.
+
+    Replaces ``shutil.rmtree(path, ignore_errors=True)`` at the in-root sandbox
+    cleanup sites (FAB-08 / HYG-053). On Windows, git object files under ``.git``
+    are read-only and make ``shutil.rmtree`` raise; the ``onexc`` handler clears
+    the read-only bit and retries. Unlike ``ignore_errors=True``, a real failure
+    propagates (cleanup must fail loudly per the FAB-08 GO constraint). Defined
+    self-contained here because the three FAB-08 target files cannot share a new
+    helper module without expanding the GO'd ``target_paths``; consolidation is a
+    follow-on.
+    """
+
+    def _on_rm_error(func, p, exc):  # exc = the raised exception instance
+        os.chmod(p, stat.S_IWRITE)
+        func(p)
+
+    if not path.exists():
+        return
+    if sys.version_info >= (3, 12):
+        # py3.12+ shutil.rmtree onexc signature (exc is the exception instance)
+        shutil.rmtree(path, onexc=_on_rm_error)
+    else:
+        # py3.11 shutil.rmtree onerror passes an exc_info tuple; adapt it to the
+        # (func, path, exc) handler above so behavior matches across runtimes.
+        shutil.rmtree(
+            path,
+            onerror=lambda func, p, exc_info: _on_rm_error(func, p, exc_info[1]),
+        )
+
+
 def _run_golden_scaffold(profile: str) -> Path:
     """Scaffold to the fixed in-root golden sandbox and return its path."""
     sandbox_name = f"_test_golden_{profile.replace('-', '_')}"
     sandbox = _GT_KB_HOST_ROOT / "applications" / sandbox_name
     if sandbox.exists():
-        shutil.rmtree(sandbox)
+        _force_rmtree(sandbox)
     options = ScaffoldOptions(
         project_name=sandbox_name,
         profile=profile,
@@ -509,7 +543,7 @@ def test_tp14_local_only_matches_golden_fixture() -> None:
         _assert_byte_equal_to_fixture("local-only", sandbox)
     finally:
         if sandbox.exists():
-            shutil.rmtree(sandbox, ignore_errors=True)
+            _force_rmtree(sandbox)
 
 
 def test_tp15_dual_agent_matches_golden_fixture() -> None:
@@ -519,4 +553,4 @@ def test_tp15_dual_agent_matches_golden_fixture() -> None:
         _assert_byte_equal_to_fixture("dual-agent", sandbox)
     finally:
         if sandbox.exists():
-            shutil.rmtree(sandbox, ignore_errors=True)
+            _force_rmtree(sandbox)

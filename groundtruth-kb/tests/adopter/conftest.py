@@ -17,8 +17,11 @@ GOV-19's outside-in contract.
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 import subprocess
+import sys
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -35,6 +38,38 @@ from groundtruth_kb.project.scaffold import (
 # ---------------------------------------------------------------------------
 # Pure helpers
 # ---------------------------------------------------------------------------
+
+
+def _force_rmtree(path: Path) -> None:
+    """Remove a sandbox tree, clearing read-only bits then retrying; fails loudly.
+
+    Replaces ``shutil.rmtree(path, ignore_errors=True)`` at the clean-adopter
+    sandbox-cleanup sites (FAB-08 / HYG-053). On Windows, git object files under
+    ``.git`` are created read-only and make ``shutil.rmtree`` raise
+    ``PermissionError``; the ``onexc`` handler clears the read-only bit and
+    retries. Unlike ``ignore_errors=True``, a removal that still fails for a real
+    reason propagates (cleanup must fail loudly per the FAB-08 GO constraint).
+    Defined self-contained here because the three FAB-08 target files cannot
+    share a new helper module without expanding the GO'd ``target_paths``;
+    consolidation into a shared test util is a follow-on.
+    """
+
+    def _on_rm_error(func, p, exc):  # exc = the raised exception instance
+        os.chmod(p, stat.S_IWRITE)
+        func(p)
+
+    if not path.exists():
+        return
+    if sys.version_info >= (3, 12):
+        # py3.12+ shutil.rmtree onexc signature (exc is the exception instance)
+        shutil.rmtree(path, onexc=_on_rm_error)
+    else:
+        # py3.11 shutil.rmtree onerror passes an exc_info tuple; adapt it to the
+        # (func, path, exc) handler above so behavior matches across runtimes.
+        shutil.rmtree(
+            path,
+            onerror=lambda func, p, exc_info: _on_rm_error(func, p, exc_info[1]),
+        )
 
 
 def _setup_git(target: Path) -> None:
@@ -89,7 +124,7 @@ def _scaffold_clean_adopter(
         yield sandbox, _GT_KB_HOST_ROOT
     finally:
         if sandbox.exists():
-            shutil.rmtree(sandbox, ignore_errors=True)
+            _force_rmtree(sandbox)
 
 
 def _load_existing_adopter_into_tmp_path(tmp_path: Path, fixture_name: str) -> tuple[Path, Path]:

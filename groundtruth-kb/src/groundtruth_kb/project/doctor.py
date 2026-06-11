@@ -8,8 +8,10 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -1152,6 +1154,73 @@ def _check_spec_classifier_codex_parity(target: Path) -> ToolCheck:
         status="warning",
         message="spec-classifier.py NOT registered in .codex/hooks.json UserPromptSubmit",
     )
+
+
+# FAB-08 (HYG-053): stale clean-adopter test-sandbox auto-prune.
+_TEST_SLOT_STALE_SECONDS = 24 * 3600
+
+
+def _force_remove_tree(path: Path) -> None:
+    """Remove a directory tree, clearing read-only bits (Windows .git) then retrying.
+
+    Mirrors the FAB-08 test-suite ``_force_rmtree`` helper: git object files
+    created on Windows are read-only and make ``shutil.rmtree`` raise; the
+    ``onexc`` handler clears the read-only bit and retries. A removal that still
+    fails for a real reason propagates (no silent ``ignore_errors``).
+    """
+
+    def _on_rm_error(func: Any, p: Any, exc: BaseException) -> None:  # exc = the raised exception instance
+        os.chmod(p, stat.S_IWRITE)
+        func(p)
+
+    if sys.version_info >= (3, 12):
+        # py3.12+ shutil.rmtree onexc signature (exc is the exception instance)
+        shutil.rmtree(path, onexc=_on_rm_error)
+    else:
+        # py3.11 shutil.rmtree onerror passes an exc_info tuple; adapt to the onexc shape.
+        shutil.rmtree(
+            path,
+            onerror=lambda func, p, exc_info: _on_rm_error(func, p, exc_info[1]),
+        )
+
+
+def _check_stale_test_slots(target: Path) -> ToolCheck:
+    """Auto-prune leaked clean-adopter test sandboxes (FAB-08 / HYG-053).
+
+    Detects ``applications/_test_*`` slots older than 24h — the clean-adopter
+    fixture leak signature — and prunes them, emitting a WARN listing what was
+    removed. Deletes ONLY ``_test_*`` directories directly under
+    ``applications/``; never a real application subtree.
+    """
+    name = "Stale test-sandbox auto-prune (applications/_test_*)"
+    apps_dir = target / "applications"
+    if not apps_dir.is_dir():
+        return ToolCheck(name=name, required=False, found=True, status="pass", message="no applications/ directory")
+    now = time.time()
+    pruned: list[str] = []
+    failed: list[str] = []
+    for child in sorted(apps_dir.glob("_test_*")):
+        # Defense-in-depth: only ever touch _test_*-named dirs directly under applications/.
+        if not child.is_dir() or child.parent != apps_dir or not child.name.startswith("_test_"):
+            continue
+        try:
+            age = now - child.stat().st_mtime
+        except OSError:
+            continue
+        if age <= _TEST_SLOT_STALE_SECONDS:
+            continue
+        try:
+            _force_remove_tree(child)
+            pruned.append(child.name)
+        except OSError as exc:
+            failed.append(f"{child.name} ({exc})")
+    if not pruned and not failed:
+        return ToolCheck(name=name, required=False, found=True, status="pass", message="no stale _test_* slots (>24h)")
+    shown = ", ".join(pruned[:10]) + (" ..." if len(pruned) > 10 else "")
+    message = f"pruned {len(pruned)} stale _test_* slot(s) >24h: {shown}"
+    if failed:
+        message += f"; {len(failed)} could not be removed: {', '.join(failed[:5])}"
+    return ToolCheck(name=name, required=False, found=True, status="warning", message=message)
 
 
 def _check_spec_classifier_test_exists(target: Path) -> ToolCheck:
@@ -2983,10 +3052,8 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
     top_updated_at_raw = data.get("updated_at")
     top_updated_at = None
     if isinstance(top_updated_at_raw, str) and top_updated_at_raw.strip():
-        try:
+        with suppress(ValueError):
             top_updated_at = datetime.fromisoformat(top_updated_at_raw.replace("Z", "+00:00"))
-        except ValueError:
-            pass
     if top_updated_at is None:
         try:
             mtime = state_path.stat().st_mtime
@@ -4276,6 +4343,7 @@ def run_doctor(
     checks.append(_check_rules(target, profile))
     checks.append(_check_canonical_terminology(target, profile))
     checks.append(_check_canonical_terms_registry(target))
+    checks.append(_check_stale_test_slots(target))
 
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))

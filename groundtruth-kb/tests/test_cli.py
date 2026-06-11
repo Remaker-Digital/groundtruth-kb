@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +14,38 @@ from click.testing import CliRunner
 
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
+
+
+def _force_rmtree(path: Path) -> None:
+    """Remove a sandbox tree, clearing read-only bits then retrying; fails loudly.
+
+    Replaces ``shutil.rmtree(path, ignore_errors=True)`` at the in-root
+    ``applications/_test_*`` cleanup site (FAB-08 / HYG-053). On Windows, git
+    object files under ``.git`` are read-only and make ``shutil.rmtree`` raise;
+    the ``onexc`` handler clears the read-only bit and retries. Unlike
+    ``ignore_errors=True``, a real failure propagates (cleanup must fail loudly
+    per the FAB-08 GO constraint). Defined self-contained here because the three
+    FAB-08 target files cannot share a new helper module without expanding the
+    GO'd ``target_paths``; consolidation is a follow-on.
+    """
+
+    def _on_rm_error(func, p, exc):  # exc = the raised exception instance
+        os.chmod(p, stat.S_IWRITE)
+        func(p)
+
+    if not path.exists():
+        return
+    if sys.version_info >= (3, 12):
+        # py3.12+ shutil.rmtree onexc signature (exc is the exception instance)
+        shutil.rmtree(path, onexc=_on_rm_error)
+    else:
+        # py3.11 shutil.rmtree onerror passes an exc_info tuple; adapt it to the
+        # (func, path, exc) handler above so behavior matches across runtimes.
+        shutil.rmtree(
+            path,
+            onerror=lambda func, p, exc_info: _on_rm_error(func, p, exc_info[1]),
+        )
+
 
 # ---------------------------------------------------------------------------
 # gt init
@@ -364,7 +400,6 @@ class TestBootstrapDesktop:
         # GTKB-ISOLATION-017 Slice 3 binds gt project init to the literal
         # in-root host root; this test migrates to the in-root sandbox pattern
         # (`applications/_test_<uuid>/`) per Codex `-008.md` GO conditions.
-        import shutil
         import uuid
 
         from groundtruth_kb.project.scaffold import _GT_KB_HOST_ROOT
@@ -398,7 +433,7 @@ class TestBootstrapDesktop:
             assert "bridge-automation/logs" in gitignore_text
         finally:
             if target.exists():
-                shutil.rmtree(target, ignore_errors=True)
+                _force_rmtree(target)
 
     def test_bootstrap_desktop_rejects_non_empty_target(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "occupied"
