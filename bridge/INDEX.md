@@ -89,6 +89,8 @@ NO-GO: bridge/gtkb-fab-05-rule-file-retirement-002.md
 NEW: bridge/gtkb-fab-05-rule-file-retirement-001.md
 
 Document: gtkb-cheap-draft-linter
+VERIFIED: bridge/gtkb-cheap-draft-linter-004.md
+NEW: bridge/gtkb-cheap-draft-linter-003.md
 GO: bridge/gtkb-cheap-draft-linter-002.md
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
