@@ -81,11 +81,7 @@ store. In GT-KB projects, use "MemBase" for the store itself and
 "GroundTruth KB" for the product. "Knowledge Database" persists as a
 descriptive phrase but is not the canonical noun.
 
-**Not to be confused with:** external knowledge bases (Confluence, Notion)
-which lack the append-only governance contract.
-
-**Source:** `MEMBASE-4-CLAUDE.md` (origin of pattern); early GT-KB
-transition docs.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#knowledge-database).*
 
 ### GroundTruth KB
 
@@ -97,39 +93,15 @@ templates, the doctor check, the file-bridge protocol (dual-agent profiles),
 and the published documentation at `docs/`. Shipped as the PyPI package
 `groundtruth-kb`.
 
-**Not to be confused with:** the downstream projects built on top of it
-(each tenant is a separate project that consumes GT-KB; GT-KB itself is
-the toolkit, not any one tenant).
-
-**Source:** `DELIB-0105` (GroundTruth rename transition); `README.md`;
-`pyproject.toml`.
-
-**Implementation pointer:** `src/groundtruth_kb/` (package),
-`pyproject.toml` (`name = "groundtruth-kb"`).
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#groundtruth-kb).*
 
 ### project-resource alias resolution
-
-**Canonical aliases:** the GitHub; project GitHub; repo; the repo; GitHub
-repo; GT-KB repo; GroundTruth-KB repo.
 
 **Definition:** Conversational references to source-control resources resolve
 through the configured GroundTruth-KB project resource URL unless the owner
 explicitly scopes the reference otherwise.
 
-**Configured GitHub repository URL:** `https://github.com/Remaker-Digital/groundtruth-kb`.
-
-**Not to be confused with:** separate project repositories such as Agent Red;
-local `origin` remote values; historical or erroneous remotes. If a local
-remote points elsewhere, treat it as configuration drift and verify before
-using it as evidence.
-
-**Source:** owner correction, 2026-05-03;
-`memory/feedback_groundtruth_kb_canonical_project_urls.md`.
-
-**Implementation pointer:** use explicit `--repo Remaker-Digital/groundtruth-kb`
-for GitHub CLI checks when the local remote is inconsistent with this record.
-The configured alias registry is `.claude/rules/project-resource-aliases.toml`;
-the human-readable companion is `memory/project_external_resource_registry.md`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#project-resource-alias-resolution).*
 
 ### GT-KB
 
@@ -338,9 +310,6 @@ clarification, 2026-05-06.
 
 ### project authorization
 
-**Canonical aliases:** project-scoped implementation authorization; project
-implementation authorization.
-
 **Definition:** A MemBase-backed, append-only owner authorization envelope for
 a named active project. It records the owner-decision deliberation id, scope,
 allowed mutation classes, forbidden operations, included/excluded work items
@@ -350,31 +319,15 @@ replace implementation proposals, Loyal Opposition review, bridge `GO`,
 proposal `target_paths`, implementation-start packets, spec-derived tests,
 implementation reports, or verification.
 
-**Not to be confused with:** backlog membership (known work, not approval);
-bridge `GO` (review approval for one proposal); implementation-start
-authorization packet (session-local proof for one GO'd proposal).
-
-**Source:** `DELIB-S347-PROJECT-SCOPED-IMPLEMENTATION-AUTHORIZATION`;
-`GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`;
-`DCL-PROJECT-AUTHORIZATION-ENVELOPE-001`;
-`PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`.
-
-**Implementation pointer:** `project_authorizations` table and
-`current_project_authorizations` view in `groundtruth.db`; `gt projects authorize`,
-`gt projects authorizations`, and `gt projects revoke-authorization`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#project-authorization).*
 
 ### sub-project
-
-**Canonical aliases:** sub-project; subproject.
 
 **Definition:** A named grouping of related work items inside a project.
 A sub-project exists to organize work under a larger project; it is not a
 separate application and is not a separate backlog source.
 
-**Not to be confused with:** project (the parent or top-level grouping);
-work item (the atomic known-work unit); application (the lifecycle object).
-
-**Source:** owner clarification, 2026-05-06.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#sub-project).*
 
 ### work item
 
@@ -548,20 +501,7 @@ isolation, not the definition.
 
 **Canonical alias:** lifecycle independence.
 
-**Not to be confused with:** sandboxing or process isolation (those are runtime
-concerns, not lifecycle ones); file-relocation under `applications/` (that is
-one consequence — the S331 wrong-frame failure).
-
-**Source:** `DELIB-S319-LIFECYCLE-INDEPENDENCE-CONTRACT` (S319, 2026-04-28,
-owner verbatim); `DELIB-0877` (industry-alignment critique, 2026-04-22);
-"S321 owner directive: platform app non specific" (DA title); `DELIB-0879`
-(`GTKB-ISOLATION-002` topology plan, 2026-04-22);
-`DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS` (S331 owner clarification:
-ZIP-portability test; scope-bound write enforcement).
-
-**Implementation pointer:** `applications/<name>/` placement convention per
-`ADR-ISOLATION-APPLICATION-PLACEMENT-001`; bridge thread family
-`gtkb-isolation-016` … `gtkb-isolation-018-*`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#isolation).*
 
 ### session scope
 
@@ -570,17 +510,7 @@ of `GT-KB`, `Application`, or `GT-KB+Application` (exceptional). Scope is
 declared at session start and mechanically enforced by hook-level write gating
 once the enforcement layer lands.
 
-**Not to be confused with:** `work subject` (work subject names the active
-subject area; session scope names the write-authority boundary).
-
-**Source:** `DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS` (S331;
-three-mode declaration as runtime invariant for lifecycle independence);
-`DELIB-0877` (asymmetric safety model, 2026-04-22); `DELIB-0876` (durable
-session work subject — adjacent governance).
-
-**Implementation pointer:** Currently advisory-only via
-`.claude/session/work-subject.json`. Mechanical enforcement is future work
-tracked under a separate proposal.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-scope).*
 
 ### bias case
 
@@ -588,17 +518,7 @@ tracked under a separate proposal.
 equivalent options, reliably prefers one over another in a way that produces
 wrong outcomes. The wrong option was actively chosen over the right one.
 
-**Not to be confused with:** `salience case` (the right option was never on
-the candidate list at all); "bias" used loosely for any agent failure (the
-term is reserved for actively-chosen-over).
-
-**Source:** `DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS` (S331;
-owner-articulated diagnostic distinction); `ADR-DA-READ-SURFACE-PLACEMENT-001`
-(alternatives-considered analysis: Path B rejection rationale references
-workaround behavior; Path D rationale uses bias-aligned framing).
-
-**Implementation pointer:** Diagnostic frame in proposal evaluation; not a
-runtime construct.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bias-case).*
 
 ### salience case
 
@@ -606,16 +526,7 @@ runtime construct.
 relevant option because it is not on the natural retrieval path at the moment
 of decision. The correct option was never weighed.
 
-**Not to be confused with:** `bias case` (option weighed and rejected);
-"salience" in the sense of "importance".
-
-**Source:** `DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS` (S331;
-aware-but-unused resources indicate placement/salience problem, not
-discipline problem); `ADR-DA-READ-SURFACE-PLACEMENT-001` (S331
-procedural-failure context that motivated Path D selection).
-
-**Implementation pointer:** Diagnostic frame; informs placement decisions for
-resources that are aware-but-unused.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#salience-case).*
 
 ### placement
 
@@ -628,16 +539,7 @@ reach-patterns rather than fighting agent defaults.
 
 **Canonical alias:** bias-aligned placement.
 
-**Not to be confused with:** enforcement (placement makes the resource
-reachable; enforcement gates a behavior). Placement and enforcement are
-complementary; the design choice is which to apply when.
-
-**Source:** `DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS` (S331;
-placement-over-coercion principle); `ADR-DA-READ-SURFACE-PLACEMENT-001`
-(Phase 0; placement codified as the chosen design path).
-
-**Implementation pointer:** Primary design lens for
-`GOV-GLOSSARY-AS-DA-READ-SURFACE-001` and downstream phases.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#placement).*
 
 ### glossary as DA read surface
 
@@ -648,18 +550,7 @@ read path for prior-decision consultation; the Deliberation Archive is the
 substrate the glossary cites. Direct DA semantic search is the long-tail /
 audit / rationale-deep-dive path.
 
-**Not to be confused with:** treating the glossary as a complete substitute
-for the DA (it is the read path, not the substrate); treating the DA as
-deprecated (it remains the rationale and provenance store).
-
-**Source:** `GOV-GLOSSARY-AS-DA-READ-SURFACE-001` (Phase 0);
-`ADR-DA-READ-SURFACE-PLACEMENT-001` (Phase 0);
-`DCL-GLOSSARY-DA-CITATION-COMPLETENESS-001` (Phase 0);
-`DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS` (S331 owner-approved
-framing).
-
-**Implementation pointer:** This entry is itself an instance of the
-principle: it cites the formal artifacts that define it.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#glossary-as-da-read-surface).*
 
 ### harness
 
@@ -671,17 +562,7 @@ vendor.
 
 **Canonical alias:** AI coding harness.
 
-**Not to be confused with:** model (e.g., Opus 4.7, GPT-5.3-Codex) — a
-harness hosts a model; the same model can run in different harnesses. Role
-assignment (see `role assignment`) is separate from harness identity.
-
-**Source:** `DELIB-0830` (Loyal Opposition assumes acting Prime Builder);
-`DELIB-0831` (Prime/LO are portable across harnesses); `DELIB-0832` (GT-KB
-installs configure Prime Builder).
-
-**Implementation pointer:** `harness-state/harness-identities.json`;
-`scripts/harness_identity.py` (identity-change CLI);
-`.claude/rules/operating-role.md`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#harness).*
 
 ### harness identity
 
@@ -691,16 +572,7 @@ unique and do not change after initial assignment except through an explicit
 owner-requested identity change operation. Startup resolves the active
 harness's identity from the persistent record before any role lookup.
 
-**Not to be confused with:** session ID; model name; role assignment (the
-role attached to the harness).
-
-**Source:** `DELIB-0832` (GT-KB installs configure harness identity);
-`DELIB-0831` (harness portability requires identity stability).
-
-**Implementation pointer:** `harness-state/harness-identities.json`;
-`groundtruth_kb.harness_projection.read_identity`;
-`python scripts/harness_identity.py set --harness-name <name>
---harness-id <id> --owner-requested`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#harness-identity).*
 
 ### canonical reader entrypoint
 
@@ -710,14 +582,7 @@ fallback, or lifecycle semantics.
 
 **Canonical alias:** reader entrypoint.
 
-**Not to be confused with:** the canonical artifact itself; direct file reads
-used only for governed audits or diagnostics.
-
-**Source:** `DCL-HARNESS-STATE-SOT-READER-CONTRACT-001`.
-
-**Implementation pointer:**
-`groundtruth_kb.harness_projection.{read_roles, read_identity, read_capabilities}`
-and the corresponding `gt harness ...` CLI surfaces.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-reader-entrypoint).*
 
 ### handoff prompt
 
@@ -732,20 +597,7 @@ distinct from its *persisted record*.
 explicitly rejected (per ``DELIB-20260883``) as a redundant third term for the
 same concept.
 
-**Not to be confused with:** ``Session Prompt`` — the PERSISTED RECORD of a
-handoff prompt (the ``session_prompts`` MemBase row; see Supporting Records). A
-handoff prompt is the generator output; a Session Prompt is that output stored
-as a governed record. Two views of one thing: the handoff prompt is what
-``::wrap`` produces; the Session Prompt is what persists it for the next session
-to consume.
-
-**Source:** ``SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001`` (the generator);
-``DELIB-20260883`` (owner terminology decision: generated-vs-stored model;
-"continuation prompt" rejected); WI-4363 (``GTKB-SYSTEMS-TERMINOLOGY-MAP-001``).
-
-**Implementation pointer:** ``groundtruth_kb.session.wrap`` / the handoff-prompt
-deterministic service invoked at canonical ``::wrap``; persisted as a
-``session_prompts`` row (the Session Prompt record).
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#handoff-prompt).*
 
 ### role assignment
 
@@ -765,19 +617,7 @@ role/status orthogonality model in
 
 **Canonical alias:** operating role.
 
-**Not to be confused with:** harness identity (the ID is stable; the role
-attached to it can change). The role attaches to the harness ID, not to a
-model, vendor name, or transient session.
-
-**Source:** `DELIB-0830` (LO assumes acting Prime Builder); `DELIB-0831`
-(Prime/LO are portable); `DELIB-0832` (installation-time role
-configuration).
-
-**Implementation pointer:** `harness-state/harness-registry.json`;
-`groundtruth_kb.harness_projection.read_roles`; the `roles` subcommand under
-`gt harness`;
-`.claude/rules/operating-role.md`; `.claude/rules/prime-builder-role.md`;
-`.claude/rules/loyal-opposition.md`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#role-assignment).*
 
 ### bridge thread
 
@@ -789,13 +629,7 @@ kebab-case slug and consists of an ordered sequence of versioned files
 retirement. `DEFERRED` parks a thread in owner-directed non-actionable state
 until its recorded clear/resume condition is met.
 
-**Not to be confused with:** bridge file (a single version within a thread);
-bridge document (the full version chain).
-
-**Source:** `GOV-FILE-BRIDGE-AUTHORITY-001` (live bridge index authority).
-
-**Implementation pointer:** `bridge/<slug>-NNN.md`; `bridge/INDEX.md`;
-`.claude/rules/file-bridge-protocol.md`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-thread).*
 
 ### GO / NO-GO / VERIFIED / DEFERRED
 
@@ -808,15 +642,7 @@ after a NO-GO) are upstream Prime-side states. `DEFERRED` is owner-directed
 bridge parking state; it is indexed and non-actionable, but it is not a Loyal
 Opposition verdict and does not authorize implementation.
 
-**Not to be confused with:** test pass/fail (a single test result); spec
-status fields like `specified`, `implemented`, `verified` (those are MemBase
-spec lifecycle states, distinct from bridge verdicts).
-
-**Source:** `GOV-FILE-BRIDGE-AUTHORITY-001`.
-
-**Implementation pointer:** Verdict lines in `bridge/<slug>-NNN.md` and the
-corresponding `bridge/INDEX.md` entry; `.claude/rules/file-bridge-protocol.md`
-§ Statuses.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#go-no-go-verified-deferred).*
 
 ### Loyal Opposition advisory
 
@@ -827,15 +653,7 @@ An LO advisory is filed at `bridge/<slug>-001.md` with status `NO-GO`
 Prime Builder with filing a normal implementation proposal that converts the
 advisory into scoped, testable GT-KB work.
 
-**Not to be confused with:** an LO review verdict on a Prime proposal (those
-carry GO/NO-GO/VERIFIED against an existing Prime-filed
-`NEW`/`REVISED`/post-implementation report).
-
-**Source:** `GOV-FILE-BRIDGE-AUTHORITY-001`.
-
-**Implementation pointer:** `bridge_kind: loyal_opposition_advisory` header
-field; precedent bootstrap pattern at
-`bridge/gtkb-canonical-terminology-system-context-model-advisory-2026-05-07-001.md`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#loyal-opposition-advisory).*
 
 ### applicability preflight
 
@@ -846,16 +664,7 @@ by the proposal's path or content. The gate emits a packet hash that LO
 verdicts cite. Returns `preflight_passed: false` when required cross-cutting
 specs are missing.
 
-**Not to be confused with:** `clause preflight` (a finer-grained sibling
-that checks ADR/DCL clause-level evidence, not just citation presence).
-
-**Source:** `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` (the
-constraint the gate enforces).
-
-**Implementation pointer:**
-`python scripts/bridge_applicability_preflight.py --bridge-id <id>`;
-`.claude/rules/file-bridge-protocol.md` § Mandatory Pre-Filing Preflight
-Subsection.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#applicability-preflight).*
 
 ### clause preflight
 
@@ -866,15 +675,7 @@ Emits an exit-5 blocking gate when any `must_apply` clause with both
 `severity = "blocking"` and `enforcement_mode = "blocking"` lacks satisfying
 evidence and is not explicitly owner-waived.
 
-**Not to be confused with:** `applicability preflight` (citation presence
-only). Clause preflight is finer-grained: it inspects clause-level evidence.
-
-**Source:** `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` (the
-constraint the gate enforces).
-
-**Implementation pointer:**
-`python scripts/adr_dcl_clause_preflight.py --bridge-id <id>`;
-`--report-only` is diagnostic only.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#clause-preflight).*
 
 ### bridge compliance gate
 
@@ -884,18 +685,7 @@ proposals/reports lacking required protocol elements. Currently enforces the
 `Owner Decisions / Input` section requirement when the proposal/report
 depends on owner approval.
 
-**Not to be confused with:** the applicability/clause preflight tools (those
-are reviewer-run gates; the compliance gate is author-side at Write time).
-
-**Source:** `SPEC-AUQ-POLICY-ENGINE-001` (deterministic policy engine that
-the gate participates in);
-`DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` (Owner Decisions /
-Input section is a linkage requirement).
-
-**Implementation pointer:** `.claude/hooks/bridge-compliance-gate.py`
-registered on `PreToolUse(Write|Edit)`;
-`.claude/rules/file-bridge-protocol.md` § Mandatory Owner Decisions / Input
-Section Gate.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-compliance-gate).*
 
 ### scanner-safe-writer
 
@@ -906,17 +696,7 @@ containing credential-shaped spans. The hook applies to direct Write/Edit
 tool calls; helper scripts that bypass the Write tool require their own scan
 implementation.
 
-**Not to be confused with:** the bridge-propose helper's internal credential
-scan (a separate implementation of the same patterns for helper-mediated
-writes).
-
-**Source:** `DELIB-0687` (VERIFIED Credential Scan Narrowing
-Post-Implementation Verification — establishes the canonical credential
-pattern set); `GOV-ARTIFACT-APPROVAL-001` (credential safety as part of the
-formal-artifact-approval discipline).
-
-**Implementation pointer:** `.claude/hooks/scanner-safe-writer.py`;
-`.claude/skills/bridge-propose/SKILL.md` (helper-side scan).
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#scanner-safe-writer).*
 
 ### owner-decision tracker
 
@@ -926,17 +706,7 @@ patterns in agent output and refuses turn-end when no `AskUserQuestion` tool
 call occurred in the same turn. Records detected questions in
 `memory/pending-owner-decisions.md`.
 
-**Not to be confused with:** the `bridge compliance gate` (Write-time hook
-on proposals); the `AskUserQuestion` tool itself (the tracker enforces use
-of the tool, not the tool itself).
-
-**Source:** `SPEC-AUQ-POLICY-ENGINE-001` (central deterministic policy
-engine returning canonical outcomes); `SPEC-AUQ-NO-LLM-CLASSIFIER-001`
-(deterministic-only; no LLM classifiers).
-
-**Implementation pointer:** `.claude/hooks/owner-decision-tracker.py`
-registered on `Stop`. `memory/pending-owner-decisions.md` is the durable
-record.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#owner-decision-tracker).*
 
 ### prose decision-ask pattern
 
@@ -946,17 +716,7 @@ resembles asking the owner for a decision in prose rather than via
 constant defines the patterns. When detected without an accompanying
 `AskUserQuestion` call in the same turn, the tracker blocks turn-end.
 
-**Not to be confused with:** factual reporting that mentions pending
-decisions (those are status updates, not asks); status-update questions
-like a single `?`.
-
-**Source:** `SPEC-AUQ-NO-LLM-CLASSIFIER-001` (deterministic patterns, not
-LLM classification); `SPEC-AUQ-POLICY-ENGINE-001` (engine that consumes the
-patterns).
-
-**Implementation pointer:** Pattern definitions in
-`.claude/hooks/owner-decision-tracker.py`. Avoid quoting matched fragments
-verbatim in prose to prevent recursive re-firing.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#prose-decision-ask-pattern).*
 
 ### AskUserQuestion
 
@@ -970,14 +730,7 @@ owner decisions).
 
 **Canonical alias:** AUQ.
 
-**Not to be confused with:** prose decision-ask patterns (anti-patterns);
-status-update reports (factual, not decision-asking).
-
-**Source:** `SPEC-AUQ-POLICY-ENGINE-001`; `SPEC-AUQ-NO-LLM-CLASSIFIER-001`.
-
-**Implementation pointer:** Claude Code built-in tool. Codex parity is
-forward-compatible per `ADR-CODEX-HOOK-PARITY-FALLBACK-001`. Mechanical
-enforcement via `.claude/hooks/owner-decision-tracker.py`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#askuserquestion).*
 
 ### operating model
 
@@ -988,18 +741,7 @@ operating-model reference; its terminology and framing are the alignment
 baseline for future remediation work. No hook or test mechanically enforces
 compliance with this artifact's text.
 
-**Not to be confused with:** an architectural specification (the
-operating-model is current how-it-works narrative; specifications are
-what-must-do constraints); a vision document.
-
-**Source:** `DELIB-S324-OM-DELTA-0001-CHOICE` (LO authority over
-requirements); `DELIB-S324-OM-DELTA-0003-CHOICE`
-(application/project/platform/hosted-application terminology);
-`DELIB-S324-OM-DELTA-0004-CHOICE` (backlog ordering semantics).
-
-**Implementation pointer:** `.claude/rules/operating-model.md`. Future
-changes require an owner-approved bridge proposal and a
-formal-artifact-approval packet.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#operating-model).*
 
 ### operating role
 
@@ -1012,18 +754,7 @@ per the Acting-Prime Compatibility Contract.
 
 **Canonical alias:** durable operating role; harness role.
 
-**Not to be confused with:** session lane (non-authority work classification;
-see below); session focus (owner-facing startup selection); work subject
-(active subject area; see below).
-
-**Source:** `GOV-HARNESS-ROLE-PORTABILITY-001`; `GOV-ACTING-PRIME-BUILDER-001`;
-bridge `gtkb-role-session-lifecycle-simplification-003` REVISED-1 GO at -004.
-
-**Implementation pointer:** `harness-state/harness-registry.json` is the
-canonical durable record; `groundtruth_kb.harness_projection.read_roles` and
-the `roles` subcommand under `gt harness` are canonical reader entrypoints;
-`.claude/rules/operating-role.md` is human-readable startup guidance (not a
-role record); `scripts/harness_roles.py` enforces the SET/READ contract.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#operating-role).*
 
 ### session lane
 
@@ -1034,14 +765,7 @@ or change the durable role assignment. Examples: research, architecture,
 implementation, quality engineering, operations/release, documentation,
 governance stewardship.
 
-**Not to be confused with:** operating role (authority-bearing; only
-prime-builder + loyal-opposition; see above).
-
-**Source:** bridge `gtkb-role-session-lifecycle-simplification-003`
-REVISED-1 GO at -004.
-
-**Implementation pointer:** Session lanes appear in Prime Builder startup
-focus options; Loyal Opposition does not present a focus menu.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-lane).*
 
 ### session focus
 
@@ -1051,14 +775,7 @@ binds the session to a specific work item or focus area for the duration
 of the session. Distinct from session lane (classification) and operating
 role (authority).
 
-**Not to be confused with:** session lane; operating role; work subject.
-
-**Source:** bridge `gtkb-role-session-lifecycle-simplification-003`
-REVISED-1 GO at -004; `GOV-SESSION-SELF-INITIALIZATION-001`.
-
-**Implementation pointer:** `scripts/session_self_initialization.py`
-renders the focus menu for Prime Builder; the owner selects one option to
-bind the session.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-focus).*
 
 ### work subject
 
@@ -1071,17 +788,7 @@ by owner commands at session start.
 
 **Canonical alias:** active work subject.
 
-**Not to be confused with:** `session scope` (the write-authority boundary;
-subject names what's being worked on, scope names which paths can be
-written). Bridge role slot and harness topology are separate dimensions in
-the same state file.
-
-**Source:** `DELIB-0876` (durable session work subject);
-`DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS` (S331 distinction
-between work subject and session scope).
-
-**Implementation pointer:** `.claude/session/work-subject.json`. Owner
-commands: `work subject GT-KB`, `application mode`, `agent red mode`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#work-subject).*
 
 ### session-stated role
 
@@ -1097,29 +804,9 @@ resume.
 
 **Canonical alias:** interactive session role; session-scoped role.
 
-**Not to be confused with:** `operating role` (the durable, cross-session role
-in `harness-state/harness-registry.json`; session-stated role overrides it only
-for interactive in-session surfaces, never for headless dispatch routing);
-`session lane` (a non-authority work classification); `session focus` (the
-owner-facing startup focus selection); `work subject` (the active subject area;
-an orthogonal axis).
-
-**Source:** `GOV-SESSION-ROLE-AUTHORITY-001` (authority split),
-`DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution table),
-`ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives);
-`DELIB-2507` (S371 originating owner directive); `DCL-CONCEPT-ON-CONTACT-001`
-(authority for first-contact glossary addition).
-
-**Implementation pointer:** `.claude/session/active-session-role.json` (runtime
-marker); written by `scripts/workstream_focus.py` on init-keyword match;
-invalidated by both `.claude/hooks/session_start_dispatch.py` and
-`.codex/gtkb-hooks/session_start_dispatch.py` at SessionStart; resolution rules
-in `scripts/session_role_resolution.py`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-stated-role).*
 
 ### smart poller
-
-**Status:** RETIRED 2026-05-09 (Slice 4 retirement; runtime archived to
-`archive/smart-poller-2026-05-09/`).
 
 **Definition:** The (now-retired) bridge-poller automation that scanned
 `bridge/INDEX.md` periodically and dispatched the appropriate harness when
@@ -1128,26 +815,7 @@ monitoring/dispatch infrastructure only; `bridge/INDEX.md` remained the
 canonical workflow state. Bridge dispatch is now governed by the
 `cross-harness event-driven trigger` (see entry below).
 
-**Not to be confused with:** the retired `OS poller` class (halted
-2026-04-25 per owner directive); the `cross-harness event-driven trigger`
-(the current canonical automation path).
-
-**Source:** `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001` v2 (mechanism-agnostic
-supersede; spawns headless harness instances when actionable);
-`DCL-SMART-POLLER-AUTO-TRIGGER-001` v2 (auto-trigger contract supersede);
-`DELIB-S319-SMART-POLLER-POLICY-CLARIFICATION` (opt-out when functional);
-`DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION` (spawn to notify
-architecture); `DELIB-S321-SMART-POLLER-AUTO-TRIGGER` (S321 owner
-directive); `DELIB-S337-SMART-POLLER-RETIREMENT-2026-05-09` (Slice 4
-retirement decision); bridge thread
-`gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`.
-
-**Implementation pointer:** Archived. Historical artifacts at
-`archive/smart-poller-2026-05-09/`: Windows scheduled task
-`GTKB-SmartBridgePoller` (halted), VBS daemon
-`scripts/run_smart_bridge_poller.vbs`, runner
-`groundtruth-kb/scripts/bridge_poller_runner.py`. Doctor's
-`_check_smart_bridge_poller` removed in Slice 4 D4.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#smart-poller).*
 
 ### cross-harness event-driven trigger
 
@@ -1165,27 +833,7 @@ poller's actionable-signature scheme byte-identically per
 `platform_tests/scripts/test_cross_harness_bridge_trigger.py` so the audit-trail
 invariants are preserved.
 
-**Not to be confused with:** retired `smart poller` (interval-driven
-substrate; archived); retired `OS poller` (blind-polling scheduled-task
-class; halted 2026-04-25); the `file bridge` (the protocol surface; the
-trigger dispatches into it).
-
-**Source:** Slice 3 closure
-`bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`
-(VERIFIED) — hook registrations; Slice 4
-`bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`
-— smart-poller substrate retirement; `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001`
-v2 (mechanism-agnostic supersede); `DCL-SMART-POLLER-AUTO-TRIGGER-001` v2
-(auto-trigger contract; trigger MUST dispatch on actionable signature
-change); `DELIB-S337-CODEX-HOOKS-WINDOWS-RETEST-2026-05-08` (empirical
-event-driven trigger foundation).
-
-**Implementation pointer:** `scripts/cross_harness_bridge_trigger.py`
-(entrypoint); `.claude/settings.json` (Claude Code-side hook
-registration); `.codex/hooks.json` (Codex-side parity registration);
-`.gtkb-state/bridge-poller/dispatch-state.json` (per-recipient dispatch
-state); `_check_cross_harness_trigger` and `_check_bridge_dispatch_liveness`
-in `groundtruth-kb/src/groundtruth_kb/project/doctor.py` (health checks).
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#cross-harness-event-driven-trigger).*
 
 ### role set
 
@@ -1199,20 +847,7 @@ multi-element lists represent the single-harness case (one harness ID holds
 both roles). In-process, role sets are represented as Python ``frozenset[str]``
 constructed by ``_normalize_role_field`` in ``scripts/harness_roles.py``.
 
-**Not to be confused with:** ``operating role`` (canonical value type;
-``role set`` is the canonical container type). The legacy scalar form
-(``"role": "prime-builder"``) is accepted on READ and normalized to a
-singleton set; the next WRITE upgrades the on-disk record to list form.
-
-**Source:** ``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` (Path 2 atomic migration
-that made role-set the active runtime schema); ``.claude/rules/operating-role.md``
-§ Role Set Schema (Active Authority).
-
-**Implementation pointer:** ``scripts/harness_roles.py``: helpers
-``_normalize_role_field``, ``_role_set_to_json``, ``is_prime_builder``,
-``is_loyal_opposition``. Doctor check
-``_check_role_set_topology_consistency`` validates list form, valid tokens,
-no duplicates, identity-map vs role-map topology consistency.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#role-set).*
 
 ### single-harness operating mode
 
@@ -1228,24 +863,7 @@ provided by the single-harness bridge dispatcher (per
 event-driven trigger. Single-harness operating mode is first-class architecture,
 not a degradation of the multi-harness topology.
 
-**Not to be confused with:** ``multi-harness operating mode`` (two or more
-harnesses installed, each with singleton role sets, dispatch via cross-harness
-event-driven trigger); ``acting-prime-builder`` legacy compatibility/provenance
-value (a READ-accepted historical value, not a topology).
-
-**Source:** ``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` (topology decision);
-``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001`` (dispatcher behavior contract);
-``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` (wake substrate constraint);
-``GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001`` (preserved: GT-KB installs
-prepare capable harnesses for either role regardless of topology);
-``bridge/gtkb-single-harness-bridge-dispatcher-001-013.md`` (Codex GO at -014).
-
-**Implementation pointer:** Topology is determined at runtime by inspecting
-the active harness's role-set cardinality in
-``harness-state/harness-registry.json``. Multi-element role set ->
-single-harness mode applicable. Doctor check
-``_check_single_harness_dispatcher_when_required`` warns when applicable but
-the scheduled task is absent.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#single-harness-operating-mode).*
 
 ### single-harness bridge dispatcher
 
@@ -1263,22 +881,7 @@ changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
 as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 ``GTKB_BRIDGE_DISPATCH_KEYWORD`` env vars.
 
-**Not to be confused with:** ``cross-harness event-driven trigger`` (the
-multi-harness dispatch substrate; the two substrates are mutually exclusive
-at runtime); retired ``smart poller`` (archived Slice 4 retirement
-2026-05-09); retired ``OS poller`` class (halted 2026-04-25).
-
-**Source:** ``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001`` (behavior contract);
-``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` (wake substrate constraint);
-``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` (topology motivating the
-dispatcher); ``bridge/gtkb-single-harness-bridge-dispatcher-001-013.md``
-(Codex GO at -014).
-
-**Implementation pointer:** Slice 1 lands the governance scaffolding +
-role-set runtime migration; Slice 2 lands the dispatcher script + scheduled
-task setup (separate bridge thread; tracked as open follow-on). State path:
-``.gtkb-state/bridge-poller/`` shared with the cross-harness trigger.
-Failures log: ``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#single-harness-bridge-dispatcher).*
 
 ### OS poller
 
@@ -1291,16 +894,7 @@ directive because they polled blindly — waking the harnesses on a fixed
 interval regardless of bridge activity — and must not be re-enabled as a
 substitute for the smart poller.
 
-**Not to be confused with:** retired `smart poller` (Slice 4 archive);
-`cross-harness event-driven trigger` (current canonical automation path).
-
-**Source:** `DELIB-S319-SMART-POLLER-POLICY-CLARIFICATION` (covers
-OLD-poller halt context).
-
-**Implementation pointer:** Listed in `.claude/rules/bridge-essential.md`
-§ Operational Mode for do-not-re-enable reference. Re-enabling requires
-explicit owner approval and the cost/benefit analysis required by
-`bridge-essential.md` § Re-Enabling Pollers.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#os-poller).*
 
 ### canonical init keyword
 
@@ -1308,11 +902,7 @@ explicit owner approval and the cost/benefit analysis required by
 
 **Definition:** The canonical first-line activator syntax for machine-emitted GroundTruth-KB session prompts, formalized as `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001`. Regex `^::init gtkb (pb|lo)$`; first-line-only; closed vocabulary `{pb, lo}` (pb = Prime Builder, lo = Loyal Opposition); no synonyms; strict parse. The keyword tells a receiving harness which durable role's auto-process content to render at SessionStart and is the single source of truth for cross-harness dispatch and future single-harness dispatchers.
 
-**Not to be confused with:** the prose role-line that accompanies the keyword as defense-in-depth (the prose line is informational; the keyword is authority); the `init gtkb` shell command for human-typed session initialization (the canonical init keyword is the machine-emitted variant for dispatcher-spawned sessions).
-
-**Source:** `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001` (syntax); `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001` (emitter authority + receiver enforcement); `bridge/gtkb-canonical-init-keyword-syntax-001-007.md` (Codex GO at -008); `DCL-CONCEPT-ON-CONTACT-001` (load-bearing concept added on first contact).
-
-**Implementation pointer:** Emitted by `scripts/cross_harness_bridge_trigger.py` in `_dispatch_prompt` (canonical keyword derived from durable role per `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001`). Recognized by `.claude/hooks/session_start_dispatch.py` and `.codex/gtkb-hooks/session_start_dispatch.py` SessionStart hooks. Receiver performs set-membership check against own durable role; mismatch produces silent drop with audit log at `.gtkb-state/bridge-poller/dispatch-failures.jsonl`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-init-keyword).*
 
 ### doctor
 
@@ -1323,16 +913,7 @@ scaffold drift, KB integrity, dashboard reachability, and other configured
 checks. The doctor is the canonical predicate for several rule-cited
 conditions.
 
-**Not to be confused with:** test runs (pytest, ruff, etc.);
-release-candidate gate (`scripts/release_candidate_gate.py`).
-
-**Source:** `SPEC-DA-DOCTOR-CHECK` (doctor bridge-thread coverage check);
-`SPEC-DSI-DOCTOR-CHECK-001` (doctor invariant reporting
-spec-derivation-gate alignment).
-
-**Implementation pointer:** `groundtruth-kb/` doctor implementation.
-Specific checks: `_check_cross_harness_trigger`,
-`_check_bridge_dispatch_liveness`, scaffold drift, KB integrity, etc.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#doctor).*
 
 ### release manifest
 
@@ -1342,18 +923,7 @@ The manifest accompanies the release tag and identifies constituent
 component versions so that the release can be reproduced, rolled back, or
 audited.
 
-**Not to be confused with:** a release-readiness report (evidence that a
-build is safe to deploy; the manifest is the inventory of what's in the
-build); a deployment record (post-deployment audit; the manifest is
-build-time).
-
-**Source:** `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` (production
-release readiness requires governed test evidence; release manifest is the
-inventory anchor for that evidence).
-
-**Implementation pointer:** Implementation is intended-but-partial as of
-2026-04-30 per `.claude/rules/operating-model.md` §3. Future formal spec
-under `GOV-RELEASE-MANIFEST-README-001` (candidate; not yet inserted).
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#release-manifest).*
 
 ### deliberation harvest
 
@@ -1362,14 +932,7 @@ under `GOV-RELEASE-MANIFEST-README-001` (candidate; not yet inserted).
 into the Deliberation Archive table in MemBase plus the ChromaDB semantic
 index. Runs as part of session wrap.
 
-**Not to be confused with:** the Deliberation Archive itself (the
-destination); direct DA queries (the read-side counterpart).
-
-**Source:** `SPEC-DA-HARVEST-INCLUSION`; `SPEC-DA-HARVEST-EXCLUSION`;
-`SPEC-DA-MECHANICAL-ENFORCE`; `SPEC-DA-RETROACTIVE-SWEEP`.
-
-**Implementation pointer:** `python scripts/harvest_session_deliberations.py`;
-`.claude/rules/deliberation-protocol.md` § When To Archive Deliberations.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#deliberation-harvest).*
 
 ### formal-artifact-approval packet
 
@@ -1387,19 +950,7 @@ hash.
 
 **Canonical alias:** approval packet.
 
-**Not to be confused with:** the bridge GO verdict (a bridge GO authorizes
-Prime to proceed to per-artifact approval collection; it does not replace
-the per-artifact packet).
-
-**Source:** `GOV-ARTIFACT-APPROVAL-001`; `PB-ARTIFACT-APPROVAL-001`;
-`DCL-ARTIFACT-APPROVAL-HOOK-001`.
-
-**Implementation pointer:**
-`.groundtruth/formal-artifact-approvals/<date>-<artifact-id>.json`. Env
-vars `GTKB_FORMAL_APPROVAL_PACKET` or
-`GTKB_NARRATIVE_ARTIFACT_APPROVAL_PACKET` reference the packet at hook
-check time. `config/governance/narrative-artifact-approval.toml` defines
-the protected-path patterns for narrative artifacts.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#formal-artifact-approval-packet).*
 
 ### canonical artifact
 
@@ -1414,15 +965,7 @@ protected narrative artifacts at `.claude/rules/*.md`, `AGENTS.md`,
 `applications/<name>/CLAUDE-ARCHITECTURE.md`. Canonical artifacts are subject to append-only
 versioning discipline.
 
-**Not to be confused with:** operational state files (`MEMORY.md`,
-`memory/*.md` topic files, `.claude/session/*.json`) — those are
-notepad-tier per ADR-0001, high-churn, not canonical.
-
-**Source:** `GOV-ARTIFACT-APPROVAL-001`; `PB-ARTIFACT-APPROVAL-001`.
-
-**Implementation pointer:** Canonical artifacts are gated by
-formal-artifact-approval-gate.py (MemBase rows) or
-narrative-artifact-approval-gate.py (protected `.md` files) at write time.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-artifact).*
 
 ### interrogative default
 
@@ -1436,17 +979,7 @@ interrogative default does NOT apply to claims the agent cannot verify
 (e.g., owner-stated business facts, customer information, organizational
 decisions).
 
-**Not to be confused with:** disagreement or pushback in general — the
-interrogative default is specifically about verifying owner factual claims
-about GT-KB itself.
-
-**Source:** `DELIB-S324-PB-INTERROGATION-DIRECTIVE` (S324 owner directive
-establishing the interrogative default).
-
-**Implementation pointer:** Posture, not runtime construct. Applied by
-Prime Builder during owner-input processing per
-`.claude/rules/operating-model.md` §1 and
-`.claude/rules/prime-builder-role.md`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#interrogative-default).*
 
 ### specify-on-contact
 
@@ -1458,59 +991,31 @@ specification triggers specification creation; touching a load-bearing
 concept that lacks a glossary entry triggers glossary promotion (per the
 DCL).
 
-**Not to be confused with:** the GOV-09 owner-input classification rule
-(specification language triggers spec-first workflow);
-`DCL-CONCEPT-ON-CONTACT-001` is parallel, not replacement.
-
-**Source:** `DCL-CONCEPT-ON-CONTACT-001` (Phase 0; terminology-layer
-mirror that explicitly references the GOV-06 specify-on-contact
-precedent).
-
-**Implementation pointer:** Specify-on-contact at the code layer is
-enforced through normal Prime Builder spec-first discipline at code-touch
-time. The terminology-layer mirror (`DCL-CONCEPT-ON-CONTACT-001`) is
-staged across Phase 3 (Stage A) and Phase 6 (Stages B and C).
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#specify-on-contact).*
 
 ### assertion category
 
 **Definition:** One of four classifications produced by `scripts/assertion_categorize.py` for currently-failing assertions: `genuine_drift`, `chronic_noise`, `flaky`, `healthy`. Categorization is deterministic inference over `assertion_runs` history; outputs are read-only at `.gtkb-state/assertion-triage/categories/<assertion_id>.json`.
 
-**Not to be confused with:** assertion (the GT-KB machine-verifiable check primitive itself).
-
-**Source:** S349 self-diagnostic; `bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-007.md` (Codex GO at -008); SPEC-1662 (GOV-18).
-
-**Implementation pointer:** `scripts/assertion_categorize.py`; `scripts/assertion_retirement_workflow.py`; `.claude/skills/assertion-triage/SKILL.md`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#assertion-category).*
 
 ### genuine_drift
 
 **Definition:** Assertion category indicating: latest run FAIL, prior PASS streak (default >=2 consecutive PASS runs), transition within configurable window (default 7 days). Drift detection per SPEC-1662 (GOV-18). Highest-priority assertion-triage category.
 
-**Not to be confused with:** chronic_noise (all recent runs FAIL) or flaky (transitions in both directions).
-
-**Source:** S349 self-diagnostic; `scripts/assertion_categorize.py` `_categorize()` function.
-
-**Implementation pointer:** `_categorize()` applying `drift_prior_pass` and `drift_window_days` thresholds.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#genuinedrift).*
 
 ### chronic_noise
 
 **Definition:** Assertion category indicating: all available recent runs FAIL, count meets configurable threshold (default 5; the SPEC-default 50 becomes reachable once the `assertion_runs` retention cap is widened). Candidate for retirement-or-accept owner decision per GOV-15 (test fix gate).
 
-**Not to be confused with:** genuine_drift (recently transitioned from PASS) or flaky (mixed PASS/FAIL).
-
-**Source:** S349 self-diagnostic; SPEC-1662 (GOV-18); `scripts/assertion_retirement_workflow.py` review-candidates / ask / apply-decision flow.
-
-**Implementation pointer:** `scripts/assertion_categorize.py` `_categorize()`; `scripts/assertion_retirement_workflow.py` (one-at-a-time AUQ retirement path).
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#chronicnoise).*
 
 ### flaky
 
 **Definition:** Assertion category indicating: recent runs window includes both PASS and FAIL with at least one transition. Flag for test-quality repair, NOT for retirement.
 
-**Not to be confused with:** chronic_noise (all FAIL, retirement candidate) or genuine_drift (clear FAIL after PASS streak).
-
-**Source:** S349 self-diagnostic; `scripts/assertion_categorize.py` `_categorize()` function.
-
-**Implementation pointer:** `_categorize()` lines computing transitions and PASS/FAIL counts within `flaky_window`.
-
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#flaky).*
 
 ### advisory-router
 
@@ -1523,11 +1028,7 @@ modifies source advisory files, uses `origin='hygiene'` and
 
 **Canonical alias:** advisory backlog router.
 
-**Not to be confused with:** the broader peer-solution-advisory-loop procedure.
-
-**Source:** S349 self-diagnostic investigation (2026-05-13); `bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-009.md` (Codex GO at -010).
-
-**Implementation pointer:** `scripts/advisory_backlog_router.py`; Stop-event surface at `.claude/hooks/advisory-router-scan.py` registered in `.claude/settings.json` and `.codex/hooks.json`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#advisory-router).*
 
 ### benchmark
 
@@ -1535,11 +1036,7 @@ modifies source advisory files, uses `origin='hygiene'` and
 
 **Canonical alias:** measurement script; metric collector.
 
-**Not to be confused with:** test (PASS/FAIL primitive against a specification); assertion (machine-verifiable check attached to a spec); doctor check (health verification with WARN/FAIL severity).
-
-**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` (Codex GO at -010); `SPEC-1662` (GOV-18 Assertion Quality Standard); `INSIGHTS-2026-05-10-13-26-GTKB-SELF-MEASUREMENT-SYSTEM.md`.
-
-**Implementation pointer:** `scripts/benchmarks/*.py` modules; `scripts/benchmarks/cli.py` for `run` / `report` / `compare` subcommands; output convention `.gtkb-state/benchmarks/<run_id>/`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#benchmark).*
 
 ### linkage heat map
 
@@ -1547,11 +1044,7 @@ modifies source advisory files, uses `origin='hygiene'` and
 
 **Canonical alias:** cross-artifact linkage matrix.
 
-**Not to be confused with:** dependency graph (directional, edge-typed); spec-to-test mapping (one-to-many per spec, not a class-level summary).
-
-**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` IP-2 (Benchmark 1); `INSIGHTS-2026-05-10-13-26-GTKB-SELF-MEASUREMENT-SYSTEM.md`.
-
-**Implementation pointer:** `scripts/benchmarks/linkage_heatmap.py`; output JSON written to `.gtkb-state/benchmarks/<run_id>/linkage_heatmap.json`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#linkage-heat-map).*
 
 ### advisory latency
 
@@ -1559,11 +1052,7 @@ modifies source advisory files, uses `origin='hygiene'` and
 
 **Canonical alias:** advisory-to-action latency; advisory turnaround time.
 
-**Not to be confused with:** dispatch latency (cross-harness trigger spawn timing); review latency (NEW/REVISED to GO/NO-GO duration).
-
-**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` IP-2 (Benchmark 5); `.claude/rules/peer-solution-advisory-loop.md` (the advisory-handling procedure measured).
-
-**Implementation pointer:** `scripts/benchmarks/advisory_latency.py`; output JSON written to `.gtkb-state/benchmarks/<run_id>/advisory_latency.json`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#advisory-latency).*
 
 ### metric snapshot
 
@@ -1571,14 +1060,7 @@ modifies source advisory files, uses `origin='hygiene'` and
 
 **Canonical alias:** benchmark result; measurement snapshot.
 
-**Not to be confused with:** session snapshot (point-in-time KB summary used for handoff); backlog snapshot (the `backlog_snapshots` MemBase table); assertion run record (single PASS/FAIL captured in `assertion_runs`).
-
-**Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` IP-1 (shared common module); `groundtruth_kb.benchmarks.common` dataclass definition.
-
-**Implementation pointer:** `scripts/benchmarks/common.py` `BenchmarkResult` dataclass; `write_run_outputs(run_id, results)` helper that emits JSON + markdown pairs.
-
-
----
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#metric-snapshot).*
 
 ## Alias / Canonical Disposition
 
@@ -1658,17 +1140,7 @@ dispatch routing).
 
 **Canonical alias:** ollama harness.
 
-**Not to be confused with:** the upstream Ollama platform CLI/server; the Ollama
-Python SDK; cross-harness dispatch (the trigger that spawns counterpart
-harnesses).
-
-**Source:** `ADR-OLLAMA-HARNESS-ADOPTION-001`; `DELIB-20260663`;
-`bridge/gtkb-ollama-integration-phase-1-001.md` and the VERIFIED child chain
-(`-foundation-012`, `-shim-012`, `-verification-012`).
-
-**Implementation pointer:** `scripts/ollama_harness.py`; `.api-harness/routing.toml`;
-`harness-state/harness-identities.json` (id `D`); `config/agent-control/harness-capability-registry.toml`
-(`[harnesses.ollama]`); doctor `_check_ollama_harness`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#ollama).*
 
 ### routing.toml
 
@@ -1678,14 +1150,7 @@ harness's model pool. Schema per `DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001`
 (`schema_version`, at least one `[models.<key>]` table, a `[routing]` table with
 `default_model`).
 
-**Not to be confused with:** the Ollama server's own model cache; bridge
-dispatch state (`.gtkb-state/bridge-poller/`).
-
-**Source:** `DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001`; `DELIB-20260663` (AUQ#2,
-static routing).
-
-**Implementation pointer:** `.api-harness/routing.toml`;
-`scripts/ollama_harness.py::load_routing_config`.
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#routingtoml).*
 
 ### task-to-model routing
 
@@ -1694,17 +1159,7 @@ within a single harness's model pool. In Phase 1 this is expressed via
 `.api-harness/routing.toml` (`[routing].default_model`, with optional
 `[routing.skills]` overrides reserved for Phase 2+).
 
-**Not to be confused with:** cross-harness dispatch
-(`cross_harness_bridge_trigger.py`, which routes work between harnesses);
-destructive-action routing (the destructive-gate path).
-
-**Source:** `ADR-OLLAMA-HARNESS-ADOPTION-001`; `DELIB-20260663` (AUQ#2).
-
-**Implementation pointer:** `.api-harness/routing.toml` (`[routing]`);
-`scripts/ollama_harness.py` model-resolution path.
-
-
----
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#task-to-model-routing).*
 
 ## Doctor Contract
 
