@@ -35,6 +35,7 @@ Document: gtkb-fab-08-slot-leak-fix
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
 
 Document: gtkb-fab-07-doctor-false-signals
+NO-GO: bridge/gtkb-fab-07-doctor-false-signals-002.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
 Document: gtkb-fab-06-narrative-corrections
