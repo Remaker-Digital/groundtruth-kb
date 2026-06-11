@@ -1,3 +1,36 @@
+Document: gtkb-fab-10-dispatch-telemetry-claim-contract
+NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
+
+Document: gtkb-fab-09-safety-gate-registration
+NEW: bridge/gtkb-fab-09-safety-gate-registration-001.md
+
+Document: gtkb-fab-08-slot-leak-fix
+NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
+
+Document: gtkb-fab-07-doctor-false-signals
+NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
+
+Document: gtkb-fab-06-narrative-corrections
+NEW: bridge/gtkb-fab-06-narrative-corrections-001.md
+
+Document: gtkb-fab-05-rule-file-retirement
+NEW: bridge/gtkb-fab-05-rule-file-retirement-001.md
+
+Document: gtkb-cheap-draft-linter
+NEW: bridge/gtkb-cheap-draft-linter-001.md
+
+Document: gtkb-fab-03-membase-backup
+NEW: bridge/gtkb-fab-03-membase-backup-001.md
+
+Document: gtkb-fab-01-dispatch-substrate-revival
+NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
+
+Document: gtkb-fab-04-storage-reclamation
+NEW: bridge/gtkb-fab-04-storage-reclamation-001.md
+
+Document: gtkb-fab-02-secrets-remediation
+NEW: bridge/gtkb-fab-02-secrets-remediation-001.md
+
 Document: gtkb-fable-investigation-advisory
 ADVISORY: bridge/gtkb-fable-investigation-advisory-001.md
 
@@ -12,100 +45,20 @@ ADVISORY: bridge/ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findin
 Document: sp1-dispatch-reliability-prime-handoff 
 ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md 
 
-Document: gtkb-platform-observability-hygiene
-VERIFIED: bridge/gtkb-platform-observability-hygiene-008.md
-REVISED: bridge/gtkb-platform-observability-hygiene-007.md
-NO-GO: bridge/gtkb-platform-observability-hygiene-006.md
-NEW: bridge/gtkb-platform-observability-hygiene-005.md
-GO: bridge/gtkb-platform-observability-hygiene-004.md
-REVISED: bridge/gtkb-platform-observability-hygiene-003.md
-NO-GO: bridge/gtkb-platform-observability-hygiene-002.md
-NEW: bridge/gtkb-platform-observability-hygiene-001.md
-
-Document: gtkb-bridge-kind-taxonomy-stabilization
-VERIFIED: bridge/gtkb-bridge-kind-taxonomy-stabilization-008.md
-REVISED: bridge/gtkb-bridge-kind-taxonomy-stabilization-007.md
-NO-GO: bridge/gtkb-bridge-kind-taxonomy-stabilization-006.md
-NEW: bridge/gtkb-bridge-kind-taxonomy-stabilization-005.md
-GO: bridge/gtkb-bridge-kind-taxonomy-stabilization-004.md
-REVISED: bridge/gtkb-bridge-kind-taxonomy-stabilization-003.md
-NO-GO: bridge/gtkb-bridge-kind-taxonomy-stabilization-002.md
-NEW: bridge/gtkb-bridge-kind-taxonomy-stabilization-001.md
-
-Document: gtkb-workstream-focus-marker-race-fix
-VERIFIED: bridge/gtkb-workstream-focus-marker-race-fix-008.md
-REVISED: bridge/gtkb-workstream-focus-marker-race-fix-007.md
-NO-GO: bridge/gtkb-workstream-focus-marker-race-fix-006.md
-NEW: bridge/gtkb-workstream-focus-marker-race-fix-005.md
-GO: bridge/gtkb-workstream-focus-marker-race-fix-004.md
-REVISED: bridge/gtkb-workstream-focus-marker-race-fix-003.md
-NO-GO: bridge/gtkb-workstream-focus-marker-race-fix-002.md
-NEW: bridge/gtkb-workstream-focus-marker-race-fix-001.md
-
-Document: gtkb-mcp-stable-harness-surface-implementation
-VERIFIED: bridge/gtkb-mcp-stable-harness-surface-implementation-008.md
-REVISED: bridge/gtkb-mcp-stable-harness-surface-implementation-007.md
-NO-GO: bridge/gtkb-mcp-stable-harness-surface-implementation-006.md
-NEW: bridge/gtkb-mcp-stable-harness-surface-implementation-005.md
-GO: bridge/gtkb-mcp-stable-harness-surface-implementation-004.md
-REVISED: bridge/gtkb-mcp-stable-harness-surface-implementation-003.md
-NO-GO: bridge/gtkb-mcp-stable-harness-surface-implementation-002.md
-NEW: bridge/gtkb-mcp-stable-harness-surface-implementation-001.md
-
 Document: gtkb-bridge-advisory-message-type-implementation
 WITHDRAWN: bridge/gtkb-bridge-advisory-message-type-implementation-003.md
 NO-GO: bridge/gtkb-bridge-advisory-message-type-implementation-002.md
 NEW: bridge/gtkb-bridge-advisory-message-type-implementation-001.md
-
-Document: gtkb-ecosystem-scout-policy-implementation
-VERIFIED: bridge/gtkb-ecosystem-scout-policy-implementation-008.md
-REVISED: bridge/gtkb-ecosystem-scout-policy-implementation-007.md
-NO-GO: bridge/gtkb-ecosystem-scout-policy-implementation-006.md
-NEW: bridge/gtkb-ecosystem-scout-policy-implementation-005.md
-GO: bridge/gtkb-ecosystem-scout-policy-implementation-004.md
-REVISED: bridge/gtkb-ecosystem-scout-policy-implementation-003.md
-NO-GO: bridge/gtkb-ecosystem-scout-policy-implementation-002.md
-NEW: bridge/gtkb-ecosystem-scout-policy-implementation-001.md
 
 Document: gtkb-smart-poller-p1-p2-implementation
 WITHDRAWN: bridge/gtkb-smart-poller-p1-p2-implementation-003.md
 NO-GO: bridge/gtkb-smart-poller-p1-p2-implementation-002.md
 NEW: bridge/gtkb-smart-poller-p1-p2-implementation-001.md
 
-Document: gtkb-directive-enforcement-p1-p2-combined
-VERIFIED: bridge/gtkb-directive-enforcement-p1-p2-combined-008.md
-REVISED: bridge/gtkb-directive-enforcement-p1-p2-combined-007.md
-NO-GO: bridge/gtkb-directive-enforcement-p1-p2-combined-006.md
-NEW: bridge/gtkb-directive-enforcement-p1-p2-combined-005.md
-GO: bridge/gtkb-directive-enforcement-p1-p2-combined-004.md
-REVISED: bridge/gtkb-directive-enforcement-p1-p2-combined-003.md
-NO-GO: bridge/gtkb-directive-enforcement-p1-p2-combined-002.md
-NEW: bridge/gtkb-directive-enforcement-p1-p2-combined-001.md
-
-Document: gtkb-isolation-phase3-implementation
-VERIFIED: bridge/gtkb-isolation-phase3-implementation-008.md
-REVISED: bridge/gtkb-isolation-phase3-implementation-007.md
-NO-GO: bridge/gtkb-isolation-phase3-implementation-006.md
-NEW: bridge/gtkb-isolation-phase3-implementation-005.md
-GO: bridge/gtkb-isolation-phase3-implementation-004.md
-REVISED: bridge/gtkb-isolation-phase3-implementation-003.md
-NO-GO: bridge/gtkb-isolation-phase3-implementation-002.md
-NEW: bridge/gtkb-isolation-phase3-implementation-001.md
-
 Document: gtkb-ollama-lo-prompt-hardening
 WITHDRAWN: bridge/gtkb-ollama-lo-prompt-hardening-003.md
 NO-GO: bridge/gtkb-ollama-lo-prompt-hardening-002.md
 NEW: bridge/gtkb-ollama-lo-prompt-hardening-001.md
-
-Document: gtkb-isolation-phase3-occupancy-detection
-VERIFIED: bridge/gtkb-isolation-phase3-occupancy-detection-008.md
-REVISED: bridge/gtkb-isolation-phase3-occupancy-detection-007.md
-NO-GO: bridge/gtkb-isolation-phase3-occupancy-detection-006.md
-NEW: bridge/gtkb-isolation-phase3-occupancy-detection-005.md
-GO: bridge/gtkb-isolation-phase3-occupancy-detection-004.md
-REVISED: bridge/gtkb-isolation-phase3-occupancy-detection-003.md
-NO-GO: bridge/gtkb-isolation-phase3-occupancy-detection-002.md
-NEW: bridge/gtkb-isolation-phase3-occupancy-detection-001.md
 
 Document: gtkb-directive-enforcement-p1-p2
 WITHDRAWN: bridge/gtkb-directive-enforcement-p1-p2-003.md
@@ -122,12 +75,6 @@ REVISED: bridge/gtkb-smart-bridge-trigger-foundation-spike-001.md
 Document: gtkb-dirty-tree-reconciliation-2026-06-07
 GO: bridge/gtkb-dirty-tree-reconciliation-2026-06-07-002.md
 NEW: bridge/gtkb-dirty-tree-reconciliation-2026-06-07-001.md
-
-Document: gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation
-VERIFIED: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-004.md
-NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-003.md
-GO: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-002.md
-NEW: bridge/gtkb-role-enhancement-lo-investigation-methodology-slice-2-owner-approved-continuation-001.md
 
 Document: gtkb-role-enhancement-no-go-cycle-escalation-slice-3
 GO: bridge/gtkb-role-enhancement-no-go-cycle-escalation-slice-3-008.md
@@ -204,14 +151,6 @@ VERIFIED: bridge/gtkb-startup-control-vocabulary-map-004.md
 NEW: bridge/gtkb-startup-control-vocabulary-map-003.md
 GO: bridge/gtkb-startup-control-vocabulary-map-002.md
 NEW: bridge/gtkb-startup-control-vocabulary-map-001.md
-
-Document: gtkb-role-enhancement
-VERIFIED: bridge/gtkb-role-enhancement-006.md
-NEW: bridge/gtkb-role-enhancement-005.md
-GO: bridge/gtkb-role-enhancement-004.md
-REVISED: bridge/gtkb-role-enhancement-003.md
-NO-GO: bridge/gtkb-role-enhancement-002.md
-NEW: bridge/gtkb-role-enhancement-001.md
 
 Document: gtkb-auto-push-investigation-slice-2
 VERIFIED: bridge/gtkb-auto-push-investigation-slice-2-005.md
