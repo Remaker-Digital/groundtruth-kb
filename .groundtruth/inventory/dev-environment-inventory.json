@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-11T08:31:53Z",
+  "generated_at": "2026-06-11T09:12:50Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -131,7 +131,7 @@
     "name": "GroundTruth-KB host workspace",
     "profile": "dual-agent",
     "root_boundary": ".",
-    "scaffold_version": "0.6.1"
+    "scaffold_version": "0.7.0rc1"
   },
   "redaction": {
     "public_exclusions": [
@@ -151,7 +151,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 30,
+      "count": 29,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -181,8 +181,7 @@
         ".claude/hooks/sot-read-discipline.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/hooks/spec-event-surfacer.py",
-        ".claude/hooks/turn-marker.py",
-        ".claude/hooks/workstream-focus.py"
+        ".claude/hooks/turn-marker.py"
       ]
     },
     "codex_hooks": {
@@ -700,11 +699,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",

@@ -1,4 +1,6 @@
 Document: gtkb-backlog-triage-and-hygiene-stage-0-analyzer
+NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-007.md
+VERIFIED: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-006.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-005.md
 GO: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-004.md
 REVISED: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-003.md
@@ -20,6 +22,7 @@ NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-002.md
 NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-001.md
 
 Document: gtkb-fab-20-hygiene-investigation-skill
+NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-006.md
 NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-005.md
 GO: bridge/gtkb-fab-20-hygiene-investigation-skill-004.md
 REVISED: bridge/gtkb-fab-20-hygiene-investigation-skill-003.md
@@ -39,6 +42,7 @@ NO-GO: bridge/gtkb-fab-18-backlog-dignity-002.md
 NEW: bridge/gtkb-fab-18-backlog-dignity-001.md
 
 Document: gtkb-fab-17-da-chroma-read-path
+GO: bridge/gtkb-fab-17-da-chroma-read-path-007.md
 REVISED: bridge/gtkb-fab-17-da-chroma-read-path-006.md
 NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-005.md
 GO: bridge/gtkb-fab-17-da-chroma-read-path-004.md

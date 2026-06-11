@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-06-11T08:31:53Z
+Generated: 2026-06-11T09:12:50Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f)
 
 ## Project
@@ -8,7 +8,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:87f8b705b680a239c6a81ccce3e
 - Name: GroundTruth-KB host workspace
 - Configured project name: Agent Red Customer Experience
 - GT-KB package version: 0.7.0rc1
-- Scaffold version: 0.6.1
+- Scaffold version: 0.7.0rc1
 
 ## Redaction
 
@@ -24,7 +24,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:87f8b705b680a239c6a81ccce3e
 | `git` | verified | `2.51.2.windows.1` | `git --version` |
 | `node` | verified | `24.11.1` | `node --version` |
 | `npm` | verified | `11.6.2` | `npm --version` |
-| `pip` | unknown | `unknown` | `python -m pip --version` |
+| `pip` | verified | `26.1.2` | `python -m pip --version` |
 | `playwright` | unsupported | `unknown` | `playwright --version` |
 | `pytest` | verified | `9.0.2` | `python -m pytest --version` |
 | `python` | verified | `3.14.0` | `python --version` |
@@ -35,7 +35,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:87f8b705b680a239c6a81ccce3e
 - Harness identity source present: True
 - Role assignment source present: True
 - Skills: 37
-- Claude hooks: 30
+- Claude hooks: 29
 - Codex hooks: 22
 - GitHub workflows: 17
 - MCP config: local_only presence only

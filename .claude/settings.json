@@ -7,6 +7,54 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python .claude/hooks/spec-before-code.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/bridge-compliance-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/kb-not-markdown.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/destructive-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/credential-scan.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/scanner-safe-writer.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/formal-artifact-approval-gate.py\"",
             "timeout": 5
           }
@@ -88,6 +136,22 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python .claude/hooks/session-start-governance.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/assertion-check.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode session-start --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
           },
@@ -105,6 +169,30 @@
       }
     ],
     "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-search-tracker.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/spec-event-surfacer.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/owner-decision-capture.py"
+          }
+        ]
+      },
       {
         "hooks": [
           {
@@ -202,6 +290,46 @@
       }
     ],
     "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-search-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/intake-classifier.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/turn-marker.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-preflight-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/gov09-capture.py"
+          }
+        ]
+      },
       {
         "hooks": [
           {

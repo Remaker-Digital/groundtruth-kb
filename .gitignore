@@ -80,6 +80,7 @@ scripts/lib/**/*.py[cod]
 .pytest_*/
 GT-KB.pytest-*/
 .tmp-codex-iso018/pytest-*/
+.test-tmp/
 # Malformed pytest cache dir name observed 2026-06-04 (concatenation glitch
 # producing names like GT-KB.gtkb-statepytest-cache without a separator).
 GT-KB.gtkb-state*/
