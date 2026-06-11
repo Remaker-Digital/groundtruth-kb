@@ -5,6 +5,7 @@ Document: gtkb-fab-18-backlog-dignity
 NEW: bridge/gtkb-fab-18-backlog-dignity-001.md
 
 Document: gtkb-fab-17-da-chroma-read-path
+NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-002.md
 NEW: bridge/gtkb-fab-17-da-chroma-read-path-001.md
 
 Document: gtkb-fab-16-harness-parity-remediation
