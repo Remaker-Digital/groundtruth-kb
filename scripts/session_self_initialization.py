@@ -627,6 +627,10 @@ STARTUP_PRUNING_RELATIVE_FILES = (
 )
 STARTUP_PRUNING_LARGE_FILE_BYTES = 50_000
 STARTUP_PRUNING_TOTAL_WARN_BYTES = 250_000
+# FAB-21 / WI-4360 rules-payload profiler: rough bytes-per-token heuristic used to
+# estimate the token cost of the always-loaded .claude/rules/*.md payload (HYG-025).
+# The byte total and file count are exact; estimated_tokens is approximate.
+RULES_PAYLOAD_BYTES_PER_TOKEN = 4
 WRAPUP_TRIGGER_COMMANDS = (
     "wrap up",
     "wrap up this session",
@@ -694,6 +698,48 @@ def _latest_insight_profile(project_root: Path) -> dict[str, Any] | None:
     except (FileNotFoundError, ValueError):
         return None
     return _file_size_profile(project_root, str(latest.relative_to(project_root)).replace("\\", "/"))
+
+
+def _rules_payload_profile(project_root: Path) -> dict[str, Any]:
+    """Profile the always-loaded ``.claude/rules/*.md`` payload against the startup budget.
+
+    Every ``.claude/rules/*.md`` file is auto-loaded into the session context before any
+    work begins, so its aggregate size is a fixed per-session cost paid by every harness.
+    This reports that payload's exact byte total plus an estimated token total against
+    ``STARTUP_PRUNING_TOTAL_WARN_BYTES`` so the startup-budget overage (FAB-21 / WI-4360,
+    HYG-025) is visible and trackable session-over-session. Estimated tokens use the rough
+    ``RULES_PAYLOAD_BYTES_PER_TOKEN`` heuristic; the byte total and file count are exact.
+    """
+    rules_dir = project_root / ".claude" / "rules"
+    try:
+        rule_files = sorted(path for path in rules_dir.glob("*.md") if path.is_file())
+    except OSError:
+        rule_files = []
+    profiles: list[dict[str, Any]] = []
+    for path in rule_files:
+        relative = str(path.relative_to(project_root)).replace("\\", "/")
+        profile = _file_size_profile(project_root, relative)
+        if profile is not None and profile.get("available"):
+            profiles.append(profile)
+    total_bytes = sum(int(profile.get("bytes", 0)) for profile in profiles)
+    estimated_tokens = total_bytes // RULES_PAYLOAD_BYTES_PER_TOKEN
+    budget_bytes = STARTUP_PRUNING_TOTAL_WARN_BYTES
+    overage_bytes = max(0, total_bytes - budget_bytes)
+    overage_pct = round((overage_bytes / budget_bytes) * 100, 1) if budget_bytes else 0.0
+    largest = sorted(profiles, key=lambda profile: int(profile.get("bytes", 0)), reverse=True)[:8]
+    return {
+        "scope": "claude_rules_md_payload",
+        "glob": ".claude/rules/*.md",
+        "file_count": len(profiles),
+        "total_bytes": total_bytes,
+        "estimated_tokens": estimated_tokens,
+        "bytes_per_token_estimate": RULES_PAYLOAD_BYTES_PER_TOKEN,
+        "budget_bytes": budget_bytes,
+        "over_budget": total_bytes > budget_bytes,
+        "overage_bytes": overage_bytes,
+        "overage_pct": overage_pct,
+        "largest_files": largest,
+    }
 
 
 def _startup_pruning_scan(
@@ -765,6 +811,7 @@ def _startup_pruning_scan(
         "candidate_count": len([c for c in candidates if c["type"] == "candidate"]),
         "completed_count": len([c for c in candidates if c["type"] == "completed"]),
         "candidates": candidates,
+        "rules_payload": _rules_payload_profile(project_root),
     }
 
 
@@ -4257,6 +4304,15 @@ def _render_startup_pruning(model: dict[str, Any]) -> str:
         f"- Completed pruning actions: {pruning.get('completed_count')}",
         f"- Candidate reductions: {pruning.get('candidate_count')}",
     ]
+    rules_payload = pruning.get("rules_payload")
+    if rules_payload:
+        budget_status = "OVER budget" if rules_payload.get("over_budget") else "within budget"
+        lines.append(
+            "- Rules payload baseline (`.claude/rules/*.md`): "
+            f"{rules_payload.get('file_count')} files, {rules_payload.get('total_bytes')} bytes "
+            f"(~{rules_payload.get('estimated_tokens')} tokens), {budget_status} "
+            f"(budget {rules_payload.get('budget_bytes')} bytes, {rules_payload.get('overage_pct')}% over)."
+        )
     if largest:
         lines.append("- Largest startup inputs:")
         for item in largest:
