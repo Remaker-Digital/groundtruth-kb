@@ -25,11 +25,14 @@ NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
 
 Document: gtkb-fab-18-backlog-dignity
+GO: bridge/gtkb-fab-18-backlog-dignity-004.md
 REVISED: bridge/gtkb-fab-18-backlog-dignity-003.md
 NO-GO: bridge/gtkb-fab-18-backlog-dignity-002.md
 NEW: bridge/gtkb-fab-18-backlog-dignity-001.md
 
 Document: gtkb-fab-17-da-chroma-read-path
+NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-005.md
+GO: bridge/gtkb-fab-17-da-chroma-read-path-004.md
 REVISED: bridge/gtkb-fab-17-da-chroma-read-path-003.md
 NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-002.md
 NEW: bridge/gtkb-fab-17-da-chroma-read-path-001.md
@@ -77,6 +80,7 @@ NO-GO: bridge/gtkb-fab-09-safety-gate-registration-002.md
 NEW: bridge/gtkb-fab-09-safety-gate-registration-001.md
 
 Document: gtkb-fab-08-slot-leak-fix
+REVISED: bridge/gtkb-fab-08-slot-leak-fix-005.md
 NO-GO: bridge/gtkb-fab-08-slot-leak-fix-004.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-003.md
 GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
