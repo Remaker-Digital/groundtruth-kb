@@ -49,6 +49,7 @@ NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-002.md
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-001.md
 
 Document: gtkb-fab-12-agent-red-residue-sweep
+REVISED: bridge/gtkb-fab-12-agent-red-residue-sweep-003.md
 NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
@@ -73,6 +74,8 @@ GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
 
 Document: gtkb-fab-07-doctor-false-signals
+GO: bridge/gtkb-fab-07-doctor-false-signals-004.md
+REVISED: bridge/gtkb-fab-07-doctor-false-signals-003.md
 NO-GO: bridge/gtkb-fab-07-doctor-false-signals-002.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
