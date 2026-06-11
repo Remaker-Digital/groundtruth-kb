@@ -37,6 +37,8 @@ GO: bridge/gtkb-fab-16-harness-parity-remediation-002.md
 NEW: bridge/gtkb-fab-16-harness-parity-remediation-001.md
 
 Document: gtkb-fab-15-role-narrative-spec-reconciliation
+GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-004.md
+REVISED: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-003.md
 NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
