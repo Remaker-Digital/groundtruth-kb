@@ -1,3 +1,30 @@
+Document: gtkb-fab-19-hygiene-detector-expansion
+NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
+
+Document: gtkb-fab-18-backlog-dignity
+NEW: bridge/gtkb-fab-18-backlog-dignity-001.md
+
+Document: gtkb-fab-17-da-chroma-read-path
+NEW: bridge/gtkb-fab-17-da-chroma-read-path-001.md
+
+Document: gtkb-fab-16-harness-parity-remediation
+NEW: bridge/gtkb-fab-16-harness-parity-remediation-001.md
+
+Document: gtkb-fab-15-role-narrative-spec-reconciliation
+NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
+
+Document: gtkb-fab-14-gate-fp-feedback-loop
+NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
+
+Document: gtkb-fab-13-retention-policy-umbrella
+NEW: bridge/gtkb-fab-13-retention-policy-umbrella-001.md
+
+Document: gtkb-fab-12-agent-red-residue-sweep
+NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
+
+Document: gtkb-fab-11-regression-signal-revival
+NEW: bridge/gtkb-fab-11-regression-signal-revival-001.md
+
 Document: gtkb-fab-10-dispatch-telemetry-claim-contract
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
 
@@ -35,6 +62,7 @@ Document: gtkb-fable-investigation-advisory
 ADVISORY: bridge/gtkb-fable-investigation-advisory-001.md
 
 Document: gtkb-architecture-governance-hygiene-investigation
+NO-GO: bridge/gtkb-architecture-governance-hygiene-investigation-004.md
 REVISED: bridge/gtkb-architecture-governance-hygiene-investigation-003.md
 NO-GO: bridge/gtkb-architecture-governance-hygiene-investigation-002.md
 NEW: bridge/gtkb-architecture-governance-hygiene-investigation-001.md
