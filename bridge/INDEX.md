@@ -79,6 +79,7 @@ NO-GO: bridge/gtkb-fab-04-storage-reclamation-002.md
 NEW: bridge/gtkb-fab-04-storage-reclamation-001.md
 
 Document: gtkb-fab-02-secrets-remediation
+NO-GO: bridge/gtkb-fab-02-secrets-remediation-004.md
 NEW: bridge/gtkb-fab-02-secrets-remediation-003.md
 GO: bridge/gtkb-fab-02-secrets-remediation-002.md
 NEW: bridge/gtkb-fab-02-secrets-remediation-001.md
