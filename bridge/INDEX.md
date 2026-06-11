@@ -65,6 +65,7 @@ NO-GO: bridge/gtkb-fab-09-safety-gate-registration-002.md
 NEW: bridge/gtkb-fab-09-safety-gate-registration-001.md
 
 Document: gtkb-fab-08-slot-leak-fix
+NO-GO: bridge/gtkb-fab-08-slot-leak-fix-004.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-003.md
 GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
