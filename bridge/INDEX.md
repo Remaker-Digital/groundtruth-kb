@@ -1,3 +1,6 @@
+Document: gtkb-dashboard-operations-cockpit-advisory
+ADVISORY: bridge/gtkb-dashboard-operations-cockpit-advisory-001.md
+
 Document: gtkb-commit-untracked-governance-hooks
 WITHDRAWN: bridge/gtkb-commit-untracked-governance-hooks-002.md
 
