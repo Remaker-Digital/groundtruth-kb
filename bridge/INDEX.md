@@ -11,6 +11,7 @@ Document: gtkb-fab-16-harness-parity-remediation
 NEW: bridge/gtkb-fab-16-harness-parity-remediation-001.md
 
 Document: gtkb-fab-15-role-narrative-spec-reconciliation
+NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
