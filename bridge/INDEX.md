@@ -20,6 +20,7 @@ Document: gtkb-fab-13-retention-policy-umbrella
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-001.md
 
 Document: gtkb-fab-12-agent-red-residue-sweep
+NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
 Document: gtkb-fab-11-regression-signal-revival
