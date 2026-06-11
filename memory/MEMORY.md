@@ -2,7 +2,7 @@
 
 ## Current Status
 
-- **2026-06-09 (PROJECT-GTKB-RELIABILITY-FIXES & ISOLATION updates terminal): All 10 active Prime Builder bridge threads are VERIFIED and terminal.** Platforms tests for dispatch state recovery, occupancy detection, application register validation, and workstream focus role marker pass successfully (41 tests passed).
+- **2026-06-11 (Harness Parity Complete):** Inspected configurations across Claude Code, Codex, and Antigravity. Generated a comparative inspection report, addressed capability parity gaps by aligning check_harness_parity.py and generate_antigravity_skill_adapters.py, generated all skill adapters for Antigravity/Ollama/OpenRouter, and verified all tests pass (clean PASS status on check_harness_parity.py --all).
 - **Recent Platform Session Memory Archive:** Full detailed session logs are preserved in [memory/CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
 
 ## Feedback Index
@@ -62,6 +62,7 @@
 ## Recent Sessions
 Detailed session content lives in git history (commits referenced) and `bridge/*-NNN.md`. For sessions prior to S398, see [memory/CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
 
+- S379-PB-AG-C-20260611 (2026-06-11; Antigravity harness C): Achieved full capability parity for Antigravity (harness C). Generated comparison report, resolved adapter generation blocks, generated 15 skill adapters for Antigravity, Ollama, and OpenRouter, updated capability registry, verified that `check_harness_parity.py --all` returns `PASS` status, ran wrap-up scanners (W0, W1, W2), and harvested deliberations.
 - S431-PB-AG-C-20260610 (2026-06-10; Antigravity harness C): Initiated wrap-up session. Checked git status which revealed uncommitted changes from S430 (Fable Investigation advisory `bridge/gtkb-fable-investigation-advisory-001.md` and project charter). Ran applicability preflight on the advisory, which failed due to missing `ADR-ISOLATION-APPLICATION-PLACEMENT-001` citation; edited the advisory to add the spec link, resolving the preflight block. Ran wrap-scanners (W0, W1, W2), staged all changes, committed, and pushed. Generated handoff prompt for S432.
 - S430-PB-CC-B-20260610 (2026-06-10; Claude Fable 5 harness B): Executed the full architecture & governance hygiene investigation (16 subagents / 4 rounds; 60 verified findings HYG-001..060 at `independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md`), verified-merged the Antigravity v2 report (admitted HYG-061..068; 8 v2 claims refuted), ran the 7-AUQ grill (`DELIB-FABLE-GRILL-20260610-Q1..Q7`), filed `bridge/gtkb-fable-investigation-advisory-001.md` (ADVISORY), and created `PROJECT-FABLE-INVESTIGATION` + WI-4413..4435 (FAB-01..23, three waves). Detail: [memory/project_2026-06-10_fable_investigation_chartered.md](project_2026-06-10_fable_investigation_chartered.md). Ran canonical `::wrap` (envelope `B-2026-06-10T19-02-13Z`). No commits (none requested).
 - S429-PB-AG-C-20260610 (2026-06-10; Antigravity harness C): Initiated wrap-up session for the hygiene investigation. Verified that the findings report was completed as `independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10-v2.md` containing 45 verified hygiene items. Ran the `::wrap` process, executed Phase 0 wrap-scanners (W0 transcript capture, W1 hygiene scan, W2 consistency scan), harvested 0 deliberations, and generated the handoff.
