@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-11T09:12:50Z",
+  "generated_at": "2026-06-11T16:50:58Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -145,13 +145,13 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 2,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 29,
+      "count": 35,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -162,6 +162,8 @@
         ".claude/hooks/code-quality-baseline-proposal-check.py",
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/delib-preflight-gate.py",
+        ".claude/hooks/delib-search-gate.py",
+        ".claude/hooks/delib-search-tracker.py",
         ".claude/hooks/destructive-gate.py",
         ".claude/hooks/directive-enforcement-claude-adapter.py",
         ".claude/hooks/document_author_provenance_gate.py",
@@ -170,6 +172,7 @@
         ".claude/hooks/gov09-capture.py",
         ".claude/hooks/implementation-start-gate.py",
         ".claude/hooks/intake-classifier.py",
+        ".claude/hooks/kb-not-markdown.py",
         ".claude/hooks/lo-file-safety-gate.py",
         ".claude/hooks/narrative-artifact-approval-gate.py",
         ".claude/hooks/owner-decision-capture.py",
@@ -177,11 +180,14 @@
         ".claude/hooks/project-completion-surface.py",
         ".claude/hooks/scanner-safe-writer.py",
         ".claude/hooks/scheduler.py",
+        ".claude/hooks/session-start-governance.py",
         ".claude/hooks/session_start_dispatch.py",
         ".claude/hooks/sot-read-discipline.py",
+        ".claude/hooks/spec-before-code.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/hooks/spec-event-surfacer.py",
-        ".claude/hooks/turn-marker.py"
+        ".claude/hooks/turn-marker.py",
+        ".claude/hooks/workstream-focus.py"
       ]
     },
     "codex_hooks": {
@@ -703,7 +709,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "26.1.2"
+      "version": "25.3"
     },
     "playwright": {
       "classification": "unsupported",
@@ -717,7 +723,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -731,7 +737,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.12"
     }
   },
   "verification": {
