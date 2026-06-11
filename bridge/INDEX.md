@@ -8,6 +8,7 @@ Document: gtkb-fab-17-da-chroma-read-path
 NEW: bridge/gtkb-fab-17-da-chroma-read-path-001.md
 
 Document: gtkb-fab-16-harness-parity-remediation
+GO: bridge/gtkb-fab-16-harness-parity-remediation-002.md
 NEW: bridge/gtkb-fab-16-harness-parity-remediation-001.md
 
 Document: gtkb-fab-15-role-narrative-spec-reconciliation
