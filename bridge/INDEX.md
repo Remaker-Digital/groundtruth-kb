@@ -14,6 +14,7 @@ Document: gtkb-fab-15-role-narrative-spec-reconciliation
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
+NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-002.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
 
 Document: gtkb-fab-13-retention-policy-umbrella
