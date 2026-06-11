@@ -44,6 +44,8 @@ GO: bridge/gtkb-fab-22-architecture-cluster-002.md
 NEW: bridge/gtkb-fab-22-architecture-cluster-001.md
 
 Document: gtkb-fab-21-startup-load-cost-reduction
+NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-006.md
+NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-005.md
 GO: bridge/gtkb-fab-21-startup-load-cost-reduction-004.md
 REVISED: bridge/gtkb-fab-21-startup-load-cost-reduction-003.md
 NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-002.md
