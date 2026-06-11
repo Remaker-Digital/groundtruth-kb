@@ -29,6 +29,7 @@ Document: gtkb-fab-10-dispatch-telemetry-claim-contract
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
 
 Document: gtkb-fab-09-safety-gate-registration
+NO-GO: bridge/gtkb-fab-09-safety-gate-registration-002.md
 NEW: bridge/gtkb-fab-09-safety-gate-registration-001.md
 
 Document: gtkb-fab-08-slot-leak-fix
