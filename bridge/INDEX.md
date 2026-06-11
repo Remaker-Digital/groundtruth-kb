@@ -50,6 +50,7 @@ Document: gtkb-fab-03-membase-backup
 NEW: bridge/gtkb-fab-03-membase-backup-001.md
 
 Document: gtkb-fab-01-dispatch-substrate-revival
+GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
