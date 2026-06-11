@@ -25,10 +25,12 @@ NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
 
 Document: gtkb-fab-18-backlog-dignity
+REVISED: bridge/gtkb-fab-18-backlog-dignity-003.md
 NO-GO: bridge/gtkb-fab-18-backlog-dignity-002.md
 NEW: bridge/gtkb-fab-18-backlog-dignity-001.md
 
 Document: gtkb-fab-17-da-chroma-read-path
+REVISED: bridge/gtkb-fab-17-da-chroma-read-path-003.md
 NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-002.md
 NEW: bridge/gtkb-fab-17-da-chroma-read-path-001.md
 
@@ -43,6 +45,7 @@ NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
+GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-004.md
 REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-003.md
 NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-002.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
