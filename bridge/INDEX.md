@@ -1,12 +1,22 @@
+Document: gtkb-fab-23-demoted-cleanup-batch
+NEW: bridge/gtkb-fab-23-demoted-cleanup-batch-001.md
+
+Document: gtkb-fab-22-architecture-cluster
+NEW: bridge/gtkb-fab-22-architecture-cluster-001.md
+
 Document: gtkb-fab-21-startup-load-cost-reduction
+REVISED: bridge/gtkb-fab-21-startup-load-cost-reduction-003.md
 NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-002.md
 NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-001.md
 
 Document: gtkb-fab-20-hygiene-investigation-skill
+REVISED: bridge/gtkb-fab-20-hygiene-investigation-skill-003.md
 NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-002.md
 NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-001.md
 
 Document: gtkb-fab-19-hygiene-detector-expansion
+GO: bridge/gtkb-fab-19-hygiene-detector-expansion-004.md
+REVISED: bridge/gtkb-fab-19-hygiene-detector-expansion-003.md
 NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
 
@@ -51,6 +61,7 @@ NO-GO: bridge/gtkb-fab-09-safety-gate-registration-002.md
 NEW: bridge/gtkb-fab-09-safety-gate-registration-001.md
 
 Document: gtkb-fab-08-slot-leak-fix
+NEW: bridge/gtkb-fab-08-slot-leak-fix-003.md
 GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
 
