@@ -38,6 +38,8 @@ NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-002.md
 NEW: bridge/gtkb-fab-17-da-chroma-read-path-001.md
 
 Document: gtkb-fab-16-harness-parity-remediation
+NO-GO: bridge/gtkb-fab-16-harness-parity-remediation-004.md
+REVISED: bridge/gtkb-fab-16-harness-parity-remediation-003.md
 GO: bridge/gtkb-fab-16-harness-parity-remediation-002.md
 NEW: bridge/gtkb-fab-16-harness-parity-remediation-001.md
 
@@ -66,6 +68,8 @@ NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
 Document: gtkb-fab-11-regression-signal-revival
+GO: bridge/gtkb-fab-11-regression-signal-revival-004.md
+REVISED: bridge/gtkb-fab-11-regression-signal-revival-003.md
 NO-GO: bridge/gtkb-fab-11-regression-signal-revival-002.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-001.md
 
