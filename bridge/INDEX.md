@@ -56,6 +56,7 @@ Document: gtkb-fab-04-storage-reclamation
 NEW: bridge/gtkb-fab-04-storage-reclamation-001.md
 
 Document: gtkb-fab-02-secrets-remediation
+GO: bridge/gtkb-fab-02-secrets-remediation-002.md
 NEW: bridge/gtkb-fab-02-secrets-remediation-001.md
 
 Document: gtkb-fable-investigation-advisory
