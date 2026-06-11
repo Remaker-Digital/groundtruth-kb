@@ -79,6 +79,7 @@ NO-GO: bridge/gtkb-fab-06-narrative-corrections-002.md
 NEW: bridge/gtkb-fab-06-narrative-corrections-001.md
 
 Document: gtkb-fab-05-rule-file-retirement
+GO: bridge/gtkb-fab-05-rule-file-retirement-004.md
 REVISED: bridge/gtkb-fab-05-rule-file-retirement-003.md
 NO-GO: bridge/gtkb-fab-05-rule-file-retirement-002.md
 NEW: bridge/gtkb-fab-05-rule-file-retirement-001.md
