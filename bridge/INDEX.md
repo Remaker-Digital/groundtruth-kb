@@ -87,6 +87,7 @@ GO: bridge/gtkb-cheap-draft-linter-002.md
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
 Document: gtkb-fab-03-membase-backup
+REVISED: bridge/gtkb-fab-03-membase-backup-003.md
 NO-GO: bridge/gtkb-fab-03-membase-backup-002.md
 NEW: bridge/gtkb-fab-03-membase-backup-001.md
 
@@ -101,6 +102,7 @@ NO-GO: bridge/gtkb-fab-04-storage-reclamation-002.md
 NEW: bridge/gtkb-fab-04-storage-reclamation-001.md
 
 Document: gtkb-fab-02-secrets-remediation
+VERIFIED: bridge/gtkb-fab-02-secrets-remediation-006.md
 REVISED: bridge/gtkb-fab-02-secrets-remediation-005.md
 NO-GO: bridge/gtkb-fab-02-secrets-remediation-004.md
 NEW: bridge/gtkb-fab-02-secrets-remediation-003.md
