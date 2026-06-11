@@ -95,6 +95,7 @@ GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
+GO: bridge/gtkb-fab-04-storage-reclamation-004.md
 REVISED: bridge/gtkb-fab-04-storage-reclamation-003.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-002.md
 NEW: bridge/gtkb-fab-04-storage-reclamation-001.md
