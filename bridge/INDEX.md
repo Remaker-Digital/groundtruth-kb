@@ -79,6 +79,7 @@ NO-GO: bridge/gtkb-fab-06-narrative-corrections-002.md
 NEW: bridge/gtkb-fab-06-narrative-corrections-001.md
 
 Document: gtkb-fab-05-rule-file-retirement
+REVISED: bridge/gtkb-fab-05-rule-file-retirement-003.md
 NO-GO: bridge/gtkb-fab-05-rule-file-retirement-002.md
 NEW: bridge/gtkb-fab-05-rule-file-retirement-001.md
 
@@ -87,6 +88,7 @@ GO: bridge/gtkb-cheap-draft-linter-002.md
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
 Document: gtkb-fab-03-membase-backup
+GO: bridge/gtkb-fab-03-membase-backup-004.md
 REVISED: bridge/gtkb-fab-03-membase-backup-003.md
 NO-GO: bridge/gtkb-fab-03-membase-backup-002.md
 NEW: bridge/gtkb-fab-03-membase-backup-001.md
