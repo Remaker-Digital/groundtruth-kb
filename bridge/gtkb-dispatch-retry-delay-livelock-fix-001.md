@@ -41,6 +41,12 @@ The retry-delay backoff should be measured from the last *launch attempt*, a tim
 
 All target paths are inside `E:\GT-KB`: `scripts/cross_harness_bridge_trigger.py`, `platform_tests/scripts/test_cross_harness_bridge_trigger.py`.
 
+## Requirement Sufficiency
+
+Existing requirements sufficient. The governing requirements - `DCL-SMART-POLLER-AUTO-TRIGGER-001` (dispatch must auto-trigger the recipient harness when actionable work waits) and `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001` (owner-out-of-loop dispatch) - already constrain the corrected behavior; this defect fix restores conformance to them. No new or revised requirement is required before implementation.
+
+(Section added post-GO to satisfy the implementation-start gate's mandatory `## Requirement Sufficiency` check; the defect-fix scaffold omitted it. The fix scope and reviewed technical content are unchanged.)
+
 ## Specification Links
 
 - `DCL-SMART-POLLER-AUTO-TRIGGER-001` - **Primary.** The constraint the livelock violates: the dispatch mechanism must auto-trigger the recipient harness when actionable work waits. The fix restores conformance by ensuring the retry-delay window actually elapses, so a wedged recipient resumes dispatching.

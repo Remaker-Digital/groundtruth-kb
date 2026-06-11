@@ -2496,15 +2496,30 @@ def run_trigger(
                         is_delay_active = False
 
                         if is_retry_pending:
-                            prior_updated_at = prior.get("updated_at")
-                            if prior_updated_at:
+                            # WI-4459: re-baseline the retry-delay window on the last
+                            # LAUNCH timestamp, not on ``updated_at``. ``updated_at`` is
+                            # rewritten on every trigger evaluation - including the
+                            # delay-only evaluations that ``continue`` below - so under
+                            # continuous activity the elapsed window is always < the retry
+                            # delay and the recipient is wedged forever (``failure_count``
+                            # frozen at its first value, circuit breaker unreachable).
+                            # ``last_launch.launched_at`` is written only on an actual
+                            # launch attempt and is stable across delay-only evaluations.
+                            prior_last_launch = prior.get("last_launch") if isinstance(prior, dict) else None
+                            prior_launched_at = (
+                                prior_last_launch.get("launched_at") if isinstance(prior_last_launch, dict) else None
+                            )
+                            if prior_launched_at:
                                 try:
-                                    updated_time = dt.datetime.fromisoformat(prior_updated_at.replace("Z", "+00:00"))
-                                    elapsed = (dt.datetime.now(dt.UTC) - updated_time).total_seconds()
+                                    launched_time = dt.datetime.fromisoformat(prior_launched_at.replace("Z", "+00:00"))
+                                    elapsed = (dt.datetime.now(dt.UTC) - launched_time).total_seconds()
                                     if elapsed < retry_delay_seconds:
                                         is_delay_active = True
                                 except Exception:
                                     pass
+                            # No recorded launch while failure_count > 0 should not occur
+                            # (failure_count increments only after a launch that sets
+                            # last_launch); fail open to dispatch rather than wedge.
 
                         if is_delay_active:
                             recipient_state["last_result"] = "retry_delay_enforced"

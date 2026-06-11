@@ -20,6 +20,7 @@ import json
 import shutil
 import subprocess
 import sys
+from datetime import UTC
 from pathlib import Path
 from types import ModuleType
 
@@ -339,6 +340,104 @@ def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> 
 
     failures = _failure_records(state_dir)
     assert any(record["reason"] == "previous_launch_failed" for record in failures)
+
+
+def test_retry_delay_clears_after_launch_window_elapses(tmp_path: Path) -> None:
+    """WI-4459: a retry-pending recipient whose last LAUNCH predates the
+    retry-delay window must dispatch, even when ``updated_at`` is recent.
+
+    Regression guard for the retry-delay livelock. The backoff window must be
+    measured from ``last_launch.launched_at`` (written only on a real launch,
+    stable across delay-only evaluations), not from ``updated_at`` (rewritten
+    on every evaluation). With the pre-fix code reading ``updated_at``, a recent
+    ``updated_at`` perpetually re-armed the delay and the recipient was wedged
+    forever (``failure_count`` frozen, circuit breaker unreachable). This test
+    FAILS against the pre-fix code and PASSES against the fix.
+    """
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+    now = datetime.now(UTC)
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    # The trigger resolves the loyal-opposition target to a harness-specific
+    # recipient key; set the retry state on both the role and role:harness keys.
+    for key in ("loyal-opposition", "loyal-opposition:A"):
+        lo_state = state["recipients"][key]
+        lo_state["failure_count"] = 1
+        lo_state["circuit_breaker_tripped"] = False
+        # Stale prior dispatched signature => the current actionable signature is
+        # treated as "changed" (reaches the dispatch branch + retry-delay gate).
+        lo_state["last_dispatched_signature"] = "stale-signature-forces-dispatch-branch"
+        lo_state["signature"] = "stale-signature-forces-dispatch-branch"
+        # Last LAUNCH is well outside the retry-delay window (default 300s);
+        # exit_code_processed=True so the prior failure is not reprocessed
+        # (failure_count stays 1, i.e., is_retry_pending).
+        lo_state["last_launch"] = {
+            "dispatch_id": "prior-old-launch",
+            "launched": True,
+            "exit_code": 1,
+            "exit_code_processed": True,
+            "launched_at": (now - timedelta(seconds=3600)).isoformat(),
+        }
+        # updated_at is recent (pre-fix code would re-arm the delay here).
+        lo_state["updated_at"] = (now - timedelta(seconds=5)).isoformat()
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    reason = retried["results"]["loyal-opposition"]["reason"]
+    assert reason != "retry_delay_enforced", (
+        f"retry-delay must clear when the last launch predates the window; got {reason!r} (livelock regression)"
+    )
+    assert reason == "dry_run"
+
+
+def test_retry_delay_enforced_within_launch_window(tmp_path: Path) -> None:
+    """WI-4459: a retry-pending recipient whose last LAUNCH is within the
+    retry-delay window must still be delayed. Guards against the fix disabling
+    backoff entirely.
+    """
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+    now = datetime.now(UTC)
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    for key in ("loyal-opposition", "loyal-opposition:A"):
+        lo_state = state["recipients"][key]
+        lo_state["failure_count"] = 1
+        lo_state["circuit_breaker_tripped"] = False
+        lo_state["last_dispatched_signature"] = "stale-signature-forces-dispatch-branch"
+        lo_state["signature"] = "stale-signature-forces-dispatch-branch"
+        # Last LAUNCH is recent (within the 300s window) => delay enforced.
+        lo_state["last_launch"] = {
+            "dispatch_id": "prior-recent-launch",
+            "launched": True,
+            "exit_code": 1,
+            "exit_code_processed": True,
+            "launched_at": (now - timedelta(seconds=10)).isoformat(),
+        }
+        lo_state["updated_at"] = (now - timedelta(seconds=5)).isoformat()
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert retried["results"]["loyal-opposition"]["reason"] == "retry_delay_enforced"
 
 
 # ──────────────────────────────────────────────────────────────────────────

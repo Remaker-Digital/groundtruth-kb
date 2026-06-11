@@ -3,6 +3,8 @@ GO: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-002.md
 NEW: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-001.md
 
 Document: gtkb-dispatch-retry-delay-livelock-fix
+VERIFIED: bridge/gtkb-dispatch-retry-delay-livelock-fix-004.md
+NEW: bridge/gtkb-dispatch-retry-delay-livelock-fix-003.md
 GO: bridge/gtkb-dispatch-retry-delay-livelock-fix-002.md
 NEW: bridge/gtkb-dispatch-retry-delay-livelock-fix-001.md
 
