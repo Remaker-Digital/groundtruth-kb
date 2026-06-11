@@ -276,6 +276,56 @@ def test_skill_defers_delta_mode(skill_text: str) -> None:
     assert "does not implement" in compact
 
 
+def test_frontmatter_does_not_overclaim_while_body_defers_delta_mode(skill_text: str) -> None:
+    """Regression for Codex NO-GO@-006 P1 (FAB-20).
+
+    The skill body retains a 'Deferred follow-on' section that scopes
+    delta/diff/evidence-pack mode out of this slice. While that is true, the
+    YAML frontmatter description MUST NOT advertise those capabilities as
+    active behavior. Every clause of the description that uses an
+    active-capability token (``diffs against``, ``delta mode``,
+    ``evidence pack``, ``the differ``) must also contain a ``deferred``,
+    ``follow-on``, or ``future`` qualifier.
+    """
+    import re
+
+    # Precondition: this regression only applies while the body still defers.
+    if "deferred follow-on" not in _compact(skill_text):
+        pytest.skip("body no longer defers delta mode; frontmatter regression scope retired")
+
+    # Extract the frontmatter 'description:' value (may span multiple lines).
+    lines = skill_text.splitlines()
+    assert lines[0].strip() == "---", "frontmatter delimiter missing"
+    closing = next(i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---")
+
+    description = ""
+    in_description = False
+    for line in lines[1:closing]:
+        if line.startswith("description:"):
+            in_description = True
+            description = line.split(":", 1)[1].strip()
+        elif in_description:
+            first_token = line.split(" ", 1)[0] if line else ""
+            if line and not line.startswith(" ") and ":" in first_token:
+                break  # Next top-level frontmatter key.
+            description += " " + line.strip()
+    description = description.lower()
+    assert description, "frontmatter description is empty"
+
+    active_tokens = ("diffs against", "delta mode", "evidence pack", "the differ")
+    qualifiers = ("deferred", "follow-on", "future")
+    clauses = re.split(r"[.;!?]+", description)
+    for clause in clauses:
+        for token in active_tokens:
+            if token in clause and not any(qual in clause for qual in qualifiers):
+                pytest.fail(
+                    f"frontmatter overclaim regression: clause '{clause.strip()}' "
+                    f"contains active-capability token {token!r} without a "
+                    f"'deferred'/'follow-on'/'future' qualifier while the body "
+                    f"still has a 'Deferred follow-on' section"
+                )
+
+
 def test_skill_uses_canonical_role_registry_not_retired_mirror(skill_text: str) -> None:
     assert "harness_projection" in skill_text
     # The retired role-assignments.json mirror must not be referenced.
