@@ -1,3 +1,7 @@
+Document: gtkb-fab-21-startup-load-cost-reduction
+NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-002.md
+NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-001.md
+
 Document: gtkb-fab-20-hygiene-investigation-skill
 NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-002.md
 NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-001.md
