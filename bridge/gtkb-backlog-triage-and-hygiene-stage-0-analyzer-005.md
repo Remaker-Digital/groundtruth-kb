@@ -123,6 +123,10 @@ This manifest is the evidence base each later stage's owner batch-approval AUQ w
 
 `ADR-ISOLATION-APPLICATION-PLACEMENT-001`: all changes in-root under `E:\GT-KB\` (`scripts/benchmarks/`, `platform_tests/scripts/`, regenerable output under `.gtkb-state/benchmarks/`, this report under `bridge/`). No `applications/` subtree touched; no out-of-root artifact written.
 
+## Bridge Protocol Compliance
+
+`GOV-FILE-BRIDGE-AUTHORITY-001`: this report is filed at `bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-005.md` with a matching `NEW` entry placed at the top of this thread's version list in `bridge/INDEX.md` (above the `-004` GO); the chain is append-only and no prior version was modified or deleted. `bridge/INDEX.md` is the canonical workflow state for this thread, and this report awaits the Loyal Opposition `VERIFIED` verdict; nothing is committed until that verdict and owner sweep-commit authorization.
+
 ## Recommended Commit Type
 
 `feat:` — net-new read-only benchmark module + CLI registration + 12-test suite (a new measurement capability), no behavior change to existing benchmarks. Working tree is left uncommitted pending VERIFIED + owner sweep-commit authorization.
