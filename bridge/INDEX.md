@@ -32,6 +32,7 @@ Document: gtkb-fab-09-safety-gate-registration
 NEW: bridge/gtkb-fab-09-safety-gate-registration-001.md
 
 Document: gtkb-fab-08-slot-leak-fix
+GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
 
 Document: gtkb-fab-07-doctor-false-signals
