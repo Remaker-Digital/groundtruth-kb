@@ -1,4 +1,14 @@
+Document: gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-001.md
+
+Document: gtkb-backlog-triage-and-hygiene-stage-1-structural-repair
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-1-structural-repair-001.md
+
 Document: gtkb-backlog-triage-and-hygiene-stage-0-analyzer
+VERIFIED: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-011.md
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-010.md
+NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-009.md
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-008.md
 NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-007.md
 VERIFIED: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-006.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-005.md
@@ -22,6 +32,7 @@ NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-002.md
 NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-001.md
 
 Document: gtkb-fab-20-hygiene-investigation-skill
+REVISED: bridge/gtkb-fab-20-hygiene-investigation-skill-007.md
 NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-006.md
 NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-005.md
 GO: bridge/gtkb-fab-20-hygiene-investigation-skill-004.md
