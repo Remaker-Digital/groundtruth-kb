@@ -44,6 +44,7 @@ Document: gtkb-fab-05-rule-file-retirement
 NEW: bridge/gtkb-fab-05-rule-file-retirement-001.md
 
 Document: gtkb-cheap-draft-linter
+GO: bridge/gtkb-cheap-draft-linter-002.md
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
 Document: gtkb-fab-03-membase-backup
