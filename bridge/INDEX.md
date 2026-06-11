@@ -41,6 +41,7 @@ Document: gtkb-fab-06-narrative-corrections
 NEW: bridge/gtkb-fab-06-narrative-corrections-001.md
 
 Document: gtkb-fab-05-rule-file-retirement
+NO-GO: bridge/gtkb-fab-05-rule-file-retirement-002.md
 NEW: bridge/gtkb-fab-05-rule-file-retirement-001.md
 
 Document: gtkb-cheap-draft-linter
