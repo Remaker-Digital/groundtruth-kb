@@ -122,11 +122,11 @@ Clauses with `enforcement_mode = "advisory"` are reported but never gate._
 - `bridge/gtkb-fab-20-hygiene-investigation-skill-002.md` - prior NO-GO on sequencing.
 - `bridge/gtkb-fab-20-hygiene-investigation-skill-004.md` - GO approving only the dependency-free first slice.
 
-Deliberation search note: direct CLI search was unavailable in this dispatch
-shell. `groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb.cli ...`
-failed with `No module named groundtruth_kb.cli`, and `gt deliberations list`
-failed because `gt` was not on PATH. Review used the thread-cited deliberation
-references and the live bridge chain.
+Deliberation search note: the targeted DA CLI search for `FAB20 hygiene
+investigation skill DELIB-FAB20-REMEDIATION` completed with no additional
+stdout in this dispatch session using
+`PYTHONPATH=E:\GT-KB\groundtruth-kb\src`. Review used the thread-cited
+deliberation references and the live bridge chain.
 
 ## Specifications Carried Forward
 

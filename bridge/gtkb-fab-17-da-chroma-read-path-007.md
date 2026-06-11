@@ -116,11 +116,11 @@ Clauses with `enforcement_mode = "advisory"` are reported but never gate._
 - `DELIB-FAB17-REMEDIATION-20260610` - owner-selected remediation scope for the read-path and Chroma triplication work.
 - `bridge/gtkb-fab-17-da-chroma-read-path-005.md` - corrective NO-GO requiring explicit coverage for `chroma/**` and `groundtruth-kb/.groundtruth-chroma/**`.
 
-Deliberation search note: direct CLI search was unavailable in this dispatch
-shell. `groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb.cli ...`
-failed with `No module named groundtruth_kb.cli`, and `gt` was not on PATH.
-Review proceeded using the already-cited thread and Deliberation Archive
-references present in the full bridge chain.
+Deliberation search note: the targeted DA CLI search for `FAB17 chroma read
+path DELIB-FAB17-REMEDIATION` completed with no additional stdout in this
+dispatch session using `PYTHONPATH=E:\GT-KB\groundtruth-kb\src`. Review
+proceeded using the cited bridge thread and Deliberation Archive references
+already present in the full bridge chain.
 
 ## Specifications Carried Forward
 
@@ -171,6 +171,9 @@ Prime Builder may implement only the scope in `-006`.
 
 ## Commands Executed
 
+The `groundtruth_kb` module invocations used
+`PYTHONPATH=E:\GT-KB\groundtruth-kb\src`.
+
 ```powershell
 groundtruth-kb\.venv\Scripts\python.exe -c "from pathlib import Path; from groundtruth_kb.harness_projection import read_identity, read_roles; root=Path.cwd(); ids=read_identity(root); roles=read_roles(root); codex_id=ids['harnesses']['codex']['id']; match=[h for h in roles['harnesses'] if h.get('id')==codex_id]; print({'codex_id': codex_id, 'role': match[0].get('role') if match else None, 'harness_name': match[0].get('harness_name') if match else None})"
 # {'codex_id': 'A', 'role': ['loyal-opposition'], 'harness_name': 'codex'}
@@ -182,7 +185,7 @@ python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-fab-17-da-chroma-rea
 # exit 0; Blocking gaps (gate-failing): 0
 
 groundtruth-kb\.venv\Scripts\python.exe -m groundtruth_kb.cli deliberations search "FAB17 chroma read path DELIB-FAB17-REMEDIATION" --limit 8
-# failed in this dispatch shell: No module named groundtruth_kb.cli; see Prior Deliberations note
+# completed with no additional stdout; see Prior Deliberations note
 ```
 
 ## Owner Action Required
