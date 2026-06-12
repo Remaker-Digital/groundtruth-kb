@@ -18,6 +18,7 @@ GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
 
 Document: gtkb-tafe-spec-promotion
+VERIFIED: bridge/gtkb-tafe-spec-promotion-004.md
 NEW: bridge/gtkb-tafe-spec-promotion-003.md
 GO: bridge/gtkb-tafe-spec-promotion-002.md
 NEW: bridge/gtkb-tafe-spec-promotion-001.md
