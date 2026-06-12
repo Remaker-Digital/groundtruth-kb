@@ -4699,6 +4699,102 @@ def _check_standing_backlog_health(target: Path) -> ToolCheck:
     )
 
 
+_DB_SNAPSHOT_OUTPUT_ALLOWLIST = re.compile(
+    r"^[A-Za-z]:[/\\]Users[/\\][^/\\]+[/\\]AppData[/\\]Local[/\\]gtkb-snapshots[/\\]",
+)
+
+
+def _check_db_snapshot_freshness(target: Path) -> ToolCheck:
+    """Check that a recent db snapshot exists (daily cadence expected)."""
+    check_name = "DB snapshot freshness"
+    try:
+        from groundtruth_kb.config import GTConfig  # noqa: PLC0415
+        from groundtruth_kb.db_snapshot import default_output_dir  # noqa: PLC0415
+
+        cfg = GTConfig.load(config_path=target / "groundtruth.toml")
+        out_dir = cfg.backup.snapshot_output_dir or default_output_dir(cfg)
+    except Exception as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"Cannot resolve snapshot output directory: {exc}",
+        )
+    out_path = Path(out_dir)
+    if not out_path.is_dir():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"Snapshot directory does not exist yet: {out_path}",
+        )
+    snapshots = sorted(out_path.glob("groundtruth-*.db"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not snapshots:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"No snapshot files found in {out_path}",
+        )
+    newest = snapshots[0]
+    age_hours = (datetime.now(tz=UTC) - datetime.fromtimestamp(newest.stat().st_mtime, tz=UTC)).total_seconds() / 3600
+    if age_hours > 48:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Newest snapshot is {age_hours:.0f}h old (>{48}h): {newest.name}",
+        )
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=f"Newest snapshot {newest.name} is {age_hours:.0f}h old",
+    )
+
+
+def _check_db_snapshot_output_allowlist(target: Path) -> ToolCheck:
+    """Enforce the DB-Snapshot Output Exception allowlist bound."""
+    check_name = "DB snapshot output allowlist"
+    try:
+        from groundtruth_kb.config import GTConfig  # noqa: PLC0415
+        from groundtruth_kb.db_snapshot import default_output_dir  # noqa: PLC0415
+
+        cfg = GTConfig.load(config_path=target / "groundtruth.toml")
+        out_dir = str(cfg.backup.snapshot_output_dir or default_output_dir(cfg))
+    except Exception as exc:
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="warning",
+            message=f"Cannot resolve snapshot output directory: {exc}",
+        )
+    if _DB_SNAPSHOT_OUTPUT_ALLOWLIST.match(out_dir):
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="pass",
+            message=f"Snapshot output {out_dir} matches allowlist",
+        )
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status="fail",
+        message=(
+            f"Snapshot output {out_dir} does NOT match the DB-Snapshot Output "
+            f"Exception allowlist in project-root-boundary.md"
+        ),
+    )
+
+
 def run_doctor(
     target: Path,
     profile: str,
@@ -4804,6 +4900,9 @@ def run_doctor(
         checks.append(_check_ollama_harness(target))
         # WI-4431 / FAB-19: Skill health check (WARN/advisory only)
         checks.append(_check_skill_health(target))
+        # FAB-03: DB snapshot checks
+        checks.append(_check_db_snapshot_freshness(target))
+        checks.append(_check_db_snapshot_output_allowlist(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
     # Local import avoids a circular dependency: doctor_isolation imports

@@ -6,18 +6,18 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+## Resolved
+
 - id: DECISION-1165
   asked_at: 2026-06-12T17:09:09.322874Z
-  question: "Want me to keep driving, or hold here?"
+  question: ""
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 04f932ff906e7ea1
   resolved_at: 2026-06-12T20:35:00Z
   resolved_in_session: ab9e903c
-  answer: "Owner directed: keep driving — prepare continuation prompt for fresh session to continue TAFE work."
-  notes: "auto-detected prose anti-pattern; resolved by owner's explicit continuation directive"
-
-## Resolved
+  answer: "Owner directed: keep driving — prepare continuation prompt for fresh session to continue TAFE work. Re-confirmed by owner continuation prompt 2026-06-12T22:00Z (S436)."
+  notes: "auto-detected prose anti-pattern; resolved by owner's explicit continuation directive; moved to Resolved section 2026-06-12 S436 (was mis-filed under Pending, causing hook re-surfacing). Question text blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 
 - id: DECISION-1147
   asked_at: 2026-06-12T02:21:51.667049Z

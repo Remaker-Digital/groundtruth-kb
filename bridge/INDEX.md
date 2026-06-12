@@ -264,6 +264,8 @@ NO-GO: bridge/gtkb-fab-11-regression-signal-revival-002.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-001.md
 
 Document: gtkb-fab-10-dispatch-telemetry-claim-contract
+REVISED: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-005.md
+NO-GO: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-004.md
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-003.md
 GO: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-002.md
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
@@ -325,6 +327,9 @@ GO: bridge/gtkb-cheap-draft-linter-002.md
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
 Document: gtkb-fab-03-membase-backup
+REVISED: bridge/gtkb-fab-03-membase-backup-008.md
+NO-GO: bridge/gtkb-fab-03-membase-backup-007.md
+NEW: bridge/gtkb-fab-03-membase-backup-006.md
 ACCEPTED: bridge/gtkb-fab-03-membase-backup-005.md
 GO: bridge/gtkb-fab-03-membase-backup-004.md
 REVISED: bridge/gtkb-fab-03-membase-backup-003.md
