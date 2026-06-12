@@ -1,4 +1,5 @@
 Document: gtkb-path-token-re-discovery-consolidation
+GO: bridge/gtkb-path-token-re-discovery-consolidation-004.md
 REVISED: bridge/gtkb-path-token-re-discovery-consolidation-003.md
 NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-002.md
 NEW: bridge/gtkb-path-token-re-discovery-consolidation-001.md
