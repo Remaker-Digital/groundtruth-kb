@@ -7618,6 +7618,58 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-12T06:59:34.641833Z
   answer: "Your questions have been answered: \"S432 wrap is complete and committed locally (5bdbb9ee4). The develop branch is 89 commits ahead of origin/develop — this session's WI-4472 fix (17c7672e4) and wrap commit, plus a large body of concurrent sessions' work I did not author or review. Push to origin/develop now?\"=\"Push develop now\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1155
+  asked_at: 2026-06-12T07:14:25.339973Z
+  question: "Before I finalize Part B, a load-bearing fact: MemBase already contains a fully *specified* (but NOT yet implemented) envelope program — `session envelope` (opened by ::init, closed by ::wrap), `topic envelope` (`::open <type>` / `::close <type>` over a CLOSED vocabulary {spec, build, test, deliberation, project}), and `dispatch envelope` — across 24 specs/DCLs/ADRs (WI-4291..WI-4302, all status=specified). Your Part B 'explicit hint' term is genuinely new, but your illustrative 'topic envelope' (e.g. `::open roadmap … ::close`) conflicts with that closed vocabulary on two axes: 'roadmap' isn't a defined type, and bare `::close` differs from typed `::close <type>`. How should the explicit-hint layer relate to the existing envelope canon?"
+  options:
+    - "Umbrella over existing specs (Recommended)"
+    - "Extend topics to free-form"
+    - "New layer, supersede envelope canon"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bf302dd043c198b8
+  resolved_at: 2026-06-12T07:14:25.339973Z
+  answer: "Your questions have been answered: \"Before I finalize Part B, a load-bearing fact: MemBase already contains a fully *specified* (but NOT yet implemented) envelope program — `session envelope` (opened by ::init, closed by ::wrap), `topic envelope` (`::open <type>` / `::close <type>` over a CLOSED vocabulary {spec, build, test, deliberation, project}), and `dispatch envelope` — across 24 specs/DCLs/ADRs (WI-4291..WI-4302, all status=specified). Your Part B 'explicit hint' term is genuinely new, but your illustrative 'topic envelope' (e.g. `::open roadmap … ::close`) conflicts with that closed vocabulary on two axes: 'roadmap' isn't a defined type, and bare `::close` differs from typed `::close <type>`. How should the explicit-hint layer relate to the existing envelope canon?\"=\"Umbrella over existing specs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1156
+  asked_at: 2026-06-12T07:14:25.339973Z
+  question: "Default back-compat policy when a GT-KB skill is renamed? (Scope note: the `::init`/`::wrap` keywords are NOT skills and are unaffected; this is about skill invocation names like `/kb-spec`, `/kb-session-wrap`. Hard cutover breaks muscle memory and any old-name references in dispatch prompts / SCHEDULE.md / docs / tests.)"
+  options:
+    - "Alias + deprecation window (Recommended)"
+    - "Hard cutover"
+    - "Permanent aliases"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 74c75fc20399dc48
+  resolved_at: 2026-06-12T07:14:25.339973Z
+  answer: "Your questions have been answered: \"Default back-compat policy when a GT-KB skill is renamed? (Scope note: the `::init`/`::wrap` keywords are NOT skills and are unaffected; this is about skill invocation names like `/kb-spec`, `/kb-session-wrap`. Hard cutover breaks muscle memory and any old-name references in dispatch prompts / SCHEDULE.md / docs / tests.)\"=\"Alias + deprecation window (Recommended)\", \"What naming-convention SHAPE should the uniform prefix follow? Your item 1 (`kb-session-wrap` → `gtkb-envelope-wrap`) is NOT a pure prefix swap — it also changes the stem (`session-wrap`→`envelope-wrap`). How far should stem changes go?\"=\"Prefix swap + curated stem fixes (Recommended)\", \"Which skills count as 'GT-KB-owned' (in-scope for the prefix)? My proposed criterion: skills authored for GT-KB *platform* governance/lifecycle living under the platform harness dirs (`.claude/skills/`, `.codex/skills/`, `.agent/skills/`, `.api-harness/skills/`), EXCLUDING plugin-namespaced skills (Notion:, stripe:, firecrawl:, plugin-dev:…) and harness built-ins (init, review, loop…). Borderline cases confirmed present in `.claude/skills/` that look application/Agent-Red-scoped rather than platform: `seed-tenant`, `deploy`, `release-candidate-gate` (plus menu-listed `refresh-creds`/`preflight`/`check-db`/`check-security`/`open-items`/`quick-review`, which I'll locate). Which do you want the prefix to cover?\"=\"Platform-core only; exclude app-scoped (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1157
+  asked_at: 2026-06-12T07:14:25.339973Z
+  question: "What naming-convention SHAPE should the uniform prefix follow? Your item 1 (`kb-session-wrap` → `gtkb-envelope-wrap`) is NOT a pure prefix swap — it also changes the stem (`session-wrap`→`envelope-wrap`). How far should stem changes go?"
+  options:
+    - "Prefix swap + curated stem fixes (Recommended)"
+    - "Strict prefix only, no stem changes"
+    - "Full structured redesign (gtkb-<verb>-<noun>)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d6363748e465a1db
+  resolved_at: 2026-06-12T07:14:25.339973Z
+  answer: "Your questions have been answered: \"Default back-compat policy when a GT-KB skill is renamed? (Scope note: the `::init`/`::wrap` keywords are NOT skills and are unaffected; this is about skill invocation names like `/kb-spec`, `/kb-session-wrap`. Hard cutover breaks muscle memory and any old-name references in dispatch prompts / SCHEDULE.md / docs / tests.)\"=\"Alias + deprecation window (Recommended)\", \"What naming-convention SHAPE should the uniform prefix follow? Your item 1 (`kb-session-wrap` → `gtkb-envelope-wrap`) is NOT a pure prefix swap — it also changes the stem (`session-wrap`→`envelope-wrap`). How far should stem changes go?\"=\"Prefix swap + curated stem fixes (Recommended)\", \"Which skills count as 'GT-KB-owned' (in-scope for the prefix)? My proposed criterion: skills authored for GT-KB *platform* governance/lifecycle living under the platform harness dirs (`.claude/skills/`, `.codex/skills/`, `.agent/skills/`, `.api-harness/skills/`), EXCLUDING plugin-namespaced skills (Notion:, stripe:, firecrawl:, plugin-dev:…) and harness built-ins (init, review, loop…). Borderline cases confirmed present in `.claude/skills/` that look application/Agent-Red-scoped rather than platform: `seed-tenant`, `deploy`, `release-candidate-gate` (plus menu-listed `refresh-creds`/`preflight`/`check-db`/`check-security`/`open-items`/`quick-review`, which I'll locate). Which do you want the prefix to cover?\"=\"Platform-core only; exclude app-scoped (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1158
+  asked_at: 2026-06-12T07:14:25.339973Z
+  question: "Which skills count as 'GT-KB-owned' (in-scope for the prefix)? My proposed criterion: skills authored for GT-KB *platform* governance/lifecycle living under the platform harness dirs (`.claude/skills/`, `.codex/skills/`, `.agent/skills/`, `.api-harness/skills/`), EXCLUDING plugin-namespaced skills (Notion:, stripe:, firecrawl:, plugin-dev:…) and harness built-ins (init, review, loop…). Borderline cases confirmed present in `.claude/skills/` that look application/Agent-Red-scoped rather than platform: `seed-tenant`, `deploy`, `release-candidate-gate` (plus menu-listed `refresh-creds`/`preflight`/`check-db`/`check-security`/`open-items`/`quick-review`, which I'll locate). Which do you want the prefix to cover?"
+  options:
+    - "Platform-core only; exclude app-scoped (Recommended)"
+    - "Everything in the platform skill dirs"
+    - "Platform-core + shared app/platform skills"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5aa88cfab0ee1bf2
+  resolved_at: 2026-06-12T07:14:25.339973Z
+  answer: "Your questions have been answered: \"Default back-compat policy when a GT-KB skill is renamed? (Scope note: the `::init`/`::wrap` keywords are NOT skills and are unaffected; this is about skill invocation names like `/kb-spec`, `/kb-session-wrap`. Hard cutover breaks muscle memory and any old-name references in dispatch prompts / SCHEDULE.md / docs / tests.)\"=\"Alias + deprecation window (Recommended)\", \"What naming-convention SHAPE should the uniform prefix follow? Your item 1 (`kb-session-wrap` → `gtkb-envelope-wrap`) is NOT a pure prefix swap — it also changes the stem (`session-wrap`→`envelope-wrap`). How far should stem changes go?\"=\"Prefix swap + curated stem fixes (Recommended)\", \"Which skills count as 'GT-KB-owned' (in-scope for the prefix)? My proposed criterion: skills authored for GT-KB *platform* governance/lifecycle living under the platform harness dirs (`.claude/skills/`, `.codex/skills/`, `.agent/skills/`, `.api-harness/skills/`), EXCLUDING plugin-namespaced skills (Notion:, stripe:, firecrawl:, plugin-dev:…) and harness built-ins (init, review, loop…). Borderline cases confirmed present in `.claude/skills/` that look application/Agent-Red-scoped rather than platform: `seed-tenant`, `deploy`, `release-candidate-gate` (plus menu-listed `refresh-creds`/`preflight`/`check-db`/`check-security`/`open-items`/`quick-review`, which I'll locate). Which do you want the prefix to cover?\"=\"Platform-core only; exclude app-scoped (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
