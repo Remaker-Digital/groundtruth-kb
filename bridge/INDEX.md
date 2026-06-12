@@ -1,4 +1,5 @@
 Document: gtkb-path-token-re-discovery-consolidation
+NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-002.md
 NEW: bridge/gtkb-path-token-re-discovery-consolidation-001.md
 
 Document: gtkb-lo-dispatch-ordered-fallback-routing
@@ -224,6 +225,7 @@ NO-GO: bridge/gtkb-fab-07-doctor-false-signals-002.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
 Document: gtkb-fab-06-narrative-corrections
+NEW: bridge/gtkb-fab-06-narrative-corrections-005.md
 GO: bridge/gtkb-fab-06-narrative-corrections-004.md
 REVISED: bridge/gtkb-fab-06-narrative-corrections-003.md
 NO-GO: bridge/gtkb-fab-06-narrative-corrections-002.md
