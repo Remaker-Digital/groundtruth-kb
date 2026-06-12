@@ -1,4 +1,5 @@
 Document: gtkb-dashboard-operations-cockpit-advisory-disposition
+GO: bridge/gtkb-dashboard-operations-cockpit-advisory-disposition-002.md
 NEW: bridge/gtkb-dashboard-operations-cockpit-advisory-disposition-001.md
 
 Document: gtkb-propose-scaffold-validation-gap-advisory-disposition
