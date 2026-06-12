@@ -7683,6 +7683,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-12T07:24:00.757061Z
   answer: "Your questions have been answered: \"Canon already settles topic-envelope concurrency (type-keyed: ≤1 per type, ≤5 concurrent), typed `::close <type>`, and auto-close+harvest on `::wrap` — so Gemini's nesting/wrap framing is moot. The ONE axis canon does NOT specify is the interception model for `::open <type>`/`::close <type>`: how does the harness load the topic's preload context + routing rules? (Note: GT-KB is explicitly multi-harness — Claude B, Codex A, Antigravity C, Ollama D — and per ADR-CODEX-HOOK-PARITY-FALLBACK-001 hook availability is parity-conditional across them. The recorded SoT-read-discipline incidents show pure agent self-policing is unreliable.)\"=\"Hook-primary + agent fallback (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1160
+  asked_at: 2026-06-12T07:38:47.518120Z
+  question: "Replacement term for 'topic envelope' (the inner-tier `::open <type>` container). Your candidates 'focus' and 'scope' both collide with existing canonical terms — `session focus` (startup work-item selection) and `session scope` (write-authority boundary {GT-KB,Application}) — so they'd create drift; 'scope' especially overloads a safety/authority term. The concept is keyed by activity TYPE {spec,build,test,deliberation,project}, not subject. Which term should the spec adopt?"
+  options:
+    - "activity (Recommended)"
+    - "Keep 'topic', fix ergonomics only"
+    - "mode"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7727030ef2d9e7ce
+  resolved_at: 2026-06-12T07:38:47.518120Z
+  answer: "Your questions have been answered: \"Replacement term for 'topic envelope' (the inner-tier `::open <type>` container). Your candidates 'focus' and 'scope' both collide with existing canonical terms — `session focus` (startup work-item selection) and `session scope` (write-authority boundary {GT-KB,Application}) — so they'd create drift; 'scope' especially overloads a safety/authority term. The concept is keyed by activity TYPE {spec,build,test,deliberation,project}, not subject. Which term should the spec adopt?\"=\"activity (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

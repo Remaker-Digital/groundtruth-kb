@@ -40,6 +40,7 @@
 - [Status updates probe live INDEX + sub-agent state](feedback_status_updates_load_index_and_subagent_state.md) — Multi-agent env moves between turns. S328.
 - [GroundTruth-KB canonical project URLs](feedback_groundtruth_kb_canonical_project_urls.md) — "the GitHub", "repo", and related aliases resolve to the configured GT-KB GitHub URL, not local remote drift.
 - [Run preflight before filing bridge proposals](feedback_preflight_before_filing_bridge_proposals.md) — Before drafting any bridge proposal, run `python scripts/bridge_applicability_preflight.py` against the intended bridge-id; cite cross-cutting governance specs of the artifact type, not just topic-specific specs. S331.
+- [Weight peer review by reliability](feedback_peer_review_weighting_by_reliability.md) — Canon-verify lower-capability/relayed peer input (e.g. Gemini); convergence across reasoners ≠ correctness. 2026-06-12.
 - [Project external resource registry](project_external_resource_registry.md) — Canonical URLs/identities for external resources and alias resolution.
 
 ## Strategic Thesis

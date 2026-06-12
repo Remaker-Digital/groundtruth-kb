@@ -82,6 +82,7 @@ NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-002.md
 NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-001.md
 
 Document: gtkb-fab-19-hygiene-detector-expansion
+VERIFIED: bridge/gtkb-fab-19-hygiene-detector-expansion-008.md
 REVISED: bridge/gtkb-fab-19-hygiene-detector-expansion-007.md
 NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-006.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-005.md
