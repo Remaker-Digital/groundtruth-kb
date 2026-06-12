@@ -1,4 +1,5 @@
 Document: gtkb-typed-artifact-flow-engine-advisory
+REVISED: bridge/gtkb-typed-artifact-flow-engine-advisory-003.md
 NO-GO: bridge/gtkb-typed-artifact-flow-engine-advisory-002.md
 NEW: bridge/gtkb-typed-artifact-flow-engine-advisory-001.md
 
