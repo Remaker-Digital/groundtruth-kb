@@ -7670,6 +7670,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-12T07:14:25.339973Z
   answer: "Your questions have been answered: \"Default back-compat policy when a GT-KB skill is renamed? (Scope note: the `::init`/`::wrap` keywords are NOT skills and are unaffected; this is about skill invocation names like `/kb-spec`, `/kb-session-wrap`. Hard cutover breaks muscle memory and any old-name references in dispatch prompts / SCHEDULE.md / docs / tests.)\"=\"Alias + deprecation window (Recommended)\", \"What naming-convention SHAPE should the uniform prefix follow? Your item 1 (`kb-session-wrap` → `gtkb-envelope-wrap`) is NOT a pure prefix swap — it also changes the stem (`session-wrap`→`envelope-wrap`). How far should stem changes go?\"=\"Prefix swap + curated stem fixes (Recommended)\", \"Which skills count as 'GT-KB-owned' (in-scope for the prefix)? My proposed criterion: skills authored for GT-KB *platform* governance/lifecycle living under the platform harness dirs (`.claude/skills/`, `.codex/skills/`, `.agent/skills/`, `.api-harness/skills/`), EXCLUDING plugin-namespaced skills (Notion:, stripe:, firecrawl:, plugin-dev:…) and harness built-ins (init, review, loop…). Borderline cases confirmed present in `.claude/skills/` that look application/Agent-Red-scoped rather than platform: `seed-tenant`, `deploy`, `release-candidate-gate` (plus menu-listed `refresh-creds`/`preflight`/`check-db`/`check-security`/`open-items`/`quick-review`, which I'll locate). Which do you want the prefix to cover?\"=\"Platform-core only; exclude app-scoped (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1159
+  asked_at: 2026-06-12T07:24:00.757061Z
+  question: "Canon already settles topic-envelope concurrency (type-keyed: ≤1 per type, ≤5 concurrent), typed `::close <type>`, and auto-close+harvest on `::wrap` — so Gemini's nesting/wrap framing is moot. The ONE axis canon does NOT specify is the interception model for `::open <type>`/`::close <type>`: how does the harness load the topic's preload context + routing rules? (Note: GT-KB is explicitly multi-harness — Claude B, Codex A, Antigravity C, Ollama D — and per ADR-CODEX-HOOK-PARITY-FALLBACK-001 hook availability is parity-conditional across them. The recorded SoT-read-discipline incidents show pure agent self-policing is unreliable.)"
+  options:
+    - "Hook-primary + agent fallback (Recommended)"
+    - "Hook-only interception"
+    - "Agent-enforced only (lightweight)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 97818df15680f987
+  resolved_at: 2026-06-12T07:24:00.757061Z
+  answer: "Your questions have been answered: \"Canon already settles topic-envelope concurrency (type-keyed: ≤1 per type, ≤5 concurrent), typed `::close <type>`, and auto-close+harvest on `::wrap` — so Gemini's nesting/wrap framing is moot. The ONE axis canon does NOT specify is the interception model for `::open <type>`/`::close <type>`: how does the harness load the topic's preload context + routing rules? (Note: GT-KB is explicitly multi-harness — Claude B, Codex A, Antigravity C, Ollama D — and per ADR-CODEX-HOOK-PARITY-FALLBACK-001 hook availability is parity-conditional across them. The recorded SoT-read-discipline incidents show pure agent self-policing is unreliable.)\"=\"Hook-primary + agent fallback (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

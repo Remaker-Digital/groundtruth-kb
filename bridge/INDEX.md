@@ -1,33 +1,3 @@
-Document: gtkb-cross-harness-dispatch-concurrency-cap
-VERIFIED: bridge/gtkb-cross-harness-dispatch-concurrency-cap-010.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-009.md
-NO-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-008.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-007.md
-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-006.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-005.md
-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-004.md
-REVISED: bridge/gtkb-cross-harness-dispatch-concurrency-cap-003.md
-NO-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-002.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-001.md
-
-Document: gtkb-openrouter-routing-deepseek-cost-optimization
-VERIFIED: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-004.md
-NEW: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-003.md
-GO: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-002.md
-NEW: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-001.md
-
-Document: gtkb-ollama-harness-provider-scoped-model-validation
-VERIFIED: bridge/gtkb-ollama-harness-provider-scoped-model-validation-004.md
-NEW: bridge/gtkb-ollama-harness-provider-scoped-model-validation-003.md
-GO: bridge/gtkb-ollama-harness-provider-scoped-model-validation-002.md
-NEW: bridge/gtkb-ollama-harness-provider-scoped-model-validation-001.md
-
-Document: gtkb-codex-skill-adapter-frontmatter-strict-yaml
-VERIFIED: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-004.md
-NEW: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-003.md
-GO: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-002.md
-NEW: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-001.md
-
 Document: gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak
 VERIFIED: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-004.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-003.md
@@ -112,6 +82,7 @@ NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-002.md
 NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-001.md
 
 Document: gtkb-fab-19-hygiene-detector-expansion
+REVISED: bridge/gtkb-fab-19-hygiene-detector-expansion-007.md
 NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-006.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-005.md
 GO: bridge/gtkb-fab-19-hygiene-detector-expansion-004.md
