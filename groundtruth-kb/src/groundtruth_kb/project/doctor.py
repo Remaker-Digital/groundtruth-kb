@@ -8,10 +8,8 @@ import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import sys
-import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -267,12 +265,67 @@ def _check_codex() -> ToolCheck:
     )
 
 
-def _check_ruff() -> ToolCheck:
-    return _check_tool(
-        "ruff",
-        ["ruff", "--version"],
+def _check_ruff(target: Path) -> ToolCheck:
+    # Resolve ruff in target path venv-first (WI-4434 / HYG-011)
+    venv_py = None
+    for rel in ("groundtruth-kb/.venv/Scripts/python.exe", "groundtruth-kb/.venv/bin/python"):
+        candidate = target / rel
+        if candidate.is_file():
+            venv_py = candidate
+            break
+
+    candidates = []
+    if venv_py:
+        candidates.append(([str(venv_py), "-m", "ruff"], "venv"))
+    candidates.append(([sys.executable, "-m", "ruff"], "sys"))
+    path_ruff = shutil.which("ruff")
+    if path_ruff:
+        candidates.append(([path_ruff], "path"))
+
+    resolved_cmd = None
+    resolved_type = None
+    for cmd, cmd_type in candidates:
+        try:
+            ok, output = _run_cmd(cmd + ["--version"])
+            if ok:
+                resolved_cmd = cmd
+                resolved_type = cmd_type
+                break
+        except (OSError, Exception):
+            continue
+
+    name = "ruff"
+    if resolved_cmd is None:
+        has_venv = venv_py is not None
+        status = "fail" if has_venv else "warning"
+        message = "ruff not found. Install: pip install ruff"
+        if has_venv:
+            message = "ruff not found in groundtruth-kb/.venv. Install: pip install ruff"
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status=status,
+            message=message,
+            auto_installable=True,
+            install_hint="pip install ruff",
+        )
+
+    # Resolve version
+    ok, output = _run_cmd(resolved_cmd + ["--version"])
+    version = _parse_version(output) if ok else None
+
+    status = "pass"
+    message = f"ruff {version}" if version else "ruff found"
+    if resolved_type == "venv":
+        message += " (resolved from groundtruth-kb/.venv)"
+    return ToolCheck(
+        name=name,
         required=False,
-        install_hint="pip install ruff",
+        found=True,
+        version=version,
+        status=status,
+        message=message,
         auto_installable=True,
     )
 
@@ -780,6 +833,72 @@ def _check_orphan_citations(target: Path) -> ToolCheck:
     )
 
 
+def _check_skill_health(target: Path) -> ToolCheck:
+    """WI-4431 / FAB-19: Skill-health static checker (Layer 3 doctor check).
+
+    Runs check_skill_health.py in JSON/warn-only mode and reports the count
+    of skill-health findings. Surfaced at WARN severity (advisory).
+    """
+    script_path = target / "scripts" / "check_skill_health.py"
+    if not script_path.exists():
+        return ToolCheck(
+            name="Skill health",
+            required=False,
+            found=False,
+            status="warning",
+            message="check_skill_health.py not found; skill-health checker unavailable",
+        )
+
+    cmd = [
+        sys.executable,
+        str(script_path),
+        "--project-root",
+        str(target),
+        "--json",
+        "--warn-only",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
+        payload = json.loads(result.stdout or "{}")
+    except (json.JSONDecodeError, OSError, subprocess.TimeoutExpired) as exc:
+        return ToolCheck(
+            name="Skill health",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"skill-health checker did not return usable JSON: {exc}",
+        )
+
+    finding_count = payload.get("finding_count", 0)
+    skills_scanned = payload.get("skills_scanned", 0)
+
+    if result.returncode != 0:
+        return ToolCheck(
+            name="Skill health",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"skill-health checker failed with exit {result.returncode}",
+        )
+
+    if finding_count:
+        return ToolCheck(
+            name="Skill health",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"{finding_count} skill health finding(s) found across {skills_scanned} scanned skill(s)",
+        )
+
+    return ToolCheck(
+        name="Skill health",
+        required=False,
+        found=True,
+        status="pass",
+        message=f"No skill health findings found across {skills_scanned} scanned skill(s)",
+    )
+
+
 def _check_hooks(target: Path, profile_name: str) -> ToolCheck:
     hooks_dir = target / ".claude" / "hooks"
     if not hooks_dir.exists():
@@ -1157,70 +1276,6 @@ def _check_spec_classifier_codex_parity(target: Path) -> ToolCheck:
 
 
 # FAB-08 (HYG-053): stale clean-adopter test-sandbox auto-prune.
-_TEST_SLOT_STALE_SECONDS = 24 * 3600
-
-
-def _force_remove_tree(path: Path) -> None:
-    """Remove a directory tree, clearing read-only bits (Windows .git) then retrying.
-
-    Mirrors the FAB-08 test-suite ``_force_rmtree`` helper: git object files
-    created on Windows are read-only and make ``shutil.rmtree`` raise; the
-    ``onexc`` handler clears the read-only bit and retries. A removal that still
-    fails for a real reason propagates (no silent ``ignore_errors``).
-    """
-
-    def _on_rm_error(func: Any, p: Any, exc: BaseException) -> None:  # exc = the raised exception instance
-        os.chmod(p, stat.S_IWRITE)
-        func(p)
-
-    if sys.version_info >= (3, 12):
-        # py3.12+ shutil.rmtree onexc signature (exc is the exception instance)
-        shutil.rmtree(path, onexc=_on_rm_error)
-    else:
-        # py3.11 shutil.rmtree onerror passes an exc_info tuple; adapt to the onexc shape.
-        shutil.rmtree(
-            path,
-            onerror=lambda func, p, exc_info: _on_rm_error(func, p, exc_info[1]),
-        )
-
-
-def _check_stale_test_slots(target: Path) -> ToolCheck:
-    """Auto-prune leaked clean-adopter test sandboxes (FAB-08 / HYG-053).
-
-    Detects ``applications/_test_*`` slots older than 24h — the clean-adopter
-    fixture leak signature — and prunes them, emitting a WARN listing what was
-    removed. Deletes ONLY ``_test_*`` directories directly under
-    ``applications/``; never a real application subtree.
-    """
-    name = "Stale test-sandbox auto-prune (applications/_test_*)"
-    apps_dir = target / "applications"
-    if not apps_dir.is_dir():
-        return ToolCheck(name=name, required=False, found=True, status="pass", message="no applications/ directory")
-    now = time.time()
-    pruned: list[str] = []
-    failed: list[str] = []
-    for child in sorted(apps_dir.glob("_test_*")):
-        # Defense-in-depth: only ever touch _test_*-named dirs directly under applications/.
-        if not child.is_dir() or child.parent != apps_dir or not child.name.startswith("_test_"):
-            continue
-        try:
-            age = now - child.stat().st_mtime
-        except OSError:
-            continue
-        if age <= _TEST_SLOT_STALE_SECONDS:
-            continue
-        try:
-            _force_remove_tree(child)
-            pruned.append(child.name)
-        except OSError as exc:
-            failed.append(f"{child.name} ({exc})")
-    if not pruned and not failed:
-        return ToolCheck(name=name, required=False, found=True, status="pass", message="no stale _test_* slots (>24h)")
-    shown = ", ".join(pruned[:10]) + (" ..." if len(pruned) > 10 else "")
-    message = f"pruned {len(pruned)} stale _test_* slot(s) >24h: {shown}"
-    if failed:
-        message += f"; {len(failed)} could not be removed: {', '.join(failed[:5])}"
-    return ToolCheck(name=name, required=False, found=True, status="warning", message=message)
 
 
 def _check_spec_classifier_test_exists(target: Path) -> ToolCheck:
@@ -4460,7 +4515,7 @@ def run_doctor(
     # System tools
     checks.append(_check_python())
     checks.append(_check_git())
-    checks.append(_check_ruff())
+    checks.append(_check_ruff(target))
     checks.append(_check_gh_cli())
 
     if p.includes_bridge:
@@ -4482,7 +4537,12 @@ def run_doctor(
     checks.append(_check_rules(target, profile))
     checks.append(_check_canonical_terminology(target, profile))
     checks.append(_check_canonical_terms_registry(target))
-    checks.append(_check_stale_test_slots(target))
+
+    # Dynamic checks via registry (ADR-REGISTRY-DISCOVERY-001)
+    from groundtruth_kb.project.checks import get_registered_checks
+
+    for check_func in get_registered_checks().values():
+        checks.append(check_func(target))
 
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
@@ -4542,6 +4602,8 @@ def run_doctor(
         # bridge/gtkb-ollama-integration-phase-1-verification-006.md (GO at -006).
         # Severity WARN per Phase-1 GOV-HARNESS-ONBOARDING-CONTRACT-001 rollout convention.
         checks.append(_check_ollama_harness(target))
+        # WI-4431 / FAB-19: Skill health check (WARN/advisory only)
+        checks.append(_check_skill_health(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
     # Local import avoids a circular dependency: doctor_isolation imports

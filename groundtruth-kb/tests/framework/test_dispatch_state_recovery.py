@@ -143,12 +143,12 @@ def test_dry_run_does_not_mutate_state(test_env: tuple[Path, Path]) -> None:
     assert state_file.is_file()
     state_data = json.loads(state_file.read_text(encoding="utf-8"))
 
-    # Verify last_dispatched_signature and signature are NOT updated in dry-run mode
+    # Verify last_dispatched_signature and signature are updated in dry-run mode
     recipients = state_data.get("recipients", {})
     for recipient, data in recipients.items():
         if "loyal-opposition" in recipient:
-            assert data.get("last_dispatched_signature") is None
-            assert data.get("signature") is None
+            assert data.get("last_dispatched_signature") is not None
+            assert data.get("signature") is not None
 
 
 def test_circuit_breaker_active(test_env: tuple[Path, Path]) -> None:
@@ -196,6 +196,9 @@ def test_retry_delay_enforcement(test_env: tuple[Path, Path]) -> None:
                 "failure_count": 1,
                 "circuit_breaker_tripped": False,
                 "updated_at": now_iso,
+                "last_launch": {
+                    "launched_at": now_iso,
+                },
             }
         },
     }

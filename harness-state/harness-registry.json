@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-11T09:08:19Z",
+  "generated_at": "2026-06-12T02:28:33Z",
   "harnesses": [
     {
       "can_fire_events": true,
@@ -112,27 +112,6 @@
       ],
       "status": "active",
       "version": 12
-    },
-    {
-      "can_fire_events": false,
-      "can_receive_dispatch": true,
-      "capabilities_ref": null,
-      "event_driven_hooks": true,
-      "harness_name": "goose",
-      "harness_type": "goose",
-      "id": "E",
-      "invocation_surfaces": {
-        "interactive": {
-          "kind": "desktop",
-          "name": "Goose Desktop"
-        }
-      },
-      "reviewer_precedence": null,
-      "role": [
-        "prime-builder"
-      ],
-      "status": "suspended",
-      "version": 2
     },
     {
       "can_fire_events": false,

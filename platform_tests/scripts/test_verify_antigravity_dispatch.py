@@ -46,7 +46,11 @@ def _antigravity_record(**overrides):
     return record
 
 
-def test_build_dispatch_command_uses_registry_template(tmp_path):
+def test_build_dispatch_command_uses_registry_template(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "scripts.verify_antigravity_dispatch.shutil.which",
+        lambda *args, **kwargs: None,
+    )
     _write_registry(tmp_path, _antigravity_record())
     command = build_dispatch_command(tmp_path, "C", "hello")
     assert command == ["gemini", "-p", "hello", "--approval-mode=yolo"]
@@ -188,9 +192,17 @@ def test_run_verification_treats_timeout_as_substrate_ok(tmp_path, monkeypatch):
     prompt = tmp_path / "prompt.txt"
     prompt.write_text("::init gtkb lo\nsentinel\n", encoding="utf-8")
 
+    calls = []
+
+    def mock_which(cmd, *args, **kwargs):
+        calls.append(cmd)
+        if len(calls) == 1:
+            return None
+        return "/fake/path/gemini.cmd"
+
     monkeypatch.setattr(
         "scripts.verify_antigravity_dispatch.shutil.which",
-        lambda *args, **kwargs: "/fake/path/gemini.cmd",
+        mock_which,
     )
 
     def raise_timeout(*args, **kwargs):

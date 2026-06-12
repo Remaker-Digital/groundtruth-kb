@@ -153,20 +153,20 @@ def test_verdict_file_withdrawn_no_metadata_passes() -> None:
 # --- CLAUSE-NON-IMPLEMENTATION-EXEMPT -------------------------------------------
 
 
-def test_bridge_kind_spec_intake_no_metadata_passes() -> None:
-    content = _proposal("NEW", metadata="", bridge_kind="spec_intake")
+def test_bridge_kind_governance_advisory_no_metadata_passes() -> None:
+    content = _proposal("NEW", metadata="", bridge_kind="governance_advisory")
     reason = _deny(content)
     assert reason is None or _METADATA_CLAUSE not in reason
 
 
-def test_bridge_kind_loyal_opposition_advisory_no_metadata_passes() -> None:
-    content = _proposal("NEW", metadata="", bridge_kind="loyal_opposition_advisory")
+def test_bridge_kind_index_reconciliation_no_metadata_passes() -> None:
+    content = _proposal("NEW", metadata="", bridge_kind="index_reconciliation")
     reason = _deny(content)
     assert reason is None or _METADATA_CLAUSE not in reason
 
 
-def test_bridge_kind_governance_review_no_metadata_passes() -> None:
-    content = _proposal("NEW", metadata="", bridge_kind="governance_review")
+def test_bridge_kind_operational_state_change_no_metadata_passes() -> None:
+    content = _proposal("NEW", metadata="", bridge_kind="operational_state_change")
     reason = _deny(content)
     assert reason is None or _METADATA_CLAUSE not in reason
 
@@ -176,6 +176,6 @@ def test_bridge_kind_governance_review_no_metadata_passes() -> None:
 
 def test_bridge_kind_implementation_proposal_still_gated() -> None:
     # A non-exempt bridge_kind must still require the metadata lines.
-    content = _proposal("NEW", metadata="", bridge_kind="implementation_proposal")
+    content = _proposal("NEW", metadata="", bridge_kind="prime_proposal")
     reason = _deny(content)
     assert reason is not None and _METADATA_CLAUSE in reason

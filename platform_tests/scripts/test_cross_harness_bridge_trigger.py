@@ -2083,13 +2083,19 @@ def test_unchanged_signature_with_previous_fatal_worker_log_retries(tmp_path: Pa
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_harness_command_builds_argv_from_invocation_surfaces(tmp_path: Path) -> None:
+def test_harness_command_builds_argv_from_invocation_surfaces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """WI-3344 FR8 / DELIB-2079 Q9: _harness_command builds the dispatch argv
     solely from a harness record's invocation_surfaces.headless template,
     substituting {{PROMPT}} and {{PROJECT_ROOT}} as individual argv elements —
     for the codex, claude, and a non-claude/codex harness record alike.
     """
     trigger = _load_trigger()
+    # FAB-01: this test exercises template substitution, not argv-head
+    # resolution. Neutralize _normalize_argv_head (HYG-001) so command[0] is the
+    # literal template head regardless of whether codex/claude/gemini happen to
+    # be on the test host's PATH; normalization has its own coverage in
+    # test_fab01_dispatch_substrate_revival.py.
+    monkeypatch.setattr(trigger, "_normalize_argv_head", lambda head, project_root: head)
     prompt = "::init gtkb lo"
     root = tmp_path
 
@@ -2150,9 +2156,14 @@ def test_claude_worker_command_uses_accept_edits_and_authoring_allowlist(tmp_pat
     assert all(not tool.startswith("mcp__") for tool in allowed)
 
 
-def test_non_claude_worker_command_does_not_receive_claude_permission_flags(tmp_path: Path) -> None:
+def test_non_claude_worker_command_does_not_receive_claude_permission_flags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Slice 4 D6b is Claude-specific; Codex argv remains the registry template."""
     trigger = _load_trigger()
+    # FAB-01: neutralize argv-head normalization (HYG-001) so this test stays
+    # focused on the absence of Claude permission flags, host-PATH-independent.
+    monkeypatch.setattr(trigger, "_normalize_argv_head", lambda head, project_root: head)
     target = trigger.DispatchTarget(
         needed_role_label="loyal-opposition",
         harness_id="A",
@@ -2324,7 +2335,7 @@ def test_harness_command_fails_closed_for_missing_or_malformed_surfaces(tmp_path
 
 
 def test_resolve_dispatch_target_attaches_invocation_surfaces_from_projection(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """WI-3344 FR8: _resolve_dispatch_target reads harness-state/harness-registry.json
     and attaches the selected harness record's invocation_surfaces onto the
@@ -2333,6 +2344,9 @@ def test_resolve_dispatch_target_attaches_invocation_surfaces_from_projection(
     """
     root = _make_synthetic_project(tmp_path)
     trigger = _load_trigger()
+    # FAB-01: neutralize argv-head normalization (HYG-001) so the end-to-end
+    # assertion checks the resolve-then-attach template, host-PATH-independent.
+    monkeypatch.setattr(trigger, "_normalize_argv_head", lambda head, project_root: head)
 
     target = trigger._resolve_dispatch_target("loyal-opposition", root)
     assert target.harness_id == "A"

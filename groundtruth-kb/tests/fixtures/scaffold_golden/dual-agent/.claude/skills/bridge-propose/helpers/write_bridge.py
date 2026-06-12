@@ -258,30 +258,49 @@ def _glossary_seed_ids_for_topic(
     if not candidate:
         return []
 
-    lines = glossary_content.splitlines()
-    seed_ids: list[str] = []
+    def extract_from_content(content: str) -> list[str]:
+        if not content:
+            return []
+        lines = content.splitlines()
+        found_seeds: list[str] = []
+        for i, line in enumerate(lines):
+            m = _GLOSSARY_HEADING_RE.match(line)
+            if not m:
+                continue
+            heading_text = m.group(1).strip().lower()
+            if heading_text != candidate:
+                continue
+            # Matching heading found; locate Source: within 30 lines.
+            for j in range(i + 1, min(i + 30, len(lines))):
+                if lines[j].lstrip().startswith("**Source:**"):
+                    source_block = [lines[j]]
+                    for k in range(j + 1, min(j + 30, len(lines))):
+                        nxt = lines[k]
+                        if nxt.lstrip().startswith("**") or nxt.startswith("### ") or nxt.startswith("## "):
+                            break
+                        source_block.append(nxt)
+                    for match in _GLOSSARY_ID_RE.finditer("\n".join(source_block)):
+                        tok = match.group(0)
+                        if tok not in found_seeds:
+                            found_seeds.append(tok)
+                    break
+            break
+        return found_seeds
 
-    for i, line in enumerate(lines):
-        m = _GLOSSARY_HEADING_RE.match(line)
-        if not m:
-            continue
-        heading_text = m.group(1).strip().lower()
-        if heading_text != candidate:
-            continue
-        for j in range(i + 1, min(i + 30, len(lines))):
-            if lines[j].lstrip().startswith("**Source:**"):
-                source_block = [lines[j]]
-                for k in range(j + 1, min(j + 30, len(lines))):
-                    nxt = lines[k]
-                    if nxt.lstrip().startswith("**") or nxt.startswith("### ") or nxt.startswith("## "):
-                        break
-                    source_block.append(nxt)
-                for match in _GLOSSARY_ID_RE.finditer("\n".join(source_block)):
-                    tok = match.group(0)
-                    if tok not in seed_ids:
-                        seed_ids.append(tok)
-                break
-        break
+    seed_ids = extract_from_content(glossary_content)
+
+    # Also parse detail glossary if present in the workspace
+    try:
+        project_root = _discover_project_root()
+        detail_path = project_root / "groundtruth-kb" / "docs" / "reference" / "canonical-terminology-detail.md"
+        if detail_path.exists():
+            detail_content = detail_path.read_text(encoding="utf-8")
+            detail_seeds = extract_from_content(detail_content)
+            for tok in detail_seeds:
+                if tok not in seed_ids:
+                    seed_ids.append(tok)
+    except Exception:
+        pass
 
     return seed_ids
 

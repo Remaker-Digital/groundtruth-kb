@@ -22,11 +22,6 @@
       "assigned_by": "owner-directed-initial-identity-via-DELIB-20260663",
       "id": "D"
     },
-    "goose": {
-      "assigned_at": "2026-06-08T00:19:00Z",
-      "assigned_by": "owner-directed-identity-registration",
-      "id": "E"
-    },
     "openrouter": {
       "assigned_at": "2026-06-09T15:47:00Z",
       "assigned_by": "owner-directed-identity-registration",

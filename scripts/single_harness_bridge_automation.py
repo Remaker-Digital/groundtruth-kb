@@ -73,6 +73,7 @@ def _run_powershell(args: list[str], *, timeout: int = 30) -> dict[str, Any]:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=timeout,
         check=False,
     )
@@ -244,6 +245,13 @@ def ensure_single_harness_automation(
     applicable, harness_id = dispatcher._is_single_harness_topology_applicable(project_root)
     command_handle = dispatcher._resolve_command_handle(project_root, harness_id) if harness_id else None
 
+    # FAB-01 step 4: the scheduled-task wake activates for the gated-wake
+    # condition (single-harness topology OR no active event-source harness), not
+    # single-harness topology alone. In the normal multi-harness-with-event-source
+    # topology, wake_applicable is False and the task is deactivated so the
+    # cross-harness trigger remains the sole substrate.
+    wake_applicable, wake_reason = dispatcher._gated_wake_applicable(project_root)
+
     payload: dict[str, Any] = {
         "schema_version": 1,
         "updated_at": _now_iso(),
@@ -253,6 +261,8 @@ def ensure_single_harness_automation(
         "interval_minutes": interval_minutes,
         "max_items": max_items,
         "single_harness_applicable": applicable,
+        "gated_wake_applicable": wake_applicable,
+        "wake_reason": wake_reason,
         "harness_id": harness_id,
         "command_handle": command_handle,
         "dry_run": dry_run,
@@ -266,7 +276,7 @@ def ensure_single_harness_automation(
                 "reason": "single-harness scheduled-task activation is Windows-only in this slice",
             }
         )
-    elif applicable:
+    elif wake_applicable:
         before = _task_snapshot(task_name)
         payload["task_before"] = before
         if force_register or not _task_matches_desired(before, project_root=project_root, max_items=max_items):
@@ -287,17 +297,21 @@ def ensure_single_harness_automation(
         uninstall = _invoke_uninstaller(project_root=project_root, task_name=task_name, dry_run=dry_run)
         payload["task_uninstall"] = uninstall
         payload["activated"] = False
-        payload["action"] = "deactivated_not_single_harness"
+        payload["action"] = "deactivated_no_wake_needed"
 
-    if dispatch_now and applicable:
+    if dispatch_now and wake_applicable:
+        # enforce_wake_gate is defense-in-depth: the dispatch cycle re-checks
+        # wake applicability so a topology change between activation and dispatch
+        # cannot cause a spurious spawn.
         payload["dispatch_now"] = dispatcher.run_dispatcher(
             project_root=project_root,
             state_dir=state_dir,
             max_items=max_items,
             dry_run=dry_run,
+            enforce_wake_gate=True,
         )
     elif dispatch_now:
-        payload["dispatch_now"] = {"skipped": True, "reason": "not_single_harness_topology"}
+        payload["dispatch_now"] = {"skipped": True, "reason": "wake_gate_not_applicable"}
 
     if not dry_run:
         try:

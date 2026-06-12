@@ -1,0 +1,60 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-11T16:18:02Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-11T16:18:02Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-11T16-18-02Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": "M bridge/INDEX.md\n?? bridge/gtkb-backlog-triage-and-hygiene-stage-1-structural-repair-005.md\n?? harness-state/claude/session-envelope-archive/2026-06-11T16-16-25Z-session-envelope.json\n?? harness-state/claude/session-envelope.json\n?? memory/handoff-2026-06-11-pb-fab20-and-hooks-restoration.md\n?? platform_tests/scripts/test_prefix_split_detector.py\n?? scripts/hygiene/prefix_split_detector.py"
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

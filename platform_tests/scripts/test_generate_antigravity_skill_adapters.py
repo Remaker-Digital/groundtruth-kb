@@ -1,7 +1,7 @@
 """Tests for scripts/generate_antigravity_skill_adapters.py (WI-3347).
 
 Covers the Antigravity-specific behaviour that distinguishes this generator
-from the Codex generator: the loyal-opposition role filter, BOM-aware
+from the Codex generator: full-skill-set adapter selection, BOM-aware
 frontmatter placement, check mode, the manifest, and the insert-or-rewrite
 [capabilities.antigravity] registry update.
 """

@@ -181,8 +181,12 @@ def test_activation_uninstalls_when_topology_is_not_single_harness(
     )
 
     assert payload["single_harness_applicable"] is False
+    # FAB-01: the "multi" fixture has codex A + claude B both active and
+    # event-capable, so the gated wake is NOT applicable and the task is
+    # deactivated (the cross-harness trigger is the sole substrate here).
+    assert payload["gated_wake_applicable"] is False
     assert payload["activated"] is False
-    assert payload["action"] == "deactivated_not_single_harness"
+    assert payload["action"] == "deactivated_no_wake_needed"
     assert calls == [
         (
             "uninstall",
@@ -257,3 +261,14 @@ def test_claude_settings_register_single_harness_activation_and_stop_dispatch() 
         and "--max-items 999" in cmd
         for cmd in stop
     )
+
+
+def test_run_powershell_harden_decode() -> None:
+    module = _load_automation()
+    # Execute a command that writes invalid UTF-8 bytes to stdout.
+    # 0xe9 is invalid UTF-8 by itself.
+    script = "[System.Console]::OpenStandardOutput().Write([byte[]](0xe9), 0, 1)"
+    res = module._run_powershell(["-Command", script])
+    assert res["returncode"] == 0
+    # The output should have been decoded successfully, replacing 0xe9 with \ufffd.
+    assert "\ufffd" in res["stdout"]

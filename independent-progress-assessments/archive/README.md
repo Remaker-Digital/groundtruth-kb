@@ -63,6 +63,20 @@ live tooling.
 | `prime-bridge-cleanup-2026-04-08.ps1` | One-shot bridge cleanup for 2026-04-08 incident | Retired |
 | `cursor-legacy/` | Pre-existing legacy archive sub-tree | Retained (see directory) |
 
+## Inventory at archive time (2026-06-12)
+
+| File | Origin / purpose | Status |
+|------|------------------|--------|
+| `apply_w5_token_framing_corrections.py` | One-shot script for W5 token framing corrections | Retired |
+| `capture_token_waste_delib.py` | One-shot script to capture token waste deliberation | Retired |
+| `create_s358_work_items.py` | One-shot script to create S358 work items | Retired |
+| `file_w4_proposal.py` | One-shot script to file W4 proposal | Retired |
+| `search_token_framing_membase.py` | One-shot script to search token framing in MemBase | Retired |
+| `stand_up_delib_s358.py` | One-shot script to stand up Deliberation S358 | Retired |
+| `w4-proposal-body.md` | Superseded draft of W4 proposal | Retired |
+| `agent-red-project-dashboard.pdf` | Legacy Agent Red project dashboard | Archived |
+| `handoff-*.md` | Stale session handoffs (10 files) | Archived |
+
 ## Companion archive
 
 The matching archive for `scripts/`-rooted one-shots lives at

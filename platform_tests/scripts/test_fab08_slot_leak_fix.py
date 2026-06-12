@@ -19,8 +19,11 @@ import time
 from pathlib import Path
 
 import pytest
-from groundtruth_kb.project import doctor as doctor_mod
-from groundtruth_kb.project.doctor import _check_stale_test_slots, _force_remove_tree
+from groundtruth_kb.project.checks import stale_test_slots as doctor_mod
+from groundtruth_kb.project.checks.stale_test_slots import (
+    check_stale_test_slots as _check_stale_test_slots,
+    _force_remove_tree,
+)
 
 # Repo root, used by the runtime-floor source-scan test below.
 _GT_KB_ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +33,7 @@ _GT_KB_ROOT = Path(__file__).resolve().parents[2]
 # which raises ``TypeError`` on the package's declared ``requires-python = ">=3.11"``
 # floor. The fix is a version-adaptive dispatch (onexc on 3.12+, onerror on 3.11).
 _RMTREE_HELPER_FILES = [
-    _GT_KB_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "project" / "doctor.py",
+    _GT_KB_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "project" / "checks" / "stale_test_slots.py",
     _GT_KB_ROOT / "groundtruth-kb" / "tests" / "adopter" / "conftest.py",
     _GT_KB_ROOT / "groundtruth-kb" / "tests" / "test_cli.py",
     _GT_KB_ROOT / "groundtruth-kb" / "tests" / "test_scaffold_isolation.py",

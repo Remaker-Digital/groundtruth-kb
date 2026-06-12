@@ -191,10 +191,16 @@ Verify the install:
 gt --version
 ```
 
+If your system `PATH` is not configured to run `gt` directly, or you are running inside a virtual environment (e.g., `groundtruth-kb/.venv`), you can run the CLI via the virtual environment's executable path (e.g., `groundtruth-kb/.venv/Scripts/gt` on Windows or `groundtruth-kb/.venv/bin/gt` on POSIX), or using the canonical python module invocation:
+
+```powershell
+python -m groundtruth_kb --version
+```
+
 Expected output:
 
 ```
-gt, version 0.6.1
+gt, version 0.7.0rc1
 ```
 
 Create your first project:

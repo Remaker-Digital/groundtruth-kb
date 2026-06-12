@@ -215,6 +215,105 @@ def _is_single_harness_topology_applicable(project_root: Path) -> tuple[bool, st
 
 
 # ---------------------------------------------------------------------------
+# Gated-wake applicability (FAB-01 step 4 / HYG-004)
+# ---------------------------------------------------------------------------
+#
+# The cross-harness event-driven trigger can only fire when an active harness
+# carries live event-firing hook surfaces (``can_fire_events`` — Claude Code /
+# Codex CLI per ADR-CODEX-HOOK-PARITY-FALLBACK-001). In a topology where every
+# active harness is event-less (``can_fire_events`` False — e.g. only ollama /
+# openrouter / antigravity active), the trigger never fires and Axis-1
+# auto-dispatch is dead even though launchable dispatch TARGETS exist (HYG-004).
+# FAB-01 generalizes this dispatcher's scheduled-task substrate to ALSO wake in
+# that degraded topology, reusing the existing actionable-signature dedup so the
+# wake spawns only on a changed signature (NOT a blind interval full-spawn —
+# the retired-poller defect class forbidden by bridge-essential.md and the GO
+# constraints on bridge/gtkb-fab-01-dispatch-substrate-revival-002.md).
+#
+# Safety: when an event-source harness IS active (the normal multi-harness
+# topology — e.g. codex A + claude B active and event-capable), the gated wake
+# is NOT applicable and the dispatcher no-ops under the wake gate. The
+# cross-harness trigger remains the sole substrate; the two stay mutually
+# exclusive at runtime (parity with the single-harness/multi-harness gate).
+
+# Event-firing harness types, mirroring
+# ``groundtruth_kb.harness_projection._EVENT_FIRING_CAPABLE_TYPES``. Used only as
+# a fallback when a (legacy) projection record predates the ``can_fire_events``
+# split axis; current projections always carry the field.
+_EVENT_FIRING_HARNESS_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli"})
+
+
+def _record_is_active_event_source(record: dict[str, Any]) -> bool:
+    """True iff the harness record is ``active`` AND can fire bridge dispatch events.
+
+    Reads the honest ``can_fire_events`` axis (FAB-01 / HYG-004). The deprecated
+    ``event_driven_hooks`` alias is intentionally NOT consulted here: it now
+    equals ``can_receive_dispatch`` (its de-facto current meaning), so a hook-less
+    dispatch target like ollama would be misread as an event source. A legacy
+    record lacking ``can_fire_events`` falls back to the harness-type set.
+    """
+    status = record.get("status")
+    if not (isinstance(status, str) and status.strip().lower() == "active"):
+        return False
+    can_fire = record.get("can_fire_events")
+    if can_fire is True:
+        return True
+    if can_fire is False:
+        return False
+    htype = str(record.get("harness_type") or "").strip().lower()
+    return htype in _EVENT_FIRING_HARNESS_TYPES
+
+
+def _no_active_event_source_harness(project_root: Path) -> bool:
+    """Return True iff >=1 harness is active AND none can fire bridge events.
+
+    This is the FAB-01 degraded-topology condition: launchable dispatch targets
+    exist but the cross-harness trigger has no active event source to fire it.
+
+    Fail-closed: an unreadable role map returns False (do not justify a wake we
+    cannot read).
+    """
+    trigger = _load_trigger_module()
+    try:
+        role_map = trigger._read_role_assignments(project_root)
+    except ValueError:
+        return False
+    harnesses = role_map.get("harnesses", {})
+    if not isinstance(harnesses, dict) or not harnesses:
+        return False
+    active = [
+        record
+        for record in harnesses.values()
+        if isinstance(record, dict)
+        and isinstance(record.get("status"), str)
+        and record["status"].strip().lower() == "active"
+    ]
+    if not active:
+        return False
+    return not any(_record_is_active_event_source(record) for record in active)
+
+
+def _gated_wake_applicable(project_root: Path) -> tuple[bool, str | None]:
+    """Return (applicable, reason) for the gated scheduled wake.
+
+    Applicable when EITHER:
+      - single-harness topology applies (the substrate's original purpose), OR
+      - no active event-source harness exists (FAB-01: the cross-harness trigger
+        is structurally unable to fire).
+
+    Returns ``(False, None)`` in the normal multi-harness-with-event-source
+    topology so the wake stays inert and the cross-harness trigger remains the
+    sole substrate.
+    """
+    applicable, _harness_id = _is_single_harness_topology_applicable(project_root)
+    if applicable:
+        return (True, "single_harness_topology")
+    if _no_active_event_source_harness(project_root):
+        return (True, "no_active_event_source_harness")
+    return (False, None)
+
+
+# ---------------------------------------------------------------------------
 # Lock management
 # ---------------------------------------------------------------------------
 
@@ -419,9 +518,7 @@ def _resolve_dispatcher_targets(
         for h_id, h_info in harnesses.items()
         if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
     ]
-    active_matching = [
-        (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info)
-    ]
+    active_matching = [(h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info)]
 
     targets = []
     identities = trigger._read_harness_identities(project_root)
@@ -468,7 +565,10 @@ def _spawn_worker(
     prompt = trigger._dispatch_prompt(target, items, max_items)
     command = trigger._harness_command(target, prompt, project_root)
     recipient_key = target.dispatch_state_key
-    dispatch_id = dispatch_id or f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{recipient_key}-{uuid.uuid4().hex[:6]}"
+    dispatch_id = (
+        dispatch_id
+        or f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{recipient_key}-{uuid.uuid4().hex[:6]}"
+    )
 
     if command is None:
         meta = {
@@ -586,14 +686,28 @@ def run_dispatcher(
     state_dir: Path,
     max_items: int = DEFAULT_MAX_ITEMS,
     dry_run: bool = False,
+    enforce_wake_gate: bool = False,
 ) -> dict[str, Any]:
     """One dispatch cycle. Always succeeds (fire-and-forget).
 
     Returns a summary dict for diagnose/test use; never propagates exceptions
     from dispatch attempts.
+
+    ``enforce_wake_gate`` (FAB-01 step 4): when True, the cycle no-ops unless the
+    gated wake is applicable (single-harness topology OR no active event-source
+    harness). This keeps the scheduled wake mutually exclusive with the
+    cross-harness trigger — in the normal multi-harness-with-event-source
+    topology the wake gate is closed and the dispatcher does not spawn. Default
+    False preserves the original single-harness dispatch behavior for callers
+    that gate applicability themselves.
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
+
+    if enforce_wake_gate:
+        wake_ok, wake_reason = _gated_wake_applicable(project_root)
+        if not wake_ok:
+            return {"skipped": True, "reason": "wake_gate_not_applicable"}
 
     if not _acquire_lock(state_dir):
         return {"skipped": True, "reason": "another_instance_running"}
@@ -669,7 +783,11 @@ def run_dispatcher(
             selected = trigger._selected_oldest_first(non_leased, max_items)
             signature = trigger._signature(selected)
 
-            prior = recipients_state.get(needed_role_label) if isinstance(recipients_state.get(needed_role_label), dict) else {}
+            prior = (
+                recipients_state.get(needed_role_label)
+                if isinstance(recipients_state.get(needed_role_label), dict)
+                else {}
+            )
             prior_legacy_signature = prior.get("signature") if isinstance(prior, dict) else None
             prior_dispatched = (
                 prior.get("last_dispatched_signature")
@@ -721,22 +839,26 @@ def run_dispatcher(
                             session_id=work_intent_session_id,
                         )
                         if not work_intent_filter["ok"]:
-                            launches.append({
-                                "dispatch_id": dispatch_id,
-                                "recipient": target.dispatch_state_key,
-                                "launched": False,
-                                "reason": work_intent_filter["reason"],
-                            })
+                            launches.append(
+                                {
+                                    "dispatch_id": dispatch_id,
+                                    "recipient": target.dispatch_state_key,
+                                    "launched": False,
+                                    "reason": work_intent_filter["reason"],
+                                }
+                            )
                             continue
 
                         dispatched_selected = list(work_intent_filter["selected"])
                         if not dispatched_selected:
-                            launches.append({
-                                "dispatch_id": dispatch_id,
-                                "recipient": target.dispatch_state_key,
-                                "launched": False,
-                                "reason": "work_intent_already_held",
-                            })
+                            launches.append(
+                                {
+                                    "dispatch_id": dispatch_id,
+                                    "recipient": target.dispatch_state_key,
+                                    "launched": False,
+                                    "reason": "work_intent_already_held",
+                                }
+                            )
                             continue
 
                         if not dry_run:
@@ -749,12 +871,14 @@ def run_dispatcher(
                                 session_id=work_intent_session_id,
                             )
                             if not acquire_result["ok"]:
-                                launches.append({
-                                    "dispatch_id": dispatch_id,
-                                    "recipient": target.dispatch_state_key,
-                                    "launched": False,
-                                    "reason": acquire_result["reason"],
-                                })
+                                launches.append(
+                                    {
+                                        "dispatch_id": dispatch_id,
+                                        "recipient": target.dispatch_state_key,
+                                        "launched": False,
+                                        "reason": acquire_result["reason"],
+                                    }
+                                )
                                 continue
                         spawn_items = dispatched_selected
 
@@ -771,6 +895,7 @@ def run_dispatcher(
                     if launch.get("launched") and not dry_run:
                         first_bridge_id = spawn_items[0].document_name if spawn_items else ""
                         import time
+
                         trigger._post_dispatch_poll(
                             dispatch_id=dispatch_id,
                             bridge_id=first_bridge_id,
@@ -796,11 +921,11 @@ def run_dispatcher(
             "recipients": recipients_state,
         }
         trigger._write_dispatch_state(state_dir, payload)
-        
+
         # Populate backward-compat keys if at least one target was resolved
         harness_id = resolved_targets[0].harness_id if resolved_targets else "unknown"
         command_handle = resolved_targets[0].command_handle if resolved_targets else "unknown"
-        
+
         return {
             "skipped": False,
             "harness_id": harness_id,
@@ -917,6 +1042,16 @@ def _build_argparser() -> argparse.ArgumentParser:
         help=f"Cap on selected entries per dispatch (default {DEFAULT_MAX_ITEMS}).",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--enforce-wake-gate",
+        action="store_true",
+        help=(
+            "FAB-01: only dispatch when the gated wake is applicable "
+            "(single-harness topology OR no active event-source harness). "
+            "No-op otherwise so the wake stays mutually exclusive with the "
+            "cross-harness trigger."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
         "--diagnose",
@@ -942,6 +1077,7 @@ def main(argv: list[str] | None = None) -> int:
             state_dir=state_dir,
             max_items=args.max_items,
             dry_run=args.dry_run,
+            enforce_wake_gate=args.enforce_wake_gate,
         )
         if args.verbose:
             print(json.dumps(summary, indent=2, sort_keys=True))

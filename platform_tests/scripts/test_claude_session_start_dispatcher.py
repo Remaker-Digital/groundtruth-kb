@@ -38,6 +38,8 @@ from types import ModuleType
 
 import pytest
 
+pytestmark = pytest.mark.timeout(120)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DISPATCHER = PROJECT_ROOT / ".claude" / "hooks" / "session_start_dispatch.py"
 DIAG_JSON = PROJECT_ROOT / ".claude" / "hooks" / "last-session-start.json"

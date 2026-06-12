@@ -2,16 +2,15 @@
 """Generate Antigravity project skill adapters from canonical GT-KB skills.
 
 WI-3347 (Antigravity Onboarding sub-project of PROJECT-ANTIGRAVITY-INTEGRATION).
-Builds ``.agent/skills/<name>/SKILL.md`` adapters for the capabilities whose
-harness-capability-registry ``required_for_roles`` includes ``loyal-opposition``
-(DELIB-2079 Q8 role-scoped parity). Antigravity is onboarded solely in the
-loyal-opposition role, so it receives only the LO-scoped subset of skills, not
-the full set the Codex harness carries.
+Builds ``.agent/skills/<name>/SKILL.md`` adapters for every registry capability
+whose canonical source is a skill ``SKILL.md`` file. Antigravity mirrors the
+canonical skill set, so adapter parity is governed by registry skill membership
+rather than role filters.
 
 This generator reuses the harness-agnostic helpers of
 ``generate_codex_skill_adapters.py``; that script is not modified. The
-Antigravity-specific behaviour is: the loyal-opposition role filter, the
-``.agent/skills/`` target directory, the ``GTKB-ANTIGRAVITY-SKILL-ADAPTER``
+Antigravity-specific behaviour is: the ``.agent/skills/`` target directory, the
+``GTKB-ANTIGRAVITY-SKILL-ADAPTER``
 marker, registry blocks that are inserted (not just rewritten), and BOM-aware
 frontmatter placement -- Antigravity parses each adapter's YAML frontmatter for
 the mandatory ``description`` trigger, so the generated marker block must follow

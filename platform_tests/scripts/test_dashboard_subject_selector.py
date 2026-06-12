@@ -34,10 +34,21 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import urllib.request
+
 from scripts import session_self_initialization as ssi  # noqa: E402
 from scripts.gtkb_dashboard import refresh_dashboard_db as rdb  # noqa: E402
 
 INDEX_HTML = REPO_ROOT / "docs" / "gtkb-dashboard" / "index.html"
+
+
+@pytest.fixture(autouse=True)
+def mock_network_reachability(monkeypatch):
+    def fake_urlopen(*args, **kwargs):
+        raise OSError("Offline by test mock")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
 
 EXPECTED_SCOPE_KEYS = {
     "regression_release_blocker_count",
@@ -142,6 +153,7 @@ def test_dashboard_data_json_carries_work_subject(tmp_path: Path, monkeypatch: p
         dashboard_dir,
         history_path,
         generate_pdf=False,
+        seed_historical_backfill=False,
         role_profile="prime-builder",
     )
     payload = json.loads(Path(result["data_path"]).read_text(encoding="utf-8"))

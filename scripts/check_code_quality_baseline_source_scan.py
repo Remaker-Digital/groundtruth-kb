@@ -19,6 +19,7 @@ def _diff(project_root: Path, since: str, paths: list[str]) -> str:
         command,
         cwd=project_root,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )
@@ -31,6 +32,7 @@ def _changed_python_files(project_root: Path, since: str, paths: list[str]) -> l
         command,
         cwd=project_root,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )

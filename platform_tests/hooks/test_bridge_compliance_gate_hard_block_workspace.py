@@ -191,7 +191,7 @@ def _template_shaped_advisory_content() -> str:
 
 {AUTHOR_METADATA}
 
-bridge_kind: loyal_opposition_advisory
+bridge_kind: governance_advisory
 Document: test-advisory-report
 Version: 001
 Author: Loyal Opposition
@@ -376,7 +376,7 @@ def _pending_preflight_content(*, include_application_spec: bool) -> str:
         # `not _bridge_kind_is_metadata_exempt` branch. The fixture then reaches
         # the pending applicability-preflight path (the behavior these tests
         # exist to exercise) without depending on live MemBase membership rows.
-        "bridge_kind: spec_intake\n\n"
+        "bridge_kind: governance_advisory\n\n"
         'target_paths: ["applications/Agent_Red/src/app.py"]\n\n'
         # Placeholder project-linkage metadata; harmless under the bridge_kind
         # exemption above (retained for a minimal diff vs WI-3314 IP-8).

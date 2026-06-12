@@ -436,7 +436,30 @@ def _probe_http_url(source: str, url: str, *, timeout: float = 3.0) -> dict[str,
     }
 
 
-def _dashboard_reachability_probes() -> list[dict[str, Any]]:
+def _dashboard_reachability_probes(*, fast_hook: bool = False) -> list[dict[str, Any]]:
+    if fast_hook:
+        return [
+            {
+                "source": "Grafana health endpoint",
+                "kind": "live_probe",
+                "required": False,
+                "status": "unavailable",
+                "queried_at": None,
+                "detail": GRAFANA_HEALTH_URL,
+                "timeout_seconds": 3.0,
+                "error": "skipped_fast_hook",
+            },
+            {
+                "source": "GT-KB dashboard URL",
+                "kind": "live_probe",
+                "required": False,
+                "status": "unavailable",
+                "queried_at": None,
+                "detail": GRAFANA_DASHBOARD_URL,
+                "timeout_seconds": 3.0,
+                "error": "skipped_fast_hook",
+            },
+        ]
     return [
         _probe_http_url("Grafana health endpoint", GRAFANA_HEALTH_URL),
         _probe_http_url("GT-KB dashboard URL", GRAFANA_DASHBOARD_URL),
@@ -3370,7 +3393,7 @@ def build_startup_model(
         "harness_parity": harness_parity,
         "gtkb_upgrade_posture": _gtkb_upgrade_posture(project_root, fast_hook=fast_hook),
         "testing_service_integrations": _testing_service_integrations(project_root, plugins, fast_hook=fast_hook),
-        "dashboard_reachability": _dashboard_reachability_probes(),
+        "dashboard_reachability": _dashboard_reachability_probes(fast_hook=fast_hook),
     }
     infrastructure["delivery_timeline"] = _delivery_timeline(project_root, infrastructure, fast_hook=fast_hook)
     dashboard_intelligence = _dashboard_intelligence(

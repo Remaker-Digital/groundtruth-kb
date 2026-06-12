@@ -29,8 +29,78 @@ def _load_module(*, live_dashboard_probes: bool = False):
     module = importlib.util.module_from_spec(spec)
     sys.modules["session_self_initialization"] = module
     spec.loader.exec_module(module)
+    module._backlog_items_from_membase = lambda *args, **kwargs: []
+    module._git_drift = lambda *args, **kwargs: {
+        "available": True,
+        "changed_path_count": 0,
+        "raw_changed_path_count": 0,
+        "untracked_path_count": 0,
+        "deleted_path_count": 0,
+        "scope_confidence": "gtkb_current_heuristic",
+    }
+    module._git_remote_origin = lambda *args, **kwargs: {
+        "present": True,
+        "host": "github.com",
+        "repository": "Remaker-Digital/groundtruth-kb",
+        "source": "git remote origin",
+        "remote_url": "https://github.com/Remaker-Digital/groundtruth-kb.git",
+    }
+    module._gh_auth_status = lambda *args, **kwargs: "authenticated"
+    module._latest_github_workflow_runs = lambda *args, **kwargs: {
+        "available": True,
+        "runs_by_workflow": {},
+        "queried_work_subject": "gtkb_framework",
+        "queried_repo": "Remaker-Digital/groundtruth-kb",
+    }
+
+    def mock_command_output(command: list[str], *args, **kwargs):
+        cmd_str = " ".join(str(c) for c in command)
+        if "show-current" in cmd_str:
+            return {"ok": True, "stdout": "main\n", "stderr": "", "returncode": 0}
+        elif "rev-parse" in cmd_str:
+            if "--short" in cmd_str:
+                return {"ok": True, "stdout": "12345678\n", "stderr": "", "returncode": 0}
+            return {"ok": True, "stdout": "1234567890abcdef1234567890abcdef12345678\n", "stderr": "", "returncode": 0}
+        elif "get-url" in cmd_str:
+            return {
+                "ok": True,
+                "stdout": "https://github.com/Remaker-Digital/groundtruth-kb.git\n",
+                "stderr": "",
+                "returncode": 0,
+            }
+        elif "status" in cmd_str:
+            return {"ok": True, "stdout": "", "stderr": "", "returncode": 0}
+        elif "log" in cmd_str:
+            return {
+                "ok": True,
+                "stdout": "1234567890abcdef1234567890abcdef12345678\x1f12345678\x1f2026-06-11T12:00:00-07:00\x1fAuthor Name\x1fCommit message\n",
+                "stderr": "",
+                "returncode": 0,
+            }
+        elif "describe" in cmd_str:
+            return {"ok": True, "stdout": "v0.7.0rc1\n", "stderr": "", "returncode": 0}
+        elif "rev-list" in cmd_str:
+            return {"ok": True, "stdout": "0\n", "stderr": "", "returncode": 0}
+        elif "ls-remote" in cmd_str:
+            if "--tags" in cmd_str:
+                return {
+                    "ok": True,
+                    "stdout": "1234567890abcdef1234567890abcdef12345678\trefs/tags/v0.7.0rc1\n",
+                    "stderr": "",
+                    "returncode": 0,
+                }
+            return {
+                "ok": True,
+                "stdout": "1234567890abcdef1234567890abcdef12345678\trefs/heads/main\n",
+                "stderr": "",
+                "returncode": 0,
+            }
+        return {"ok": True, "stdout": "", "stderr": "", "returncode": 0}
+
+    module._command_output = mock_command_output
+
     if not live_dashboard_probes:
-        module._dashboard_reachability_probes = lambda: [
+        module._dashboard_reachability_probes = lambda *args, **kwargs: [
             {
                 "source": "Grafana health endpoint",
                 "kind": "live_probe",
@@ -185,7 +255,7 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     posture = model["infrastructure"]["gtkb_upgrade_posture"]
     assert posture["scope"] == "implementation_infrastructure"
     assert posture["package_version"]
-    assert posture["scaffold_version"] == "0.6.1"
+    assert posture["scaffold_version"] == "0.7.0rc1"
     assert posture["repo_url"] == "https://github.com/Remaker-Digital/groundtruth-kb"
     assert posture["latest_release_tag"]
     assert posture["plan_command"]
@@ -472,7 +542,7 @@ def test_dashboard_reachability_probes_feed_payload_and_disclosure(monkeypatch) 
     monkeypatch.setattr(
         module,
         "_dashboard_reachability_probes",
-        lambda: [
+        lambda *args, **kwargs: [
             {
                 "source": "Grafana health endpoint",
                 "kind": "live_probe",

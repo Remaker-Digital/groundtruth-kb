@@ -130,7 +130,8 @@ def test_canonical_terminology_has_three_ollama_glossary_entries() -> None:
 
 
 def test_ollama_glossary_entries_cite_authorities() -> None:
-    src = CT_PATH.read_text(encoding="utf-8")
+    detail_path = PROJECT_ROOT / "groundtruth-kb" / "docs" / "reference" / "canonical-terminology-detail.md"
+    src = CT_PATH.read_text(encoding="utf-8") + detail_path.read_text(encoding="utf-8")
     assert "ADR-OLLAMA-HARNESS-ADOPTION-001" in src
     assert "DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001" in src
     assert "DELIB-20260663" in src

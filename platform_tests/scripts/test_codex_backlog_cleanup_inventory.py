@@ -149,13 +149,18 @@ def test_review_packet_contains_phase_2_deferred_marker(inventory_module, review
 
 def test_no_kb_write_during_generation(inventory_module, review_module, db_available, tmp_path):
     """Read-only discipline: DB file mtime + sha256 unchanged across both runs."""
-    pre_mtime = db_available.stat().st_mtime_ns
-    pre_hash = _file_sha256(db_available)
+    import shutil
+
+    db_copy = tmp_path / "groundtruth_copy.db"
+    shutil.copy2(db_available, db_copy)
+
+    pre_mtime = db_copy.stat().st_mtime_ns
+    pre_hash = _file_sha256(db_copy)
     inv = tmp_path / "inventory.md"
     pkt = tmp_path / "packet.md"
-    assert inventory_module.main(["--db", str(db_available), "--out", str(inv)]) == 0
-    assert review_module.main(["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)]) == 0
-    post_mtime = db_available.stat().st_mtime_ns
-    post_hash = _file_sha256(db_available)
+    assert inventory_module.main(["--db", str(db_copy), "--out", str(inv)]) == 0
+    assert review_module.main(["--db", str(db_copy), "--inventory", str(inv), "--out", str(pkt)]) == 0
+    post_mtime = db_copy.stat().st_mtime_ns
+    post_hash = _file_sha256(db_copy)
     assert pre_mtime == post_mtime, "DB mtime changed — read-only contract violated"
     assert pre_hash == post_hash, "DB sha256 changed — read-only contract violated"

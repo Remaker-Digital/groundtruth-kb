@@ -103,7 +103,7 @@ _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 _EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli"})
 
 _DISPATCH_RECEIVE_CAPABLE_TYPES = frozenset(
-    {"claude", "claude-code", "codex", "codex-cli", "ollama", "openrouter", "antigravity", "goose"}
+    {"claude", "claude-code", "codex", "codex-cli", "ollama", "openrouter", "antigravity"}
 )
 
 # Deprecated alias preserved for back-compat readers; equals the receive axis.

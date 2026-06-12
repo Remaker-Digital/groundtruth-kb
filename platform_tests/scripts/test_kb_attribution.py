@@ -72,7 +72,6 @@ def mock_harness_state(tmp_path, monkeypatch):
                     "codex": {"id": "A"},
                     "antigravity": {"id": "C"},
                     "ollama": {"id": "D"},
-                    "goose": {"id": "E"},
                 },
             }
         ),
@@ -81,6 +80,11 @@ def mock_harness_state(tmp_path, monkeypatch):
 
     monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry_file))
     monkeypatch.setenv("GTKB_HARNESS_IDENTITIES_PATH", str(identities_file))
+    # Baseline tests assert durable registry behavior; marker tests cover overrides.
+    monkeypatch.setattr(
+        "scripts._kb_attribution._session_role_override",
+        lambda _harness_name: None,
+    )
 
 
 def test_explicit_kwarg_resolves_codex() -> None:

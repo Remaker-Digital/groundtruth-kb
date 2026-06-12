@@ -10,6 +10,16 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-1147
+  asked_at: 2026-06-12T02:21:51.667049Z
+  question: ""
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 98c1155ff7d31e2e
+  resolved_at: 2026-06-12T02:24:00Z
+  resolved_in_session: 2026-06-12 interactive PB (harness B, Opus 4.8) AUQ conversion
+  answer: "Owner selected via AskUserQuestion: this interactive Claude session (harness B) takes the WI-4472 implementation once Codex GOs the revised proposal, AFTER the owner stops the other Prime sessions (Gemini/antigravity harness C; /loop 544b584c). Single-owner implementation to avoid the live-dispatch-path collision that hit Stage 3."
+  notes: "Converted prose anti-pattern DECISION-1147 to AskUserQuestion. Question text blanked to prevent recursive prose re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-1095
   asked_at: 2026-06-05T21:28:00.112529Z
   question: ""
@@ -7411,6 +7421,165 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 677ee7830da15721
   resolved_at: 2026-06-11T05:34:56.775186Z
   answer: "Your questions have been answered: \"FAB-16 can't be cleanly implemented as GO'd — Area 2's antigravity adapter generator is broken (produces 0 of the 36 declared adapters; parity can't reach PASS). Areas 1+3 ARE implementable. The generator drift is a real defect. This session is now very deep in context. How should I proceed?\"=\"Please note: Goose does not need to have any role in GT-KB. Goose is acting as a desktop UI for the OpenRouter cloud API and nothing more. OpenRouter participates in the bridge via the SDK.\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1139
+  asked_at: 2026-06-11T17:37:35.074877Z
+  question: "The WI-4459 fix is filed and compliant but stuck at NEW — I can't implement it without a Codex GO, and headless Codex dispatch is wedged (the bug it fixes). How do we get it reviewed, and what should I work while it's pending?"
+  options:
+    - "You run the manual Codex scan"
+    - "I draft the hooks-fix proposals in parallel"
+    - "I attempt a one-time throttle reset"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4b934ce13c9f5b94
+  resolved_at: 2026-06-11T17:37:35.074877Z
+  answer: "Your questions have been answered: \"The WI-4459 fix is filed and compliant but stuck at NEW — I can't implement it without a Codex GO, and headless Codex dispatch is wedged (the bug it fixes). How do we get it reviewed, and what should I work while it's pending?\"=\"I draft the hooks-fix proposals in parallel\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1140
+  asked_at: 2026-06-12T01:09:14.251998Z
+  question: "Emergency fix for the dispatch-cascade resource exhaustion (root cause: hung dispatched sessions re-dispatch every 120s; circuit breaker misses hung-but-launched sessions, so nothing caps total processes). Which approach should I implement now?"
+  options:
+    - "Both: kill-switch + watchdog"
+    - "Watchdog monitor only"
+    - "Kill-switch only (prevent)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4902d2026d3dfbf0
+  resolved_at: 2026-06-12T01:09:14.251998Z
+  answer: "Your questions have been answered: \"Emergency fix for the dispatch-cascade resource exhaustion (root cause: hung dispatched sessions re-dispatch every 120s; circuit breaker misses hung-but-launched sessions, so nothing caps total processes). Which approach should I implement now?\"=\"Both: kill-switch + watchdog\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1141
+  asked_at: 2026-06-12T01:09:14.251998Z
+  question: "The resource emergency is fixed and verified. FAB-05 is staged, owner-approved, and one step from done but currently uncommitted in a Drive-polluted tree. How should I proceed?"
+  options:
+    - "Finish + commit FAB-05 now"
+    - "Hold FAB-05; watch stability"
+    - "Wrap the session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0823c99a588bd703
+  resolved_at: 2026-06-12T01:09:14.251998Z
+  answer: "Your questions have been answered: \"The resource emergency is fixed and verified. FAB-05 is staged, owner-approved, and one step from done but currently uncommitted in a Drive-polluted tree. How should I proceed?\"=\"Finish + commit FAB-05 now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1142
+  asked_at: 2026-06-12T01:09:14.251998Z
+  question: "Google Drive is actively re-restoring the FAB-05 moved-from files (Cursor rule files + poller scripts) into the working tree, so the HYG-018/026 archive moves can't cleanly land while E:\\GT-KB is Drive-synced. The 8 in-place edits are unaffected. How should I proceed?"
+  options:
+    - "Exclude Drive, then commit clean"
+    - "Commit in-place edits; defer moves"
+    - "Hold all of FAB-05"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 152e98bc7139bab5
+  resolved_at: 2026-06-12T01:09:14.251998Z
+  answer: "Your questions have been answered: \"Google Drive is actively re-restoring the FAB-05 moved-from files (Cursor rule files + poller scripts) into the working tree, so the HYG-018/026 archive moves can't cleanly land while E:\\GT-KB is Drive-synced. The 8 in-place edits are unaffected. How should I proceed?\"=\"Exclude Drive, then commit clean\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1143
+  asked_at: 2026-06-12T01:16:51.138423Z
+  question: "Ollama dispatch is broken by ollama_harness.py validating OpenRouter-provider models against the local server. Fixing it is a governed scripts/ change, and re-enabling dispatch interacts with the storm kill-switch. How should I sequence the Ollama fix?"
+  options:
+    - "Fix Ollama + storm cap, then re-enable"
+    - "Fix Ollama, re-enable now"
+    - "Diagnosis only; defer fix"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ff0eed5fd1907d3a
+  resolved_at: 2026-06-12T01:16:51.138423Z
+  answer: "Your questions have been answered: \"Ollama dispatch is broken by ollama_harness.py validating OpenRouter-provider models against the local server. Fixing it is a governed scripts/ change, and re-enabling dispatch interacts with the storm kill-switch. How should I sequence the Ollama fix?\"=\"Fix Ollama + storm cap, then re-enable\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1144
+  asked_at: 2026-06-12T01:31:03.090872Z
+  question: "OpenRouter's guardrail allows only ~19 Qwen/Alibaba models (cheap, $0.10-$1.25/M); your routing.toml asks for Gemini 2.5 Pro + a non-allowed Qwen, both blocked. How do you want OpenRouter (harness F) configured?"
+  options:
+    - "Keep guardrail; GT-KB uses allowed Qwen"
+    - "Widen guardrail; keep Gemini 2.5 Pro"
+    - "Both"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d5eed23c407a8c36
+  resolved_at: 2026-06-12T01:31:03.090872Z
+  answer: "Your questions have been answered: \"OpenRouter's guardrail allows only ~19 Qwen/Alibaba models (cheap, $0.10-$1.25/M); your routing.toml asks for Gemini 2.5 Pro + a non-allowed Qwen, both blocked. How do you want OpenRouter (harness F) configured?\"=\"Widen guardrail; keep Gemini 2.5 Pro\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1145
+  asked_at: 2026-06-12T01:52:21.206484Z
+  question: "The directed program (priority fixes + backlog-triage Stages 0–3) is complete — all VERIFIED, committed, and resolved. But a /loop session (544b584c) is autonomously working this same environment, which already caused a mid-flight file collision on Stage 3 and left its closeout incomplete. Given the directed work is done, how should THIS interactive session proceed?"
+  options:
+    - "Stand down; you re-engage me on demand"
+    - "Continue solo — you stop the /loop session"
+    - "Continue, but on a scoped lane you name"
+    - "Wrap up this session now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2350035f5c143565
+  resolved_at: 2026-06-12T01:52:21.206484Z
+  answer: "Your questions have been answered: \"The directed program (priority fixes + backlog-triage Stages 0–3) is complete — all VERIFIED, committed, and resolved. But a /loop session (544b584c) is autonomously working this same environment, which already caused a mid-flight file collision on Stage 3 and left its closeout incomplete. Given the directed work is done, how should THIS interactive session proceed?\"=\"Continue solo — you stop the /loop session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1146
+  asked_at: 2026-06-12T01:52:21.206484Z
+  question: "Continuing solo through the standing backlog. The priority ranking is non-obvious (backlog order vs. owner-elevated flags vs. current operational pain), so which should I take next as a NEW bridge proposal? Note: anything touching the live cross-harness dispatch path carries collision risk while dispatched workers are still active."
+  options:
+    - "WI-4472 dispatch-storm root-cause fix"
+    - "WORKLIST-ARCH-IMPROVEMENT-P1 (Agent Red reclassification)"
+    - "GTKB-ADR-DCL-CLAUSE-TEST-ENFORCEMENT-001"
+    - "WI-4475 repair failing platform pytest assertions"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cec0c067f549be29
+  resolved_at: 2026-06-12T01:52:21.206484Z
+  answer: "Your questions have been answered: \"Continuing solo through the standing backlog. The priority ranking is non-obvious (backlog order vs. owner-elevated flags vs. current operational pain), so which should I take next as a NEW bridge proposal? Note: anything touching the live cross-harness dispatch path carries collision risk while dispatched workers are still active.\"=\"WI-4472 dispatch-storm root-cause fix\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1148
+  asked_at: 2026-06-12T02:22:45.017875Z
+  question: "WI-4472's revised proposal (-003, filed by the Gemini harness-C session) should GO shortly. Because the implementation edits the live dispatch path, it needs a single owner to avoid the collision/corruption that hit Stage 3. Who should implement WI-4472 once Codex GOs it?"
+  options:
+    - "I take it — after you stop the other Prime sessions"
+    - "Leave it to the looping session"
+    - "I take it now, others still running"
+    - "Wrap up this session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: acce4ac977d02601
+  resolved_at: 2026-06-12T02:22:45.017875Z
+  answer: "Your questions have been answered: \"WI-4472's revised proposal (-003, filed by the Gemini harness-C session) should GO shortly. Because the implementation edits the live dispatch path, it needs a single owner to avoid the collision/corruption that hit Stage 3. Who should implement WI-4472 once Codex GOs it?\"=\"I take it — after you stop the other Prime sessions\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1149
+  asked_at: 2026-06-12T04:13:18.996686Z
+  question: "WI-4472's Codex GO on `-003` is stalled: the thread is starved by the cap-2 oldest-first dispatch selector (behind the failing gtkb-fab-22/23 NEW entries), and the headless Codex dispatch is crashing on startup (exit 0xFFFFFFFF). I cannot implement without GO and cannot self-GO. How do you want to obtain the outstanding Codex GO so I can implement WI-4472 solo per DECISION-1147?"
+  options:
+    - "Run Codex review (Rec.)"
+    - "Force targeted re-dispatch"
+    - "Fix dispatch crash first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d87fcbe9911e762a
+  resolved_at: 2026-06-12T04:13:18.996686Z
+  answer: "Your questions have been answered: \"WI-4472's Codex GO on `-003` is stalled: the thread is starved by the cap-2 oldest-first dispatch selector (behind the failing gtkb-fab-22/23 NEW entries), and the headless Codex dispatch is crashing on startup (exit 0xFFFFFFFF). I cannot implement without GO and cannot self-GO. How do you want to obtain the outstanding Codex GO so I can implement WI-4472 solo per DECISION-1147?\"=\"Run Codex review (Rec.)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1150
+  asked_at: 2026-06-12T04:54:07.514573Z
+  question: "Antigravity (harness C) implemented WI-4472 itself and filed the -005 implementation report, overtaking DECISION-1147 (which designated THIS Claude session to implement solo after the other sessions were stopped). The code is real and in the working tree, but the implementation is UNVERIFIED — Codex's -006 ratified only the proposal text, not the code. How do you want to reach VERIFIED?"
+  options:
+    - "Accept + Codex verify"
+    - "Claude re-verifies first"
+    - "Redo solo (clean)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5c91014d17576a22
+  resolved_at: 2026-06-12T04:54:07.514573Z
+  answer: "Your questions have been answered: \"Antigravity (harness C) implemented WI-4472 itself and filed the -005 implementation report, overtaking DECISION-1147 (which designated THIS Claude session to implement solo after the other sessions were stopped). The code is real and in the working tree, but the implementation is UNVERIFIED — Codex's -006 ratified only the proposal text, not the code. How do you want to reach VERIFIED?\"=\"Accept + Codex verify\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1151
+  asked_at: 2026-06-12T04:54:07.514573Z
+  question: "Independent sanity-check: the implementation is sound (15/15 tests, cap code matches the GO'd contract exactly, format clean). BUT antigravity's -005 report claims 'ruff check: All checks passed', while ruff check actually flags one PRE-EXISTING B007 (unused loop var, line 2421) in code WI-4472 did not touch (diff-confirmed). WI-4472's own additions are lint-clean. Since -005 carries a false verification claim, how should I take this to Codex VERIFY?"
+  options:
+    - "File accurate report"
+    - "Also fix the 1-line B007"
+    - "Route -005 as-is"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9386480b7008db1d
+  resolved_at: 2026-06-12T04:54:07.514573Z
+  answer: "Your questions have been answered: \"Independent sanity-check: the implementation is sound (15/15 tests, cap code matches the GO'd contract exactly, format clean). BUT antigravity's -005 report claims 'ruff check: All checks passed', while ruff check actually flags one PRE-EXISTING B007 (unused loop var, line 2421) in code WI-4472 did not touch (diff-confirmed). WI-4472's own additions are lint-clean. Since -005 carries a false verification claim, how should I take this to Codex VERIFY?\"=\"File accurate report\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

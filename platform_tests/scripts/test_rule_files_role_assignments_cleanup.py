@@ -67,7 +67,10 @@ def test_rule_files_have_no_live_role_assignments_mirror_authority() -> None:
 def test_rule_files_cite_canonical_role_reader_entrypoint() -> None:
     """Each protected role surface points live role reads at the canonical reader."""
     for relpath in PROTECTED_TARGETS:
-        text = _read(relpath)
+        if relpath == ".claude/rules/canonical-terminology.md":
+            text = _read("groundtruth-kb/docs/reference/canonical-terminology-detail.md")
+        else:
+            text = _read(relpath)
         assert CANONICAL_READER in text, f"{relpath} does not cite {CANONICAL_READER}"
         assert CANONICAL_READER_CLI_GROUP in text, f"{relpath} does not cite {CANONICAL_READER_CLI_GROUP}"
         assert CANONICAL_READER_CLI_SUBCOMMAND in text, f"{relpath} does not cite {CANONICAL_READER_CLI_SUBCOMMAND}"
@@ -110,7 +113,8 @@ def test_live_guidance_has_no_overlay_pointer_references() -> None:
 
 def test_canonical_reader_entrypoint_glossary_entry_present() -> None:
     """The new first-contact concept is present in canonical terminology."""
-    text = _read(".claude/rules/canonical-terminology.md")
-    assert "### canonical reader entrypoint" in text
-    assert "DCL-HARNESS-STATE-SOT-READER-CONTRACT-001" in text
-    assert "groundtruth_kb.harness_projection.{read_roles, read_identity, read_capabilities}" in text
+    term_text = _read(".claude/rules/canonical-terminology.md")
+    assert "### canonical reader entrypoint" in term_text
+    detail_text = _read("groundtruth-kb/docs/reference/canonical-terminology-detail.md")
+    assert "DCL-HARNESS-STATE-SOT-READER-CONTRACT-001" in detail_text
+    assert "groundtruth_kb.harness_projection.{read_roles, read_identity, read_capabilities}" in detail_text

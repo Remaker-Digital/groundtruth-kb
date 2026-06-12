@@ -29,6 +29,9 @@ for _parent in Path(__file__).resolve().parents:
     if (_parent / "scripts" / "bridge_author_metadata.py").is_file():
         if str(_parent) not in sys.path:
             sys.path.insert(0, str(_parent))
+        _gt_src = _parent / "groundtruth-kb" / "src"
+        if _gt_src.is_dir() and str(_gt_src) not in sys.path:
+            sys.path.insert(0, str(_gt_src))
         break
 
 try:
@@ -169,7 +172,17 @@ WORK_ITEM_LINE_RE = re.compile(
     r"^Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
 )
 BRIDGE_KIND_LINE_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
-BRIDGE_KIND_METADATA_EXEMPT = frozenset({"spec_intake", "governance_review", "loyal_opposition_advisory"})
+BRIDGE_KIND_METADATA_EXEMPT = frozenset(
+    {
+        "spec_intake",
+        "governance_review",
+        "loyal_opposition_advisory",
+        "governance_advisory",
+        "index_reconciliation",
+        "operational_state_change",
+        "lo_verdict",
+    }
+)
 PROJECT_METADATA_STATUSES = frozenset({"NEW", "REVISED"})
 
 # WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
@@ -1016,6 +1029,32 @@ def _pending_proposal_ask_reason(index_path: Path, file_path: str) -> str | None
     return None
 
 
+def _bridge_kind_validation_error(content: str) -> str | None:
+    match = BRIDGE_KIND_LINE_RE.search(content)
+    if not match:
+        return None
+    val = match.group(1).strip().lower()
+    try:
+        from groundtruth_kb.bridge.taxonomy import BridgeKind
+
+        allowed = {k.value for k in BridgeKind}
+    except ImportError:
+        allowed = {
+            "prime_proposal",
+            "lo_verdict",
+            "implementation_report",
+            "governance_advisory",
+            "index_reconciliation",
+            "operational_state_change",
+        }
+    if val not in allowed:
+        return (
+            f"[Governance] Invalid bridge_kind: {val!r}. "
+            f"Must be one of {sorted(allowed)} per DCL-BRIDGE-KIND-TAXONOMY-ENUM-001."
+        )
+    return None
+
+
 def _deny_reason_for_content(
     *,
     cwd_path: Path,
@@ -1035,6 +1074,9 @@ def _deny_reason_for_content(
                 "body-status-token rule; see .claude/rules/file-bridge-protocol.md "
                 "section 'Body Status-Token Rule'.)"
             )
+        kind_err = _bridge_kind_validation_error(content)
+        if kind_err:
+            return kind_err
         first_line = _first_nonblank_line(content)
         if first_line == "ADVISORY" and not _is_template_shaped_advisory_report(content):
             return (

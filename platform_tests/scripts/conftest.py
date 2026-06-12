@@ -43,6 +43,7 @@ def mock_harness_registry_for_tests(request) -> None:
             "test_single_harness_bridge_automation",
             "test_single_harness_bridge_dispatcher",
             "test_single_harness_doctor_check_upgrade",
+            "test_fab01_dispatch_substrate_revival",
             "test_single_harness_governance_artifacts",
             "test_strict_drop_misdirected_headless_dispatch",
             "test_verify_antigravity_dispatch",

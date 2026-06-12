@@ -91,6 +91,7 @@ def test_should_refuse_self_review_handles_missing_author_metadata(tmp_path: Pat
 def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refusal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
     root = _write_project(tmp_path)
     state_dir = tmp_path / "state"
 

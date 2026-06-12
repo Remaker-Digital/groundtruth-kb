@@ -78,7 +78,7 @@ def test_bridge_author_metadata_placeholder_model_blocked(gate: ModuleType) -> N
 
 
 def test_bridge_kind_exemption_does_not_exempt_author_metadata(gate: ModuleType) -> None:
-    content = "NEW\nbridge_kind: spec_intake\n\n## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    content = "NEW\nbridge_kind: governance_advisory\n\n## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
 
     reason = _deny(gate, content)
 

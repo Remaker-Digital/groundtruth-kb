@@ -33,6 +33,7 @@ BENCHMARK_MODULES = [
     "linkage_heatmap",
     "recall_coverage",
     "tool_identification",
+    "versions_per_landed_change",
 ]
 
 

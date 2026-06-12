@@ -25,17 +25,15 @@ def _one_line(text: str) -> str:
 
 
 def _assert_not_git_ignored(paths: list[str]) -> None:
-    ignored: list[str] = []
-    for path in paths:
-        result = subprocess.run(
-            ["git", "check-ignore", "-q", path],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            ignored.append(path)
+    result = subprocess.run(
+        ["git", "check-ignore"] + paths,
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    ignored = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     assert not ignored, f"GroundTruth governance artifacts are still git-ignored: {ignored}"
 
 
@@ -47,7 +45,7 @@ def test_groundtruth_adopter_profile_is_pinned() -> None:
     assert config["project"]["owner"] == "Remaker Digital"
     assert config["project"]["profile"] == "dual-agent"
     assert config["project"]["cloud_provider"] == "azure"
-    assert config["project"]["scaffold_version"] == "0.6.1"
+    assert config["project"]["scaffold_version"] == "0.7.0rc1"
 
 
 def test_transport_evidence_gate_plugin_is_configured() -> None:

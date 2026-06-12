@@ -1119,12 +1119,11 @@ def test_detect_counterpart_state_no_counterpart_files_no_warning(tmp_path, monk
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
     monkeypatch.setenv("GTKB_HARNESS_ID", "B")
-    role_map = _write_role_map(
-        tmp_path / "role-assignments.json",
+    _write_registry_projection(
+        tmp_path,
         {"B": ("claude", "prime-builder")},
     )
-    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
-    result = module.detect_counterpart_state()
+    result = module.detect_counterpart_state(tmp_path)
     assert result["warnings"] == []
     assert result["counterpart_present"] is False
 
@@ -1322,12 +1321,11 @@ def test_detect_counterpart_state_missing_counterpart_no_crash(tmp_path, monkeyp
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
     monkeypatch.setenv("GTKB_HARNESS_ID", "B")
-    role_map = _write_role_map(
-        tmp_path / "role-assignments.json",
+    _write_registry_projection(
+        tmp_path,
         {"B": ("claude", "prime-builder")},
     )
-    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
-    result = module.detect_counterpart_state()
+    result = module.detect_counterpart_state(tmp_path)
     assert result["counterpart_present"] is False
     assert result["warnings"] == []
 

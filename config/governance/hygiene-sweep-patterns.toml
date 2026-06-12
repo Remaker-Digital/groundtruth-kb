@@ -48,22 +48,12 @@ content_patterns = [
 exclusion_globs = [
     "applications/**",
     "bridge/**",
-    "memory/**",
-    "independent-progress-assessments/**",
     ".gtkb-state/**",
     "archive/**",
-    ".claude/**",
-    ".codex/**",
     "config/governance/hygiene-sweep-patterns.toml",
 ]
 classification = "agent_red_inherited"
 remediation_hint = "Verify path/key is in canonical GT-KB scope; relink if not. See bridge thread gtkb-sonarcloud-config-relink-gt-kb for the relink pattern."
-
-# WI-4249 (gtkb-hygiene-sweep-presence-patterns-slice-1): presence-mode detection
-# for path-presence drift classes — the file's existence under file_globs (and
-# not under exclusion_globs) is itself the finding (match_mode = "presence";
-# content_patterns not consulted). Report-only; remediation is child-bridge-gated
-# (WI-4259). The pytest-basetemp ACL class is deferred pending WI-3469.
 
 [[patterns]]
 id = "runtime-residue-paths"
@@ -102,3 +92,178 @@ exclusion_globs = [
 ]
 classification = "snapshots_non_manifest"
 remediation_hint = "Snapshot self-recursion detected (snapshots nested under snapshots). Verify the snapshot generator excludes prior snapshot output from its capture set; prune the recursive subtree."
+
+[[patterns]]
+id = "retired-poller"
+class = "workflow_drift"
+description = "References to retired OS bridge pollers or smart pollers (scheduled tasks, VBS daemons, etc.)."
+file_globs = [
+    "**/*.md",
+    "**/*.py",
+    "**/*.toml",
+    "**/*.json",
+]
+content_patterns = [
+    "AgentRedFileBridgeIndexScan",
+    "AgentRedPollerLivenessWatcher",
+    "GTKB-SmartBridgePoller",
+    "scripts/run_smart_bridge_poller\\.vbs",
+    "scripts/run_smart_bridge_poller\\.ps1",
+    "scripts/install_smart_poller_task\\.ps1",
+    "bridge_poller_runner\\.py",
+]
+exclusion_globs = [
+    "archive/**",
+    "groundtruth-kb/tests/**",
+    "config/governance/hygiene-sweep-patterns.toml",
+]
+classification = "retired_mechanism"
+remediation_hint = "Retired poller reference found; replace with cross-harness event-driven trigger. References should be archived or deleted."
+
+[[patterns]]
+id = "claude-playground"
+class = "config_drift"
+description = "References to the legacy root archive path E:\\Claude-Playground or similar aliases."
+file_globs = [
+    "**/*.md",
+    "**/*.py",
+    "**/*.json",
+    "**/*.toml",
+    "**/*.xml",
+    "**/*.yml",
+    "**/*.yaml",
+]
+content_patterns = [
+    "E:\\\\Claude-Playground",
+    "E:/Claude-Playground",
+    "//e/Claude-Playground",
+    "//E/Claude-Playground",
+]
+exclusion_globs = [
+    "archive/**",
+    "groundtruth-kb/tests/**",
+    "config/governance/hygiene-sweep-patterns.toml",
+]
+classification = "config_drift"
+remediation_hint = "Reference to legacy root E:\\Claude-Playground found. Relink to the active E:\\GT-KB root or clean up."
+
+[[patterns]]
+id = "work-list-anchor"
+class = "workflow_drift"
+description = "References to retired work_list.md anchor files or mechanisms."
+file_globs = [
+    "**/*.md",
+    "**/*.py",
+    "**/*.json",
+]
+content_patterns = [
+    "work_list\\.md",
+    "work-list\\.md",
+]
+exclusion_globs = [
+    "archive/**",
+    "groundtruth-kb/tests/**",
+    "config/governance/hygiene-sweep-patterns.toml",
+]
+classification = "retired_mechanism"
+remediation_hint = "Reference to retired work_list.md found. BACKLOG management uses MemBase-backed project commands; clean up or migrate reference."
+
+[[patterns]]
+id = "cursor-references"
+class = "workflow_drift"
+description = "Stale session markers or cursor-position references (CURSOR-*)."
+file_globs = [
+    "**/*.md",
+    "**/*.py",
+    "**/*.json",
+]
+content_patterns = [
+    "CURSOR-[a-zA-Z0-9_*-]+",
+]
+exclusion_globs = [
+    "archive/**",
+    "groundtruth-kb/tests/**",
+    "config/governance/hygiene-sweep-patterns.toml",
+]
+classification = "workflow_drift"
+remediation_hint = "Stale cursor session reference found (CURSOR-*). Scrub these references from active rule or doc files."
+
+[[patterns]]
+id = "stale-relocated-paths"
+class = "config_drift"
+description = "Stale root-level assumptions for relocated Agent Red directories (src/, admin/, widget/ -> should be applications/Agent_Red/)."
+file_globs = [
+    "**/*.md",
+    "**/*.py",
+    "**/*.json",
+    "**/*.toml",
+]
+content_patterns = [
+    "sonar\\.sources=src/",
+    "\\bsrc/admin/\\b",
+    "\\bsrc/widget/\\b",
+]
+exclusion_globs = [
+    "archive/**",
+    "groundtruth-kb/tests/**",
+    "config/governance/hygiene-sweep-patterns.toml",
+]
+classification = "config_drift"
+remediation_hint = "Stale root-level path assumption found. Agent Red source directories live under applications/Agent_Red/."
+
+[[patterns]]
+id = "render-tmp-presence"
+class = "runtime_residue"
+description = "Committed render or tmp residue directories in the workspace."
+match_mode = "presence"
+file_globs = [
+    "**/render/**",
+    "**/tmp/**",
+]
+exclusion_globs = [
+    ".gtkb-state/**",
+    "archive/**",
+    "applications/**",
+    "bridge/**",
+    "independent-progress-assessments/**",
+    ".claude/**",
+    ".codex/**",
+]
+classification = "runtime_residue"
+remediation_hint = "Committed render/tmp directory residue detected. Sandbox files should not be committed to the repository."
+
+[[patterns]]
+id = "dead-allowlist-presence"
+class = "runtime_residue"
+description = "Presence of dead or leftover allowlist files like thumbs.db or desktop.ini or .ds_store."
+match_mode = "presence"
+file_globs = [
+    "**/thumbs.db",
+    "**/desktop.ini",
+    "**/.ds_store",
+]
+exclusion_globs = [
+    ".gtkb-state/**",
+    "archive/**",
+    "applications/**",
+]
+classification = "runtime_residue"
+remediation_hint = "Leftover dead allowlist/OS metadata file detected. Prune these files from the source tree."
+
+[[patterns]]
+id = "hook-templates-drift"
+class = "config_drift"
+description = "Drift or mismatch between live hooks (.claude/hooks/, .codex/gtkb-hooks/) and their templates (templates/hooks/)."
+file_globs = [
+    ".claude/hooks/*.py",
+    ".codex/gtkb-hooks/*.py",
+]
+content_patterns = [
+    "class HooksDriftPlaceholder"
+]
+exclusion_globs = [
+    "archive/**",
+    "config/governance/hygiene-sweep-patterns.toml",
+]
+classification = "hook_drift"
+remediation_hint = "Live hook differs from its template. Run gt project doctor to check and sync hooks."
