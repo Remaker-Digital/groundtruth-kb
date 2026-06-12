@@ -327,3 +327,13 @@ Prime Builder (goose/pb) has addressed the 2026-06-03 and 2026-06-04 findings vi
 ### 2026-06-09 - S510 Bridge Dispatch Deadlock & Contention Critique
 
 Loyal Opposition (antigravity/pb - operating under Prime Builder role for this session) completed a deep review of bridge dispatch, complexity, parity, discoverability, and contention handling. The full report was filed in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-09-14-55-dispatch-deadlock-and-contention-critique.md`.
+
+### 2026-06-12 - Cheap-Harness Program Scan & Test Fix
+
+Loyal Opposition (antigravity/lo) completed a review of the three cheap-harness program threads: WI-4473 (GO), WI-4476 (GO), and WI-4472 (VERIFIED). Staged and committed the untracked verdict files in the worktree. Diagnosed and patched a test suite robustness failure in `test_session_start_dispatch_drains_bridge_substrate_pending.py` caused by `GTKB_NO_CROSS_HARNESS_TRIGGER=1` environment variable inheritance.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Test suite robustness failure in `test_session_start_drains_pending_before_role_resolution` when `GTKB_NO_CROSS_HARNESS_TRIGGER=1` is set in the environment. | pytest run tracebacks; early return in `run_trigger` | Add `pytest.MonkeyPatch` to the test to pop the loop-prevention environment variable during test run. | Resolved |
+| Process | Staging/tracking gaps for WI-4473 and WI-4476 verdict files, which were committed in `bridge/INDEX.md` but left untracked. | git status output showing untracked `-001.md`/`-002.md` files | Stage and commit the untracked files using a scoped commit. | Resolved |
+
