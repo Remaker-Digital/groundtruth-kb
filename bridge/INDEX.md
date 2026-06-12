@@ -5,6 +5,7 @@ Document: gtkb-bridge-index-atomic-write-integration-advisory
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
 
 Document: gtkb-path-token-re-discovery-consolidation
+NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-008.md
 REVISED: bridge/gtkb-path-token-re-discovery-consolidation-007.md
 NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-006.md
 NEW: bridge/gtkb-path-token-re-discovery-consolidation-005.md
