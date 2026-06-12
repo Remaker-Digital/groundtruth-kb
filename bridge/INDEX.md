@@ -1,4 +1,5 @@
 Document: gtkb-fab-10-codex-index-adapter-addendum-sufficiency
+NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-003.md
 GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-001.md
 
@@ -7,7 +8,11 @@ WITHDRAWN: bridge/gtkb-fab-10-codex-index-adapter-addendum-003.md
 GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
 
+Document: gtkb-tafe-spec-promotion
+NEW: bridge/gtkb-tafe-spec-promotion-001.md
+
 Document: gtkb-tafe-backlog-reconciliation
+NEW: bridge/gtkb-tafe-backlog-reconciliation-003.md
 GO: bridge/gtkb-tafe-backlog-reconciliation-002.md
 NEW: bridge/gtkb-tafe-backlog-reconciliation-001.md
 
@@ -248,6 +253,7 @@ NO-GO: bridge/gtkb-fab-11-regression-signal-revival-002.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-001.md
 
 Document: gtkb-fab-10-dispatch-telemetry-claim-contract
+NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-003.md
 GO: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-002.md
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
 
@@ -321,6 +327,7 @@ GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
+REVISED: bridge/gtkb-fab-04-storage-reclamation-008.md
 BLOCKED: bridge/gtkb-fab-04-storage-reclamation-007.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-006.md
 NEW: bridge/gtkb-fab-04-storage-reclamation-005.md
