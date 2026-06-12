@@ -1,3 +1,6 @@
+Document: gtkb-explicit-hint-layer-specification
+NEW: bridge/gtkb-explicit-hint-layer-specification-001.md
+
 Document: gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak
 VERIFIED: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-004.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-003.md
@@ -193,6 +196,7 @@ GO: bridge/gtkb-cheap-draft-linter-002.md
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
 Document: gtkb-fab-03-membase-backup
+ACCEPTED: bridge/gtkb-fab-03-membase-backup-005.md
 GO: bridge/gtkb-fab-03-membase-backup-004.md
 REVISED: bridge/gtkb-fab-03-membase-backup-003.md
 NO-GO: bridge/gtkb-fab-03-membase-backup-002.md
@@ -205,6 +209,7 @@ GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
+BLOCKED: bridge/gtkb-fab-04-storage-reclamation-007.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-006.md
 NEW: bridge/gtkb-fab-04-storage-reclamation-005.md
 GO: bridge/gtkb-fab-04-storage-reclamation-004.md
