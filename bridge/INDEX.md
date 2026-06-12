@@ -227,6 +227,7 @@ NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
 Document: gtkb-fab-11-regression-signal-revival
+VERIFIED: bridge/gtkb-fab-11-regression-signal-revival-008.md
 REVISED: bridge/gtkb-fab-11-regression-signal-revival-007.md
 NO-GO: bridge/gtkb-fab-11-regression-signal-revival-006.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-005.md

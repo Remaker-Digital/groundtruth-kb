@@ -1,0 +1,15 @@
+{
+  "action": "update",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "GOV-12",
+  "artifact_type": "governance",
+  "change_reason": "gtkb-fab-11-regression-signal-revival: pytest evidence contract amendment",
+  "changed_by": "prime-builder/codex",
+  "explicit_change_request": "DELIB-FAB11-REMEDIATION-20260610B / PAUTH-FAB11-20260610: amend GOV-12 to recognize pytest execution and pytest coverage mappings as current governed verification evidence.",
+  "full_content": "Creating a work item initiates test creation; the backlog initiates implementation. Work items describe implementation work and originate from three sources: bugs/defects discovered during testing, owner-provided requirements, or Claude-proposed improvements. Creating a work item does NOT initiate execution of the implementation \u2014 only the backlog triggers execution. Creating a work item DOES trigger the creation of a test. The test ensures that the implementation of the work item satisfies the specification. Test forms: (1) Logical assertion \u2014 exists/does not exist, greater than/less than, if-then. (2) User story \u2014 a verifiable process description. (3) Abstract description \u2014 measurements, pseudocode, or other information describing the desired implementation.\n\nFAB-11 pytest evidence amendment (2026-06-12): work-item creation still initiates test planning, but current repository-native pytest files and their execution output are governed verification evidence. Historical MemBase `tests` rows imported from Agent Red before application isolation are app-scoped history and must not be counted as live pass evidence unless refreshed by a current execution record.",
+  "full_content_sha256": "3cbd1176aff9d3e07ee63b6cfee9886bc7f62cbb541e8523bc08eabd06f7f549",
+  "presented_to_user": true,
+  "source_ref": "bridge/gtkb-fab-11-regression-signal-revival-003.md",
+  "transcript_captured": true
+}

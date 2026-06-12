@@ -101,8 +101,11 @@ def _append_amendment(description: str | None, spec_id: str) -> str:
 
 def _packet_path(spec_id: str, date_text: str) -> Path:
     safe_id = spec_id.lower().replace("-", "-")
-    return PROJECT_ROOT / ".groundtruth" / "formal-artifact-approvals" / (
-        f"{date_text}-fab11-{safe_id}-pytest-evidence.json"
+    return (
+        PROJECT_ROOT
+        / ".groundtruth"
+        / "formal-artifact-approvals"
+        / (f"{date_text}-fab11-{safe_id}-pytest-evidence.json")
     )
 
 
@@ -171,8 +174,7 @@ def _apply_historical_test_scope(db: KnowledgeDB, test_ids: list[str], *, max_te
             continue
         description = (current.get("description") or "").rstrip()
         note = (
-            "FAB-11: retained as historical Agent Red MemBase test evidence; "
-            "not counted as live pytest pass evidence."
+            "FAB-11: retained as historical Agent Red MemBase test evidence; not counted as live pytest pass evidence."
         )
         if note not in description:
             description = f"{description}\n\n{note}".strip()
@@ -211,8 +213,7 @@ def apply(db_path: Path, *, date_text: str, max_tests: int | None = None) -> dic
                     amendment.spec_id,
                     changed_by=CHANGED_BY,
                     change_reason=(
-                        f"{BRIDGE_ID}: pytest evidence contract amendment; "
-                        f"approval packet {amendment.packet_path}"
+                        f"{BRIDGE_ID}: pytest evidence contract amendment; approval packet {amendment.packet_path}"
                     ),
                     description=amendment.new_description,
                     validate_assertions=False,
@@ -271,7 +272,11 @@ def main() -> int:
     parser.add_argument("--format", choices=("json", "text"), default="text")
     args = parser.parse_args()
 
-    result = apply(args.db, date_text=args.date, max_tests=args.max_tests) if args.apply else dry_run(args.db, date_text=args.date)
+    result = (
+        apply(args.db, date_text=args.date, max_tests=args.max_tests)
+        if args.apply
+        else dry_run(args.db, date_text=args.date)
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

@@ -28,6 +28,7 @@ from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 BRIDGE_ID = "gtkb-fab-11-regression-signal-revival"
 CHANGED_BY = "prime-builder/codex"
 CONFIG_PATH = PROJECT_ROOT / "config" / "governance" / "pipeline-events-retention.toml"
+FAB11_SNAPSHOT_PREFIX = "groundtruth.db.pre-backfill-fab11-vacuum-"
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
@@ -69,6 +70,8 @@ def _dead_snapshot_paths(project_root: Path, fresh_snapshot: Path | None = None)
     for pattern in ("groundtruth.db.corrupt-S311-*", "groundtruth.db.pre-backfill-*"):
         for path in project_root.glob(pattern):
             if fresh_snapshot is not None and path.resolve() == fresh_snapshot.resolve():
+                continue
+            if path.name.startswith(FAB11_SNAPSHOT_PREFIX):
                 continue
             if path.is_file():
                 dead.append(path)

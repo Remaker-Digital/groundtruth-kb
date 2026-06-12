@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: E402, I001
+
 import sqlite3
 import sys
 from pathlib import Path
@@ -138,7 +140,9 @@ def test_pytest_contract_scopes_historical_tests_and_writes_packets(
 
     assert result["amended_specs"] == 2
     assert result["historical_tests_applied"] == 1
-    assert (tmp_path / ".groundtruth" / "formal-artifact-approvals" / "2026-06-12-fab11-gov-12-pytest-evidence.json").is_file()
+    assert (
+        tmp_path / ".groundtruth" / "formal-artifact-approvals" / "2026-06-12-fab11-gov-12-pytest-evidence.json"
+    ).is_file()
     db = KnowledgeDB(db_path=db_path)
     try:
         gov12 = db.get_spec("GOV-12")

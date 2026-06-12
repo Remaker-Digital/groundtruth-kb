@@ -1,0 +1,15 @@
+{
+  "action": "update",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "GOV-13",
+  "artifact_type": "governance",
+  "change_reason": "gtkb-fab-11-regression-signal-revival: pytest evidence contract amendment",
+  "changed_by": "prime-builder/codex",
+  "explicit_change_request": "DELIB-FAB11-REMEDIATION-20260610B / PAUTH-FAB11-20260610: amend GOV-13 to recognize pytest execution and pytest coverage mappings as current governed verification evidence.",
+  "full_content": "Every Test artifact must be referenced by at least one test_plan_phase.test_ids array at the time of creation. The Master Test Plan (PLAN-001) must cover every Test artifact in the system. A test not in any phase is an orphan \u2014 invisible to execution, coverage tracking, and regression detection. This governance principle closes the final gap in the spec\u2192test\u2192procedure\u2192master hierarchy: specifications produce tests (GOV-12), tests must be in procedures (GOV-13), and all procedures compose the Master Test Plan.\n\nFAB-11 pytest evidence amendment (2026-06-12): phase assignment remains required for governed test artifacts, and repository-native pytest coverage mappings may satisfy live spec-to-test visibility. Historical Agent Red MemBase `tests` rows are retained for provenance but are excluded from live KPI pass-evidence counts.",
+  "full_content_sha256": "0faa3152e755ad5c3fad158ea9e2d48b4fb16f6a4feb39d4da948249b544ff92",
+  "presented_to_user": true,
+  "source_ref": "bridge/gtkb-fab-11-regression-signal-revival-003.md",
+  "transcript_captured": true
+}

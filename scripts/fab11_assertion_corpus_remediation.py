@@ -202,7 +202,9 @@ def _rewrite_assertion(assertion: dict[str, Any], missing_paths: set[str]) -> tu
     return updated, changed
 
 
-def rewrite_assertions(assertions: list[dict[str, Any]], missing_paths: tuple[str, ...]) -> tuple[list[dict[str, Any]], int]:
+def rewrite_assertions(
+    assertions: list[dict[str, Any]], missing_paths: tuple[str, ...]
+) -> tuple[list[dict[str, Any]], int]:
     missing = set(missing_paths)
     rewritten: list[dict[str, Any]] = []
     changed_count = 0
