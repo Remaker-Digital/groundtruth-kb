@@ -1,4 +1,12 @@
+Document: gtkb-typed-artifact-flow-engine-advisory
+NEW: bridge/gtkb-typed-artifact-flow-engine-advisory-001.md
+
+Document: gtkb-bridge-index-atomic-write-integration-advisory
+ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
+
 Document: gtkb-path-token-re-discovery-consolidation
+NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-006.md
+NEW: bridge/gtkb-path-token-re-discovery-consolidation-005.md
 GO: bridge/gtkb-path-token-re-discovery-consolidation-004.md
 REVISED: bridge/gtkb-path-token-re-discovery-consolidation-003.md
 NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-002.md
@@ -166,6 +174,7 @@ NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
+REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-011.md
 NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-010.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-009.md
 GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-008.md
@@ -206,6 +215,7 @@ GO: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-002.md
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
 
 Document: gtkb-fab-09-safety-gate-registration
+NEW: bridge/gtkb-fab-09-safety-gate-registration-005.md
 GO: bridge/gtkb-fab-09-safety-gate-registration-004.md
 REVISED: bridge/gtkb-fab-09-safety-gate-registration-003.md
 NO-GO: bridge/gtkb-fab-09-safety-gate-registration-002.md
