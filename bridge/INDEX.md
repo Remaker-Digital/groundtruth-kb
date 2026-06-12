@@ -66,6 +66,7 @@ NO-GO: bridge/gtkb-wi-4250-pauth-creation-002.md
 NEW: bridge/gtkb-wi-4250-pauth-creation-001.md
 
 Document: gtkb-wi-4250-status-reconciliation-authorization
+WITHDRAWN: bridge/gtkb-wi-4250-status-reconciliation-authorization-007.md
 NO-GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-006.md
 NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-005.md
 WITHDRAWN: bridge/gtkb-wi-4250-status-reconciliation-authorization-004.md
@@ -350,6 +351,7 @@ GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
+NO-GO: bridge/gtkb-fab-04-storage-reclamation-013.md
 REVISED: bridge/gtkb-fab-04-storage-reclamation-012.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-011.md
 REVISED: bridge/gtkb-fab-04-storage-reclamation-010.md
