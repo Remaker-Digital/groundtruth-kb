@@ -18,6 +18,7 @@ GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-002.md
 NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-001.md
 
 Document: gtkb-wi-4251-diagnostic-write-envelope
+VERIFIED: bridge/gtkb-wi-4251-diagnostic-write-envelope-008.md
 REVISED: bridge/gtkb-wi-4251-diagnostic-write-envelope-007.md
 NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-006.md
 NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-005.md
