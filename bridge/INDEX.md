@@ -17,9 +17,11 @@ GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
 
 Document: gtkb-tafe-spec-promotion
+GO: bridge/gtkb-tafe-spec-promotion-002.md
 NEW: bridge/gtkb-tafe-spec-promotion-001.md
 
 Document: gtkb-tafe-backlog-reconciliation
+VERIFIED: bridge/gtkb-tafe-backlog-reconciliation-004.md
 NEW: bridge/gtkb-tafe-backlog-reconciliation-003.md
 GO: bridge/gtkb-tafe-backlog-reconciliation-002.md
 NEW: bridge/gtkb-tafe-backlog-reconciliation-001.md
