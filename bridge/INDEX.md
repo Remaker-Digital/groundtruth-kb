@@ -1,3 +1,24 @@
+Document: gtkb-lo-dispatch-ordered-fallback-routing
+NEW: bridge/gtkb-lo-dispatch-ordered-fallback-routing-001.md
+
+Document: gtkb-wi-4250-pauth-creation
+NEW: bridge/gtkb-wi-4250-pauth-creation-001.md
+
+Document: gtkb-wi-4250-status-reconciliation-authorization
+GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-002.md
+NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-001.md
+
+Document: gtkb-wi-4251-diagnostic-write-envelope
+NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-005.md
+GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-004.md
+REVISED: bridge/gtkb-wi-4251-diagnostic-write-envelope-003.md
+NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-002.md
+NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-001.md
+
+Document: gtkb-wi-4250-backlog-reconciliation
+NO-GO: bridge/gtkb-wi-4250-backlog-reconciliation-002.md
+NEW: bridge/gtkb-wi-4250-backlog-reconciliation-001.md
+
 Document: gtkb-explicit-hint-layer-specification
 NEW: bridge/gtkb-explicit-hint-layer-specification-001.md
 
@@ -95,12 +116,15 @@ NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
 
 Document: gtkb-fab-18-backlog-dignity
+NEW: bridge/gtkb-fab-18-backlog-dignity-005.md
 GO: bridge/gtkb-fab-18-backlog-dignity-004.md
 REVISED: bridge/gtkb-fab-18-backlog-dignity-003.md
 NO-GO: bridge/gtkb-fab-18-backlog-dignity-002.md
 NEW: bridge/gtkb-fab-18-backlog-dignity-001.md
 
 Document: gtkb-fab-17-da-chroma-read-path
+VERIFIED: bridge/gtkb-fab-17-da-chroma-read-path-009.md
+NEW: bridge/gtkb-fab-17-da-chroma-read-path-008.md
 GO: bridge/gtkb-fab-17-da-chroma-read-path-007.md
 REVISED: bridge/gtkb-fab-17-da-chroma-read-path-006.md
 NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-005.md
