@@ -264,6 +264,7 @@ NO-GO: bridge/gtkb-fab-11-regression-signal-revival-002.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-001.md
 
 Document: gtkb-fab-10-dispatch-telemetry-claim-contract
+VERIFIED: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-006.md
 REVISED: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-005.md
 NO-GO: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-004.md
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-003.md
