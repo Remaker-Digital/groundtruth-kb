@@ -39,7 +39,9 @@ NEW_THREAD_ORDER = [
     "gtkb-smart-bridge-trigger-foundation-spike",
 ]
 
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN):\s+(bridge/\S+\.md)\s*$")
+_STATUS_LINE_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+(bridge/\S+\.md)\s*$"
+)
 
 
 def _git_show(ref: str, path: str) -> str:

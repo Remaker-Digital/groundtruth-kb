@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """PreToolUse hook for directive enforcement (DIR-ROOT-BOUNDARY-001)."""
 
-import sys
+import datetime as _dt
+import hashlib
 import json
+import os
+import sys
 from pathlib import Path
 
 # Add GT-KB paths to sys.path so we can import groundtruth_kb
@@ -16,7 +19,7 @@ for _parent in Path(__file__).resolve().parents:
         break
 
 try:
-    from groundtruth_kb.enforcement import check_path_boundary, check_bash_command
+    from groundtruth_kb.enforcement import check_bash_command, check_path_boundary
 except ImportError:
 
     def check_path_boundary(path_str: str, project_root: Path) -> tuple[bool, str]:
@@ -26,7 +29,32 @@ except ImportError:
         return True, ""
 
 
-def emit_deny(reason: str) -> None:
+def _project_root_from_env() -> Path:
+    return Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
+
+
+def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    if not path.is_absolute():
+        path = _project_root_from_env() / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "directive-enforcement-claude-adapter",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def emit_deny(reason: str, *, pattern_id: str = "root-boundary", subject: str = "") -> None:
+    _record_gate_denial(pattern_id, subject or reason, reason)
     out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -65,12 +93,16 @@ def main() -> None:
             break
 
     # 1. Handle command execution (bash, run_command, command, etc.)
-    if tool_name.lower() in {"bash", "run_command"}:
+    if tool_name.lower() in {"bash", "powershell", "run_command"}:
         command = tool_input.get("command") or tool_input.get("CommandLine") or ""
         if command:
             allowed, reason = check_bash_command(command, project_root)
             if not allowed:
-                emit_deny(f"Command blocked by directive: {reason}")
+                emit_deny(
+                    f"Command blocked by directive: {reason}",
+                    pattern_id="root-boundary-command",
+                    subject=command,
+                )
         emit_pass()
 
     # 2. Extract potential paths from tool_input
@@ -101,7 +133,11 @@ def main() -> None:
     for path_str in path_args:
         allowed, reason = check_path_boundary(path_str, project_root)
         if not allowed:
-            emit_deny(f"Tool execution blocked: {reason}")
+            emit_deny(
+                f"Tool execution blocked: {reason}",
+                pattern_id="root-boundary-path",
+                subject=path_str,
+            )
 
     emit_pass()
 

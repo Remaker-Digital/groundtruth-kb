@@ -22,6 +22,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
+try:
+    from scripts.implementation_authorization import PATH_TOKEN_RE
+except ImportError:  # pragma: no cover - direct script execution path
+    from implementation_authorization import PATH_TOKEN_RE
+
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_INDEX_PATH: Final[Path] = PROJECT_ROOT / "bridge" / "INDEX.md"
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
@@ -38,12 +43,8 @@ SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
 RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
 WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b")
-# Anchored to an enumerated repo-directory set so prose "word/word" tokens
-# (e.g. GO/NO-GO, prime-builder/loyal-opposition) are not harvested as
-# repository paths. Kept consistent with scripts/implementation_start_gate.py.
-PATH_TOKEN_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
-)
+# PATH_TOKEN_RE is imported from implementation_authorization (HYG-046 single
+# source; previously a drifted local copy that lacked 'memory/').
 TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
 FILES_CHANGED_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s+Files\s+(?:Changed|Expected\s+To\s+Change)\s*$",

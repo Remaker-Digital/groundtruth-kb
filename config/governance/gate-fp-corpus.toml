@@ -1,0 +1,69 @@
+# Cross-gate false-positive regression corpus — FAB-14 (HYG-040 / WI-4426).
+#
+# Each gate ships a deterministic classifier of free-form text. This corpus is the
+# shared regression surface: commands/content that must NOT be falsely blocked
+# (`*_pass`), plus genuine violations that MUST still be blocked (`*_block`). LO
+# verification of any gate-parser change is required to keep this corpus green.
+#
+# Authority: SPEC-AUQ-NO-LLM-CLASSIFIER-001 (deterministic classifiers),
+# SPEC-AUQ-POLICY-ENGINE-001 (gate precision), DCL-CROSS-HARNESS-ENFORCEMENT-001.
+
+schema_version = 1
+
+# --- Root-boundary Bash parser (groundtruth_kb.enforcement.check_bash_command) ---
+# HYG-042: the '/word' branch of PATH_DELIMITER_RE mis-read any relative path with
+# an internal slash as an out-of-root '/word' absolute, blocking everyday commands.
+
+[[bash_parser_pass]]
+command = 'python scripts/implementation_authorization.py begin --bridge-id gtkb-fab-17-da-chroma-read-path'
+note = 'relative scripts/... mis-read as out-of-root /implementation_authorization.py (this session)'
+
+[[bash_parser_pass]]
+command = 'wc -l bridge/INDEX.md'
+note = 'relative bridge/INDEX.md (this session)'
+
+[[bash_parser_pass]]
+command = 'python -m pytest platform_tests/scripts/'
+note = 'relative test dir with trailing slash'
+
+[[bash_parser_pass]]
+command = 'ruff check groundtruth-kb/src/groundtruth_kb/db.py'
+note = 'deeply-nested relative source path'
+
+[[bash_parser_pass]]
+command = 'git diff scripts/benchmarks/cli.py'
+note = 'relative path argument'
+
+[[bash_parser_pass]]
+command = 'cat /dev/null'
+note = 'null sink whitelisted'
+
+[[bash_parser_pass]]
+command = 'curl https://example.com/api/v1/path'
+note = 'URL scheme://... skipped, not a filesystem path'
+
+[[bash_parser_block]]
+command = 'cat C:\Users\micha\secret.txt'
+note = 'genuine out-of-root drive-letter absolute'
+
+[[bash_parser_block]]
+command = 'type \\server\share\file'
+note = 'genuine UNC path'
+
+[[bash_parser_block]]
+command = 'cat /c/Users/micha/secret'
+note = 'MSYS /c/ translated to C:\Users\... -> out of root'
+
+# --- Cross-harness directive surfaces (FAB-14 re-scope) ---
+
+[[powershell_parser_pass]]
+command = 'Get-Content bridge/INDEX.md'
+note = 'Claude PowerShell matcher routes command text through the same root-boundary parser without false-blocking in-root relative paths'
+
+[[codex_apply_patch_pass]]
+path = 'bridge/INDEX.md'
+note = 'Codex apply_patch adapter treats in-root patch targets as allowed'
+
+[[codex_apply_patch_block]]
+path = 'C:\Users\micha\secret.txt'
+note = 'Codex apply_patch adapter still blocks genuine out-of-root absolute paths'

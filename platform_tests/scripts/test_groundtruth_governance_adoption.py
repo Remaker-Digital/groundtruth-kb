@@ -1,4 +1,4 @@
-"""Regression checks for Agent Red's GroundTruth-KB governance adoption."""
+"""Regression checks for GroundTruth-KB platform governance adoption."""
 
 from __future__ import annotations
 
@@ -41,11 +41,12 @@ def test_groundtruth_adopter_profile_is_pinned() -> None:
     config = _load_toml("groundtruth.toml")
 
     assert config["groundtruth"]["db_path"] == "groundtruth.db"
-    assert config["project"]["project_name"] == "Agent Red Customer Experience"
+    assert config["project"]["project_name"] == "GroundTruth-KB Platform"
     assert config["project"]["owner"] == "Remaker Digital"
     assert config["project"]["profile"] == "dual-agent"
     assert config["project"]["cloud_provider"] == "azure"
     assert config["project"]["scaffold_version"] == "0.7.0rc1"
+    assert config["scoped_service"]["application_id"] == "agent-red"
 
 
 def test_transport_evidence_gate_plugin_is_configured() -> None:
@@ -83,7 +84,6 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/destructive-gate.py",
         ".claude/hooks/formal-artifact-approval-gate.py",
-        ".claude/hooks/scheduler.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/rules/bridge-essential.md",
         ".claude/rules/acting-prime-builder.md",
@@ -101,7 +101,6 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         ".claude/skills/bridge-propose/helpers/write_bridge.py",
         ".claude/skills/decision-capture/SKILL.md",
         ".claude/skills/decision-capture/helpers/record_decision.py",
-        ".claude/skills/deploy/SKILL.md",
         ".claude/skills/kb-adr/SKILL.md",
         ".claude/skills/kb-assert/SKILL.md",
         ".claude/skills/kb-batch/SKILL.md",
@@ -112,11 +111,12 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         ".claude/skills/kb-work-item/SKILL.md",
         ".claude/skills/proposal-review/SKILL.md",
         ".claude/skills/release-candidate-gate/SKILL.md",
-        ".claude/skills/run-tests/SKILL.md",
-        ".claude/skills/seed-tenant/SKILL.md",
         ".claude/skills/send-review/SKILL.md",
         ".claude/skills/spec-intake/SKILL.md",
         ".claude/skills/spec-intake/helpers/spec_intake.py",
+        "applications/Agent_Red/.claude/skills/deploy/SKILL.md",
+        "applications/Agent_Red/.claude/skills/run-tests/SKILL.md",
+        "applications/Agent_Red/.claude/skills/seed-tenant/SKILL.md",
         "scripts/check_codex_hook_parity.py",
         "scripts/session_self_initialization.py",
         "scripts/workstream_focus.py",
@@ -303,12 +303,12 @@ def test_acting_prime_builder_rule_maps_prime_skill_labels_to_assigned_role() ->
     assert "plugins" in rule
     assert "hooks" in rule
     assert "bridge counterpart is always Loyal Opposition" in rule
-    assert "When GroundTruth-KB is installed" in rule
-    assert "fully configured for the role of Prime Builder" in rule
-    assert "configuration should be" in rule
-    assert "prepared for all capable harnesses" in rule
-    assert "The owner assigns the Prime Builder role" in rule
-    assert "not Prime Builder" in rule
+    assert "legacy/compatibility/provenance" in rule
+    assert "NOT a new role-switch target" in rule
+    assert "only `prime-builder` and `loyal-opposition` are valid" in rule
+    assert "READ operations load role values from the canonical role registry" in rule
+    assert "unqualified GT-KB tooling references" in rule
+    assert "must not resolve silently to Agent Red" in rule
     assert "DELIB-0834" in rule
     assert "GOV-AGENT-RED-GTKB-CONFORMANCE-001" in rule
     assert "Agent Red is a well-behaved" in rule

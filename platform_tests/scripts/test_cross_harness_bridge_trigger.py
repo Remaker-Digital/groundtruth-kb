@@ -2396,6 +2396,7 @@ def _rec(
     status=_NO_STATUS,
     surfaces=None,
     event_driven_hooks=True,
+    reviewer_precedence=None,
 ) -> dict:
     """Build one registry record. status=_NO_STATUS omits the status key
     (assertion 5: absent status). Pass status=None / "" / "bogus" for the other
@@ -2411,6 +2412,8 @@ def _rec(
         record["status"] = status
     if event_driven_hooks is not _NO_EVENT_CAPABILITY:
         record["event_driven_hooks"] = event_driven_hooks
+    if reviewer_precedence is not None:
+        record["reviewer_precedence"] = reviewer_precedence
     return record
 
 
@@ -2459,6 +2462,173 @@ def test_ollama_loyal_opposition_dispatch_caps_selected_batch_to_one(
     rec = state["recipients"]["loyal-opposition"]
     assert rec["pending_count"] == 3
     assert rec["selected_count"] == 1
+
+
+def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4484: preferred ready LO candidate wins and later candidates are not dispatched."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=10,
+            ),
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES, reviewer_precedence=20),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=30,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = summary["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "D"
+    assert result["selected_candidate"]["reviewer_precedence"] == 10
+    assert "loyal-opposition:A" not in summary["results"]
+    assert "loyal-opposition:F" not in summary["results"]
+
+
+def test_lo_ordered_fallback_skips_not_ready_preferred_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4484: preferred not-ready LO candidate records skip evidence and falls through."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=10,
+            ),
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES, reviewer_precedence=20),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=30,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+
+    def _readiness(kind: str, _project_root: Path) -> dict[str, object]:
+        return {"ready": kind != "ollama"}
+
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", _readiness)
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = summary["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "A"
+    assert result["fallback_skipped_candidates"] == [
+        {
+            "recipient": "loyal-opposition:D",
+            "needed_role_label": "loyal-opposition",
+            "harness_id": "D",
+            "command_handle": "ollama",
+            "reviewer_precedence": 10,
+            "reason": "ollama_dispatch_not_ready",
+        }
+    ]
+    state = summary["dispatch_state"]["recipients"]
+    assert state["loyal-opposition"]["selected_candidate"]["harness_id"] == "A"
+    assert state["loyal-opposition:D"]["last_result"] == "ollama_dispatch_not_ready"
+    assert "loyal-opposition:F" not in summary["results"]
+
+
+def test_lo_ordered_fallback_all_candidates_unavailable_records_no_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4484: exhausted LO candidate set produces a deterministic no-ready result."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=10,
+            ),
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES, reviewer_precedence=20),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": False})
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = summary["results"]["loyal-opposition"]
+    assert result["reason"] == "no_ready_target_for_role"
+    assert [candidate["harness_id"] for candidate in result["fallback_skipped_candidates"]] == ["D", "A"]
+    assert [candidate["reason"] for candidate in result["fallback_skipped_candidates"]] == [
+        "ollama_dispatch_not_ready",
+        "codex_dispatch_not_ready",
+    ]
+    state = summary["dispatch_state"]["recipients"]
+    assert state["loyal-opposition"]["last_result"] == "no_ready_target_for_role"
+    assert state["loyal-opposition:D"]["last_result"] == "ollama_dispatch_not_ready"
+    assert state["loyal-opposition:A"]["last_result"] == "codex_dispatch_not_ready"
+
+
+def test_prime_builder_multi_active_remains_configuration_failure(tmp_path: Path) -> None:
+    """WI-4484: ordered fallback is LO-only; Prime Builder dispatch remains single-target."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+            _rec("C", "antigravity", ["prime-builder"], "active", {"headless": {"argv": ["ag", "{{PROMPT}}"]}}),
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_go(root))
+    trigger = _load_trigger()
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert summary["results"]["prime-builder"]["reason"] == "dispatch_target_resolution_failed"
+    records = _failure_records(state_dir)
+    assert records[-1]["reason"] == "dispatch_target_resolution_failed"
+    assert "'B'" in records[-1]["error_message"] and "'C'" in records[-1]["error_message"]
 
 
 def test_resolve_exactly_one_active_dispatches(tmp_path: Path) -> None:

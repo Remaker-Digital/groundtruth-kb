@@ -66,6 +66,50 @@
         "hooks": [
           {
             "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\destructive-gate.cmd",
+            "statusMessage": "Checking destructive operation safety",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\destructive-gate.cmd",
+            "statusMessage": "Checking destructive operation safety",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\credential-scan.cmd",
+            "statusMessage": "Scanning for credential exposure",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\credential-scan.cmd",
+            "statusMessage": "Scanning for credential exposure",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
             "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\workstream-focus.cmd",
             "statusMessage": "Checking active workstream focus",
             "timeout": 5
@@ -134,6 +178,28 @@
             "type": "command",
             "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\implementation-start-gate.cmd",
             "statusMessage": "Checking implementation-start authorization",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\directive-enforcement.cmd",
+            "statusMessage": "Checking directive root boundary",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\directive-enforcement.cmd",
+            "statusMessage": "Checking directive root boundary",
             "timeout": 5
           }
         ]

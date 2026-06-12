@@ -1,0 +1,60 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-12T18:21:03Z",
+  "envelope_schema_version": 1,
+  "harness_id": "A",
+  "harness_name": "codex",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-12T18:21:03Z",
+  "project_id": null,
+  "role": "loyal-opposition",
+  "role_asserted": null,
+  "role_resolved": "loyal-opposition",
+  "session_id": "A-2026-06-12T18-21-03Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "canonical_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": "M .claude/hooks/bridge-compliance-gate.py\n M .claude/hooks/directive-enforcement-claude-adapter.py\n M .claude/hooks/formal-artifact-approval-gate.py\nMM .claude/hooks/narrative-artifact-approval-gate.py\n M .claude/hooks/scanner-safe-writer.py\nM  .claude/rules/acting-prime-builder.md\nM  .claude/rules/canonical-terminology.md\nM  .claude/rules/project-root-boundary.md\n M .claude/settings.json\nM  .claude/skills/bridge/helpers/impl_report_bridge.py\nM  .claude/skills/bridge/helpers/scan_bridge.py\nM  .claude/skills/bridge/helpers/show_thread_bridge.py\n M .codex/config.toml\n M .codex/hooks.json\nM  AGENTS.md\nMM CLAUDE.md\nM  applications/Agent_Red/tests/evaluation/test_deepeval_scaffold.py\nM  applications/Agent_Red/tests/evaluation/test_quality_pilot.py\nM  applications/Agent_Red/tests/multi_tenant/test_deploy_event_recording.py\nM  applications/Agent_Red/tests/ops/test_hooks_specs.py\nM  applications/Agent_Red/tests/ops/test_pre_flight_specs.py\nM  applications/Agent_Red/tests/ops/test_upgrade_verification_specs.py\nA  config/governance/advisory-routing-retention.toml\nA  config/governance/chroma-read-path.toml\nAM config/governance/gate-fp-corpus.toml\nM  groundtruth-kb/src/groundtruth_kb/bridge/detector.py\nM  groundtruth-kb/src/groundtruth_kb/db.py\nM  groundtruth-kb/src/groundtruth_kb/enforcement/__init__.py\nM  groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py\nMM groundtruth-kb/src/groundtruth_kb/project/doctor.py\nM  groundtruth-kb/src/groundtruth_kb/project/preflight.py\nM  groundtruth-kb/src/groundtruth_kb/reporting/harvest_coverage.py\n M groundtruth-kb/templates/hooks/bridge-compliance-gate.py\n M groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py\n M groundtruth-kb/templates/hooks/scanner-safe-writer.py\nM  groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py\nM  groundtruth-kb/templates/skills/bridge/helpers/scan_bridge.py\nM  groundtruth-kb/templates/skills/bridge/helpers/show_thread_bridge.py\nA  harness-state/codex/session-envelope-archive/2026-06-12T13-28-34Z-session-envelope.json\nA  harness-state/codex/session-envelope-archive/2026-06-12T16-08-24Z-session-envelope.json\n M harness-state/harness-registry.json\nR  independent-progress-assessments/AGENT-RED-GO-STATE-PATCH-QUEUE-2026-04-19.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/AGENT-RED-GO-STATE-PATCH-QUEUE-2026-04-19.md\nR  independent-progress-assessments/AGENT-RED-GO-STATE-RECOVERY-PLAN-2026-04-19.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/AGENT-RED-GO-STATE-RECOVERY-PLAN-2026-04-19.md\nR  independent-progress-assessments/BRIDGE-RESPONSIVENESS-LEDGER.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/BRIDGE-RESPONSIVENESS-LEDGER.md\nR  independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CODEX-REVIEW-CHECKLISTS.md\nR  independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CODEX-REVIEW-OPERATING-CONTRACT.md\nR  independent-progress-assessments/CONTROL-SURFACE-PHASE-3-PLAN.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CONTROL-SURFACE-PHASE-3-PLAN.md\nR  independent-progress-assessments/EMERGENCY-HARNESS-REGISTRAR-DISPATCHER-CONFORMANCE-PLAN-2026-05-19.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/EMERGENCY-HARNESS-REGISTRAR-DISPATCHER-CONFORMANCE-PLAN-2026-05-19.md\nR  independent-progress-assessments/OPERATING-MODEL-DRIFT-INVENTORY-2026-04-30.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/OPERATING-MODEL-DRIFT-INVENTORY-2026-04-30.md\nR  independent-progress-assessments/PHASE-1-PLAN.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/PHASE-1-PLAN.md\nR  independent-progress-assessments/PHASE-2-PLAN.md -> independent-progress-assessments/CODEX-INSIGHT-DROPBOX/PHASE-2-PLAN.md\nMM memory/pending-owner-decisions.md\nM  platform_tests/scripts/test_advisory_backlog_router.py\n M platform_tests/scripts/test_check_canonical_terminology_doctor_integration.py\n M platform_tests/scripts/test_cross_harness_bridge_trigger.py\nA  platform_tests/scripts/test_fab14_narrative_autodiscovery.py\nAM platform_tests/scripts/test_fab14_requirement_sufficiency.py\nA  platform_tests/scripts/test_fab17_chroma_read_path.py\nA  platform_tests/scripts/test_fab18_backlog_dignity.py\nAM platform_tests/scripts/test_gate_fp_corpus.py\nM  platform_tests/scripts/test_implementation_authorization.py\nA  platform_tests/scripts/test_implementation_start_gate_diagnostic_write_envelope.py\nM  platform_tests/scripts/test_session_self_initialization.py\nM  pyproject.toml\nM  scripts/advisory_backlog_router.py\nM  scripts/benchmarks/cli.py\n M scripts/bridge_applicability_preflight.py\nMM scripts/cross_harness_bridge_trigger.py\nAM scripts/generate_governance_index.py\nM  scripts/gtkb_bridge_writer.py\nM  scripts/harvest_session_deliberations.py\nMM scripts/implementation_authorization.py\nMM scripts/implementation_start_gate.py\nM  scripts/repair_bridge_index_truncation.py\nM  scripts/retroactive_harvest_bridge_threads.py\nM  scripts/run_with_status.py\nM  scripts/session_self_initialization.py\n?? .codex/gtkb-hooks/directive-enforcement-adapter.py\n?? .codex/gtkb-hooks/directive-enforcement.cmd\n?? bridge/gtkb-fab-06-narrative-corrections-005.md\n?? bridge/gtkb-fab-15-role-narrative-spec-reconciliation-005.md\n?? bridge/gtkb-wi-4250-pauth-creation-003.md\n?? bridge/gtkb-wi-4251-diagnostic-write-envelope-007.md\n?? config/governance/canonical-terms-sync.toml\n?? harness-state/codex/session-envelope-archive/2026-06-12T17-03-50Z-session-envelope.json\n?? harness-state/codex/session-envelope.json\n?? platform_tests/scripts/test_fab06_narrative_correctness.py\n?? platform_tests/scripts/test_fab14_directive_hook_coverage.py\n?? platform_tests/scripts/test_fab14_formal_autodiscovery.py\n?? platform_tests/scripts/test_fab14_gate_denial_telemetry.py\n?? platform_tests/scripts/test_fab14_path_token_dedup.py\n?? platform_tests/scripts/test_fab15_role_narrative.py\n?? scripts/sync_canonical_terms.py"
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

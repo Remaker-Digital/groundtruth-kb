@@ -31,7 +31,9 @@ PLACEHOLDER_RE = re.compile(r"\b(?:TBD|TODO|pending|no relevant|not applicable|n
 # link; the placeholder scan must not flag an ordinary English word in its
 # prose description.
 _SPEC_ID_RE = re.compile(r"\b[A-Z][A-Z0-9]*-[A-Z0-9][A-Z0-9-]*\b")
-SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+# HYG-046 (FAB-14): match h2 AND h3 headings so a '### Requirement Sufficiency'
+# (or any h3-headed section) is not silently invisible to the section scan.
+SECTION_RE = re.compile(r"^#{2,3}\s+(.+?)\s*$", re.MULTILINE)
 # Heading substrings that mark a section as a spec-derived verification plan.
 # Substring match (not equality) so a heading like "Test Plan (spec-to-test
 # mapping)" is accepted, matching what the bridge clause-preflight already
@@ -67,6 +69,16 @@ TARGET_PATHS_RE = re.compile(
 PROJECT_AUTHORIZATION_KEYS = frozenset({"project authorization", "project authorization id"})
 PROJECT_KEYS = frozenset({"project", "project id"})
 WORK_ITEM_KEYS = frozenset({"work item", "work item id", "backlog item", "backlog item id"})
+
+# HYG-046 (FAB-14): single canonical repo-path-token matcher. Previously duplicated
+# (and drifted — one copy carried 'memory/', the other did not) across
+# implementation_start_gate.py and bridge_applicability_preflight.py, which now
+# import it from here. WI-4485 folds the adr_dcl_applicability_discovery.py skills
+# prefixes into this canonical union. Anchored to an enumerated repo-directory set
+# so prose 'word/word' tokens (e.g. GO/NO-GO) are not harvested as repository paths.
+PATH_TOKEN_RE = re.compile(
+    r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/skills|\.codex/skills|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments|memory)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
+)
 
 
 class AuthorizationError(RuntimeError):
@@ -436,8 +448,20 @@ def _phrase_re(phrase: str) -> re.Pattern[str]:
     return re.compile(pattern, re.IGNORECASE)
 
 
-REQUIREMENT_GAP_RE = _phrase_re(REQUIREMENT_GAP_PHRASE)
-REQUIREMENT_SUFFICIENCY_RES = tuple(_phrase_re(phrase) for phrase in REQUIREMENT_SUFFICIENCY_PHRASES)
+# HYG-046 (FAB-14): two bounded regexes replace the former per-incident literal
+# phrase list. Each is anchored to the Requirement-Sufficiency vocabulary and
+# bounded by the next period (newline-tolerant for markdown line wrapping). The
+# gap matcher explicitly excludes a negated "no new or revised requirement is
+# needed" sufficiency sentence; the sufficiency matcher's guard keeps a
+# "requirements are not sufficient" sentence from matching as sufficient.
+REQUIREMENT_GAP_RE = re.compile(
+    r"(?i)(?<!\bno\s)\bnew\s+or\s+revised\s+requirements?\b[^.]{0,60}?\b(?:required|needed)\b"
+)
+REQUIREMENT_SUFFICIENCY_RE = re.compile(
+    r"(?i)\b(?:existing\s+)?(?:requirements?|owner\s+direction)\b(?:(?!\bnot\b)[^.]){0,80}?\bsufficient\b"
+)
+# Back-compat 1-tuple alias for any remaining iterator-style consumer.
+REQUIREMENT_SUFFICIENCY_RES = (REQUIREMENT_SUFFICIENCY_RE,)
 
 
 def _bullet_has_citation(text: str) -> bool:
@@ -832,14 +856,22 @@ def extract_and_validate_project_authorization(
 
 
 def requirement_sufficiency_state(markdown: str) -> str:
+    """Classify the Requirement Sufficiency section (HYG-046 / FAB-14).
+
+    Returns "missing" (no such section), "gap" (declares a requirement gap),
+    "sufficient" (declares existing requirements sufficient), or "unrecognized"
+    (the section exists but matches neither bounded pattern). Splitting
+    "unrecognized" from "missing" lets the caller emit a distinct, actionable
+    message instead of falsely reporting the section absent.
+    """
     body = section_body(markdown, "Requirement Sufficiency")
     if not body:
         return "missing"
     if REQUIREMENT_GAP_RE.search(body):
         return "gap"
-    if any(pattern.search(body) for pattern in REQUIREMENT_SUFFICIENCY_RES):
+    if REQUIREMENT_SUFFICIENCY_RE.search(body):
         return "sufficient"
-    return "missing"
+    return "unrecognized"
 
 
 def has_spec_derived_verification(markdown: str) -> bool:
@@ -930,7 +962,7 @@ def create_authorization_packet(
     sufficiency = requirement_sufficiency_state(proposal)
     if sufficiency == "gap":
         errors.append("Approved proposal says new or revised requirements are required before implementation")
-    elif sufficiency == "missing" and bridge_id not in BOOTSTRAP_BRIDGE_IDS:
+    elif sufficiency in {"missing", "unrecognized"} and bridge_id not in BOOTSTRAP_BRIDGE_IDS:
         if owner_sufficiency_deliberation_id:
             try:
                 owner_sufficiency_evidence = validate_owner_sufficiency_deliberation(
@@ -942,8 +974,13 @@ def create_authorization_packet(
                 sufficiency = "owner_deliberation"
             except AuthorizationError as exc:
                 errors.append(str(exc))
-        else:
+        elif sufficiency == "missing":
             errors.append("Approved proposal is missing ## Requirement Sufficiency")
+        else:  # unrecognized phrasing — HYG-046 distinct, actionable message
+            errors.append(
+                "Approved proposal's ## Requirement Sufficiency phrasing is unrecognized; state either "
+                "'Existing requirements sufficient' or 'New or revised requirement required before implementation'"
+            )
 
     if errors:
         raise AuthorizationError("; ".join(errors))
@@ -957,7 +994,9 @@ def create_authorization_packet(
         "latest_status": entry.latest_status,
         "target_path_globs": target_paths,
         "spec_links": spec_links,
-        "requirement_sufficiency": sufficiency if sufficiency != "missing" else "bootstrap_pre_rule",
+        "requirement_sufficiency": sufficiency
+        if sufficiency not in {"missing", "unrecognized"}
+        else "bootstrap_pre_rule",
         "created_at": created_at.isoformat().replace("+00:00", "Z"),
         "expires_at": (created_at + timedelta(minutes=expires_minutes)).isoformat().replace("+00:00", "Z"),
     }

@@ -12,8 +12,7 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 HOOKS_DIR = PROJECT_ROOT / ".claude" / "hooks"
 
 
@@ -294,10 +293,12 @@ class TestLoadState:
     @patch("scheduler.STATE_FILE")
     def test_resets_on_session_change(self, mock_state_file):
         """State resets when session_id changes."""
-        mock_state_file.read_text.return_value = json.dumps({
-            "session_id": "old-session",
-            "prompt_count": 42,
-        })
+        mock_state_file.read_text.return_value = json.dumps(
+            {
+                "session_id": "old-session",
+                "prompt_count": 42,
+            }
+        )
         state = load_state("new-session")
         assert state["session_id"] == "new-session"
         assert state["prompt_count"] == 0
@@ -305,10 +306,12 @@ class TestLoadState:
     @patch("scheduler.STATE_FILE")
     def test_preserves_state_for_same_session(self, mock_state_file):
         """State is preserved when session_id matches."""
-        mock_state_file.read_text.return_value = json.dumps({
-            "session_id": "current",
-            "prompt_count": 7,
-        })
+        mock_state_file.read_text.return_value = json.dumps(
+            {
+                "session_id": "current",
+                "prompt_count": 7,
+            }
+        )
         state = load_state("current")
         assert state["session_id"] == "current"
         assert state["prompt_count"] == 7

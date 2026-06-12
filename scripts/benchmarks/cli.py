@@ -23,7 +23,13 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.benchmarks.common import write_run_outputs
+# FAB-17: support script-form invocation (`python scripts/benchmarks/cli.py`),
+# not only module form (`python -m scripts.benchmarks.cli`). Ensure the repo
+# root is importable so the `scripts.benchmarks.*` imports below resolve.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from scripts.benchmarks.common import write_run_outputs  # noqa: E402
 
 BENCHMARK_MODULES = [
     "assertion_signal_noise",

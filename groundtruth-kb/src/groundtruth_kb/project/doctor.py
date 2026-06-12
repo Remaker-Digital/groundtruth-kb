@@ -27,6 +27,9 @@ from groundtruth_kb.project.managed_registry import (
 from groundtruth_kb.project.profiles import get_profile
 
 STANDING_BACKLOG_STALE_NO_GO_DAYS = 14
+IMPLEMENTATION_ACTIVE_APPROVAL_STATES = frozenset({"implementation_authorized"})
+IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = frozenset({"in_progress"})
+IMPLEMENTATION_ACTIVE_STAGES = frozenset({"implementing"})
 _BRIDGE_LATEST_STATUS_RE = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
 )
@@ -1449,25 +1452,41 @@ def _check_auq_coverage(target: Path) -> ToolCheck:
             message=f"No entries in window (cutoff={cutoff.date().isoformat()})",
         )
 
-    auq = [e for e in in_window if e.get("detected_via") == "ask_user_question"]
-    pct = (len(auq) / len(in_window)) * 100.0
-    if len(auq) == len(in_window):
+    genuine = [e for e in in_window if not (e.get("detected_via") or "").startswith("prose:")]
+
+    if not genuine:
         return ToolCheck(
             name="AUQ coverage",
             required=False,
             found=True,
             status="pass",
-            message=f"AUQ coverage 100% over {len(in_window)} entries since {cutoff.date().isoformat()}",
+            message=(
+                f"No genuine entries in window (cutoff={cutoff.date().isoformat()}; "
+                f"{len(in_window) - len(genuine)} prose-pattern false positives excluded)"
+            ),
         )
 
-    non_auq_ids = [e["id"] for e in in_window if e.get("detected_via") != "ask_user_question"][:5]
+    auq = [e for e in genuine if e.get("detected_via") == "ask_user_question"]
+    pct = (len(auq) / len(genuine)) * 100.0
+    if len(auq) == len(genuine):
+        excluded = len(in_window) - len(genuine)
+        suffix = f" ({excluded} prose-pattern excluded)" if excluded else ""
+        return ToolCheck(
+            name="AUQ coverage",
+            required=False,
+            found=True,
+            status="pass",
+            message=f"AUQ coverage 100% over {len(genuine)} entries since {cutoff.date().isoformat()}{suffix}",
+        )
+
+    non_auq_ids = [e["id"] for e in genuine if e.get("detected_via") != "ask_user_question"][:5]
     return ToolCheck(
         name="AUQ coverage",
         required=False,
         found=True,
         status="fail",
         message=(
-            f"AUQ coverage {pct:.1f}% ({len(auq)}/{len(in_window)}) since {cutoff.date().isoformat()}; "
+            f"AUQ coverage {pct:.1f}% ({len(auq)}/{len(genuine)}) since {cutoff.date().isoformat()}; "
             f"non-AUQ sample: {non_auq_ids}"
         ),
     )
@@ -2789,19 +2808,20 @@ def _check_canonical_terms_registry(target: Path) -> ToolCheck:
     """Phase 1 backing-registry check for the Canonical Terminology System.
 
     Per ``bridge/gtkb-canonical-terminology-system-context-model-001-005.md``
-    (Codex GO at ``-006``): when the ``canonical_terms`` table exists in
-    the project's MemBase, run parity check (markdown ↔ table) plus
-    collision detection over current platform_core rows.
+    (Codex GO at ``-006``) plus FAB-15: when the ``canonical_terms`` table
+    exists in the project's MemBase, run deterministic generator-freshness
+    check (markdown -> table dry-run) plus collision detection over current
+    platform_core rows.
 
     Behavior:
 
     - Pass when the table is empty (Phase 1 backing registry hasn't been
       seeded yet — that's fine; the markdown remains the canonical source).
-    - Pass when seeded and parity is clean and no collision findings exist.
-    - Warning when parity has WARN findings (e.g., markdown term not seeded
-      yet, content drift).
-    - Fail when parity has ERROR findings (e.g., platform_core row in table
-      but no markdown counterpart) or collision detection reports any
+    - Pass when seeded, the generator dry-run is all-unchanged, and no
+      collision findings exist.
+    - Warning when the generator dry-run has pending insert/update/retire
+      operations.
+    - Fail only when collision detection reports a
       ``platform_core_redefinition``.
 
     The table-not-present case is also a pass: this check never blocks if
@@ -2854,29 +2874,17 @@ def _check_canonical_terms_registry(target: Path) -> ToolCheck:
                 message=("canonical_terms table not yet provisioned — run gt project upgrade --apply"),
             )
 
-        terms = _ct.list_terms(conn, include_retired=False)
-        if not terms:
-            return ToolCheck(
-                name="canonical terms registry",
-                required=False,
-                found=True,
-                status="warning",
-                message=(
-                    "canonical_terms table present but empty while .claude/rules/canonical-terminology.md "
-                    "defines platform_core terms — schema/seed drift; run `gt canonical-terms seed --apply`"
-                ),
-            )
+        plan = _ct.seed_from_markdown(conn, glossary, dry_run=True)
+        pending_ops = [op for op in plan.operations if op.op != "unchanged"]
+        pending_summary: dict[str, int] = {}
+        for op in pending_ops:
+            pending_summary[op.op] = pending_summary.get(op.op, 0) + 1
 
-        parity = _ct.parity_check(conn, glossary)
+        terms = _ct.list_terms(conn, include_retired=False)
         errors_collisions, warnings_collisions = _ct.find_collisions(terms)
 
-        parity_errors = [p for p in parity if p.severity == "error"]
-        parity_warnings = [p for p in parity if p.severity == "warning"]
-
-        if parity_errors or errors_collisions:
+        if errors_collisions:
             details = []
-            for p in parity_errors:
-                details.append(f"parity:{p.kind}:{p.id}")
             for c in errors_collisions:
                 details.append(f"collision:{c.classification}:{c.key[1]}")
             return ToolCheck(
@@ -2885,25 +2893,28 @@ def _check_canonical_terms_registry(target: Path) -> ToolCheck:
                 found=True,
                 status="fail",
                 message=(
-                    f"canonical_terms registry blocking findings: {len(parity_errors)} parity error(s), "
+                    "canonical_terms registry blocking findings: "
                     f"{len(errors_collisions)} platform_core redefinition(s) — "
                     f"{'; '.join(details[:10])}"
                 ),
             )
 
-        if parity_warnings or warnings_collisions:
+        if pending_ops or warnings_collisions:
             details = []
-            for p in parity_warnings:
-                details.append(f"parity:{p.kind}:{p.id}")
+            for op in pending_ops:
+                details.append(f"freshness:{op.op}:{op.id}")
             for c in warnings_collisions:
                 details.append(f"collision:{c.classification}:{c.key[1]}")
+            summary_bits = ", ".join(f"{key}={value}" for key, value in sorted(pending_summary.items()))
             return ToolCheck(
                 name="canonical terms registry",
                 required=False,
                 found=True,
                 status="warning",
                 message=(
-                    f"canonical_terms registry advisory findings: {len(parity_warnings)} parity warn(s), "
+                    "canonical_terms registry generator freshness findings: "
+                    f"{len(pending_ops)} pending sync operation(s)"
+                    f"{f' ({summary_bits})' if summary_bits else ''}, "
                     f"{len(warnings_collisions)} cross-field/cross-scope collision(s) — "
                     f"{'; '.join(details[:10])}"
                 ),
@@ -2914,7 +2925,7 @@ def _check_canonical_terms_registry(target: Path) -> ToolCheck:
             required=True,
             found=True,
             status="pass",
-            message=(f"canonical_terms registry OK — {len(terms)} active terms, parity clean, no collisions"),
+            message=(f"canonical_terms registry OK — {len(terms)} active terms, generator fresh, no collisions"),
         )
     finally:
         conn.close()
@@ -4347,6 +4358,17 @@ def _active_authorized_work_item_ids(db: Any) -> set[str]:
     return authorized
 
 
+def _is_implementation_active_work_item(item: dict[str, Any]) -> bool:
+    approval_state = str(item.get("approval_state") or "").strip()
+    resolution_status = str(item.get("resolution_status") or "").strip()
+    stage = str(item.get("stage") or "").strip()
+    return (
+        approval_state in IMPLEMENTATION_ACTIVE_APPROVAL_STATES
+        or resolution_status in IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES
+        or stage in IMPLEMENTATION_ACTIVE_STAGES
+    )
+
+
 def check_standing_backlog_health(
     target: Path,
     *,
@@ -4355,8 +4377,10 @@ def check_standing_backlog_health(
 ) -> dict[str, Any]:
     """Return a machine-readable standing-backlog health payload.
 
-    Findings use the severity taxonomy required by GTKB-GOV-010:
-    orphaned-WI=WARN, stale-NO-GO=WARN, missing-evidence=FAIL.
+    Findings use the severity taxonomy required by GTKB-GOV-010, calibrated by
+    GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001:
+    implementation-active orphaned-WI=WARN, stale-NO-GO=WARN,
+    missing-evidence=FAIL. Unapproved/future WIs do not require PAUTH coverage.
     """
 
     from groundtruth_kb.db import KnowledgeDB
@@ -4364,6 +4388,7 @@ def check_standing_backlog_health(
     target = target.resolve()
     now = now or datetime.now(UTC)
     findings: list[dict[str, Any]] = []
+    non_implementation_uncovered_count = 0
 
     db_path = target / "groundtruth.db"
     if not db_path.is_file():
@@ -4381,20 +4406,25 @@ def check_standing_backlog_health(
             authorized_work_item_ids = _active_authorized_work_item_ids(db)
             for item in db.get_open_work_items():
                 item_id = str(item.get("id") or "")
-                if item_id and item_id not in authorized_work_item_ids:
-                    findings.append(
-                        {
-                            "kind": "orphaned-WI",
-                            "severity": "WARN",
-                            "work_item_id": item_id,
-                            "project_name": item.get("project_name"),
-                            "resolution_status": item.get("resolution_status"),
-                            "message": (
-                                f"Open work item {item_id} is not listed in any active "
-                                "project authorization's included_work_item_ids."
-                            ),
-                        }
-                    )
+                if not item_id or item_id in authorized_work_item_ids:
+                    continue
+                if not _is_implementation_active_work_item(item):
+                    non_implementation_uncovered_count += 1
+                    continue
+                findings.append(
+                    {
+                        "kind": "orphaned-WI",
+                        "severity": "WARN",
+                        "work_item_id": item_id,
+                        "project_name": item.get("project_name"),
+                        "approval_state": item.get("approval_state"),
+                        "resolution_status": item.get("resolution_status"),
+                        "message": (
+                            f"Implementation-active work item {item_id} is not listed in any active "
+                            "project authorization's included_work_item_ids."
+                        ),
+                    }
+                )
         except Exception as exc:  # intentional-catch: doctor payload, error -> FAIL finding
             findings.append(
                 {
@@ -4475,6 +4505,7 @@ def check_standing_backlog_health(
             "fail_count": fail_count,
             "warn_count": warn_count,
             "orphaned_wi_count": sum(1 for finding in findings if finding["kind"] == "orphaned-WI"),
+            "non_implementation_uncovered_count": non_implementation_uncovered_count,
             "stale_no_go_count": sum(1 for finding in findings if finding["kind"] == "stale-NO-GO"),
             "missing_evidence_count": sum(1 for finding in findings if finding["kind"] == "missing-evidence"),
         },

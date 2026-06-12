@@ -214,3 +214,26 @@ def test_router_compact_mode_reports_staged_count(router, fake_project: Path, db
     compact_json = json.loads(result.as_json(compact=True))
     assert "staged" not in compact_json
     assert compact_json["staged_count"] == 1
+    assert compact_json["skipped_expired_count"] == 0
+
+
+def test_router_retention_policy_skips_expired_advisories(router, fake_project: Path, db_factory) -> None:
+    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    _write_insights(dropbox, "INSIGHTS-2026-03-01-13-26-OLD.md", _basic_advisory(date_str="2026-03-01"))
+    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-NEW.md", _basic_advisory(date_str="2026-05-10"))
+
+    result = router.run(
+        project_root=fake_project,
+        source="dropbox",
+        since=None,
+        dry_run=False,
+        db_factory=db_factory,
+        retention_policy=router.RetentionPolicy(max_advisory_age_days=60),
+        now=router.date(2026, 6, 12),
+    )
+
+    assert result.scanned == 2
+    assert [row["source_key"] for row in result.skipped_expired] == ["INSIGHTS-2026-03-01-13-26-OLD.md"]
+    assert [row["source_key"] for row in result.staged] == ["INSIGHTS-2026-05-10-13-26-NEW.md"]
+    events = _candidate_events(fake_project)
+    assert [row["source_key"] for row in events] == ["INSIGHTS-2026-05-10-13-26-NEW.md"]

@@ -55,6 +55,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -122,7 +123,13 @@ QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 DISPATCH_FAILURES_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_FAILURES_MAX_BYTES"
-DEFAULT_DISPATCH_FAILURES_MAX_BYTES = 1024 * 1024
+DEFAULT_JSONL_MAX_BYTES = 10 * 1024 * 1024
+DEFAULT_JSONL_ROLLOVERS = 5
+DEFAULT_DISPATCH_FAILURES_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
+DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
+DEFAULT_DISPATCH_RUNS_MAX_BYTES = 200 * 1024 * 1024
+DEFAULT_GTKB_STATE_GC_AGE_DAYS = 14
+RUNTIME_RETENTION_CONFIG_REL = Path("config") / "governance" / "runtime-evidence-retention.toml"
 # WI-4472: hard global concurrency cap on live dispatched headless harness
 # processes. The 2026-06-11 dispatch storm accumulated ~300 hung codex
 # sessions because nothing bounded the total live-process count. Default 8 is
@@ -752,6 +759,223 @@ def _dispatch_failures_max_bytes() -> int:
     return parsed if parsed > 0 else DEFAULT_DISPATCH_FAILURES_MAX_BYTES
 
 
+def _runtime_retention_policy(project_root: Path) -> dict[str, int]:
+    """Load FAB-13 runtime retention horizons with fail-safe defaults."""
+    policy = {
+        "dispatch_runs_retention_days": DEFAULT_DISPATCH_RUNS_RETENTION_DAYS,
+        "dispatch_runs_max_bytes": DEFAULT_DISPATCH_RUNS_MAX_BYTES,
+        "jsonl_max_bytes": DEFAULT_JSONL_MAX_BYTES,
+        "jsonl_rollovers": DEFAULT_JSONL_ROLLOVERS,
+        "gtkb_state_gc_age_days": DEFAULT_GTKB_STATE_GC_AGE_DAYS,
+    }
+    config_path = project_root / RUNTIME_RETENTION_CONFIG_REL
+    try:
+        data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return policy
+
+    runtime = data.get("cross_harness_trigger", {})
+    gc = data.get("gtkb_state_gc", {})
+    raw_values = {
+        "dispatch_runs_retention_days": runtime.get("dispatch_runs_retention_days"),
+        "dispatch_runs_max_bytes": runtime.get("dispatch_runs_max_bytes"),
+        "jsonl_max_bytes": runtime.get("jsonl_max_bytes"),
+        "jsonl_rollovers": runtime.get("jsonl_rollovers"),
+        "gtkb_state_gc_age_days": gc.get("age_days"),
+    }
+    for key, raw in raw_values.items():
+        try:
+            parsed = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            policy[key] = parsed
+    return policy
+
+
+def _jsonl_rollover_path(target: Path, index: int) -> Path:
+    return target.with_name(f"{target.name}.{index}")
+
+
+def _rotate_jsonl_if_needed(
+    target: Path,
+    *,
+    max_bytes: int = DEFAULT_JSONL_MAX_BYTES,
+    max_rollovers: int = DEFAULT_JSONL_ROLLOVERS,
+) -> None:
+    """Rotate ``target`` through ``.1``..``.N`` when it exceeds ``max_bytes``."""
+    try:
+        size = target.stat().st_size
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+    if size <= max_bytes:
+        return
+
+    max_rollovers = max(1, max_rollovers)
+    _safe_unlink(_jsonl_rollover_path(target, max_rollovers))
+    for index in range(max_rollovers - 1, 0, -1):
+        src = _jsonl_rollover_path(target, index)
+        if src.exists():
+            try:
+                _rename_with_retry(src, _jsonl_rollover_path(target, index + 1))
+            except OSError:
+                return
+    try:
+        _rename_with_retry(target, _jsonl_rollover_path(target, 1))
+    except OSError:
+        return
+
+
+def _dispatch_id_from_run_artifact(path: Path) -> str:
+    name = path.name
+    for suffix in (".stdout.log", ".stderr.log", ".exit_code", ".pid", ".prompt.txt", ".input.json"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return path.stem
+
+
+def _run_artifact_live(path: Path, runs_dir: Path) -> bool:
+    dispatch_id = _dispatch_id_from_run_artifact(path)
+    pid_file = runs_dir / f"{dispatch_id}.pid"
+    if not pid_file.is_file():
+        return False
+    status_file = runs_dir / f"{dispatch_id}.exit_code"
+    try:
+        if status_file.exists() and status_file.stat().st_size > 0:
+            return False
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
+    except (OSError, TypeError, ValueError):
+        return False
+    return _pid_alive(pid)
+
+
+def _path_size(path: Path) -> int:
+    try:
+        if path.is_dir() and not path.is_symlink():
+            return sum(child.stat().st_size for child in path.rglob("*") if child.is_file())
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def _remove_path_best_effort(path: Path) -> None:
+    try:
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+    except OSError:
+        pass
+
+
+def _prune_dispatch_runs(
+    runs_dir: Path,
+    *,
+    max_age_days: int,
+    max_total_bytes: int,
+    now_epoch: float | None = None,
+) -> dict[str, int]:
+    """Prune inactive dispatch-run artifacts by age, then oldest-first by size."""
+    if not runs_dir.is_dir():
+        return {"deleted_count": 0, "deleted_bytes": 0}
+
+    now = time.time() if now_epoch is None else now_epoch
+    cutoff = now - (max_age_days * 86400)
+    candidates: list[tuple[float, int, Path]] = []
+    deleted_count = 0
+    deleted_bytes = 0
+
+    for path in sorted(runs_dir.iterdir()):
+        if _run_artifact_live(path, runs_dir):
+            continue
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        size = _path_size(path)
+        if mtime < cutoff:
+            _remove_path_best_effort(path)
+            deleted_count += 1
+            deleted_bytes += size
+            continue
+        candidates.append((mtime, size, path))
+
+    remaining_total = sum(size for _, size, path in candidates if path.exists())
+    for _mtime, size, path in sorted(candidates, key=lambda item: item[0]):
+        if remaining_total <= max_total_bytes:
+            break
+        if not path.exists() or _run_artifact_live(path, runs_dir):
+            continue
+        _remove_path_best_effort(path)
+        remaining_total -= size
+        deleted_count += 1
+        deleted_bytes += size
+
+    return {"deleted_count": deleted_count, "deleted_bytes": deleted_bytes}
+
+
+def _gc_gtkb_state_runtime_dirs(state_root: Path, *, age_days: int, now_epoch: float | None = None) -> dict[str, int]:
+    """Remove stale pytest/uv-cache runtime directories under .gtkb-state only."""
+    if not state_root.is_dir():
+        return {"deleted_count": 0, "deleted_bytes": 0}
+    now = time.time() if now_epoch is None else now_epoch
+    cutoff = now - (age_days * 86400)
+    deleted_count = 0
+    deleted_bytes = 0
+    for path in sorted(state_root.rglob("*")):
+        if not path.is_dir() or path.is_symlink():
+            continue
+        name = path.name.lower()
+        if not any(token in name for token in ("pytest-tmp", "pytest_tmp", "pytest-cache", "uv-cache")):
+            continue
+        try:
+            if path.stat().st_mtime >= cutoff:
+                continue
+        except OSError:
+            continue
+        size = _path_size(path)
+        _remove_path_best_effort(path)
+        deleted_count += 1
+        deleted_bytes += size
+    return {"deleted_count": deleted_count, "deleted_bytes": deleted_bytes}
+
+
+def _apply_runtime_evidence_retention(project_root: Path, state_dir: Path) -> dict[str, Any]:
+    """FAB-13 retention pass for regenerable trigger/runtime evidence."""
+    policy = _runtime_retention_policy(project_root)
+    state_dirs = [state_dir, project_root.joinpath(*BRIDGE_POLLER_STATE_SUBDIR)]
+    seen: set[Path] = set()
+    pruned: dict[str, dict[str, int]] = {}
+    for candidate_state_dir in state_dirs:
+        resolved = candidate_state_dir.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        _rotate_jsonl_if_needed(
+            candidate_state_dir / DISPATCH_FAILURES_FILENAME,
+            max_bytes=policy["jsonl_max_bytes"],
+            max_rollovers=policy["jsonl_rollovers"],
+        )
+        _rotate_jsonl_if_needed(
+            candidate_state_dir / TRIGGER_DIAGNOSTIC_FILENAME,
+            max_bytes=policy["jsonl_max_bytes"],
+            max_rollovers=policy["jsonl_rollovers"],
+        )
+        pruned[str(candidate_state_dir)] = _prune_dispatch_runs(
+            candidate_state_dir / DISPATCH_RUNS_SUBDIR,
+            max_age_days=policy["dispatch_runs_retention_days"],
+            max_total_bytes=policy["dispatch_runs_max_bytes"],
+        )
+
+    gc_result = _gc_gtkb_state_runtime_dirs(
+        project_root / ".gtkb-state",
+        age_days=policy["gtkb_state_gc_age_days"],
+    )
+    return {"policy": policy, "dispatch_runs": pruned, "gtkb_state_gc": gc_result}
+
+
 def _max_live_dispatched_processes() -> int:
     """Resolve the hard global concurrency cap (WI-4472).
 
@@ -865,15 +1089,12 @@ def _count_live_dispatched_processes(runs_dir: Path) -> int:
 
 
 def _rotate_dispatch_failures_if_needed(target: Path) -> None:
-    """Rotate dispatch-failures.jsonl to .1 when the current segment is oversized."""
-    try:
-        size = target.stat().st_size
-    except FileNotFoundError:
-        return
-    if size <= _dispatch_failures_max_bytes():
-        return
-    rollover = target.with_name(target.name + ".1")
-    _rename_with_retry(target, rollover)
+    """Rotate dispatch-failures.jsonl through 5 rollovers when oversized."""
+    _rotate_jsonl_if_needed(
+        target,
+        max_bytes=_dispatch_failures_max_bytes(),
+        max_rollovers=DEFAULT_JSONL_ROLLOVERS,
+    )
 
 
 def _path_mtime_iso(path: Path) -> str | None:
@@ -1073,6 +1294,7 @@ def _emit_trigger_diagnostic(state_dir: Path, record: dict[str, Any]) -> None:
     try:
         state_dir.mkdir(parents=True, exist_ok=True)
         target = state_dir / TRIGGER_DIAGNOSTIC_FILENAME
+        _rotate_jsonl_if_needed(target)
         with target.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, sort_keys=True) + "\n")
     except OSError:
@@ -1143,7 +1365,12 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
     selected = _selected_oldest_first(items, max_items)
     rows = [f"- {item.top_status} {item.document_name} {item.top_file}" for item in selected]
     selected_text = "\n".join(rows) if rows else "- No selected entries."
+    harness_info_line = (
+        f"Your resolved harness ID is {target.harness_id!r} ({target.command_handle!r}) "
+        f"and your active role is {target.needed_role_label!r} (canonical mode: {target.canonical_mode!r})."
+    )
     role_line = (
+        f"{harness_info_line}\n"
         "Resolve your durable harness identity from `harness-state/harness-identities.json`, "
         "then read your assigned role from `harness-state/harness-registry.json` "
         "through the canonical `groundtruth_kb.harness_projection` or `gt harness roles` reader. "
@@ -1276,7 +1503,10 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
         if not isinstance(element, str):
             return None
         if element == "{{PROMPT}}":
-            command.append(prompt)
+            if target.command_handle == "antigravity":
+                command.append("")
+            else:
+                command.append(prompt)
         elif element == "{{PROJECT_ROOT}}":
             command.append(str(project_root))
         else:
@@ -1290,6 +1520,21 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
             command.extend(["--permission-mode", "acceptEdits"])
         if "--allowed-tools" not in command and "--allowedTools" not in command:
             command.extend(["--allowed-tools", CLAUDE_WORKER_ALLOWED_TOOLS])
+
+    if os.name == "nt" and command:
+        new_command: list[str] = []
+        skip = False
+        for i in range(len(command)):
+            if skip:
+                skip = False
+                continue
+            if command[i] in {"-p", "--prompt"} and i + 1 < len(command) and command[i + 1] == "":
+                new_command.append("--prompt=")
+                skip = True
+            else:
+                new_command.append(command[i])
+        command = new_command
+
     return command
 
 
@@ -1365,6 +1610,7 @@ class DispatchTarget:
     harness_id: str  # "A", "B", etc. — durable identity from harness-identities.json
     command_handle: str  # "claude" / "codex" — from inverted harness-identities.json
     canonical_mode: str  # "pb" / "lo" — the canonical-init-keyword mode
+    reviewer_precedence: int | None = None
     invocation_surfaces: dict[str, Any] | None = (
         None  # WI-3344: headless argv template from the harness-registry projection; None when the projection carries no record for this harness
     )
@@ -1402,6 +1648,26 @@ _LABEL_TO_CANONICAL_MODE = {
     "prime-builder": "pb",
     "loyal-opposition": "lo",
 }
+
+
+def _reviewer_precedence_for_record(record: dict[str, object]) -> int:
+    """Return deterministic LO reviewer order; missing or invalid sorts last."""
+    try:
+        return int(record.get("reviewer_precedence"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 1_000_000
+
+
+def _dispatch_target_evidence(target: DispatchTarget) -> dict[str, Any]:
+    evidence: dict[str, Any] = {
+        "recipient": target.dispatch_state_key,
+        "needed_role_label": target.needed_role_label,
+        "harness_id": target.harness_id,
+        "command_handle": target.command_handle,
+    }
+    if target.reviewer_precedence is not None:
+        evidence["reviewer_precedence"] = target.reviewer_precedence
+    return evidence
 
 
 def _evaluate_ollama_dispatch_readiness(project_root: Path) -> dict[str, Any]:
@@ -1714,6 +1980,11 @@ def _resolve_dispatch_targets(
     active_matching = [
         (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info) and _record_can_receive_dispatch(h_info)
     ]
+    if needed_role_label == "loyal-opposition":
+        active_matching = sorted(
+            active_matching,
+            key=lambda item: (_reviewer_precedence_for_record(item[1]), str(item[0])),
+        )
 
     if not active_matching:
         if state_dir is not None:
@@ -1770,6 +2041,9 @@ def _resolve_dispatch_targets(
                 harness_id=harness_id,
                 command_handle=identity_handle,
                 canonical_mode=mode,
+                reviewer_precedence=_reviewer_precedence_for_record(role_record)
+                if needed_role_label == "loyal-opposition"
+                else None,
                 invocation_surfaces=invocation_surfaces,
             )
         )
@@ -2003,9 +2277,11 @@ def _spawn_harness(
     # a new bridge response that flips the counterpart's signature.
     # Explicitly strip in case the parent has it set:
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     if os.name == "nt":
-        creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+        creationflags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
+        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+    else:
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
     selected = _selected_oldest_first(items, max_items)
     sig = _signature(selected)
@@ -2017,8 +2293,16 @@ def _spawn_harness(
         str(stdout_path),
         "--stderr",
         str(stderr_path),
-        str(status_file_path),
-    ] + command
+    ]
+    if target.command_handle == "antigravity":
+        stdin_path = runs_dir / f"{dispatch_id}.stdin.log"
+        try:
+            stdin_path.write_text(prompt, encoding="utf-8")
+        except OSError:
+            pass
+        wrapped_command.extend(["--stdin", str(stdin_path)])
+    wrapped_command.append(str(status_file_path))
+    wrapped_command += command
 
     meta: dict[str, Any] = {
         "dispatch_id": dispatch_id,
@@ -2032,16 +2316,20 @@ def _spawn_harness(
         "status_file_path": str(status_file_path),
     }
     try:
-        process = subprocess.Popen(
-            wrapped_command,
-            cwd=str(project_root),
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            creationflags=creationflags,
-        )
+        try:
+            process = subprocess.Popen(
+                wrapped_command,
+                cwd=str(project_root),
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                creationflags=creationflags,
+            )
+        except Exception as e:
+            # Re-raise to be handled by the outer try-except block
+            raise e
         meta.update({"launched": True, "pid": process.pid})
         # WI-4472: live-process accounting sidecar. Written only for a
         # successful launch; consumed by _count_live_dispatched_processes.
@@ -2337,6 +2625,7 @@ def run_trigger(
         return {"skipped": True, "reason": "loop_prevention_env_var"}
 
     _cleanup_stale_tmp_files(state_dir)
+    retention_result = _apply_runtime_evidence_retention(project_root, state_dir)
 
     # Substrate check: if cross_harness_trigger is not the active substrate,
     # record substrate mismatch skip and exit inertly.
@@ -2435,7 +2724,7 @@ def run_trigger(
     # Build targets defensively: if resolution fails (drift, missing
     # identity entry, etc.), record the failure and skip that recipient
     # for this cycle without aborting the whole run.
-    pending_by_target: list[tuple[DispatchTarget | None, list[Any], str, str | None]] = []
+    pending_by_target: list[tuple[DispatchTarget | None, list[Any], str, str | None, list[dict[str, Any]] | None]] = []
 
     role_map = _read_role_assignments(project_root)
     harnesses = role_map.get("harnesses", {})
@@ -2461,14 +2750,55 @@ def run_trigger(
                     "error_message": str(exc),
                 },
             )
-            pending_by_target.append((None, items, needed_role_label, "dispatch_target_resolution_failed"))
+            pending_by_target.append((None, items, needed_role_label, "dispatch_target_resolution_failed", None))
             continue
 
         if not targets:
             # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 2: zero-ACTIVE
             # sentinel. _resolve_dispatch_targets already emitted the
             # no_active_target_for_role audit record; do NOT double-record here.
-            pending_by_target.append((None, items, needed_role_label, "no_active_target_for_role"))
+            pending_by_target.append((None, items, needed_role_label, "no_active_target_for_role", None))
+            continue
+
+        if needed_role_label == "loyal-opposition":
+            skipped_candidates: list[dict[str, Any]] = []
+            selected_target: DispatchTarget | None = None
+            for target in targets:
+                h_info = harnesses.get(target.harness_id) or {}
+                harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
+                if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
+                    reason = f"{harness_type}_dispatch_not_ready"
+                    skip = _dispatch_target_evidence(target)
+                    skip["reason"] = reason
+                    skipped_candidates.append(skip)
+                    pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
+                    continue
+                selected_target = target
+                break
+            if selected_target is None:
+                pending_by_target.append(
+                    (None, items, needed_role_label, "no_ready_target_for_role", skipped_candidates)
+                )
+            else:
+                pending_by_target.append(
+                    (selected_target, items, selected_target.dispatch_state_key, None, skipped_candidates)
+                )
+            continue
+
+        if len(targets) > 1:
+            ids_str = ", ".join(f"'{target.harness_id}'" for target in targets)
+            error_message = f"multiple active harnesses match role {needed_role_label!r}: {ids_str}"
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "dispatch_id": _now_iso() + "-resolve-fail",
+                    "recipient": needed_role_label,
+                    "launched": False,
+                    "reason": "dispatch_target_resolution_failed",
+                    "error_message": error_message,
+                },
+            )
+            pending_by_target.append((None, items, needed_role_label, "dispatch_target_resolution_failed", None))
             continue
 
         for target in targets:
@@ -2476,13 +2806,13 @@ def run_trigger(
             harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
             if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
                 pending_by_target.append(
-                    (target, items, target.dispatch_state_key, f"{harness_type}_dispatch_not_ready")
+                    (target, items, target.dispatch_state_key, f"{harness_type}_dispatch_not_ready", None)
                 )
             else:
-                pending_by_target.append((target, items, target.dispatch_state_key, None))
+                pending_by_target.append((target, items, target.dispatch_state_key, None, None))
 
     results: dict[str, Any] = {}
-    for target, items, recipient, failure_reason in pending_by_target:
+    for target, items, recipient, failure_reason, fallback_skipped_candidates in pending_by_target:
         if target is None or failure_reason is not None:
             # Resolution produced no dispatch target (multi-active ValueError or
             # zero-active sentinel) or target is not ready. Reflect the per-recipient
@@ -2492,8 +2822,16 @@ def run_trigger(
             recipient_state = dict(prior) if isinstance(prior, dict) else {}
             recipient_state["last_result"] = reason
             recipient_state["updated_at"] = _now_iso()
+            result: dict[str, Any] = {"launched": False, "reason": reason}
+            if target is not None:
+                candidate = _dispatch_target_evidence(target)
+                recipient_state["candidate"] = candidate
+                result["candidate"] = candidate
+            if fallback_skipped_candidates:
+                recipient_state["fallback_skipped_candidates"] = fallback_skipped_candidates
+                result["fallback_skipped_candidates"] = fallback_skipped_candidates
             recipients_state[recipient] = recipient_state
-            results[recipient] = {"launched": False, "reason": reason}
+            results[recipient] = result
             continue
 
         target_max_items = _effective_max_items_for_target(target, max_items)
@@ -2782,6 +3120,17 @@ def run_trigger(
                                 recipient_state["signature"] = dispatched_signature
                         results[recipient] = launch
 
+        selected_candidate = _dispatch_target_evidence(target)
+        recipient_state["selected_candidate"] = selected_candidate
+        if fallback_skipped_candidates:
+            recipient_state["fallback_skipped_candidates"] = fallback_skipped_candidates
+        if isinstance(results.get(recipient), dict):
+            results[recipient]["selected_candidate"] = selected_candidate
+            if fallback_skipped_candidates:
+                results[recipient]["fallback_skipped_candidates"] = fallback_skipped_candidates
+            results[target.needed_role_label] = results[recipient]
+            recipients_state[target.needed_role_label] = recipient_state
+
         recipients_state[recipient] = recipient_state
 
     compat_recipients_state = dict(recipients_state)
@@ -2863,7 +3212,7 @@ def run_trigger(
                 "last_suppressed_signature": _diag_state.get("last_suppressed_signature"),
             },
         )
-    return {"skipped": False, "results": compat_results, "dispatch_state": payload}
+    return {"skipped": False, "results": compat_results, "dispatch_state": payload, "retention": retention_result}
 
 
 def _classify_failure_record(record: dict[str, Any]) -> str:

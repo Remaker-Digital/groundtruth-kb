@@ -14,8 +14,32 @@ updates:
     commit-message:
       prefix: "chore(deps):"
 
+  - package-ecosystem: "pip"
+    directory: "/groundtruth-kb"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "groundtruth-kb"
+    commit-message:
+      prefix: "chore(deps):"
+
   - package-ecosystem: "npm"
-    directory: "/widget"
+    directory: "/applications/Agent_Red"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "agent-red"
+    commit-message:
+      prefix: "chore(deps):"
+
+  - package-ecosystem: "npm"
+    directory: "/applications/Agent_Red/widget"
     schedule:
       interval: "weekly"
       day: "tuesday"
@@ -23,11 +47,12 @@ updates:
     labels:
       - "dependencies"
       - "widget"
+      - "agent-red"
     commit-message:
       prefix: "chore(deps):"
 
   - package-ecosystem: "npm"
-    directory: "/admin"
+    directory: "/applications/Agent_Red/admin"
     schedule:
       interval: "weekly"
       day: "tuesday"
@@ -35,6 +60,20 @@ updates:
     labels:
       - "dependencies"
       - "admin"
+      - "agent-red"
+    commit-message:
+      prefix: "chore(deps):"
+
+  - package-ecosystem: "npm"
+    directory: "/applications/Agent_Red/docs-site"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docs"
+      - "agent-red"
     commit-message:
       prefix: "chore(deps):"
 

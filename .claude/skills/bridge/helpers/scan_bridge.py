@@ -84,7 +84,9 @@ _KIND_TERMINAL_TOKENS = (
 # Header read budget (bytes). ``bridge_kind`` is always in the header section.
 _HEADER_READ_BUDGET_BYTES = 4096
 
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
+_STATUS_LINE_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
+)
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 _BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.MULTILINE)
 

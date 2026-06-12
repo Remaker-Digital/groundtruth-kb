@@ -15,15 +15,18 @@ Run:
 
 from __future__ import annotations
 
+try:
+    from evaluation.pilots.quality_pilot import (
+        DATASET_PATH,
+        ScenarioResult,
+        evaluate_response,
+        load_dataset,
+        run_pilot,
+    )
+except ImportError:
+    import pytest
 
-
-from evaluation.pilots.quality_pilot import (
-    DATASET_PATH,
-    ScenarioResult,
-    evaluate_response,
-    load_dataset,
-    run_pilot,
-)
+    pytestmark = pytest.mark.skip(reason="evaluation package not available (retired/deleted under S320)")
 
 
 # ---------------------------------------------------------------------------
@@ -48,10 +51,17 @@ class TestGoldenDataset:
         """Each scenario has all required fields."""
         scenarios = load_dataset()
         required_keys = {
-            "id", "category", "customer_message", "knowledge_context",
-            "expected_intent", "expected_response_contains",
-            "expected_response_excludes", "expected_escalation",
-            "expected_critic_verdict", "quality_dimensions", "difficulty",
+            "id",
+            "category",
+            "customer_message",
+            "knowledge_context",
+            "expected_intent",
+            "expected_response_contains",
+            "expected_response_excludes",
+            "expected_escalation",
+            "expected_critic_verdict",
+            "quality_dimensions",
+            "difficulty",
         }
         for s in scenarios:
             missing = required_keys - set(s.keys())
@@ -67,8 +77,15 @@ class TestGoldenDataset:
         """Dataset covers key intent categories."""
         scenarios = load_dataset()
         categories = {s["category"] for s in scenarios}
-        expected = {"greeting", "product_inquiry", "return_request",
-                    "shipping_question", "complaint", "jailbreak", "faq"}
+        expected = {
+            "greeting",
+            "product_inquiry",
+            "return_request",
+            "shipping_question",
+            "complaint",
+            "jailbreak",
+            "faq",
+        }
         missing = expected - categories
         assert not missing, f"Missing categories: {missing}"
 
@@ -256,10 +273,7 @@ class TestPilotReport:
     def test_qp_14_run_pilot_with_empty_responses(self):
         """Pilot with empty responses produces low pass rate."""
         scenarios = load_dataset()
-        responses = {
-            s["id"]: {"response": "", "escalation": False, "critic_verdict": "approved"}
-            for s in scenarios
-        }
+        responses = {s["id"]: {"response": "", "escalation": False, "critic_verdict": "approved"} for s in scenarios}
         report = run_pilot(responses)
         assert report.total_scenarios == len(scenarios)
         # Empty responses should fail most scenarios
@@ -282,8 +296,7 @@ class TestPilotReport:
         """Report includes per-difficulty score breakdown."""
         scenarios = load_dataset()
         responses = {
-            s["id"]: {"response": "generic", "escalation": False, "critic_verdict": "approved"}
-            for s in scenarios
+            s["id"]: {"response": "generic", "escalation": False, "critic_verdict": "approved"} for s in scenarios
         }
         report = run_pilot(responses)
         assert "easy" in report.difficulty_scores

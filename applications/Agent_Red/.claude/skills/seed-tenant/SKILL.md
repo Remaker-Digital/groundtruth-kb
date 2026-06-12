@@ -38,7 +38,7 @@ example without modification.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-python scripts/seed_tenant.py $ARGUMENTS
+python applications/Agent_Red/scripts/seed_tenant.py $ARGUMENTS
 ```
 
 ## Process Overview

@@ -90,7 +90,7 @@ jobs:
               echo "test_args=platform_tests/unit applications/Agent_Red/tests/unit" >> "$GITHUB_OUTPUT"
               ;;
             core)
-              echo "test_args=platform_tests/multi_tenant applications/Agent_Red/tests/multi_tenant applications/Agent_Red/tests/migrations platform_tests/test_conftest_smoke.py platform_tests/test_cross_module.py platform_tests/test_env_loader.py platform_tests/test_error_handling.py platform_tests/test_forgot_password.py platform_tests/test_health.py platform_tests/test_multi_tenant_isolation_e2e.py" >> "$GITHUB_OUTPUT"
+              echo "test_args=platform_tests/multi_tenant applications/Agent_Red/tests/multi_tenant applications/Agent_Red/tests/migrations applications/Agent_Red/tests/test_conftest_smoke.py applications/Agent_Red/tests/test_cross_module.py applications/Agent_Red/tests/test_env_loader.py applications/Agent_Red/tests/test_error_handling.py applications/Agent_Red/tests/test_forgot_password.py applications/Agent_Red/tests/test_health.py applications/Agent_Red/tests/test_multi_tenant_isolation_e2e.py" >> "$GITHUB_OUTPUT"
               ;;
             agents-chat)
               echo "test_args=applications/Agent_Red/tests/agents applications/Agent_Red/tests/chat applications/Agent_Red/tests/persistent_memory" >> "$GITHUB_OUTPUT"

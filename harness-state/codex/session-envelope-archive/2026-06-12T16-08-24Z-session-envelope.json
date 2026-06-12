@@ -1,0 +1,60 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-12T16:08:24Z",
+  "envelope_schema_version": 1,
+  "harness_id": "A",
+  "harness_name": "codex",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-12T16:08:23Z",
+  "project_id": null,
+  "role": "loyal-opposition",
+  "role_asserted": null,
+  "role_resolved": "loyal-opposition",
+  "session_id": "A-2026-06-12T16-08-23Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "canonical_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": "M .claude/rules/acting-prime-builder.md\n M .claude/rules/canonical-terminology.md\n M .claude/rules/project-root-boundary.md\n M .claude/skills/bridge/helpers/impl_report_bridge.py\n M .claude/skills/bridge/helpers/scan_bridge.py\n M .claude/skills/bridge/helpers/show_thread_bridge.py\n M AGENTS.md\n M CLAUDE.md\n M applications/Agent_Red/tests/evaluation/test_deepeval_scaffold.py\n M applications/Agent_Red/tests/evaluation/test_quality_pilot.py\n M applications/Agent_Red/tests/multi_tenant/test_deploy_event_recording.py\n M applications/Agent_Red/tests/ops/test_hooks_specs.py\n M applications/Agent_Red/tests/ops/test_pre_flight_specs.py\n M applications/Agent_Red/tests/ops/test_upgrade_verification_specs.py\n M groundtruth-kb/src/groundtruth_kb/bridge/detector.py\n M groundtruth-kb/src/groundtruth_kb/db.py\n M groundtruth-kb/src/groundtruth_kb/enforcement/__init__.py\n M groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py\n M groundtruth-kb/src/groundtruth_kb/project/doctor.py\n M groundtruth-kb/src/groundtruth_kb/project/preflight.py\n M groundtruth-kb/src/groundtruth_kb/reporting/harvest_coverage.py\n M groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py\n M groundtruth-kb/templates/skills/bridge/helpers/scan_bridge.py\n M groundtruth-kb/templates/skills/bridge/helpers/show_thread_bridge.py\n D independent-progress-assessments/AGENT-RED-GO-STATE-PATCH-QUEUE-2026-04-19.md\n D independent-progress-assessments/AGENT-RED-GO-STATE-RECOVERY-PLAN-2026-04-19.md\n D independent-progress-assessments/BRIDGE-RESPONSIVENESS-LEDGER.md\n D independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md\n D independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md\n D independent-progress-assessments/CONTROL-SURFACE-PHASE-3-PLAN.md\n D independent-progress-assessments/EMERGENCY-HARNESS-REGISTRAR-DISPATCHER-CONFORMANCE-PLAN-2026-05-19.md\n D independent-progress-assessments/OPERATING-MODEL-DRIFT-INVENTORY-2026-04-30.md\n D independent-progress-assessments/PHASE-1-PLAN.md\n D independent-progress-assessments/PHASE-2-PLAN.md\n M memory/pending-owner-decisions.md\n M platform_tests/scripts/test_advisory_backlog_router.py\n M platform_tests/scripts/test_implementation_authorization.py\n M platform_tests/scripts/test_session_self_initialization.py\n M pyproject.toml\n M scripts/advisory_backlog_router.py\n M scripts/benchmarks/cli.py\n M scripts/cross_harness_bridge_trigger.py\n M scripts/gtkb_bridge_writer.py\n M scripts/harvest_session_deliberations.py\n M scripts/implementation_authorization.py\n M scripts/implementation_start_gate.py\n M scripts/repair_bridge_index_truncation.py\n M scripts/retroactive_harvest_bridge_threads.py\n M scripts/run_with_status.py\n M scripts/session_self_initialization.py\n?? archive/fab-18-ipa-root-reorg/\n?? config/governance/advisory-routing-retention.toml\n?? config/governance/chroma-read-path.toml\n?? config/governance/gate-fp-corpus.toml\n?? diag.txt\n?? harness-state/codex/session-envelope-archive/2026-06-12T13-28-34Z-session-envelope.json\n?? harness-state/codex/session-envelope.json\n?? platform_tests/scripts/test_fab14_requirement_sufficiency.py\n?? platform_tests/scripts/test_fab17_chroma_read_path.py\n?? platform_tests/scripts/test_fab18_backlog_dignity.py\n?? platform_tests/scripts/test_gate_fp_corpus.py\n?? platform_tests/scripts/test_implementation_start_gate_diagnostic_write_envelope.py\n?? scripts/generate_governance_index.py"
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

@@ -112,13 +112,13 @@ you need to populate KB articles for testing.
 
 Usage:
     # Dry-run preview (no DB writes):
-    python scripts/seed_tenant.py
+    python applications/Agent_Red/scripts/seed_tenant.py
 
     # Write to DB (initialization — clean tenant, zero articles):
-    python scripts/seed_tenant.py --execute
+    python applications/Agent_Red/scripts/seed_tenant.py --execute
 
     # Write + seed demo conversations:
-    python scripts/seed_tenant.py --execute --demo
+    python applications/Agent_Red/scripts/seed_tenant.py --execute --demo
 
 Requires Azure credentials in .env.local:
     COSMOS_DB_ENDPOINT, COSMOS_DB_KEY, COSMOS_DB_DATABASE
@@ -135,8 +135,9 @@ import os
 import secrets
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Project setup
@@ -147,7 +148,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Load .env.local (shared loader — R7 refactoring)
-from scripts._env import load_env_local
+from scripts._env import load_env_local  # noqa: E402
 
 load_env_local()
 
@@ -454,7 +455,7 @@ async def phase_2_tenant(dry_run: bool) -> None:
     # in auth.py; per-user keys use generate_user_api_key instead).
     api_key = "ar_" + secrets.token_hex(24)
     widget_key = generate_widget_key(TENANT_ID)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # SPEC-1673: Only the widget_key is retained temporarily (needed by
     # Phase 3 preferences).  The tenant API key is hashed and discarded.
@@ -484,11 +485,11 @@ async def phase_2_tenant(dry_run: bool) -> None:
     print(f"  Shop domain:    {SHOP_DOMAIN}")
     print(f"  Tier:           {TIER}")
     print(f"  Channel:        {BILLING_CHANNEL}")
-    print(f"  Status:         active")
+    print("  Status:         active")
     print(f"  Email:          {CUSTOMER_EMAIL}")
 
     if dry_run:
-        print(f"  [DRY RUN] Would create tenant document")
+        print("  [DRY RUN] Would create tenant document")
         phase_results["2_tenant"] = "DRY RUN"
         return
 
@@ -536,7 +537,7 @@ async def phase_3_preferences(dry_run: bool) -> None:
 
     from src.multi_tenant.cosmos_schema import PreferencesDocument
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Quick actions are NOT seeded — tests exercise full CRUD on these.
     # A fresh tenant starts with zero quick actions.
@@ -671,7 +672,7 @@ async def phase_4_team(dry_run: bool) -> None:
     from src.multi_tenant.auth import generate_user_api_key, hash_api_key
     from src.multi_tenant.cosmos_schema import TeamMemberDocument, TeamMemberRole
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     role_map = {
         "superadmin": TeamMemberRole.SUPERADMIN,
         "admin": TeamMemberRole.ADMIN,
@@ -713,7 +714,7 @@ async def phase_4_team(dry_run: bool) -> None:
         print(f"  {display_name} <{email}> — {member_cfg['role']}")
 
         if dry_run:
-            print(f"    [DRY RUN] Would create team member")
+            print("    [DRY RUN] Would create team member")
             continue
 
         from src.multi_tenant.repository import TeamMemberRepository
@@ -721,11 +722,11 @@ async def phase_4_team(dry_run: bool) -> None:
         repo = TeamMemberRepository()
         try:
             await repo.create(TENANT_ID, doc)
-            print(f"    [OK] Created.")
+            print("    [OK] Created.")
         except Exception as e:
             if "409" in str(e) or "Conflict" in str(e) or "already exists" in str(e):
                 await repo.upsert(TENANT_ID, doc)
-                print(f"    [OK] Updated (upsert).")
+                print("    [OK] Updated (upsert).")
             else:
                 print(f"    [ERROR] {e}")
 
@@ -792,7 +793,7 @@ async def phase_6_platform_config(dry_run: bool) -> None:
     )
     from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     doc_count = 0
 
     # --- Legacy tier_defaults documents (backward compat) ---
@@ -816,7 +817,7 @@ async def phase_6_platform_config(dry_run: bool) -> None:
             repo = PlatformConfigRepository()
             try:
                 await repo.set_config(doc)
-                print(f"      [OK] Upserted.")
+                print("      [OK] Upserted.")
             except Exception as e:
                 print(f"      [ERROR] {e}")
 
@@ -859,7 +860,7 @@ async def phase_6_platform_config(dry_run: bool) -> None:
             repo = PlatformConfigRepository()
             try:
                 await repo.set_config(doc)
-                print(f"      [OK] Upserted.")
+                print("      [OK] Upserted.")
             except Exception as e:
                 print(f"      [ERROR] {e}")
 
@@ -959,7 +960,7 @@ def phase_8_summary() -> None:
         key_name = f"user_key_{email}"
         if key_name in generated_credentials:
             print(f"    {member_cfg['display_name']} <{email}>")
-            print(f"      [GENERATED — hash stored in Cosmos]")
+            print("      [GENERATED — hash stored in Cosmos]")
             print()
 
     print("  Raw keys are NOT displayed or saved (SPEC-1673).")
@@ -975,7 +976,7 @@ def phase_8_summary() -> None:
     print(f"  API Docs:          https://{FQDN}/docs")
     print(f"  Health:            https://{FQDN}/health")
     print(f"  Widget JS:         https://{FQDN}/widget.js")
-    print(f"  Storefront:        https://blanco-9939.myshopify.com/")
+    print("  Storefront:        https://blanco-9939.myshopify.com/")
     print()
 
     # Phase results
@@ -1013,7 +1014,7 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
         phase_results["3b_preset"] = "SKIPPED — use --preset flag"
         return
 
-    from src.presets.preset_service import PresetService, CONFIG_SAVE_FIELDS
+    from src.presets.preset_service import PresetService
 
     svc = PresetService()
     preset = svc.get_preset(preset_id)
@@ -1035,11 +1036,12 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
         phase_results["3b_preset"] = f"DRY RUN — {preset_id}"
         return
 
-    from src.multi_tenant.repository import PreferencesRepository
     import uuid as _uuid
 
+    from src.multi_tenant.repository import PreferencesRepository
+
     repo = PreferencesRepository()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     qa_created = 0
     kb_created = 0
 
@@ -1108,8 +1110,8 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
 
         # Step 4: Seed KB articles directly via KB repository
         if kb_articles:
-            from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
             from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
+            from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
 
             kb_repo = KnowledgeBaseRepository()
             for article in kb_articles:

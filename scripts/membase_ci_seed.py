@@ -9,7 +9,7 @@ Two modes:
 
 * ``--export``: read the listed spec/deliberation IDs from the local
   ``groundtruth.db`` and write a JSON fixture at
-  ``tests/fixtures/ci_membase_seed.json``. Run this locally when records
+  ``applications/Agent_Red/tests/fixtures/ci_membase_seed.json``. Run this locally when records
   change; commit the fixture so CI sees the update.
 * ``--seed``: read the JSON fixture and insert the records into the target
   database (default: repo-root ``groundtruth.db``). Idempotent — skips
@@ -33,10 +33,10 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO_ROOT / "groundtruth.db"
-DEFAULT_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "ci_membase_seed.json"
+DEFAULT_FIXTURE = REPO_ROOT / "applications" / "Agent_Red" / "tests" / "fixtures" / "ci_membase_seed.json"
 TEST_FILES = (
-    REPO_ROOT / "tests" / "scripts" / "test_groundtruth_governance_adoption.py",
-    REPO_ROOT / "tests" / "scripts" / "test_standing_backlog_harvest.py",
+    REPO_ROOT / "platform_tests" / "scripts" / "test_groundtruth_governance_adoption.py",
+    REPO_ROOT / "platform_tests" / "scripts" / "test_standing_backlog_harvest.py",
 )
 
 SPEC_ID_PREFIXES = ("GOV-", "PB-", "ADR-", "DCL-", "SPEC-", "REQ-")

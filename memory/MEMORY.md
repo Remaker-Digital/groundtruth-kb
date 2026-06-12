@@ -1,4 +1,4 @@
-# Agent Red Memory
+# GroundTruth-KB Platform Memory
 
 ## Current Status
 

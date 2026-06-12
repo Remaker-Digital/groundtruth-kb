@@ -13,16 +13,19 @@ from __future__ import annotations
 
 import pytest
 
-from evaluation.deepeval_config import (
-    DEEPEVAL_AVAILABLE,
-    EVAL_MODEL,
-    FAITHFULNESS_THRESHOLD,
-    HALLUCINATION_THRESHOLD,
-    RELEVANCY_THRESHOLD,
-    create_deepeval_test_cases,
-    create_metrics,
-    run_deepeval_evaluation,
-)
+try:
+    from evaluation.deepeval_config import (
+        DEEPEVAL_AVAILABLE,
+        EVAL_MODEL,
+        FAITHFULNESS_THRESHOLD,
+        HALLUCINATION_THRESHOLD,
+        RELEVANCY_THRESHOLD,
+        create_deepeval_test_cases,
+        create_metrics,
+        run_deepeval_evaluation,
+    )
+except ImportError:
+    pytestmark = pytest.mark.skip(reason="evaluation package not available (retired/deleted under S320)")
 
 
 class TestDeepEvalConfig:

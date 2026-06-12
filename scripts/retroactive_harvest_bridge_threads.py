@@ -50,7 +50,9 @@ KB_PATH = REPO_ROOT / "groundtruth.db"
 
 FILENAME_VERSION_RE = re.compile(r"^(.+)-(\d{3})\.md$")
 _DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/(.+\.md)$")
+_STATUS_LINE_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+bridge/(.+\.md)$"
+)
 _HEADER_COMMENT_KEEPERS = (
     "Prime inserts new document entries",
     "Codex scans for NEW/REVISED",

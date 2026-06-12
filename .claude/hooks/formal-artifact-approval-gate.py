@@ -52,7 +52,11 @@ APPROVAL_FLAG_PATTERNS = (
 )
 
 FORMAL_MUTATION_PATTERNS = [
-    re.compile(r"\b(?:gt|python\s+-m\s+groundtruth_kb)\s+deliberations\s+(?:add|upsert|link)\b", re.IGNORECASE),
+    re.compile(r"\b(?:gt(?:\.exe)?|python\s+-m\s+groundtruth_kb)\s+spec\s+(?:record|update)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:gt(?:\.exe)?|python\s+-m\s+groundtruth_kb)\s+deliberations\s+(?:add|upsert|link)\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"\b(?:insert_spec|update_spec|insert_deliberation|upsert_deliberation_source)\s*\(", re.IGNORECASE),
     re.compile(r"\blink_deliberation_(?:spec|work_item)\s*\(", re.IGNORECASE),
     re.compile(
@@ -226,12 +230,96 @@ def _content_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def _project_root() -> Path:
+    return Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
+
+
+def _flag_value(tokens: list[str], names: set[str]) -> str | None:
+    for index, token in enumerate(tokens):
+        cleaned = _clean_token(token)
+        for name in names:
+            if cleaned == name and index + 1 < len(tokens):
+                return _clean_token(tokens[index + 1])
+            if cleaned.startswith(f"{name}="):
+                return _strip_quotes(cleaned.split("=", 1)[1])
+    return None
+
+
+def _autodiscover_packet(root: Path, command: str) -> str | None:
+    """HYG-047 (FAB-14): find a matching formal packet already on disk.
+
+    Formal mutations are Bash-mediated, so the hook does not receive a Write
+    target. For governed CLI updates that include ``--content-file`` and
+    ``--id``/``--artifact-id``, bind discovery to the exact proposed content
+    hash and target artifact id. The explicit env var / flag path remains the
+    override and is checked first by ``_extract_packet_path``.
+    """
+    tokens = _command_tokens(command)
+    content_file = _flag_value(tokens, {"--content-file"})
+    artifact_id = _flag_value(tokens, {"--id", "--artifact-id"})
+    if not content_file or not artifact_id:
+        return None
+
+    content_path = Path(content_file).expanduser()
+    if not content_path.is_absolute():
+        content_path = root / content_path
+    try:
+        content = content_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    approvals_dir = root / ".groundtruth" / "formal-artifact-approvals"
+    if not approvals_dir.is_dir():
+        return None
+    target_hash = _content_hash(content)
+    matches: list[tuple[float, str]] = []
+    for packet_file in approvals_dir.glob("*.json"):
+        try:
+            packet = json.loads(packet_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(packet, dict):
+            continue
+        if packet.get("artifact_id") != artifact_id:
+            continue
+        if packet.get("full_content_sha256") != target_hash:
+            continue
+        try:
+            mtime = packet_file.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        matches.append((mtime, str(packet_file)))
+    if not matches:
+        return None
+    matches.sort(reverse=True)
+    return matches[0][1]
+
+
+def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    if not path.is_absolute():
+        path = _project_root() / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "formal-artifact-approval-gate",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 def _load_packet(path_text: str) -> tuple[dict[str, Any] | None, str | None]:
     try:
         packet_path = Path(path_text).expanduser()
         if not packet_path.is_absolute():
-            project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
-            packet_path = Path(project_dir) / packet_path
+            packet_path = _project_root() / packet_path
         data = json.loads(packet_path.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001 - hook must convert every failure to a block reason
         return None, f"approval packet could not be read or parsed: {exc}"
@@ -298,7 +386,8 @@ def _validate_packet(packet: dict[str, Any]) -> str | None:
     return _fallback_validate_packet(packet)
 
 
-def _block(reason: str) -> None:
+def _block(reason: str, *, command: str = "", pattern_id: str = "formal-artifact-approval") -> None:
+    _record_gate_denial(pattern_id, command, reason)
     print(
         json.dumps(
             {
@@ -316,13 +405,14 @@ def main() -> None:
     try:
         data = json.loads(sys.stdin.read())
     except Exception as exc:  # noqa: BLE001
-        _block(f"Hook input could not be parsed: {exc}")
+        _block(f"Hook input could not be parsed: {exc}", pattern_id="hook-input")
         return
 
     if data.get("tool_name") != "Bash":
         print(json.dumps({}))
         return
 
+    root = _project_root()
     command = data.get("tool_input", {}).get("command", "")
     if not command or not _is_formal_mutation(command):
         print(json.dumps({}))
@@ -330,21 +420,26 @@ def main() -> None:
 
     packet_path = _extract_packet_path(command)
     if not packet_path:
+        packet_path = _autodiscover_packet(root, command)
+    if not packet_path:
         _block(
             "Command matches a formal artifact write path but does not reference "
-            "GTKB_FORMAL_APPROVAL_PACKET or --formal-approval-packet."
+            "GTKB_FORMAL_APPROVAL_PACKET or --formal-approval-packet, and no matching "
+            "on-disk packet could be auto-discovered from --content-file + artifact id.",
+            command=command,
+            pattern_id="missing-formal-approval-packet",
         )
         return
 
     packet, load_error = _load_packet(packet_path)
     if load_error:
-        _block(load_error)
+        _block(load_error, command=command, pattern_id="formal-packet-load")
         return
 
     assert packet is not None
     validation_error = _validate_packet(packet)
     if validation_error:
-        _block(validation_error)
+        _block(validation_error, command=command, pattern_id="formal-packet-validation")
         return
 
     print(json.dumps({}))

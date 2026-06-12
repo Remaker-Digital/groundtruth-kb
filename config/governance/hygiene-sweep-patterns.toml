@@ -35,6 +35,8 @@ file_globs = [
     "*.properties",
     ".github/workflows/*.yml",
     ".github/workflows/*.yaml",
+    ".claude/**/*.md",
+    ".claude/**/*.json",
     "pyproject.toml",
     "scripts/**/*.py",
     "sonar-project.properties",

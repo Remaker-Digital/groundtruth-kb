@@ -20,8 +20,10 @@ import hashlib
 import importlib.util
 import json
 import logging
+import os
 import re
 import sqlite3
+import threading
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -77,6 +79,50 @@ CHUNK_MAX_TOKENS = 230  # Safe margin below all-MiniLM-L6-v2's 256 wordpiece lim
 CHUNK_OVERLAP_TOKENS = 30  # Overlap between consecutive chunks
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _CHROMA_COLLECTION_NAME = "deliberations"
+
+# FAB-17 (HYG-048): the ChromaDB read path must DEGRADE under contention, not
+# crash or hang. Multi-session concurrency is this project's normal mode, so the
+# chroma probe + query run under a bounded timeout in a daemon worker thread the
+# caller can abandon; on timeout or error the caller falls back to the
+# SQLite-LIKE path (search_method="text_match"). Overridable via env for
+# operators on slow disks.
+_CHROMA_QUERY_TIMEOUT_SECONDS = float(os.environ.get("GTKB_CHROMA_QUERY_TIMEOUT_SECONDS") or "10")
+_CHROMA_QUERY_RETRIES = int(os.environ.get("GTKB_CHROMA_QUERY_RETRIES") or "1")
+
+# FAB-17 (Area 3): the single canonical on-disk Chroma store directory name,
+# declared in config/governance/chroma-read-path.toml so every read path
+# resolves to ONE index and no stray default-path store (e.g. ./chroma) is
+# treated as authoritative. Falls back to the historical default when the config
+# is absent (adopter installs / fresh clones).
+_CANONICAL_CHROMA_DIRNAME_DEFAULT = ".groundtruth-chroma"
+_CHROMA_READ_PATH_CONFIG_RELPATH = ("config", "governance", "chroma-read-path.toml")
+
+
+def _call_with_timeout(fn, timeout_seconds: float) -> Any:
+    """Run ``fn()`` in a daemon thread, raising ``TimeoutError`` past ``timeout_seconds``.
+
+    The worker is a daemon so a genuinely hung ChromaDB C call cannot block
+    interpreter exit or the calling session; on timeout we abandon it and let
+    the caller degrade to the SQLite-LIKE fallback. Exceptions raised by ``fn``
+    are re-raised on the calling thread.
+    """
+    box: dict[str, Any] = {}
+
+    def _worker() -> None:
+        try:
+            box["value"] = fn()
+        except Exception as exc:  # intentional-catch: surfaced to the caller below
+            box["error"] = exc
+
+    thread = threading.Thread(target=_worker, name="gtkb-chroma-query", daemon=True)
+    thread.start()
+    thread.join(timeout_seconds)
+    if thread.is_alive():
+        raise TimeoutError(f"ChromaDB query exceeded {timeout_seconds:.1f}s")
+    if "error" in box:
+        raise box["error"]
+    return box.get("value")
+
 
 WORK_ITEM_BACKLOG_COLUMNS = {
     "approval_state": "TEXT",
@@ -787,13 +833,22 @@ ON h.id = m.id AND h.version = m.max_v;
 
 -- Phase 1 DB Instrumentation: KPI Suite Views
 CREATE VIEW IF NOT EXISTS kpi_spec_test_mapping AS
+WITH live_test_evidence AS (
+    SELECT DISTINCT spec_id FROM test_coverage
+    UNION
+    SELECT DISTINCT spec_id FROM current_tests
+    WHERE test_file IS NOT NULL
+      AND TRIM(test_file) != ''
+      AND COALESCE(last_result, '') NOT IN ('stale', 'historical_agent_red')
+)
 SELECT
     COUNT(DISTINCT s.id) AS total_specifications,
     SUM(CASE WHEN t.spec_id IS NOT NULL THEN 1 ELSE 0 END) AS mapped_specifications,
     SUM(CASE WHEN t.spec_id IS NULL THEN 1 ELSE 0 END) AS unmapped_specifications,
     (SUM(CASE WHEN t.spec_id IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT s.id)) AS spec_test_mapping_percentage
 FROM current_specifications s
-LEFT JOIN (SELECT DISTINCT spec_id FROM current_tests) t ON s.id = t.spec_id;
+LEFT JOIN live_test_evidence t ON s.id = t.spec_id
+WHERE s.status != 'retired';
 
 CREATE VIEW IF NOT EXISTS kpi_deliberation_provenance AS
 SELECT
@@ -5779,7 +5834,7 @@ class KnowledgeDB:
         return self._metric(round(rate, 4), numerator=retired, denominator=denom, unit="ratio")
 
     def compute_m16_verified_with_passing_tests_rate(self) -> dict[str, Any]:
-        """M16: Verified specs where ALL linked tests have last_result='pass' and test_file is not null."""
+        """M16: Verified specs where ALL live linked test artifacts have last_result='pass'."""
         conn = self._get_conn()
         verified_specs = conn.execute("SELECT id FROM current_specifications WHERE status = 'verified'").fetchall()
         if not verified_specs:
@@ -5788,7 +5843,12 @@ class KnowledgeDB:
         for spec_row in verified_specs:
             sid = spec_row["id"]
             tests = conn.execute(
-                "SELECT last_result, test_file FROM current_tests WHERE spec_id = ?", (sid,)
+                """SELECT last_result, test_file FROM current_tests
+                   WHERE spec_id = ?
+                   AND test_file IS NOT NULL
+                   AND TRIM(test_file) != ''
+                   AND COALESCE(last_result, '') NOT IN ('stale', 'historical_agent_red')""",
+                (sid,),
             ).fetchall()
             if not tests:
                 continue  # No tests = not verified with evidence
@@ -5804,21 +5864,26 @@ class KnowledgeDB:
         )
 
     def compute_m17_stale_test_ratio(self, *, now: str | None = None) -> dict[str, Any]:
-        """M17: Tests with last_executed_at >30 days old or null / total tests.
+        """M17: Live tests with last_executed_at >30 days old or null / total live tests.
 
         Args:
             now: ISO timestamp to use as "current time" (for deterministic tests).
                  Defaults to actual current time.
         """
         conn = self._get_conn()
-        total = conn.execute("SELECT COUNT(*) FROM current_tests").fetchone()[0]
+        live_filter = """test_file IS NOT NULL
+            AND TRIM(test_file) != ''
+            AND COALESCE(last_result, '') NOT IN ('stale', 'historical_agent_red')"""
+        total = conn.execute(f"SELECT COUNT(*) FROM current_tests WHERE {live_filter}").fetchone()[0]
         if total == 0:
             return self._metric(None, numerator=0, denominator=0, unit="ratio", status="not_applicable")
         if now is None:
             now = _now()
         cutoff = (datetime.fromisoformat(now) - __import__("datetime").timedelta(days=30)).isoformat()
         stale = conn.execute(
-            "SELECT COUNT(*) FROM current_tests WHERE last_executed_at IS NULL OR last_executed_at < ?",
+            f"""SELECT COUNT(*) FROM current_tests
+                WHERE {live_filter}
+                AND (last_executed_at IS NULL OR last_executed_at < ?)""",
             (cutoff,),
         ).fetchone()[0]
         return self._metric(round(stale / total, 4), numerator=stale, denominator=total, unit="ratio")
@@ -5834,7 +5899,16 @@ class KnowledgeDB:
         rows = conn.execute(
             """SELECT s.id FROM current_specifications s
                WHERE s.status IN ('implemented', 'verified')
-               AND NOT EXISTS (SELECT 1 FROM current_tests t WHERE t.spec_id = s.id)"""
+               AND NOT EXISTS (
+                   SELECT 1 FROM test_coverage c WHERE c.spec_id = s.id
+               )
+               AND NOT EXISTS (
+                   SELECT 1 FROM current_tests t
+                   WHERE t.spec_id = s.id
+                   AND t.test_file IS NOT NULL
+                   AND TRIM(t.test_file) != ''
+                   AND COALESCE(t.last_result, '') NOT IN ('stale', 'historical_agent_red')
+               )"""
         ).fetchall()
         return self._metric(len(rows), denominator=total_impl, unit="count", spec_ids=[r["id"] for r in rows])
 
@@ -6140,7 +6214,7 @@ class KnowledgeDB:
         if not hasattr(self, "_chroma_client"):
             chroma_path = getattr(self, "_chroma_path", None)
             if chroma_path is None:
-                chroma_path = self.db_path.parent / ".groundtruth-chroma"
+                chroma_path = self.db_path.parent / self._canonical_chroma_dirname()
             chroma_path = Path(chroma_path)
             chroma_path.mkdir(parents=True, exist_ok=True)
             _chromadb = _load_chromadb()
@@ -6239,6 +6313,27 @@ class KnowledgeDB:
 
         return chunks
 
+    def _canonical_chroma_dirname(self) -> str:
+        """Return the single canonical Chroma store directory name (FAB-17 Area 3).
+
+        Reads config/governance/chroma-read-path.toml relative to the DB's
+        parent (the project root) so every read path resolves to ONE index.
+        Falls back to the historical default when the config is absent or
+        unreadable (adopter installs / fresh clones).
+        """
+        try:
+            import tomllib
+
+            cfg = self.db_path.parent.joinpath(*_CHROMA_READ_PATH_CONFIG_RELPATH)
+            if cfg.is_file():
+                data = tomllib.loads(cfg.read_text(encoding="utf-8"))
+                name = data.get("chroma", {}).get("canonical_dirname")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+        except Exception:  # intentional-catch: config optional; fall back to default
+            pass
+        return _CANONICAL_CHROMA_DIRNAME_DEFAULT
+
     def _index_deliberation_in_chroma(self, delib_id: str) -> int:
         """Index the current version of a deliberation in ChromaDB.
 
@@ -6279,6 +6374,38 @@ class KnowledgeDB:
         collection.add(ids=ids, documents=documents, metadatas=metadatas)
         return len(chunks)
 
+    def _chroma_query_matches(self, collection: Any, query: str, limit: int) -> dict[str, dict[str, Any]]:
+        """Run the ChromaDB count + query and return ``{delib_id: match_info}``.
+
+        Pure ChromaDB interaction (no SQLite) so it can run under a bounded
+        timeout in a worker thread (FAB-17 / HYG-048) without violating SQLite
+        thread affinity. Returns ``{}`` when the store is empty or nothing
+        survives the distance filter; the caller then degrades to SQLite LIKE.
+        """
+        if collection.count() <= 0:
+            return {}
+        results = collection.query(
+            query_texts=[query],
+            n_results=min(limit * 3, 30),  # Over-fetch for dedup
+        )
+        if not (results and results["ids"] and results["ids"][0]):
+            return {}
+        seen_delib_ids: dict[str, dict[str, Any]] = {}
+        for idx, (doc_id, distance) in enumerate(zip(results["ids"][0], results["distances"][0], strict=True)):
+            if distance > SEMANTIC_MAX_DISTANCE:
+                continue
+            metadata = results["metadatas"][0][idx]
+            delib_id = metadata.get("delib_id", "")
+            # Keep best (lowest distance) per delib_id
+            if delib_id not in seen_delib_ids or distance < seen_delib_ids[delib_id]["score"]:
+                doc_text = results["documents"][0][idx] if results["documents"] else ""
+                seen_delib_ids[delib_id] = {
+                    "score": distance,
+                    "matched_chunk_id": doc_id,
+                    "matched_chunk_preview": doc_text[:200] if doc_text else None,
+                }
+        return seen_delib_ids
+
     def search_deliberations(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
         """Search deliberations semantically via ChromaDB with SQLite LIKE fallback.
 
@@ -6292,48 +6419,52 @@ class KnowledgeDB:
           - matched_chunk_id: str | None
           - matched_chunk_preview: str | None (first 200 chars of matched chunk)
         """
-        # Try semantic search first
+        # Try semantic search first — bounded so chroma contention degrades to
+        # the SQLite-LIKE fallback (FAB-17 / HYG-048) instead of crashing (the
+        # count() probe was previously OUTSIDE the try) or hanging indefinitely.
         collection = self._get_chroma_collection()
-        if collection is not None and collection.count() > 0:
-            try:
-                results = collection.query(
-                    query_texts=[query],
-                    n_results=min(limit * 3, 30),  # Over-fetch for dedup
-                )
-                if results and results["ids"] and results["ids"][0]:
-                    # Filter by distance threshold and deduplicate by delib_id
-                    seen_delib_ids: dict[str, dict[str, Any]] = {}
-                    for idx, (doc_id, distance) in enumerate(
-                        zip(results["ids"][0], results["distances"][0], strict=True)
-                    ):
-                        if distance > SEMANTIC_MAX_DISTANCE:
-                            continue
-                        metadata = results["metadatas"][0][idx]
-                        delib_id = metadata.get("delib_id", "")
-                        # Keep best (lowest distance) per delib_id
-                        if delib_id not in seen_delib_ids or distance < seen_delib_ids[delib_id]["score"]:
-                            doc_text = results["documents"][0][idx] if results["documents"] else ""
-                            seen_delib_ids[delib_id] = {
-                                "score": distance,
-                                "matched_chunk_id": doc_id,
-                                "matched_chunk_preview": doc_text[:200] if doc_text else None,
-                            }
+        if collection is not None:
+            seen_delib_ids: dict[str, dict[str, Any]] = {}
+            attempts = max(1, _CHROMA_QUERY_RETRIES + 1)
+            for attempt in range(attempts):
+                try:
+                    seen_delib_ids = _call_with_timeout(
+                        lambda: self._chroma_query_matches(collection, query, limit),
+                        _CHROMA_QUERY_TIMEOUT_SECONDS,
+                    )
+                    break
+                except TimeoutError as _chroma_timeout:  # intentional-catch: degrade to SQLite LIKE
+                    _log.warning(
+                        "ChromaDB search timed out after %.1fs, falling back to SQLite LIKE: %s",
+                        _CHROMA_QUERY_TIMEOUT_SECONDS,
+                        _chroma_timeout,
+                    )
+                    seen_delib_ids = {}
+                    break  # a stalled store will stall again; do not retry a timeout
+                except Exception as _chroma_err:  # intentional-catch: ChromaDB fallback to SQLite LIKE
+                    _log.warning(
+                        "ChromaDB search failed (attempt %d/%d), falling back to SQLite LIKE: %s",
+                        attempt + 1,
+                        attempts,
+                        _chroma_err,
+                    )
+                    seen_delib_ids = {}
+                    continue
 
-                    if seen_delib_ids:
-                        # Fetch full deliberation rows and merge semantic metadata
-                        semantic_results = []
-                        for delib_id, match_info in sorted(seen_delib_ids.items(), key=lambda x: x[1]["score"])[:limit]:
-                            row = self.get_deliberation(delib_id)
-                            if row:
-                                row["search_method"] = "semantic"
-                                row["score"] = match_info["score"]
-                                row["matched_chunk_id"] = match_info["matched_chunk_id"]
-                                row["matched_chunk_preview"] = match_info["matched_chunk_preview"]
-                                semantic_results.append(row)
-                        if semantic_results:
-                            return semantic_results
-            except Exception as _chroma_err:  # intentional-catch: ChromaDB fallback to SQLite LIKE
-                _log.warning("ChromaDB search failed, falling back to SQLite LIKE: %s", _chroma_err)
+            if seen_delib_ids:
+                # Fetch full deliberation rows on the calling thread (SQLite is
+                # thread-affine) and merge the semantic metadata.
+                semantic_results = []
+                for delib_id, match_info in sorted(seen_delib_ids.items(), key=lambda x: x[1]["score"])[:limit]:
+                    row = self.get_deliberation(delib_id)
+                    if row:
+                        row["search_method"] = "semantic"
+                        row["score"] = match_info["score"]
+                        row["matched_chunk_id"] = match_info["matched_chunk_id"]
+                        row["matched_chunk_preview"] = match_info["matched_chunk_preview"]
+                        semantic_results.append(row)
+                if semantic_results:
+                    return semantic_results
 
         # SQLite LIKE fallback
         conn = self._get_conn()

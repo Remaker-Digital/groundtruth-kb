@@ -69,6 +69,7 @@ import json
 import os
 import re
 import sys
+import tomllib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -79,11 +80,14 @@ from typing import Any
 # format so they are stable across sessions and easy to reference in chat.
 DECISION_ID_PREFIX = "DECISION-"
 
-# Resolved entries older than this many days move to ## History on Stop.
-# 30 days chosen to keep ## Resolved scannable while preserving recent
-# decisions for cross-session reference (most decisions are referenced
-# within a sprint or two of resolution).
+# Resolved entries older than this many days move to dated archive sidecars on
+# Stop after Deliberation Archive harvest. The default comes from FAB-13; the
+# optional runtime-evidence-retention.toml entry lets the project tune the
+# threshold without editing hook code.
 HISTORY_AGE_DAYS = 30
+OWNER_DECISION_ARCHIVE_DIR_REL = Path("memory") / "archive"
+OWNER_DECISION_RETENTION_FAILURE_LOG_REL = Path(".gtkb-state") / "owner-decision-retention" / "failures.jsonl"
+RUNTIME_RETENTION_CONFIG_REL = Path("config") / "governance" / "runtime-evidence-retention.toml"
 
 # question_hash uses sha256 of question + sorted option labels, truncated
 # to 16 hex chars (~64 bits). Length-collision probability is negligible
@@ -93,6 +97,9 @@ QUESTION_HASH_LENGTH = 16
 # Project root resolution: prefer CLAUDE_PROJECT_DIR env var (Claude Code
 # sets this for hooks); fall back to walking up from this file's location.
 PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]).resolve()
+PACKAGE_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
+if PACKAGE_SRC.is_dir() and str(PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SRC))
 
 PENDING_FILE_REL = "memory/pending-owner-decisions.md"
 DISPATCH_RUNS_REL = Path(".gtkb-state") / "cross-harness-trigger" / "dispatch-runs"
@@ -517,6 +524,165 @@ def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> No
                 handle.write(json.dumps(record) + "\n")
         except OSError:
             pass
+
+
+def _owner_decision_retention_age_days() -> int:
+    """Return the configured resolved-decision archive age threshold."""
+    config_path = PROJECT_ROOT / RUNTIME_RETENTION_CONFIG_REL
+    try:
+        data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return HISTORY_AGE_DAYS
+
+    raw = data.get("owner_decision_ledger", {}).get("archive_resolved_after_days")
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return HISTORY_AGE_DAYS
+    return max(1, parsed)
+
+
+def _sidecar_retention_enabled() -> bool:
+    return (PROJECT_ROOT / RUNTIME_RETENTION_CONFIG_REL).is_file()
+
+
+def _move_old_resolved_to_history(
+    sections: dict[str, list[DecisionEntry]],
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Legacy fallback for temp projects without the FAB-13 retention config."""
+    cutoff = (now or datetime.now(UTC)) - timedelta(days=HISTORY_AGE_DAYS)
+    keep_resolved: list[DecisionEntry] = []
+    mutated = False
+    for entry in sections["resolved"]:
+        ts = _parse_iso_timestamp(entry.resolved_at or entry.asked_at)
+        if ts is not None and ts < cutoff:
+            sections["history"].append(entry)
+            mutated = True
+        else:
+            keep_resolved.append(entry)
+    if len(keep_resolved) != len(sections["resolved"]):
+        sections["resolved"] = keep_resolved
+    return mutated
+
+
+def _record_retention_archive_failure(entry: DecisionEntry, exc: Exception) -> None:
+    """Record DA-harvest failure without losing or rotating the ledger entry."""
+    try:
+        failure_log = PROJECT_ROOT / OWNER_DECISION_RETENTION_FAILURE_LOG_REL
+        failure_log.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "decision_id": entry.id,
+            "error_type": type(exc).__name__,
+            "error_message": str(exc)[:500],
+        }
+        with failure_log.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def _archive_decision_for_retention(entry: DecisionEntry) -> bool:
+    """Harvest one resolved decision to the DA before sidecar rotation.
+
+    Returns True only when the DA call completed. Failure keeps the entry in the
+    live ledger so archive/truncate never outruns canonical preservation.
+    """
+    try:
+        from groundtruth_kb.owner_decision.auto_archive import (
+            DecisionForArchive,
+            archive_decision,
+        )
+
+        decision = DecisionForArchive(
+            decision_id=entry.id,
+            question=entry.question,
+            options=tuple(entry.options),
+            answer=entry.answer,
+            resolved_at=entry.resolved_at or entry.asked_at,
+            session_id=entry.resolved_in_session or entry.asked_in_session,
+            detected_via=entry.detected_via,
+        )
+        archive_decision(decision, project_root=PROJECT_ROOT)
+        return True
+    except Exception as exc:  # noqa: BLE001 - hook must never raise
+        _record_retention_archive_failure(entry, exc)
+        return False
+
+
+def _archive_sidecar_path(entry: DecisionEntry) -> Path:
+    ts = _parse_iso_timestamp(entry.resolved_at or entry.asked_at)
+    month = "unknown" if ts is None else ts.strftime("%Y%m")
+    return PROJECT_ROOT / OWNER_DECISION_ARCHIVE_DIR_REL / f"pending-owner-decisions-{month}.md"
+
+
+def _append_archive_sidecars(entries: list[DecisionEntry]) -> None:
+    """Append archived entries to dated sidecars, idempotent by decision id."""
+    by_path: dict[Path, list[DecisionEntry]] = {}
+    for entry in entries:
+        by_path.setdefault(_archive_sidecar_path(entry), []).append(entry)
+
+    for path, bucket in by_path.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+        existing_ids = {match.group(1) for match in re.finditer(r"(?m)^- id:\s+(DECISION-\d+)\s*$", existing)}
+        new_entries = [entry for entry in bucket if entry.id not in existing_ids]
+        if not new_entries:
+            continue
+        parts: list[str] = []
+        if not existing:
+            parts.extend(
+                [
+                    "# Archived Pending Owner Decisions",
+                    "",
+                    "This dated sidecar is written by .claude/hooks/owner-decision-tracker.py.",
+                    "Entries were harvested to the Deliberation Archive before rotation.",
+                    "",
+                ]
+            )
+        else:
+            parts.append("")
+        parts.extend(entry.render() for entry in new_entries)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(parts).rstrip() + "\n")
+
+
+def _rotate_resolved_decisions_for_retention(
+    sections: dict[str, list[DecisionEntry]],
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Archive old resolved/history entries to dated sidecars after DA harvest.
+
+    The live notepad remains pending + recent resolved decisions. If DA harvest
+    fails for an entry, that entry stays in its current live section.
+    """
+    if not _sidecar_retention_enabled():
+        return _move_old_resolved_to_history(sections, now=now)
+
+    cutoff = (now or datetime.now(UTC)) - timedelta(days=_owner_decision_retention_age_days())
+    archived_entries: list[DecisionEntry] = []
+    mutated = False
+
+    for section_name in ("resolved", "history"):
+        retained: list[DecisionEntry] = []
+        for entry in sections.get(section_name, []):
+            ts = _parse_iso_timestamp(entry.resolved_at or entry.asked_at)
+            if ts is None or ts >= cutoff:
+                retained.append(entry)
+                continue
+            if _archive_decision_for_retention(entry):
+                archived_entries.append(entry)
+                mutated = True
+            else:
+                retained.append(entry)
+        sections[section_name] = retained
+
+    if archived_entries:
+        _append_archive_sidecars(archived_entries)
+    return mutated
 
 
 def _ensure_pending_file(path: Path) -> None:
@@ -1294,18 +1460,8 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
             sections["pending"].append(entry)
         mutated = True
 
-    # 30-day archival: move resolved entries older than HISTORY_AGE_DAYS to history.
-    cutoff = datetime.now(UTC) - timedelta(days=HISTORY_AGE_DAYS)
-    keep_resolved: list[DecisionEntry] = []
-    for entry in sections["resolved"]:
-        ts = _parse_iso_timestamp(entry.resolved_at or entry.asked_at)
-        if ts is not None and ts < cutoff:
-            sections["history"].append(entry)
-            mutated = True
-        else:
-            keep_resolved.append(entry)
-    if len(keep_resolved) != len(sections["resolved"]):
-        sections["resolved"] = keep_resolved
+    if _rotate_resolved_decisions_for_retention(sections):
+        mutated = True
 
     if mutated:
         _write_pending_file(pending_path, sections)

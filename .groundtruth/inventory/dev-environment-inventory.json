@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-12T01:22:38Z",
+  "generated_at": "2026-06-12T20:26:19Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -115,7 +115,7 @@
   },
   "project": {
     "classification": "public_safe",
-    "configured_project_name": "Agent Red Customer Experience",
+    "configured_project_name": "GroundTruth-KB Platform",
     "groundtruth_kb_package_version": "0.7.0rc1",
     "name": "GroundTruth-KB host workspace",
     "profile": "dual-agent",
@@ -134,13 +134,13 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 2,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 35,
+      "count": 32,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -150,7 +150,6 @@
         ".claude/hooks/bridge-proposal-wi-id-collision-gate.py",
         ".claude/hooks/code-quality-baseline-proposal-check.py",
         ".claude/hooks/credential-scan.py",
-        ".claude/hooks/delib-preflight-gate.py",
         ".claude/hooks/delib-search-gate.py",
         ".claude/hooks/delib-search-tracker.py",
         ".claude/hooks/destructive-gate.py",
@@ -168,23 +167,22 @@
         ".claude/hooks/owner-decision-tracker.py",
         ".claude/hooks/project-completion-surface.py",
         ".claude/hooks/scanner-safe-writer.py",
-        ".claude/hooks/scheduler.py",
         ".claude/hooks/session-start-governance.py",
         ".claude/hooks/session_start_dispatch.py",
         ".claude/hooks/sot-read-discipline.py",
         ".claude/hooks/spec-before-code.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/hooks/spec-event-surfacer.py",
-        ".claude/hooks/turn-marker.py",
         ".claude/hooks/workstream-focus.py"
       ]
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 22,
+      "count": 26,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
+        ".codex/gtkb-hooks/directive-enforcement-adapter.py",
         ".codex/gtkb-hooks/document_author_provenance_gate.py",
         ".codex/gtkb-hooks/glossary-expansion.py",
         ".codex/gtkb-hooks/lo-file-safety-gate-bash-adapter.py",
@@ -198,6 +196,9 @@
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
         ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd",
+        ".codex/gtkb-hooks/credential-scan.cmd",
+        ".codex/gtkb-hooks/destructive-gate.cmd",
+        ".codex/gtkb-hooks/directive-enforcement.cmd",
         ".codex/gtkb-hooks/formal-artifact-approval.cmd",
         ".codex/gtkb-hooks/implementation-start-gate.cmd",
         ".codex/gtkb-hooks/lo-file-safety-gate.cmd",
@@ -293,7 +294,7 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 37,
+      "count": 34,
       "items": [
         "alternatives-investigation",
         "arch-audit",
@@ -304,7 +305,6 @@
         "code-review-audit",
         "codex-report",
         "decision-capture",
-        "deploy",
         "grill-me-for-clarification",
         "gtkb-benchmarks",
         "gtkb-hygiene-investigation",
@@ -326,8 +326,6 @@
         "projects",
         "proposal-review",
         "release-candidate-gate",
-        "run-tests",
-        "seed-tenant",
         "send-review",
         "spec-intake",
         "structural-hygiene-review",
@@ -694,7 +692,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "25.3"
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -708,7 +706,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -722,7 +720,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {

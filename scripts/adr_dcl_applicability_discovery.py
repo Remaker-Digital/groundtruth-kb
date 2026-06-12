@@ -24,6 +24,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
+try:
+    from scripts.implementation_authorization import PATH_TOKEN_RE
+except ImportError:  # pragma: no cover - direct script execution path
+    from implementation_authorization import PATH_TOKEN_RE
+
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_INDEX_PATH: Final[Path] = PROJECT_ROOT / "bridge" / "INDEX.md"
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
@@ -37,9 +42,6 @@ INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
 )
 TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\b")
-PATH_TOKEN_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/skills|\.codex/skills|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
-)
 TOKEN_RE: Final[re.Pattern[str]] = re.compile(r"[a-z0-9][a-z0-9_/-]*")
 STOP_WORDS: Final[set[str]] = {
     "000",

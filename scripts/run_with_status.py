@@ -10,21 +10,24 @@ import sys
 def main() -> None:
     args = sys.argv[1:]
 
+    stdin_path = None
     stdout_path = None
     stderr_path = None
 
-    # Parse optional stdout/stderr redirections
-    while len(args) >= 2 and args[0] in ("--stdout", "--stderr"):
+    # Parse optional stdin/stdout/stderr redirections
+    while len(args) >= 2 and args[0] in ("--stdin", "--stdout", "--stderr"):
         flag = args.pop(0)
         val = args.pop(0)
-        if flag == "--stdout":
+        if flag == "--stdin":
+            stdin_path = val
+        elif flag == "--stdout":
             stdout_path = val
         else:
             stderr_path = val
 
     if len(args) < 2:
         print(
-            "Usage: python run_with_status.py [--stdout <file>] [--stderr <file>] <status_file_path> <cmd> [args...]",
+            "Usage: python run_with_status.py [--stdin <file>] [--stdout <file>] [--stderr <file>] <status_file_path> <cmd> [args...]",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -33,29 +36,70 @@ def main() -> None:
     cmd_args = args[1:]
 
     exit_code = 127
+    stdin_fh = None
     out_fh = None
     err_fh = None
     try:
+        if stdin_path:
+            stdin_fh = open(stdin_path, "r", encoding="utf-8")
+        else:
+            stdin_fh = subprocess.DEVNULL
+
         if stdout_path:
             os.makedirs(os.path.dirname(os.path.abspath(stdout_path)), exist_ok=True)
             out_fh = open(stdout_path, "w", encoding="utf-8")
+        else:
+            out_fh = subprocess.DEVNULL
+
         if stderr_path:
             os.makedirs(os.path.dirname(os.path.abspath(stderr_path)), exist_ok=True)
             err_fh = open(stderr_path, "w", encoding="utf-8")
-
-        result = subprocess.run(cmd_args, stdout=out_fh, stderr=err_fh)
-        exit_code = result.returncode
-    except Exception as exc:
-        msg = f"run_with_status.py failed to run subprocess: {exc}\n"
-        if err_fh:
-            err_fh.write(msg)
         else:
-            print(msg, file=sys.stderr)
+            err_fh = subprocess.DEVNULL
+
+        if (
+            os.name == "nt"
+            and cmd_args
+            and (cmd_args[0].lower().endswith(".cmd") or cmd_args[0].lower().endswith(".bat"))
+        ):
+            cmd_args = ["cmd.exe", "/c"] + cmd_args
+
+        p = subprocess.Popen(
+            cmd_args,
+            stdin=stdin_fh,
+            stdout=out_fh,
+            stderr=err_fh,
+        )
+
+        p.wait()
+        exit_code = p.returncode
+
+    except Exception as exc:
+        msg = f"run_with_status.py failed to run subprocess (args={cmd_args}): {exc}\n"
+        if stderr_path:
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(stderr_path)), exist_ok=True)
+                with open(stderr_path, "a", encoding="utf-8") as fh:
+                    fh.write(msg)
+            except Exception:
+                pass
+        print(msg, file=sys.stderr)
     finally:
-        if out_fh:
-            out_fh.close()
-        if err_fh:
-            err_fh.close()
+        if stdin_fh and stdin_fh != subprocess.DEVNULL:
+            try:
+                stdin_fh.close()
+            except Exception:
+                pass
+        if out_fh and out_fh != subprocess.DEVNULL:
+            try:
+                out_fh.close()
+            except Exception:
+                pass
+        if err_fh and err_fh != subprocess.DEVNULL:
+            try:
+                err_fh.close()
+            except Exception:
+                pass
         try:
             status_path = os.path.abspath(status_file_path)
             os.makedirs(os.path.dirname(status_path), exist_ok=True)

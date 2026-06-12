@@ -2,8 +2,8 @@
 
 Exercises ``groundtruth_kb.project.doctor._check_canonical_terms_registry``
 against a temp project root with a real KnowledgeDB. Verifies the four
-outcome paths: skip (table absent), pass (clean), warning (parity drift /
-cross-field collision), fail (parity error / platform_core redefinition).
+outcome paths: skip (table absent), pass (fresh), warning (generator
+freshness drift / cross-field collision), fail (platform_core redefinition).
 
 Per `bridge/gtkb-canonical-terminology-system-context-model-001-005.md`
 T-doctor-1 and T-doctor-2.
@@ -49,8 +49,8 @@ def _open_db(tmp_path: Path) -> KnowledgeDB:
 
 def test_warning_when_table_empty_with_glossary(tmp_path: Path) -> None:
     """Table provisioned but no rows while the markdown glossary defines
-    platform_core terms: schema/seed drift, surfaced as ``warning`` (not
-    ``pass``) so the same regression class that left the production seed
+    platform_core terms: generator freshness drift, surfaced as ``warning``
+    (not ``pass``) so the same regression class that left the production sync
     unrun cannot remain invisible in aggregate doctor output.
 
     Pinned per `bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-001.md`
@@ -62,13 +62,13 @@ def test_warning_when_table_empty_with_glossary(tmp_path: Path) -> None:
 
     check = _check_canonical_terms_registry(target)
     assert check.status == "warning"
-    assert "empty" in check.message.lower()
-    assert "seed" in check.message.lower()
-    assert "drift" in check.message.lower()
+    assert "generator freshness" in check.message
+    assert "pending sync" in check.message
+    assert "insert" in check.message
 
 
 def test_pass_when_seeded_clean(tmp_path: Path) -> None:
-    """T-doctor-1 (positive): seeded table, markdown matches, no collisions."""
+    """T-doctor-1 (positive): synced table, markdown matches, no collisions."""
     target = _setup_project(tmp_path)
     db = _open_db(target)
     glossary = target / ".claude" / "rules" / "canonical-terminology.md"
@@ -77,11 +77,12 @@ def test_pass_when_seeded_clean(tmp_path: Path) -> None:
 
     check = _check_canonical_terms_registry(target)
     assert check.status == "pass"
-    assert "OK" in check.message or "clean" in check.message
+    assert "OK" in check.message
+    assert "generator fresh" in check.message
 
 
-def test_warning_on_parity_missing_in_table(tmp_path: Path) -> None:
-    """T-doctor-2 (parity): markdown has a term not seeded; surfaces as warning."""
+def test_warning_on_generator_pending_insert(tmp_path: Path) -> None:
+    """T-doctor-2: markdown has a term not synced; surfaces as warning."""
     target = _setup_project(tmp_path)
     db = _open_db(target)
     glossary = target / ".claude" / "rules" / "canonical-terminology.md"
@@ -93,13 +94,15 @@ def test_warning_on_parity_missing_in_table(tmp_path: Path) -> None:
 
     check = _check_canonical_terms_registry(target)
     assert check.status == "warning"
-    assert "missing_in_table" in check.message
+    assert "freshness:insert:NEWTERM" in check.message
 
 
-def test_fail_on_parity_missing_in_markdown(tmp_path: Path) -> None:
-    """T-doctor-2 (parity): table has a platform_core term not in markdown;
-    surfaces as fail (the table claims canonical authority for a row the
-    markdown source has dropped without retire).
+def test_warning_on_generator_pending_retire(tmp_path: Path) -> None:
+    """T-doctor-2: table has a platform_core term not in markdown.
+
+    FAB-15 treats markdown as the source of truth; the deterministic sync
+    generator should retire the row append-only instead of leaving the doctor
+    on a hand-parity error model.
     """
     target = _setup_project(tmp_path)
     db = _open_db(target)
@@ -123,9 +126,8 @@ def test_fail_on_parity_missing_in_markdown(tmp_path: Path) -> None:
     db.close()
 
     check = _check_canonical_terms_registry(target)
-    assert check.status == "fail"
-    assert "missing_in_markdown" in check.message
-    assert "ROGUE" in check.message
+    assert check.status == "warning"
+    assert "freshness:retire:ROGUE" in check.message
 
 
 def test_fail_on_platform_core_redefinition(tmp_path: Path) -> None:

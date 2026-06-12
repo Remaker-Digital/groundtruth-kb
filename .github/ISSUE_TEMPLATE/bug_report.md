@@ -26,10 +26,10 @@ What actually happened.
 
 ## Environment
 
-- **Surface:** Widget / Standalone Admin / Shopify Admin / Provider Console / API
+- **Surface:** CLI / Bridge / Governance / Dashboard / Harness / Hosted application / API
 - **Browser:** Chrome / Firefox / Safari / Edge
-- **Tenant tier:** Starter / Professional / Enterprise
-- **Version:** (check widget footer or API /health endpoint)
+- **Scope:** GT-KB platform / Agent Red application / Other adopter
+- **Version:** (package version, commit SHA, workflow run, or API /health endpoint)
 
 ## Screenshots / Logs
 

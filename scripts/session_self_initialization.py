@@ -1292,6 +1292,9 @@ def _residual_override_present(body: str) -> bool:
 
 
 _PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3, "P4": 4}
+_IMPLEMENTATION_ACTIVE_APPROVAL_STATES = {"implementation_authorized"}
+_IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = {"in_progress"}
+_IMPLEMENTATION_ACTIVE_STAGES = {"implementing"}
 
 
 def _top_priority_sort_key(item: dict[str, Any]) -> tuple[int, str]:
@@ -1303,6 +1306,17 @@ def _top_priority_sort_key(item: dict[str, Any]) -> tuple[int, str]:
 
     priority = str(item.get("priority") or "").upper().strip()
     return (_PRIORITY_RANK.get(priority, 5), str(item.get("id") or ""))
+
+
+def _is_implementation_active_backlog_item(item: dict[str, Any]) -> bool:
+    approval_state = str(item.get("approval_state") or "").strip()
+    resolution_status = str(item.get("resolution_status") or "").strip()
+    stage = str(item.get("stage") or "").strip()
+    return (
+        approval_state in _IMPLEMENTATION_ACTIVE_APPROVAL_STATES
+        or resolution_status in _IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES
+        or stage in _IMPLEMENTATION_ACTIVE_STAGES
+    )
 
 
 def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -1331,6 +1345,8 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
             continue
         eligible.append(item)
 
+    implementation_active_items = [item for item in eligible if _is_implementation_active_backlog_item(item)]
+
     # Top-3 selection per SPEC-ENVELOPE-DISCLOSURE-UI-001:
     # Operates on ALL classified items (bypasses the agent_red scope filter so
     # GT-KB infrastructure WIs appear in the session-startup priority surface).
@@ -1347,7 +1363,7 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
             continue
         if _STALE_PRIORITY_RE.search(_body):
             continue
-        if _item.get("approval_state") == "implementation_authorized" and _item.get("resolution_status") in (
+        if _is_implementation_active_backlog_item(_item) and _item.get("resolution_status") in (
             "open",
             "in_progress",
             "blocked",
@@ -1356,8 +1372,10 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
     top_eligible.sort(key=_top_priority_sort_key)
     top_priority = top_eligible[:3]
     return {
-        "active_item_count": len(eligible),
+        "active_item_count": len(implementation_active_items),
         "raw_active_item_count": len(items),
+        "visible_non_terminal_item_count": len(eligible),
+        "non_implementation_future_item_count": len(eligible) - len(implementation_active_items),
         "top_priority_actions": top_priority,
         "source": "MemBase work_items",
         "scope_counts": dict(sorted(Counter(item["scope"] for item in classified).items())),
@@ -2187,15 +2205,11 @@ def _status_from_requirements(requirements: list[bool], manual: bool = False) ->
 
 
 def _package_json(project_root: Path, relative_path: str) -> dict[str, Any]:
-    candidates = (
-        project_root / relative_path,
-        project_root / "applications" / "Agent_Red" / relative_path,
-    )
-    for path in candidates:
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError):
-            continue
+    path = project_root / relative_path
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
     return {}
 
 
@@ -2251,22 +2265,30 @@ def _version_from_text(*values: Any) -> str | None:
 
 def _current_version_manifest(project_root: Path) -> dict[str, Any]:
     versions: dict[str, Any] = {}
-    pyproject = _read_toml(project_root / "pyproject.toml")
+    pyproject = _read_toml(project_root / "groundtruth-kb" / "pyproject.toml")
     if pyproject.get("project", {}).get("version"):
-        versions["python_package"] = pyproject["project"]["version"]
-    api_version_text = _read_text(project_root / "src" / "api_versioning.py")
-    api_match = re.search(r'API_VERSION\s*=\s*["\']([^"\']+)["\']', api_version_text)
-    if api_match:
-        versions["api_version"] = api_match.group(1)
-    for label, relative_path in {
-        "root_package": "applications/Agent_Red/package.json",
-        "widget": "applications/Agent_Red/widget/package.json",
-        "admin": "applications/Agent_Red/admin/package.json",
-        "docs_site": "applications/Agent_Red/docs-site/package.json",
-    }.items():
-        package = _package_json(project_root, relative_path)
-        if package.get("version"):
-            versions[label] = package["version"]
+        versions["groundtruth_kb_package"] = pyproject["project"]["version"]
+    package_init_text = _read_text(project_root / "groundtruth-kb" / "src" / "groundtruth_kb" / "__init__.py")
+    package_match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', package_init_text)
+    if package_match:
+        versions["groundtruth_kb_package"] = package_match.group(1)
+
+    if _active_work_subject(project_root) == FOCUS_APPLICATION:
+        api_version_text = _read_text(
+            project_root / "applications" / "Agent_Red" / "src" / "multi_tenant" / "api_versioning.py"
+        )
+        api_match = re.search(r'API_VERSION\s*=\s*["\']([^"\']+)["\']', api_version_text)
+        if api_match:
+            versions["agent_red_api_version"] = api_match.group(1)
+        for label, relative_path in {
+            "agent_red_root_package": "applications/Agent_Red/package.json",
+            "agent_red_widget": "applications/Agent_Red/widget/package.json",
+            "agent_red_admin": "applications/Agent_Red/admin/package.json",
+            "agent_red_docs_site": "applications/Agent_Red/docs-site/package.json",
+        }.items():
+            package = _package_json(project_root, relative_path)
+            if package.get("version"):
+                versions[label] = package["version"]
     return {
         "versions": versions,
         "display": ", ".join(f"{key}: {value}" for key, value in versions.items()) or "No package version files found.",
@@ -2539,9 +2561,16 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
     workflow_names = sorted(workflows)
     workflow_set = set(workflow_names)
     remote = _git_remote_origin(project_root)
+    work_subject = _active_work_subject(project_root)
+    application_subject = work_subject == FOCUS_APPLICATION
     if fast_hook:
         gh_auth_status = "skipped_fast_hook"
-        gh_runs = {"available": False, "reason": "skipped_fast_hook", "runs_by_workflow": {}}
+        gh_runs = {
+            "available": False,
+            "reason": "skipped_fast_hook",
+            "runs_by_workflow": {},
+            "queried_work_subject": work_subject,
+        }
     else:
         gh_auth_status = _gh_auth_status(project_root)
         gh_runs = _latest_github_workflow_runs(project_root, gh_auth_status)
@@ -2552,9 +2581,28 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
     python_tests_text = _workflow_text(workflows, "python-tests.yml")
     lint_text = _workflow_text(workflows, "lint.yml")
     security_text = _workflow_text(workflows, "security-scan.yml")
-    widget_package = _package_json(project_root, "applications/Agent_Red/widget/package.json")
-    docs_package = _package_json(project_root, "applications/Agent_Red/docs-site/package.json")
-    admin_package = _package_json(project_root, "applications/Agent_Red/admin/package.json")
+    widget_package = (
+        _package_json(project_root, "applications/Agent_Red/widget/package.json") if application_subject else {}
+    )
+    docs_package = (
+        _package_json(project_root, "applications/Agent_Red/docs-site/package.json") if application_subject else {}
+    )
+    admin_package = (
+        _package_json(project_root, "applications/Agent_Red/admin/package.json") if application_subject else {}
+    )
+    accessibility_tests_present = (
+        (project_root / "platform_tests" / "accessibility").is_dir()
+        or (project_root / "tests" / "accessibility").is_dir()
+        or (application_subject and (project_root / "applications" / "Agent_Red" / "tests" / "accessibility").is_dir())
+    )
+    locust_profile_present = (
+        (project_root / "tests" / "performance" / "locustfile.py").is_file()
+        or (project_root / "platform_tests" / "performance" / "locustfile.py").is_file()
+        or (
+            application_subject
+            and (project_root / "applications" / "Agent_Red" / "tests" / "performance" / "locustfile.py").is_file()
+        )
+    )
     dependabot_ecosystems = sorted(set(re.findall(r'package-ecosystem:\s*["\']?([^"\'\n]+)', dependabot_text)))
     required_workflow_files = [
         "python-tests.yml",
@@ -2745,14 +2793,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
     integrations["accessibility_axe"] = _integration(
         order=100,
         display_name="axe-core Accessibility",
-        status=_status_from_requirements(
-            [
-                "accessibility.yml" in workflow_set,
-                (project_root / "applications" / "Agent_Red" / "tests" / "accessibility").is_dir()
-                or (project_root / "platform_tests" / "accessibility").is_dir()
-                or (project_root / "tests" / "accessibility").is_dir(),
-            ]
-        ),
+        status=_status_from_requirements(["accessibility.yml" in workflow_set, accessibility_tests_present]),
         workflow_file="accessibility.yml",
         latest_run=_workflow_run(gh_runs, workflows, "accessibility.yml"),
         gate_role="WCAG 2.1 AA accessibility enforcement.",
@@ -2844,12 +2885,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
         order=170,
         display_name="Locust Performance",
         status=_status_from_requirements(
-            [
-                (project_root / "tests" / "performance" / "locustfile.py").is_file()
-                or (project_root / "applications" / "Agent_Red" / "tests" / "performance" / "locustfile.py").is_file()
-                or (project_root / "platform_tests" / "performance" / "locustfile.py").is_file(),
-                _dependency_declared(project_root, "locust"),
-            ],
+            [locust_profile_present, _dependency_declared(project_root, "locust")],
             manual=True,
         ),
         gate_role="Manual/local load and latency testing capability.",
@@ -2999,6 +3035,14 @@ def _dashboard_intelligence(
         for item in integrations.values()
         if item.get("health") in {"no_recent_run", "live_state_unavailable", "partial_history"}
     ]
+    work_subject = integrations.get("github", {}).get("queried_work_subject") or metrics["work_subject"].get(
+        "current_subject"
+    )
+    actions_url = (
+        "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions"
+        if work_subject == FOCUS_APPLICATION
+        else "https://github.com/Remaker-Digital/groundtruth-kb/actions"
+    )
     release_blockers = metrics["regression"].get("release_blocker_count") or 0
     bridge_actions = metrics["contention"].get("actionable_count") or 0
     drift_count = metrics["drift"].get("changed_path_count") or 0
@@ -3086,11 +3130,7 @@ def _dashboard_intelligence(
                 "action": f"Repair {item.get('display_name')}",
                 "why": item.get("latest_run_summary") or "Integration is failing.",
                 "remediation": item.get("remediation"),
-                "shortcut": _shortcut(
-                    "Open GitHub Actions",
-                    "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions",
-                    "web",
-                ),
+                "shortcut": _shortcut("Open GitHub Actions", actions_url, "web"),
                 "source": "Testing Service / Tool Integrations",
             }
         )
@@ -3269,9 +3309,7 @@ def _dashboard_intelligence(
             _shortcut("Query MemBase backlog", "gt backlog list", "command"),
             _shortcut("Open bridge index", "bridge/INDEX.md"),
             _shortcut("Open dev environment inventory", "docs/release/dev-environment-inventory.md"),
-            _shortcut(
-                "Open GitHub Actions", "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions", "web"
-            ),
+            _shortcut("Open GitHub Actions", actions_url, "web"),
             _shortcut("Open GT-KB upstream", "https://github.com/Remaker-Digital/groundtruth-kb", "web"),
         ],
     }

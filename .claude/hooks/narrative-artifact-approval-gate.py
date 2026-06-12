@@ -25,6 +25,7 @@ Exit:   Always 0 (Claude Code hook contract: hook always returns 0; decision is 
 
 from __future__ import annotations
 
+import datetime as _dt
 import fnmatch
 import hashlib
 import json
@@ -76,7 +77,28 @@ def _emit_pass() -> None:
 
 
 def _emit_block(reason: str) -> None:
+    _record_gate_denial("narrative-artifact-approval", reason, reason)
     _emit({"decision": "block", "reason": reason})
+
+
+def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    if not path.is_absolute():
+        path = _project_root() / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "narrative-artifact-approval-gate",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
 
 
 def _load_config(root: Path) -> dict[str, Any] | None:
@@ -207,6 +229,48 @@ def _validate_packet(
     return None
 
 
+def _autodiscover_packet(root: Path, rel_path: str, new_content: str | None) -> str | None:
+    """HYG-047 (FAB-14): find an owner-approved packet on disk matching THIS write.
+
+    Scans .groundtruth/formal-artifact-approvals/*.json newest-first for a packet
+    whose ``target_path`` == ``rel_path`` AND whose ``full_content_sha256`` ==
+    sha256(``new_content``). Returns the packet path, or None. This lets a
+    session-native Write to a protected narrative succeed from a matching on-disk
+    packet without an env var the Write tool cannot carry. The env var / explicit
+    tool_input hint remain explicit overrides (checked first by
+    ``_resolve_packet_path``). Requires the proposed content, so it applies to
+    Write (content present), not content-less Edit.
+    """
+    if new_content is None:
+        return None
+    approvals_dir = root / ".groundtruth" / "formal-artifact-approvals"
+    if not approvals_dir.is_dir():
+        return None
+    target_hash = hashlib.sha256(new_content.encode("utf-8")).hexdigest()
+    matches: list[tuple[float, str]] = []
+    for packet_file in approvals_dir.glob("*.json"):
+        try:
+            data = json.loads(packet_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        target = data.get("target_path")
+        if not isinstance(target, str) or Path(target).as_posix() != rel_path:
+            continue
+        if data.get("full_content_sha256") != target_hash:
+            continue
+        try:
+            mtime = packet_file.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        matches.append((mtime, str(packet_file)))
+    if not matches:
+        return None
+    matches.sort(reverse=True)  # newest-first
+    return matches[0][1]
+
+
 def _block_reason(rel_path: str, detail: str) -> str:
     return (
         f"[Governance] Narrative-artifact write to {rel_path!r} requires an owner-visible approval packet "
@@ -255,7 +319,15 @@ def main() -> None:
         _emit_pass()
         return
 
+    new_content = tool_input.get("content") if tool_name == "Write" else None
+    if new_content is not None and not isinstance(new_content, str):
+        new_content = None
+
     packet_ref = _resolve_packet_path(tool_input, config, root)
+    if not packet_ref:
+        # HYG-047 (FAB-14): fall back to deterministic on-disk packet discovery so a
+        # compliant owner-approved Write succeeds without an un-settable env var.
+        packet_ref = _autodiscover_packet(root, rel_path, new_content)
     if not packet_ref:
         _emit_block(_block_reason(rel_path, "No approval-packet reference was found."))
         return
@@ -264,10 +336,6 @@ def main() -> None:
     if parse_error or packet is None:
         _emit_block(_block_reason(rel_path, parse_error or "approval packet did not load"))
         return
-
-    new_content = tool_input.get("content") if tool_name == "Write" else None
-    if new_content is not None and not isinstance(new_content, str):
-        new_content = None
 
     error = _validate_packet(packet, rel_path, new_content)
     if error:

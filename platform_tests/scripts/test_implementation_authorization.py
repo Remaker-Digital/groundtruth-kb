@@ -631,9 +631,10 @@ def test_requirement_sufficiency_gap_takes_precedence(auth_module):
 
 
 def test_requirement_sufficiency_state_rejects_unapproved_phrase(auth_module):
-    """WI-3410: the matcher stays bounded to the approved phrase set."""
+    """WI-3410 + HYG-046: an unapproved phrase is not accepted as sufficient; a
+    present-but-unrecognized section returns the distinct 'unrecognized' state."""
     markdown = "## Requirement Sufficiency\n\nThis probably fits existing requirements.\n"
-    assert auth_module.requirement_sufficiency_state(markdown) == "missing"
+    assert auth_module.requirement_sufficiency_state(markdown) == "unrecognized"
 
 
 def test_create_authorization_packet_accepts_requirement_sufficiency_are_sufficient(auth_module, tmp_path):
@@ -752,7 +753,7 @@ def test_missing_requirement_sufficiency_still_blocks_without_owner_evidence(aut
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
     _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
 
-    with pytest.raises(auth_module.AuthorizationError, match="missing ## Requirement Sufficiency"):
+    with pytest.raises(auth_module.AuthorizationError, match="phrasing is unrecognized"):
         auth_module.create_authorization_packet(tmp_path, slug)
 
 

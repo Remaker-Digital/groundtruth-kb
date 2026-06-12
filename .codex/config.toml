@@ -5,10 +5,14 @@
 # not break hook startup execution. Wrap-up is phrase-gated
 # through UserPromptSubmit so normal assistant completions do not look like
 # session boundaries.
+# DELIB-FAB15-REMEDIATION-20260610: interactive Codex sessions default to
+# approval_policy="on-request" with network disabled. Headless bridge-dispatch
+# workers cannot answer approvals and must apply their "never" posture at
+# dispatch/runtime scope rather than by making this project config permissive.
 
-approval_policy = "never"
+approval_policy = "on-request"
 [features]
 codex_hooks = true
 
 [sandbox_workspace_write]
-network_access = true
+network_access = false

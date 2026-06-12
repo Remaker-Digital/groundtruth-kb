@@ -38,9 +38,10 @@ import argparse
 import json
 import re
 import sys
+import tomllib
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,7 @@ DROPBOX_RELATIVE = Path("independent-progress-assessments/CODEX-INSIGHT-DROPBOX"
 INSIGHTS_GLOB = "INSIGHTS-*.md"
 LAST_SCAN_RELATIVE = Path(".gtkb-state/advisory-router/last-scan.json")
 BRIDGE_INDEX_RELATIVE = Path("bridge/INDEX.md")
+RETENTION_CONFIG_RELATIVE = Path("config/governance/advisory-routing-retention.toml")
 
 # Stage 3 (WI-4469, DELIB-20261667 D5): the router no longer auto-promotes
 # advisories to OPEN work_items rows. It stages each advisory on an append-only
@@ -72,6 +74,23 @@ HIGH_SEVERITY = {"0", "1"}
 MEDIUM_SEVERITY = {"2"}
 
 INSIGHTS_DATE_RE = re.compile(r"INSIGHTS-(\d{4})-(\d{2})-(\d{2})")
+
+
+@dataclass(frozen=True)
+class RetentionPolicy:
+    """Age-out policy for newly staged advisory candidates."""
+
+    max_advisory_age_days: int | None = None
+
+    @property
+    def enabled(self) -> bool:
+        return self.max_advisory_age_days is not None and self.max_advisory_age_days >= 0
+
+    def cutoff_date(self, *, now: date) -> date | None:
+        if not self.enabled:
+            return None
+        assert self.max_advisory_age_days is not None
+        return now - timedelta(days=self.max_advisory_age_days)
 
 
 @dataclass
@@ -102,6 +121,7 @@ class RouterResult:
     # step (scripts/hygiene/advisory_candidate_promote.py).
     staged: list[dict[str, Any]] = field(default_factory=list)
     skipped_existing: list[dict[str, Any]] = field(default_factory=list)
+    skipped_expired: list[dict[str, Any]] = field(default_factory=list)
     errors: list[dict[str, Any]] = field(default_factory=list)
     scanned: int = 0
     scan_started_at: str = ""
@@ -113,6 +133,7 @@ class RouterResult:
             payload = {
                 "staged_count": len(self.staged),
                 "skipped_existing_count": len(self.skipped_existing),
+                "skipped_expired_count": len(self.skipped_expired),
                 "errors": self.errors,
                 "scanned": self.scanned,
                 "scan_started_at": self.scan_started_at,
@@ -123,6 +144,7 @@ class RouterResult:
             payload = {
                 "staged": self.staged,
                 "skipped_existing": self.skipped_existing,
+                "skipped_expired": self.skipped_expired,
                 "errors": self.errors,
                 "scanned": self.scanned,
                 "scan_started_at": self.scan_started_at,
@@ -144,6 +166,30 @@ def _now_iso() -> str:
 
 def _parse_iso_date(value: str) -> date:
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def load_retention_policy(project_root: Path, config_path: Path | None = None) -> RetentionPolicy:
+    """Load the advisory-router retention policy.
+
+    Missing config means no age-out for scaffold/test roots. The GT-KB checkout
+    carries an explicit config file so the live router remains bounded.
+    """
+    path = config_path or (project_root / RETENTION_CONFIG_RELATIVE)
+    if not path.is_file():
+        return RetentionPolicy()
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    router = data.get("advisory_router", {}) if isinstance(data, dict) else {}
+    retention = router.get("retention", {}) if isinstance(router, dict) else {}
+    raw_days = retention.get("max_advisory_age_days") if isinstance(retention, dict) else None
+    if raw_days is None:
+        return RetentionPolicy()
+    try:
+        days = int(raw_days)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid advisory retention max_advisory_age_days in {path}") from exc
+    if days < 0:
+        raise ValueError(f"Invalid advisory retention max_advisory_age_days in {path}: must be >= 0")
+    return RetentionPolicy(max_advisory_age_days=days)
 
 
 def _severity_to_priority(severity_token: str | None) -> str:
@@ -458,6 +504,7 @@ def _write_last_scan(project_root: Path, result: RouterResult, source: str, sinc
         "scanned": result.scanned,
         "staged_count": len(result.staged),
         "skipped_existing_count": len(result.skipped_existing),
+        "skipped_expired_count": len(result.skipped_expired),
         "errors_count": len(result.errors),
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -470,6 +517,8 @@ def run(
     since: date | None = None,
     dry_run: bool = False,
     db_factory=None,
+    retention_policy: RetentionPolicy | None = None,
+    now: date | None = None,
 ) -> RouterResult:
     """Run one router pass: stage unhandled advisories on the candidate surface.
 
@@ -482,6 +531,24 @@ def run(
     result.scan_started_at = _now_iso()
     advisories = collect_advisories(project_root, source=source, since=since)
     result.scanned = len(advisories)
+
+    policy = retention_policy if retention_policy is not None else load_retention_policy(project_root)
+    cutoff = policy.cutoff_date(now=now or datetime.now(UTC).date())
+    if cutoff is not None:
+        retained: list[Advisory] = []
+        for advisory in advisories:
+            if advisory.advisory_date is not None and advisory.advisory_date < cutoff:
+                result.skipped_expired.append(
+                    {
+                        "source": advisory.source,
+                        "source_key": advisory.source_key,
+                        "advisory_date": advisory.advisory_date.isoformat(),
+                        "cutoff_date": cutoff.isoformat(),
+                    }
+                )
+                continue
+            retained.append(advisory)
+        advisories = retained
 
     store_path = _candidate_store_path(project_root)
     status_map = current_candidate_status(_load_candidate_events(store_path))
@@ -568,11 +635,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--since", help="ISO date (YYYY-MM-DD); skip advisories dated before this")
     parser.add_argument("--project-root", default=None, help="override project root (defaults to script parent)")
     parser.add_argument("--compact", action="store_true", help="suppress full staged and skipped lists in output JSON")
+    parser.add_argument(
+        "--include-expired",
+        action="store_true",
+        help="ignore advisory-routing-retention.toml age-out policy for this run",
+    )
     args = parser.parse_args(argv)
 
     since = _parse_iso_date(args.since) if args.since else None
     root = _project_root_from_arg(args.project_root)
-    result = run(project_root=root, source=args.source, since=since, dry_run=args.dry_run)
+    retention_policy = RetentionPolicy() if args.include_expired else None
+    result = run(
+        project_root=root,
+        source=args.source,
+        since=since,
+        dry_run=args.dry_run,
+        retention_policy=retention_policy,
+    )
     print(result.as_json(compact=args.compact))
     return 0 if not result.errors else 1
 

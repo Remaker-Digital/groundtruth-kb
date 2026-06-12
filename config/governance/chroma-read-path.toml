@@ -1,0 +1,16 @@
+# Canonical ChromaDB read-path declaration — FAB-17 (HYG-048 / WI-4429).
+#
+# The Deliberation Archive semantic index is a DERIVED index over the canonical
+# groundtruth.db DA store. It must resolve to exactly ONE on-disk Chroma store so
+# concurrent sessions neither contend across nor diverge between duplicate
+# default-path copies. groundtruth_kb.db.KnowledgeDB resolves the store to
+# <db_path.parent>/<canonical_dirname>; stray default-path stores (e.g. ./chroma
+# or a package-tree .groundtruth-chroma) are not authoritative and are removed.
+#
+# Authority: GOV-SOURCE-OF-TRUTH-FRESHNESS-001 (no divergent aliases),
+# GOV-08 (canonical store is groundtruth.db; this index is regenerable from it).
+
+schema_version = 1
+
+[chroma]
+canonical_dirname = ".groundtruth-chroma"

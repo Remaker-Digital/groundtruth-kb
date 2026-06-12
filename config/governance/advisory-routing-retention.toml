@@ -1,0 +1,4 @@
+[advisory_router.retention]
+# FAB-18 / WI-4430: bound future advisory candidate staging so historical
+# reports do not keep refilling the visible backlog intake surface.
+max_advisory_age_days = 60

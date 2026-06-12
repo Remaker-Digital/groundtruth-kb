@@ -18,6 +18,7 @@ from groundtruth_kb.harness_projection import HarnessStateError, read_identity, 
 
 ENVELOPE_SCHEMA_VERSION = 1
 TOPIC_TYPES = ("spec", "build", "test", "deliberation", "project")
+GIT_STATUS_SHORT_LINE_LIMIT = 80
 
 ROUTE_TARGETS = {
     "spec": "spec-governance-service",
@@ -143,12 +144,17 @@ def _git_status(project_root: Path) -> dict[str, Any]:
         )
     except OSError as exc:
         return {"available": False, "error": str(exc), "dirty": None, "short": ""}
-    short = result.stdout.strip()
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    shown = lines[:GIT_STATUS_SHORT_LINE_LIMIT]
+    short = "\n".join(shown)
     return {
         "available": result.returncode == 0,
         "returncode": result.returncode,
-        "dirty": bool(short),
+        "dirty": bool(lines),
         "short": short,
+        "short_line_count": len(lines),
+        "short_line_limit": GIT_STATUS_SHORT_LINE_LIMIT,
+        "short_truncated": len(lines) > GIT_STATUS_SHORT_LINE_LIMIT,
     }
 
 

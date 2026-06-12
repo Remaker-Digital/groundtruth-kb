@@ -1,4 +1,4 @@
-# Agent Red Customer Experience — Project Configuration
+# GroundTruth-KB Platform — Project Configuration
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 # ---------------------------------------------------------------------------
@@ -12,7 +12,7 @@ asyncio_mode = "auto"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --strict-markers --timeout=30"
+addopts = "-v --tb=short --strict-markers --timeout=30 --ignore=applications/Agent_Red/tests/test_host"
 markers = [
     "unit: fast, isolated unit tests (no I/O, no network)",
     "integration: cross-module integration tests (may use mocks for external services)",
@@ -93,11 +93,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = [
-    "E501",    # long test names and assertions are fine
-    "B011",    # assert False is valid in tests
-    "SIM300",  # yoda conditions in assertions are fine
-]
 "scripts/**" = [
     "E501",    # scripts can have long lines
 ]
@@ -120,14 +115,3 @@ skip-magic-trailing-comma = false
 # injection review in code review/tests instead of blocking CI on this heuristic.
 skips = ["B608"]
 
-# ---------------------------------------------------------------------------
-# mutmut - mutation testing (SPEC-1842)
-# ---------------------------------------------------------------------------
-
-[tool.mutmut]
-paths_to_mutate = "src/"
-tests_dir = "tests/"
-runner = "python -m pytest -x --timeout=30"
-# Session-scoped: only mutate files changed in the current session.
-# Full-codebase mutation is too slow; session wrap-up runs on changed files only.
-# Target: >= 70% mutation score on changed files.

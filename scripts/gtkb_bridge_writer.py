@@ -34,7 +34,7 @@ PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
 
 _STATUS_LINE_RE = re.compile(
-    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+"
+    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+"
     r"bridge/(?P<filename>[A-Za-z0-9._\-]+)-(?P<version>\d{3,})\.md\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+(?P<name>[A-Za-z0-9._\-]+)\s*$")

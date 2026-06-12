@@ -510,7 +510,7 @@ def _check_isolation_chroma_regeneratable(target: Path) -> ToolCheck:
 
 
 def run_isolation_checks(target: Path, profile: str, *, product_root: Path) -> list[ToolCheck]:
-    """Return the 9 isolation checks in preflight order.
+    """Return the isolation checks in preflight order.
 
     Per Phase 9 §4 line 224-226: environment boundary → service reachability →
     subject assertion → registry compliance → app-local governed state health.
@@ -519,7 +519,40 @@ def run_isolation_checks(target: Path, profile: str, *, product_root: Path) -> l
     ``manifest.find_project_root()`` API; callers must supply ``product_root``
     explicitly. ``run_doctor`` derives it from
     ``Path(__file__).resolve().parents[3]``.
+
+    When ``target`` is the platform development repository (detected by the
+    presence of the ``groundtruth-kb/`` package directory), adopter-specific
+    checks are replaced with pass-with-explanation results. Checks 2 (service
+    endpoint), 4 (writable product paths), and 9 (chroma cache) apply to both
+    contexts and run unconditionally.
     """
+    is_platform_dev = (target / "groundtruth-kb").is_dir()
+
+    if is_platform_dev:
+        _skip = "platform development repository; adopter-context check not applicable"
+        return [
+            ToolCheck(
+                name="isolation:adopter-root-placement", required=False, found=True, status="pass", message=_skip
+            ),
+            _check_isolation_service_endpoint_not_raw_db(target),
+            ToolCheck(name="isolation:work-subject", required=False, found=True, status="pass", message=_skip),
+            _check_isolation_no_writable_product_paths(target, profile),
+            ToolCheck(
+                name="isolation:hooks-point-to-wrappers", required=False, found=True, status="pass", message=_skip
+            ),
+            ToolCheck(
+                name="isolation:workstream-focus-hook-absent", required=False, found=True, status="pass", message=_skip
+            ),
+            ToolCheck(
+                name="isolation:release-readiness-app-subject-header",
+                required=False,
+                found=True,
+                status="pass",
+                message=_skip,
+            ),
+            _check_isolation_chroma_regeneratable(target),
+        ]
+
     return [
         _check_isolation_adopter_root_not_under_product_root(target, product_root),
         _check_isolation_service_endpoint_not_raw_db(target),

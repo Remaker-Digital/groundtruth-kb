@@ -33,9 +33,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
 # Ensure scripts/ is importable
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 # pre_flight_checklist.py replaces sys.stdout/stderr with UTF-8 wrappers
@@ -78,9 +77,7 @@ class TestPhaseASourceLevel:
     @patch("pre_flight_checklist.subprocess.run")
     def test_phase_a_returns_list_of_assertion_results(self, mock_run):
         """Phase A returns list[AssertionResult] — source-level checks."""
-        mock_run.return_value = MagicMock(
-            stdout="1.60.0", stderr="", returncode=0
-        )
+        mock_run.return_value = MagicMock(stdout="1.60.0", stderr="", returncode=0)
         results = phase_a("1.60.0")
         assert isinstance(results, list)
         for r in results:
@@ -96,11 +93,13 @@ class TestPhaseDSSE:
     def test_httpx_availability_check_exists(self):
         """The module checks for httpx availability for SSE streaming."""
         import pre_flight_checklist
+
         assert hasattr(pre_flight_checklist, "_HTTPX_AVAILABLE")
 
     def test_verify_sse_function_exists(self):
         """_verify_sse is available for SSE streaming verification."""
         from pre_flight_checklist import _verify_sse
+
         assert callable(_verify_sse)
 
 
@@ -114,7 +113,10 @@ class TestPhaseAPreBuild:
     def test_phase_a_checks_version_bump(self, mock_stream):
         """A.1 verifies PRODUCT_VERSION matches expected version."""
         mock_stream.return_value = MagicMock(
-            returncode=0, stdout="1.60.0", duration=0.1, timed_out=False,
+            returncode=0,
+            stdout="1.60.0",
+            duration=0.1,
+            timed_out=False,
         )
         results = phase_a("1.60.0")
         a1 = [r for r in results if r.id == "A.1"]
@@ -125,7 +127,10 @@ class TestPhaseAPreBuild:
     def test_phase_a_checks_version_mismatch(self, mock_stream):
         """A.1 FAILS when version doesn't match."""
         mock_stream.return_value = MagicMock(
-            returncode=0, stdout="1.59.0", duration=0.1, timed_out=False,
+            returncode=0,
+            stdout="1.59.0",
+            duration=0.1,
+            timed_out=False,
         )
         results = phase_a("1.60.0")
         a1 = [r for r in results if r.id == "A.1"]
@@ -160,9 +165,12 @@ class TestPhaseASnapshotCheck:
         """C.10 is SKIP when Phase A snapshot doesn't exist."""
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.read.return_value = json.dumps({
-            "status": "healthy", "product_version": "1.60.0",
-        }).encode()
+        mock_resp.read.return_value = json.dumps(
+            {
+                "status": "healthy",
+                "product_version": "1.60.0",
+            }
+        ).encode()
         mock_resp.getheaders.return_value = [
             ("x-product-version", "1.60.0"),
             ("content-type", "application/json"),
@@ -174,16 +182,16 @@ class TestPhaseASnapshotCheck:
         mock_urlopen.return_value = mock_resp
 
         # Ensure no snapshot exists for the staging tenant
-        snapshot_path = (
-            PROJECT_ROOT / "scripts" / "upgrade-results"
-            / "phase_a_staging-001.json"
-        )
+        snapshot_path = PROJECT_ROOT / "scripts" / "upgrade-results" / "phase_a_staging-001.json"
         snapshot_existed = snapshot_path.exists()
 
         # Use a mock for stream_subprocess (tier regression + upgrade verification)
         with patch("scripts._subprocess_stream.stream_subprocess") as mock_stream:
             mock_stream.return_value = MagicMock(
-                returncode=0, stdout="0 passed", duration=0.1, timed_out=False,
+                returncode=0,
+                stdout="0 passed",
+                duration=0.1,
+                timed_out=False,
             )
             # Temporarily rename snapshot if it exists
             temp_path = snapshot_path.with_suffix(".tmp_test_backup")
@@ -192,7 +200,9 @@ class TestPhaseASnapshotCheck:
             try:
                 results = phase_c(
                     "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-                    "test-key", "test-widget", "1.60.0"
+                    "test-key",
+                    "test-widget",
+                    "1.60.0",
                 )
             finally:
                 if snapshot_existed and temp_path.exists():
@@ -214,13 +224,15 @@ class TestPhaseCApiCallCount:
     @patch("pre_flight_checklist.time.sleep")
     @patch("scripts._subprocess_stream.stream_subprocess")
     @patch("upgrade_verification.urlopen")
-    def test_phase_c_makes_at_least_15_calls(self, mock_urlopen, mock_stream,
-                                              mock_sleep):
+    def test_phase_c_makes_at_least_15_calls(self, mock_urlopen, mock_stream, mock_sleep):
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.read.return_value = json.dumps({
-            "status": "healthy", "product_version": "1.60.0",
-        }).encode()
+        mock_resp.read.return_value = json.dumps(
+            {
+                "status": "healthy",
+                "product_version": "1.60.0",
+            }
+        ).encode()
         mock_resp.getheaders.return_value = [
             ("x-product-version", "1.60.0"),
             ("content-type", "text/html"),
@@ -232,13 +244,14 @@ class TestPhaseCApiCallCount:
         mock_urlopen.return_value = mock_resp
 
         mock_stream.return_value = MagicMock(
-            returncode=0, stdout="35 PASS, 0 FAIL\n17 passed",
-            duration=1.0, timed_out=False,
+            returncode=0,
+            stdout="35 PASS, 0 FAIL\n17 passed",
+            duration=1.0,
+            timed_out=False,
         )
 
         phase_c(
-            "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-            "test-key", "test-widget", "1.60.0"
+            "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io", "test-key", "test-widget", "1.60.0"
         )
         # C.1 shares a call with C.9 for /health, C.4-C.6 make 3 calls,
         # C.7 widget.js, C.8 openapi, C.9 security headers = at least 8
@@ -270,9 +283,8 @@ class TestPhaseDWithoutCredentials:
     def test_phase_d_skips_when_create_fails(self, mock_urlopen):
         """If D.1 (create tenant) fails, D.2-D.18 are SKIP."""
         from urllib.error import HTTPError
-        mock_urlopen.side_effect = HTTPError(
-            "https://test", 500, "Server Error", {}, None
-        )
+
+        mock_urlopen.side_effect = HTTPError("https://test", 500, "Server Error", {}, None)
         results = phase_d("test.example.com", "test-key")
         d1 = [r for r in results if r.id == "D.1"]
         assert len(d1) == 1
@@ -294,20 +306,22 @@ class TestPhaseDSummary:
         """D.18 reports PASS/FAIL/SKIP/WARN counts."""
         mock_resp = MagicMock()
         mock_resp.status = 201
-        mock_resp.read.return_value = json.dumps({
-            "tenantId": "smoke-001",
-            "superadminApiKey": "key1",
-            "widgetKey": "wk1",
-            "role": "superadmin",
-            "totalCount": 0,
-            "total": 0,
-            "conversation_id": "c1",
-            "is_active": True,
-            "isActive": True,
-            "is_configured": True,
-            "isConfigured": True,
-            "members": [],
-        }).encode()
+        mock_resp.read.return_value = json.dumps(
+            {
+                "tenantId": "smoke-001",
+                "superadminApiKey": "key1",
+                "widgetKey": "wk1",
+                "role": "superadmin",
+                "totalCount": 0,
+                "total": 0,
+                "conversation_id": "c1",
+                "is_active": True,
+                "isActive": True,
+                "is_configured": True,
+                "isConfigured": True,
+                "members": [],
+            }
+        ).encode()
         mock_resp.getheaders.return_value = [
             ("content-type", "application/json"),
         ]
@@ -328,11 +342,13 @@ class TestVerdictPhaseA:
     """SPEC-1475: Phase A failures produce DEPLOYMENT BLOCKED."""
 
     def test_a_fail_blocks_deployment(self):
-        result = compute_verdict({
-            "A": [_fail("A.1", "Version mismatch")],
-            "C": [],
-            "D": [],
-        })
+        result = compute_verdict(
+            {
+                "A": [_fail("A.1", "Version mismatch")],
+                "C": [],
+                "D": [],
+            }
+        )
         assert "BLOCKED" in result
         assert "Phase A" in result
 
@@ -344,11 +360,13 @@ class TestVerdictPhaseC:
     """SPEC-1476: Phase C failures produce ROLLBACK REQUIRED."""
 
     def test_c_fail_requires_rollback(self):
-        result = compute_verdict({
-            "A": [],
-            "C": [_fail("C.1", "Version mismatch")],
-            "D": [],
-        })
+        result = compute_verdict(
+            {
+                "A": [],
+                "C": [_fail("C.1", "Version mismatch")],
+                "D": [],
+            }
+        )
         assert "ROLLBACK" in result
         assert "Phase C" in result
 
@@ -360,11 +378,13 @@ class TestVerdictPhaseD:
     """SPEC-1477: Phase D failures produce DEPLOYMENT LIVE BUT DEFECTIVE."""
 
     def test_d_fail_live_but_defective(self):
-        result = compute_verdict({
-            "A": [],
-            "C": [],
-            "D": [_fail("D.1", "Tenant create failed")],
-        })
+        result = compute_verdict(
+            {
+                "A": [],
+                "C": [],
+                "D": [_fail("D.1", "Tenant create failed")],
+            }
+        )
         assert "DEFECTIVE" in result
         assert "Phase D" in result
 
@@ -378,6 +398,7 @@ class TestPhaseDEnvKey:
     def test_main_reads_spa_key_from_env(self):
         """The main() function reads SUPERADMIN_PREVIEW_API_KEY from os.environ."""
         import pre_flight_checklist
+
         source = inspect.getsource(pre_flight_checklist.main)
         assert "SUPERADMIN_PREVIEW_API_KEY" in source
         assert "os.environ" in source
@@ -420,6 +441,7 @@ class TestPhaseBManual:
     def test_main_prints_phase_b_reminder(self):
         """main() prints Phase B reminder even when not explicitly selected."""
         import pre_flight_checklist
+
         source = inspect.getsource(pre_flight_checklist.main)
         assert "Phase B" in source
         assert "MANUAL" in source
@@ -433,6 +455,7 @@ class TestPhaseBLabel:
 
     def test_phase_b_label_in_source(self):
         import pre_flight_checklist
+
         source = inspect.getsource(pre_flight_checklist.main)
         assert "Build & Deploy" in source
 
@@ -445,6 +468,7 @@ class TestPhaseBExecution:
 
     def test_phase_b_mentions_manual_execution(self):
         import pre_flight_checklist
+
         source = inspect.getsource(pre_flight_checklist.main)
         assert "manually" in source or "upgrade.ps1" in source
 
@@ -458,6 +482,7 @@ class TestPhaseASnapshotIntegration:
     def test_phase_b_mentions_phase_a_snapshot(self):
         """Phase B reminder tells user to capture Phase A snapshot."""
         import pre_flight_checklist
+
         source = inspect.getsource(pre_flight_checklist.main)
         assert "phase-a" in source
         assert "upgrade_verification" in source
@@ -472,6 +497,7 @@ class TestPhaseDRequiresSPAKey:
     def test_phase_d_blocked_without_key(self):
         """When SUPERADMIN_PREVIEW_API_KEY is empty, Phase D fails with D.0."""
         import pre_flight_checklist
+
         source = inspect.getsource(pre_flight_checklist.main)
         # The main function checks: if not spa_api_key
         assert "spa_api_key" in source
@@ -537,36 +563,44 @@ class TestComputeVerdict:
         assert result == "DEPLOYMENT VERIFIED"
 
     def test_only_pass_results(self):
-        result = compute_verdict({
-            "A": [_pass("A.1", "ok"), _pass("A.2", "ok")],
-            "C": [_pass("C.1", "ok")],
-            "D": [_pass("D.1", "ok")],
-        })
+        result = compute_verdict(
+            {
+                "A": [_pass("A.1", "ok"), _pass("A.2", "ok")],
+                "C": [_pass("C.1", "ok")],
+                "D": [_pass("D.1", "ok")],
+            }
+        )
         assert result == "DEPLOYMENT VERIFIED"
 
     def test_a_fail_takes_precedence(self):
         """Phase A failure blocks even if C and D also fail."""
-        result = compute_verdict({
-            "A": [_fail("A.1", "bad")],
-            "C": [_fail("C.1", "bad")],
-            "D": [_fail("D.1", "bad")],
-        })
+        result = compute_verdict(
+            {
+                "A": [_fail("A.1", "bad")],
+                "C": [_fail("C.1", "bad")],
+                "D": [_fail("D.1", "bad")],
+            }
+        )
         assert "BLOCKED" in result
 
     def test_c_fail_takes_precedence_over_d(self):
         """Phase C failure requires rollback even if D also fails."""
-        result = compute_verdict({
-            "A": [],
-            "C": [_fail("C.1", "bad")],
-            "D": [_fail("D.1", "bad")],
-        })
+        result = compute_verdict(
+            {
+                "A": [],
+                "C": [_fail("C.1", "bad")],
+                "D": [_fail("D.1", "bad")],
+            }
+        )
         assert "ROLLBACK" in result
 
     def test_skip_and_warn_do_not_block(self):
         """SKIP and WARN do not count as failures."""
-        result = compute_verdict({
-            "A": [_skip("A.1", "skip"), _warn("A.2", "warn")],
-            "C": [_skip("C.1", "skip")],
-            "D": [_warn("D.1", "warn")],
-        })
+        result = compute_verdict(
+            {
+                "A": [_skip("A.1", "skip"), _warn("A.2", "warn")],
+                "C": [_skip("C.1", "skip")],
+                "D": [_warn("D.1", "warn")],
+            }
+        )
         assert result == "DEPLOYMENT VERIFIED"

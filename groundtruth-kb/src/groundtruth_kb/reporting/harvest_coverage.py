@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Protocol
 
 _DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/(.+\.md)$")
+_STATUS_LINE_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+bridge/(.+\.md)$"
+)
 
 
 class _DeliberationLister(Protocol):
@@ -103,13 +105,11 @@ def compute_active_bridge_thread_coverage(
     """
     active_verified = set(_active_verified_threads(index_path))
 
+    all_bridge = db.list_deliberations(source_type="bridge_thread")
     covered: set[str] = set()
     for name in active_verified:
-        hits = db.list_deliberations(
-            source_type="bridge_thread",
-            source_ref=f"bridge/{name}-*.md",
-        )
-        if hits:
+        prefix = f"bridge/{name}-"
+        if any(str(d.get("source_ref", "")).startswith(prefix) for d in all_bridge):
             covered.add(name)
 
     denom = len(active_verified)

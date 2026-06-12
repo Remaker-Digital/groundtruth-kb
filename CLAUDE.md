@@ -9,7 +9,7 @@ For application-scope guidance (Application Identity, Copyright, Adding Commerci
 > **📁 Application-scope reference** (Agent Red legal, pricing, infrastructure, AGNTCY rules): [`applications/Agent_Red/CLAUDE-REFERENCE.md`](applications/Agent_Red/CLAUDE-REFERENCE.md) — read on demand when working on Agent Red.
 > **📁 Application-scope architecture** (Agent Red project structure, module inventory): [`applications/Agent_Red/CLAUDE-ARCHITECTURE.md`](applications/Agent_Red/CLAUDE-ARCHITECTURE.md) — read on demand.
 > **📁 Application-scope historical archive** (Agent Red session logs, technical decisions): [`applications/Agent_Red/CLAUDE_ARCHIVE.md`](applications/Agent_Red/CLAUDE_ARCHIVE.md) — read when investigating Agent Red historical decisions.
-> **📁 Platform session memory** (operational patterns, lessons): `memory/MEMORY.md` — active GT-KB memory must resolve inside `E:\GT-KB`, not a home-directory mirror or legacy project path.
+> **📁 Platform session memory** (operational patterns, lessons): `memory/MEMORY.md` — the in-repo GT-KB notepad is authoritative; home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
 
 ### Canonical Terminology
 
@@ -90,29 +90,69 @@ Specifications should be **as stable as the business need.** Specs function as a
 
 All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
 
-| GOV | Short Name | Core Rule |
-|-----|-----------|-----------|
-| 01 | Spec-first | First priority: create/update spec before any code |
-| 02 | Owner consent | Specs immutable without owner approval |
-| 03 | Test clarity | Every test must produce unambiguous PASS/FAIL |
-| 04 | Maturation | Iterative spec refinement is normal, not a defect |
-| 05 | Fix spec first | Correct specification before changing implementation |
-| 06 | Specify on contact | Unspecified elements become controlled when touched |
-| 07 | No fixes during testing | Record defects as WIs; fix in separate sessions |
-| 08 | KB is truth | All project knowledge lives in the Knowledge Database |
-| 09 | Input classification | Specification language triggers spec-first workflow |
-| 10 | Live interfaces only | Tests must exercise production interfaces, not source code |
-| 11 | Checkpoint discipline | Review spec coverage at WI/phase boundaries |
-| 12 | WI triggers tests | Work item creation initiates test creation |
-| 13 | Phase assignment | Every Test assigned to PLAN-001 phase at creation; no orphans |
-| 14 | UI test sync | UI element changes require matching test updates |
-| 15 | Test fix gate | No fixing failed tests without owner approval |
-| 16 | Deploy gate | No deployment without owner approval |
-| 17 | Quality first | Prioritize quality over effort; software engineering excellence |
-| 18 | Assertion quality | Meaningfulness over coverage; no rubber-stamp assertions |
-| 19 | Outside-in testing | Tests exercise surfaces and behaviors; internals are supplemental |
-| 20 | Architecture decisions | ADR/DCL/IPR/CVR advisory pilot for cross-cutting decisions |
-
+| ID | Title |
+|----|-------|
+| GOV-01 | CLAUDE.md must not exceed 300 lines |
+| GOV-02 | CLAUDE.md must be minimum size without loss of fidelity |
+| GOV-03 | Specs are the negotiation artifact for mutual understanding |
+| GOV-04 | Spec granularity driven by test unambiguity, not mandatory decomposition |
+| GOV-05 | Specs mature through iterative refinement |
+| GOV-06 | Spec-first correction cycle: fix the spec, not the code |
+| GOV-07 | No bug fixes during testing procedures |
+| GOV-08 | Knowledge Database is the single source of truth |
+| GOV-09 | Owner Input Classification Rule: detect specification language before implementation |
+| GOV-10 | Test artifacts must exercise exposed production interfaces |
+| GOV-11 | Design Decision Checkpoint Discipline |
+| GOV-12 | Work item creation triggers test creation |
+| GOV-13 | Test artifacts must be assigned to at least one test plan phase upon creation |
+| GOV-14 | UI element test maintenance — add/retire tests when UI elements change |
+| GOV-15 | Test fix approval gate — no autonomous fixes for failed tests |
+| GOV-16 | Deployment approval gate — no autonomous deployments |
+| GOV-17 | Automation script modification approval gate |
+| GOV-19 | Outside-in testing principle |
+| GOV-20 | Architecture Decision Governance |
+| GOV-ACTING-PRIME-BUILDER-001 | Codex acts as Prime Builder while canonical Prime Builder is unavailable |
+| GOV-AGENT-RED-GTKB-CONFORMANCE-001 | Agent Red is a separate project, not part of GroundTruth-KB |
+| GOV-AGENT-RED-NESTED-IN-APPLICATIONS-001 | GT-KB project root boundary: Agent Red MUST live at E:/GT-KB/applications/Agent_Red/; applications/ namespace contains only deployed applications |
+| GOV-ARTIFACT-AMBIGUITY-AUDIT-001 | All project artifacts must be audited to remove application-specific framing from platform layer |
+| GOV-ARTIFACT-APPROVAL-001 | Formal artifact approval gate |
+| GOV-ARTIFACT-ORIENTED-GOVERNANCE-001 | Artifact-oriented governance is the default project interpretation stance |
+| GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001 | All cross-cutting technical requirements MUST be mechanically enforced for all implementation proposals, via two-layer defense in depth (write-time + review-time) |
+| GOV-DOCUMENT-AUTHOR-PROVENANCE-001 | Document Artifact Author Provenance Contract |
+| GOV-ENV-LOCAL-AUTHORITY-001 | env source-of-truth artifacts are authoritative per scope; single SoT per scope at a fixed relative path |
+| GOV-FILE-BRIDGE-AUTHORITY-001 | Live bridge index authority and permanent bridge repair authority |
+| GOV-GLOSSARY-AS-DA-READ-SURFACE-001 | Canonical glossary is the Deliberation Archive's primary read surface |
+| GOV-GTKB-ADOPTION-ENFORCEMENT-001 | A GroundTruth-KB adopter application must adopt and enforce available GT-KB governance capabilities |
+| GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001 | GT-KB installs must prepare capable harnesses for Prime Builder and Loyal Opposition roles |
+| GOV-HARNESS-ONBOARDING-CONTRACT-001 | Harness Onboarding Contract -- required artifacts, machine-checkable assertions, and capability floor for any new GT-KB coding harness |
+| GOV-HARNESS-ROLE-PORTABILITY-001 | Prime Builder and Loyal Opposition are portable harness-assigned roles |
+| GOV-HARNESS-STATE-SOT-CONSOLIDATION-001 | Harness State Source-of-Truth Consolidation |
+| GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001 | LO Advisory Owner-Grilling Gate Before Implementation Proposal |
+| GOV-MAJOR-RELEASE-CONTENT-GOAL-001 | Standing Major-Release Content Goal |
+| GOV-PLATFORM-SOT-REGISTRY-001 | Platform-wide SoT Artifact Registry |
+| GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 | Project-scoped implementation authorization |
+| GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001 | Project Authorization Requires Linked Specifications |
+| GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 | VERIFIED-Driven Project Completion and Retirement Are Automatic (No Owner Confirmation) |
+| GOV-RELEASE-READINESS-GOVERNED-TESTING-001 | Production release readiness requires governed test evidence |
+| GOV-RELIABILITY-FAST-LANE-001 | Reliability fast-lane for small defect fixes |
+| GOV-REQUIREMENTS-COLLECTION-HOOK-001 | A UserPromptSubmit hook MUST classify each owner message and force 3-option clarification when a requirement candidate is detected |
+| GOV-SESSION-FORMALIZATION-AUDIT-001 | Session decisions and principles require artifact mapping audit |
+| GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001 | Sessions actively inform and engage the user with project priorities and suggested actions |
+| GOV-SESSION-ROLE-AUTHORITY-001 | Session Role Authority Split - Durable vs Session-Stated |
+| GOV-SESSION-SELF-INITIALIZATION-001 | Fresh sessions self-initialize with live role, governance, bridge, dashboard, priorities, and token context |
+| GOV-SOURCE-OF-TRUTH-FRESHNESS-001 | Source-of-truth freshness: state claims derive from fresh canonical reads |
+| GOV-SPEC-CAPTURE-TRANSPARENCY-001 | Specification capture transparency: surface every capture event + present full text on approve/reject |
+| GOV-SPEC-CREATION-STANDING-AUTHORIZATION-001 | Spec creation from owner input has standing authorization |
+| GOV-STANDING-BACKLOG-001 | Standing backlog is the durable cross-session work authority |
+| GOV-TRIAD-COMPLETENESS-AUDIT-001 | Standing audit of spec/test/implementation triad completeness |
+| GOV-V1-ACCEPTANCE-CRITERIA-001 | GT-KB v1.0 Acceptance Criteria (gating, 3-tier; sole anti-perpetual-rc1 checkpoint) |
+| RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 | Retire harness-state/role-assignments.json legacy mirror |
+| SPEC-1493 | Artifact Inventory: 8 managed artifact types, 2 supporting record types, 0 phantom references |
+| SPEC-1499 | Orchestrating artifact principle: composing artifacts reference by ID without duplicating content |
+| SPEC-1534 | AGNTCY SDK Mandatory for All Agent Communication |
+| SPEC-1662 | GOV-18: Assertion Quality Standard — meaningfulness over coverage |
+| SPEC-1830 | Operational Procedures Must Be Code, Not Conversation |
+| SPEC-INTAKE-0ecc94 | GT-KB is the default locus for all new artifacts |
 ### Architecture Decision Workflow (GOV-20)
 
 Cross-cutting decisions use four artifact types stored in KB:
@@ -175,9 +215,9 @@ Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`
 
 ### Knowledge Database Access
 
-**Always use the Python API** (`tools/knowledge-db/db.py`) — never edit SQLite directly. Web UI: `localhost:8090`. Claude is the sole writer; owner observes via read-only UI.
+**Always use the Python API** (`groundtruth-kb/src/groundtruth_kb/db.py`) to access the root `groundtruth.db` — never edit SQLite directly. Web UI: `localhost:8090`. Claude is the sole writer; owner observes via read-only UI.
 
-**Session-start hook** (`.claude/hooks/assertion-check.py`) runs assertions automatically. Failing `specified` = expected. Failing `implemented`/`verified` = regression.
+**Claude SessionStart hook** (`.claude/hooks/assertion-check.py`) runs assertions automatically in the Claude hook surface. Failing `specified` = expected. Failing `implemented`/`verified` = regression.
 
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
@@ -199,10 +239,6 @@ Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`
 
 - **Prime Builder sessions:** Execute `/kb-session-wrap <session-id>` for the full 5-phase procedure. Every 5th session is an **audit session** (extra hygiene steps included in the skill).
 - **Loyal Opposition sessions:** default wrap-up is an evidence-based report in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` plus unresolved-item updates in `independent-progress-assessments/loyal-opposition-log.md`. Do not update KB, MEMORY.md, push, or deploy unless Mike explicitly asked for it.
-
-### Session Scheduler
-
-`.claude/SCHEDULE.md` contains pre-planned prompts injected via `UserPromptSubmit` hook.
 
 ### Continuous Improvement Feedback
 

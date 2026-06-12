@@ -35,11 +35,11 @@ jobs:
           python -m pip install --upgrade pip
           grep -v '^agntcy-app-sdk' requirements.txt > /tmp/requirements-filtered.txt
           pip install -r /tmp/requirements-filtered.txt
-          pip install pytest pytest-cov
+          pip install "./groundtruth-kb[dev,search]" pytest pytest-cov pytest-timeout
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=applications/Agent_Red/src --cov-report=xml:coverage.xml platform_tests/unit/ applications/Agent_Red/tests/unit/ || true
+          python -m pytest --cov=groundtruth-kb/src --cov=scripts --cov-report=xml:coverage.xml groundtruth-kb/tests/ platform_tests/unit/ || true
         continue-on-error: true
 
       - name: Validate SonarCloud token

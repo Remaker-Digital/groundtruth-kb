@@ -8,7 +8,9 @@ Loyal Opposition.
 
 - **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared platform infrastructure, governance artifacts, and conventions that one active developed application consumes at a time. Platform/application isolation exists for independent lifecycle and release cadence, not for concurrent multi-application development inside one GT-KB host directory. Expanded reference: `docs/gtkb-idp-concept.md`. Canonical operating-model artifact: `.claude/rules/operating-model.md` §2 (active; rule-cited soft authority) — defines application, project, platform, hosted application, work item, backlog, specification, requirement, implementation proposal, implementation report, verification, release, MemBase, Deliberation Archive, dashboard.
 - **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
-- **Adopter / demo application:** An application that consumes GT-KB. GT-KB includes four small demo applications for validation and examples. Agent Red is not part of GT-KB; it is a separate project whose repository is `https://github.com/mike-remakerdigital/agent-red`. Unless Mike explicitly says the session is Agent Red work, assume active work is GroundTruth-KB.
+- **Adopter / demo application:** An application that consumes GT-KB.
+  - **Agent Red:** The reference adopter application for GT-KB. Agent Red exercises the platform's application-isolation contract in continuous use through a deliberately lifecycle-independent repository and CI cadence. The application subtree lives at `applications/Agent_Red/`. Its hosted form deploys from a lifecycle-independent repository (`https://github.com/mike-remakerdigital/agent-red`). Agent Red is the isolation validator: portability of Agent Red between GT-KB installations is the operative test of the platform/application isolation contract. Unless Mike explicitly says the session is Agent Red work, assume active work is GroundTruth-KB.
+  - **Other demo applications:** GT-KB includes five adopter fixtures in `groundtruth-kb/examples/` for validation and examples. These are distinct from Agent Red (the reference adopter).
 - **MEMORY.md:** The operational notepad tier of ADR-0001. In the GT-KB checkout this lives at `memory/MEMORY.md` (harness-memory profile); in standard scaffolded adopter projects it lives at the project root. The doctor's `harness-memory` profile skips the root-MEMORY.md content check while still enforcing the canonical-term content contract on AGENTS.md and rule files.
 
 ## Mandatory Project Root Boundary
@@ -16,8 +18,7 @@ Loyal Opposition.
 All active files for the GT-KB project MUST be within `E:\GT-KB`. No GT-KB
 artifact may be created, read as a live dependency, updated, verified, or
 required from outside that root. GT-KB demo/application files MUST be within
-`E:\GT-KB\applications\`. Agent Red project files are not GT-KB files and must
-not be treated as live GT-KB artifacts. There are no exceptions.
+`E:\GT-KB\applications\`. Agent Red project files are managed separately from GT-KB, exercising a lifecycle-independent repository and CI cadence as the reference adopter application, and must not be treated as directly integrated GT-KB artifacts. There are no exceptions.
 `E:\Claude-Playground` is an archive only and must not be used as a live
 GT-KB, Agent Red, harness-state, bridge, dashboard, memory, source,
 verification, or dependency location.

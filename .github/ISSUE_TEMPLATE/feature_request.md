@@ -24,4 +24,4 @@ Any alternative approaches you've thought about.
 
 ## Additional Context
 
-Any mockups, references, or related issues.
+Any mockups, references, related issues, specifications, or bridge threads.

@@ -2,16 +2,16 @@
 
 <!-- Brief description of what this PR does and why -->
 
-## Change Class (S251 OM-2 — Required)
+## Change Class (Required)
 
-<!-- Select ONE. This determines the release gates required for production promotion. -->
+<!-- Select ONE. This determines the review and release gates required for promotion. -->
 
-- [ ] **Class A** — UI-only, no widget/chat/auth/config effect
-- [ ] **Class B** — Admin/config/integration change
-- [ ] **Class C** — Widget, auth, tenant routing, chat transport, activation, migration, or AI-path change
+- [ ] **Class A** — Documentation, tests, or tooling-only; no runtime behavior effect
+- [ ] **Class B** — Platform configuration, governance, bridge, dashboard, or workflow change
+- [ ] **Class C** — Hosted-application runtime, auth, tenant routing, data migration, deploy path, or AI-path change
 
-> **Class C changes require live widget conversation proof in staging and a production canary post-deploy.**
-> If unsure, classify as C. Under-classification is a release-governance violation.
+> **Class C changes require release-readiness evidence appropriate to the affected hosted application or platform surface.**
+> If unsure, classify as C. Under-classification is a governance violation.
 
 ## Test Plan
 

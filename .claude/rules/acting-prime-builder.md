@@ -39,9 +39,9 @@ one model name or vendor harness.
 ## Mandatory Project Root Boundary
 
 All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
-demo/application files must remain within `E:\GT-KB\applications\`. Agent Red
+demo/application files must remain within `E:\GT-KB\applications`. Agent Red
 is the reference adopter application for GT-KB at
-`E:\GT-KB\applications\Agent_Red\`; its in-root application subtree is in scope
+`E:\GT-KB\applications\Agent_Red`; its in-root application subtree is in scope
 for GT-KB review when explicitly named. Unqualified GT-KB tooling references
 must not resolve silently to Agent Red's lifecycle-independent repository or CI
 surfaces. There are no exceptions to the root-containment rule.
@@ -60,22 +60,12 @@ harness.
 When the bridge is available, the bridge counterpart is always Loyal Opposition
 and must be configured to behave accordingly.
 
-## GT-KB Installation Configuration Principle
-
-When GroundTruth-KB is installed, the project must be fully configured for the role of Prime Builder.
-
-If more than one AI harness is installed or available, configuration should be
-prepared for all capable harnesses so any of them may take either role when the
-owner assigns it.
-
-The owner assigns the Prime Builder role. The Loyal Opposition role is assumed
-by the bridge participant that is not Prime Builder.
-
 ## Agent Red Reference Adopter Application Boundary
 
 Agent Red is the reference adopter application for GT-KB. The application subtree
-lives at `applications/Agent_Red/` per `CLAUDE.md` section Mandatory Project Root
-Boundary; its hosted form deploys from a lifecycle-independent repository at
+lives at `applications/Agent_Red/` per `CLAUDE.md` § Mandatory Project Root
+Boundary and is described by `applications/Agent_Red/.gtkb-app-isolation.json`.
+Its hosted form deploys from a lifecycle-independent repository at
 `https://github.com/mike-remakerdigital/agent-red`. Agent Red exercises the
 platform's application-isolation contract in continuous use; portability of
 Agent Red between GT-KB installations is the operative test of that contract.
@@ -94,10 +84,13 @@ Red surfaces. The narrowing scopes tooling-reference resolution; it does not
 alter Agent Red's role as the reference adopter or as the isolation validator.
 Agent Red surfaces are addressed explicitly when in scope.
 
-GroundTruth-KB also includes four small demo applications used as scaffold
-examples; those are distinct from Agent Red (the reference adopter). Do not
+GroundTruth-KB also includes five adopter fixtures in `groundtruth-kb/examples/` used as scaffold examples; those are distinct from Agent Red (the reference adopter). Do not
 route unqualified GT-KB release, CI, bridge, source, or verification evidence to
 Agent Red surfaces; Agent Red work requires explicit scope.
+
+Owner decision `DELIB-S347-AGENT-RED-REFERENCE-ADOPTER-FRAMING-RESTORATION`
+explicitly confirms the "reference adopter" framing for Agent Red and authorizes
+this narrative edit.
 
 ## Formal Artifact Approval And Audit Principle
 

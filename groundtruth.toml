@@ -15,7 +15,7 @@ runtime_root = "memory"
 dashboard_db = "memory/gtkb-dashboard.sqlite"
 
 [project]
-project_name = "Agent Red Customer Experience"
+project_name = "GroundTruth-KB Platform"
 owner = "Remaker Digital"
 profile = "dual-agent"
 copyright_notice = "© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved."

@@ -23,10 +23,12 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-BRIDGE_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY", "DEFERRED"})
+BRIDGE_STATUS_TOKENS = frozenset(
+    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY", "DEFERRED", "ACCEPTED", "BLOCKED"}
+)
 
 _BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s+(bridge/\S+\.md)\s*$"
 )
 _BRIDGE_STATUS_SHAPED_LINE_RE = re.compile(r"^([A-Z][A-Z\-]+):\s+bridge/\S+\.md\s*$")
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+\S")

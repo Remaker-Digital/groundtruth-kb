@@ -9,6 +9,7 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 - No GT-KB artifact may be created, read as a live dependency, updated, verified,
   or required from outside `E:\GT-KB`.
 - GT-KB demo/application files MUST be within `E:\GT-KB\applications\`.
+- **EXCEPTION:** `groundtruth-kb/examples/` (adopter fixtures) are exempt from the `applications/` mandate.
 - Agent Red is the reference adopter application for GT-KB. Its application files
   live at `E:\GT-KB\applications\Agent_Red\` per `CLAUDE.md` section
   Mandatory Project Root Boundary, governed by the isolation contract at

@@ -1,0 +1,11 @@
+# FAB-11 retention policy for high-volume assertion_run pipeline telemetry.
+# Core artifact rows remain append-only; this applies only to operational
+# pipeline_events rows where event_type == "assertion_run".
+
+schema_version = 1
+authority = "bridge/gtkb-fab-11-regression-signal-revival-003.md"
+event_type = "assertion_run"
+retention_days = 14
+delete_batch_size = 50000
+vacuum_after_delete = true
+snapshot_prefix = "groundtruth.db.pre-backfill-fab11-vacuum"

@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Ensure scripts/ is importable
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from upgrade_verification import (  # noqa: E402
@@ -37,13 +37,12 @@ from upgrade_verification import (  # noqa: E402
     widget_call,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_mock_response(status: int = 200, body: dict | str = "",
-                        headers: list[tuple[str, str]] | None = None):
+
+def _make_mock_response(status: int = 200, body: dict | str = "", headers: list[tuple[str, str]] | None = None):
     """Create a mock urllib response object."""
     mock_resp = MagicMock()
     mock_resp.status = status
@@ -88,10 +87,16 @@ class TestPhaseASnapshot:
     def test_phase_a_returns_dict(self, mock_urlopen):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "active_version": 1,
-             "totalCount": 5, "status_breakdown": {},
-             "members": [{"displayName": "Admin", "role": "superadmin"}]},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "active_version": 1,
+                "totalCount": 5,
+                "status_breakdown": {},
+                "members": [{"displayName": "Admin", "role": "superadmin"}],
+            },
             [("x-product-version", "1.60.0"), ("content-type", "application/json")],
         )
         mock_urlopen.return_value = mock_resp
@@ -103,19 +108,32 @@ class TestPhaseASnapshot:
     def test_phase_a_snapshot_has_expected_keys(self, mock_urlopen):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "active_version": 1,
-             "totalCount": 5, "status_breakdown": {},
-             "members": [{"displayName": "Admin", "role": "superadmin"}]},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "active_version": 1,
+                "totalCount": 5,
+                "status_breakdown": {},
+                "members": [{"displayName": "Admin", "role": "superadmin"}],
+            },
             [("x-product-version", "1.60.0"), ("content-type", "application/json")],
         )
         mock_urlopen.return_value = mock_resp
         env = ENVIRONMENTS["staging"].copy()
         result = phase_a(env)
         expected_keys = {
-            "A1_version", "A2_status", "A3_activation", "A4_conversation_count",
-            "A5_status_breakdown", "A6_kb_count", "A7_team_count",
-            "A8_team_members", "A9_draft_status", "A10_config_keys",
+            "A1_version",
+            "A2_status",
+            "A3_activation",
+            "A4_conversation_count",
+            "A5_status_breakdown",
+            "A6_kb_count",
+            "A7_team_count",
+            "A8_team_members",
+            "A9_draft_status",
+            "A10_config_keys",
             "A11_widget_key_exists",
         }
         assert expected_keys.issubset(set(result.keys()))
@@ -131,10 +149,16 @@ class TestPhaseAHeader:
     def test_phase_a_prints_header(self, mock_urlopen, capsys):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "active_version": 1,
-             "totalCount": 0, "status_breakdown": {},
-             "members": []},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "active_version": 1,
+                "totalCount": 0,
+                "status_breakdown": {},
+                "members": [],
+            },
             [("x-product-version", "1.60.0")],
         )
         mock_urlopen.return_value = mock_resp
@@ -155,15 +179,27 @@ class TestPhaseCVerification:
     def test_phase_c_returns_list(self, mock_urlopen, mock_sleep):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "totalCount": 5,
-             "status_breakdown": {}, "members": [],
-             "total": 1, "overallStatus": "healthy",
-             "tenantId": "staging-001", "totalPlatformCost": 0,
-             "totalTenantsScanned": 0, "current_tier": "starter",
-             "addons": [1, 2, 3, 4], "total_vectors": 0,
-             "memory_enabled": False, "etag": "x", "fcrRate": 0,
-             "direction": "up"},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "totalCount": 5,
+                "status_breakdown": {},
+                "members": [],
+                "total": 1,
+                "overallStatus": "healthy",
+                "tenantId": "staging-001",
+                "totalPlatformCost": 0,
+                "totalTenantsScanned": 0,
+                "current_tier": "starter",
+                "addons": [1, 2, 3, 4],
+                "total_vectors": 0,
+                "memory_enabled": False,
+                "etag": "x",
+                "fcrRate": 0,
+                "direction": "up",
+            },
             [("x-product-version", "1.60.0")],
         )
         mock_urlopen.return_value = mock_resp
@@ -191,15 +227,27 @@ class TestPhaseCVerification:
     def test_phase_c_results_have_expected_shape(self, mock_urlopen, mock_sleep):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "totalCount": 5,
-             "status_breakdown": {}, "members": [],
-             "total": 1, "overallStatus": "healthy",
-             "tenantId": "staging-001", "totalPlatformCost": 0,
-             "totalTenantsScanned": 0, "current_tier": "starter",
-             "addons": [1, 2, 3, 4], "total_vectors": 0,
-             "memory_enabled": False, "etag": "x", "fcrRate": 0,
-             "direction": "up"},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "totalCount": 5,
+                "status_breakdown": {},
+                "members": [],
+                "total": 1,
+                "overallStatus": "healthy",
+                "tenantId": "staging-001",
+                "totalPlatformCost": 0,
+                "totalTenantsScanned": 0,
+                "current_tier": "starter",
+                "addons": [1, 2, 3, 4],
+                "total_vectors": 0,
+                "memory_enabled": False,
+                "etag": "x",
+                "fcrRate": 0,
+                "direction": "up",
+            },
             [("x-product-version", "1.60.0")],
         )
         mock_urlopen.return_value = mock_resp
@@ -235,15 +283,27 @@ class TestPhaseCCallCount:
     def test_phase_c_makes_many_calls(self, mock_urlopen, mock_sleep):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "totalCount": 5,
-             "status_breakdown": {}, "members": [],
-             "total": 1, "overallStatus": "healthy",
-             "tenantId": "staging-001", "totalPlatformCost": 0,
-             "totalTenantsScanned": 0, "current_tier": "starter",
-             "addons": [1, 2, 3, 4], "total_vectors": 0,
-             "memory_enabled": False, "etag": "x", "fcrRate": 0,
-             "direction": "up"},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "totalCount": 5,
+                "status_breakdown": {},
+                "members": [],
+                "total": 1,
+                "overallStatus": "healthy",
+                "tenantId": "staging-001",
+                "totalPlatformCost": 0,
+                "totalTenantsScanned": 0,
+                "current_tier": "starter",
+                "addons": [1, 2, 3, 4],
+                "total_vectors": 0,
+                "memory_enabled": False,
+                "etag": "x",
+                "fcrRate": 0,
+                "direction": "up",
+            },
             [("x-product-version", "1.60.0")],
         )
         mock_urlopen.return_value = mock_resp
@@ -264,9 +324,7 @@ class TestPhaseCCallCount:
         # Each non-SKIP check makes at least one urlopen call.
         # The function also uses a rate-limited wrapper.
         # We expect at least 20 calls (some are SKIPs).
-        assert mock_urlopen.call_count >= 20, (
-            f"Expected ~30 API calls, got {mock_urlopen.call_count}"
-        )
+        assert mock_urlopen.call_count >= 20, f"Expected ~30 API calls, got {mock_urlopen.call_count}"
 
 
 # ---------------------------------------------------------------------------
@@ -280,15 +338,27 @@ class TestPhaseCHeader:
     def test_phase_c_prints_header(self, mock_urlopen, mock_sleep, capsys):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "totalCount": 5,
-             "status_breakdown": {}, "members": [],
-             "total": 1, "overallStatus": "healthy",
-             "tenantId": "staging-001", "totalPlatformCost": 0,
-             "totalTenantsScanned": 0, "current_tier": "starter",
-             "addons": [1, 2, 3, 4], "total_vectors": 0,
-             "memory_enabled": False, "etag": "x", "fcrRate": 0,
-             "direction": "up"},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "totalCount": 5,
+                "status_breakdown": {},
+                "members": [],
+                "total": 1,
+                "overallStatus": "healthy",
+                "tenantId": "staging-001",
+                "totalPlatformCost": 0,
+                "totalTenantsScanned": 0,
+                "current_tier": "starter",
+                "addons": [1, 2, 3, 4],
+                "total_vectors": 0,
+                "memory_enabled": False,
+                "etag": "x",
+                "fcrRate": 0,
+                "direction": "up",
+            },
             [("x-product-version", "1.60.0")],
         )
         mock_urlopen.return_value = mock_resp
@@ -319,10 +389,16 @@ class TestPhaseASnapshotJSON:
     def test_snapshot_is_json_serializable(self, mock_urlopen):
         mock_resp = _make_mock_response(
             200,
-            {"state": "active", "is_active": True, "is_configured": True,
-             "has_pending_changes": False, "active_version": 1,
-             "totalCount": 5, "status_breakdown": {},
-             "members": [{"displayName": "Admin", "role": "superadmin"}]},
+            {
+                "state": "active",
+                "is_active": True,
+                "is_configured": True,
+                "has_pending_changes": False,
+                "active_version": 1,
+                "totalCount": 5,
+                "status_breakdown": {},
+                "members": [{"displayName": "Admin", "role": "superadmin"}],
+            },
             [("x-product-version", "1.60.0")],
         )
         mock_urlopen.return_value = mock_resp
@@ -402,8 +478,7 @@ class TestEnvironmentsStructure:
 
     @pytest.mark.parametrize("env_name", ["staging", "production"])
     def test_environment_has_required_keys(self, env_name):
-        required = {"fqdn", "container_app", "tenant_id", "api_key",
-                     "widget_key", "resource_group"}
+        required = {"fqdn", "container_app", "tenant_id", "api_key", "widget_key", "resource_group"}
         assert required.issubset(set(ENVIRONMENTS[env_name].keys()))
 
     def test_tenants_has_staging_002(self):

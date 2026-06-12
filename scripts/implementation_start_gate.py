@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import ast
+import datetime as _dt
+import hashlib
 import json
+import os
 import re
 import shlex
 import sys
@@ -29,6 +32,27 @@ except ImportError:  # pragma: no cover - direct script execution path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+
+def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "implementation-start-gate",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 PROTECTED_EXACT = {
     ".claude/settings.json",
     ".codex/hooks.json",
@@ -50,6 +74,10 @@ PROTECTED_PREFIXES = (
 ALLOWED_WRITE_PREFIXES = (
     "bridge/",
     "independent-progress-assessments/",
+)
+DIAGNOSTIC_WRITE_PREFIXES = (
+    ".groundtruth/session/snapshots/",
+    ".gtkb-state/",
 )
 SAFE_COMMAND_PREFIXES = (
     "rg ",
@@ -110,9 +138,9 @@ SQLITE_WRITE_DISQUALIFIERS_RE = re.compile(
     re.IGNORECASE,
 )
 BLOCKING_CLAUSE_ID = "PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001"
-PATH_TOKEN_RE = re.compile(
-    r"(?P<path>(?:\.?/?(?:scripts|groundtruth-kb/src|groundtruth-kb/tests|platform_tests|tests|config|\.claude/hooks|\.codex/gtkb-hooks|\.github|bridge|independent-progress-assessments|memory)/[^\s'\";]+|\.claude/settings\.json|\.codex/hooks\.json|pyproject\.toml|groundtruth\.toml))"
-)
+# PATH_TOKEN_RE removed here (HYG-046): it was an unused dead copy. The canonical
+# constant lives in implementation_authorization; bridge_applicability_preflight
+# (its sole live user) imports it from there — eliminating the prior drift.
 PATCH_PATH_RE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
 PATCH_MOVE_RE = re.compile(r"^\*\*\* Move to: (.+)$", re.MULTILINE)
 POWERSHELL_ENV_ASSIGNMENT_RE = re.compile(
@@ -130,6 +158,12 @@ _HEREDOC_OPENER_RE = re.compile(
     r"\$\([ \t]*cat[ \t]+<<(?P<dash>-?)[ \t]*"
     r"(?P<q>['\"])(?P<delim>[A-Za-z_][A-Za-z0-9_]*)(?P=q)"
 )
+_PYTHON_EXECUTABLE_NAMES = {"py", "python", "python.exe"}
+_WRAP_DIAGNOSTIC_SCRIPT_NAMES = {
+    "wrap_capture_transcript.py",
+    "wrap_scan_hygiene.py",
+    "wrap_scan_consistency.py",
+}
 
 
 def _project_root(payload: dict[str, Any]) -> Path:
@@ -174,6 +208,8 @@ def is_protected_path(relative_path: str) -> bool:
     if rel in PROTECTED_EXACT:
         return True
     if rel.startswith(ALLOWED_WRITE_PREFIXES):
+        return False
+    if rel.startswith(DIAGNOSTIC_WRITE_PREFIXES):
         return False
     return any(rel.startswith(prefix) for prefix in PROTECTED_PREFIXES)
 
@@ -424,6 +460,124 @@ def _split_pipeline_stages(command: str) -> list[str]:
         i += 1
     stages.append(command[start:])
     return [s.strip() for s in stages if s.strip()]
+
+
+def _shell_split(command: str, *, punctuation: bool = False) -> list[str] | None:
+    if not command:
+        return []
+    if punctuation:
+        lexer = shlex.shlex(command, posix=False, punctuation_chars=True)
+        lexer.whitespace_split = True
+        try:
+            return list(lexer)
+        except ValueError:
+            return None
+    try:
+        return shlex.split(command, posix=False)
+    except ValueError:
+        return None
+
+
+def _shell_verb_index(tokens: list[str]) -> int | None:
+    for index, token in enumerate(tokens):
+        if "=" in token and not token.startswith("-") and "/" not in token and "\\" not in token:
+            continue
+        return index
+    return None
+
+
+def _python_script_invocation(tokens: list[str]) -> tuple[str, list[str]] | None:
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None
+    relevant = tokens[verb_index:]
+    verb_name = Path(relevant[0].strip("'\"")).name.lower()
+    if verb_name not in _PYTHON_EXECUTABLE_NAMES and not verb_name.startswith("python"):
+        return None
+    if len(relevant) < 2:
+        return None
+    script_token = relevant[1].strip("'\"")
+    script_name = Path(script_token).name
+    if script_name not in _WRAP_DIAGNOSTIC_SCRIPT_NAMES:
+        return None
+    return script_name, relevant[2:]
+
+
+def _arg_value(args: list[str], flag: str) -> str | None:
+    for index, token in enumerate(args):
+        if token == flag and index + 1 < len(args):
+            return args[index + 1]
+        if token.startswith(flag + "="):
+            return token.split("=", 1)[1]
+    return None
+
+
+def _redirect_targets(stage: str) -> list[str]:
+    tokens = _shell_split(stage, punctuation=True)
+    if tokens is None:
+        return []
+    targets: list[str] = []
+    for index, token in enumerate(tokens):
+        if REDIRECT_OPERATOR_TOKEN_RE.fullmatch(token):
+            if index + 1 < len(tokens):
+                targets.append(tokens[index + 1])
+            continue
+        if (
+            re.fullmatch(r"\d+", token)
+            and index + 1 < len(tokens)
+            and REDIRECT_OPERATOR_TOKEN_RE.fullmatch(tokens[index + 1])
+        ):
+            if index + 2 < len(tokens):
+                targets.append(tokens[index + 2])
+    return targets
+
+
+def _diagnostic_output_paths_for_stage(root: Path, stage: str) -> list[str] | None:
+    tokens = _shell_split(stage)
+    if tokens is None:
+        return None
+    invocation = _python_script_invocation(tokens)
+    if invocation is None:
+        return None
+    script_name, args = invocation
+    outputs: list[str] = []
+    if script_name == "wrap_capture_transcript.py":
+        session_id = _arg_value(args, "--session-id")
+        if not session_id:
+            return None
+        snapshot_root = _arg_value(args, "--snapshot-root") or ".groundtruth/session/snapshots"
+        snapshot_root = snapshot_root.rstrip("/").rstrip("\\")
+        outputs.append(f"{snapshot_root}/{session_id}/manifest.json")
+    else:
+        report_path = _arg_value(args, "--write-report")
+        if report_path:
+            outputs.append(report_path)
+        outputs.extend(_redirect_targets(stage))
+        if not outputs:
+            return None
+    normalized: list[str] = []
+    for output in outputs:
+        rel = _normalize(root, output)
+        if not rel:
+            return None
+        normalized.append(rel)
+    return sorted(set(normalized))
+
+
+def _diagnostic_output_paths_from_shell(root: Path, command: str) -> list[str] | None:
+    if not command:
+        return None
+    outputs: list[str] = []
+    matched = False
+    for stage in _split_pipeline_stages(command):
+        stage_outputs = _diagnostic_output_paths_for_stage(root, stage)
+        if stage_outputs is None:
+            continue
+        matched = True
+        outputs.extend(stage_outputs)
+    if not matched:
+        return None
+    return sorted(set(outputs))
 
 
 def _paths_from_shell(root: Path, command: str) -> list[str]:
@@ -833,6 +987,9 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
         command = str((data.get("command") if isinstance(data, dict) else None) or payload.get("command") or "")
         if _is_safe_command(command):
             return [], False
+        diagnostic_outputs = _diagnostic_output_paths_from_shell(root, command)
+        if diagnostic_outputs is not None:
+            return diagnostic_outputs, True
         paths = _paths_from_shell(root, command)
         return paths, _is_mutating_command(command)
 
@@ -896,6 +1053,7 @@ def main() -> int:
         return 0
     if result.get("decision") == "block":
         reason = result.get("reason") or "BLOCKED (GTKB-IMPLEMENTATION-START-GATE)"
+        _record_gate_denial("protected-target-without-go", json.dumps(payload, sort_keys=True), reason)
         print(
             json.dumps(
                 {

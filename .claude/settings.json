@@ -58,7 +58,7 @@
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|Bash|Delete|Move|Copy",
+        "matcher": "Write|Edit|MultiEdit|Bash|PowerShell|Delete|Move|Copy",
         "hooks": [
           {
             "type": "command",
@@ -252,14 +252,6 @@
           {
             "type": "command",
             "command": "python .claude/hooks/intake-classifier.py"
-          },
-          {
-            "type": "command",
-            "command": "python .claude/hooks/turn-marker.py"
-          },
-          {
-            "type": "command",
-            "command": "python .claude/hooks/delib-preflight-gate.py"
           },
           {
             "type": "command",

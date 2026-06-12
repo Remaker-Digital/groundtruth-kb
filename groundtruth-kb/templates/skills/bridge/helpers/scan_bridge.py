@@ -44,7 +44,9 @@ PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO"})
 LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED"})
 TERMINAL_STATUSES = frozenset({"VERIFIED"})
 
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
+_STATUS_LINE_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
+)
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 
 

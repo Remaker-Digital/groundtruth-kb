@@ -7,6 +7,7 @@ Total: 8 tests
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import json
@@ -17,10 +18,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Add scripts/ to path so we can import deploy module
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts"))
 
 import deploy  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -39,7 +39,6 @@ def _silence_log(monkeypatch):
 
 
 class TestRecordDeploymentEvent:
-
     @patch.dict("os.environ", {"SPA_PLATFORM_ADMIN_KEY": "test-key-123"})
     @patch("deploy.urllib.request.urlopen")
     def test_posts_correct_payload(self, mock_urlopen):

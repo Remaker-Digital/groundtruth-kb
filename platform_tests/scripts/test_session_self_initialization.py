@@ -282,13 +282,13 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert integrations["pip_audit"]["status"] == "ready"
     assert integrations["docker_scout"]["status"] == "ready"
     assert integrations["accessibility_axe"]["status"] == "ready"
-    assert integrations["chromatic"]["status"] == "ready"
-    assert integrations["docs_quality"]["status"] == "ready"
+    assert integrations["chromatic"]["status"] == "partial"
+    assert integrations["docs_quality"]["status"] == "partial"
     assert integrations["openapi_compatibility"]["status"] == "ready"
     assert integrations["dependabot"]["status"] == "ready"
-    assert integrations["locust_performance"]["status"] == "manual"
-    assert integrations["mutation_testing"]["status"] == "manual"
-    assert integrations["contract_testing"]["status"] == "manual"
+    assert integrations["locust_performance"]["status"] == "partial"
+    assert integrations["mutation_testing"]["status"] == "partial"
+    assert integrations["contract_testing"]["status"] == "not_wired"
     assert integrations["schemathesis_api"]["status"] == "manual"
     assert all(item["remediation"] for item in integrations.values())
     assert all(item["remediation"] for item in integrations.values() if item["health"] == "failing")
@@ -2712,6 +2712,41 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatc
     metrics, top = module._backlog_metrics(root)
     assert "GTKB-NO-BRIDGE-001" in [item["id"] for item in top]
     assert metrics["filtered_verified_ids"] == []
+    assert metrics["active_item_count"] == 1
+
+
+def test_backlog_metrics_counts_only_implementation_active_items(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    backlog_items = [
+        {
+            "id": "GTKB-FUTURE-001",
+            "title": "Future unapproved work",
+            "body": "Body.",
+            "approval_state": "unapproved",
+            "resolution_status": "open",
+            "priority": "P1",
+        },
+        {
+            "id": "GTKB-AUTHORIZED-002",
+            "title": "Authorized work",
+            "body": "Body.",
+            "approval_state": "implementation_authorized",
+            "resolution_status": "open",
+            "priority": "P2",
+        },
+    ]
+    root = _make_recommender_fixture(tmp_path, backlog_items, "")
+    monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
+    module.classify_dashboard_scope = lambda row: "gtkb"
+    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+
+    metrics, top = module._backlog_metrics(root)
+
+    assert metrics["visible_non_terminal_item_count"] == 2
+    assert metrics["active_item_count"] == 1
+    assert metrics["non_implementation_future_item_count"] == 1
+    assert [item["id"] for item in top] == ["GTKB-AUTHORIZED-002"]
 
 
 def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, monkeypatch) -> None:

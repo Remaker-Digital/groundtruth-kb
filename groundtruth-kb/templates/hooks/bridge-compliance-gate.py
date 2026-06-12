@@ -16,6 +16,8 @@ All rights reserved.
 
 from __future__ import annotations
 
+import datetime as _dt
+import hashlib
 import json
 import os
 import re
@@ -229,6 +231,27 @@ ADVISORY_REPORT_SECTIONS = (
     "Classification Slot",
 )
 AUDIT_OUTPUT_RELATIVE_PATH = Path(".codex") / "gtkb-hooks" / "last-bridge-audit.json"
+
+
+def _record_gate_denial(pattern_id: str, subject: str, reason: str, *, root: Path | None = None) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    base = root or Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
+    if not path.is_absolute():
+        path = base / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "bridge-compliance-gate",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
 
 
 def _ancestor_or_self(root: Path, cwd_path: Path) -> bool:
@@ -1341,6 +1364,7 @@ def main() -> None:
             print(json.dumps(out))
 
         def emit_deny(event: str, reason: str) -> None:  # type: ignore[misc]
+            _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
             out = {
                 "hookSpecificOutput": {
                     "hookEventName": event,
@@ -1386,6 +1410,7 @@ def main() -> None:
 
     work_intent_reason = _bridge_work_intent_deny_reason(cwd_path=cwd_path, file_path=file_path, payload=payload)
     if work_intent_reason:
+        _record_gate_denial("bridge-compliance", file_path, work_intent_reason, root=cwd_path)
         emit_deny("PreToolUse", work_intent_reason)
         sys.exit(0)
 
@@ -1397,6 +1422,7 @@ def main() -> None:
         run_pending_preflight=tool_name == "Write",
     )
     if reason:
+        _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
         emit_deny("PreToolUse", reason)
         sys.exit(0)
 
