@@ -21,6 +21,7 @@ GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
 
 Document: gtkb-tafe-phase-0-enablement
+GO: bridge/gtkb-tafe-phase-0-enablement-002.md
 NEW: bridge/gtkb-tafe-phase-0-enablement-001.md
 
 Document: gtkb-tafe-spec-promotion
