@@ -11,10 +11,14 @@ NO-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-002.md
 NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-001.md
 
 Document: gtkb-openrouter-routing-deepseek-cost-optimization
+VERIFIED: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-004.md
+NEW: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-003.md
 GO: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-002.md
 NEW: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-001.md
 
 Document: gtkb-ollama-harness-provider-scoped-model-validation
+VERIFIED: bridge/gtkb-ollama-harness-provider-scoped-model-validation-004.md
+NEW: bridge/gtkb-ollama-harness-provider-scoped-model-validation-003.md
 GO: bridge/gtkb-ollama-harness-provider-scoped-model-validation-002.md
 NEW: bridge/gtkb-ollama-harness-provider-scoped-model-validation-001.md
 

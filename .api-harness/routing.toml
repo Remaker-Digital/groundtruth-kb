@@ -12,14 +12,14 @@ provider = "ollama"
 tool_calling_supported = true
 allowed_tools = ["Read", "Grep", "Glob", "Write", "Edit"]
 
-[models.gemini-2-5-pro]
-model_id = "google/gemini-2.5-pro"
+[models.deepseek-v4-pro]
+model_id = "deepseek/deepseek-v4-pro"
 provider = "openrouter"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
-[models.qwen-2-5-coder]
-model_id = "qwen/qwen-2.5-coder-32b-instruct"
+[models.deepseek-v4-flash]
+model_id = "deepseek/deepseek-v4-flash"
 provider = "openrouter"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
@@ -34,10 +34,10 @@ verification = "qwen3-coder-next-cloud"
 implementation = "qwen3-coder-next-cloud"
 
 [routing.openrouter]
-default_model = "gemini-2-5-pro"
+default_model = "deepseek-v4-pro"
 timeout_seconds = 240
 
 [routing.openrouter.skills]
-bridge-review = "gemini-2-5-pro"
-verification = "gemini-2-5-pro"
-implementation = "gemini-2-5-pro"
+bridge-review = "deepseek-v4-pro"
+verification = "deepseek-v4-pro"
+implementation = "deepseek-v4-pro"

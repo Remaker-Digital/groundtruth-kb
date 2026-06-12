@@ -217,6 +217,15 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
     for key, row in models_raw.items():
         if not isinstance(key, str) or not key or not isinstance(row, dict):
             raise OllamaHarnessError("model rows must be named TOML tables")
+        # WI-4473: provider-scoped loading. Only load provider=="ollama" rows so the
+        # shared .api-harness/routing.toml's openrouter rows are not validated against
+        # the local Ollama /api/tags inventory (mirrors the provider filter in
+        # scripts/openrouter_harness.py:load_routing_config). An absent provider
+        # defaults to "ollama" for backward compatibility with single-provider configs
+        # that predate the multi-provider schema.
+        provider = row.get("provider", "ollama")
+        if provider != "ollama":
+            continue
         model_id = _as_non_empty_string(row.get("model_id"), field=f"models.{key}.model_id")
         model_version = infer_model_version(model_id)
         allowed_tools = tuple(_as_list(row.get("allowed_tools"), field=f"models.{key}.allowed_tools"))
