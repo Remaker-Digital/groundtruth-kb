@@ -212,6 +212,7 @@ NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
 Document: gtkb-fab-11-regression-signal-revival
+NEW: bridge/gtkb-fab-11-regression-signal-revival-005.md
 GO: bridge/gtkb-fab-11-regression-signal-revival-004.md
 REVISED: bridge/gtkb-fab-11-regression-signal-revival-003.md
 NO-GO: bridge/gtkb-fab-11-regression-signal-revival-002.md
@@ -238,6 +239,7 @@ GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
 
 Document: gtkb-fab-07-doctor-false-signals
+REVISED: bridge/gtkb-fab-07-doctor-false-signals-007.md
 NO-GO: bridge/gtkb-fab-07-doctor-false-signals-006.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-005.md
 GO: bridge/gtkb-fab-07-doctor-false-signals-004.md
