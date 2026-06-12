@@ -39,6 +39,8 @@ NO-GO: bridge/gtkb-wi-4250-pauth-creation-002.md
 NEW: bridge/gtkb-wi-4250-pauth-creation-001.md
 
 Document: gtkb-wi-4250-status-reconciliation-authorization
+WITHDRAWN: bridge/gtkb-wi-4250-status-reconciliation-authorization-004.md
+WITHDRAWN: bridge/gtkb-wi-4250-status-reconciliation-authorization-003.md
 GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-002.md
 NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-001.md
 
@@ -225,6 +227,7 @@ NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
 Document: gtkb-fab-11-regression-signal-revival
+REVISED: bridge/gtkb-fab-11-regression-signal-revival-007.md
 NO-GO: bridge/gtkb-fab-11-regression-signal-revival-006.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-005.md
 GO: bridge/gtkb-fab-11-regression-signal-revival-004.md
@@ -265,6 +268,7 @@ NO-GO: bridge/gtkb-fab-07-doctor-false-signals-002.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
 Document: gtkb-fab-06-narrative-corrections
+REVISED: bridge/gtkb-fab-06-narrative-corrections-009.md
 NO-GO: bridge/gtkb-fab-06-narrative-corrections-008.md
 REVISED: bridge/gtkb-fab-06-narrative-corrections-007.md
 NO-GO: bridge/gtkb-fab-06-narrative-corrections-006.md
