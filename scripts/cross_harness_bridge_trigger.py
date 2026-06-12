@@ -123,6 +123,13 @@ DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 DISPATCH_FAILURES_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_FAILURES_MAX_BYTES"
 DEFAULT_DISPATCH_FAILURES_MAX_BYTES = 1024 * 1024
+# WI-4472: hard global concurrency cap on live dispatched headless harness
+# processes. The 2026-06-11 dispatch storm accumulated ~300 hung codex
+# sessions because nothing bounded the total live-process count. Default 8 is
+# well above normal steady-state (2 roles x a few harnesses) and far below the
+# incident peak; env-tunable, fail-safe to the default on invalid/non-positive.
+MAX_LIVE_DISPATCHED_PROCESSES_ENV_VAR = "GTKB_MAX_LIVE_DISPATCHED_PROCESSES"
+DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES = 8
 
 # Selected-batch cap mirrors the smart-poller's default per
 # ``groundtruth-kb/scripts/bridge_poller_runner.py:670-673``. Bumping this
@@ -728,6 +735,118 @@ def _dispatch_failures_max_bytes() -> int:
     except ValueError:
         return DEFAULT_DISPATCH_FAILURES_MAX_BYTES
     return parsed if parsed > 0 else DEFAULT_DISPATCH_FAILURES_MAX_BYTES
+
+
+def _max_live_dispatched_processes() -> int:
+    """Resolve the hard global concurrency cap (WI-4472).
+
+    Reads ``GTKB_MAX_LIVE_DISPATCHED_PROCESSES``; fail-safe to
+    ``DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES`` on missing/blank/invalid input
+    and on non-positive values (a zero or negative cap would disable all
+    dispatch, which is never the intended configuration).
+    """
+    raw = os.environ.get(MAX_LIVE_DISPATCHED_PROCESSES_ENV_VAR)
+    if raw is None or raw.strip() == "":
+        return DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES
+    return parsed if parsed > 0 else DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES
+
+
+def _safe_unlink(path: Path) -> None:
+    """Best-effort sidecar removal; never raises."""
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
+def _pid_alive(pid: int) -> bool:
+    """Best-effort cross-platform process-liveness check (WI-4472).
+
+    Prefers ``psutil.pid_exists`` when importable. Falls back to the Win32
+    ``OpenProcess`` + ``GetExitCodeProcess`` pair on Windows and ``os.kill(pid,
+    0)`` on POSIX. Any unknown/parse failure returns ``False`` (fail-closed to
+    not-alive) so a malformed sidecar can never inflate the live-process count.
+    """
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid_int <= 0:
+        return False
+    try:
+        import psutil  # noqa: PLC0415
+
+        return bool(psutil.pid_exists(pid_int))
+    except Exception:  # noqa: BLE001 - degrade to the OS-native fallback
+        pass
+    if os.name == "nt":
+        try:
+            import ctypes  # noqa: PLC0415
+
+            process_query_limited_information = 0x1000
+            still_active = 259
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            handle = kernel32.OpenProcess(process_query_limited_information, False, pid_int)
+            if not handle:
+                return False
+            try:
+                exit_code = ctypes.c_ulong()
+                if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                    return exit_code.value == still_active
+                return True
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001 - fail-closed to not-alive
+            return False
+    try:
+        os.kill(pid_int, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _count_live_dispatched_processes(runs_dir: Path) -> int:
+    """Count live dispatched headless harness processes via ``.pid`` sidecars.
+
+    Each successful ``_spawn_harness`` launch writes ``<dispatch_id>.pid``.
+    A dispatch is LIVE iff its sidecar exists, its ``<dispatch_id>.exit_code``
+    status file (written by ``run_with_status.py`` only on child EXIT) is
+    absent/empty, and the PID is alive. Sidecars whose process has exited or
+    died (or whose contents are malformed) are pruned during the count pass so
+    the runs dir does not grow unbounded.
+    """
+    if not runs_dir.is_dir():
+        return 0
+    live = 0
+    for pid_file in sorted(runs_dir.glob("*.pid")):
+        dispatch_id = pid_file.name[: -len(".pid")]
+        try:
+            pid_text = pid_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        try:
+            pid = int(pid_text)
+        except (TypeError, ValueError):
+            _safe_unlink(pid_file)
+            continue
+        status_file = runs_dir / f"{dispatch_id}.exit_code"
+        try:
+            exited = status_file.exists() and status_file.stat().st_size > 0
+        except OSError:
+            exited = False
+        if exited or not _pid_alive(pid):
+            _safe_unlink(pid_file)
+            continue
+        live += 1
+    return live
 
 
 def _rotate_dispatch_failures_if_needed(target: Path) -> None:
@@ -1775,6 +1894,26 @@ def _spawn_harness(
             "command_head": command[:2],
         }
 
+    # WI-4472: hard global concurrency cap. Count live dispatched processes
+    # before issuing any authorization packet or spawning; fail-closed (skip
+    # the dispatch, logged) when at/over the cap. This bounds the hung-but-
+    # launched class that the circuit breaker (launch-failure count only) and
+    # active-session suppression (per-target liveness) both miss.
+    runs_dir = state_dir / DISPATCH_RUNS_SUBDIR
+    cap = _max_live_dispatched_processes()
+    live_count = _count_live_dispatched_processes(runs_dir)
+    if live_count >= cap:
+        meta = {
+            "dispatch_id": dispatch_id,
+            "recipient": recipient_key,
+            "launched": False,
+            "reason": "concurrency_cap_reached",
+            "live_count": live_count,
+            "cap": cap,
+        }
+        _record_dispatch_failure(state_dir, meta)
+        return meta
+
     packet_context: dict[str, Any] | None = None
     if target.needed_role_label == "prime-builder":
         selected = _selected_oldest_first(items, max_items)
@@ -1796,7 +1935,7 @@ def _spawn_harness(
             }
         packet_context = issue_result["context"]
 
-    runs_dir = state_dir / DISPATCH_RUNS_SUBDIR
+    # runs_dir is computed in the concurrency-cap gate above (WI-4472).
     runs_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
     stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
@@ -1883,6 +2022,12 @@ def _spawn_harness(
                 creationflags=creationflags,
             )
         meta.update({"launched": True, "pid": process.pid})
+        # WI-4472: live-process accounting sidecar. Written only for a
+        # successful launch; consumed by _count_live_dispatched_processes.
+        try:
+            (runs_dir / f"{dispatch_id}.pid").write_text(str(process.pid), encoding="utf-8")
+        except OSError:
+            pass
     except (OSError, FileNotFoundError, subprocess.SubprocessError) as exc:
         meta.update(
             {
@@ -2273,7 +2418,7 @@ def run_trigger(
     if not isinstance(harnesses, dict):
         harnesses = {}
 
-    for legacy_recipient, needed_role_label, items in (
+    for _legacy_recipient, needed_role_label, items in (
         ("prime", "prime-builder", actionable_for_prime),
         ("codex", "loyal-opposition", actionable_for_codex),
     ):
@@ -2606,9 +2751,9 @@ def run_trigger(
                             )
                         recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                         recipient_state["last_launch"] = launch
-                        if not dry_run and launch.get("launched"):
+                        if dry_run or launch.get("launched"):
                             recipient_state["last_suppressed_signature"] = None
-                            if target.needed_role_label == "prime-builder":
+                            if dry_run or target.needed_role_label == "prime-builder":
                                 recipient_state["last_dispatched_signature"] = dispatched_signature
                                 recipient_state["signature"] = dispatched_signature
                         results[recipient] = launch

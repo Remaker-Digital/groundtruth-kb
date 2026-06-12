@@ -1,3 +1,23 @@
+Document: gtkb-cross-harness-dispatch-concurrency-cap
+VERIFIED: bridge/gtkb-cross-harness-dispatch-concurrency-cap-010.md
+NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-009.md
+NO-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-008.md
+NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-007.md
+GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-006.md
+NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-005.md
+GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-004.md
+REVISED: bridge/gtkb-cross-harness-dispatch-concurrency-cap-003.md
+NO-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-002.md
+NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-001.md
+
+Document: gtkb-openrouter-routing-deepseek-cost-optimization
+GO: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-002.md
+NEW: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-001.md
+
+Document: gtkb-ollama-harness-provider-scoped-model-validation
+GO: bridge/gtkb-ollama-harness-provider-scoped-model-validation-002.md
+NEW: bridge/gtkb-ollama-harness-provider-scoped-model-validation-001.md
+
 Document: gtkb-codex-skill-adapter-frontmatter-strict-yaml
 VERIFIED: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-004.md
 NEW: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-003.md
@@ -5,6 +25,9 @@ GO: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-002.md
 NEW: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-001.md
 
 Document: gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak
+VERIFIED: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-004.md
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-003.md
+GO: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-002.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-001.md
 
 Document: gtkb-delib-2500-review-advisory
@@ -122,6 +145,8 @@ NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-002.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
 
 Document: gtkb-fab-13-retention-policy-umbrella
+GO: bridge/gtkb-fab-13-retention-policy-umbrella-006.md
+REVISED: bridge/gtkb-fab-13-retention-policy-umbrella-005.md
 NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-004.md
 REVISED: bridge/gtkb-fab-13-retention-policy-umbrella-003.md
 NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-002.md
