@@ -5,6 +5,7 @@ build orchestration, deploy dry-run, verification, and CLI.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -15,7 +16,7 @@ from unittest import mock
 import pytest
 
 # Ensure the scripts directory is importable
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "scripts"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[4] / "scripts"))
 import deploy_ui
 
 
@@ -74,8 +75,7 @@ def patched_components(fake_dist):
                 "dist_dir": fake_dist / "admin" / name / "dist",
             }
 
-    with mock.patch.object(deploy_ui, "COMPONENTS", fake_components), \
-         mock.patch.object(deploy_ui, "ROOT", fake_dist):
+    with mock.patch.object(deploy_ui, "COMPONENTS", fake_components), mock.patch.object(deploy_ui, "ROOT", fake_dist):
         yield fake_components
 
 
@@ -231,6 +231,7 @@ class TestBuildComponent:
     def test_missing_source_dir_raises(self, patched_components):
         # Remove a source dir
         import shutil
+
         src = patched_components["standalone"]["source_dir"]
         shutil.rmtree(src)
         with pytest.raises(FileNotFoundError, match="Source directory not found"):
@@ -263,13 +264,27 @@ class TestBuildAll:
 
     def test_builds_all_four_by_default(self, patched_components):
         with mock.patch.object(deploy_ui, "build_component") as mock_build:
-            mock_build.return_value = {"name": "test", "hash": "abc", "size": 100, "size_human": "100 B", "duration_s": 1.0, "dist_dir": "/tmp"}
+            mock_build.return_value = {
+                "name": "test",
+                "hash": "abc",
+                "size": 100,
+                "size_human": "100 B",
+                "duration_s": 1.0,
+                "dist_dir": "/tmp",
+            }
             results = deploy_ui.build_all()
         assert len(results) == 4
 
     def test_builds_subset(self, patched_components):
         with mock.patch.object(deploy_ui, "build_component") as mock_build:
-            mock_build.return_value = {"name": "test", "hash": "abc", "size": 100, "size_human": "100 B", "duration_s": 1.0, "dist_dir": "/tmp"}
+            mock_build.return_value = {
+                "name": "test",
+                "hash": "abc",
+                "size": 100,
+                "size_human": "100 B",
+                "duration_s": 1.0,
+                "dist_dir": "/tmp",
+            }
             results = deploy_ui.build_all(["standalone", "widget"])
         assert len(results) == 2
         assert mock_build.call_count == 2
@@ -296,6 +311,7 @@ class TestGetUiStatus:
 
     def test_missing_dist_shows_missing(self, patched_components):
         import shutil
+
         shutil.rmtree(patched_components["widget"]["dist_dir"])
         status = deploy_ui.get_ui_status()
         assert status["widget"]["exists"] is False
@@ -330,6 +346,7 @@ class TestDeployUi:
 
     def test_missing_dist_raises(self, patched_components):
         import shutil
+
         shutil.rmtree(patched_components["standalone"]["dist_dir"])
         with pytest.raises(FileNotFoundError, match="Missing dist directories"):
             deploy_ui.deploy_ui("staging", "v1.81.2")
@@ -357,8 +374,7 @@ class TestDeployUi:
         mock_run.assert_not_called()
 
     def test_deploy_calls_acr_then_containerapp(self, patched_components):
-        with mock.patch.object(deploy_ui, "_run") as mock_run, \
-             mock.patch("time.sleep"):
+        with mock.patch.object(deploy_ui, "_run") as mock_run, mock.patch("time.sleep"):
             mock_run.return_value = subprocess.CompletedProcess(args="", returncode=0)
             result = deploy_ui.deploy_ui("staging", "v1.81.2")
 
@@ -396,8 +412,10 @@ class TestVerifyDeployment:
         mock_resp.__enter__ = mock.MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = mock.MagicMock(return_value=False)
 
-        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
-             mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}):
+        with (
+            mock.patch("urllib.request.urlopen", return_value=mock_resp),
+            mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}),
+        ):
             result = deploy_ui.verify_deployment("staging")
 
         assert result["summary"]["all_ok"] is True
@@ -413,8 +431,10 @@ class TestVerifyDeployment:
         mock_resp.__enter__ = mock.MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = mock.MagicMock(return_value=False)
 
-        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
-             mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}):
+        with (
+            mock.patch("urllib.request.urlopen", return_value=mock_resp),
+            mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}),
+        ):
             result = deploy_ui.verify_deployment("staging")
 
         assert result["summary"]["total"] == 6
@@ -431,8 +451,10 @@ class TestVerifyDeployment:
             "STAGING_REMAKER_WIDGET_KEY": "",
             "PRODUCTION_WIDGET_KEY": "",
         }
-        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
-             mock.patch.dict("os.environ", env_clean, clear=False):
+        with (
+            mock.patch("urllib.request.urlopen", return_value=mock_resp),
+            mock.patch.dict("os.environ", env_clean, clear=False),
+        ):
             result = deploy_ui.verify_deployment("staging")
 
         assert result["summary"]["all_ok"] is False
@@ -440,6 +462,7 @@ class TestVerifyDeployment:
 
     def test_http_error_marks_fail(self):
         import urllib.error
+
         def side_effect(req, **kwargs):
             raise urllib.error.HTTPError(req.full_url, 500, "Error", {}, None)
 
@@ -486,13 +509,16 @@ class TestCli:
         mock_resp.__enter__ = mock.MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = mock.MagicMock(return_value=False)
 
-        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
-             mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}):
+        with (
+            mock.patch("urllib.request.urlopen", return_value=mock_resp),
+            mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}),
+        ):
             rc = deploy_ui.main(["verify", "--env", "staging"])
         assert rc == 0
 
     def test_verify_command_failure_returns_1(self):
         import urllib.error
+
         def side_effect(req, **kwargs):
             raise urllib.error.HTTPError(req.full_url, 500, "Error", {}, None)
 

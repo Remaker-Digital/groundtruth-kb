@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 
 # Bootstrap: make `scripts/` importable so `from lib.X import Y` works.
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
@@ -43,8 +43,7 @@ from lib.scaling_targets import (  # noqa: E402
 # Test fixture: a runner that records every command it receives plus a
 # canned response. Default response is success (returncode 0).
 class RecordingRunner:
-    def __init__(self, responses: dict[str, tuple[int, str]] | None = None,
-                 default: tuple[int, str] = (0, "")) -> None:
+    def __init__(self, responses: dict[str, tuple[int, str]] | None = None, default: tuple[int, str] = (0, "")) -> None:
         self.calls: list[tuple[str, int]] = []
         self.responses = responses or {}
         self.default = default
@@ -164,8 +163,8 @@ def test_enforce_all_scaling_continues_on_partial_failure() -> None:
     runner = RecordingRunner(responses={"agent-red-api-gateway": (1, "fail")})
     logger = RecordingLogger()
     targets = [
-        "agent-red-api-gateway",          # will fail
-        "agent-red-intent-classifier",    # should still be attempted
+        "agent-red-api-gateway",  # will fail
+        "agent-red-intent-classifier",  # should still be attempted
         "agent-red-knowledge-retrieval",  # should still be attempted
     ]
 
@@ -192,13 +191,9 @@ def test_enforce_all_scaling_continues_on_partial_failure() -> None:
         ("staging", "agent-red-staging"),
     ],
 )
-def test_get_scaling_targets_environment_specific_gateway(
-    environment: str, expected_first: str
-) -> None:
+def test_get_scaling_targets_environment_specific_gateway(environment: str, expected_first: str) -> None:
     targets = get_scaling_targets(environment)
-    assert targets[0] == expected_first, (
-        f"First target for {environment} must be {expected_first}, got {targets[0]}"
-    )
+    assert targets[0] == expected_first, f"First target for {environment} must be {expected_first}, got {targets[0]}"
     # Both environments include the same shared agent containers
     assert "agent-red-intent-classifier" in targets
     assert "agent-red-knowledge-retrieval" in targets

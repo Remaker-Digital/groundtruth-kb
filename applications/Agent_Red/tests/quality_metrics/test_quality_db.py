@@ -5,6 +5,7 @@ insert/get methods work correctly.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import sys
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "knowledge-db"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "tools" / "knowledge-db"))
 from db import KnowledgeDB, SCHEMA_SQL
 
 
@@ -26,9 +27,15 @@ class TestQualityScoresSchema:
         assert "UNIQUE(session_id)" in SCHEMA_SQL
 
     def test_schema_has_all_metric_columns(self):
-        for col in ["spec_coverage", "defect_escape_rate", "assertion_strength",
-                     "change_failure_rate", "test_freshness", "coverage_delta",
-                     "composite_score"]:
+        for col in [
+            "spec_coverage",
+            "defect_escape_rate",
+            "assertion_strength",
+            "change_failure_rate",
+            "test_freshness",
+            "coverage_delta",
+            "composite_score",
+        ]:
             assert col in SCHEMA_SQL, f"Missing column: {col}"
 
     def test_schema_has_details_json(self):
@@ -70,7 +77,7 @@ class TestQualityScoresCRUD:
         """get_quality_scores(last=N) returns up to N records."""
         for i in range(5):
             kb.insert_quality_score(
-                session_id=f"S{200+i}",
+                session_id=f"S{200 + i}",
                 spec_coverage=0.80 + i * 0.01,
                 defect_escape_rate=0.02,
                 assertion_strength=0.70,
