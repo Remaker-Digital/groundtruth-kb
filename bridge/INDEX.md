@@ -1,32 +1,13 @@
-Document: gtkb-cross-harness-dispatch-concurrency-cap
-VERIFIED: bridge/gtkb-cross-harness-dispatch-concurrency-cap-010.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-009.md
-NO-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-008.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-007.md
-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-006.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-005.md
-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-004.md
-REVISED: bridge/gtkb-cross-harness-dispatch-concurrency-cap-003.md
-NO-GO: bridge/gtkb-cross-harness-dispatch-concurrency-cap-002.md
-NEW: bridge/gtkb-cross-harness-dispatch-concurrency-cap-001.md
-
-Document: gtkb-openrouter-routing-deepseek-cost-optimization
-VERIFIED: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-004.md
-NEW: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-003.md
-GO: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-002.md
-NEW: bridge/gtkb-openrouter-routing-deepseek-cost-optimization-001.md
-
-Document: gtkb-ollama-harness-provider-scoped-model-validation
-VERIFIED: bridge/gtkb-ollama-harness-provider-scoped-model-validation-004.md
-NEW: bridge/gtkb-ollama-harness-provider-scoped-model-validation-003.md
-GO: bridge/gtkb-ollama-harness-provider-scoped-model-validation-002.md
-NEW: bridge/gtkb-ollama-harness-provider-scoped-model-validation-001.md
+Document: gtkb-path-token-re-discovery-consolidation
+NEW: bridge/gtkb-path-token-re-discovery-consolidation-001.md
 
 Document: gtkb-lo-dispatch-ordered-fallback-routing
+NEW: bridge/gtkb-lo-dispatch-ordered-fallback-routing-003.md
 GO: bridge/gtkb-lo-dispatch-ordered-fallback-routing-002.md
 NEW: bridge/gtkb-lo-dispatch-ordered-fallback-routing-001.md
 
 Document: gtkb-wi-4250-pauth-creation
+WITHDRAWN: bridge/gtkb-wi-4250-pauth-creation-003.md
 NO-GO: bridge/gtkb-wi-4250-pauth-creation-002.md
 NEW: bridge/gtkb-wi-4250-pauth-creation-001.md
 
@@ -35,6 +16,7 @@ GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-002.md
 NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-001.md
 
 Document: gtkb-wi-4251-diagnostic-write-envelope
+REVISED: bridge/gtkb-wi-4251-diagnostic-write-envelope-007.md
 NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-006.md
 NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-005.md
 GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-004.md
@@ -148,6 +130,7 @@ NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
 
 Document: gtkb-fab-18-backlog-dignity
+REVISED: bridge/gtkb-fab-18-backlog-dignity-007.md
 NO-GO: bridge/gtkb-fab-18-backlog-dignity-006.md
 NEW: bridge/gtkb-fab-18-backlog-dignity-005.md
 GO: bridge/gtkb-fab-18-backlog-dignity-004.md
@@ -177,6 +160,8 @@ GO: bridge/gtkb-fab-16-harness-parity-remediation-002.md
 NEW: bridge/gtkb-fab-16-harness-parity-remediation-001.md
 
 Document: gtkb-fab-15-role-narrative-spec-reconciliation
+VERIFIED: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-006.md
+NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-005.md
 GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-004.md
 REVISED: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-003.md
 NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
