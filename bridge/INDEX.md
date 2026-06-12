@@ -2,6 +2,7 @@ Document: gtkb-path-token-re-discovery-consolidation
 NEW: bridge/gtkb-path-token-re-discovery-consolidation-001.md
 
 Document: gtkb-lo-dispatch-ordered-fallback-routing
+NO-GO: bridge/gtkb-lo-dispatch-ordered-fallback-routing-004.md
 NEW: bridge/gtkb-lo-dispatch-ordered-fallback-routing-003.md
 GO: bridge/gtkb-lo-dispatch-ordered-fallback-routing-002.md
 NEW: bridge/gtkb-lo-dispatch-ordered-fallback-routing-001.md
