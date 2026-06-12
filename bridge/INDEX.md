@@ -66,6 +66,7 @@ NO-GO: bridge/gtkb-wi-4250-pauth-creation-002.md
 NEW: bridge/gtkb-wi-4250-pauth-creation-001.md
 
 Document: gtkb-wi-4250-status-reconciliation-authorization
+NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-005.md
 WITHDRAWN: bridge/gtkb-wi-4250-status-reconciliation-authorization-004.md
 WITHDRAWN: bridge/gtkb-wi-4250-status-reconciliation-authorization-003.md
 GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-002.md
