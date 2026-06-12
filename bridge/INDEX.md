@@ -130,6 +130,7 @@ NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
 NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-001.md
 
 Document: gtkb-fab-18-backlog-dignity
+VERIFIED: bridge/gtkb-fab-18-backlog-dignity-008.md
 REVISED: bridge/gtkb-fab-18-backlog-dignity-007.md
 NO-GO: bridge/gtkb-fab-18-backlog-dignity-006.md
 NEW: bridge/gtkb-fab-18-backlog-dignity-005.md
