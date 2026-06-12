@@ -177,6 +177,7 @@ NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-002.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
 
 Document: gtkb-fab-13-retention-policy-umbrella
+NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-008.md
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-007.md
 GO: bridge/gtkb-fab-13-retention-policy-umbrella-006.md
 REVISED: bridge/gtkb-fab-13-retention-policy-umbrella-005.md
