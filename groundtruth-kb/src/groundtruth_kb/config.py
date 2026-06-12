@@ -125,15 +125,12 @@ class GTConfig:
 
         config = cls(**{k: v for k, v in merged.items() if k in cls.__dataclass_fields__})
         # Only resolve paths to absolute when they came from config/overrides, not defaults
-        if "project_root" in merged:
-            if not config.project_root.is_absolute():
-                config.project_root = anchor / config.project_root
-        if "db_path" in merged:
-            if not config.db_path.is_absolute():
-                config.db_path = anchor / config.db_path
-        if "chroma_path" in merged and config.chroma_path is not None:
-            if not config.chroma_path.is_absolute():
-                config.chroma_path = anchor / config.chroma_path
+        if "project_root" in merged and not config.project_root.is_absolute():
+            config.project_root = anchor / config.project_root
+        if "db_path" in merged and not config.db_path.is_absolute():
+            config.db_path = anchor / config.db_path
+        if "chroma_path" in merged and config.chroma_path is not None and not config.chroma_path.is_absolute():
+            config.chroma_path = anchor / config.chroma_path
         return config
 
 

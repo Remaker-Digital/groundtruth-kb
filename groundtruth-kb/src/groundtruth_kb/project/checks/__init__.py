@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from groundtruth_kb.project.doctor import ToolCheck

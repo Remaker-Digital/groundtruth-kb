@@ -107,7 +107,10 @@ def evaluate_isolation_state(project_root: Path) -> dict[str, any]:
             {
                 "severity": "P0",
                 "verdict": "Multi-slot occupancy",
-                "remediation": "Platform supports only one developed application at a time. Run `gt application unregister <name>` to remove an application.",
+                "remediation": (
+                    "Platform supports only one developed application at a time. "
+                    "Run `gt application unregister <name>` to remove an application."
+                ),
                 "details": f"Multiple occupied slots detected: {', '.join(sorted(occupied_slots))}",
             }
         )
@@ -123,7 +126,10 @@ def evaluate_isolation_state(project_root: Path) -> dict[str, any]:
                 {
                     "severity": "P1",
                     "verdict": "Malformed markers",
-                    "remediation": f"Malformed marker at `applications/{name}/{path}`. Manual repair required before registration can proceed.",
+                    "remediation": (
+                        f"Malformed marker at `applications/{name}/{path}`. "
+                        "Manual repair required before registration can proceed."
+                    ),
                     "details": f"Parse error in {path}: {err}",
                 }
             )
@@ -137,7 +143,11 @@ def evaluate_isolation_state(project_root: Path) -> dict[str, any]:
                 {
                     "severity": "P1",
                     "verdict": "Mismatched markers",
-                    "remediation": f"Slot at `applications/{name}/` contains markers naming `{found}`. Run `gt application register {found}` (if `{found}` is the intended occupant) or archive the slot.",
+                    "remediation": (
+                        f"Slot at `applications/{name}/` contains markers naming `{found}`. "
+                        f"Run `gt application register {found}` (if `{found}` is the "
+                        "intended occupant) or archive the slot."
+                    ),
                     "details": f"Marker {path} names {found} instead of slot {name}",
                 }
             )
@@ -149,7 +159,10 @@ def evaluate_isolation_state(project_root: Path) -> dict[str, any]:
                 {
                     "severity": "P2",
                     "verdict": "Registry drift",
-                    "remediation": f"Registry drift: registry references `{name}` but no slot directory exists. Run `gt application unregister {name}` to clean registry.",
+                    "remediation": (
+                        f"Registry drift: registry references `{name}` but no slot directory "
+                        f"exists. Run `gt application unregister {name}` to clean registry."
+                    ),
                     "details": f"applications/{name}/ directory is missing but entry exists in registry.toml",
                 }
             )
@@ -161,7 +174,10 @@ def evaluate_isolation_state(project_root: Path) -> dict[str, any]:
                 {
                     "severity": "P2",
                     "verdict": "Empty leftover slot",
-                    "remediation": f"Empty leftover slot detected at `applications/{name}/`. Run `rm -r applications/{name}` to clean up.",
+                    "remediation": (
+                        f"Empty leftover slot detected at `applications/{name}/`. "
+                        f"Run `rm -r applications/{name}` to clean up."
+                    ),
                     "details": f"leftover slot at applications/{name}/",
                 }
             )

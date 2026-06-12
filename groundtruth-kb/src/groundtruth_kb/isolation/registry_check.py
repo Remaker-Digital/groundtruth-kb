@@ -12,8 +12,6 @@ def has_registry_entry(project_root: Path, app_name: str) -> bool:
             data = tomllib.load(f)
         # Check both top-level applications mapping and sub-table formats
         apps = data.get("applications", {})
-        if isinstance(apps, dict) and app_name in apps:
-            return True
-        return False
+        return bool(isinstance(apps, dict) and app_name in apps)
     except Exception:
         return False

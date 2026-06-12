@@ -1,7 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """PASS/WARN/FAIL coverage for ``_check_cross_harness_trigger``.
 
-Per Slice 4 D4 (proposal `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-015.md`)
+Per Slice 4 D4 (proposal
+`bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-015.md`)
 the doctor's smart-poller end-to-end activation check was replaced by a
 cross-harness event-driven trigger check. Three subchecks, three
 representative outcome scenarios per `T-4-doctor-cross-harness-trigger-coverage`.

@@ -152,7 +152,8 @@ def verify_role_document_partition(role_document: dict[str, Any]) -> RolePartiti
         overlapping = set(primes) & set(los)
         if overlapping:
             raise RolePartitionViolation(
-                f"harnesses cannot carry both prime-builder and loyal-opposition when more than one active harness exists; overlapping: {sorted(overlapping)}"
+                "harnesses cannot carry both prime-builder and loyal-opposition "
+                f"when more than one active harness exists; overlapping: {sorted(overlapping)}"
             )
     return RolePartitionSummary(
         prime_builder_id=prime_id,

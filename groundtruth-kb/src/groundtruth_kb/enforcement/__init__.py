@@ -46,10 +46,7 @@ def check_path_boundary(path_str: str, project_root: Path) -> tuple[bool, str]:
     try:
         candidate = Path(path_str)
         # If relative, resolve against project_root
-        if not candidate.is_absolute():
-            candidate = (project_root / candidate).resolve()
-        else:
-            candidate = candidate.resolve()
+        candidate = (project_root / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
     except Exception as exc:
         return False, f"Path '{path_str}' could not be resolved: {exc}"
 

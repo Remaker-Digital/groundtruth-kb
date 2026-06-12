@@ -32,7 +32,7 @@ def detect_occupancy(project_root: Path, app_name: str) -> dict[str, any]:
     # 2. Check non-allowlisted contents
     non_allowlisted = []
     if app_dir.is_dir():
-        for root, dirs, files in os.walk(app_dir):
+        for root, _dirs, files in os.walk(app_dir):
             root_path = Path(root)
             for file in files:
                 file_path = root_path / file

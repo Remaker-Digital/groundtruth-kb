@@ -50,12 +50,12 @@ _INVALID_PAIRS = [
 
 
 def test_four_states_defined() -> None:
-    assert HARNESS_STATUSES == {
+    assert {
         STATUS_REGISTERED,
         STATUS_ACTIVE,
         STATUS_SUSPENDED,
         STATUS_RETIRED,
-    }
+    } == HARNESS_STATUSES
     assert len(HARNESS_STATUSES) == 4
 
 

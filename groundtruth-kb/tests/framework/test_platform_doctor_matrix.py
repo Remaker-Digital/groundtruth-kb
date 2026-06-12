@@ -1,7 +1,7 @@
 import json
-import pytest
+
 from click.testing import CliRunner
-from pathlib import Path
+
 from groundtruth_kb.cli import main
 
 

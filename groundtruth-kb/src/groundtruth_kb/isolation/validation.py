@@ -27,7 +27,7 @@ def validate_self_completion_preflight(project_root: Path, slot_name: str) -> No
             raise ValidationError(
                 f"Malformed marker at `applications/{slot_name}/application.toml`: {e}. "
                 "Manually inspect or restore from backup."
-            )
+            ) from e
 
         app_name = data.get("name")
         if not app_name:
@@ -49,13 +49,14 @@ def validate_self_completion_preflight(project_root: Path, slot_name: str) -> No
             raise ValidationError(
                 f"Malformed marker at `applications/{slot_name}/.gtkb-app-isolation.json`: {e}. "
                 "Manually inspect or restore from backup."
-            )
+            ) from e
 
         app_name = data.get("application")
         if app_name and app_name != slot_name:
             raise ValidationError(
-                f"Slot `applications/{slot_name}/` contains marker `.gtkb-app-isolation.json` naming application `{app_name}`. "
-                f"This is a slot-name mismatch. Run `gt application register {app_name}` to claim it for `{app_name}`, "
+                f"Slot `applications/{slot_name}/` contains marker `.gtkb-app-isolation.json` "
+                f"naming application `{app_name}`. This is a slot-name mismatch. "
+                f"Run `gt application register {app_name}` to claim it for `{app_name}`, "
                 f"or manually archive the slot if it should be removed."
             )
 
@@ -64,7 +65,8 @@ def validate_self_completion_preflight(project_root: Path, slot_name: str) -> No
             if not isinstance(schema_version, (str, int, float)):
                 raise ValidationError(
                     f"Marker at `applications/{slot_name}/.gtkb-app-isolation.json` is schema-incompatible: "
-                    f"schema_version = {schema_version}. Run `gt application repair {slot_name}` or manually edit and retry."
+                    f"schema_version = {schema_version}. Run `gt application repair {slot_name}` "
+                    f"or manually edit and retry."
                 )
             try:
                 version_val = float(schema_version)

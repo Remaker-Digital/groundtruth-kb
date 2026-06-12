@@ -1,12 +1,8 @@
-import json
 import shutil
-import pytest
 from pathlib import Path
-from groundtruth_kb.isolation.allowlist import is_allowlisted_file
-from groundtruth_kb.isolation.strong_markers import has_strong_marker
-from groundtruth_kb.isolation.registry_check import has_registry_entry
+
+from groundtruth_kb.isolation.doctor_verdicts import evaluate_isolation_state
 from groundtruth_kb.isolation.occupancy_detector import detect_occupancy
-from groundtruth_kb.isolation.doctor_verdicts import evaluate_isolation_state, check_slot_markers
 
 
 def write_registry(tmp_path: Path, apps: dict):
@@ -14,7 +10,7 @@ def write_registry(tmp_path: Path, apps: dict):
     reg_dir.mkdir(parents=True, exist_ok=True)
     reg_file = reg_dir / "registry.toml"
     content = "[applications]\n"
-    for app_name, app_data in apps.items():
+    for app_name, _app_data in apps.items():
         content += f"{app_name} = {{ slot = '{app_name}' }}\n"
     reg_file.write_text(content, encoding="utf-8")
 

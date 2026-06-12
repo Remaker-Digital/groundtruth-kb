@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from groundtruth_kb.enforcement import check_bash_command
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

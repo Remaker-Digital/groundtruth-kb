@@ -6,10 +6,8 @@ circuit breakers, retry delays, and dry-run safety in cross-harness bridge trigg
 import datetime as dt
 import json
 import os
-import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -21,9 +19,8 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 # Import scripts
-import run_with_status
-from cross_harness_bridge_trigger import main as trigger_main
-from cross_harness_bridge_trigger import run_trigger
+from cross_harness_bridge_trigger import main as trigger_main  # noqa: E402
+from cross_harness_bridge_trigger import run_trigger  # noqa: E402
 
 
 @pytest.fixture()
@@ -130,7 +127,7 @@ def test_dry_run_does_not_mutate_state(test_env: tuple[Path, Path]) -> None:
     project_root, state_dir = test_env
 
     # Run trigger in dry-run mode
-    summary = run_trigger(
+    run_trigger(
         project_root=project_root,
         state_dir=state_dir,
         max_items=2,

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 import pytest
 from pydantic import ValidationError
 from scripts.validate_directive_registry import RegistryModel

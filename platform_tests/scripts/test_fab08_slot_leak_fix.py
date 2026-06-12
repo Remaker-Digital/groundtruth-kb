@@ -21,8 +21,10 @@ from pathlib import Path
 import pytest
 from groundtruth_kb.project.checks import stale_test_slots as doctor_mod
 from groundtruth_kb.project.checks.stale_test_slots import (
-    check_stale_test_slots as _check_stale_test_slots,
     _force_remove_tree,
+)
+from groundtruth_kb.project.checks.stale_test_slots import (
+    check_stale_test_slots as _check_stale_test_slots,
 )
 
 # Repo root, used by the runtime-floor source-scan test below.
