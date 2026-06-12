@@ -20,6 +20,7 @@ NO-GO: bridge/gtkb-wi-4250-backlog-reconciliation-002.md
 NEW: bridge/gtkb-wi-4250-backlog-reconciliation-001.md
 
 Document: gtkb-explicit-hint-layer-specification
+GO: bridge/gtkb-explicit-hint-layer-specification-002.md
 NEW: bridge/gtkb-explicit-hint-layer-specification-001.md
 
 Document: gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak
