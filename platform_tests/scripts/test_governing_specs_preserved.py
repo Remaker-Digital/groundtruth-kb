@@ -321,7 +321,7 @@ def test_keyword_emitted_only_on_actionable() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_no_keyword_on_idle_signature(tmp_path: Path) -> None:
+def test_no_keyword_on_idle_signature(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """DCL-SMART-POLLER-AUTO-TRIGGER-001 v2 — auto-trigger NEVER fires when
     work waits, never when idle. With an empty INDEX, no
     ``_dispatch_prompt`` call happens and no keyword is emitted.
@@ -340,6 +340,7 @@ def test_no_keyword_on_idle_signature(tmp_path: Path) -> None:
     (tmp_path / "bridge" / "INDEX.md").write_text("# empty\n", encoding="utf-8")
     _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
 
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
     state_dir = tmp_path / "state"
     summary = trigger.run_trigger(project_root=tmp_path, state_dir=state_dir, dry_run=True)
 

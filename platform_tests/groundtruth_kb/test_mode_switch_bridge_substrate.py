@@ -246,9 +246,12 @@ def test_cli_set_bridge_substrate_defer_flag_queues_pending(project_root: Path) 
     assert len(list(pending_dir.glob("*.json"))) == 1
 
 
-def test_substrate_inert_path_when_disagrees_with_durable_selection(project_root: Path) -> None:
+def test_substrate_inert_path_when_disagrees_with_durable_selection(
+    project_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from scripts.cross_harness_bridge_trigger import run_trigger
 
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
     # Setup trigger
     state_dir = project_root / ".gtkb-state" / "bridge-poller"
 

@@ -508,6 +508,20 @@ def _detect_previous_launch_failure(
     if not isinstance(launch, dict):
         return None
 
+    if launch.get("exit_code") == 4294967295:
+        return {
+            "ts": _now_iso(),
+            "dispatch_id": _now_iso() + "-previous-launch-failed",
+            "recipient": recipient,
+            "launched": False,
+            "reason": "previous_launch_failed",
+            "error_type": "process_terminated_abruptly",
+            "prior_dispatch_id": launch.get("dispatch_id"),
+            "prior_launched_at": launch.get("launched_at"),
+            "signature": signature,
+            "matched_markers": [{"field": "exit_code", "marker": "4294967295", "label": "process_terminated_abruptly"}],
+        }
+
     matched: list[dict[str, str]] = []
     inspected_paths: dict[str, str] = {}
     for field in ("stdout_path", "stderr_path"):
@@ -543,7 +557,8 @@ def _detect_previous_launch_failure(
 
 
 def _new_dispatch_id(recipient_key: str) -> str:
-    return f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{recipient_key}-{uuid.uuid4().hex[:6]}"
+    safe_recipient = str(recipient_key or "").replace(":", "-")
+    return f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}-{safe_recipient}-{uuid.uuid4().hex[:6]}"
 
 
 def _work_intent_session_id(dispatch_id: str) -> str:
@@ -1989,6 +2004,8 @@ def _spawn_harness(
     # Explicitly strip in case the parent has it set:
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if os.name == "nt":
+        creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
 
     selected = _selected_oldest_first(items, max_items)
     sig = _signature(selected)
@@ -1996,6 +2013,10 @@ def _spawn_harness(
     wrapped_command = [
         sys.executable,
         str(project_root / "scripts" / "run_with_status.py"),
+        "--stdout",
+        str(stdout_path),
+        "--stderr",
+        str(stderr_path),
         str(status_file_path),
     ] + command
 
@@ -2011,16 +2032,16 @@ def _spawn_harness(
         "status_file_path": str(status_file_path),
     }
     try:
-        with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open("w", encoding="utf-8") as err:
-            process = subprocess.Popen(
-                wrapped_command,
-                cwd=str(project_root),
-                env=env,
-                stdout=out,
-                stderr=err,
-                text=True,
-                creationflags=creationflags,
-            )
+        process = subprocess.Popen(
+            wrapped_command,
+            cwd=str(project_root),
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            creationflags=creationflags,
+        )
         meta.update({"launched": True, "pid": process.pid})
         # WI-4472: live-process accounting sidecar. Written only for a
         # successful launch; consumed by _count_live_dispatched_processes.
@@ -2232,14 +2253,17 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
         runs_dir = state_dir / DISPATCH_RUNS_SUBDIR
         status_file = runs_dir / f"{dispatch_id}.exit_code"
         if not status_file.is_file():
-            continue
-
-        # Read the exit code
-        try:
-            exit_code_str = status_file.read_text(encoding="utf-8").strip()
-            exit_code = int(exit_code_str)
-        except (ValueError, OSError):
-            continue
+            pid = last_launch.get("pid")
+            if pid and not _pid_alive(pid):
+                exit_code = 4294967295
+            else:
+                continue
+        else:
+            try:
+                exit_code_str = status_file.read_text(encoding="utf-8").strip()
+                exit_code = int(exit_code_str)
+            except (ValueError, OSError):
+                continue
 
         # Process the exit code
         launch_signature = last_launch.get("signature")
