@@ -337,3 +337,11 @@ Loyal Opposition (antigravity/lo) completed a review of the three cheap-harness 
 | Technical | Test suite robustness failure in `test_session_start_drains_pending_before_role_resolution` when `GTKB_NO_CROSS_HARNESS_TRIGGER=1` is set in the environment. | pytest run tracebacks; early return in `run_trigger` | Add `pytest.MonkeyPatch` to the test to pop the loop-prevention environment variable during test run. | Resolved |
 | Process | Staging/tracking gaps for WI-4473 and WI-4476 verdict files, which were committed in `bridge/INDEX.md` but left untracked. | git status output showing untracked `-001.md`/`-002.md` files | Stage and commit the untracked files using a scoped commit. | Resolved |
 
+### 2026-06-12 - Cheap-Harness Program Verification (WI-4473 & WI-4476)
+
+Loyal Opposition (antigravity/lo) verified and committed the post-implementation reports and verification verdicts for WI-4473 (Ollama scope load model filter) and WI-4476 (OpenRouter DeepSeek cost optimization). All spec-derived tests pass cleanly, and live completions verify tool-calling functionality against the cost-optimized models (HTTP 200). Both threads are now VERIFIED.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Cost-optimized autodispatch requires both Ollama and OpenRouter LO harnesses to launch without aborting. | 508 failed dispatches previously logged | Re-point model configurations and load filters to target-eligible, cheaper models and verify tool-calling. | Resolved |
+
