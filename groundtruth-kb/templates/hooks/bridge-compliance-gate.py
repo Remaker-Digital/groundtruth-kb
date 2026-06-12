@@ -61,6 +61,22 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
+BRIDGE_INDEX_STATUS_TOKENS = (
+    "NEW",
+    "REVISED",
+    "GO",
+    "NO-GO",
+    "VERIFIED",
+    "WITHDRAWN",
+    "ADVISORY",
+    "DEFERRED",
+    "ACCEPTED",
+    "BLOCKED",
+)
+BRIDGE_INDEX_STATUS_RE = re.compile(
+    r"^(?:" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r"):\s+bridge/[^\s]+\.md$"
+)
+BRIDGE_INDEX_STATUS_LIKE_RE = re.compile(r"^[A-Z][A-Z-]*:")
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
 # (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
 # unification-003 GO at -004). Import the canonical bridge work-intent order;
@@ -378,13 +394,59 @@ def _parse_bridge_index(index_path: Path) -> dict[str, str]:
             current_doc = line.removeprefix("Document:").strip()
             current_doc_status_seen = False
         elif current_doc and not current_doc_status_seen:
-            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "DEFERRED", "REVISED", "NEW"):
+            for status in BRIDGE_INDEX_STATUS_TOKENS:
                 if line.startswith(status + ":"):
                     result[current_doc] = status
                     current_doc_status_seen = True
                     break
 
     return result
+
+
+def _bridge_index_well_formedness_error(content: str) -> str | None:
+    """Return a hard-block reason for malformed bridge/INDEX.md content."""
+    if "\\n" in content:
+        return "bridge/INDEX.md contains literal escaped newline text (\\n); write real newline characters instead."
+
+    seen_documents: set[str] = set()
+    current_doc: str | None = None
+    current_doc_status_seen = False
+    for lineno, raw_line in enumerate(content.splitlines(), start=1):
+        line = raw_line.strip()
+        if line.startswith("Document:"):
+            if current_doc is not None and not current_doc_status_seen:
+                return f"Document {current_doc!r} has no status line before line {lineno}."
+            document = line.removeprefix("Document:").strip()
+            if not document:
+                return f"line {lineno}: Document line is missing a bridge document id."
+            if document in seen_documents:
+                return f"line {lineno}: duplicate Document entry {document!r}."
+            seen_documents.add(document)
+            current_doc = document
+            current_doc_status_seen = False
+            continue
+
+        if current_doc is None:
+            continue
+
+        if not line:
+            if not current_doc_status_seen:
+                return f"Document {current_doc!r} has a blank line before its first status line."
+            current_doc = None
+            current_doc_status_seen = False
+            continue
+
+        if BRIDGE_INDEX_STATUS_RE.match(line):
+            current_doc_status_seen = True
+            continue
+
+        if BRIDGE_INDEX_STATUS_LIKE_RE.match(line):
+            return f"line {lineno}: malformed bridge status line {line!r}."
+        return f"line {lineno}: unexpected non-status content inside Document {current_doc!r}: {line!r}."
+
+    if current_doc is not None and not current_doc_status_seen:
+        return f"Document {current_doc!r} has no status line."
+    return None
 
 
 def _first_nonblank_line(content: str) -> str:
@@ -1085,6 +1147,12 @@ def _deny_reason_for_content(
     content: str,
     run_pending_preflight: bool = True,
 ) -> str | None:
+    if _is_bridge_index_file(file_path) and content:
+        index_error = _bridge_index_well_formedness_error(content)
+        if index_error:
+            return f"[Governance] bridge/INDEX.md is malformed: {index_error}"
+        return None
+
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
             return (

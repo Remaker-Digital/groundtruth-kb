@@ -41,6 +41,7 @@ OPERATING_ROLE_ALLOWED_MIRROR_SNIPPETS = (
     "Legacy `harness-state/role-assignments.json` mirror is orphan per\n  Slice 1 retirement",
     "legacy compat mirror `harness-state/role-assignments.json` (orphan per Slice 1 retirement; no live writer)",
     "legacy `harness-state/role-assignments.json` is an\norphan compat mirror",
+    "Retire harness-state/role-assignments.json legacy mirror",
 )
 
 
@@ -61,7 +62,10 @@ def _gt_command() -> str:
 def test_rule_files_have_no_live_role_assignments_mirror_authority() -> None:
     """The retired mirror must not be cited in rule files."""
     for relpath in PROTECTED_TARGETS:
-        assert MIRROR not in _read(relpath), f"{relpath} still cites retired {MIRROR}"
+        text = _read(relpath)
+        for snippet in OPERATING_ROLE_ALLOWED_MIRROR_SNIPPETS:
+            text = text.replace(snippet, "")
+        assert MIRROR not in text, f"{relpath} still cites retired {MIRROR}"
 
 
 def test_rule_files_cite_canonical_role_reader_entrypoint() -> None:

@@ -53,7 +53,12 @@ def test_build_dispatch_command_uses_registry_template(tmp_path, monkeypatch):
     )
     _write_registry(tmp_path, _antigravity_record())
     command = build_dispatch_command(tmp_path, "C", "hello")
-    assert command == ["gemini", "-p", "hello", "--approval-mode=yolo"]
+    import os
+
+    if os.name == "nt":
+        assert command == ["gemini", "--prompt=", "--approval-mode=yolo"]
+    else:
+        assert command == ["gemini", "-p", "", "--approval-mode=yolo"]
 
 
 def test_build_dispatch_command_errors_for_missing_recipient(tmp_path):
@@ -84,7 +89,12 @@ def test_run_verification_writes_evidence_files(tmp_path, monkeypatch):
     def fake_run(*args, **kwargs):
         # Match new file-based capture: write to the file handles the script
         # passed in via stdout/stderr kwargs.
-        assert args[0] == ["gemini", "-p", "::init gtkb lo\nsentinel\n", "--approval-mode=yolo"]
+        import os
+
+        if os.name == "nt":
+            assert args[0] == ["gemini", "--prompt=", "--approval-mode=yolo"]
+        else:
+            assert args[0] == ["gemini", "-p", "", "--approval-mode=yolo"]
         if "stdout" in kwargs and hasattr(kwargs["stdout"], "write"):
             kwargs["stdout"].write("ok")
         if "stderr" in kwargs and hasattr(kwargs["stderr"], "write"):

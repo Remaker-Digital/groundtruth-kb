@@ -90,14 +90,6 @@
       "source_sha256": "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
     },
     {
-      "adapter_relative_path": ".api-harness/skills/deploy/SKILL.md",
-      "canonical_name": "deploy",
-      "capability_id": "skill.deploy",
-      "description": "Deploy Agent Red to staging or production. Executes the full build-deploy-verify pipeline with GOV-16 deploy gate enforcement.",
-      "source_relative_path": ".claude/skills/deploy/SKILL.md",
-      "source_sha256": "7a9a68d5808b31b92a13d7fcc927bc94ee5f12012f8e81ae0937851867f7672f"
-    },
-    {
       "adapter_relative_path": ".api-harness/skills/harness-parity-review/SKILL.md",
       "canonical_name": "harness-parity-review",
       "capability_id": "skill.harness-parity-review",
@@ -200,22 +192,6 @@
       "description": "Run the non-deploying Agent Red release-candidate gate before treating a build as production deployable. Covers Python security checks, targeted regression tests, frontend builds, and GroundTruth governance adoption checks.",
       "source_relative_path": ".claude/skills/release-candidate-gate/SKILL.md",
       "source_sha256": "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
-    },
-    {
-      "adapter_relative_path": ".api-harness/skills/run-tests/SKILL.md",
-      "canonical_name": "run-tests",
-      "capability_id": "skill.run-tests",
-      "description": "Run Agent Red tests using the thermal-safe batch runner or the live E2E test pipeline. Supports unit tests, integration tests, and full PLAN-001 E2E phases.",
-      "source_relative_path": ".claude/skills/run-tests/SKILL.md",
-      "source_sha256": "eb6c2f2b5c19028f5716fd7cbf4d3e150c73170548d2073041e5056da7b15bb9"
-    },
-    {
-      "adapter_relative_path": ".api-harness/skills/seed-tenant/SKILL.md",
-      "canonical_name": "seed-tenant",
-      "capability_id": "skill.seed-tenant",
-      "description": "Seed a new tenant in Cosmos DB using the 9-phase seed_tenant.py script. Creates a complete, production-ready tenant environment.",
-      "source_relative_path": ".claude/skills/seed-tenant/SKILL.md",
-      "source_sha256": "935fd60755692ec66473b86a1ff1130b79948a5e0c14cc6555f81b5bcd9ff41d"
     },
     {
       "adapter_relative_path": ".api-harness/skills/send-review/SKILL.md",

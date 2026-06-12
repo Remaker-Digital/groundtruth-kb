@@ -257,29 +257,6 @@ status = "adapter"
 adapter_source = ".claude/skills/decision-capture/SKILL.md"
 source_sha256 = "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
 [[capabilities]]
-id = "skill.deploy"
-kind = "skill"
-canonical_name = "deploy"
-canonical_purpose = "Execute governed deployment workflows."
-canonical_source = ".claude/skills/deploy/SKILL.md"
-required_for_roles = ["prime-builder"]
-parity_class = "owner-gated"
-
-[capabilities.claude]
-surface = ".claude/skills/deploy/SKILL.md"
-status = "native"
-
-[capabilities.codex]
-surface = ".codex/skills/deploy/SKILL.md"
-status = "adapter"
-adapter_source = ".claude/skills/deploy/SKILL.md"
-source_sha256 = "7a9a68d5808b31b92a13d7fcc927bc94ee5f12012f8e81ae0937851867f7672f"
-[capabilities.antigravity]
-surface = ".agent/skills/deploy/SKILL.md"
-status = "adapter"
-adapter_source = ".claude/skills/deploy/SKILL.md"
-source_sha256 = "7a9a68d5808b31b92a13d7fcc927bc94ee5f12012f8e81ae0937851867f7672f"
-[[capabilities]]
 id = "skill.harness-parity-review"
 kind = "skill"
 canonical_name = "harness-parity-review"
@@ -578,52 +555,6 @@ surface = ".agent/skills/release-candidate-gate/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/release-candidate-gate/SKILL.md"
 source_sha256 = "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
-[[capabilities]]
-id = "skill.run-tests"
-kind = "skill"
-canonical_name = "run-tests"
-canonical_purpose = "Run governed test workflows."
-canonical_source = ".claude/skills/run-tests/SKILL.md"
-required_for_roles = ["prime-builder", "loyal-opposition"]
-parity_class = "required"
-
-[capabilities.claude]
-surface = ".claude/skills/run-tests/SKILL.md"
-status = "native"
-
-[capabilities.codex]
-surface = ".codex/skills/run-tests/SKILL.md"
-status = "adapter"
-adapter_source = ".claude/skills/run-tests/SKILL.md"
-source_sha256 = "eb6c2f2b5c19028f5716fd7cbf4d3e150c73170548d2073041e5056da7b15bb9"
-[capabilities.antigravity]
-surface = ".agent/skills/run-tests/SKILL.md"
-status = "adapter"
-adapter_source = ".claude/skills/run-tests/SKILL.md"
-source_sha256 = "eb6c2f2b5c19028f5716fd7cbf4d3e150c73170548d2073041e5056da7b15bb9"
-[[capabilities]]
-id = "skill.seed-tenant"
-kind = "skill"
-canonical_name = "seed-tenant"
-canonical_purpose = "Seed tenant data under governed workflows."
-canonical_source = ".claude/skills/seed-tenant/SKILL.md"
-required_for_roles = ["prime-builder"]
-parity_class = "baseline"
-
-[capabilities.claude]
-surface = ".claude/skills/seed-tenant/SKILL.md"
-status = "native"
-
-[capabilities.codex]
-surface = ".codex/skills/seed-tenant/SKILL.md"
-status = "adapter"
-adapter_source = ".claude/skills/seed-tenant/SKILL.md"
-source_sha256 = "935fd60755692ec66473b86a1ff1130b79948a5e0c14cc6555f81b5bcd9ff41d"
-[capabilities.antigravity]
-surface = ".agent/skills/seed-tenant/SKILL.md"
-status = "adapter"
-adapter_source = ".claude/skills/seed-tenant/SKILL.md"
-source_sha256 = "935fd60755692ec66473b86a1ff1130b79948a5e0c14cc6555f81b5bcd9ff41d"
 [[capabilities]]
 id = "skill.send-review"
 kind = "skill"

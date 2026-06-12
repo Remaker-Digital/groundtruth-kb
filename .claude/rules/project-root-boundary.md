@@ -64,6 +64,35 @@ Owner approval is per-manifest, not per-run; adding new sandbox paths requires:
 2. An owner-approved manifest update through the bridge protocol (which exercises the new pattern under owner review).
 3. Synchronized update of this rule's allowlist citation to keep rule text and source code aligned (verified by platform_tests/scripts/test_rehearse_isolation.py asserting `_OUTPUT_DIR_ALLOWLIST_DESC` equals the rule-text quotation).
 
+
+## DB-Snapshot Output Exception
+
+GT-KB database snapshot operations (`gt db snapshot` / `create_snapshot()`) write
+snapshot files to a platform-default directory outside `E:\GT-KB` when ALL of the
+following hold:
+
+1. The output directory resolves to `%LOCALAPPDATA%\gtkb-snapshots\<project-name>`
+   (the platform default computed by `groundtruth_kb.db_snapshot.default_output_dir`)
+   or to a path explicitly configured in `groundtruth.toml` under
+   `[backup] snapshot_output_dir`.
+2. The snapshot output is a regenerable integrity-checked copy of `groundtruth.db`,
+   not canonical project state. The canonical MemBase remains at
+   `E:\GT-KB\groundtruth.db`; snapshots are disaster-recovery artifacts.
+3. The doctor check `_check_db_snapshot_output_allowlist` enforces the bound: it
+   confirms the resolved output directory matches the allowlist constant
+   `_DB_SNAPSHOT_OUTPUT_ALLOWLIST` in `doctor.py` and reports FAIL if the output
+   would land in an unrecognized location.
+
+Source: `DELIB-FAB03-ROOT-BOUNDARY-EXCEPTION-20260611` (owner AUQ). Rationale:
+`groundtruth.db` resides on a cloud-synced drive (`E:\`); writing VACUUM'd copies
+to the same sync root risks corruption from concurrent sync operations. The
+`%LOCALAPPDATA%` default is a non-synced, user-local directory that avoids this
+class of corruption.
+
+Snapshots covered by this exception remain outside the scope of GT-KB canonical
+state, audit history, release evidence, and dependency closure. The canonical
+MemBase is always `E:\GT-KB\groundtruth.db`.
+
 ## External Harness Executable Resolution Exception
 
 GT-KB cross-harness operations may resolve and invoke external AI coding harness

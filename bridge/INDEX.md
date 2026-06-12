@@ -1,3 +1,9 @@
+Document: gtkb-dashboard-operations-cockpit-advisory-disposition
+NEW: bridge/gtkb-dashboard-operations-cockpit-advisory-disposition-001.md
+
+Document: gtkb-propose-scaffold-validation-gap-advisory-disposition
+NEW: bridge/gtkb-propose-scaffold-validation-gap-advisory-disposition-001.md
+
 Document: gtkb-fab-10-codex-index-adapter-addendum-sufficiency
 VERIFIED: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-004.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-003.md
