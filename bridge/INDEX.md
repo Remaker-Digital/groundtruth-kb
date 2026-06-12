@@ -74,10 +74,16 @@ NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-002.md
 NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-0-analyzer-001.md
 
 Document: gtkb-fab-23-demoted-cleanup-batch
+VERIFIED: bridge/gtkb-fab-23-demoted-cleanup-batch-006.md
+NEW: bridge/gtkb-fab-23-demoted-cleanup-batch-005.md
+NO-GO: bridge/gtkb-fab-23-demoted-cleanup-batch-004.md
+NEW: bridge/gtkb-fab-23-demoted-cleanup-batch-003.md
 GO: bridge/gtkb-fab-23-demoted-cleanup-batch-002.md
 NEW: bridge/gtkb-fab-23-demoted-cleanup-batch-001.md
 
 Document: gtkb-fab-22-architecture-cluster
+VERIFIED: bridge/gtkb-fab-22-architecture-cluster-004.md
+NEW: bridge/gtkb-fab-22-architecture-cluster-003.md
 GO: bridge/gtkb-fab-22-architecture-cluster-002.md
 NEW: bridge/gtkb-fab-22-architecture-cluster-001.md
 
@@ -106,6 +112,8 @@ NO-GO: bridge/gtkb-fab-20-hygiene-investigation-skill-002.md
 NEW: bridge/gtkb-fab-20-hygiene-investigation-skill-001.md
 
 Document: gtkb-fab-19-hygiene-detector-expansion
+NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-006.md
+NEW: bridge/gtkb-fab-19-hygiene-detector-expansion-005.md
 GO: bridge/gtkb-fab-19-hygiene-detector-expansion-004.md
 REVISED: bridge/gtkb-fab-19-hygiene-detector-expansion-003.md
 NO-GO: bridge/gtkb-fab-19-hygiene-detector-expansion-002.md
@@ -199,6 +207,8 @@ NO-GO: bridge/gtkb-fab-06-narrative-corrections-002.md
 NEW: bridge/gtkb-fab-06-narrative-corrections-001.md
 
 Document: gtkb-fab-05-rule-file-retirement
+VERIFIED: bridge/gtkb-fab-05-rule-file-retirement-006.md
+NEW: bridge/gtkb-fab-05-rule-file-retirement-005.md
 GO: bridge/gtkb-fab-05-rule-file-retirement-004.md
 REVISED: bridge/gtkb-fab-05-rule-file-retirement-003.md
 NO-GO: bridge/gtkb-fab-05-rule-file-retirement-002.md
