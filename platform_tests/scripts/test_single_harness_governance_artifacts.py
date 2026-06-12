@@ -61,7 +61,9 @@ def test_canonical_terminology_has_three_new_glossary_entries() -> None:
 
 
 def test_glossary_entries_cite_authorities() -> None:
-    src = (PROJECT_ROOT / ".claude" / "rules" / "canonical-terminology.md").read_text(encoding="utf-8")
+    src = (PROJECT_ROOT / "groundtruth-kb" / "docs" / "reference" / "canonical-terminology-detail.md").read_text(
+        encoding="utf-8"
+    )
     # Each entry must cite an originating spec/ADR/DCL.
     assert "ADR-SINGLE-HARNESS-OPERATING-MODE-001" in src
     assert "SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001" in src

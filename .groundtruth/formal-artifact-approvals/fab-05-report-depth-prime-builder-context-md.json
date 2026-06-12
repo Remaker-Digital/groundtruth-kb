@@ -1,0 +1,15 @@
+{
+  "artifact_type": "narrative_artifact",
+  "artifact_id": "fab-05-report-depth-prime-builder-context-md",
+  "action": "update",
+  "target_path": ".claude/rules/report-depth-prime-builder-context.md",
+  "source_ref": "bridge:gtkb-fab-05-rule-file-retirement-003:HYG-018-026-027-038",
+  "full_content": "# Report Depth and Prime Builder Context Standard \u2014 Pointer (HYG-027)\n\n> **Deduplicated (FAB-05 / HYG-027).** The full Report Depth and Prime Builder\n> Context Standard is maintained canonically in\n> [`report-depth.md`](report-depth.md). This file previously duplicated that\n> content verbatim, creating a lockstep-edit hazard. The content was\n> consolidated into `report-depth.md`; this file now points to it.\n>\n> This file path is retained because the governance-adoption check\n> (`platform_tests/scripts/test_groundtruth_governance_adoption.py`) and Loyal\n> Opposition skill frontmatter (`governance: report-depth-prime-builder-context`)\n> reference it. Consult [`report-depth.md`](report-depth.md) for the active\n> Loyal Opposition report-depth contract.\n\n## Copyright\n\n(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.",
+  "full_content_sha256": "a58dc441789bc9fcea05b628e4e07ea9e7609d401502cac9adb7002c8903f948",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "FAB-05 rule-file retirement approved by owner: dispositions via AskUserQuestion 2026-06-10 (DELIB-FAB05-REMEDIATION-20260610); concrete-content approval via AskUserQuestion 2026-06-11 (Approve all - packets, WIs, commit). HYG-027: replaced the duplicated content with a pointer stub to canonical report-depth.md (pointer-not-delete: the file is referenced by test_groundtruth_governance_adoption.py + skill frontmatter).",
+  "changed_by": "prime-builder/claude-opus",
+  "change_reason": "FAB-05 rule-file retirement (HYG-018/026/027/038); bridge gtkb-fab-05-rule-file-retirement GO at -004; DELIB-FAB05-REMEDIATION-20260610. Retires era-stranded + contradictory auto-loaded rule content (poller runbook, Cursor-era index paths, duplicated normative blocks, deleted-work_list.md repoint)."
+}

@@ -1,126 +1,37 @@
-# Bridge Permanent Operations Runbook
+# DEPRECATED — Bridge Permanent Operations Runbook (Retired 2026-06-11, FAB-05 / HYG-018)
 
-Date: 2026-04-15
-Owner decision source: Mike, live session instruction
-Scope: Agent Red file bridge for GroundTruth-KB coordination
+> ⚠️ **DEPRECATED / RETIRED.** This runbook formerly mandated 3-minute OS bridge
+> pollers plus repair/verification commands. That mechanism is **retired and
+> must not be re-enabled.** The authoritative do-not-re-enable rule is
+> [`bridge-essential.md`](bridge-essential.md) § "Operational Mode". The retired
+> poller scripts are archived at `archive/os-poller-2026-04-25/`.
 
-## Owner Decision
+## Why Retired
 
-The file bridge is critical infrastructure. There is no accepted future state in
-which the bridge is allowed to stop being maintained, monitored, or treated as
-top-priority operational work.
+The OS-poller stack (Windows scheduled tasks `AgentRedFileBridgeIndexScan-*`,
+`AgentRedPollerLivenessWatcher`, the foreground watchdog, and the liveness
+watchers) polled blindly on a fixed interval regardless of bridge activity and
+was halted by owner directive on 2026-04-25. Bridge dispatch is now event-driven
+via the cross-harness event-driven trigger
+(`scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse + Stop
+hooks); manual `bridge/INDEX.md` scans remain the fallback. See
+[`bridge-essential.md`](bridge-essential.md) for the canonical operating mode and
+the two-axis bridge-automation model.
 
-Required behavior:
+## The Only Sanctioned Path Back
 
-- The Prime and Codex bridge pollers must run on a 3-minute cycle.
-- The bridge must have a visible liveness surface so Mike can see normal
-  heartbeat, work-in-progress, failures, and recovery.
-- If the bridge fails, restoring bridge function is always the top-priority
-  task before ordinary review or implementation work.
-- GroundTruth-KB is not operationally functional when the bridge is not working.
+There is no accepted state that re-enables the retired OS pollers as the active
+automation path. A *governed* scheduled-poller restoration, if ever pursued, is
+tracked as **WI-4404** and would require a fresh owner directive plus a bridge
+proposal; the orchestrator direction in
+`DELIB-BRIDGE-ORCHESTRATOR-VISION-20260610` may supersede WI-4404.
 
-## Current Durable Controls
+## Historical Content
 
-Bridge automation lives in:
+The archived poller scripts and the prior runbook procedures are preserved under
+`archive/os-poller-2026-04-25/` for historical reference only. They are not live
+dependencies and must not be invoked.
 
-`independent-progress-assessments/bridge-automation/`
+## Copyright
 
-Scheduled tasks:
-
-- `AgentRedFileBridgeIndexScan-Codex`
-  - every 3 minutes
-  - handles latest `NEW` and `REVISED` entries in `bridge/INDEX.md`
-- `AgentRedFileBridgeIndexScan-Claude`
-  - every 3 minutes
-  - handles latest `GO` and `NO-GO` entries in `bridge/INDEX.md`
-- `AgentRedPollerLivenessWatcher`
-  - every 2 minutes
-  - runs `poller-liveness-stable-watcher.ps1`
-  - writes `logs/poller-liveness-external.json`
-  - debounces the brief "running child PID disappeared" completion race before
-    publishing a dead liveness verdict
-  - treats fresh scanner `error` states as failed liveness, not as healthy
-    heartbeat
-
-User-logon watchdog:
-
-- `Agent Red Bridge Monitor Watchdog.lnk`
-  - stored in the current user's Windows Startup folder
-  - runs `run-bridge-monitor-watchdog-hidden.vbs`
-  - starts `bridge-monitor-watchdog.ps1` hidden
-  - every 2 minutes, ensures the visible monitor exists and runs the liveness
-    alert check
-  - every 2 minutes, disables a stale `.local/claude-oauth-token.txt` handoff
-    token if injected-token auth fails but Claude managed desktop auth works
-
-## Visible Status Surfaces
-
-Primary visible surface:
-
-`independent-progress-assessments/bridge-automation/bridge-scan-monitor-window.ps1`
-
-The monitor displays:
-
-- Claude poller state
-- Codex poller state
-- combined external liveness verdict
-- clear/running/completed/skipped/error state transitions
-
-Failure notifications:
-
-`independent-progress-assessments/bridge-automation/show-bridge-liveness-alert.ps1`
-
-This script emits Windows notifications when liveness is not `ok`, and emits a
-recovery notification when liveness returns to `ok`.
-
-Startup watchdog:
-
-`independent-progress-assessments/bridge-automation/bridge-monitor-watchdog.ps1`
-
-This hidden process is launched from the Windows Startup folder. It keeps the
-visible monitor open, repairs stale Claude token handoff when possible, and
-calls the liveness alert script every 2 minutes.
-
-Machine-readable surfaces:
-
-- `logs/claude-scan-status.json`
-- `logs/codex-scan-status.json`
-- `logs/poller-liveness-external.json`
-- `logs/poller-liveness-stable.log`
-- `logs/bridge-liveness-alert-state.json`
-- `logs/claude-token-handoff-repair.log`
-
-## Repair / Verification
-
-Register or repair all durable scheduled tasks:
-
-```powershell
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File independent-progress-assessments/bridge-automation/repair-permanent-bridge-automation.ps1
-```
-
-Verify without changing task registration:
-
-```powershell
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File independent-progress-assessments/bridge-automation/repair-permanent-bridge-automation.ps1 -VerifyOnly
-```
-
-Expected verification:
-
-- core scheduled tasks present
-- Codex scanner interval is `PT3M`
-- Claude scanner interval is `PT3M`
-- liveness watcher interval is `PT2M`
-- startup watchdog shortcut exists
-- visible monitor process is running or can be started by the watchdog
-- `poller-liveness-external.json` reports `overall=ok`
-
-## Escalation Rule
-
-If verification fails, stop ordinary work and repair the bridge first. The
-minimum acceptable recovery evidence is:
-
-1. scheduled tasks present and enabled
-2. scanner tasks set to 3-minute intervals
-3. liveness JSON updated within the alert threshold
-4. external liveness `overallState` is `ok`
-5. visible monitor window is running or can be started by the ensure task
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

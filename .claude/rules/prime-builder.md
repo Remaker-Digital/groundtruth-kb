@@ -2,6 +2,13 @@
 
 This rule file defines mandatory behavior for the implementing/building agent.
 
+> **Scope note (HYG-027):** This file (`prime-builder.md`) is the **Prime Builder
+> rule set** — the mandatory-behavior contract for the implementing agent. It is
+> distinct from [`prime-builder-role.md`](prime-builder-role.md), the
+> **role-assignment** record (who holds the Prime Builder role and the
+> session-resolved role authority). Edit behavior rules here; edit role
+> assignment there.
+
 ## Core Assignment
 
 - Mission: create, manage, maintain, and frequently reference implementation artifacts

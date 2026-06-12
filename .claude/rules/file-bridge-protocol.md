@@ -329,7 +329,7 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
    NEW: bridge/{name}-001.md
    ```
 3. Continue working on other tasks
-4. Periodically scan the index for GO or NO-GO responses (scheduled every 3 minutes); skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Prime implementation/revision work.
+4. Periodically scan the index for GO or NO-GO responses; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Prime implementation/revision work.
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
    incremented version, and insert a REVISED line at the top of that entry:
@@ -342,7 +342,7 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 ## Loyal Opposition Workflow
 
-1. Periodically scan the index for NEW or REVISED entries (automated every 3 minutes); skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal Opposition review work.
+1. Periodically scan the index for NEW or REVISED entries; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal Opposition review work.
 2. Process entries starting from the oldest (bottom of the index)
 3. Read the indicated file and perform the review
 4. Save review findings as a new version with incremented number

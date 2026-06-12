@@ -131,7 +131,7 @@ def test_strict_drop_audit_path_matches_glossary_citation() -> None:
     ``.gtkb-state/bridge-poller/dispatch-failures.jsonl``. Drift between
     rule text and code would defeat the rule-cited soft-authority chain.
     """
-    glossary_path = PROJECT_ROOT / ".claude" / "rules" / "canonical-terminology.md"
+    glossary_path = PROJECT_ROOT / "groundtruth-kb" / "docs" / "reference" / "canonical-terminology-detail.md"
     glossary = _read(glossary_path)
     # Glossary cites the exact path.
     assert ".gtkb-state/bridge-poller/dispatch-failures.jsonl" in glossary

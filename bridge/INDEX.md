@@ -1,12 +1,11 @@
 Document: gtkb-codex-skill-adapter-frontmatter-strict-yaml
+VERIFIED: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-004.md
+NEW: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-003.md
 GO: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-002.md
 NEW: bridge/gtkb-codex-skill-adapter-frontmatter-strict-yaml-001.md
 
-Document: gtkb-dispatch-retry-delay-livelock-fix
-VERIFIED: bridge/gtkb-dispatch-retry-delay-livelock-fix-004.md
-NEW: bridge/gtkb-dispatch-retry-delay-livelock-fix-003.md
-GO: bridge/gtkb-dispatch-retry-delay-livelock-fix-002.md
-NEW: bridge/gtkb-dispatch-retry-delay-livelock-fix-001.md
+Document: gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-3-stop-the-leak-001.md
 
 Document: gtkb-delib-2500-review-advisory
 ADVISORY: bridge/gtkb-delib-2500-review-advisory-001.md
@@ -18,6 +17,9 @@ Document: gtkb-commit-untracked-governance-hooks
 WITHDRAWN: bridge/gtkb-commit-untracked-governance-hooks-002.md
 
 Document: gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition
+VERIFIED: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-007.md
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-006.md
+NEW: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-005.md
 GO: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-004.md
 REVISED: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-003.md
 NO-GO: bridge/gtkb-backlog-triage-and-hygiene-stage-2-router-corpus-disposition-002.md
@@ -53,6 +55,10 @@ GO: bridge/gtkb-fab-22-architecture-cluster-002.md
 NEW: bridge/gtkb-fab-22-architecture-cluster-001.md
 
 Document: gtkb-fab-21-startup-load-cost-reduction
+VERIFIED: bridge/gtkb-fab-21-startup-load-cost-reduction-012.md
+NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-011.md
+VERIFIED: bridge/gtkb-fab-21-startup-load-cost-reduction-010.md
+NEW: bridge/gtkb-fab-21-startup-load-cost-reduction-009.md
 VERIFIED: bridge/gtkb-fab-21-startup-load-cost-reduction-008.md
 REVISED: bridge/gtkb-fab-21-startup-load-cost-reduction-007.md
 NO-GO: bridge/gtkb-fab-21-startup-load-cost-reduction-006.md
@@ -94,6 +100,10 @@ NO-GO: bridge/gtkb-fab-17-da-chroma-read-path-002.md
 NEW: bridge/gtkb-fab-17-da-chroma-read-path-001.md
 
 Document: gtkb-fab-16-harness-parity-remediation
+VERIFIED: bridge/gtkb-fab-16-harness-parity-remediation-008.md
+NEW: bridge/gtkb-fab-16-harness-parity-remediation-007.md
+GO: bridge/gtkb-fab-16-harness-parity-remediation-006.md
+REVISED: bridge/gtkb-fab-16-harness-parity-remediation-005.md
 NO-GO: bridge/gtkb-fab-16-harness-parity-remediation-004.md
 REVISED: bridge/gtkb-fab-16-harness-parity-remediation-003.md
 GO: bridge/gtkb-fab-16-harness-parity-remediation-002.md
@@ -178,10 +188,14 @@ NO-GO: bridge/gtkb-fab-03-membase-backup-002.md
 NEW: bridge/gtkb-fab-03-membase-backup-001.md
 
 Document: gtkb-fab-01-dispatch-substrate-revival
+VERIFIED: bridge/gtkb-fab-01-dispatch-substrate-revival-004.md
+NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-003.md
 GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
+NO-GO: bridge/gtkb-fab-04-storage-reclamation-006.md
+NEW: bridge/gtkb-fab-04-storage-reclamation-005.md
 GO: bridge/gtkb-fab-04-storage-reclamation-004.md
 REVISED: bridge/gtkb-fab-04-storage-reclamation-003.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-002.md

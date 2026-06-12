@@ -38,10 +38,10 @@ Purpose: index of Loyal Opposition rules maintained for Codex and Prime Builder 
 
 Legacy Cursor artifacts were moved (not deleted) to:
 
-- `archive/cursor-legacy/CURSOR-KNOWLEDGE-BASE-INDEX.md`
-- `archive/cursor-legacy/CURSOR-LOYAL-OPPOSITION-ROLE.md`
-- `archive/cursor-legacy/CURSOR-WAY-OF-WORKING.md`
-- `archive/cursor-legacy/CURSOR-INSIGHT-DROPBOX/`
+- `independent-progress-assessments/archive/cursor-legacy/CURSOR-KNOWLEDGE-BASE-INDEX.md`
+- `independent-progress-assessments/archive/cursor-legacy/CURSOR-LOYAL-OPPOSITION-ROLE.md`
+- `independent-progress-assessments/archive/cursor-legacy/CURSOR-WAY-OF-WORKING.md`
+- `independent-progress-assessments/archive/cursor-legacy/CURSOR-INSIGHT-DROPBOX/`
 
 ## Update Convention
 

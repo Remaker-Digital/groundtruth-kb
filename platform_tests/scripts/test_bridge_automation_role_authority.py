@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BRIDGE_AUTOMATION = REPO_ROOT / "independent-progress-assessments" / "bridge-automation"
+BRIDGE_AUTOMATION = REPO_ROOT / "archive" / "os-poller-2026-04-25"
 
 
 def test_common_bridge_scan_role_authority_guard_exists() -> None:

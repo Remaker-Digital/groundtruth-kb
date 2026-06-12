@@ -7,26 +7,20 @@ These priorities remain active across sessions unless Mike explicitly suspends t
 ## Priority 1 - Role-Appropriate Top Priority Work
 
 - Default idle work choice for both Prime Builder and Loyal Opposition is the
-  revised release plan recorded in `memory/work_list.md`:
-  1. `GTKB-SECRETS-PURGE-AND-COMMIT-ENFORCEMENT` remains the P0 controlling
-     workstream until current-file purge, generated-artifact redaction, and
-     inspection-before-commit enforcement are implemented and verified.
-  2. Resume the release path after P0 containment gates are verified:
-     `GTKB-ISOLATION-017` Slice 8.6, then Slice 8.5 CI-green evidence, then
-     the `v0.7.0-rc1` release lane.
-  3. Continue the isolation sequence after the rc1 lane: `GTKB-ISOLATION-018`
-     Agent Red child-directory cutover, then `GTKB-ISOLATION-019` program
-     closeout and cleanup.
-  4. Treat GA/release-hardening items such as GT-KB platform CI coverage,
-     evaluation-module waiver retirement, and pip-installed adopter UX as next
-     release-plan work after the rc1/isolation lane unless Mike elevates them.
+  highest-priority actionable item in the MemBase standing backlog, surfaced
+  via `gt backlog list`. The MemBase `work_items` table is the canonical work
+  authority per `GOV-STANDING-BACKLOG-001`; the former `memory/work_list.md`
+  release-plan view was retired at the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH`
+  migration conclusion (`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`).
+  Honor owner-prioritized / TOP items first; do not silently bypass, reorder,
+  or drop them without an explicit owner decision or completion evidence.
 - Prime Builder idle behavior: when Mike has not supplied a different task,
-  continue the highest-priority item in that release plan that is actionable
+  continue the highest-priority item in the standing backlog that is actionable
   for Prime Builder, including revising `NO-GO` bridge items or implementing
   items that have received `GO`.
 - Loyal Opposition idle behavior: when Mike has not supplied a different task,
-  review or verify the highest-priority `NEW` or `REVISED` bridge item in that
-  release plan before lower-priority review work.
+  review or verify the highest-priority `NEW` or `REVISED` bridge item in the
+  standing backlog before lower-priority review work.
 - When operating as Loyal Opposition, reviews requested by Prime Builder are the
   standing top-priority task.
 - Loyal Opposition does not need separate owner approval to execute reviews

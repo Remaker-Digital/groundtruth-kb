@@ -48,6 +48,12 @@ This matches the live Codex dispatch stderr (2026-06-11T14:15Z): `ERROR codex_co
 
 All target paths are inside `E:\GT-KB`: `scripts/generate_codex_skill_adapters.py`, `platform_tests/scripts/test_generate_codex_skill_adapters.py`, and the 5 `.codex/skills/*/SKILL.md` adapters.
 
+## Requirement Sufficiency
+
+Existing requirements sufficient. The governing requirement - `ADR-CODEX-HOOK-PARITY-FALLBACK-001` (Codex skill/hook adapters must be loadable) - already constrains the corrected behavior; this defect fix restores conformance. No new or revised requirement is required before implementation.
+
+(Section added post-GO to satisfy the implementation-start gate's mandatory `## Requirement Sufficiency` check; the defect-fix scaffold omitted it. The fix scope and reviewed technical content are unchanged.)
+
 ## Specification Links
 
 - `ADR-CODEX-HOOK-PARITY-FALLBACK-001` - **Primary.** Codex hook/skill parity is required; broken adapter loading degrades Codex's parity surface. The fix restores loadability of the 5 KB-operation skills so Codex's Loyal-Opposition capability is intact.

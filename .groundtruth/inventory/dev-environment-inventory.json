@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-11T20:02:07Z",
+  "generated_at": "2026-06-12T01:22:38Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -253,7 +253,7 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 38,
+      "count": 34,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
@@ -273,7 +273,6 @@
         ".claude/rules/codex-standing-priorities.md",
         ".claude/rules/codex-way-of-working.md",
         ".claude/rules/deliberation-protocol.md",
-        ".claude/rules/exec-summary-report-guide.md",
         ".claude/rules/file-bridge-protocol.md",
         ".claude/rules/groundtruth-kb-vision.md",
         ".claude/rules/gtkb-capability-import-policy.md",
@@ -284,12 +283,9 @@
         ".claude/rules/prime-bridge-collaboration-protocol.md",
         ".claude/rules/prime-builder-role.md",
         ".claude/rules/prime-builder.md",
-        ".claude/rules/project-progress-dashboard-runbook.md",
         ".claude/rules/project-root-boundary.md",
-        ".claude/rules/prompt-organize-reports-in-dropbox.md",
         ".claude/rules/report-depth-prime-builder-context.md",
         ".claude/rules/report-depth.md",
-        ".claude/rules/session-start-prompt.md",
         ".claude/rules/sot-read-discipline.md",
         ".claude/rules/template-code-review.md",
         ".claude/rules/template-decision-memo.md"
@@ -698,7 +694,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "26.1.2"
+      "version": "25.3"
     },
     "playwright": {
       "classification": "unsupported",
@@ -712,7 +708,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -726,7 +722,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.12"
     }
   },
   "verification": {

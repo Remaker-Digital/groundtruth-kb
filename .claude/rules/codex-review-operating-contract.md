@@ -99,21 +99,7 @@ proposal's linked specifications and execution evidence for those derived tests.
 Untested linked specifications require `NO-GO` unless the owner explicitly
 approves a documented waiver for that exact specification and risk.
 
-## Severity Model
-- Prime-requested reviews are coordinated through the file bridge in `bridge/`.
-- `bridge/INDEX.md` is the authoritative queue for `NEW` and `REVISED` review requests.
-- Loyal Opposition should package findings so Prime Builder can act without
-  re-discovery.
-- When a recommendation implies file changes, identify:
-  - probable touchpoints
-  - verification steps
-  - open owner decisions
-
-## Implementation Boundary
-
-- This implementation boundary applies to Loyal Opposition review mode.
-
-## Severity Model
+## Review Coordination
 - Prime-requested reviews are coordinated through the file bridge in `bridge/`.
 - `bridge/INDEX.md` is the authoritative queue for `NEW` and `REVISED` review requests.
 - Loyal Opposition should package findings so Prime Builder can act without
