@@ -1,3 +1,6 @@
+Document: gtkb-ollama-server-readiness-autostart-advisory
+ADVISORY: bridge/gtkb-ollama-server-readiness-autostart-advisory-001.md
+
 Document: gtkb-dashboard-operations-cockpit-advisory-disposition
 GO: bridge/gtkb-dashboard-operations-cockpit-advisory-disposition-002.md
 NEW: bridge/gtkb-dashboard-operations-cockpit-advisory-disposition-001.md
@@ -16,6 +19,9 @@ Document: gtkb-fab-10-codex-index-adapter-addendum
 WITHDRAWN: bridge/gtkb-fab-10-codex-index-adapter-addendum-003.md
 GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
+
+Document: gtkb-tafe-phase-0-enablement
+NEW: bridge/gtkb-tafe-phase-0-enablement-001.md
 
 Document: gtkb-tafe-spec-promotion
 VERIFIED: bridge/gtkb-tafe-spec-promotion-004.md
@@ -36,6 +42,7 @@ NO-GO: bridge/gtkb-typed-artifact-flow-engine-advisory-002.md
 NEW: bridge/gtkb-typed-artifact-flow-engine-advisory-001.md
 
 Document: gtkb-bridge-index-atomic-write-integration-advisory
+ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-002.md
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
 
 Document: gtkb-path-token-re-discovery-consolidation
