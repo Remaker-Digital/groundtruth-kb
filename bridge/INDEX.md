@@ -1,4 +1,5 @@
 Document: gtkb-fab-10-codex-index-adapter-addendum-sufficiency
+VERIFIED: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-004.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-003.md
 GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-001.md
