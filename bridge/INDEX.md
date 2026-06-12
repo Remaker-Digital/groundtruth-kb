@@ -11,6 +11,7 @@ GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-002.md
 NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-001.md
 
 Document: gtkb-wi-4251-diagnostic-write-envelope
+NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-006.md
 NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-005.md
 GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-004.md
 REVISED: bridge/gtkb-wi-4251-diagnostic-write-envelope-003.md
@@ -18,6 +19,8 @@ NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-002.md
 NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-001.md
 
 Document: gtkb-wi-4250-backlog-reconciliation
+GO: bridge/gtkb-wi-4250-backlog-reconciliation-004.md
+REVISED: bridge/gtkb-wi-4250-backlog-reconciliation-003.md
 NO-GO: bridge/gtkb-wi-4250-backlog-reconciliation-002.md
 NEW: bridge/gtkb-wi-4250-backlog-reconciliation-001.md
 
@@ -153,6 +156,7 @@ NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
+REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-005.md
 GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-004.md
 REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-003.md
 NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-002.md
