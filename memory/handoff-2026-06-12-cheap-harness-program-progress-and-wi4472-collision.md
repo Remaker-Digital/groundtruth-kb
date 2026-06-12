@@ -105,7 +105,46 @@ Fable program; want it working ASAP." Enacted:
 - Coordinates with **FAB-01 (WI-4413)** "Restore bridge dispatch launchability" in the Fable
   program (adjacent; don't duplicate).
 
-### Critical path to working cost-optimized auto-dispatch
+### PROGRESS UPDATE 2026-06-12 ~05:45Z (both GO'd items IMPLEMENTED this session)
+
+- **WI-4472 storm cap → VERIFIED@-010.** The bridge self-corrected (per owner decision): -005→GO-006→NEW-007→NO-GO-008→NEW-009→VERIFIED-010. DONE.
+- **WI-4473 ollama provider fix → IMPLEMENTED + REPORTED.** GO@-002 (Antigravity LO) → claimed + packet `sha256:a6a2865…` → edited `scripts/ollama_harness.py` (9-line provider filter) + new `test_ollama_provider_scoped_routing.py` (6 tests). Verified: 6/6 new, 38/38 existing ollama regression, ruff check+format clean. Post-impl report filed **NEW@-003** → awaits manual LO VERIFY.
+- **WI-4476 openrouter→DeepSeek → IMPLEMENTED + REPORTED + LIVE-VERIFIED.** GO@-002 → packet `sha256:b2f978e…` → edited `.api-harness/routing.toml` (gemini/qwen → `deepseek/deepseek-v4-pro` + `deepseek-v4-flash`, default+skills) + new `test_openrouter_routing_deepseek.py` (6 tests). Verified: 6/6, ruff clean, **LIVE OpenRouter call HTTP 200** (deepseek-v4-pro replied "OK", tool accepted — 404 class CLOSED). Post-impl report filed **NEW@-003** → awaits manual LO VERIFY.
+- Working tree (uncommitted, per discipline): `M scripts/ollama_harness.py`, `M .api-harness/routing.toml`, `?? test_ollama_provider_scoped_routing.py`, `?? test_openrouter_routing_deepseek.py`, + the WI-4472 tree changes.
+
+### ✅ PROGRAM COMPLETE 2026-06-12 ~05:55Z — AUTO-DISPATCH RE-ENABLED
+
+All 3 core blockers VERIFIED (WI-4472@-010, WI-4473@-004, WI-4476@-004; WI-4476 verdict
+independently confirms live HTTP 200 + tool-calling on deepseek-v4-pro). Verified work
+committed to `develop` by a concurrent sweep-commit (`17c7672e4` cap (WI-4472), `bb40cab85`
+WI-4473+WI-4476+tests) — confirmed HEAD contains the cap, the `provider != "ollama"` filter,
+and the deepseek routing.toml models.
+
+**Owner AUQ (2026-06-12) → "Full re-enable, watchdog off". EXECUTED:**
+- `GTKB-HarnessStormWatchdog` scheduled task → **Disabled** (reversible: `Enable-ScheduledTask`).
+- `GTKB_NO_CROSS_HARNESS_TRIGGER` User-scope env var → **CLEARED**. Cross-harness auto-dispatch
+  is ON for new sessions. Storm protection now relies SOLELY on the verified concurrency cap
+  (default 8, `GTKB_MAX_LIVE_DISPATCHED_PROCESSES`).
+- Dry-run verification (kill-switch unset): trigger `skipped=False`, would dispatch pending
+  Prime work batched 2/fire, globally capped 8 (raw_pending 39 → bounded). Functional.
+- **Activation semantics:** durable re-enable is live for NEW sessions; resumes as the owner's
+  running sessions cycle/restart. THIS interactive session retains the process-scope var (=1)
+  so it stays inert (won't burst mid-conversation). A fresh session dispatches immediately.
+- Cost-optimization routing (precedence Ollama 10 / OpenRouter-DeepSeek 30 / Codex 20 backstop)
+  configured; both cheap backends now fixed + verified.
+
+### Remaining (non-blocking)
+- **WI-4477** ollama server reliability (open; graceful-skip means it doesn't block dispatch).
+- Watchdog is OFF — re-enable with `Enable-ScheduledTask -TaskName GTKB-HarnessStormWatchdog`
+  if a storm safety-net is wanted back. The cap is the primary protection.
+
+### (historical) Remaining path to working cost-optimized auto-dispatch
+
+1. **WI-4473 + WI-4476** post-impl reports (both NEW@-003) → **need manual LO VERIFY** (last code gate).
+2. **WI-4477** ollama server reliability (investigated; needs proposal) — does NOT block re-enable (dispatch degrades gracefully when ollama down; codex+openrouter still serve).
+3. **ENABLEMENT GATE (owner-gated AUQ):** once WI-4473 + WI-4476 VERIFIED → lift `GTKB_NO_CROSS_HARNESS_TRIGGER` + disable `GTKB-HarnessStormWatchdog`. WI-4472 cap is already VERIFIED, so re-enable is safe once the two LO VERIFYs land.
+
+### (historical) Critical path to working cost-optimized auto-dispatch
 
 1. **WI-4473** ollama provider fix — proposal NEW@-001 filed → **needs manual LO GO** → I implement → VERIFIED.
 2. **WI-4472** storm cap — implemented+verified in tree; report -005 (Antigravity's) + GO@-006 confused verdict → **needs manual LO VERIFY** (let-bridge-self-correct). Gates kill-switch lift.

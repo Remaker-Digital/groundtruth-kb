@@ -7581,6 +7581,31 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-12T04:54:07.514573Z
   answer: "Your questions have been answered: \"Independent sanity-check: the implementation is sound (15/15 tests, cap code matches the GO'd contract exactly, format clean). BUT antigravity's -005 report claims 'ruff check: All checks passed', while ruff check actually flags one PRE-EXISTING B007 (unused loop var, line 2421) in code WI-4472 did not touch (diff-confirmed). WI-4472's own additions are lint-clean. Since -005 carries a false verification claim, how should I take this to Codex VERIFY?\"=\"File accurate report\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1152
+  asked_at: 2026-06-12T05:34:45.263711Z
+  question: "WI-4472 (the dispatch concurrency cap) is VERIFIED by Codex at bridge -010 and committed at 17c7672e4. Marking the work item resolved in MemBase requires explicit owner approval under GOV-15 because WI-4472 is classified as a defect. Approve resolving WI-4472?"
+  options:
+    - "Approve resolve"
+    - "Hold (leave open)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: df7b92c7f05899a0
+  resolved_at: 2026-06-12T05:34:45.263711Z
+  answer: "Your questions have been answered: \"WI-4472 (the dispatch concurrency cap) is VERIFIED by Codex at bridge -010 and committed at 17c7672e4. Marking the work item resolved in MemBase requires explicit owner approval under GOV-15 because WI-4472 is classified as a defect. Approve resolving WI-4472?\"=\"Approve resolve\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1153
+  asked_at: 2026-06-12T05:56:44.162366Z
+  question: "All three core blockers are VERIFIED (WI-4472 storm cap, WI-4473 Ollama provider fix, WI-4476 OpenRouter→DeepSeek, live-confirmed HTTP 200). The emergency kill-switch (GTKB_NO_CROSS_HARNESS_TRIGGER) + GTKB-HarnessStormWatchdog are the last thing holding cost-optimized auto-dispatch off. The verified storm cap (default 8) is live in the tree. How should I re-enable?"
+  options:
+    - "Re-enable, keep watchdog"
+    - "Full re-enable, watchdog off"
+    - "Hold — stay OFF for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a3f8b9e90cc2e5d5
+  resolved_at: 2026-06-12T05:56:44.162366Z
+  answer: "Your questions have been answered: \"All three core blockers are VERIFIED (WI-4472 storm cap, WI-4473 Ollama provider fix, WI-4476 OpenRouter→DeepSeek, live-confirmed HTTP 200). The emergency kill-switch (GTKB_NO_CROSS_HARNESS_TRIGGER) + GTKB-HarnessStormWatchdog are the last thing holding cost-optimized auto-dispatch off. The verified storm cap (default 8) is live in the tree. How should I re-enable?\"=\"Full re-enable, watchdog off\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
