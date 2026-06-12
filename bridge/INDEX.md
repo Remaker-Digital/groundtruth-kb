@@ -269,6 +269,7 @@ NO-GO: bridge/gtkb-fab-07-doctor-false-signals-002.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
 Document: gtkb-fab-06-narrative-corrections
+VERIFIED: bridge/gtkb-fab-06-narrative-corrections-010.md
 REVISED: bridge/gtkb-fab-06-narrative-corrections-009.md
 NO-GO: bridge/gtkb-fab-06-narrative-corrections-008.md
 REVISED: bridge/gtkb-fab-06-narrative-corrections-007.md
