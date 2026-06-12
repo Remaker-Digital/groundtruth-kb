@@ -22,7 +22,7 @@ import subprocess
 import sys
 from datetime import UTC
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -225,6 +225,73 @@ def _index_with_one_go(root: Path, doc: str = "example-thread") -> str:
 # ──────────────────────────────────────────────────────────────────────────
 # T-2-signature-computation
 # ──────────────────────────────────────────────────────────────────────────
+
+
+def test_fab10_work_intent_claim_contract_uses_child_dispatch_id() -> None:
+    trigger = _load_trigger()
+    dispatch_id = "2026-06-12T22-10-00Z-prime-builder-A-abc123"
+
+    assert trigger.WORK_INTENT_TRIGGER_TTL_SECONDS >= 600
+    assert trigger._work_intent_session_id(dispatch_id) == dispatch_id
+    assert ":" not in trigger._new_dispatch_id("prime-builder:A")
+
+
+def test_fab10_dispatch_retry_knobs_prefer_gtkb_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setenv("GTKB_DISPATCH_MAX_RETRIES", "7")
+    monkeypatch.setenv("OLLAMA_MAX_RETRIES", "2")
+    monkeypatch.setenv("GTKB_DISPATCH_RETRY_DELAY_SECONDS", "11")
+    monkeypatch.setenv("OLLAMA_RETRY_DELAY_SECONDS", "22")
+
+    assert trigger._dispatch_max_retries() == 7
+    assert trigger._dispatch_retry_delay_seconds() == 11
+
+    monkeypatch.delenv("GTKB_DISPATCH_MAX_RETRIES")
+    monkeypatch.delenv("GTKB_DISPATCH_RETRY_DELAY_SECONDS")
+
+    assert trigger._dispatch_max_retries() == 2
+    assert trigger._dispatch_retry_delay_seconds() == 22
+
+
+def test_fab10_circuit_breaker_half_open_after_retry_window() -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    old = {"circuit_breaker_tripped_at": (datetime.now(UTC) - timedelta(seconds=601)).isoformat()}
+    recent = {"circuit_breaker_tripped_at": (datetime.now(UTC) - timedelta(seconds=10)).isoformat()}
+
+    assert trigger._circuit_breaker_half_open_allowed(old, 600) is True
+    assert trigger._circuit_breaker_half_open_allowed(recent, 600) is False
+
+
+def test_fab10_prime_work_intent_held_logging_dedupes_per_holder_and_slug(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    item = SimpleNamespace(document_name="fixture-thread", top_status="GO", top_file="bridge/fixture-thread-002.md")
+    holder = {"session_id": "dispatch-1", "ttl_expires_at": "2026-06-12T22:30:00+00:00"}
+
+    for _ in range(2):
+        trigger._record_prime_work_intent_held(
+            state_dir=state_dir,
+            recipient="prime-builder:B",
+            dispatch_id="dispatch-2",
+            item=item,
+            holder=holder,
+        )
+
+    records = _failure_records(state_dir)
+    assert len(records) == 1
+    assert records[0]["reason"] == "work_intent_already_held"
+    assert records[0]["holder_session_id"] == "dispatch-1"
+
+    trigger._record_prime_work_intent_held(
+        state_dir=state_dir,
+        recipient="prime-builder:B",
+        dispatch_id="dispatch-3",
+        item=item,
+        holder={"session_id": "dispatch-3"},
+    )
+    assert len(_failure_records(state_dir)) == 2
 
 
 def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) -> None:

@@ -31,8 +31,9 @@ IMPLEMENTATION_ACTIVE_APPROVAL_STATES = frozenset({"implementation_authorized"})
 IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = frozenset({"in_progress"})
 IMPLEMENTATION_ACTIVE_STAGES = frozenset({"implementing"})
 _BRIDGE_LATEST_STATUS_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s+(bridge/\S+\.md)\s*$"
 )
+_BRIDGE_INDEX_STATUS_LIKE_RE = re.compile(r"^[A-Z][A-Z-]*:")
 _BRIDGE_DATE_RE = re.compile(r"^Date:\s*(\d{4}-\d{2}-\d{2})(?:\s+UTC)?\s*$", re.IGNORECASE)
 _LEGACY_ROOT_MARKERS = (
     "E:\\Claude-Playground",
@@ -1801,6 +1802,84 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
     )
 
 
+def _check_safety_gate_registration(target: Path) -> ToolCheck:
+    """Check that destructive-gate.py and credential-scan.py are registered
+    in tracked .claude/settings.json PreToolUse.
+
+    Returns PASS when both are registered, WARNING when one or both are
+    missing from PreToolUse.
+    """
+    settings_path = target / ".claude" / "settings.json"
+    gates = ["destructive-gate.py", "credential-scan.py"]
+    missing = [g for g in gates if not _is_command_registered_in_event(settings_path, "PreToolUse", g)]
+    if missing:
+        return ToolCheck(
+            name="safety-gate-registration",
+            required=True,
+            found=True,
+            status="warning",
+            message=f"safety gate(s) missing from settings.json PreToolUse: {', '.join(missing)}",
+        )
+    return ToolCheck(
+        name="safety-gate-registration",
+        required=True,
+        found=True,
+        status="pass",
+        message="destructive-gate.py and credential-scan.py registered in PreToolUse",
+    )
+
+
+def _check_capture_hook_stub_status(target: Path) -> ToolCheck:
+    """Report whether owner-decision-capture.py and gov09-capture.py are real
+    implementations or stubs.
+
+    A hook is considered a stub if it has fewer than 35 non-blank lines or
+    contains the marker text 'scaffold stub' (case-insensitive).
+    """
+    hooks_dir = target / ".claude" / "hooks"
+    capture_hooks = ["owner-decision-capture.py", "gov09-capture.py"]
+    stubbed: list[str] = []
+    missing: list[str] = []
+
+    for hook_name in capture_hooks:
+        hook_path = hooks_dir / hook_name
+        if not hook_path.exists():
+            missing.append(hook_name)
+            continue
+        try:
+            content = hook_path.read_text(encoding="utf-8")
+        except OSError:
+            missing.append(hook_name)
+            continue
+        non_blank = [ln for ln in content.splitlines() if ln.strip()]
+        if len(non_blank) < 35 or "scaffold stub" in content.lower():
+            stubbed.append(hook_name)
+
+    if missing:
+        return ToolCheck(
+            name="capture-hook-stub-status",
+            required=True,
+            found=False,
+            status="warning",
+            message=f"capture hook(s) missing: {', '.join(missing)}",
+        )
+    if stubbed:
+        return ToolCheck(
+            name="capture-hook-stub-status",
+            required=True,
+            found=True,
+            status="warning",
+            message=f"capture hook(s) stubbed: {', '.join(stubbed)}",
+        )
+    return ToolCheck(
+        name="capture-hook-stub-status",
+        required=True,
+        found=True,
+        status="pass",
+        message="owner-decision-capture.py and gov09-capture.py are real implementations",
+    )
+
+
 def _derive_paired_hook_id(registration_id: str, event_lowercase: str) -> str:
     """Derive the paired ``hook.<short>`` FileArtifact id from a registration id.
 
@@ -2986,6 +3065,93 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
         found=True,
         status="pass",
         message="File bridge inventory, setup prompt, bridge/INDEX.md, and bridge rules present",
+    )
+
+
+def _bridge_index_well_formedness_error(index_text: str) -> str | None:
+    if "\\n" in index_text:
+        return "contains literal escaped newline text (\\n); write real newline characters instead"
+
+    seen_documents: set[str] = set()
+    current_doc: str | None = None
+    current_doc_status_seen = False
+    for lineno, raw_line in enumerate(index_text.splitlines(), start=1):
+        line = raw_line.strip()
+        if line.startswith("Document:"):
+            if current_doc is not None and not current_doc_status_seen:
+                return f"Document {current_doc!r} has no status line before line {lineno}"
+            document = line.removeprefix("Document:").strip()
+            if not document:
+                return f"line {lineno}: Document line is missing a bridge document id"
+            if document in seen_documents:
+                return f"line {lineno}: duplicate Document entry {document!r}"
+            seen_documents.add(document)
+            current_doc = document
+            current_doc_status_seen = False
+            continue
+
+        if current_doc is None:
+            continue
+
+        if not line:
+            if not current_doc_status_seen:
+                return f"Document {current_doc!r} has a blank line before its first status line"
+            current_doc = None
+            current_doc_status_seen = False
+            continue
+
+        if _BRIDGE_LATEST_STATUS_RE.match(line):
+            current_doc_status_seen = True
+            continue
+
+        if _BRIDGE_INDEX_STATUS_LIKE_RE.match(line):
+            return f"line {lineno}: malformed bridge status line {line!r}"
+        return f"line {lineno}: unexpected non-status content inside Document {current_doc!r}: {line!r}"
+
+    if current_doc is not None and not current_doc_status_seen:
+        return f"Document {current_doc!r} has no status line"
+    return None
+
+
+def _check_file_bridge_index_parse(target: Path) -> ToolCheck:
+    index = target / "bridge" / "INDEX.md"
+    if not index.exists():
+        return ToolCheck(
+            name="File Bridge Index",
+            required=True,
+            found=False,
+            status="fail",
+            message="bridge/INDEX.md not found; cannot parse canonical bridge workflow state",
+        )
+
+    try:
+        index_text = index.read_text(encoding="utf-8")
+    except OSError as exc:
+        return ToolCheck(
+            name="File Bridge Index",
+            required=True,
+            found=True,
+            status="fail",
+            message=f"bridge/INDEX.md unreadable: {exc}",
+        )
+
+    error = _bridge_index_well_formedness_error(index_text)
+    if error:
+        return ToolCheck(
+            name="File Bridge Index",
+            required=True,
+            found=True,
+            status="fail",
+            message=f"bridge/INDEX.md malformed: {error}",
+        )
+
+    entry_count = len(_latest_bridge_status_entries(index_text))
+    return ToolCheck(
+        name="File Bridge Index",
+        required=True,
+        found=True,
+        status="pass",
+        message=f"bridge/INDEX.md parseable ({entry_count} document entr{'y' if entry_count == 1 else 'ies'})",
     )
 
 
@@ -4577,6 +4743,7 @@ def run_doctor(
 
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
+        checks.append(_check_file_bridge_index_parse(target))
         checks.append(_check_settings_classifiers(target))
         checks.append(_check_active_legacy_root_references(target))
         checks.append(_check_spec_classifier_canonical_path(target))
@@ -4587,6 +4754,8 @@ def run_doctor(
         checks.append(_check_auq_coverage(target))
         checks.append(_check_uncited_owner_input_bridges(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
+        checks.append(_check_safety_gate_registration(target))
+        checks.append(_check_capture_hook_stub_status(target))
         checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_spec_intake_skill_present(target, profile))

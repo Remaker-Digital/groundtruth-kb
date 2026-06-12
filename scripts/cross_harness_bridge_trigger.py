@@ -147,7 +147,10 @@ QUIESCE_WINDOW_SECONDS = 5.0
 QUIESCE_WINDOW_ENV_VAR = "GTKB_TRIGGER_QUIESCE_SECONDS"
 CLAUDE_WORKER_ALLOWED_TOOLS = "Read Edit Write Glob Grep Bash TodoWrite NotebookEdit"
 WORK_INTENT_TRIGGER_SESSION_PREFIX = "trigger-dispatched-"
-WORK_INTENT_TRIGGER_TTL_SECONDS = 120
+WORK_INTENT_TRIGGER_TTL_SECONDS = 600
+WORK_INTENT_HELD_DEDUPE_FILENAME = "work-intent-held-dedupe.json"
+DEFAULT_DISPATCH_MAX_RETRIES = 3
+DEFAULT_DISPATCH_RETRY_DELAY_SECONDS = 300
 IMPLEMENTATION_AUTH_ENV_VARS = (
     "GTKB_IMPLEMENTATION_AUTH_DISPATCH_ID",
     "GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS",
@@ -484,6 +487,64 @@ def _hook_context_value(hook_context: dict[str, str] | None, key: str) -> str:
     return value if isinstance(value, str) else ""
 
 
+def _env_positive_int(primary: str, legacy: str | None, default: int) -> int:
+    for name in (primary, legacy):
+        if not name:
+            continue
+        raw = os.environ.get(name)
+        if raw is None or raw.strip() == "":
+            continue
+        try:
+            value = int(raw)
+        except ValueError:
+            continue
+        if value > 0:
+            return value
+    return default
+
+
+def _dispatch_max_retries() -> int:
+    return _env_positive_int("GTKB_DISPATCH_MAX_RETRIES", "OLLAMA_MAX_RETRIES", DEFAULT_DISPATCH_MAX_RETRIES)
+
+
+def _dispatch_retry_delay_seconds() -> int:
+    return _env_positive_int(
+        "GTKB_DISPATCH_RETRY_DELAY_SECONDS",
+        "OLLAMA_RETRY_DELAY_SECONDS",
+        DEFAULT_DISPATCH_RETRY_DELAY_SECONDS,
+    )
+
+
+def _parse_iso_timestamp(value: Any) -> dt.datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.UTC)
+    return parsed.astimezone(dt.UTC)
+
+
+def _circuit_breaker_half_open_allowed(recipient_state: dict[str, Any], retry_delay_seconds: int) -> bool:
+    candidates: list[Any] = [recipient_state.get("circuit_breaker_tripped_at")]
+    last_launch = recipient_state.get("last_launch")
+    if isinstance(last_launch, dict):
+        candidates.append(last_launch.get("launched_at"))
+    candidates.append(recipient_state.get("updated_at"))
+
+    for raw_timestamp in candidates:
+        timestamp = _parse_iso_timestamp(raw_timestamp)
+        if timestamp is None:
+            continue
+        return (dt.datetime.now(dt.UTC) - timestamp).total_seconds() >= retry_delay_seconds
+
+    # Legacy tripped records had no timestamp. Allow one probe rather than
+    # preserving an unrecoverable fail-closed state forever.
+    return True
+
+
 def _record_dispatch_failure(state_dir: Path, payload: dict[str, Any]) -> None:
     """Append a fire-and-forget failure record to the JSONL diagnosis log."""
     try:
@@ -515,18 +576,21 @@ def _detect_previous_launch_failure(
     if not isinstance(launch, dict):
         return None
 
-    if launch.get("exit_code") == 4294967295:
+    exit_code = launch.get("exit_code")
+    if isinstance(exit_code, int) and exit_code != 0:
+        error_type = "process_terminated_abruptly" if exit_code == 4294967295 else "subprocess_execution_failed"
         return {
             "ts": _now_iso(),
             "dispatch_id": _now_iso() + "-previous-launch-failed",
             "recipient": recipient,
             "launched": False,
             "reason": "previous_launch_failed",
-            "error_type": "process_terminated_abruptly",
+            "error_type": error_type,
+            "exit_code": exit_code,
             "prior_dispatch_id": launch.get("dispatch_id"),
             "prior_launched_at": launch.get("launched_at"),
             "signature": signature,
-            "matched_markers": [{"field": "exit_code", "marker": "4294967295", "label": "process_terminated_abruptly"}],
+            "matched_markers": [{"field": "exit_code", "marker": str(exit_code), "label": error_type}],
         }
 
     matched: list[dict[str, str]] = []
@@ -569,7 +633,37 @@ def _new_dispatch_id(recipient_key: str) -> str:
 
 
 def _work_intent_session_id(dispatch_id: str) -> str:
-    return f"{WORK_INTENT_TRIGGER_SESSION_PREFIX}{dispatch_id}"
+    return dispatch_id
+
+
+def _mark_work_intent_held_recorded(state_dir: Path, *, document_name: str, holder_session_id: str) -> bool:
+    key = f"{document_name}|{holder_session_id}"
+    now = time.time()
+    dedupe_path = state_dir / WORK_INTENT_HELD_DEDUPE_FILENAME
+    payload: dict[str, float] = {}
+    try:
+        raw = json.loads(dedupe_path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            for raw_key, raw_expiry in raw.items():
+                try:
+                    expiry = float(raw_expiry)
+                except (TypeError, ValueError):
+                    continue
+                if expiry > now:
+                    payload[str(raw_key)] = expiry
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+
+    if payload.get(key, 0.0) > now:
+        return False
+
+    payload[key] = now + WORK_INTENT_TRIGGER_TTL_SECONDS
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        dedupe_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+    return True
 
 
 def _record_prime_work_intent_held(
@@ -580,6 +674,13 @@ def _record_prime_work_intent_held(
     item: Any,
     holder: dict[str, str],
 ) -> None:
+    holder_session_id = holder.get("session_id") or ""
+    if not _mark_work_intent_held_recorded(
+        state_dir,
+        document_name=item.document_name,
+        holder_session_id=holder_session_id,
+    ):
+        return
     _record_dispatch_failure(
         state_dir,
         {
@@ -591,7 +692,7 @@ def _record_prime_work_intent_held(
             "document_name": item.document_name,
             "top_status": item.top_status,
             "top_file": item.top_file,
-            "holder_session_id": holder.get("session_id"),
+            "holder_session_id": holder_session_id,
             "holder_ttl_expires_at": holder.get("ttl_expires_at"),
         },
     )
@@ -1272,15 +1373,50 @@ def _post_dispatch_poll(
     project_root: Path,
     state_dir: Path,
 ) -> None:
-    """Spawn a daemon thread to poll for dispatch verdict in background."""
-    import threading
-
-    t = threading.Thread(
-        target=_poll_and_log_verdict,
-        args=(dispatch_id, bridge_id, dispatch_ts, project_root, state_dir),
-        daemon=True,
-    )
-    t.start()
+    """Spawn a durable subprocess to poll for dispatch verdict in background."""
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--project-root",
+        str(project_root),
+        "--state-dir",
+        str(state_dir),
+        "--post-dispatch-poll",
+        "--post-dispatch-id",
+        dispatch_id,
+        "--post-dispatch-bridge-id",
+        bridge_id,
+        "--post-dispatch-timestamp",
+        str(dispatch_ts),
+    ]
+    if os.name == "nt":
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+    else:
+        creationflags = 0
+    try:
+        subprocess.Popen(
+            command,
+            cwd=str(project_root),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+            close_fds=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        _record_dispatch_failure(
+            state_dir,
+            {
+                "ts": _now_iso(),
+                "dispatch_id": dispatch_id,
+                "bridge_id": bridge_id,
+                "launched": False,
+                "reason": "post_dispatch_poll_spawn_failed",
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+            },
+        )
 
 
 def _emit_trigger_diagnostic(state_dir: Path, record: dict[str, Any]) -> None:
@@ -2555,22 +2691,15 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
 
         # Process the exit code
         launch_signature = last_launch.get("signature")
-        needed_role = last_launch.get("needed_role_label") or (
-            "loyal-opposition" if "loyal-opposition" in recipient else "prime-builder"
-        )
-
         # Mark exit code as processed in the state
         last_launch["exit_code"] = exit_code
         last_launch["exit_code_processed"] = True
 
-        try:
-            max_retries = int(os.environ.get("OLLAMA_MAX_RETRIES", "3"))
-        except ValueError:
-            max_retries = 3
+        max_retries = _dispatch_max_retries()
 
         if exit_code == 0:
-            # Success! Update signature state for loyal-opposition
-            if needed_role == "loyal-opposition":
+            # Success: keep signature state aligned for every recipient role.
+            if launch_signature:
                 recipient_state["last_dispatched_signature"] = launch_signature
                 recipient_state["signature"] = launch_signature
                 recipient_state["last_suppressed_signature"] = None
@@ -2578,12 +2707,15 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             # Reset failure count and circuit breaker
             recipient_state["failure_count"] = 0
             recipient_state["circuit_breaker_tripped"] = False
+            recipient_state.pop("circuit_breaker_tripped_at", None)
+            recipient_state.pop("circuit_breaker_half_open", None)
         else:
             # Failure!
             failure_count = recipient_state.get("failure_count", 0) + 1
             recipient_state["failure_count"] = failure_count
             if failure_count >= max_retries:
                 recipient_state["circuit_breaker_tripped"] = True
+                recipient_state["circuit_breaker_tripped_at"] = _now_iso()
 
             # Since it failed, write to dispatch failures log as well
             _record_dispatch_failure(
@@ -2884,7 +3016,10 @@ def run_trigger(
             "signature": prior_legacy_signature,
             "failure_count": prior.get("failure_count", 0),
             "circuit_breaker_tripped": prior.get("circuit_breaker_tripped", False),
+            "circuit_breaker_tripped_at": prior.get("circuit_breaker_tripped_at"),
         }
+        if isinstance(prior, dict) and prior.get("circuit_breaker_half_open"):
+            recipient_state["circuit_breaker_half_open"] = prior.get("circuit_breaker_half_open")
         if isinstance(prior, dict) and isinstance(prior.get("last_launch"), dict):
             recipient_state["last_launch"] = prior["last_launch"]
 
@@ -2984,20 +3119,17 @@ def run_trigger(
                         #   - first dispatch ever
                         #   - signature changed since last dispatch
                         #   - prior_suppressed == signature (retry after target exit)
+                        retry_delay_seconds = _dispatch_retry_delay_seconds()
                         if recipient_state.get("circuit_breaker_tripped"):
-                            recipient_state["last_result"] = "circuit_breaker_active"
-                            results[recipient] = {
-                                "launched": False,
-                                "reason": "circuit_breaker_active",
-                            }
-                            recipients_state[recipient] = recipient_state
-                            continue
-
-                        # Check retry delay check
-                        try:
-                            retry_delay_seconds = int(os.environ.get("OLLAMA_RETRY_DELAY_SECONDS", "300"))
-                        except ValueError:
-                            retry_delay_seconds = 300
+                            if not _circuit_breaker_half_open_allowed(recipient_state, retry_delay_seconds):
+                                recipient_state["last_result"] = "circuit_breaker_active"
+                                results[recipient] = {
+                                    "launched": False,
+                                    "reason": "circuit_breaker_active",
+                                }
+                                recipients_state[recipient] = recipient_state
+                                continue
+                            recipient_state["circuit_breaker_half_open"] = True
 
                         is_retry_pending = recipient_state.get("failure_count", 0) > 0
                         is_delay_active = False
@@ -3027,6 +3159,8 @@ def run_trigger(
                             # No recorded launch while failure_count > 0 should not occur
                             # (failure_count increments only after a launch that sets
                             # last_launch); fail open to dispatch rather than wedge.
+                            if recipient_state.get("circuit_breaker_half_open"):
+                                is_delay_active = False
 
                         if is_delay_active:
                             recipient_state["last_result"] = "retry_delay_enforced"
@@ -3115,9 +3249,8 @@ def run_trigger(
                         recipient_state["last_launch"] = launch
                         if dry_run or launch.get("launched"):
                             recipient_state["last_suppressed_signature"] = None
-                            if dry_run or target.needed_role_label == "prime-builder":
-                                recipient_state["last_dispatched_signature"] = dispatched_signature
-                                recipient_state["signature"] = dispatched_signature
+                            recipient_state["last_dispatched_signature"] = dispatched_signature
+                            recipient_state["signature"] = dispatched_signature
                         results[recipient] = launch
 
         selected_candidate = _dispatch_target_evidence(target)
@@ -3495,6 +3628,14 @@ def _build_argparser() -> argparse.ArgumentParser:
         default=None,
         help="Clear circuit breakers/failure count for a recipient.",
     )
+    parser.add_argument(
+        "--post-dispatch-poll",
+        action="store_true",
+        help="Internal mode: poll for a just-dispatched bridge verdict and append dispatch-diagnostic-post.jsonl.",
+    )
+    parser.add_argument("--post-dispatch-id", type=str, default="")
+    parser.add_argument("--post-dispatch-bridge-id", type=str, default="")
+    parser.add_argument("--post-dispatch-timestamp", type=float, default=0.0)
     return parser
 
 
@@ -3544,6 +3685,17 @@ def main(argv: list[str] | None = None) -> int:
             state_dir = _resolve_diagnose_state_dir(project_root)
         else:
             state_dir = project_root.joinpath(*DEFAULT_STATE_SUBDIR)
+
+        if args.post_dispatch_poll:
+            if args.post_dispatch_id and args.post_dispatch_bridge_id and args.post_dispatch_timestamp > 0:
+                _poll_and_log_verdict(
+                    dispatch_id=args.post_dispatch_id,
+                    bridge_id=args.post_dispatch_bridge_id,
+                    dispatch_ts=args.post_dispatch_timestamp,
+                    project_root=project_root,
+                    state_dir=state_dir,
+                )
+            return 0
 
         if args.reset_recipient:
             state = _load_dispatch_state(state_dir, project_root)

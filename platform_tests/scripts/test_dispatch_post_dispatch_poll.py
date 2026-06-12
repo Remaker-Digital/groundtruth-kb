@@ -61,18 +61,17 @@ def test_poll_dispatch_verdict_returns_none_on_timeout(tmp_path: Path) -> None:
     assert latency is None
 
 
-def test_post_dispatch_poll_thread_is_daemon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    import threading
+def test_post_dispatch_poll_spawns_durable_subprocess(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: list[tuple[list[str], dict]] = []
 
-    created_threads = []
-    orig_thread = threading.Thread
+    class _FakeProcess:
+        pid = 12345
 
-    def spy_thread(*args, **kwargs):
-        t = orig_thread(*args, **kwargs)
-        created_threads.append(t)
-        return t
+    def fake_popen(command, **kwargs):
+        captured.append((command, kwargs))
+        return _FakeProcess()
 
-    monkeypatch.setattr(threading, "Thread", spy_thread)
+    monkeypatch.setattr(cht.subprocess, "Popen", fake_popen)
 
     cht._post_dispatch_poll(
         dispatch_id="d1",
@@ -82,8 +81,16 @@ def test_post_dispatch_poll_thread_is_daemon(tmp_path: Path, monkeypatch: pytest
         state_dir=tmp_path / "state",
     )
 
-    assert len(created_threads) == 1
-    assert created_threads[0].daemon is True
+    assert len(captured) == 1
+    command, kwargs = captured[0]
+    assert command[:2] == [sys.executable, str(Path(cht.__file__).resolve())]
+    assert "--post-dispatch-poll" in command
+    assert command[command.index("--post-dispatch-id") + 1] == "d1"
+    assert command[command.index("--post-dispatch-bridge-id") + 1] == "b1"
+    assert kwargs["cwd"] == str(tmp_path)
+    assert kwargs["stdin"] is cht.subprocess.DEVNULL
+    assert kwargs["stdout"] is cht.subprocess.DEVNULL
+    assert kwargs["stderr"] is cht.subprocess.DEVNULL
 
 
 def test_post_dispatch_poll_writes_to_dedicated_jsonl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

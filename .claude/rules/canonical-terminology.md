@@ -669,7 +669,11 @@ content against the canonical credential catalog
 (`CREDENTIAL_PATTERNS + BASH_EXTRAS`, PII excluded) and blocks writes
 containing credential-shaped spans. The hook applies to direct Write/Edit
 tool calls; helper scripts that bypass the Write tool require their own scan
-implementation.
+implementation. Two registered safety-gate hooks implement this surface:
+`.claude/hooks/credential-scan.py` (general-purpose, all Write/Edit targets)
+and `.claude/hooks/scanner-safe-writer.py` (bridge-scoped, Write-only for
+`bridge/*.md` files). Both are registered in tracked `.claude/settings.json`
+and `.codex/hooks.json` PreToolUse arrays.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#scanner-safe-writer).*
 

@@ -10,9 +10,12 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   asked_at: 2026-06-12T17:09:09.322874Z
   question: "Want me to keep driving, or hold here?"
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: 04f932ff906e7ea1
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-06-12T20:35:00Z
+  resolved_in_session: ab9e903c
+  answer: "Owner directed: keep driving — prepare continuation prompt for fresh session to continue TAFE work."
+  notes: "auto-detected prose anti-pattern; resolved by owner's explicit continuation directive"
 
 ## Resolved
 
@@ -7754,6 +7757,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 4db95a6b0b5f715a
   resolved_at: 2026-06-12T17:03:35.914953Z
   answer: "Your questions have been answered: \"The gated narrative threads (fab-06/07/09/11/12) all edit shared files (CLAUDE.md/canonical-terminology/AGENTS), which already carry intermingled uncommitted edits from prior incomplete sessions (mostly fab-06's). Filing any one now risks a Codex scope-bleed NO-GO. fab-10/fab-13 are trigger-blocked. How should I untangle and proceed?\"=\"Finish fab-06 first, then layer\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1166
+  asked_at: 2026-06-12T20:34:11.194608Z
+  question: "The 5 governance/narrative files are in a flapping approval state (an in-flight 'fab-06-narrative-corrections' worker is editing them + their packets concurrently). Non-narrative platform changes are clean. How should I proceed?"
+  options:
+    - "Commit platform, defer narrative"
+    - "Skip tree, just merge tip"
+    - "Hold until quiescent"
+    - "Investigate fab-06 worker"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ff3df6ab4fc113fd
+  resolved_at: 2026-06-12T20:34:11.194608Z
+  answer: "Your questions have been answered: \"The 5 governance/narrative files are in a flapping approval state (an in-flight 'fab-06-narrative-corrections' worker is editing them + their packets concurrently). Non-narrative platform changes are clean. How should I proceed?\"=\"Things have changed since this pause. Please review the changes before continuing.\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1167
+  asked_at: 2026-06-12T20:34:11.194608Z
+  question: "develop is a clean fast-forward to main (866 ahead / 0 behind); the substantive work is committed; only one active worker's 7 in-flight files remain uncommitted. How should I do the merge?"
+  options:
+    - "Fast-forward main now (local)"
+    - "Wait for fab11 worker, then merge"
+    - "Fast-forward main + push origin"
+    - "Hold for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 56e55c0948445520
+  resolved_at: 2026-06-12T20:34:11.194608Z
+  answer: "Your questions have been answered: \"develop is a clean fast-forward to main (866 ahead / 0 behind); the substantive work is committed; only one active worker's 7 in-flight files remain uncommitted. How should I do the merge?\"=\"Fast-forward main now (local)\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
