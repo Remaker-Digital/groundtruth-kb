@@ -191,6 +191,7 @@ NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-002.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
 
 Document: gtkb-fab-13-retention-policy-umbrella
+REVISED: bridge/gtkb-fab-13-retention-policy-umbrella-009.md
 NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-008.md
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-007.md
 GO: bridge/gtkb-fab-13-retention-policy-umbrella-006.md
@@ -243,6 +244,7 @@ NO-GO: bridge/gtkb-fab-07-doctor-false-signals-002.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
 Document: gtkb-fab-06-narrative-corrections
+REVISED: bridge/gtkb-fab-06-narrative-corrections-007.md
 NO-GO: bridge/gtkb-fab-06-narrative-corrections-006.md
 NEW: bridge/gtkb-fab-06-narrative-corrections-005.md
 GO: bridge/gtkb-fab-06-narrative-corrections-004.md
