@@ -188,6 +188,8 @@ NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-002.md
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-001.md
 
 Document: gtkb-fab-12-agent-red-residue-sweep
+NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-006.md
+NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-005.md
 GO: bridge/gtkb-fab-12-agent-red-residue-sweep-004.md
 REVISED: bridge/gtkb-fab-12-agent-red-residue-sweep-003.md
 NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
