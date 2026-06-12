@@ -1,8 +1,10 @@
 Document: gtkb-path-token-re-discovery-consolidation
+REVISED: bridge/gtkb-path-token-re-discovery-consolidation-003.md
 NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-002.md
 NEW: bridge/gtkb-path-token-re-discovery-consolidation-001.md
 
 Document: gtkb-lo-dispatch-ordered-fallback-routing
+REVISED: bridge/gtkb-lo-dispatch-ordered-fallback-routing-005.md
 NO-GO: bridge/gtkb-lo-dispatch-ordered-fallback-routing-004.md
 NEW: bridge/gtkb-lo-dispatch-ordered-fallback-routing-003.md
 GO: bridge/gtkb-lo-dispatch-ordered-fallback-routing-002.md
@@ -16,16 +18,6 @@ NEW: bridge/gtkb-wi-4250-pauth-creation-001.md
 Document: gtkb-wi-4250-status-reconciliation-authorization
 GO: bridge/gtkb-wi-4250-status-reconciliation-authorization-002.md
 NEW: bridge/gtkb-wi-4250-status-reconciliation-authorization-001.md
-
-Document: gtkb-wi-4251-diagnostic-write-envelope
-VERIFIED: bridge/gtkb-wi-4251-diagnostic-write-envelope-008.md
-REVISED: bridge/gtkb-wi-4251-diagnostic-write-envelope-007.md
-NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-006.md
-NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-005.md
-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-004.md
-REVISED: bridge/gtkb-wi-4251-diagnostic-write-envelope-003.md
-NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-002.md
-NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-001.md
 
 Document: gtkb-wi-4250-backlog-reconciliation
 VERIFIED: bridge/gtkb-wi-4250-backlog-reconciliation-006.md
@@ -172,6 +164,7 @@ NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
+NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-009.md
 GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-008.md
 REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-007.md
 NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-006.md
@@ -182,6 +175,7 @@ NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-002.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-001.md
 
 Document: gtkb-fab-13-retention-policy-umbrella
+NEW: bridge/gtkb-fab-13-retention-policy-umbrella-007.md
 GO: bridge/gtkb-fab-13-retention-policy-umbrella-006.md
 REVISED: bridge/gtkb-fab-13-retention-policy-umbrella-005.md
 NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-004.md
@@ -220,12 +214,14 @@ GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
 
 Document: gtkb-fab-07-doctor-false-signals
+NEW: bridge/gtkb-fab-07-doctor-false-signals-005.md
 GO: bridge/gtkb-fab-07-doctor-false-signals-004.md
 REVISED: bridge/gtkb-fab-07-doctor-false-signals-003.md
 NO-GO: bridge/gtkb-fab-07-doctor-false-signals-002.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-001.md
 
 Document: gtkb-fab-06-narrative-corrections
+NO-GO: bridge/gtkb-fab-06-narrative-corrections-006.md
 NEW: bridge/gtkb-fab-06-narrative-corrections-005.md
 GO: bridge/gtkb-fab-06-narrative-corrections-004.md
 REVISED: bridge/gtkb-fab-06-narrative-corrections-003.md
