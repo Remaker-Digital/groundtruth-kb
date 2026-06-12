@@ -332,6 +332,7 @@ GO: bridge/gtkb-cheap-draft-linter-002.md
 NEW: bridge/gtkb-cheap-draft-linter-001.md
 
 Document: gtkb-fab-03-membase-backup
+REVISED: bridge/gtkb-fab-03-membase-backup-010.md
 NO-GO: bridge/gtkb-fab-03-membase-backup-009.md
 REVISED: bridge/gtkb-fab-03-membase-backup-008.md
 NO-GO: bridge/gtkb-fab-03-membase-backup-007.md
