@@ -54,7 +54,12 @@ def project_root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_session_start_drains_pending_before_role_resolution(project_root: Path) -> None:
+def test_session_start_drains_pending_before_role_resolution(
+    project_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Ensure no environment variable overrides skip execution in test
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+
     # Set a pending transaction
     defer_bridge_substrate_switch(project_root, "cross_harness_trigger", change_reason="session start drain test")
 
