@@ -1,4 +1,9 @@
+Document: gtkb-fab-10-codex-index-adapter-addendum-sufficiency
+GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-002.md
+NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-sufficiency-001.md
+
 Document: gtkb-fab-10-codex-index-adapter-addendum
+WITHDRAWN: bridge/gtkb-fab-10-codex-index-adapter-addendum-003.md
 GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
 
@@ -221,6 +226,8 @@ NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-002.md
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-001.md
 
 Document: gtkb-fab-12-agent-red-residue-sweep
+VERIFIED: bridge/gtkb-fab-12-agent-red-residue-sweep-010.md
+NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-009.md
 GO: bridge/gtkb-fab-12-agent-red-residue-sweep-008.md
 REVISED: bridge/gtkb-fab-12-agent-red-residue-sweep-007.md
 NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-006.md
