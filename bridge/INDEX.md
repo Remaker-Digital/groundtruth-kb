@@ -245,6 +245,7 @@ GO: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-002.md
 NEW: bridge/gtkb-fab-10-dispatch-telemetry-claim-contract-001.md
 
 Document: gtkb-fab-09-safety-gate-registration
+REVISED: bridge/gtkb-fab-09-safety-gate-registration-009.md
 NO-GO: bridge/gtkb-fab-09-safety-gate-registration-008.md
 REVISED: bridge/gtkb-fab-09-safety-gate-registration-007.md
 NO-GO: bridge/gtkb-fab-09-safety-gate-registration-006.md
