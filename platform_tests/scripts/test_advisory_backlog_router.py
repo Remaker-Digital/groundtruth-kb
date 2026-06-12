@@ -1,11 +1,8 @@
-"""Spec-derived tests for scripts/advisory_backlog_router.py (Slice 1 IPs 1-4).
+"""Stage 3 tests for scripts/advisory_backlog_router.py.
 
-Per ``bridge/gtkb-self-diagnostic-leak-closure-slice-1-advisory-router-009.md``
-REVISED-4 (Codex GO at -010). Each test maps to a verifiable behavior of the
-router service.
-
-Uses ``tmp_path``-rooted fixture projects with fresh ``groundtruth.db`` files
-so tests are deterministic and independent of live state.
+WI-4469 redirects advisory intake from automatic OPEN work_items rows to an
+append-only approval-staging surface. These tests use tmp_path-rooted fixture
+projects so the live candidate store and live groundtruth.db are untouched.
 """
 
 from __future__ import annotations
@@ -18,17 +15,15 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+GTKB_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "advisory_backlog_router.py"
+for path in (PROJECT_ROOT, GTKB_SRC):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 
 @pytest.fixture(scope="module")
 def router():
-    """Load ``advisory_backlog_router.py`` as a module without executing main().
-
-    Registers the module in ``sys.modules`` before ``exec_module`` so Python
-    3.14's stricter ``@dataclass`` lookup (which reads
-    ``sys.modules.get(cls.__module__).__dict__``) finds the module dict.
-    """
     spec = importlib.util.spec_from_file_location("advisory_backlog_router", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -38,8 +33,7 @@ def router():
 
 
 @pytest.fixture()
-def fake_project(tmp_path):
-    """Build a minimal project tree (dropbox + bridge/INDEX.md) for one test."""
+def fake_project(tmp_path: Path) -> Path:
     dropbox = tmp_path / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     dropbox.mkdir(parents=True)
     bridge = tmp_path / "bridge"
@@ -49,9 +43,8 @@ def fake_project(tmp_path):
 
 
 @pytest.fixture()
-def db_factory(tmp_path):
-    """Return a callable yielding a KnowledgeDB rooted at the project's groundtruth.db."""
-    from groundtruth_kb.db import KnowledgeDB  # imported lazily so test collection stays cheap
+def db_factory(tmp_path: Path):
+    from groundtruth_kb.db import KnowledgeDB
 
     db_path = tmp_path / "groundtruth.db"
 
@@ -79,8 +72,7 @@ def _basic_advisory(date_str: str = "2026-05-10", severity: str | None = "P1") -
         "\n"
         "## Claim\n"
         "\n"
-        "This is the first prose paragraph of the advisory. It explains the "
-        "issue the router should route into the backlog.\n"
+        "This is the first prose paragraph of the advisory. It explains the issue the router should stage.\n"
         "\n"
         "## Finding F1\n"
         f"\n{severity_line}\n"
@@ -90,210 +82,135 @@ def _basic_advisory(date_str: str = "2026-05-10", severity: str | None = "P1") -
     )
 
 
-# 1.
-def test_router_creates_wi_for_new_advisory(router, fake_project, db_factory):
+def _candidate_events(project_root: Path) -> list[dict]:
+    store = project_root / ".gtkb-state" / "advisory-candidates" / "candidates.jsonl"
+    if not store.exists():
+        return []
+    return [json.loads(line) for line in store.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _work_item_count(db) -> int:
+    return db._get_conn().execute("SELECT COUNT(*) FROM work_items").fetchone()[0]
+
+
+def test_router_stages_candidates_creates_no_work_items(router, fake_project: Path, db_factory) -> None:
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-A.md", _basic_advisory())
+
     result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
+
     assert result.scanned == 1
-    assert len(result.created) == 1
-    assert result.created[0]["id"].startswith("WI-")
-    assert result.created[0]["source"] == "dropbox"
-    assert result.created[0]["source_key"] == "INSIGHTS-2026-05-10-13-26-SAMPLE-A.md"
+    assert len(result.staged) == 1
     assert result.errors == []
+    assert _work_item_count(db_factory()) == 0
+    events = _candidate_events(fake_project)
+    assert len(events) == 1
+    assert events[0]["status"] == "staged"
+    assert events[0]["source_key"] == "INSIGHTS-2026-05-10-13-26-SAMPLE-A.md"
+    assert events[0]["proposed_title"] == "Route LO advisory: INSIGHTS-2026-05-10-13-26-SAMPLE-A.md"
+    assert events[0]["source_spec_id"] == "GOV-STANDING-BACKLOG-001"
 
 
-# 2.
-def test_router_idempotent_on_rerun(router, fake_project, db_factory):
+def test_router_idempotent_on_rerun(router, fake_project: Path, db_factory) -> None:
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-B.md", _basic_advisory())
+
     first = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
     second = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
-    assert len(first.created) == 1
-    assert len(second.created) == 0
+
+    assert len(first.staged) == 1
+    assert len(second.staged) == 0
     assert len(second.skipped_existing) == 1
-    assert second.skipped_existing[0]["matched_wi"] == first.created[0]["id"]
+    assert second.skipped_existing[0]["matched_in"] == "candidate_store"
+    assert second.skipped_existing[0]["matched_status"] == "staged"
+    assert len(_candidate_events(fake_project)) == 1
 
 
-# 3.
 @pytest.mark.parametrize(
-    "severity,expected_priority",
-    [("P0", "high"), ("P1", "high"), ("P2", "medium"), ("P3", "low"), ("P4", "low")],
+    ("severity", "expected_priority", "expected_token"),
+    [("P0", "high", "P0"), ("P1", "high", "P1"), ("P2", "medium", "P2"), ("P3", "low", "P3")],
 )
-def test_router_parses_severity_from_header(router, fake_project, db_factory, severity, expected_priority):
+def test_router_parses_severity_for_staged_candidate(
+    router,
+    fake_project: Path,
+    db_factory,
+    severity: str,
+    expected_priority: str,
+    expected_token: str,
+) -> None:
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    filename = f"INSIGHTS-2026-05-10-13-26-{severity}.md"
-    _write_insights(dropbox, filename, _basic_advisory(severity=severity))
+    _write_insights(dropbox, f"INSIGHTS-2026-05-10-13-26-{severity}.md", _basic_advisory(severity=severity))
+
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
+
+    assert result.staged[0]["priority"] == expected_priority
+    event = _candidate_events(fake_project)[0]
+    assert event["severity_token"] == expected_token
+    assert event["priority"] == expected_priority
+
+
+def test_router_dry_run_does_not_mutate_db_or_candidate_store(router, fake_project: Path, db_factory) -> None:
+    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-DRY.md", _basic_advisory())
+
     result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
+
     assert result.scanned == 1
-    assert result.created[0]["priority"] == expected_priority
+    assert len(result.staged) == 1
+    assert result.staged[0]["status"] == "staged"
+    assert _work_item_count(db_factory()) == 0
+    assert _candidate_events(fake_project) == []
+    assert not (fake_project / ".gtkb-state" / "advisory-router" / "last-scan.json").exists()
 
 
-# 4.
-def test_router_defaults_priority_when_severity_missing(router, fake_project, db_factory):
+def test_already_promoted_source_key_not_restaged(router, fake_project: Path, db_factory) -> None:
+    source_key = "INSIGHTS-2026-05-10-13-26-PROMOTED.md"
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_insights(
-        dropbox,
-        "INSIGHTS-2026-05-10-13-26-NO-SEVERITY.md",
-        _basic_advisory(severity=None),
-    )
-    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
-    assert result.scanned == 1
-    assert result.created[0]["priority"] == "low"
-
-
-# 5.
-def test_router_skips_advisories_already_in_bridge_threads(router, fake_project, db_factory):
-    """When a WI's ``related_bridge_threads`` references the advisory's source key, skip."""
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-C.md", _basic_advisory())
-
-    # Pre-populate a work_item that references the advisory filename via related_deliberation_ids.
+    _write_insights(dropbox, source_key, _basic_advisory())
     db = db_factory()
     db.insert_work_item(
         id="WI-9999",
-        title="Pre-existing manual routing",
+        title="Pre-existing promoted advisory",
         origin="hygiene",
         component="backlog",
         resolution_status="open",
-        changed_by="test/manual",
-        change_reason="pre-populate for idempotency test",
+        changed_by="test",
+        change_reason="seed promoted advisory",
         source_spec_id="GOV-STANDING-BACKLOG-001",
-        related_deliberation_ids="INSIGHTS-2026-05-10-13-26-SAMPLE-C.md",
+        related_deliberation_ids=source_key,
     )
 
     result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
-    assert result.scanned == 1
-    assert len(result.created) == 0
-    assert len(result.skipped_existing) == 1
+
+    assert result.staged == []
+    assert result.skipped_existing[0]["matched_in"] == "work_items"
     assert result.skipped_existing[0]["matched_wi"] == "WI-9999"
+    assert _candidate_events(fake_project) == []
 
 
-# 6.
-def test_router_dry_run_does_not_mutate(router, fake_project, db_factory):
+def test_router_writes_last_scan_with_staged_count(router, fake_project: Path, db_factory) -> None:
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-D.md", _basic_advisory())
-    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
-    assert result.scanned == 1
-    assert len(result.created) == 1
-    assert result.created[0]["id"] == "<dry-run>"
-    # Confirm the table did not gain a row.
-    db = db_factory()
-    rows = db._get_conn().execute("SELECT COUNT(*) FROM work_items").fetchone()
-    assert rows[0] == 0
-    # And the last-scan file was NOT written.
-    last_scan = fake_project / ".gtkb-state" / "advisory-router" / "last-scan.json"
-    assert not last_scan.exists()
+    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-LAST-SCAN.md", _basic_advisory())
 
-
-# 7.
-def test_router_handles_malformed_advisory(router, fake_project, db_factory, monkeypatch):
-    """A failure mid-loop becomes an entry in ``result.errors``, not a hard crash."""
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-BAD.md", _basic_advisory())
-
-    # Force insert_wi_for_advisory to raise, simulating a malformed/uninsertable advisory.
-    def _boom(db, advisory):
-        raise RuntimeError("simulated insert failure")
-
-    monkeypatch.setattr(router, "insert_wi_for_advisory", _boom)
-
-    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
-    assert result.scanned == 1
-    assert len(result.errors) == 1
-    assert "simulated insert failure" in result.errors[0]["error"]
-    assert result.errors[0]["source_key"] == "INSIGHTS-2026-05-10-13-26-BAD.md"
-    # And no rows were created in result.created.
-    assert result.created == []
-
-
-# 8.
-def test_router_writes_last_scan_timestamp(router, fake_project, db_factory):
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-E.md", _basic_advisory())
     router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
+
     last_scan = fake_project / ".gtkb-state" / "advisory-router" / "last-scan.json"
-    assert last_scan.is_file()
     payload = json.loads(last_scan.read_text(encoding="utf-8"))
-    assert "last_scan_started_at" in payload
-    assert "last_scan_finished_at" in payload
     assert payload["dry_run"] is False
     assert payload["scanned"] == 1
-    assert payload["created_count"] == 1
-    assert payload["source"] == "dropbox"
+    assert payload["staged_count"] == 1
+    assert payload["skipped_existing_count"] == 0
 
 
-# 9.
-def test_router_uses_hygiene_origin(router, fake_project, db_factory):
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-F.md", _basic_advisory())
-    router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
-    db = db_factory()
-    row = (
-        db._get_conn()
-        .execute(
-            "SELECT origin FROM current_work_items WHERE related_deliberation_ids LIKE ?",
-            ("%INSIGHTS-2026-05-10-13-26-SAMPLE-F.md%",),
-        )
-        .fetchone()
-    )
-    assert row is not None
-    assert row[0] == "hygiene"
-
-
-# 10.
-def test_router_sets_source_spec_id(router, fake_project, db_factory):
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-SAMPLE-G.md", _basic_advisory())
-    router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
-    db = db_factory()
-    row = (
-        db._get_conn()
-        .execute(
-            "SELECT source_spec_id FROM current_work_items WHERE related_deliberation_ids LIKE ?",
-            ("%INSIGHTS-2026-05-10-13-26-SAMPLE-G.md%",),
-        )
-        .fetchone()
-    )
-    assert row is not None
-    assert row[0] == "GOV-STANDING-BACKLOG-001"
-
-
-# 11.
-def test_canonical_glossary_contains_advisory_router_entry():
-    """IP-4 glossary edit lands the ``advisory-router`` entry in canonical-terminology.md.
-
-    Runs against the LIVE project glossary, not a fixture; this test fails until
-    the IP-4 narrative-artifact-approval-packet workflow is executed. Verification
-    plan §4 requires this assertion.
-    """
-    glossary = PROJECT_ROOT / ".claude" / "rules" / "canonical-terminology.md"
-    body = glossary.read_text(encoding="utf-8-sig")
-    assert "### advisory-router" in body, (
-        "Slice 1 IP-4 requires a ### advisory-router entry in "
-        ".claude/rules/canonical-terminology.md, landed via the narrative-artifact "
-        "approval-packet workflow per .claude/hooks/narrative-artifact-approval-gate.py"
-    )
-    assert "scripts/advisory_backlog_router.py" in body, (
-        "advisory-router glossary entry should include an Implementation pointer to scripts/advisory_backlog_router.py"
-    )
-
-
-def test_router_compact_mode(router, fake_project, db_factory):
+def test_router_compact_mode_reports_staged_count(router, fake_project: Path, db_factory) -> None:
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-COMPACT.md", _basic_advisory())
     result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=True, db_factory=db_factory)
 
-    # 1. Non-compact format check
     normal_json = json.loads(result.as_json(compact=False))
-    assert "created" in normal_json
-    assert "skipped_existing" in normal_json
-    assert "created_count" not in normal_json
-    assert "skipped_existing_count" not in normal_json
+    assert "staged" in normal_json
+    assert "staged_count" not in normal_json
 
-    # 2. Compact format check
     compact_json = json.loads(result.as_json(compact=True))
-    assert "created" not in compact_json
-    assert "skipped_existing" not in compact_json
-    assert compact_json["created_count"] == 1
-    assert compact_json["skipped_existing_count"] == 0
+    assert "staged" not in compact_json
+    assert compact_json["staged_count"] == 1

@@ -3,15 +3,24 @@
 
 Scans Loyal Opposition advisories under
 ``independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md`` and
-bridge ``ADVISORY`` entries listed in ``bridge/INDEX.md``, and creates one
-``work_items`` row per unhandled advisory under ``GOV-STANDING-BACKLOG-001``
-authority. The service is idempotent on rerun: an advisory is "already handled"
-when an existing ``work_items`` row has the advisory's source identifier in
-``related_deliberation_ids``.
+bridge ``ADVISORY`` entries listed in ``bridge/INDEX.md``, and STAGES one
+candidate per unhandled advisory on an append-only candidate surface
+(``.gtkb-state/advisory-candidates/candidates.jsonl``) under
+``GOV-STANDING-BACKLOG-001`` authority.
+
+Stage 3 (WI-4469, ``DELIB-20261667`` D5, owner AUQ 2026-06-11 = approval-staged
+intake) stops the backlog leak at the source: the router no longer auto-promotes
+advisories to OPEN ``work_items`` rows. Staged candidates enter the active
+backlog only via the owner-batch-AUQ promotion path in
+``scripts/hygiene/advisory_candidate_promote.py``. The service is idempotent on
+rerun: an advisory is "already handled" when its source identifier is present on
+the candidate surface (any status) OR already references an existing
+``work_items`` row via ``related_deliberation_ids``.
 
 Per ``DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE``, this replaces the
 repetitive per-session plumbing of manually opening the dropbox and
-hand-creating backlog rows.
+hand-creating backlog rows; the only marginal human judgment is the owner's
+per-batch promotion APPROVE / REFINE / REJECT decision.
 
 CLI:
     python scripts/advisory_backlog_router.py
@@ -46,6 +55,15 @@ INSIGHTS_GLOB = "INSIGHTS-*.md"
 LAST_SCAN_RELATIVE = Path(".gtkb-state/advisory-router/last-scan.json")
 BRIDGE_INDEX_RELATIVE = Path("bridge/INDEX.md")
 
+# Stage 3 (WI-4469, DELIB-20261667 D5): the router no longer auto-promotes
+# advisories to OPEN work_items rows. It stages each advisory on an append-only
+# candidate surface; entry into the active backlog happens only via the
+# owner-batch-AUQ promotion path in scripts/hygiene/advisory_candidate_promote.py.
+# The store is an append-only JSONL event log; the current status of a candidate
+# is the ``event`` of its latest record (staged -> promoted/rejected), so status
+# transitions preserve full provenance instead of rewriting prior records.
+CANDIDATE_STORE_RELATIVE = Path(".gtkb-state/advisory-candidates/candidates.jsonl")
+
 # Severity tokens P0-P4 in advisory bodies. The strictest match wins; we look
 # for "Severity: P<n>" and "**Severity:** P<n>" patterns in both Finding-block
 # headers and report frontmatter.
@@ -78,7 +96,11 @@ class Advisory:
 
 @dataclass
 class RouterResult:
-    created: list[dict[str, Any]] = field(default_factory=list)
+    # ``staged``: advisories appended to the candidate surface this run (or, in
+    # dry-run, the advisories that WOULD be staged). The router no longer creates
+    # work_items rows; promotion to the active backlog is a separate owner-gated
+    # step (scripts/hygiene/advisory_candidate_promote.py).
+    staged: list[dict[str, Any]] = field(default_factory=list)
     skipped_existing: list[dict[str, Any]] = field(default_factory=list)
     errors: list[dict[str, Any]] = field(default_factory=list)
     scanned: int = 0
@@ -89,7 +111,7 @@ class RouterResult:
     def as_json(self, *, compact: bool = False) -> str:
         if compact:
             payload = {
-                "created_count": len(self.created),
+                "staged_count": len(self.staged),
                 "skipped_existing_count": len(self.skipped_existing),
                 "errors": self.errors,
                 "scanned": self.scanned,
@@ -99,7 +121,7 @@ class RouterResult:
             }
         else:
             payload = {
-                "created": self.created,
+                "staged": self.staged,
                 "skipped_existing": self.skipped_existing,
                 "errors": self.errors,
                 "scanned": self.scanned,
@@ -127,7 +149,7 @@ def _parse_iso_date(value: str) -> date:
 def _severity_to_priority(severity_token: str | None) -> str:
     if severity_token is None:
         return "low"
-    digit = severity_token.strip()
+    digit = severity_token.strip().upper().removeprefix("P")
     if digit in HIGH_SEVERITY:
         return "high"
     if digit in MEDIUM_SEVERITY:
@@ -147,7 +169,7 @@ def _extract_severity(text: str) -> str | None:
     digits = [m.strip() for m in matches if m.strip().isdigit()]
     if not digits:
         return None
-    return min(digits)
+    return f"P{min(digits)}"
 
 
 def _extract_title(text: str, fallback: str) -> str:
@@ -346,36 +368,82 @@ def _existing_wi_for(db, source_key: str) -> str | None:
     return None if row is None else row[0]
 
 
-def _next_work_item_id(db) -> str:
-    """Mint the next ``WI-NNNN`` id by scanning the live ``work_items`` table."""
-    conn = db._get_conn()
-    rows = conn.execute("SELECT id FROM work_items WHERE id LIKE 'WI-%'").fetchall()
-    max_n = 0
-    for (raw_id,) in rows:
-        match = re.match(r"^WI-(\d+)$", str(raw_id))
-        if match:
-            max_n = max(max_n, int(match.group(1)))
-    return f"WI-{max_n + 1:04d}"
+def _candidate_store_path(project_root: Path) -> Path:
+    return project_root / CANDIDATE_STORE_RELATIVE
 
 
-def insert_wi_for_advisory(db, advisory: Advisory) -> str:
-    """Insert one work_items row for ``advisory`` and return its id."""
-    wi_id = _next_work_item_id(db)
-    db.insert_work_item(
-        id=wi_id,
-        title=advisory.proposed_wi_title(),
-        origin=ORIGIN,
-        component=WORK_ITEM_COMPONENT,
-        resolution_status=RESOLUTION_STATUS,
-        changed_by=ROUTER_ID,
-        change_reason=f"advisory-router routed LO advisory at {advisory.relative_path}",
-        description=advisory.description,
-        source_spec_id=SOURCE_SPEC_ID,
-        priority=advisory.priority,
-        related_deliberation_ids=advisory.source_key,
-        related_bridge_threads=advisory.related_bridge_threads,
-    )
-    return wi_id
+def _load_candidate_events(store_path: Path) -> list[dict[str, Any]]:
+    """Read the append-only candidate event log (one JSON object per line)."""
+    if not store_path.is_file():
+        return []
+    events: list[dict[str, Any]] = []
+    for raw_line in store_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict) and record.get("source_key"):
+            events.append(record)
+    return events
+
+
+def load_candidate_events(project_root: Path) -> list[dict[str, Any]]:
+    """Read candidate events from the project-rooted advisory candidate store."""
+    return _load_candidate_events(_candidate_store_path(project_root))
+
+
+def _record_status(record: dict[str, Any]) -> str:
+    return str(record.get("status") or record.get("event") or "")
+
+
+def current_candidate_status(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Fold the append-only event log into the latest record per source_key.
+
+    The current status of a candidate is the ``event`` of its most recent record
+    (``staged`` -> ``promoted`` / ``rejected``). Later records never rewrite
+    earlier ones; provenance is preserved by append, so the log is a literal
+    successor-record audit trail.
+    """
+    status: dict[str, dict[str, Any]] = {}
+    for record in events:
+        folded = dict(record)
+        folded["status"] = _record_status(record)
+        status[str(record["source_key"])] = folded
+    return status
+
+
+def stage_advisory_candidate(store_path: Path, advisory: Advisory) -> dict[str, Any]:
+    """Append one ``staged`` event for ``advisory`` to the candidate store.
+
+    Carries the advisory metadata the promotion tool needs to mint a real
+    ``work_items`` row on owner-batch approval (origin/component/source_spec_id,
+    title, description, priority, provenance), without creating any backlog row.
+    """
+    record = {
+        "event": "staged",
+        "status": "staged",
+        "source": advisory.source,
+        "source_key": advisory.source_key,
+        "relative_path": advisory.relative_path,
+        "proposed_title": advisory.proposed_wi_title(),
+        "title": advisory.title,
+        "description": advisory.description,
+        "priority": advisory.priority,
+        "severity_token": advisory.severity_token,
+        "related_bridge_threads": advisory.related_bridge_threads,
+        "advisory_date": advisory.advisory_date.isoformat() if advisory.advisory_date else None,
+        "origin": ORIGIN,
+        "component": WORK_ITEM_COMPONENT,
+        "source_spec_id": SOURCE_SPEC_ID,
+        "recorded_at": _now_iso(),
+    }
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    with store_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+    return record
 
 
 def _write_last_scan(project_root: Path, result: RouterResult, source: str, since: date | None) -> None:
@@ -388,7 +456,7 @@ def _write_last_scan(project_root: Path, result: RouterResult, source: str, sinc
         "since": since.isoformat() if since else None,
         "dry_run": result.dry_run,
         "scanned": result.scanned,
-        "created_count": len(result.created),
+        "staged_count": len(result.staged),
         "skipped_existing_count": len(result.skipped_existing),
         "errors_count": len(result.errors),
     }
@@ -403,11 +471,20 @@ def run(
     dry_run: bool = False,
     db_factory=None,
 ) -> RouterResult:
-    """Run one router pass. ``db_factory`` is for test injection."""
+    """Run one router pass: stage unhandled advisories on the candidate surface.
+
+    The router never writes work_items rows; promotion to the active backlog is
+    the owner-batch-AUQ step in scripts/hygiene/advisory_candidate_promote.py.
+    ``db_factory`` is for test injection and is used only for the promoted-row
+    idempotency read.
+    """
     result = RouterResult(dry_run=dry_run)
     result.scan_started_at = _now_iso()
     advisories = collect_advisories(project_root, source=source, since=since)
     result.scanned = len(advisories)
+
+    store_path = _candidate_store_path(project_root)
+    status_map = current_candidate_status(_load_candidate_events(store_path))
 
     if db_factory is None:
         from groundtruth_kb.db import KnowledgeDB
@@ -418,34 +495,49 @@ def run(
 
     for advisory in advisories:
         try:
+            # Idempotency #1: already on the candidate surface (any status).
+            if advisory.source_key in status_map:
+                result.skipped_existing.append(
+                    {
+                        "source_key": advisory.source_key,
+                        "source": advisory.source,
+                        "matched_in": "candidate_store",
+                        "matched_status": status_map[advisory.source_key].get("status"),
+                    }
+                )
+                continue
+            # Idempotency #2: already promoted to a work_items row (or a legacy
+            # auto-created row from the pre-Stage-3 router).
             existing = _existing_wi_for(db, advisory.source_key)
             if existing is not None:
                 result.skipped_existing.append(
                     {
                         "source_key": advisory.source_key,
                         "source": advisory.source,
+                        "matched_in": "work_items",
                         "matched_wi": existing,
                     }
                 )
                 continue
             if dry_run:
-                result.created.append(
+                result.staged.append(
                     {
-                        "id": "<dry-run>",
+                        "status": "staged",
                         "source": advisory.source,
                         "source_key": advisory.source_key,
-                        "title": advisory.proposed_wi_title(),
+                        "proposed_title": advisory.proposed_wi_title(),
                         "priority": advisory.priority,
                     }
                 )
                 continue
-            wi_id = insert_wi_for_advisory(db, advisory)
-            result.created.append(
+            record = stage_advisory_candidate(store_path, advisory)
+            status_map[advisory.source_key] = record
+            result.staged.append(
                 {
-                    "id": wi_id,
+                    "status": record["status"],
                     "source": advisory.source,
                     "source_key": advisory.source_key,
-                    "title": advisory.proposed_wi_title(),
+                    "proposed_title": record["proposed_title"],
                     "priority": advisory.priority,
                 }
             )
@@ -466,7 +558,7 @@ def run(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", help="report what would be created without writing")
+    parser.add_argument("--dry-run", action="store_true", help="report what would be staged without writing")
     parser.add_argument(
         "--source",
         choices=("dropbox", "bridge", "both"),
@@ -475,7 +567,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--since", help="ISO date (YYYY-MM-DD); skip advisories dated before this")
     parser.add_argument("--project-root", default=None, help="override project root (defaults to script parent)")
-    parser.add_argument("--compact", action="store_true", help="suppress full created and skipped lists in output JSON")
+    parser.add_argument("--compact", action="store_true", help="suppress full staged and skipped lists in output JSON")
     args = parser.parse_args(argv)
 
     since = _parse_iso_date(args.since) if args.since else None
