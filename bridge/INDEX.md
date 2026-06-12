@@ -1,3 +1,6 @@
+Document: gtkb-tafe-backlog-reconciliation
+NEW: bridge/gtkb-tafe-backlog-reconciliation-001.md
+
 Document: gtkb-typed-artifact-flow-engine-advisory
 GO: bridge/gtkb-typed-artifact-flow-engine-advisory-004.md
 REVISED: bridge/gtkb-typed-artifact-flow-engine-advisory-003.md
@@ -211,6 +214,7 @@ NO-GO: bridge/gtkb-fab-13-retention-policy-umbrella-002.md
 NEW: bridge/gtkb-fab-13-retention-policy-umbrella-001.md
 
 Document: gtkb-fab-12-agent-red-residue-sweep
+REVISED: bridge/gtkb-fab-12-agent-red-residue-sweep-007.md
 NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-006.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-005.md
 GO: bridge/gtkb-fab-12-agent-red-residue-sweep-004.md
@@ -219,6 +223,7 @@ NO-GO: bridge/gtkb-fab-12-agent-red-residue-sweep-002.md
 NEW: bridge/gtkb-fab-12-agent-red-residue-sweep-001.md
 
 Document: gtkb-fab-11-regression-signal-revival
+NO-GO: bridge/gtkb-fab-11-regression-signal-revival-006.md
 NEW: bridge/gtkb-fab-11-regression-signal-revival-005.md
 GO: bridge/gtkb-fab-11-regression-signal-revival-004.md
 REVISED: bridge/gtkb-fab-11-regression-signal-revival-003.md
