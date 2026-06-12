@@ -1,4 +1,5 @@
 Document: gtkb-lo-dispatch-ordered-fallback-routing
+GO: bridge/gtkb-lo-dispatch-ordered-fallback-routing-002.md
 NEW: bridge/gtkb-lo-dispatch-ordered-fallback-routing-001.md
 
 Document: gtkb-wi-4250-pauth-creation
