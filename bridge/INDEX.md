@@ -19,6 +19,7 @@ NO-GO: bridge/gtkb-wi-4251-diagnostic-write-envelope-002.md
 NEW: bridge/gtkb-wi-4251-diagnostic-write-envelope-001.md
 
 Document: gtkb-wi-4250-backlog-reconciliation
+VERIFIED: bridge/gtkb-wi-4250-backlog-reconciliation-006.md
 NEW: bridge/gtkb-wi-4250-backlog-reconciliation-005.md
 GO: bridge/gtkb-wi-4250-backlog-reconciliation-004.md
 REVISED: bridge/gtkb-wi-4250-backlog-reconciliation-003.md
