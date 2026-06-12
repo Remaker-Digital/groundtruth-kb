@@ -156,6 +156,7 @@ NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
+NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-006.md
 REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-005.md
 GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-004.md
 REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-003.md
