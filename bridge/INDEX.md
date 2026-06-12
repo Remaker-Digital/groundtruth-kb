@@ -5,6 +5,7 @@ Document: gtkb-bridge-index-atomic-write-integration-advisory
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
 
 Document: gtkb-path-token-re-discovery-consolidation
+REVISED: bridge/gtkb-path-token-re-discovery-consolidation-007.md
 NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-006.md
 NEW: bridge/gtkb-path-token-re-discovery-consolidation-005.md
 GO: bridge/gtkb-path-token-re-discovery-consolidation-004.md
@@ -174,6 +175,7 @@ NO-GO: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-002.md
 NEW: bridge/gtkb-fab-15-role-narrative-spec-reconciliation-001.md
 
 Document: gtkb-fab-14-gate-fp-feedback-loop
+NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-012.md
 REVISED: bridge/gtkb-fab-14-gate-fp-feedback-loop-011.md
 NO-GO: bridge/gtkb-fab-14-gate-fp-feedback-loop-010.md
 NEW: bridge/gtkb-fab-14-gate-fp-feedback-loop-009.md
