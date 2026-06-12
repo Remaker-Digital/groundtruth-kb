@@ -1,3 +1,6 @@
+Document: gtkb-fab-10-codex-index-adapter-addendum
+NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
+
 Document: gtkb-tafe-backlog-reconciliation
 GO: bridge/gtkb-tafe-backlog-reconciliation-002.md
 NEW: bridge/gtkb-tafe-backlog-reconciliation-001.md
