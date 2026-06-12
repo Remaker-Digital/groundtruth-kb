@@ -8,6 +8,8 @@ Document: gtkb-bridge-index-atomic-write-integration-advisory
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
 
 Document: gtkb-path-token-re-discovery-consolidation
+VERIFIED: bridge/gtkb-path-token-re-discovery-consolidation-010.md
+REVISED: bridge/gtkb-path-token-re-discovery-consolidation-009.md
 NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-008.md
 REVISED: bridge/gtkb-path-token-re-discovery-consolidation-007.md
 NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-006.md
