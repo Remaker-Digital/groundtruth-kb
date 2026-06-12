@@ -255,6 +255,7 @@ GO: bridge/gtkb-fab-08-slot-leak-fix-002.md
 NEW: bridge/gtkb-fab-08-slot-leak-fix-001.md
 
 Document: gtkb-fab-07-doctor-false-signals
+VERIFIED: bridge/gtkb-fab-07-doctor-false-signals-008.md
 REVISED: bridge/gtkb-fab-07-doctor-false-signals-007.md
 NO-GO: bridge/gtkb-fab-07-doctor-false-signals-006.md
 NEW: bridge/gtkb-fab-07-doctor-false-signals-005.md
