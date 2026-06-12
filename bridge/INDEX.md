@@ -1,4 +1,5 @@
 Document: gtkb-tafe-backlog-reconciliation
+GO: bridge/gtkb-tafe-backlog-reconciliation-002.md
 NEW: bridge/gtkb-tafe-backlog-reconciliation-001.md
 
 Document: gtkb-typed-artifact-flow-engine-advisory
