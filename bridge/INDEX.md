@@ -1,3 +1,7 @@
+Document: gtkb-tafe-runtime-tables-schema
+GO: bridge/gtkb-tafe-runtime-tables-schema-002.md
+NEW: bridge/gtkb-tafe-runtime-tables-schema-001.md
+
 Document: gtkb-role-authority-declared-not-detected
 GO: bridge/gtkb-role-authority-declared-not-detected-002.md
 NEW: bridge/gtkb-role-authority-declared-not-detected-001.md
