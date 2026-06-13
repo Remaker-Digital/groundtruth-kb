@@ -662,6 +662,61 @@ def flow_dispatch_health_cmd(ctx: click.Context, subject_scope: str | None, json
     _emit_cli_payload(payload, json_output=json_output)
 
 
+@flow_group.command("stuck")
+@click.option("--subject-scope", default=None, help="Restrict detection to one flow subject scope.")
+@click.option("--stalled-seconds", type=int, default=None, help="Override stalled-pending threshold (seconds).")
+@click.option(
+    "--owner-gate-stalled-seconds", type=int, default=None, help="Override owner-gate-stalled threshold (seconds)."
+)
+@click.option(
+    "--lease-expiry-grace-seconds", type=int, default=None, help="Override expired-lease grace window (seconds)."
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_stuck_cmd(
+    ctx: click.Context,
+    subject_scope: str | None,
+    stalled_seconds: int | None,
+    owner_gate_stalled_seconds: int | None,
+    lease_expiry_grace_seconds: int | None,
+    json_output: bool,
+) -> None:
+    """Detect and self-diagnose stuck TAFE flows (SPEC-TAFE-R3).
+
+    Read-only: classifies why each active stage is stuck (expired lease, stalled
+    pending, owner-gate stalled, failed-unrecovered) and attaches an advisory
+    self-diagnosis from the per-stage-attempt telemetry. Never actuates recovery.
+    """
+    from groundtruth_kb.tafe_stuck_flow import (
+        StuckThresholds,
+        detect_stuck_flows,
+        stuck_report_to_payload,
+    )
+
+    defaults = StuckThresholds()
+    thresholds = StuckThresholds(
+        stalled_seconds=stalled_seconds if stalled_seconds is not None else defaults.stalled_seconds,
+        owner_gate_stalled_seconds=(
+            owner_gate_stalled_seconds
+            if owner_gate_stalled_seconds is not None
+            else defaults.owner_gate_stalled_seconds
+        ),
+        lease_expiry_grace_seconds=(
+            lease_expiry_grace_seconds
+            if lease_expiry_grace_seconds is not None
+            else defaults.lease_expiry_grace_seconds
+        ),
+    )
+
+    db, service = _flow_service(ctx)
+    try:
+        report = detect_stuck_flows(service, thresholds=thresholds, subject_scope=subject_scope)
+        payload = stuck_report_to_payload(report)
+    finally:
+        db.close()
+    _emit_cli_payload(payload, json_output=json_output)
+
+
 @flow_group.group("render")
 def flow_render_group() -> None:
     """No-op Phase 0 generated-view command skeleton."""
