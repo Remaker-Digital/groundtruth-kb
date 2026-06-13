@@ -7,20 +7,10 @@ NO-GO: bridge/gtkb-tafe-dispatch-policy-scoring-model-002.md
 NEW: bridge/gtkb-tafe-dispatch-policy-scoring-model-001.md
 
 Document: gtkb-tafe-dispatch-policy-engine
+NO-GO: bridge/gtkb-tafe-dispatch-policy-engine-004.md
+NEW: bridge/gtkb-tafe-dispatch-policy-engine-003.md
 GO: bridge/gtkb-tafe-dispatch-policy-engine-002.md
 NEW: bridge/gtkb-tafe-dispatch-policy-engine-001.md
-
-Document: gtkb-cli-module-main-guard
-VERIFIED: bridge/gtkb-cli-module-main-guard-004.md
-NEW: bridge/gtkb-cli-module-main-guard-003.md
-GO: bridge/gtkb-cli-module-main-guard-002.md
-NEW: bridge/gtkb-cli-module-main-guard-001.md
-
-Document: gtkb-go-impl-claim-timebox
-VERIFIED: bridge/gtkb-go-impl-claim-timebox-004.md
-NEW: bridge/gtkb-go-impl-claim-timebox-003.md
-GO: bridge/gtkb-go-impl-claim-timebox-002.md
-NEW: bridge/gtkb-go-impl-claim-timebox-001.md
 
 Document: gtkb-tafe-agent-capability-snapshots-schema
 VERIFIED: bridge/gtkb-tafe-agent-capability-snapshots-schema-004.md
