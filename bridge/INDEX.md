@@ -1,8 +1,16 @@
+Document: gtkb-tafe-flow-type-lifecycle-coverage
+GO: bridge/gtkb-tafe-flow-type-lifecycle-coverage-002.md
+NEW: bridge/gtkb-tafe-flow-type-lifecycle-coverage-001.md
+
 Document: gtkb-impl-auth-per-session-pointer-isolation
+GO: bridge/gtkb-impl-auth-per-session-pointer-isolation-004.md
+REVISED: bridge/gtkb-impl-auth-per-session-pointer-isolation-003.md
 NO-GO: bridge/gtkb-impl-auth-per-session-pointer-isolation-002.md
 NEW: bridge/gtkb-impl-auth-per-session-pointer-isolation-001.md
 
 Document: gtkb-prompt-role-hint-authority-emergency-fix
+VERIFIED: bridge/gtkb-prompt-role-hint-authority-emergency-fix-004.md
+NEW: bridge/gtkb-prompt-role-hint-authority-emergency-fix-003.md
 GO: bridge/gtkb-prompt-role-hint-authority-emergency-fix-002.md
 NEW: bridge/gtkb-prompt-role-hint-authority-emergency-fix-001.md
 
