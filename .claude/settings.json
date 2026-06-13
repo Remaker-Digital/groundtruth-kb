@@ -233,6 +233,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/advisory-router-scan.py\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/advisory_grilling_gate_lint.py\" --stop-hook",
+            "timeout": 10
           }
         ]
       }
