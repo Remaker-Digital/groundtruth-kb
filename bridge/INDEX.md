@@ -1,3 +1,8 @@
+Document: gtkb-tafe-dual-write-index-parity
+NO-GO: bridge/gtkb-tafe-dual-write-index-parity-003.md
+NO-GO: bridge/gtkb-tafe-dual-write-index-parity-002.md
+NEW: bridge/gtkb-tafe-dual-write-index-parity-001.md
+
 Document: gtkb-wi-4529-windows-spawn-no-window-creationflags
 NEW: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-001.md
 
