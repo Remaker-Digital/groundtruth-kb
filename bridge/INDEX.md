@@ -1,4 +1,8 @@
+Document: gtkb-tafe-dispatch-tick-health
+NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
+
 Document: gtkb-claim-gated-implementation-start
+NO-GO: bridge/gtkb-claim-gated-implementation-start-002.md
 NEW: bridge/gtkb-claim-gated-implementation-start-001.md
 
 Document: gtkb-tafe-flow-lease-commands
