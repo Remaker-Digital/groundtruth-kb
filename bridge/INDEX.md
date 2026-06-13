@@ -10,6 +10,8 @@ Document: gtkb-antigravity-startup-optimization-governance-docs
 ADVISORY: bridge/gtkb-antigravity-startup-optimization-governance-docs-001.md
 
 Document: gtkb-tafe-stuck-flow-detection
+VERIFIED: bridge/gtkb-tafe-stuck-flow-detection-004.md
+NEW: bridge/gtkb-tafe-stuck-flow-detection-003.md
 GO: bridge/gtkb-tafe-stuck-flow-detection-002.md
 NEW: bridge/gtkb-tafe-stuck-flow-detection-001.md
 
