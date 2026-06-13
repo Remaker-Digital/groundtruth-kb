@@ -1,3 +1,7 @@
+Document: gtkb-cli-module-main-guard
+GO: bridge/gtkb-cli-module-main-guard-002.md
+NEW: bridge/gtkb-cli-module-main-guard-001.md
+
 Document: gtkb-tafe-agent-capability-snapshots-schema
 GO: bridge/gtkb-tafe-agent-capability-snapshots-schema-002.md
 NEW: bridge/gtkb-tafe-agent-capability-snapshots-schema-001.md
