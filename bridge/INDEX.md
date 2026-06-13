@@ -1,4 +1,5 @@
 Document: gtkb-tafe-dispatch-tick-health
+NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
 
 Document: gtkb-claim-gated-implementation-start
