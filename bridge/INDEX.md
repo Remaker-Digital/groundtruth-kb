@@ -1,7 +1,10 @@
 Document: gtkb-wi-4477-ollama-readiness-autostart
+GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
 NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-001.md
 
 Document: gtkb-wi4452-impl-auth-named-packet-fallback
+REVISED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-004.md
+NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-003.md
 NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-002.md
 NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-001.md
 
@@ -47,6 +50,7 @@ NO-GO: bridge/gtkb-typed-artifact-flow-engine-advisory-002.md
 NEW: bridge/gtkb-typed-artifact-flow-engine-advisory-001.md
 
 Document: gtkb-bridge-index-atomic-write-integration-advisory
+NEW: bridge/gtkb-bridge-index-atomic-write-integration-advisory-003.md
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-002.md
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
 
