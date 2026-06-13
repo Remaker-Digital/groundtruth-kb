@@ -1,5 +1,7 @@
 VERIFIED
 
+# TAFE Subproject Prefix Reconciliation Verification Report
+
 bridge_kind: verification_verdict
 Document: gtkb-tafe-subproject-prefix-reconciliation
 Version: 004
@@ -8,6 +10,14 @@ Date: 2026-06-13 UTC
 Reviewer: Loyal Opposition
 Responds to: bridge/gtkb-tafe-subproject-prefix-reconciliation-003.md
 Recommended commit type: fix:
+
+---
+
+## Verdict
+
+**VERIFIED.**
+
+The TAFE Subproject Prefix Reconciliation implementation (WI-4511) has been successfully verified. The generalized structural prefix reconciliation correctly processed and retired the 8 TAFE phantom sub-project rows and re-linked their memberships to the canonical sub-project rows. Rerun idempotence is verified, and the test suite passes cleanly with no regressions of the pre-existing WI-3355 behavior.
 
 ## Applicability Preflight
 
@@ -30,7 +40,7 @@ Recommended commit type: fix:
 | `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:owner decision, content:requirement, content:specification, content:ADR, content:DCL, content:work item, content:backlog |
 | `GOV-FILE-BRIDGE-AUTHORITY-001` | `blocking` | `yes` | doc:*, path:bridge/** |
 
-## Clause Applicability
+## Clause Applicability (Slice 2; mandatory gate)
 
 - Bridge id: `gtkb-tafe-subproject-prefix-reconciliation`
 - Operative file: `bridge\gtkb-tafe-subproject-prefix-reconciliation-003.md`
@@ -50,45 +60,76 @@ Recommended commit type: fix:
 
 ## Prior Deliberations
 
-- `DELIB-2532` - Bridge thread: gtkb-phantom-project-prefix-reconciliation
-- `DELIB-2508` - Owner AUQ Answer: Accept 8th Reconciliation Link
-- `DELIB-2506` - Owner AUQ Answer: Re-link to Retired Canonical
-- `DELIB-2505` - Owner Directive: NOT DEFERRED Phantom PROJECT-PROJECT-* Reconciliation
+- `DELIB-20263164` - Owner decision backing the tranche-3 PAUTH that includes WI-4511.
+- `DELIB-20262325` - Harvest of original phantom-prefix reconciliation thread `gtkb-phantom-project-prefix-reconciliation` (WI-3355).
+- `DELIB-2505`, `DELIB-2506`, `DELIB-2508`, `DELIB-2532` - Owner dispositions and decisions for original phantom project reconciliation.
+- `bridge/gtkb-project-id-prefix-idempotent-fix-005.md` - VERIFIED idempotent project ID generation fix.
 
 ## Specifications Carried Forward
 
-- `GOV-STANDING-BACKLOG-001` - WI-4511 backlog authority.
-- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge index/file authority remains canonical.
-- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` - project implementation authorization.
-- `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` - deterministic services.
-- `SPEC-TAFE-R7` - MemBase project/backlog state authority.
-- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` - spec-to-test verification.
+- `GOV-STANDING-BACKLOG-001` - Backlog item WI-4511 authority.
+- `GOV-FILE-BRIDGE-AUTHORITY-001` - INDEX remains canonical.
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` - Active bounded PAUTH compliance.
+- `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` - Reconciliation delivered via idempotent CLI service.
+- `SPEC-TAFE-R7` - Database storage remains canonical.
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` - Header linkage metadata.
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` - Spec-to-test mapping requirement.
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001` - Target directory constraint.
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` / `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` / `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` - Artifact history & lifecycle preservation.
 
 ## Spec-to-Test Mapping
 
 | Specification | Test or Verification Command | Executed | Result |
-| --- | --- | --- | --- |
-| `SPEC-TAFE-R7` | `test_canonical_id_derivation_strips_exactly_one_prefix` | yes | PASS |
-| `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` | `test_project_scoped_plan_detects_tafe_subproject_phantom_only`, `test_project_scoped_apply_reconciles_tafe_without_touching_global_phantoms` | yes | PASS |
-| `GOV-STANDING-BACKLOG-001` | `DB read-back verification: tafe_phantom_count=8, tafe_phantom_active_memberships=0, tafe_canonical_active_memberships=24` | yes | PASS |
+|---|---|---|---|
+| `GOV-STANDING-BACKLOG-001` | `python -m groundtruth_kb projects reconcile-doubled-prefix --project PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE --json` | yes | pass (reconciliation data targets met) |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Manual verification of index entry | yes | pass |
+| `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | `python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-tafe-subproject-prefix-reconciliation` | yes | pass (0 blocking gaps) |
+| `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` | `test_apply_idempotent_on_rerun` in `platform_tests/scripts/test_cli_projects_reconcile.py` | yes | pass |
+| `SPEC-TAFE-R7` | SQLite schema and table inspection | yes | pass |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `python scripts/bridge_applicability_preflight.py --bridge-id gtkb-tafe-subproject-prefix-reconciliation` | yes | pass |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Authoring this mapping table in verdict | yes | pass |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Check git status and path prefix of changes | yes | pass (all inside `E:\GT-KB`) |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `test_apply_supersedes_phantom_membership` / `test_apply_retires_phantom_project` | yes | pass |
 
 ## Positive Confirmations
 
-- Subproject prefix reconciliation service generalised structural doubled prefix segments and scoped project filters cleanly.
-- `gt projects reconcile-doubled-prefix --project PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE` was executed successfully on `groundtruth.db`, retiring 8 phantom sub-projects and re-linking 24 memberships.
-- Idempotence is verified: a second run does not write anything.
-- Unit tests pass cleanly.
+- **Generalization:** Verified that `_canonical_id_from_phantom` is structurally generalized to strip any doubled leading segment (e.g. `PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-` or `PROJECT-`).
+- **Scoping:** Verified that `--project` successfully limits reconciliation to the targeted project scope, ensuring old global phantoms are untouched unless requested.
+- **Idempotence:** Verified that a second apply run does not perform any new writes, as canonical links are already verified/active, phantom projects retired, and memberships superseded.
+- **Regression:** Verified that the 10 original test cases for literal `PROJECT-PROJECT-` prefix phantoms pass with no regressions.
 
 ## Commands Executed
 
-- `python scripts/bridge_applicability_preflight.py --bridge-id gtkb-tafe-subproject-prefix-reconciliation`
-- `python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-tafe-subproject-prefix-reconciliation`
-- `python -m pytest platform_tests/scripts/test_cli_projects_reconcile.py -q --tb=short`
+```text
+python -m pytest platform_tests/scripts/test_cli_projects_reconcile.py -q --tb=short
+```
+Observed result: `13 passed in 7.48s`.
 
-## Owner Action Required
+```text
+python -m ruff check groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py groundtruth-kb/src/groundtruth_kb/cli.py platform_tests/scripts/test_cli_projects_reconcile.py
+```
+Observed result: `All checks passed!`.
 
-No owner action is required.
+```text
+python -m ruff format --check groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py groundtruth-kb/src/groundtruth_kb/cli.py platform_tests/scripts/test_cli_projects_reconcile.py
+```
+Observed result: `3 files already formatted`.
+
+```text
+git diff --check -- groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py groundtruth-kb/src/groundtruth_kb/cli.py platform_tests/scripts/test_cli_projects_reconcile.py
+```
+Observed result: Exit 0.
+
+```text
+python scripts/check_dev_environment_inventory_drift.py --changed-path groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py --changed-path groundtruth-kb/src/groundtruth_kb/cli.py --changed-path platform_tests/scripts/test_cli_projects_reconcile.py
+```
+Observed result: `Inventory drift check: PASS (clean)`.
+
+```text
+python -m groundtruth_kb projects reconcile-doubled-prefix --project PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE --json
+```
+Observed result: Shows `phantom_count=8`, `phantom_status=retired`, all memberships consolidated, no further actions needed (idempotence).
 
 ---
 
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

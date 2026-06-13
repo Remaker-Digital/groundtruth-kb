@@ -1,3 +1,11 @@
+Document: gtkb-tafe-stuck-flow-detection
+GO: bridge/gtkb-tafe-stuck-flow-detection-002.md
+NEW: bridge/gtkb-tafe-stuck-flow-detection-001.md
+
+Document: gtkb-bridge-index-atomic-write-guard
+GO: bridge/gtkb-bridge-index-atomic-write-guard-002.md
+NEW: bridge/gtkb-bridge-index-atomic-write-guard-001.md
+
 Document: gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening
 GO: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-002.md
 NEW: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-001.md
