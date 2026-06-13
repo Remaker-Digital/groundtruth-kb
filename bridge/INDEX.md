@@ -1,4 +1,6 @@
 Document: gtkb-wi-4477-ollama-readiness-autostart
+VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-009.md
+NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-008.md
 GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-007.md
 REVISED: bridge/gtkb-wi-4477-ollama-readiness-autostart-006.md
 NO-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-005.md
@@ -28,15 +30,6 @@ Document: gtkb-fab-10-codex-index-adapter-addendum
 WITHDRAWN: bridge/gtkb-fab-10-codex-index-adapter-addendum-003.md
 GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
-
-Document: gtkb-tafe-phase-0-enablement
-VERIFIED: bridge/gtkb-tafe-phase-0-enablement-007.md
-NEW: bridge/gtkb-tafe-phase-0-enablement-006.md
-GO: bridge/gtkb-tafe-phase-0-enablement-005.md
-REVISED: bridge/gtkb-tafe-phase-0-enablement-004.md
-DEFERRED: bridge/gtkb-tafe-phase-0-enablement-003.md
-GO: bridge/gtkb-tafe-phase-0-enablement-002.md
-NEW: bridge/gtkb-tafe-phase-0-enablement-001.md
 
 Document: gtkb-tafe-backlog-reconciliation
 VERIFIED: bridge/gtkb-tafe-backlog-reconciliation-004.md
@@ -1937,6 +1930,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
+NEW: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-009.md
 DEFERRED: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-008.md
 NO-GO: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-007.md
 REVISED: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-006.md
