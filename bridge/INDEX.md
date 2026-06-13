@@ -1,8 +1,11 @@
 Document: gtkb-wi-4477-ollama-readiness-autostart
+VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-004.md
+NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-003.md
 GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
 NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-001.md
 
 Document: gtkb-wi4452-impl-auth-named-packet-fallback
+NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-006.md
 GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-005.md
 REVISED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-004.md
 NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-003.md
@@ -49,12 +52,6 @@ GO: bridge/gtkb-typed-artifact-flow-engine-advisory-004.md
 REVISED: bridge/gtkb-typed-artifact-flow-engine-advisory-003.md
 NO-GO: bridge/gtkb-typed-artifact-flow-engine-advisory-002.md
 NEW: bridge/gtkb-typed-artifact-flow-engine-advisory-001.md
-
-Document: gtkb-bridge-index-atomic-write-integration-advisory
-VERIFIED: bridge/gtkb-bridge-index-atomic-write-integration-advisory-004.md
-NEW: bridge/gtkb-bridge-index-atomic-write-integration-advisory-003.md
-ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-002.md
-ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
 
 Document: gtkb-lo-dispatch-ordered-fallback-routing
 VERIFIED: bridge/gtkb-lo-dispatch-ordered-fallback-routing-008.md
