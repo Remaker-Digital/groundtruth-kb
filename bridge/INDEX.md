@@ -32,6 +32,7 @@ GO: bridge/gtkb-tafe-stuck-flow-detection-002.md
 NEW: bridge/gtkb-tafe-stuck-flow-detection-001.md
 
 Document: gtkb-bridge-index-atomic-write-guard
+VERIFIED: bridge/gtkb-bridge-index-atomic-write-guard-004.md
 NEW: bridge/gtkb-bridge-index-atomic-write-guard-003.md
 GO: bridge/gtkb-bridge-index-atomic-write-guard-002.md
 NEW: bridge/gtkb-bridge-index-atomic-write-guard-001.md
