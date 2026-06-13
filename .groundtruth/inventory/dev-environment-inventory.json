@@ -5,7 +5,7 @@
     "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-12T20:26:19Z",
+  "generated_at": "2026-06-13T01:34:16Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -84,7 +84,7 @@
       "C": {
         "harness_type": "antigravity",
         "role": [
-          "prime-builder"
+          "loyal-opposition"
         ],
         "status": "verified"
       },
@@ -134,7 +134,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {

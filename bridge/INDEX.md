@@ -1,18 +1,11 @@
 Document: gtkb-wi-4477-ollama-readiness-autostart
+GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-007.md
+REVISED: bridge/gtkb-wi-4477-ollama-readiness-autostart-006.md
 NO-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-005.md
 VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-004.md
 NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-003.md
 GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
 NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-001.md
-
-Document: gtkb-wi4452-impl-auth-named-packet-fallback
-VERIFIED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-007.md
-NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-006.md
-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-005.md
-REVISED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-004.md
-NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-003.md
-NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-002.md
-NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-001.md
 
 Document: gtkb-ollama-server-readiness-autostart-advisory
 ADVISORY: bridge/gtkb-ollama-server-readiness-autostart-advisory-001.md
