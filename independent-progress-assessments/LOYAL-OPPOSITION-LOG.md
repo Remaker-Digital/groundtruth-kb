@@ -361,4 +361,12 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 |------|---------|-------------------|------------------|--------|
 | Technical | OpenRouter and Ollama SDK harness `Bash` dispatch can mutate `bridge/*.md` without invoking bridge-compliance guards; `Write`/`Edit` do invoke bridge-compliance. | Temp-directory reproductions through `dispatch_tool_call("Bash", ...)`; `scripts/openrouter_harness.py` and `scripts/ollama_harness.py` guard routing; 54 targeted harness tests passed; Codex bridge adapter tests have a separate claim-handling failure. | Resolve `WI-4468` first or as step zero, then hard-deny SDK harness `Bash` bridge writes and require a single guarded bridge-writer path with OpenRouter/Ollama parity tests. | Open |
 
+### 2026-06-13 - WI-4464 Git Index Contamination Advisory
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4464`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-08-55-WI-4464-git-index-contamination-advisory.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Shared Git index contamination remains a live P1 commit-safety risk; current staged state again mixes bridge, hook, and unrelated script/test work before this LO report. | `memory/recovery-2026-06-11-fab20-commit-collision.md`; live `git diff --cached --name-status`; full WI-4464 report. | Prime should file a bridge proposal for an explicit-path safe commit helper, mixed-index warning, and stale-HEAD reset guard before changing git tooling. | Open |
+
 

@@ -3,6 +3,7 @@ GO: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-002.md
 NEW: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-001.md
 
 Document: gtkb-tafe-subproject-prefix-reconciliation
+VERIFIED: bridge/gtkb-tafe-subproject-prefix-reconciliation-004.md
 NEW: bridge/gtkb-tafe-subproject-prefix-reconciliation-003.md
 GO: bridge/gtkb-tafe-subproject-prefix-reconciliation-002.md
 NEW: bridge/gtkb-tafe-subproject-prefix-reconciliation-001.md
