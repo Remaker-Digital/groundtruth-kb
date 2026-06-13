@@ -1,3 +1,7 @@
+Document: gtkb-tafe-dispatch-policy-engine
+GO: bridge/gtkb-tafe-dispatch-policy-engine-002.md
+NEW: bridge/gtkb-tafe-dispatch-policy-engine-001.md
+
 Document: gtkb-cli-module-main-guard
 VERIFIED: bridge/gtkb-cli-module-main-guard-004.md
 NEW: bridge/gtkb-cli-module-main-guard-003.md
