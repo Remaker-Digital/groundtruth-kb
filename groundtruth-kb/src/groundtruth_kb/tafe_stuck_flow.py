@@ -432,7 +432,7 @@ def detect_stuck_flows(
     service: _FlowService,
     *,
     now: str | datetime | None = None,
-    thresholds: StuckThresholds = StuckThresholds(),
+    thresholds: StuckThresholds | None = None,
     subject_scope: str | None = None,
 ) -> StuckFlowReport:
     """Detect and self-diagnose stuck conditions across active flows (read-only).
@@ -441,6 +441,7 @@ def detect_stuck_flows(
     non-terminal stage of each active (non-terminal) flow. Performs no mutation:
     the returned report always carries ``mutated == False``.
     """
+    thresholds = thresholds if thresholds is not None else StuckThresholds()
     now_dt = _coerce_now(now)
     flows = [flow for flow in service.list_flow_instances() if not _is_terminal_flow(flow)]
     if subject_scope is not None:

@@ -38,7 +38,6 @@ from groundtruth_kb.tafe_stuck_flow import (
     StuckThresholds,
     detect_stuck_flows,
     diagnose_stuck_flow,
-    stuck_report_to_payload,
 )
 from groundtruth_kb.typed_artifact_flow import TypedArtifactFlowService
 
@@ -448,10 +447,36 @@ def test_detect_is_non_mutating_against_real_db(tmp_path: Path) -> None:
 
 
 def test_module_has_no_recovery_actuation_surface() -> None:
-    """WI-4505 bounding: read/compute/report only -- no actuation surface."""
+    """WI-4505 bounding: read/compute/report only -- no actuation surface.
+
+    Scans the module's CODE with docstrings and comments stripped, so a
+    forbidden token that appears only in prose documenting the no-actuation
+    bound (e.g. ``subprocess`` in the module docstring's "no ... subprocess"
+    sentence) is not a false positive. Real usage -- a ``subprocess`` import, a
+    ``Popen`` / ``os.system`` call, a mutation method name, an ``insert_`` write,
+    an ``INDEX.md`` string, or a ``.commit(`` -- survives docstring stripping and
+    is still flagged, because ``ast.unparse`` emits only executable code
+    (comments are absent from the AST).
+    """
+    import ast
+
     import groundtruth_kb.tafe_stuck_flow as module
 
-    source = Path(module.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = node.body
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                stripped = body[1:]
+                if not stripped and not isinstance(node, ast.Module):
+                    stripped = [ast.Pass()]
+                node.body = stripped
+    code = ast.unparse(ast.fix_missing_locations(tree))
     forbidden = (
         "subprocess",
         "Popen",
@@ -466,7 +491,7 @@ def test_module_has_no_recovery_actuation_surface() -> None:
         ".commit(",
     )
     for token in forbidden:
-        assert token not in source, f"unexpected actuation/mutation surface: {token}"
+        assert token not in code, f"unexpected actuation/mutation surface: {token}"
 
 
 # ---------------------------------------------------------------------------

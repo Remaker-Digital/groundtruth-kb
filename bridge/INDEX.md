@@ -4,6 +4,7 @@ GO: bridge/gtkb-bounded-parallel-cross-harness-dispatch-002.md
 NEW: bridge/gtkb-bounded-parallel-cross-harness-dispatch-001.md
 
 Document: gtkb-tafe-flow-type-lifecycle-coverage
+VERIFIED: bridge/gtkb-tafe-flow-type-lifecycle-coverage-004.md
 NEW: bridge/gtkb-tafe-flow-type-lifecycle-coverage-003.md
 GO: bridge/gtkb-tafe-flow-type-lifecycle-coverage-002.md
 NEW: bridge/gtkb-tafe-flow-type-lifecycle-coverage-001.md
