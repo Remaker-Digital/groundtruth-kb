@@ -1,3 +1,7 @@
+Document: gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening
+GO: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-002.md
+NEW: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-001.md
+
 Document: gtkb-tafe-subproject-prefix-reconciliation
 GO: bridge/gtkb-tafe-subproject-prefix-reconciliation-002.md
 NEW: bridge/gtkb-tafe-subproject-prefix-reconciliation-001.md
@@ -17,6 +21,7 @@ REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-002.md
 NEW: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-001.md
 
 Document: gtkb-tafe-lease-recovery-cleanup
+NO-GO: bridge/gtkb-tafe-lease-recovery-cleanup-005.md
 NEW: bridge/gtkb-tafe-lease-recovery-cleanup-004.md
 GO: bridge/gtkb-tafe-lease-recovery-cleanup-003.md
 REVISED: bridge/gtkb-tafe-lease-recovery-cleanup-002.md
@@ -27,12 +32,13 @@ GO: bridge/gtkb-tafe-stage-attempt-telemetry-002.md
 NEW: bridge/gtkb-tafe-stage-attempt-telemetry-001.md
 
 Document: gtkb-role-resolution-r1-r5-assertion-enforcement
+GO: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-004.md
 REVISED: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-003.md
 NO-GO: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-002.md
 NEW: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-001.md
 
 Document: gtkb-tafe-dispatch-tick-health
-NO-GO: bridge/gtkb-tafe-dispatch-tick-health-006.md
+VERIFIED: bridge/gtkb-tafe-dispatch-tick-health-006.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-005.md
 GO: bridge/gtkb-tafe-dispatch-tick-health-004.md
 REVISED: bridge/gtkb-tafe-dispatch-tick-health-003.md
@@ -40,6 +46,7 @@ NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
 
 Document: gtkb-claim-gated-implementation-start
+NO-GO: bridge/gtkb-claim-gated-implementation-start-006.md
 NEW: bridge/gtkb-claim-gated-implementation-start-005.md
 GO: bridge/gtkb-claim-gated-implementation-start-004.md
 REVISED: bridge/gtkb-claim-gated-implementation-start-003.md
