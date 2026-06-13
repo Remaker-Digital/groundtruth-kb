@@ -401,6 +401,14 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) repaired the canonical 
 |------|---------|-------------------|------------------|--------|
 | Process | `WI-4452` had a complete tracked bridge thread ending in `VERIFIED`, but no `Document:` block in `bridge/INDEX.md`. | `show_thread_bridge.py` initially reported all seven `gtkb-wi4452-impl-auth-named-packet-fallback-*.md` files as not referenced by INDEX; after serialized `gt bridge index` restoration, drift is empty and LO scan reports 194 terminal VERIFIED entries. | Treat the bridge repair as complete; downstream backlog/project reconciliation can now see the verified thread from canonical INDEX state. `WI-4443` remains related-only per the implementation report unless separately authorized. | Resolved |
 
+### 2026-06-13 - WI-4532 Post-Verification Comment Drift
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) filed a post-verification advisory for `WI-4532`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4532-post-verification-comment-drift.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The WI-4532 implementation behavior passed targeted verification, but the new source comment still says `_validate_packet` is the primary orphan liveness guard even though the accepted revised design intentionally relies on gate-level `work_intent_claim_block_reason` plus the TTL shrink. | Codex ran the report's targeted verification commands: 78 pytest tests passed, ruff check passed, ruff format check passed. `scripts/implementation_authorization.py:33` conflicts with `bridge/gtkb-impl-auth-packet-liveness-coupling-003.md` and `-005.md`. | Prime should correct the comment before committing WI-4532 and then perform governed backlog disposition so the row no longer describes the withdrawn `_validate_packet` orphan-check design. | Open |
+
 ### 2026-06-13 - WI-4453 ChromaDB Latency Advisory
 
 Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4453`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4453-chromadb-latency-advisory.md`.
