@@ -1,3 +1,7 @@
+Document: gtkb-tafe-dashboard-observability
+GO: bridge/gtkb-tafe-dashboard-observability-002.md
+NEW: bridge/gtkb-tafe-dashboard-observability-001.md
+
 Document: gtkb-ollama-phase2-subproject-completion-coverage
 VERIFIED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-008.md
 REVISED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-007.md
