@@ -6,7 +6,15 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-WI4481-PROJECT-LINKAGE
+  asked_at: 2026-06-13T09:52:00Z
+  question: "WI-4481 (P1 bridge-integrity defect, INDEX atomic-write guard) is implemented + verified green and was GO'd (bridge/gtkb-bridge-index-atomic-write-guard-002.md), but the post-implementation report cannot be filed: WI-4481 is a standalone work item (project_name=None) and is in no active PAUTH's included_work_item_ids list. The bridge-compliance-gate hard-blocks the NEW/REVISED implementation_report via DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001 (missing Project Authorization: / Project: lines) and the live membership check (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001). Owner decision needed: admit WI-4481 to a project (candidate: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY) and add it to that project's PAUTH included_work_item_ids via AUQ (precedent: PAUTH v4 'add WI-3380' = DELIB-S-LOOP-2026-06-04-WI3380-PAUTH-INCLUSION-AUQ). A dispatched worker cannot run AUQ or amend a PAUTH, so this blocks report-filing → VERIFIED → WI close."
+  detected_via: prime_dispatched_worker_blocker
+  status: pending
+  resolved_in_session: 2026-06-13T09-48-16Z-prime-builder-B-9cea65 (dispatched)
+  notes: "Implementation artifacts are complete and uncommitted on disk: .claude/hooks/bridge-index-write-serializer.py (+181), platform_tests/hooks/test_bridge_index_write_serializer.py (+164, 16/16 pass), .claude/settings.json (+5 registration on Write|Edit|MultiEdit|Bash), .codex/hooks.json (+28 Bash + apply_patch registrations). Verification green this session: guard 16/16, serialized-writer regression 12/12 (incl. T4 20-thread no-lost-update), ruff check + format clean, both config files valid JSON. Once WI-4481 is project-homed + PAUTH-included, file bridge/gtkb-bridge-index-atomic-write-guard-003.md (implementation_report, NEW) with the carried-forward spec links + spec-to-test mapping already drafted this session. CORROBORATION (2026-06-13T10:01Z, dispatched session 2026-06-13T09-58-18Z-prime-builder-B-20606e): a SECOND dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16, writer 12/12 incl. T4, ruff clean, JSON valid). Both PAUTH-BATCH variants use explicit included_work_item_ids allowlists omitting WI-4481 (membership gate -> wi-not-included-by-authorization); no durable S437/WI-4481 DELIB exists. RECURRING DISPATCH DEAD-END: the cross-harness trigger will keep re-dispatching this latest-GO entry to fresh Prime workers on every fire (burning ~30-50K tokens each) until an owner-present session captures the S437 decision as a DELIB, admits WI-4481 to PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY, and amends a PAUTH to include it. Substrate-hygiene candidate: park/defer this GO entry to stop the re-dispatch loop pending the owner authorization. CORROBORATION-2 (2026-06-13T11:05Z, dispatched session 2026-06-13T11-03-34Z-prime-builder-B-b1274b): a THIRD dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16 in 0.22s, serialized-writer 12/12 incl. T4, ruff check + format clean, gt bridge index CLI present with add-document/set-status). Confirmed PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY is the natural home (already contains sibling WI-3513 'Serialize agent-tool INDEX.md edits' resolved). Deliberation search returned no S437/WI-4481 owner-decision DELIB (only DELIB-20263131, an unrelated advisory thread). Three dispatched workers now blocked at this identical gate (~estimated 90-130K cumulative tokens). The re-dispatch loop will continue until an owner-present session (a) captures the S437 'Proceed' decision as a DELIB, (b) runs `gt projects add-item PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY WI-4481`, and (c) amends a PAUTH (or mints PAUTH-WI-4481-INDEX-ATOMIC-WRITE-GUARD) to include WI-4481, then re-dispatches so a worker can file -003. STRONG RECOMMENDATION: owner should DEFER this GO entry now to halt the loop until the authorization lands."
+
+(no other pending decisions)
 
 ## Resolved
 
@@ -7763,6 +7771,57 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 0a941d3a0adc5fb5
   resolved_at: 2026-06-13T07:11:30.674641Z
   answer: "Your questions have been answered: \"I triaged the backlog for the next authorization. Which ready, specced scope should I authorize next (DELIB + PAUTH, then the swarm executes via the bridge protocol)?\"=\"Deepen TAFE Phase-2\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1195
+  asked_at: 2026-06-13T08:15:17.458779Z
+  question: "As 2nd PB I claimed TAFE lease-recovery to implement — but Codex already implemented it AND filed its post-impl report (-004), which is now freezing ALL new impl-start authorizations pending LO review. Net: Codex is saturating TAFE PB implementation; the real bottleneck is LO VERIFICATION (your manual Gemini); and a pending report freezes my PB work entirely. A second PB on TAFE adds little right now. How do you want to deploy me?"
+  options:
+    - "Hold; you clear LO queue"
+    - "Redeploy me off TAFE"
+    - "I prep forward TAFE work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c17f7893a8c3a8e9
+  resolved_at: 2026-06-13T08:15:17.458779Z
+  answer: "Your questions have been answered: \"As 2nd PB I claimed TAFE lease-recovery to implement — but Codex already implemented it AND filed its post-impl report (-004), which is now freezing ALL new impl-start authorizations pending LO review. Net: Codex is saturating TAFE PB implementation; the real bottleneck is LO VERIFICATION (your manual Gemini); and a pending report freezes my PB work entirely. A second PB on TAFE adds little right now. How do you want to deploy me?\"=\"Redeploy me off TAFE\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1196
+  asked_at: 2026-06-13T09:10:33.221221Z
+  question: "WI-4511 (TAFE sub-project dedup) is implemented + VERIFIED by the swarm (bridge -004: 8 phantom rows retired, 24 memberships re-linked, idempotence confirmed). But it's a defect-origin WI, so GOV-15 requires your explicit approval to mark it resolved in MemBase. Approve resolution?"
+  options:
+    - "Approve — resolve it"
+    - "Leave open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d79915a20a8cfc78
+  resolved_at: 2026-06-13T09:10:33.221221Z
+  answer: "Your questions have been answered: \"WI-4511 (TAFE sub-project dedup) is implemented + VERIFIED by the swarm (bridge -004: 8 phantom rows retired, 24 memberships re-linked, idempotence confirmed). But it's a defect-origin WI, so GOV-15 requires your explicit approval to mark it resolved in MemBase. Approve resolution?\"=\"Approve — resolve it\", \"3 protected narrative files (AGENTS.md, CLAUDE.md, codex-session-bootstrap.md) carry another session's unapproved 1-line 'Antigravity startup optimization' edit (no approval packets), which I excluded from the sweep-commit. They're still modified in the working tree. Disposition?\"=\"Approve + commit\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1197
+  asked_at: 2026-06-13T09:10:33.221221Z
+  question: "3 protected narrative files (AGENTS.md, CLAUDE.md, codex-session-bootstrap.md) carry another session's unapproved 1-line 'Antigravity startup optimization' edit (no approval packets), which I excluded from the sweep-commit. They're still modified in the working tree. Disposition?"
+  options:
+    - "Leave for owning session"
+    - "Approve + commit"
+    - "Revert the edits"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7049fdbf68b0009d
+  resolved_at: 2026-06-13T09:10:33.221221Z
+  answer: "Your questions have been answered: \"WI-4511 (TAFE sub-project dedup) is implemented + VERIFIED by the swarm (bridge -004: 8 phantom rows retired, 24 memberships re-linked, idempotence confirmed). But it's a defect-origin WI, so GOV-15 requires your explicit approval to mark it resolved in MemBase. Approve resolution?\"=\"Approve — resolve it\", \"3 protected narrative files (AGENTS.md, CLAUDE.md, codex-session-bootstrap.md) carry another session's unapproved 1-line 'Antigravity startup optimization' edit (no approval packets), which I excluded from the sweep-commit. They're still modified in the working tree. Disposition?\"=\"Approve + commit\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1198
+  asked_at: 2026-06-13T09:10:33.221221Z
+  question: "Committing the 3 Antigravity narrative edits is blocked by the inventory-drift gate: AGENTS.md / CLAUDE.md / codex-session-bootstrap.md are role-and-governance-rules surfaces requiring a bridge governance_review disposition, which these direct edits lack (the narrative-approval packets I generated cleared the narrative gate but not this one). 'Approve + commit' therefore now requires authoring a full governance-review bridge thread for another session's edits. How do you want to handle it?"
+  options:
+    - "Leave for owning session"
+    - "I file the governance-review bridge"
+    - "Revert the edits"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c5dd98d1df5039c
+  resolved_at: 2026-06-13T09:10:33.221221Z
+  answer: "Your questions have been answered: \"Committing the 3 Antigravity narrative edits is blocked by the inventory-drift gate: AGENTS.md / CLAUDE.md / codex-session-bootstrap.md are role-and-governance-rules surfaces requiring a bridge governance_review disposition, which these direct edits lack (the narrative-approval packets I generated cleared the narrative gate but not this one). 'Approve + commit' therefore now requires authoring a full governance-review bridge thread for another session's edits. How do you want to handle it?\"=\"Leave for owning session\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

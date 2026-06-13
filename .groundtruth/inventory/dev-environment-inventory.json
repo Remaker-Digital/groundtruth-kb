@@ -5,7 +5,7 @@
     "script_hash": "sha256:61d23cb8e64e6a66d45eb02faf81eac9ebba575138a86c907369e89dfb6dbc12",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-13T08:06:53Z",
+  "generated_at": "2026-06-13T09:11:03Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -70,7 +70,7 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "prime-builder"
+          "loyal-opposition"
         ],
         "status": "verified"
       },
@@ -134,19 +134,20 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 32,
+      "count": 33,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-axis-2-surface.py",
         ".claude/hooks/bridge-compliance-gate.py",
+        ".claude/hooks/bridge-index-write-serializer.py",
         ".claude/hooks/bridge-proposal-wi-id-collision-gate.py",
         ".claude/hooks/code-quality-baseline-proposal-check.py",
         ".claude/hooks/credential-scan.py",
@@ -413,7 +414,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -567,7 +568,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
