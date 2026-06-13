@@ -10,6 +10,7 @@ pre-drafting boundary for bridge thread coordination per the
 
 Usage:
     python scripts/bridge_claim_cli.py claim <slug>
+    python scripts/bridge_claim_cli.py extend <slug>
     python scripts/bridge_claim_cli.py release <slug>
     python scripts/bridge_claim_cli.py status <slug>
 
@@ -56,7 +57,9 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from bridge_work_intent_registry import (  # noqa: E402  (path-fix import)
     WorkIntentRegistryError,
     acquire,
+    claim_status,
     current_holder,
+    extend,
     release,
 )
 from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id  # noqa: E402  (path-fix import)
@@ -137,10 +140,22 @@ def cmd_release(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_extend(args: argparse.Namespace) -> int:
+    session_id = _resolve_session_id(args.session_id)
+    project_root = _resolve_project_root(args.project_root)
+    try:
+        holder = extend(args.slug, session_id, project_root=project_root)
+    except WorkIntentRegistryError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 3
+    _print_holder_or_default(holder)
+    return 0
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     project_root = _resolve_project_root(args.project_root)
     try:
-        holder = current_holder(args.slug, project_root=project_root)
+        holder = claim_status(args.slug, project_root=project_root)
     except WorkIntentRegistryError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 3
@@ -175,6 +190,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override default project root (test affordance).",
     )
     p_claim.set_defaults(func=cmd_claim)
+
+    p_extend = sub.add_parser(
+        "extend",
+        help="Extend a GO-implementation work-intent claim.",
+        description=(
+            "Extend a held GO-implementation claim by the fixed self-service "
+            "increment, up to the configured total-hold cap."
+        ),
+    )
+    p_extend.add_argument("slug", help="Bridge thread slug (kebab-case).")
+    p_extend.add_argument("--session-id", help="Override harness session env vars.")
+    p_extend.add_argument(
+        "--project-root",
+        type=Path,
+        help="Override default project root (test affordance).",
+    )
+    p_extend.set_defaults(func=cmd_extend)
 
     p_release = sub.add_parser(
         "release",

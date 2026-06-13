@@ -5012,6 +5012,59 @@ def _check_standing_backlog_health(target: Path) -> ToolCheck:
     )
 
 
+def _check_lapsed_go_implementation_claims(target: Path) -> ToolCheck:
+    """Warn when GO-latest implementation claims are lapsed past grace."""
+    check_name = "Lapsed GO implementation claims"
+    scripts_dir = target / "scripts"
+    inserted = False
+    if scripts_dir.is_dir() and str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+        inserted = True
+    try:
+        try:
+            from bridge_work_intent_registry import lapsed_go_implementation_claims  # type: ignore
+        except Exception as exc:  # pragma: no cover - defensive doctor surface
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=False,
+                status="warning",
+                message=f"Lapsed GO implementation claims: registry unavailable: {exc}",
+            )
+        try:
+            claims = lapsed_go_implementation_claims(project_root=target)
+        except Exception as exc:  # noqa: BLE001 - diagnostic doctor check
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=False,
+                status="warning",
+                message=f"Lapsed GO implementation claims: inspection failed: {exc}",
+            )
+    finally:
+        if inserted:
+            with suppress(ValueError):
+                sys.path.remove(str(scripts_dir))
+
+    if not claims:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="Lapsed GO implementation claims: none",
+        )
+    examples = ", ".join(str(claim.get("thread_slug")) for claim in claims[:5])
+    suffix = "" if len(claims) <= 5 else f", +{len(claims) - 5} more"
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="warning",
+        message=f"Lapsed GO implementation claims: {len(claims)} lapsed ({examples}{suffix})",
+    )
+
+
 _DB_SNAPSHOT_OUTPUT_ALLOWLIST = re.compile(
     r"^[A-Za-z]:[/\\]Users[/\\][^/\\]+[/\\]AppData[/\\]Local[/\\]gtkb-snapshots[/\\]",
 )
@@ -5178,6 +5231,7 @@ def run_doctor(
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
         checks.append(_check_cross_harness_trigger(target))
+        checks.append(_check_lapsed_go_implementation_claims(target))
         # FAB-01 / HYG-001: exercise launchability of each active dispatch
         # target's argv head so a WinError-2-class launch regression surfaces
         # in the doctor rather than as a silent exit-127 in dispatch logs.

@@ -284,6 +284,21 @@ def _render_surface(
         lines.append(f"| {item.top_status} | {item.document_name} | {item.top_file} |")
     if len(items) > 10:
         lines.append(f"| … | ({len(items) - 10} more not shown) | (see `bridge/INDEX.md`) |")
+    if role_profile == ROLE_PRIME:
+        available_go_items = [item for item in items if getattr(item, "top_status", "") == "GO"]
+        if available_go_items:
+            lines.extend(
+                [
+                    "",
+                    "| Availability | Document | Next Step |",
+                    "|---|---|---|",
+                ]
+            )
+            for item in available_go_items[:10]:
+                lines.append(
+                    "| AVAILABLE GO-IMPLEMENTATION | "
+                    f"{item.document_name} | produce implementation report or claim/extend first |"
+                )
     if claimed_items:
         lines.extend(["", "| Claim | Document | Holder | Until |", "|---|---|---|---|"])
         for claimed in claimed_items[:10]:

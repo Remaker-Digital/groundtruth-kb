@@ -2,6 +2,12 @@ Document: gtkb-cli-module-main-guard
 GO: bridge/gtkb-cli-module-main-guard-002.md
 NEW: bridge/gtkb-cli-module-main-guard-001.md
 
+Document: gtkb-go-impl-claim-timebox
+VERIFIED: bridge/gtkb-go-impl-claim-timebox-004.md
+NEW: bridge/gtkb-go-impl-claim-timebox-003.md
+GO: bridge/gtkb-go-impl-claim-timebox-002.md
+NEW: bridge/gtkb-go-impl-claim-timebox-001.md
+
 Document: gtkb-tafe-agent-capability-snapshots-schema
 GO: bridge/gtkb-tafe-agent-capability-snapshots-schema-002.md
 NEW: bridge/gtkb-tafe-agent-capability-snapshots-schema-001.md
@@ -39,12 +45,6 @@ VERIFIED: bridge/gtkb-tafe-runtime-tables-schema-004.md
 NEW: bridge/gtkb-tafe-runtime-tables-schema-003.md
 GO: bridge/gtkb-tafe-runtime-tables-schema-002.md
 NEW: bridge/gtkb-tafe-runtime-tables-schema-001.md
-
-Document: gtkb-role-authority-declared-not-detected
-VERIFIED: bridge/gtkb-role-authority-declared-not-detected-004.md
-NEW: bridge/gtkb-role-authority-declared-not-detected-003.md
-GO: bridge/gtkb-role-authority-declared-not-detected-002.md
-NEW: bridge/gtkb-role-authority-declared-not-detected-001.md
 
 Document: gtkb-wi4487-flow-definitions-schema
 WITHDRAWN: bridge/gtkb-wi4487-flow-definitions-schema-002.md
