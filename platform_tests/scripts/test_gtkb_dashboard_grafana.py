@@ -156,7 +156,13 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "frser-sqlite-datasource" in datasource_text
     assert "$GTKB_DASHBOARD_SQLITE_PATH" in datasource_text
     assert "$GTKB_DASHBOARD_DASHBOARDS_PATH" in dashboard_provider_text
-    assert dashboard_json["uid"] == "gtkb"
+    # Drift cleanup: the generator hard-codes "agent-red-gtkb" in
+    # build_dashboard(); the previously committed JSON had "gtkb", a stale
+    # artifact from before the generator change. The idempotent WI-4506 regen
+    # surfaced the drift; updating the assertion to match the SoT (the
+    # generator) is in scope of WI-4506's target_paths (this test file is
+    # listed) and is a one-line drift cleanup, not a scope expansion.
+    assert dashboard_json["uid"] == "agent-red-gtkb"
     assert dashboard_json["links"] == []
     assert [panel["title"] for panel in dashboard_json["panels"][:10]] == [
         "GT-KB Dashboard",
@@ -262,3 +268,126 @@ def test_dashboard_launch_path_does_not_require_docker_desktop() -> None:
     assert "Docker Desktop" not in refresh_text
     assert "start_local_dashboard.ps1" in index_text
     assert "Grafana OSS" in refresh_text
+
+
+# =============================================================================
+# WI-4506: TAFE Observability panel assertions on the generated dashboard.
+# =============================================================================
+
+_TAFE_PANEL_TITLES: tuple[str, ...] = (
+    "Stage Attempt Outcomes (TAFE)",
+    "Failure Class Distribution (TAFE)",
+    "Active Flow Instances (TAFE)",
+    "Active Stage Leases (TAFE)",
+    "Capability Snapshot Readiness by Role (TAFE)",
+)
+
+_TAFE_PROJECTION_TABLES: tuple[str, ...] = (
+    "tafe_stage_attempt_telemetry",
+    "tafe_flow_instances",
+    "tafe_stage_instances",
+    "tafe_stage_leases",
+    "tafe_agent_capability_snapshots",
+)
+
+
+def _load_generated_dashboard() -> dict:
+    dashboard_path = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
+    return json.loads(dashboard_path.read_text(encoding="utf-8"))
+
+
+def _walk_panels(panels: list[dict]) -> list[dict]:
+    """Flat list of all panels in the dashboard, recursively through rows."""
+    out: list[dict] = []
+    for panel in panels:
+        out.append(panel)
+        out.extend(_walk_panels(panel.get("panels", [])))
+    return out
+
+
+def test_tafe_observability_row_exists() -> None:
+    dashboard = _load_generated_dashboard()
+    titles = _panel_titles(dashboard["panels"])
+    assert "TAFE Observability" in titles, "TAFE Observability row missing from generated dashboard"
+
+
+def test_all_tafe_panel_titles_present() -> None:
+    dashboard = _load_generated_dashboard()
+    titles = set(_panel_titles(dashboard["panels"]))
+    for title in _TAFE_PANEL_TITLES:
+        assert title in titles, f"TAFE panel {title!r} missing from generated dashboard"
+
+
+def test_tafe_panels_use_sqlite_datasource() -> None:
+    dashboard = _load_generated_dashboard()
+    flat = _walk_panels(dashboard["panels"])
+    tafe_panels = [p for p in flat if p.get("title") in _TAFE_PANEL_TITLES]
+    assert len(tafe_panels) == len(_TAFE_PANEL_TITLES), "Expected all TAFE panels to be present"
+    for panel in tafe_panels:
+        for target in panel.get("targets", []):
+            ds = target.get("datasource", {})
+            assert ds.get("uid") == "gtkb-dashboard-sqlite", (
+                f"TAFE panel {panel['title']!r} uses non-SQLite datasource: {ds}"
+            )
+
+
+def test_tafe_panel_queries_are_read_only() -> None:
+    """No TAFE panel query may issue a write (INSERT/UPDATE/DELETE/DROP/CREATE)."""
+    dashboard = _load_generated_dashboard()
+    flat = _walk_panels(dashboard["panels"])
+    forbidden = ("INSERT ", "UPDATE ", "DELETE ", "DROP ", "CREATE ")
+    for panel in flat:
+        if panel.get("title") not in _TAFE_PANEL_TITLES:
+            continue
+        for target in panel.get("targets", []):
+            sql_upper = target.get("rawQueryText", "").upper()
+            for verb in forbidden:
+                assert verb not in sql_upper, (
+                    f"TAFE panel {panel['title']!r} contains forbidden SQL verb {verb!r}: {sql_upper!r}"
+                )
+
+
+def test_tafe_panel_queries_reference_projection_tables() -> None:
+    """Each TAFE panel's query must read from one of the projection tables, not
+    from any canonical `groundtruth.db` table name. The dashboard datasource
+    points at the dashboard SQLite, so a canonical-table reference would be a
+    silent miss."""
+    dashboard = _load_generated_dashboard()
+    flat = _walk_panels(dashboard["panels"])
+    for panel in flat:
+        if panel.get("title") not in _TAFE_PANEL_TITLES:
+            continue
+        for target in panel.get("targets", []):
+            sql = target.get("rawQueryText", "")
+            assert any(table in sql for table in _TAFE_PROJECTION_TABLES), (
+                f"TAFE panel {panel['title']!r} references no projection table; SQL: {sql!r}"
+            )
+
+
+def test_panel_ids_are_monotonically_unique() -> None:
+    """Adding the TAFE row + 5 panels must not collide with existing panel IDs."""
+    dashboard = _load_generated_dashboard()
+    flat = _walk_panels(dashboard["panels"])
+    ids = [p.get("id") for p in flat if "id" in p]
+    assert len(ids) == len(set(ids)), f"duplicate panel IDs found: {sorted(ids)}"
+
+
+def test_no_alert_rule_references_a_tafe_panel() -> None:
+    """The WI-4506 PAUTH forbids alert-rule scope creep. No alert rule may
+    reference a TAFE panel by id or by title."""
+    alerting_dir = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "alerting"
+    if not alerting_dir.exists():
+        return
+    dashboard = _load_generated_dashboard()
+    flat = _walk_panels(dashboard["panels"])
+    tafe_panel_ids = {str(p.get("id")) for p in flat if p.get("title") in _TAFE_PANEL_TITLES}
+
+    for alert_file in alerting_dir.glob("*.yaml"):
+        text = alert_file.read_text(encoding="utf-8")
+        for title in _TAFE_PANEL_TITLES:
+            assert title not in text, f"alert file {alert_file.name} references TAFE panel title {title!r}"
+        for panel_id in tafe_panel_ids:
+            # Match panelId: NN exactly (alert-rule schema field).
+            assert f"panelId: {panel_id}" not in text, (
+                f"alert file {alert_file.name} references TAFE panel id {panel_id}"
+            )

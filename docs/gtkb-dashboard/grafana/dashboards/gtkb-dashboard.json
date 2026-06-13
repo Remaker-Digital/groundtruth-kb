@@ -32,7 +32,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "# GroundTruth-KB Dashboard\n\nSQLite-backed project health, setup, delivery, and operations view.\n[Manual refresh](http://127.0.0.1:8766/) | `memory/gtkb-dashboard.sqlite` | `scripts\\gtkb_dashboard\\start_local_dashboard.ps1`"
+        "content": "# Agent Red GT-KB Dashboard\n\nSQLite-backed project health, setup, delivery, and operations view.\n[Manual refresh](http://127.0.0.1:8766/) | `memory/gtkb-dashboard.sqlite` | `scripts\\gtkb_dashboard\\start_local_dashboard.ps1`"
       }
     },
     {
@@ -2823,6 +2823,359 @@
           }
         }
       ]
+    },
+    {
+      "id": 48,
+      "type": "row",
+      "title": "TAFE Observability",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 43,
+          "type": "piechart",
+          "title": "Stage Attempt Outcomes (TAFE)",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT COALESCE(outcome, 'unknown') AS metric, COUNT(*) AS value\n            FROM tafe_stage_attempt_telemetry\n            WHERE status = 'active'\n            GROUP BY COALESCE(outcome, 'unknown')\n            ORDER BY value DESC;",
+              "queryType": "table",
+              "rawQueryText": "SELECT COALESCE(outcome, 'unknown') AS metric, COUNT(*) AS value\n            FROM tafe_stage_attempt_telemetry\n            WHERE status = 'active'\n            GROUP BY COALESCE(outcome, 'unknown')\n            ORDER BY value DESC;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "displayLabels": [
+              "name",
+              "value"
+            ],
+            "legend": {
+              "displayMode": "list",
+              "placement": "right",
+              "showLegend": true
+            },
+            "pieType": "donut",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 44,
+          "type": "piechart",
+          "title": "Failure Class Distribution (TAFE)",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT COALESCE(failure_class, 'unspecified') AS metric, COUNT(*) AS value\n            FROM tafe_stage_attempt_telemetry\n            WHERE status = 'active' AND outcome IS NOT NULL AND outcome != 'success'\n            GROUP BY COALESCE(failure_class, 'unspecified')\n            ORDER BY value DESC;",
+              "queryType": "table",
+              "rawQueryText": "SELECT COALESCE(failure_class, 'unspecified') AS metric, COUNT(*) AS value\n            FROM tafe_stage_attempt_telemetry\n            WHERE status = 'active' AND outcome IS NOT NULL AND outcome != 'success'\n            GROUP BY COALESCE(failure_class, 'unspecified')\n            ORDER BY value DESC;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "displayLabels": [
+              "name",
+              "value"
+            ],
+            "legend": {
+              "displayMode": "list",
+              "placement": "right",
+              "showLegend": true
+            },
+            "pieType": "donut",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 45,
+          "type": "table",
+          "title": "Active Flow Instances (TAFE)",
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT id, flow_type, subject_type, subject_id, status, started_at\n            FROM tafe_flow_instances\n            WHERE status IS NULL OR status NOT IN ('completed', 'cancelled', 'failed', 'retired')\n            ORDER BY started_at DESC NULLS LAST\n            LIMIT 50;",
+              "queryType": "table",
+              "rawQueryText": "SELECT id, flow_type, subject_type, subject_id, status, started_at\n            FROM tafe_flow_instances\n            WHERE status IS NULL OR status NOT IN ('completed', 'cancelled', 'failed', 'retired')\n            ORDER BY started_at DESC NULLS LAST\n            LIMIT 50;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 46,
+          "type": "table",
+          "title": "Active Stage Leases (TAFE)",
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT stage_instance_id, holder_harness_id, lease_status, acquired_at, heartbeat_at, expires_at\n            FROM tafe_stage_leases\n            WHERE lease_status = 'active'\n            ORDER BY acquired_at DESC NULLS LAST\n            LIMIT 50;",
+              "queryType": "table",
+              "rawQueryText": "SELECT stage_instance_id, holder_harness_id, lease_status, acquired_at, heartbeat_at, expires_at\n            FROM tafe_stage_leases\n            WHERE lease_status = 'active'\n            ORDER BY acquired_at DESC NULLS LAST\n            LIMIT 50;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 47,
+          "type": "bargauge",
+          "title": "Capability Snapshot Readiness by Role (TAFE)",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 24,
+            "h": 6
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT role AS metric, COUNT(*) AS value\n            FROM tafe_agent_capability_snapshots\n            WHERE status = 'active'\n            GROUP BY role\n            ORDER BY value DESC;",
+              "queryType": "table",
+              "rawQueryText": "SELECT role AS metric, COUNT(*) AS value\n            FROM tafe_agent_capability_snapshots\n            WHERE status = 'active'\n            GROUP BY role\n            ORDER BY value DESC;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "displayMode": "gradient",
+            "maxVizHeight": 34,
+            "minVizHeight": 18,
+            "minVizWidth": 8,
+            "namePlacement": "left",
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showUnfilled": true,
+            "valueMode": "color"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 2
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          }
+        }
+      ]
     }
   ],
   "refresh": "5m",
@@ -2841,8 +3194,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "GroundTruth-KB Dashboard",
-  "uid": "gtkb",
+  "title": "Agent Red GT-KB Dashboard",
+  "uid": "agent-red-gtkb",
   "version": 4,
   "weekStart": ""
 }

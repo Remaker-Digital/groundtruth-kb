@@ -725,6 +725,80 @@ def build_dashboard() -> dict[str, Any]:
     ]
     panels.append(_row(builder, "Data Freshness Details", 56, collapsed=True, panels=freshness_details))
 
+    # WI-4506: TAFE Observability panels (read-only visualization of the TAFE
+    # state surfaces from groundtruth.db, projected into the dashboard SQLite
+    # via _refresh_tafe_projection in refresh_dashboard_db.py).
+    # SPEC-TAFE-R6 (outcome / failure-class telemetry), SPEC-TAFE-R3 (failure-
+    # class diagnosis inputs), SPEC-TAFE-R2 (stage-lease state), SPEC-TAFE-R4
+    # (dispatch readiness via capability snapshots). Collapsed by default to
+    # match the existing detail-row convention; no alert rule consumes these
+    # panels (the WI-4506 PAUTH forbids alert-rule scope creep).
+    tafe_details = [
+        _pie_panel(
+            builder,
+            "Stage Attempt Outcomes (TAFE)",
+            _grid(0, 0, 12, 8),
+            """
+            SELECT COALESCE(outcome, 'unknown') AS metric, COUNT(*) AS value
+            FROM tafe_stage_attempt_telemetry
+            WHERE status = 'active'
+            GROUP BY COALESCE(outcome, 'unknown')
+            ORDER BY value DESC;
+            """,
+        ),
+        _pie_panel(
+            builder,
+            "Failure Class Distribution (TAFE)",
+            _grid(12, 0, 12, 8),
+            """
+            SELECT COALESCE(failure_class, 'unspecified') AS metric, COUNT(*) AS value
+            FROM tafe_stage_attempt_telemetry
+            WHERE status = 'active' AND outcome IS NOT NULL AND outcome != 'success'
+            GROUP BY COALESCE(failure_class, 'unspecified')
+            ORDER BY value DESC;
+            """,
+        ),
+        _table_panel(
+            builder,
+            "Active Flow Instances (TAFE)",
+            _grid(0, 8, 12, 8),
+            """
+            SELECT id, flow_type, subject_type, subject_id, status, started_at
+            FROM tafe_flow_instances
+            WHERE status IS NULL OR status NOT IN ('completed', 'cancelled', 'failed', 'retired')
+            ORDER BY started_at DESC NULLS LAST
+            LIMIT 50;
+            """,
+            hidden_columns=(),
+        ),
+        _table_panel(
+            builder,
+            "Active Stage Leases (TAFE)",
+            _grid(12, 8, 12, 8),
+            """
+            SELECT stage_instance_id, holder_harness_id, lease_status, acquired_at, heartbeat_at, expires_at
+            FROM tafe_stage_leases
+            WHERE lease_status = 'active'
+            ORDER BY acquired_at DESC NULLS LAST
+            LIMIT 50;
+            """,
+            hidden_columns=(),
+        ),
+        _bar_gauge_panel(
+            builder,
+            "Capability Snapshot Readiness by Role (TAFE)",
+            _grid(0, 16, 24, 6),
+            """
+            SELECT role AS metric, COUNT(*) AS value
+            FROM tafe_agent_capability_snapshots
+            WHERE status = 'active'
+            GROUP BY role
+            ORDER BY value DESC;
+            """,
+        ),
+    ]
+    panels.append(_row(builder, "TAFE Observability", 57, collapsed=True, panels=tafe_details))
+
     return {
         "annotations": {
             "list": [

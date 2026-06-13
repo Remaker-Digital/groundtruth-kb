@@ -348,6 +348,302 @@ def _migrate_schema(db_path: Path) -> None:
         conn.close()
 
 
+# =============================================================================
+# WI-4506: TAFE Observability projection (read-only narrowed projection of
+# canonical TAFE state from groundtruth.db into the dashboard SQLite).
+# Tables are created at runtime via CREATE TABLE IF NOT EXISTS so the additive
+# WI-4506 surface lands without modifying schema.sql. All columns NULL-tolerant
+# so fresh-install / pre-TAFE adopters render "No data" rather than error.
+# SPEC-TAFE-R7: dashboard SQLite is a derived cache; canonical TAFE state
+# remains in groundtruth.db. No PK/FK to the canonical store.
+# =============================================================================
+
+_TAFE_PROJECTION_TABLE_DDL: tuple[tuple[str, str], ...] = (
+    (
+        "tafe_stage_attempt_telemetry",
+        """
+        CREATE TABLE IF NOT EXISTS tafe_stage_attempt_telemetry (
+            id TEXT,
+            version INTEGER,
+            flow_instance_id TEXT,
+            stage_instance_id TEXT,
+            attempt_number INTEGER,
+            agent_harness_id TEXT,
+            model_identifier TEXT,
+            provider TEXT,
+            started_at TEXT,
+            completed_at TEXT,
+            duration_ms INTEGER,
+            outcome TEXT,
+            verdict TEXT,
+            failure_class TEXT,
+            cleanup_result TEXT,
+            status TEXT
+        )
+        """,
+    ),
+    (
+        "tafe_flow_instances",
+        """
+        CREATE TABLE IF NOT EXISTS tafe_flow_instances (
+            id TEXT,
+            version INTEGER,
+            flow_definition_id TEXT,
+            flow_type TEXT,
+            subject_type TEXT,
+            subject_id TEXT,
+            status TEXT,
+            current_stage_instance_id TEXT,
+            started_at TEXT,
+            completed_at TEXT
+        )
+        """,
+    ),
+    (
+        "tafe_stage_instances",
+        """
+        CREATE TABLE IF NOT EXISTS tafe_stage_instances (
+            id TEXT,
+            version INTEGER,
+            flow_instance_id TEXT,
+            stage_id TEXT,
+            stage_index INTEGER,
+            required_role TEXT,
+            status TEXT,
+            claim_status TEXT,
+            claimed_by_harness_id TEXT,
+            started_at TEXT,
+            completed_at TEXT
+        )
+        """,
+    ),
+    (
+        "tafe_stage_leases",
+        """
+        CREATE TABLE IF NOT EXISTS tafe_stage_leases (
+            id TEXT,
+            version INTEGER,
+            stage_instance_id TEXT,
+            holder_harness_id TEXT,
+            holder_session_id TEXT,
+            lease_status TEXT,
+            acquired_at TEXT,
+            heartbeat_at TEXT,
+            expires_at TEXT,
+            released_at TEXT
+        )
+        """,
+    ),
+    (
+        "tafe_agent_capability_snapshots",
+        """
+        CREATE TABLE IF NOT EXISTS tafe_agent_capability_snapshots (
+            id TEXT,
+            version INTEGER,
+            harness_id TEXT,
+            harness_name TEXT,
+            role TEXT,
+            subject_scope TEXT,
+            health_status TEXT,
+            reviewer_precedence INTEGER,
+            workspace_availability TEXT,
+            model_identifier TEXT,
+            captured_at TEXT,
+            status TEXT
+        )
+        """,
+    ),
+)
+
+TAFE_PROJECTION_TABLE_NAMES: tuple[str, ...] = tuple(name for name, _ddl in _TAFE_PROJECTION_TABLE_DDL)
+
+
+def _migrate_tafe_projection_schema(db_path: Path) -> None:
+    """Create the WI-4506 TAFE projection tables in the dashboard SQLite.
+
+    Idempotent via CREATE TABLE IF NOT EXISTS. Uses the same BEGIN IMMEDIATE
+    lock pattern as `_migrate_schema` so concurrent dashboard refreshes do not
+    race the migration.
+    """
+    conn = sqlite3.connect(db_path, isolation_level=None, timeout=30.0)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            for _name, ddl in _TAFE_PROJECTION_TABLE_DDL:
+                conn.execute(ddl)
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+
+
+def _project_tafe_row_subset(row: dict[str, Any], columns: tuple[str, ...]) -> tuple[Any, ...]:
+    """Return a value tuple for the named columns from a TAFE row, defaulting to None.
+
+    The canonical row dicts from `KnowledgeDB.list_*` may omit columns the
+    dashboard projection does not require; the dashboard projection is
+    NULL-tolerant by design.
+    """
+    return tuple(row.get(col) for col in columns)
+
+
+# Projection column lists per table — kept aligned with the DDL above.
+_TAFE_PROJECTION_COLUMNS: dict[str, tuple[str, ...]] = {
+    "tafe_stage_attempt_telemetry": (
+        "id",
+        "version",
+        "flow_instance_id",
+        "stage_instance_id",
+        "attempt_number",
+        "agent_harness_id",
+        "model_identifier",
+        "provider",
+        "started_at",
+        "completed_at",
+        "duration_ms",
+        "outcome",
+        "verdict",
+        "failure_class",
+        "cleanup_result",
+        "status",
+    ),
+    "tafe_flow_instances": (
+        "id",
+        "version",
+        "flow_definition_id",
+        "flow_type",
+        "subject_type",
+        "subject_id",
+        "status",
+        "current_stage_instance_id",
+        "started_at",
+        "completed_at",
+    ),
+    "tafe_stage_instances": (
+        "id",
+        "version",
+        "flow_instance_id",
+        "stage_id",
+        "stage_index",
+        "required_role",
+        "status",
+        "claim_status",
+        "claimed_by_harness_id",
+        "started_at",
+        "completed_at",
+    ),
+    "tafe_stage_leases": (
+        "id",
+        "version",
+        "stage_instance_id",
+        "holder_harness_id",
+        "holder_session_id",
+        "lease_status",
+        "acquired_at",
+        "heartbeat_at",
+        "expires_at",
+        "released_at",
+    ),
+    "tafe_agent_capability_snapshots": (
+        "id",
+        "version",
+        "harness_id",
+        "harness_name",
+        "role",
+        "subject_scope",
+        "health_status",
+        "reviewer_precedence",
+        "workspace_availability",
+        "model_identifier",
+        "captured_at",
+        "status",
+    ),
+}
+
+
+def _refresh_tafe_projection(db_path: Path, project_root: Path) -> dict[str, int]:
+    """Project the canonical TAFE rows from `groundtruth.db` into the dashboard SQLite.
+
+    Read-only against the canonical store; reuses the existing GT-KB Python
+    API (`KnowledgeDB`) so the projection tracks the canonical schema surface
+    without raw SQL. Truncate-and-insert per table (`_replace_table` pattern),
+    so a rerun yields the same row set (idempotence).
+    """
+    counts: dict[str, int] = {name: 0 for name in TAFE_PROJECTION_TABLE_NAMES}
+
+    kb_path = project_root / "groundtruth.db"
+    if not kb_path.exists():
+        logger.info("groundtruth.db absent at %s; TAFE projection emits zero rows", kb_path)
+        return counts
+
+    # Local import: the dashboard refresh runs in adopter contexts where the
+    # canonical `groundtruth_kb` package may not be importable until very
+    # late in startup; deferring the import keeps the module loadable.
+    from groundtruth_kb.db import KnowledgeDB
+
+    kb = KnowledgeDB(kb_path)
+    try:
+        list_fns: dict[str, Any] = {
+            "tafe_stage_attempt_telemetry": kb.list_stage_attempt_telemetry,
+            "tafe_flow_instances": kb.list_flow_instances,
+            "tafe_stage_instances": kb.list_stage_instances,
+            "tafe_stage_leases": kb.list_stage_leases,
+            "tafe_agent_capability_snapshots": kb.list_agent_capability_snapshots,
+        }
+    except AttributeError:
+        # Pre-TAFE adopter: one or more list_* methods missing.
+        logger.info("KnowledgeDB lacks one or more TAFE list_* methods; projection emits zero rows")
+        try:
+            kb.close()
+        except Exception:
+            pass
+        return counts
+
+    rows_by_table: dict[str, list[dict[str, Any]]] = {}
+    try:
+        for table_name, list_fn in list_fns.items():
+            try:
+                rows_by_table[table_name] = list(list_fn())
+            except Exception:
+                logger.warning("TAFE list_* failed for %s; emitting zero rows", table_name, exc_info=True)
+                rows_by_table[table_name] = []
+    finally:
+        try:
+            kb.close()
+        except Exception:
+            pass
+
+    with sqlite3.connect(db_path) as conn:
+        for table_name, rows in rows_by_table.items():
+            columns = _TAFE_PROJECTION_COLUMNS[table_name]
+            _replace_table(conn, table_name)
+            placeholders = ",".join("?" for _ in columns)
+            column_list = ",".join(columns)
+            insert_sql = f"INSERT INTO {table_name} ({column_list}) VALUES ({placeholders})"
+            for row in rows:
+                conn.execute(insert_sql, _project_tafe_row_subset(row, columns))
+            counts[table_name] = len(rows)
+        conn.commit()
+
+    return counts
+
+
+def _refresh_tafe_projection_safe(db_path: Path, project_root: Path) -> None:
+    """Run `_refresh_tafe_projection` but never abort the dashboard refresh on failure.
+
+    Same defensive pattern as `_write_bridge_swimlane_safe`: the TAFE
+    observability panels are an additive surface; their absence must not
+    break the rest of the dashboard refresh.
+    """
+    try:
+        _migrate_tafe_projection_schema(db_path)
+        _refresh_tafe_projection(db_path, project_root)
+    except Exception:
+        logger.warning("TAFE projection refresh failed; dashboard refresh continues", exc_info=True)
+
+
 def refresh_database(
     db_path: Path = DEFAULT_DB_PATH,
     project_root: Path = PROJECT_ROOT,
@@ -378,6 +674,7 @@ def refresh_database(
             history = _append_snapshot(previous_history, snapshot)
         _write_model_to_db(db_path, model, history, project_root)
         _write_bridge_swimlane_safe(project_root)
+        _refresh_tafe_projection_safe(db_path, project_root)
         completed_at = datetime.now(UTC).isoformat()
         with sqlite3.connect(db_path) as conn:
             conn.execute(
