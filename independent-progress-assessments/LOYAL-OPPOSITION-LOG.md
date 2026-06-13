@@ -464,3 +464,11 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | The dirty worktree already contains the apparent `CREATE_NO_WINDOW` fix for `WI-4529`, but the live bridge has no matching indexed `WI-4529` proposal/GO and the current GO target paths do not authorize the two touched source files. | `git diff -- scripts/cross_harness_bridge_trigger.py groundtruth-kb/src/groundtruth_kb/bridge/worker.py`; current GO target-path checks for `gtkb-impl-auth-per-session-pointer-isolation`, `gtkb-prompt-role-hint-authority-emergency-fix`, and `gtkb-tafe-bridge-index-preview`; live LO scan had zero actionable entries. | Prime should file a narrow `WI-4529` bridge proposal, or revise an active thread to include `WI-4529` and both target paths, before committing the source change. | Open |
+
+### 2026-06-13 - WI-22C078 Role Dispatch Disposition
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition investigation for `WI-AUTO-SPEC-INTAKE-22C078`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-22C078-role-dispatch-disposition.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | The open P1 backlog row still frames 22c078 around `STRICT_DROP` durable-role enforcement, but live dispatch code and tests already authorize role-mismatched dispatched keywords with audit evidence. | `session_start_dispatch_core.py` returns `DISPATCH_AUTHORIZED` with "authorized with audit" for role mismatch; targeted role-resolution tests passed 17; `.claude/rules/operating-role.md` still has stale `STRICT_DROP` wording. | Prime should disposition or restate `WI-AUTO-SPEC-INTAKE-22C078` before any implementation, and file a protected-narrative correction only through normal approval evidence. | Open |
