@@ -1930,6 +1930,7 @@ GO: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-002.md
 NEW: bridge/gtkb-bridge-advisory-report-message-advisory-disposition-001.md
 
 Document: gtkb-gov-code-quality-baseline-formal-artifact-approval
+VERIFIED: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-010.md
 NEW: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-009.md
 DEFERRED: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-008.md
 NO-GO: bridge/gtkb-gov-code-quality-baseline-formal-artifact-approval-007.md
