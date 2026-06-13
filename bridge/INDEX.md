@@ -1,17 +1,14 @@
-Document: gtkb-role-authority-declared-not-detected
-VERIFIED: bridge/gtkb-role-authority-declared-not-detected-004.md
-
-Document: gtkb-tafe-spec-promotion
-VERIFIED: bridge/gtkb-tafe-spec-promotion-004.md
-
-Document: gtkb-tafe-phase-0-enablement
-VERIFIED: bridge/gtkb-tafe-phase-0-enablement-007.md
+Document: gtkb-tafe-subproject-prefix-reconciliation
+NEW: bridge/gtkb-tafe-subproject-prefix-reconciliation-001.md
 
 Document: gtkb-lo-advisory-owner-grilling-gate-slice3-lint
+VERIFIED: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-004.md
+NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-003.md
 GO: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-002.md
 NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-001.md
 
 Document: gtkb-architecture-p2-stale-assertions-reconciliation
+NEW: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-005.md
 GO: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-004.md
 REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-003.md
 REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-002.md
@@ -28,6 +25,7 @@ GO: bridge/gtkb-tafe-stage-attempt-telemetry-002.md
 NEW: bridge/gtkb-tafe-stage-attempt-telemetry-001.md
 
 Document: gtkb-role-resolution-r1-r5-assertion-enforcement
+REVISED: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-003.md
 NO-GO: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-002.md
 NEW: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-001.md
 
@@ -38,6 +36,7 @@ NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
 
 Document: gtkb-claim-gated-implementation-start
+NEW: bridge/gtkb-claim-gated-implementation-start-005.md
 GO: bridge/gtkb-claim-gated-implementation-start-004.md
 REVISED: bridge/gtkb-claim-gated-implementation-start-003.md
 NO-GO: bridge/gtkb-claim-gated-implementation-start-002.md
