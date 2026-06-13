@@ -409,3 +409,10 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 |------|---------|-------------------|------------------|--------|
 | Technical | Current Python 3.14 fallback paths make `deliberations search` and `bridge propose --dry-run` fast, but WI-4453 remains open because non-dry-run record indexing is still synchronous and there is no median-latency regression benchmark for all three named CLI surfaces. | Live runtime reports `HAS_CHROMADB=False`; direct search/propose probes returned quickly; `insert_deliberation()` commits SQLite then calls `_index_deliberation_in_chroma()` without a timeout wrapper; targeted tests passed (3/1 skipped import-budget, 50 CLI tests, 10 Chroma/fail-soft tests). | Prime should file a narrow defect-fix proposal for bounded/out-of-band record indexing, deterministic related-deliberation seeding in bridge propose, and the WI's `<= 10s` median-latency benchmark. | Open |
 
+### 2026-06-13 - WI-4443 Implementation Authorization Current Pointer Disposition
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4443`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4443-impl-auth-current-pointer-disposition.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | The live implementation-start gate no longer appears to have the WI-4443 operational defect, because the verified WI-4452 named-packet fallback covers the same `current.json` clobber path; the remaining issue is MemBase disposition. | `validate_targets()` falls back to exactly one valid by-bridge packet; `gate_decision()` calls `validate_targets()`; WI-4452 thread is VERIFIED with no drift; focused auth/gate tests passed (183). | Prime should either supersede/close WI-4443 against the WI-4452 VERIFIED evidence with required approval, or restate it as a broader per-session pointer redesign if that remaining scope is intentional. | Open |
