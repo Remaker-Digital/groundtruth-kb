@@ -1576,6 +1576,32 @@ def _harness_parity_compact_text(status: dict[str, Any]) -> str:
     return text
 
 
+def _harness_launchability_status(project_root: Path) -> dict[str, Any]:
+    """WI-4525: surface cross-harness dispatch-target launchability at SessionStart.
+
+    Reuses the doctor's ``_check_harness_launchability`` (FAB-01 / HYG-001) so a
+    static dispatch-config defect (e.g. a hollow venv interpreter that would make
+    the cross-harness trigger spawn into a silent WinError-2 / exit-127) is
+    visible at the next interactive SessionStart, not only on an explicit
+    ``gt doctor`` run. Startup must continue even if the check raises.
+    """
+    try:
+        from groundtruth_kb.project.doctor import _check_harness_launchability  # noqa: PLC0415
+
+        check = _check_harness_launchability(project_root)
+    except Exception as exc:  # noqa: BLE001 - startup must continue with visible diagnostic
+        return {
+            "status": "unavailable",
+            "message": f"launchability check unavailable: {exc}",
+            "verification_command": "gt project doctor",
+        }
+    return {
+        "status": str(getattr(check, "status", "unknown")),
+        "message": str(getattr(check, "message", "")),
+        "verification_command": "gt project doctor",
+    }
+
+
 def _release_blockers(project_root: Path) -> list[str]:
     text = _read_text(project_root / "memory" / "release-readiness.md")
     blockers: list[str] = []
@@ -3385,6 +3411,7 @@ def build_startup_model(
         harness_name=harness_name,
         role_profile=resolved_role_profile,
     )
+    harness_launchability = _harness_launchability_status(project_root)
     agent_red_test_files = [
         path for path in test_files if _path_matches(path.relative_to(project_root).as_posix(), AGENT_RED_PATH_PREFIXES)
     ]
@@ -3418,6 +3445,7 @@ def build_startup_model(
         "work_subject": _collect_work_subject(project_root),
         "dev_environment_inventory": dev_environment_inventory,
         "harness_parity": harness_parity,
+        "harness_launchability": harness_launchability,
     }
     infrastructure = {
         "instrumentation": "GT-KB",
@@ -4927,6 +4955,24 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
         ]
         project_state_rollup_section = []
 
+    launchability = metrics.get("harness_launchability") or {}
+    if isinstance(launchability, dict) and launchability.get("status") == "fail":
+        harness_launchability_section = [
+            "### Harness Dispatch Launchability",
+            "",
+            f"- ALERT: {launchability.get('message') or 'one or more active dispatch targets are unlaunchable'}",
+            (
+                "- A static dispatch-target config defect (e.g. a missing or hollow "
+                "interpreter) makes the cross-harness trigger spawn into a silent "
+                "WinError-2 / exit-127 and trips the per-recipient circuit breaker. "
+                "Repair the harness registry argv head, then re-run `gt project doctor` "
+                "to confirm launchability before relying on auto-dispatch."
+            ),
+            "",
+        ]
+    else:
+        harness_launchability_section = []
+
     return "\n".join(
         [
             "# GroundTruth-KB Fresh Session Startup",
@@ -4964,6 +5010,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             _render_current_project_state(model),
             "",
             *project_state_rollup_section,
+            *harness_launchability_section,
             "### Active Work Subject",
             "",
             render_active_work_subject(

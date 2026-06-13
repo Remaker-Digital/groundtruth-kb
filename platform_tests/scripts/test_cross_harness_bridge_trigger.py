@@ -812,6 +812,71 @@ def test_ollama_lo_dispatch_caps_selected_batch_to_one(
     assert command_head[1].startswith("::init gtkb lo\n")
 
 
+def test_spawn_gate_skips_unlaunchable_harness_with_distinct_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4525: a dispatch target whose argv head does not resolve to a
+    launchable executable is skipped BEFORE spawn, recorded with a distinct
+    ``target_unlaunchable`` reason, and does NOT consume circuit-breaker
+    retries -- the masking failure mode of the 2026-06-13 hollow-venv jam."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {
+                    "headless": {
+                        "argv": ["gtkb-nonexistent-interpreter-xyz123.exe", "{{PROMPT}}"],
+                        "max_items": 1,
+                    }
+                },
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    # Clear the ambient loop-prevention var so the gate is exercised regardless
+    # of whether the test runs inside a dispatch-aware harness session (which
+    # sets GTKB_NO_CROSS_HARNESS_TRIGGER=1) or in CI (where it is unset).
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+    monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda _root: {"ready": True})
+
+    spawn_calls: list[object] = []
+
+    def _fake_spawn(**kwargs: object) -> dict[str, object]:
+        spawn_calls.append(kwargs.get("target"))
+        return {"launched": True, "reason": "fake_spawn", "dispatch_id": "fake"}
+
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn)
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=False)
+
+    # (a) the unlaunchable target was NOT spawned.
+    assert spawn_calls == []
+
+    rec = summary["dispatch_state"]["recipients"]["loyal-opposition"]
+    # (d) the distinct unlaunchable state is recorded.
+    assert rec["last_result"] == "target_unlaunchable"
+    # (c) the circuit-breaker failure counter was NOT consumed.
+    assert int(rec.get("failure_count", 0)) == 0
+    assert not rec.get("circuit_breaker_tripped")
+
+    # (b) a distinct dispatch-failure record was written with launched=False.
+    unlaunchable = [r for r in _failure_records(state_dir) if r.get("reason") == "target_unlaunchable"]
+    assert unlaunchable, "expected a target_unlaunchable dispatch-failure record"
+    assert unlaunchable[0]["launched"] is False
+    # dispatch_state_key carries the durable role label plus harness id suffix.
+    assert unlaunchable[0]["recipient"].startswith("loyal-opposition")
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-2-reciprocal-dispatch — per Codex F2 on -008
 # ──────────────────────────────────────────────────────────────────────────

@@ -1601,6 +1601,38 @@ def _normalize_argv_head(head: str, project_root: Path) -> str:
     return normalized
 
 
+def _dispatch_target_argv_head(target: DispatchTarget) -> str | None:
+    """Return a dispatch target's headless argv executable head, or ``None``.
+
+    Mirrors the extraction the doctor launchability check (FAB-01 / HYG-001)
+    performs on raw registry records, but operates on the already-resolved
+    ``DispatchTarget``. Placeholder tokens are not real executables, so they
+    yield ``None`` and the pre-spawn gate (WI-4525) skips them rather than
+    false-failing.
+    """
+    surfaces = target.invocation_surfaces
+    headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+    argv = headless.get("argv") if isinstance(headless, dict) else None
+    if not isinstance(argv, list) or not argv or not isinstance(argv[0], str):
+        return None
+    head = argv[0]
+    if head in ("{{PROMPT}}", "{{PROJECT_ROOT}}"):
+        return None
+    return head
+
+
+def _argv_head_launchable(head: str, project_root: Path) -> bool:
+    """Return True when a normalized argv head resolves to a launchable file.
+
+    Reuses ``_normalize_argv_head`` then models the ``CreateProcess`` executable
+    lookup the same way the doctor launchability check does: ``shutil.which``
+    (PATHEXT-aware) OR an existing file. Resolution failure IS the WinError-2
+    launch failure the WI-4525 pre-spawn gate exists to catch.
+    """
+    resolved = _normalize_argv_head(head, project_root)
+    return bool(shutil.which(resolved)) or os.path.isfile(resolved)
+
+
 def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) -> list[str] | None:
     """Build the recipient harness invocation command, data-driven from the
     harness-registry projection.
@@ -3202,6 +3234,39 @@ def run_trigger(
                                 recipients_state[recipient] = recipient_state
                                 continue
 
+                        # WI-4525 pre-spawn launchability gate. A static dispatch
+                        # config defect (a hollow venv interpreter, an unresolvable
+                        # argv head) must surface loudly HERE rather than spawning
+                        # into a WinError-2 / exit-127 that the per-recipient
+                        # circuit breaker then trips as if it were a transient (the
+                        # masking failure mode of the 2026-06-13 dispatch jam).
+                        # Reuses the same normalize+resolve logic the doctor
+                        # launchability check (FAB-01 / HYG-001) uses, applied in
+                        # the dispatch hot-path. Placed before the prime work-intent
+                        # acquisition so an unlaunchable target acquires no claim and
+                        # issues no authorization packet. Skipping the spawn means
+                        # the post-dispatch failure path never runs, so failure_count
+                        # is untouched and genuine-transient breaker semantics hold.
+                        if not dry_run:
+                            unlaunchable_head = _dispatch_target_argv_head(target)
+                            if unlaunchable_head is not None and not _argv_head_launchable(
+                                unlaunchable_head, project_root
+                            ):
+                                unlaunchable_meta = {
+                                    "ts": _now_iso(),
+                                    "dispatch_id": dispatch_id or _new_dispatch_id(target.dispatch_state_key),
+                                    "recipient": target.dispatch_state_key,
+                                    "launched": False,
+                                    "reason": "target_unlaunchable",
+                                    "argv_head": unlaunchable_head,
+                                    "resolved_head": _normalize_argv_head(unlaunchable_head, project_root),
+                                }
+                                _record_dispatch_failure(state_dir, unlaunchable_meta)
+                                recipient_state["last_result"] = "target_unlaunchable"
+                                recipient_state["last_launch"] = unlaunchable_meta
+                                results[recipient] = unlaunchable_meta
+                                recipients_state[recipient] = recipient_state
+                                continue
                         if target.needed_role_label == "prime-builder" and not dry_run:
                             if dispatch_id is None:
                                 dispatch_id = _new_dispatch_id(target.dispatch_state_key)

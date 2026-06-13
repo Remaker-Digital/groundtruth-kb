@@ -11,6 +11,7 @@ GO: bridge/gtkb-tafe-bridge-index-preview-002.md
 NEW: bridge/gtkb-tafe-bridge-index-preview-001.md
 
 Document: gtkb-dispatch-launchability-pre-spawn-gate
+NEW: bridge/gtkb-dispatch-launchability-pre-spawn-gate-003.md
 GO: bridge/gtkb-dispatch-launchability-pre-spawn-gate-002.md
 NEW: bridge/gtkb-dispatch-launchability-pre-spawn-gate-001.md
 

@@ -218,6 +218,43 @@ def test_user_local_preference_controls_startup_dashboard_open(tmp_path, monkeyp
     assert opened == [dashboard_url]
 
 
+def test_startup_disclosure_includes_harness_launchability_alert(monkeypatch) -> None:
+    """WI-4525: a failing harness-dispatch launchability check surfaces a
+    prominent alert section at SessionStart; a passing check adds no noise."""
+    module = _load_module()
+
+    # Fail case: the alert section is present and carries the failure message.
+    monkeypatch.setattr(
+        module,
+        "_harness_launchability_status",
+        lambda _root: {
+            "status": "fail",
+            "message": "ollama argv head 'gtkb-nonexistent.exe' unlaunchable (resolved 'gtkb-nonexistent.exe')",
+            "verification_command": "gt project doctor",
+        },
+    )
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+    assert model["metrics"]["harness_launchability"]["status"] == "fail"
+    report = module.render_report(model, module.GRAFANA_DASHBOARD_URL, REPO_ROOT)
+    assert "### Harness Dispatch Launchability" in report
+    assert "gtkb-nonexistent.exe' unlaunchable" in report
+
+    # Pass case: no alert section is rendered (no startup noise on a healthy state).
+    monkeypatch.setattr(
+        module,
+        "_harness_launchability_status",
+        lambda _root: {
+            "status": "pass",
+            "message": "all 2 active dispatch target(s) launchable",
+            "verification_command": "gt project doctor",
+        },
+    )
+    pass_model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+    assert pass_model["metrics"]["harness_launchability"]["status"] == "pass"
+    pass_report = module.render_report(pass_model, module.GRAFANA_DASHBOARD_URL, REPO_ROOT)
+    assert "### Harness Dispatch Launchability" not in pass_report
+
+
 def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
