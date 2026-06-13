@@ -1,14 +1,9 @@
-Document: gtkb-wi-4450-exact-target-path-regression
-VERIFIED: bridge/gtkb-wi-4450-exact-target-path-regression-004.md
-NEW: bridge/gtkb-wi-4450-exact-target-path-regression-003.md
-GO: bridge/gtkb-wi-4450-exact-target-path-regression-002.md
-NEW: bridge/gtkb-wi-4450-exact-target-path-regression-001.md
+Document: gtkb-wi-4477-ollama-readiness-autostart
+NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-001.md
 
-Document: gtkb-wi4388-work-intent-session-test-drift
-VERIFIED: bridge/gtkb-wi4388-work-intent-session-test-drift-004.md
-NEW: bridge/gtkb-wi4388-work-intent-session-test-drift-003.md
-GO: bridge/gtkb-wi4388-work-intent-session-test-drift-002.md
-NEW: bridge/gtkb-wi4388-work-intent-session-test-drift-001.md
+Document: gtkb-wi4452-impl-auth-named-packet-fallback
+NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-002.md
+NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-001.md
 
 Document: gtkb-ollama-server-readiness-autostart-advisory
 ADVISORY: bridge/gtkb-ollama-server-readiness-autostart-advisory-001.md
@@ -33,14 +28,11 @@ GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
 
 Document: gtkb-tafe-phase-0-enablement
+GO: bridge/gtkb-tafe-phase-0-enablement-005.md
+REVISED: bridge/gtkb-tafe-phase-0-enablement-004.md
+DEFERRED: bridge/gtkb-tafe-phase-0-enablement-003.md
 GO: bridge/gtkb-tafe-phase-0-enablement-002.md
 NEW: bridge/gtkb-tafe-phase-0-enablement-001.md
-
-Document: gtkb-tafe-spec-promotion
-VERIFIED: bridge/gtkb-tafe-spec-promotion-004.md
-NEW: bridge/gtkb-tafe-spec-promotion-003.md
-GO: bridge/gtkb-tafe-spec-promotion-002.md
-NEW: bridge/gtkb-tafe-spec-promotion-001.md
 
 Document: gtkb-tafe-backlog-reconciliation
 VERIFIED: bridge/gtkb-tafe-backlog-reconciliation-004.md
@@ -57,18 +49,6 @@ NEW: bridge/gtkb-typed-artifact-flow-engine-advisory-001.md
 Document: gtkb-bridge-index-atomic-write-integration-advisory
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-002.md
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
-
-Document: gtkb-path-token-re-discovery-consolidation
-VERIFIED: bridge/gtkb-path-token-re-discovery-consolidation-010.md
-REVISED: bridge/gtkb-path-token-re-discovery-consolidation-009.md
-NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-008.md
-REVISED: bridge/gtkb-path-token-re-discovery-consolidation-007.md
-NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-006.md
-NEW: bridge/gtkb-path-token-re-discovery-consolidation-005.md
-GO: bridge/gtkb-path-token-re-discovery-consolidation-004.md
-REVISED: bridge/gtkb-path-token-re-discovery-consolidation-003.md
-NO-GO: bridge/gtkb-path-token-re-discovery-consolidation-002.md
-NEW: bridge/gtkb-path-token-re-discovery-consolidation-001.md
 
 Document: gtkb-lo-dispatch-ordered-fallback-routing
 VERIFIED: bridge/gtkb-lo-dispatch-ordered-fallback-routing-008.md
@@ -372,6 +352,8 @@ GO: bridge/gtkb-fab-01-dispatch-substrate-revival-002.md
 NEW: bridge/gtkb-fab-01-dispatch-substrate-revival-001.md
 
 Document: gtkb-fab-04-storage-reclamation
+VERIFIED: bridge/gtkb-fab-04-storage-reclamation-015.md
+REVISED: bridge/gtkb-fab-04-storage-reclamation-014.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-013.md
 REVISED: bridge/gtkb-fab-04-storage-reclamation-012.md
 NO-GO: bridge/gtkb-fab-04-storage-reclamation-011.md
