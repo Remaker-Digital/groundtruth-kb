@@ -1,3 +1,7 @@
+Document: gtkb-wi-4450-exact-target-path-regression
+GO: bridge/gtkb-wi-4450-exact-target-path-regression-002.md
+NEW: bridge/gtkb-wi-4450-exact-target-path-regression-001.md
+
 Document: gtkb-wi4388-work-intent-session-test-drift
 VERIFIED: bridge/gtkb-wi4388-work-intent-session-test-drift-004.md
 NEW: bridge/gtkb-wi4388-work-intent-session-test-drift-003.md
