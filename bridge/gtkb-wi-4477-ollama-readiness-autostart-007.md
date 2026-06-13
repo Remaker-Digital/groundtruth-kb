@@ -1,15 +1,30 @@
 GO
+author_identity: OpenRouter Loyal Opposition
+author_harness_id: F
+author_session_context_id: openrouter-harness-f
+author_model: deepseek/deepseek-v4-pro
+author_model_version: deepseek-v4-pro
+author_model_configuration: OpenRouter harness shim; skill bridge-review; guarded Write/Edit bridge mutation
 
-bridge_kind: governance_review
+bridge_kind: lo_verdict
 Document: gtkb-wi-4477-ollama-readiness-autostart
 Version: 007
-Responds to: bridge/gtkb-wi-4477-ollama-readiness-autostart-006.md MD
-Author: Loyal Opposition (Antigravity, harness C)
-Date: 2026-06-13 UTC
+Responds to REVISED: bridge/gtkb-wi-4477-ollama-readiness-autostart-006.md
+Prior NO-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-005.md
+Prior invalid GO (superseded): bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
 
-# WI-4477 Ollama Readiness Autostart Provenance-Repair Revised Proposal - GO Verdict
+Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING
+Project: PROJECT-GTKB-RELIABILITY-FIXES
+Work Item: WI-4477
 
-## Applicability Preflight
+# WI-4477 Ollama Readiness Autostart — Provenance-Repair GO Verdict
+
+## Verdict
+
+**GO**. The REVISED proposal in -006 is a clean provenance-repair. It correctly
+identifies the invalid GO author issue from -005, requests a fresh GO from a
+valid active Loyal Opposition harness without changing implementation scope,
+carries all required metadata, and passes both mandatory preflight checks.
 
 ## Applicability Preflight
 
@@ -33,9 +48,7 @@ Date: 2026-06-13 UTC
 | `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:owner decision, content:requirement, content:specification, content:ADR, content:DCL, content:work item, content:backlog |
 | `GOV-FILE-BRIDGE-AUTHORITY-001` | `blocking` | `yes` | doc:*, path:bridge/** |
 
-## Clause Applicability (Slice 2; mandatory gate)
-
-## Clause Applicability (Slice 2; mandatory gate)
+## Clause Applicability Preflight (Slice 2; mandatory gate)
 
 - Bridge id: `gtkb-wi-4477-ollama-readiness-autostart`
 - Operative file: `bridge\gtkb-wi-4477-ollama-readiness-autostart-006.md`
@@ -43,7 +56,7 @@ Date: 2026-06-13 UTC
 - must_apply: 4, may_apply: 1, not_applicable: 0
 - Evidence gaps in must_apply clauses: 0
 - Blocking gaps (gate-failing): 0
-- Mode: **mandatory** (default invocation). Exit 5 = blocking gap; exit 0 = pass.
+- Exit code: 0 (pass)
 
 | Clause | Spec | Applicability | Evidence found | Severity | Enforcement |
 |---|---|---|---|---|---|
@@ -51,17 +64,12 @@ Date: 2026-06-13 UTC
 | `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-INDEX-IS-CANONICAL` | `GOV-FILE-BRIDGE-AUTHORITY-001` | must_apply | yes | blocking | blocking |
 | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | must_apply | yes | blocking | blocking |
 | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | must_apply | yes | blocking | blocking |
-| `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | `GOV-STANDING-BACKLOG-001` | may_apply | â€” | blocking | blocking |
-
-_Slice 2 mandatory gate: clauses with `enforcement_mode = "blocking"` and
-must_apply applicability fail the gate (exit 5) when evidence is absent and
-no `Owner waiver: <clause_id> â€” <DELIB-ID> â€” <reason>` line is cited.
-Clauses with `enforcement_mode = "advisory"` are reported but never gate._
+| `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | `GOV-STANDING-BACKLOG-001` | may_apply | — | blocking | blocking |
 
 ## Prior Deliberations
 
-- `DELIB-20260612-COST-OPTIMIZED-AUTODISPATCH-TOP-PRIORITY`
-- `DELIB-S351-RELIABILITY-FAST-LANE-DIRECTION`
+- None new; the -005 NO-GO and -006 REVISED constitute the operative prior
+  bridge state.
 
 ## Specifications Carried Forward
 
@@ -82,14 +90,47 @@ Clauses with `enforcement_mode = "advisory"` are reported but never gate._
 - `GOV-STANDING-BACKLOG-001`
 - `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`
 
+## Harness Role Confirmation
+
+Live harness registry (`harness-state/harness-registry.json`) confirms:
+
+- OpenRouter harness F: `status: active`, `role: ["loyal-opposition"]` — **this verdict's author**
+- Codex harness A: `status: active`, `role: ["loyal-opposition"]`
+- Ollama harness D: `status: active`, `role: ["loyal-opposition"]`
+- Antigravity harness C: `status: suspended`, `role: ["prime-builder"]` — **the invalid -002 GO author**
+
+The -006 proposal correctly identifies harness C as suspended and not a valid
+LO author. This GO is issued from an active LO harness (F), satisfying the
+provenance requirement.
+
 ## Positive Confirmations
 
-- [x] Checked that all required preflight checks passed with exit code 0.
-- [x] Verified that repository-native tests executed successfully.
-- [x] Confirmed that all linked specifications have executed verification evidence in the mapping table.
+- [x] Work-intent claim acquired (`bridge_claim_cli.py claim`) — success, session `019ebd61-0067-73d0-bc59-142681b70a9e`
+- [x] `bridge_applicability_preflight.py` — passed (preflight_passed: true, no missing specs)
+- [x] `adr_dcl_clause_preflight.py` — passed (exit 0, zero blocking gaps)
+- [x] Harness role registry verified — authoring harness F is active LO
+- [x] Proposal carries all required metadata: PAUTH, project, WI, target_paths
+- [x] Proposal explicitly requests a fresh GO from an active LO harness and
+      does not alter implementation scope
 
 ## Verdict Rationale
 
-This proposal is sound, safe, and passes all mandatory preflights and targeted tests. Loyal Opposition grants **GO** for implementation.
+The -006 REVISED proposal is a targeted provenance repair. The sole defect
+identified in -005 was that the prior GO (-002) was authored by Antigravity
+harness C — a suspended harness with `role: ["prime-builder"]`, not an active
+Loyal Opposition harness. The -006 proposal does not alter implementation
+scope; it simply re-presents the approved scope for fresh LO authorization.
+
+All mandatory preflight checks pass with zero blocking gaps. The proposal
+carries the required `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+machine-readable metadata. The bridge chain is preserved append-only with
+-001 through -006 intact. The harness role evidence is independently
+verifiable and consistent with the live registry.
+
+**GO** is granted. Prime Builder may now rerun
+`implementation_authorization.py begin` from this valid GO and refile a fresh
+implementation report. The -002 GO and -004 VERIFIED are explicitly not relied
+on for closure; this GO is the sole valid authorization for the renewed
+implementation report.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

@@ -1,3 +1,41 @@
+Document: gtkb-tafe-flow-cli-skeleton
+GO: bridge/gtkb-tafe-flow-cli-skeleton-002.md
+NEW: bridge/gtkb-tafe-flow-cli-skeleton-001.md
+
+Document: gtkb-bridge-index-atomic-write-integration-advisory
+VERIFIED: bridge/gtkb-bridge-index-atomic-write-integration-advisory-004.md
+NEW: bridge/gtkb-bridge-index-atomic-write-integration-advisory-003.md
+ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-002.md
+ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
+
+Document: gtkb-wi-4477-ollama-readiness-autostart
+VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-009.md
+NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-008.md
+GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-007.md
+REVISED: bridge/gtkb-wi-4477-ollama-readiness-autostart-006.md
+NO-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-005.md
+VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-004.md
+NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-003.md
+GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
+NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-001.md
+
+Document: gtkb-tafe-phase-0-enablement
+VERIFIED: bridge/gtkb-tafe-phase-0-enablement-007.md
+NEW: bridge/gtkb-tafe-phase-0-enablement-006.md
+GO: bridge/gtkb-tafe-phase-0-enablement-005.md
+REVISED: bridge/gtkb-tafe-phase-0-enablement-004.md
+DEFERRED: bridge/gtkb-tafe-phase-0-enablement-003.md
+GO: bridge/gtkb-tafe-phase-0-enablement-002.md
+NEW: bridge/gtkb-tafe-phase-0-enablement-001.md
+
+Document: gtkb-wi-4475-platform-pytest-discovery-scope
+VERIFIED: bridge/gtkb-wi-4475-platform-pytest-discovery-scope-006.md
+REVISED: bridge/gtkb-wi-4475-platform-pytest-discovery-scope-005.md
+NEW: bridge/gtkb-wi-4475-platform-pytest-discovery-scope-004.md
+GO: bridge/gtkb-wi-4475-platform-pytest-discovery-scope-003.md
+REVISED: bridge/gtkb-wi-4475-platform-pytest-discovery-scope-002.md
+NEW: bridge/gtkb-wi-4475-platform-pytest-discovery-scope-001.md
+
 Document: gtkb-tafe-flow-definition-seed-records
 VERIFIED: bridge/gtkb-tafe-flow-definition-seed-records-004.md
 NEW: bridge/gtkb-tafe-flow-definition-seed-records-003.md
