@@ -1,9 +1,30 @@
+Document: gtkb-reconciler-wi-bridge-linkage-derivation
+VERIFIED: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-004.md
+NEW: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-003.md
+GO: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-002.md
+NEW: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-001.md
+
 Document: gtkb-tafe-dual-write-index-parity
+GO: bridge/gtkb-tafe-dual-write-index-parity-005.md
+REVISED: bridge/gtkb-tafe-dual-write-index-parity-004.md
 NO-GO: bridge/gtkb-tafe-dual-write-index-parity-003.md
-NO-GO: bridge/gtkb-tafe-dual-write-index-parity-002.md
+GO: bridge/gtkb-tafe-dual-write-index-parity-002.md
 NEW: bridge/gtkb-tafe-dual-write-index-parity-001.md
 
+Document: gtkb-impl-auth-packet-liveness-coupling
+VERIFIED: bridge/gtkb-impl-auth-packet-liveness-coupling-006.md
+NEW: bridge/gtkb-impl-auth-packet-liveness-coupling-005.md
+GO: bridge/gtkb-impl-auth-packet-liveness-coupling-004.md
+REVISED: bridge/gtkb-impl-auth-packet-liveness-coupling-003.md
+GO: bridge/gtkb-impl-auth-packet-liveness-coupling-002.md
+NEW: bridge/gtkb-impl-auth-packet-liveness-coupling-001.md
+
 Document: gtkb-wi-4529-windows-spawn-no-window-creationflags
+VERIFIED: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-006.md
+REVISED: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-005.md
+NO-GO: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-004.md
+NEW: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-003.md
+GO: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-002.md
 NEW: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-001.md
 
 Document: gtkb-bounded-parallel-cross-harness-dispatch
@@ -32,6 +53,8 @@ GO: bridge/gtkb-prompt-role-hint-authority-emergency-fix-002.md
 NEW: bridge/gtkb-prompt-role-hint-authority-emergency-fix-001.md
 
 Document: gtkb-tafe-bridge-index-preview
+VERIFIED: bridge/gtkb-tafe-bridge-index-preview-004.md
+NEW: bridge/gtkb-tafe-bridge-index-preview-003.md
 GO: bridge/gtkb-tafe-bridge-index-preview-002.md
 NEW: bridge/gtkb-tafe-bridge-index-preview-001.md
 

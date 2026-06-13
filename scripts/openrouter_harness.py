@@ -412,6 +412,7 @@ def _default_guard_runner(
     env: Mapping[str, str],
     timeout: float,
 ) -> GuardExecutionResult:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
     try:
         completed = subprocess.run(
             [sys.executable, str(guard_path)],
@@ -422,6 +423,7 @@ def _default_guard_runner(
             env=dict(env),
             timeout=timeout,
             check=False,
+            creationflags=creationflags,
         )
     except subprocess.TimeoutExpired as exc:
         return GuardExecutionResult(-1, exc.stdout or "", exc.stderr or "", timed_out=True)
@@ -662,6 +664,7 @@ def _default_command_runner(
     env: Mapping[str, str],
     timeout: float,
 ) -> subprocess.CompletedProcess[str]:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
     return subprocess.run(
         command,
         text=True,
@@ -671,6 +674,7 @@ def _default_command_runner(
         timeout=timeout,
         shell=True,
         check=False,
+        creationflags=creationflags,
     )
 
 

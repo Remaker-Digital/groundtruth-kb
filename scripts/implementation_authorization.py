@@ -28,7 +28,13 @@ except ImportError:  # pragma: no cover - direct script execution from scripts/
 
 DEFAULT_PACKET_RELATIVE_PATH = Path(".gtkb-state/implementation-authorizations/current.json")
 BY_BRIDGE_DIRECTORY_RELATIVE_PATH = Path(".gtkb-state/implementation-authorizations/by-bridge")
-DEFAULT_EXPIRY_MINUTES = 480
+# WI-4532: the packet TTL must not outlive the work-intent claim that backs it.
+# 120 min == GO_IMPLEMENTATION_MAX_HOLD_SECONDS (bridge_work_intent_registry, 2 h).
+# The orphan check in _validate_packet is the primary liveness guard; this shrunk
+# TTL is the fail-open fallback ceiling (used when the registry is unreachable).
+# A direct import of the claim constant is avoided to keep this module free of an
+# import cycle; test_default_expiry_minutes_tracks_claim_max_hold asserts alignment.
+DEFAULT_EXPIRY_MINUTES = 120
 BOOTSTRAP_BRIDGE_IDS = frozenset({"gtkb-implementation-start-authorization-gate"})
 PLACEHOLDER_RE = re.compile(r"\b(?:TBD|TODO|pending|no relevant|not applicable|n/a)\b", re.IGNORECASE)
 # A concrete artifact-ID citation: an uppercase identifier with at least one

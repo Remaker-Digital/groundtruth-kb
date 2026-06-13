@@ -63,45 +63,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0587
-  asked_at: 2026-05-14T18:51:04.968915Z
-  question: "Approve DELIB-2077 verbatim content for canonical insert?"
-  options:
-    - "Approve as drafted (Recommended)"
-    - "Approve with edits"
-    - "Reject — skip the DA filing"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: eea06d2f1680c064
-  resolved_at: 2026-05-14T18:51:04.968915Z
-  answer: "User has answered your questions: \"Approve DELIB-2077 verbatim content for canonical insert?\"=\"Approve as drafted (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0588
-  asked_at: 2026-05-14T20:17:18.014823Z
-  question: "Friction-hygiene NO-GO -018 reports IP-D delivers 19 regression tests vs. the 32 approved in proposal -005 (carried through to GO). The thread has 18 bridge rounds. F1 (WI-3310 bridge thread linkage) is closed; only the IP-D test-count gap remains. How should Prime close this thread?"
-  options:
-    - "Land remaining ~13 tests (Recommended)"
-    - "File REVISED proposal narrowing IP-D 32→19"
-    - "Owner waiver for the 32→19 scope reduction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d93821b6ab87017d
-  resolved_at: 2026-05-14T20:17:18.014823Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0589
-  asked_at: 2026-05-14T20:17:18.014823Z
-  question: "Friction-hygiene NO-GO -018 reports IP-D delivered 19 regression tests vs. the 32 approved in proposal -005 (carried through to GO). The thread has 18 bridge rounds. F1 (WI-3310 bridge-thread linkage) is closed; only the IP-D test-count gap remains. How should Prime close this thread?"
-  options:
-    - "Land remaining ~13 tests (Recommended)"
-    - "File REVISED proposal narrowing 32 to 19"
-    - "Owner waiver for 32 to 19 reduction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 41a4e168118cb3cd
-  resolved_at: 2026-05-14T20:17:18.014823Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0590
   asked_at: 2026-05-14T21:41:01.750101Z
   question: "Friction-hygiene IP-D is 13 tests short of the approved 32-test scope (delivered 19). How should Prime close the gap?"
@@ -7633,6 +7594,71 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: e8d9ee336a2a71bb
   resolved_at: 2026-06-13T18:06:18.302739Z
   answer: "Your questions have been answered: \"Correcting my earlier framing: the TAFE flow-type (WI-4500-4503) and compat-view (WI-4507) work is NOT blocked — the concurrent fleet is already completing it (test-only) under existing PAUTHs, because the runtime is generic and the definitions are seeded. So the 'reformation' I set up was mis-grounded; I did not file the Slice-1 proposal. The only genuinely-reserved TAFE work is the LIVE implementation-flow pilot (TAFE actually driving real work toward cutover) — high-risk, touches the core coordination mechanism, and the fleet deliberately avoids it. How should I proceed?\"=\"Pursue the live implementation-flow pilot\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1205
+  asked_at: 2026-06-13T18:41:30.323852Z
+  question: "Confirmed: 8 h packet TTL (DEFAULT_EXPIRY_MINUTES=480) vs 10–40 min claim (2 h hard cap) — the packet outlives its liveness signal by up to ~12×. The WI-4443 session-aware fix is already committed + VERIFIED and should NOT be reverted (my earlier 'revert' call was a mischaracterization). How should I fix the 8 h root cause?"
+  options:
+    - "Liveness-coupled + shrink TTL"
+    - "Just shrink the TTL"
+    - "You direct the design"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9e62af8c21673096
+  resolved_at: 2026-06-13T18:41:30.323852Z
+  answer: "Your questions have been answered: \"Confirmed: 8 h packet TTL (DEFAULT_EXPIRY_MINUTES=480) vs 10–40 min claim (2 h hard cap) — the packet outlives its liveness signal by up to ~12×. The WI-4443 session-aware fix is already committed + VERIFIED and should NOT be reverted (my earlier 'revert' call was a mischaracterization). How should I fix the 8 h root cause?\"=\"Liveness-coupled + shrink TTL\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1206
+  asked_at: 2026-06-13T18:49:37.110254Z
+  question: "Your '120-minute disregard' rule for bridge ownership assertions — which mechanisms should it cover? (Today only go_implementation work-intent claims have a 120-min max-hold cap = 7200s in scripts/bridge_work_intent_registry.py; impl-start authorization packets in scripts/implementation_authorization.py are a second ownership-assertion surface.)"
+  options:
+    - "All work-intent claims"
+    - "Claims + impl-start packets"
+    - "All ownership mechanisms"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 609b40a566825772
+  resolved_at: 2026-06-13T18:49:37.110254Z
+  answer: "Your questions have been answered: \"Your '120-minute disregard' rule for bridge ownership assertions — which mechanisms should it cover? (Today only go_implementation work-intent claims have a 120-min max-hold cap = 7200s in scripts/bridge_work_intent_registry.py; impl-start authorization packets in scripts/implementation_authorization.py are a second ownership-assertion surface.)\"=\"Ownership of \"GO\" verdict implementation work. Agents have been claiming implementation work and then terminating unexpectedly. Those records are stale.\", \"What should 'disregarded' do mechanically, relative to the existing per-claim TTL?\"=\"A permanent fix is already in-process. My direction is for this session, and will be supplanted by future formal system updates.\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1207
+  asked_at: 2026-06-13T18:49:37.110254Z
+  question: "What should 'disregarded' do mechanically, relative to the existing per-claim TTL?"
+  options:
+    - "Absolute cap, supplements TTL"
+    - "Replace TTL with 120 min"
+    - "Formalize existing cap only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6b656f38ac6f0333
+  resolved_at: 2026-06-13T18:49:37.110254Z
+  answer: "Your questions have been answered: \"Your '120-minute disregard' rule for bridge ownership assertions — which mechanisms should it cover? (Today only go_implementation work-intent claims have a 120-min max-hold cap = 7200s in scripts/bridge_work_intent_registry.py; impl-start authorization packets in scripts/implementation_authorization.py are a second ownership-assertion surface.)\"=\"Ownership of \"GO\" verdict implementation work. Agents have been claiming implementation work and then terminating unexpectedly. Those records are stale.\", \"What should 'disregarded' do mechanically, relative to the existing per-claim TTL?\"=\"A permanent fix is already in-process. My direction is for this session, and will be supplanted by future formal system updates.\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1208
+  asked_at: 2026-06-13T19:04:31.972253Z
+  question: "Implementing the GO'd liveness-coupling in the shared _validate_packet breaks 14 existing tests incl. the WI-4452 + WI-4443 VERIFIED contracts, AND it's largely redundant: the gate's existing work_intent_claim_block_reason (step-2) already rejects mutations not backed by the current session's live claim. The TTL shrink 480->120 alone is green (76 passed) and closes the actual 8h-zombie gap. How should I finalize WI-4532? (Whichever you pick, I file a REVISED proposal reflecting it for LO re-GO, since the design changed from what was GO'd.)"
+  options:
+    - "TTL shrink + proof test"
+    - "TTL shrink + narrow activate-guard"
+    - "Force broad check (as GO'd)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b32230c0c9a08b21
+  resolved_at: 2026-06-13T19:04:31.972253Z
+  answer: "Your questions have been answered: \"Implementing the GO'd liveness-coupling in the shared _validate_packet breaks 14 existing tests incl. the WI-4452 + WI-4443 VERIFIED contracts, AND it's largely redundant: the gate's existing work_intent_claim_block_reason (step-2) already rejects mutations not backed by the current session's live claim. The TTL shrink 480->120 alone is green (76 passed) and closes the actual 8h-zombie gap. How should I finalize WI-4532? (Whichever you pick, I file a REVISED proposal reflecting it for LO re-GO, since the design changed from what was GO'd.)\"=\"TTL shrink + proof test\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1209
+  asked_at: 2026-06-13T20:12:04.191531Z
+  question: "The LO screenshot is reconciled (both my fixes VERIFIED; Codex's empty queue is correct). I also found + captured WI-4533 (VERIFIED WIs not auto-resolving due to a one-directional WI->bridge link gap). Where should I point the next effort?"
+  options:
+    - "Continue the loop"
+    - "Backlog-accuracy cleanup"
+    - "Checkpoint / wrap"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2e9371b1c0deb69f
+  resolved_at: 2026-06-13T20:12:04.191531Z
+  answer: "Your questions have been answered: \"The LO screenshot is reconciled (both my fixes VERIFIED; Codex's empty queue is correct). I also found + captured WI-4533 (VERIFIED WIs not auto-resolving due to a one-directional WI->bridge link gap). Where should I point the next effort?\"=\"Backlog-accuracy cleanup\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

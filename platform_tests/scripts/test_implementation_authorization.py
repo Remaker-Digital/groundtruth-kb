@@ -1411,3 +1411,48 @@ def test_project_root_from_arg_resolves_canonical_from_worktree(
     explicit = tmp_path / "explicit-root"
     explicit.mkdir()
     assert auth_module.project_root_from_arg(str(explicit)).resolve() == explicit.resolve()
+
+
+# ---------------------------------------------------------------------------
+# WI-4532: packet TTL shrink + gate-level liveness-coupling proof
+# ---------------------------------------------------------------------------
+
+
+def test_default_expiry_minutes_tracks_claim_max_hold(auth_module):
+    """WI-4532: the impl-start packet TTL must not outlive the work-intent claim's
+    2-hour hard cap, so an orphaned packet self-expires within the claim window
+    instead of lingering for the former 8 hours. Fails closed if anyone re-widens
+    DEFAULT_EXPIRY_MINUTES past the claim cap.
+    """
+    max_hold_minutes = auth_module.bridge_work_intent_registry.GO_IMPLEMENTATION_MAX_HOLD_SECONDS // 60
+    assert max_hold_minutes >= auth_module.DEFAULT_EXPIRY_MINUTES
+    assert auth_module.DEFAULT_EXPIRY_MINUTES == 120
+
+
+def test_gate_rejects_orphaned_packet_via_work_intent_claim_check(auth_module, tmp_path):
+    """WI-4532: the liveness coupling the owner asked for already exists at the gate.
+
+    For a bridge with NO live work-intent claim (the orphaned-packet condition),
+    work_intent_claim_block_reason returns a denial, so an orphaned packet cannot
+    authorize a mutation regardless of its TTL window. This is the behavior the
+    withdrawn broad _validate_packet orphan check would have duplicated (and which
+    broke 14 verified tests); proving it here documents why the narrow design is
+    sufficient.
+    """
+    slug = "orphan-liveness-bridge"
+    # No claim acquired -> current_holder(slug) is None -> orphaned condition.
+    reason = auth_module.work_intent_claim_block_reason(tmp_path, slug, "session-1")
+    assert reason is not None
+    assert "no active work-intent claim" in reason.lower()
+
+    # Positive control: a live claim by the same session removes the block.
+    auth_module.bridge_work_intent_registry.acquire(slug, "session-1", project_root=tmp_path)
+    assert auth_module.work_intent_claim_block_reason(tmp_path, slug, "session-1") is None
+
+    # Cross-scope denial preserved: a claim held by a DIFFERENT session still blocks
+    # the caller -- the gate's liveness coupling is session-specific.
+    other = "orphan-liveness-bridge-2"
+    auth_module.bridge_work_intent_registry.acquire(other, "session-2", project_root=tmp_path)
+    cross = auth_module.work_intent_claim_block_reason(tmp_path, other, "session-1")
+    assert cross is not None
+    assert "session-2" in cross

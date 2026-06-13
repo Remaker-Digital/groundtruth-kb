@@ -27,6 +27,11 @@ BRIDGE_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRA
 BRIDGE_PATH_RE = re.compile(r"(?:^|\b)bridge/([A-Za-z0-9_.-]+?)-\d{3}\.md(?:\b|$)")
 VERSIONED_MD_RE = re.compile(r"^([A-Za-z0-9_.-]+?)-\d{3}\.md$")
 TOKEN_SPLIT_RE = re.compile(r"[,;\r\n]+")
+# Canonical bridge-file metadata line declaring the thread's parent work item.
+# Anchored and MULTILINE so only the metadata declaration matches, never a prose
+# WI mention. The captured ID is upper-cased to key the reverse index against the
+# canonical uppercase work_items.id form.
+_WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*(WI-[A-Za-z0-9-]+)\s*$", re.MULTILINE | re.IGNORECASE)
 
 CHANGED_BY = "bridge-verified-backlog-reconciler"
 CHANGE_REASON = (
@@ -130,6 +135,34 @@ def _bridge_thread_files(project_root: Path, slug: str) -> list[Path]:
     return sorted((project_root / "bridge").glob(f"{slug}-*.md"))
 
 
+def build_work_item_bridge_index(
+    project_root: Path,
+    bridge_statuses: dict[str, dict[str, str]],
+) -> dict[str, list[str]]:
+    """Derive the reverse work-item -> [bridge slug] index from bridge files.
+
+    Bridge files carry a canonical ``Work Item: WI-XXXX`` metadata line that
+    declares the thread's parent work item (file -> WI). MemBase work items do
+    not always carry the inverse ``related_bridge_threads`` link, so a VERIFIED
+    bridge can never reach an unlinked WI through ``related_bridge_threads``
+    alone. This builds the inverse map by scanning each indexed slug's files for
+    the metadata line only (never prose WI mentions), so the reconciler can
+    supplement a WI's links with the slugs that explicitly declare it.
+    """
+
+    index: dict[str, set[str]] = {}
+    for slug in bridge_statuses:
+        for path in _bridge_thread_files(project_root, slug):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            for match in _WORK_ITEM_METADATA_RE.finditer(text):
+                work_item_id = match.group(1).upper()
+                index.setdefault(work_item_id, set()).add(slug)
+    return {work_item_id: sorted(slugs) for work_item_id, slugs in index.items()}
+
+
 def _contains_work_item_id(text: str, work_item_id: str) -> bool:
     escaped = re.escape(work_item_id)
     return bool(re.search(rf"(?<![A-Za-z0-9_.-]){escaped}(?![A-Za-z0-9_.-])", text))
@@ -178,9 +211,14 @@ def classify_work_item(
     *,
     project_root: Path = PROJECT_ROOT,
     ignore_terminal: bool = False,
+    derived_links: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     raw_links = item.get("related_bridge_threads_parsed", item.get("related_bridge_threads"))
     parsed_links = parse_related_bridge_threads(raw_links)
+    if derived_links:
+        for slug in derived_links.get(item["id"], []):
+            if slug not in parsed_links:
+                parsed_links.append(slug)
     recognized = [slug for slug in parsed_links if slug in bridge_statuses]
     missing = [slug for slug in parsed_links if slug not in bridge_statuses]
     statuses = {slug: bridge_statuses[slug]["status"] for slug in recognized}
@@ -238,8 +276,15 @@ def classify_reconciler_resolution(
     bridge_statuses: dict[str, dict[str, str]],
     *,
     project_root: Path = PROJECT_ROOT,
+    derived_links: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
-    strict = classify_work_item(item, bridge_statuses, project_root=project_root, ignore_terminal=True)
+    strict = classify_work_item(
+        item,
+        bridge_statuses,
+        project_root=project_root,
+        ignore_terminal=True,
+        derived_links=derived_links,
+    )
     if strict["action"] == "resolve":
         action = "keep_resolved"
         reason = "strict_parent_evidence_satisfied"
@@ -295,6 +340,7 @@ def reconcile(
     database_path = db_path or root / "groundtruth.db"
 
     bridge_statuses = parse_latest_bridge_statuses(index_path.read_text(encoding="utf-8"))
+    derived_links = build_work_item_bridge_index(root, bridge_statuses)
     db = KnowledgeDB(database_path)
     resolved_ids: list[str] = []
     reopened_ids: list[str] = []
@@ -304,9 +350,14 @@ def reconcile(
         candidates = [
             item
             for item in db.get_open_work_items()
-            if item.get("related_bridge_threads") or item.get("related_bridge_threads_parsed")
+            if item.get("related_bridge_threads")
+            or item.get("related_bridge_threads_parsed")
+            or derived_links.get(item["id"])
         ]
-        inventory = [classify_work_item(item, bridge_statuses, project_root=root) for item in candidates]
+        inventory = [
+            classify_work_item(item, bridge_statuses, project_root=root, derived_links=derived_links)
+            for item in candidates
+        ]
         items_by_id = {item["id"]: item for item in candidates}
         if apply:
             for row in inventory:
@@ -333,7 +384,7 @@ def reconcile(
                 if item.get("changed_by") == CHANGED_BY
             ]
             repair_inventory = [
-                classify_reconciler_resolution(item, bridge_statuses, project_root=root)
+                classify_reconciler_resolution(item, bridge_statuses, project_root=root, derived_links=derived_links)
                 for item in reconciler_resolutions
             ]
             if apply:

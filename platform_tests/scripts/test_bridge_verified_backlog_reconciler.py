@@ -54,6 +54,14 @@ def _write_parent_evidence(root: Path, slug: str, item_id: str, *, version: str 
     path.write_text(f"{existing}\nParent work item: {item_id}\n", encoding="utf-8")
 
 
+def _write_work_item_metadata(root: Path, slug: str, item_id: str, *, version: str = "002") -> None:
+    """Append a canonical ``Work Item: WI-XXXX`` metadata line to a bridge file."""
+
+    path = root / "bridge" / f"{slug}-{version}.md"
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    path.write_text(f"{existing}\nWork Item: {item_id}\n", encoding="utf-8")
+
+
 def _db(root: Path) -> KnowledgeDB:
     return KnowledgeDB(root / "groundtruth.db")
 
@@ -312,6 +320,146 @@ def test_repair_overbroad_keeps_strict_evidence_resolution_closed(tmp_path: Path
         assert summary["repair_candidates"][0]["reason"] == "strict_parent_evidence_satisfied"
     finally:
         db.close()
+
+
+def test_build_work_item_bridge_index_parses_metadata_line_only(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED"})
+    # Canonical metadata line for WI-0100; a prose mention of WI-0200 must not link.
+    _write_work_item_metadata(tmp_path, "thread-a", "WI-0100")
+    path = tmp_path / "bridge" / "thread-a-002.md"
+    path.write_text(path.read_text(encoding="utf-8") + "\nSee WI-0200 for related context.\n", encoding="utf-8")
+
+    bridge_statuses = module.parse_latest_bridge_statuses(
+        (tmp_path / "bridge" / "INDEX.md").read_text(encoding="utf-8")
+    )
+    index = module.build_work_item_bridge_index(tmp_path, bridge_statuses)
+
+    assert index == {"WI-0100": ["thread-a"]}
+    assert "WI-0200" not in index
+
+
+def test_derives_link_from_bridge_work_item_metadata_resolves_unlinked_wi(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED"})
+    _write_work_item_metadata(tmp_path, "thread-a", "WI-0011")
+    db = _db(tmp_path)
+    try:
+        # related_bridge_threads=None mirrors a WI created via `gt backlog add`:
+        # truly unlinked, so the pre-fix candidate filter would have excluded it.
+        db.insert_work_item(
+            "WI-0011",
+            "WI-0011 title",
+            "new",
+            "platform",
+            "open",
+            "test",
+            "seed",
+            stage="backlogged",
+            related_bridge_threads=None,
+        )
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0011")
+        assert row is not None
+        assert row["resolution_status"] == "resolved"
+        assert row["stage"] == "resolved"
+        assert "thread-a" in row["completion_evidence"]
+        assert summary["resolved_ids"] == ["WI-0011"]
+        assert summary["candidates"][0]["recognized_bridge_threads"] == ["thread-a"]
+    finally:
+        db.close()
+
+
+def test_derivation_ignores_prose_work_item_mentions(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED"})
+    # WI-0012 appears only in prose, never as a `Work Item:` metadata line.
+    path = tmp_path / "bridge" / "thread-a-002.md"
+    path.write_text(path.read_text(encoding="utf-8") + "\nThis work supports WI-0012 indirectly.\n", encoding="utf-8")
+    db = _db(tmp_path)
+    try:
+        db.insert_work_item(
+            "WI-0012",
+            "WI-0012 title",
+            "new",
+            "platform",
+            "open",
+            "test",
+            "seed",
+            stage="backlogged",
+            related_bridge_threads=None,
+        )
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0012")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        # No derived link, no own link -> WI is not even a candidate.
+        assert "WI-0012" not in [row["id"] for row in summary["candidates"]]
+    finally:
+        db.close()
+
+
+def test_derived_link_with_unverified_sibling_thread_not_resolved(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED", "thread-b": "GO"})
+    # The WI's own link is the unverified sibling; the derivation adds the VERIFIED thread.
+    _write_work_item_metadata(tmp_path, "thread-a", "WI-0013")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0013", ["thread-b"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0013")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        candidate = summary["candidates"][0]
+        assert candidate["reason"] == "linked_bridge_not_verified"
+        # Derivation supplemented the links: both the own (GO) and derived (VERIFIED) slug present.
+        assert set(candidate["recognized_bridge_threads"]) == {"thread-a", "thread-b"}
+    finally:
+        db.close()
+
+
+def test_classify_work_item_without_derived_links_is_byte_identical(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED"})
+    _write_parent_evidence(tmp_path, "thread-a", "WI-0014")
+    bridge_statuses = module.parse_latest_bridge_statuses(
+        (tmp_path / "bridge" / "INDEX.md").read_text(encoding="utf-8")
+    )
+    item = {
+        "id": "WI-0014",
+        "title": "WI-0014 title",
+        "resolution_status": "open",
+        "stage": "backlogged",
+        "related_bridge_threads": json.dumps(["thread-a"]),
+    }
+
+    baseline = module.classify_work_item(item, bridge_statuses, project_root=tmp_path)
+    with_none = module.classify_work_item(item, bridge_statuses, project_root=tmp_path, derived_links=None)
+    with_empty = module.classify_work_item(item, bridge_statuses, project_root=tmp_path, derived_links={})
+
+    assert baseline == with_none == with_empty
+    assert baseline["action"] == "resolve"
 
 
 def test_claude_and_codex_hooks_register_reconciler_command() -> None:

@@ -5821,3 +5821,44 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-14T17:11:56.952042Z
   answer: "Answer questions?"
   notes: ""
+
+- id: DECISION-0587
+  asked_at: 2026-05-14T18:51:04.968915Z
+  question: "Approve DELIB-2077 verbatim content for canonical insert?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Reject — skip the DA filing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eea06d2f1680c064
+  resolved_at: 2026-05-14T18:51:04.968915Z
+  answer: "User has answered your questions: \"Approve DELIB-2077 verbatim content for canonical insert?\"=\"Approve as drafted (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0588
+  asked_at: 2026-05-14T20:17:18.014823Z
+  question: "Friction-hygiene NO-GO -018 reports IP-D delivers 19 regression tests vs. the 32 approved in proposal -005 (carried through to GO). The thread has 18 bridge rounds. F1 (WI-3310 bridge thread linkage) is closed; only the IP-D test-count gap remains. How should Prime close this thread?"
+  options:
+    - "Land remaining ~13 tests (Recommended)"
+    - "File REVISED proposal narrowing IP-D 32→19"
+    - "Owner waiver for the 32→19 scope reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d93821b6ab87017d
+  resolved_at: 2026-05-14T20:17:18.014823Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0589
+  asked_at: 2026-05-14T20:17:18.014823Z
+  question: "Friction-hygiene NO-GO -018 reports IP-D delivered 19 regression tests vs. the 32 approved in proposal -005 (carried through to GO). The thread has 18 bridge rounds. F1 (WI-3310 bridge-thread linkage) is closed; only the IP-D test-count gap remains. How should Prime close this thread?"
+  options:
+    - "Land remaining ~13 tests (Recommended)"
+    - "File REVISED proposal narrowing 32 to 19"
+    - "Owner waiver for 32 to 19 reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 41a4e168118cb3cd
+  resolved_at: 2026-05-14T20:17:18.014823Z
+  answer: "Answer questions?"
+  notes: ""

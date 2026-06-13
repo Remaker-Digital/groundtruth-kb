@@ -7,8 +7,8 @@ import subprocess
 import sys
 
 
-def main() -> None:
-    args = sys.argv[1:]
+def main(argv: list[str] | None = None) -> None:
+    args = list(sys.argv[1:] if argv is None else argv)
 
     stdin_path = None
     stdout_path = None
@@ -64,11 +64,19 @@ def main() -> None:
         ):
             cmd_args = ["cmd.exe", "/c"] + cmd_args
 
+        # On Windows, suppress the per-child console window. Without this flag
+        # the wrapped harness — which lives for the entire dispatched run —
+        # allocates an empty console window (stdout/stderr are redirected to
+        # log files). Mirrors the cross-harness trigger's outer Popen sites
+        # (scripts/cross_harness_bridge_trigger.py). No-op (0) off Windows.
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+
         p = subprocess.Popen(
             cmd_args,
             stdin=stdin_fh,
             stdout=out_fh,
             stderr=err_fh,
+            creationflags=creationflags,
         )
 
         p.wait()

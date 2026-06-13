@@ -34,7 +34,7 @@ from groundtruth_kb.tafe_index_preview import (
     BridgeIndexPreview,
     render_tafe_bridge_index_preview,
 )
-from groundtruth_kb.typed_artifact_flow import FlowDefinitionService, TypedArtifactFlowService
+from groundtruth_kb.typed_artifact_flow import TypedArtifactFlowService
 
 FIXED_NOW = datetime(2026, 6, 13, 17, 0, 0, tzinfo=UTC)
 
