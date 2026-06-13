@@ -1,3 +1,7 @@
+Document: gtkb-tafe-flow-definitions-schema
+GO: bridge/gtkb-tafe-flow-definitions-schema-002.md
+NEW: bridge/gtkb-tafe-flow-definitions-schema-001.md
+
 Document: gtkb-wi-4477-ollama-readiness-autostart
 VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-009.md
 NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-008.md
