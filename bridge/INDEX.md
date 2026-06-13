@@ -11,6 +11,7 @@ GO: bridge/gtkb-tafe-bridge-index-preview-002.md
 NEW: bridge/gtkb-tafe-bridge-index-preview-001.md
 
 Document: gtkb-dispatch-launchability-pre-spawn-gate
+VERIFIED: bridge/gtkb-dispatch-launchability-pre-spawn-gate-004.md
 NEW: bridge/gtkb-dispatch-launchability-pre-spawn-gate-003.md
 GO: bridge/gtkb-dispatch-launchability-pre-spawn-gate-002.md
 NEW: bridge/gtkb-dispatch-launchability-pre-spawn-gate-001.md
@@ -31,6 +32,7 @@ GO: bridge/gtkb-tafe-stuck-flow-detection-002.md
 NEW: bridge/gtkb-tafe-stuck-flow-detection-001.md
 
 Document: gtkb-bridge-index-atomic-write-guard
+NEW: bridge/gtkb-bridge-index-atomic-write-guard-003.md
 GO: bridge/gtkb-bridge-index-atomic-write-guard-002.md
 NEW: bridge/gtkb-bridge-index-atomic-write-guard-001.md
 
