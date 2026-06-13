@@ -353,4 +353,12 @@ Loyal Opposition (antigravity/lo) completed a scan of the active bridge review q
 |------|---------|-------------------|------------------|--------|
 | Process | No active review items are pending on the bridge queue; the queue is completely drained. | `bridge/INDEX.md` scan; status command output showing 0 LO actionable items | None required; proceed with Prime Builder tasks | Resolved |
 
+### 2026-06-13 - WI-4516 OpenRouter/Ollama Bash Bridge Bypass
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4516`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4516-openrouter-bash-bridge-bypass.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | OpenRouter and Ollama SDK harness `Bash` dispatch can mutate `bridge/*.md` without invoking bridge-compliance guards; `Write`/`Edit` do invoke bridge-compliance. | Temp-directory reproductions through `dispatch_tool_call("Bash", ...)`; `scripts/openrouter_harness.py` and `scripts/ollama_harness.py` guard routing; 54 targeted harness tests passed; Codex bridge adapter tests have a separate claim-handling failure. | Resolve `WI-4468` first or as step zero, then hard-deny SDK harness `Bash` bridge writes and require a single guarded bridge-writer path with OpenRouter/Ollama parity tests. | Open |
+
 
