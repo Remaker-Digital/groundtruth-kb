@@ -1,4 +1,5 @@
 Document: gtkb-tafe-subproject-prefix-reconciliation
+GO: bridge/gtkb-tafe-subproject-prefix-reconciliation-002.md
 NEW: bridge/gtkb-tafe-subproject-prefix-reconciliation-001.md
 
 Document: gtkb-lo-advisory-owner-grilling-gate-slice3-lint
@@ -30,6 +31,7 @@ NO-GO: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-002.md
 NEW: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-001.md
 
 Document: gtkb-tafe-dispatch-tick-health
+NEW: bridge/gtkb-tafe-dispatch-tick-health-005.md
 GO: bridge/gtkb-tafe-dispatch-tick-health-004.md
 REVISED: bridge/gtkb-tafe-dispatch-tick-health-003.md
 NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md

@@ -613,27 +613,53 @@ def flow_advance_cmd(stage_instance_id: str, to_stage: str | None, json_output: 
 
 @flow_group.group("dispatch")
 def flow_dispatch_group() -> None:
-    """No-op Phase 0 dispatch command skeleton."""
+    """Evaluate non-mutating TAFE dispatch readiness."""
 
 
 @flow_dispatch_group.command("tick")
+@click.option("--subject-scope", default=None, help="Restrict evaluation to one flow subject scope.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
-def flow_dispatch_tick_cmd(json_output: bool) -> None:
-    """No-op Phase 0 placeholder for one dispatch evaluation cycle."""
-    _emit_cli_payload(
-        _flow_noop_payload("flow dispatch tick", detail="dispatch policy is reserved for later TAFE phases."),
-        json_output=json_output,
+@click.pass_context
+def flow_dispatch_tick_cmd(ctx: click.Context, subject_scope: str | None, json_output: bool) -> None:
+    """Evaluate need-driven dispatch (SPEC-TAFE-R5) for eligible unclaimed stages.
+
+    Read-only: reports what would be dispatched; never claims, spawns, or mutates.
+    """
+    from groundtruth_kb.tafe_dispatch_runtime import (
+        evaluate_dispatch_tick,
+        tick_report_to_payload,
     )
+
+    db, service = _flow_service(ctx)
+    try:
+        report = evaluate_dispatch_tick(service, subject_scope=subject_scope)
+        payload = tick_report_to_payload(report)
+    finally:
+        db.close()
+    _emit_cli_payload(payload, json_output=json_output)
 
 
 @flow_dispatch_group.command("health")
+@click.option("--subject-scope", default=None, help="Restrict aggregation to one flow subject scope.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
-def flow_dispatch_health_cmd(json_output: bool) -> None:
-    """No-op Phase 0 placeholder for dispatcher health."""
-    _emit_cli_payload(
-        _flow_noop_payload("flow dispatch health", detail="dispatcher health is reserved for later TAFE phases."),
-        json_output=json_output,
+@click.pass_context
+def flow_dispatch_health_cmd(ctx: click.Context, subject_scope: str | None, json_output: bool) -> None:
+    """Aggregate dispatch readiness across pending unclaimed stages.
+
+    Read-only: reports readiness counts; never claims, spawns, or mutates.
+    """
+    from groundtruth_kb.tafe_dispatch_runtime import (
+        evaluate_dispatch_health,
+        health_report_to_payload,
     )
+
+    db, service = _flow_service(ctx)
+    try:
+        report = evaluate_dispatch_health(service, subject_scope=subject_scope)
+        payload = health_report_to_payload(report)
+    finally:
+        db.close()
+    _emit_cli_payload(payload, json_output=json_output)
 
 
 @flow_group.group("render")
