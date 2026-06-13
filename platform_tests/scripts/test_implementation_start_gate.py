@@ -590,29 +590,60 @@ def test_chained_git_commit_with_protected_write_still_blocks(tmp_path: Path) ->
     assert "authorization packet" in result["reason"]
 
 
-def test_gate_unchanged_reads_current_json_only(tmp_path: Path) -> None:
-    """IP-2 contract invariant (per Slice 4 REVISED-1, GO at -004):
-    the gate reads current.json only and never auto-discovers a named
-    packet from by-bridge/. A valid named packet is not sufficient
-    authorization on its own; the explicit `activate --bridge-id X`
-    subcommand is the only deterministic path from named cache to
-    current.json.
-
-    Setup: thread is GO, a valid by-bridge/<bridge>.json exists, but
-    current.json is absent. Assert: gate blocks a protected mutation.
-    """
+def test_gate_uses_unique_named_packet_when_current_json_absent(tmp_path: Path) -> None:
+    """WI-4452: a unique valid named packet can authorize the protected target."""
     _write_thread(tmp_path)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
 
-    # Write ONLY the named-cache packet. Do NOT call write_packet (which
-    # writes current.json). This isolates the gate's input contract:
-    # if it ever silently reads from by-bridge/, this test breaks.
     named_path = auth.write_named_packet(tmp_path, packet, "sample-implementation")
     assert named_path.is_file(), "test setup: named packet must be on disk"
     assert not auth.packet_path(tmp_path).is_file(), (
-        "test setup: current.json must be absent so any positive gate decision "
-        "could only come from reading by-bridge/, which would be a contract violation"
+        "test setup: current.json must be absent so any positive gate decision comes from the unique by-bridge packet"
     )
+
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": ("*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n")},
+    }
+
+    assert gate.gate_decision(payload) == {}
+
+
+def test_gate_blocks_ambiguous_named_packet_fallback(tmp_path: Path) -> None:
+    """WI-4452: overlapping named packets fail closed instead of guessing."""
+    shared_target = "scripts/sample.py"
+    _write_thread(
+        tmp_path,
+        bridge_id="bridge-a",
+        proposal=_proposal(bridge_id="bridge-a", target_paths=[shared_target]),
+    )
+    bridge = tmp_path / "bridge"
+    (bridge / "bridge-b-001.md").write_text(
+        _proposal(bridge_id="bridge-b", target_paths=[shared_target]),
+        encoding="utf-8",
+    )
+    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "\n".join(
+            [
+                "Document: bridge-a",
+                "GO: bridge/bridge-a-002.md",
+                "NEW: bridge/bridge-a-001.md",
+                "",
+                "Document: bridge-b",
+                "GO: bridge/bridge-b-002.md",
+                "NEW: bridge/bridge-b-001.md",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    packet_a = auth.create_authorization_packet(tmp_path, "bridge-a")
+    packet_b = auth.create_authorization_packet(tmp_path, "bridge-b")
+    auth.write_named_packet(tmp_path, packet_a, "bridge-a")
+    auth.write_named_packet(tmp_path, packet_b, "bridge-b")
+    assert not auth.packet_path(tmp_path).is_file()
 
     payload = {
         "cwd": str(tmp_path),
@@ -622,12 +653,10 @@ def test_gate_unchanged_reads_current_json_only(tmp_path: Path) -> None:
 
     result = gate.gate_decision(payload)
 
-    assert result.get("decision") == "block", (
-        "Gate must block when current.json is absent, even though a valid named "
-        "packet exists at by-bridge/sample-implementation.json. The gate's contract "
-        "is current.json-only; named packets require explicit `activate`."
-    )
-    assert "authorization packet" in result.get("reason", "")
+    assert result.get("decision") == "block"
+    assert "Ambiguous implementation authorization" in result.get("reason", "")
+    assert "bridge-a" in result.get("reason", "")
+    assert "bridge-b" in result.get("reason", "")
 
 
 # IP-A: Null-sink redirect classifier tests (F1 closures)

@@ -141,9 +141,12 @@ def test_t_rename_4_pyproject_testpaths(pyproject_pytest_config: dict) -> None:
     testpaths = pyproject_pytest_config.get("testpaths", [])
     assert testpaths, "pyproject.toml testpaths must be non-empty"
     assert "platform_tests" in testpaths, f"pyproject.toml testpaths must include 'platform_tests'; got {testpaths}"
-    # The bare "tests" entry must not be present (the migrated application
-    # tests are referenced as "applications/Agent_Red/tests" which IS allowed).
+    # The bare "tests" entry must not be present, and the default GT-KB
+    # platform pytest scope must not collect adopter/application tests.
     assert "tests" not in testpaths, f"pyproject.toml testpaths must not include bare 'tests'; got {testpaths}"
+    assert "applications/Agent_Red/tests" not in testpaths, (
+        f"pyproject.toml default testpaths must not include Agent Red application tests; got {testpaths}"
+    )
 
 
 def test_t_rename_5_no_remaining_workflow_refs() -> None:

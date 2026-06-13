@@ -23,8 +23,10 @@ from pathlib import Path
 
 try:
     from scripts.bridge_author_metadata import ensure_author_metadata
+    from scripts.bridge_index_writer import atomic_index_update
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from bridge_author_metadata import ensure_author_metadata
+    from bridge_index_writer import atomic_index_update
 
 VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
@@ -424,35 +426,58 @@ def insert_index_status(
     if status == "DEFERRED":
         _validate_deferred_status_file(document_name, version, project_root)
     index_path = _index_path(project_root)
-    raw_current = index_path.read_text(encoding="utf-8")
-    if expected_index_raw is not None and expected_index_raw != raw_current:
-        raise BridgeConflictError("INDEX.md changed between snapshot and write; refusing stale insert")
-    block = get_block(parse_index(raw_current), document_name)
-    if block is not None and block.latest_status == "DEFERRED" and status != "DEFERRED":
-        _validate_deferred_clear_file(document_name, version, project_root)
     new_line = f"{status}: bridge/{document_name}-{version:03d}.md"
-    lines = raw_current.splitlines(keepends=True)
-    updated: list[str] = []
-    inserted = False
-    i = 0
-    while i < len(lines):
-        line = lines[i]
+
+    def latest_tuple(block: DocumentBlock | None) -> tuple[str | None, int | None]:
+        return (block.latest_status, block.latest_version) if block is not None else (None, None)
+
+    def mutate(raw_current: str) -> str:
+        current_blocks = parse_index(raw_current)
+        block = get_block(current_blocks, document_name)
+        if expected_index_raw is not None:
+            expected_block = get_block(parse_index(expected_index_raw), document_name)
+            if latest_tuple(expected_block) != latest_tuple(block):
+                raise BridgeConflictError(
+                    "INDEX.md target document changed between snapshot and write; refusing stale insert"
+                )
+        if block is None:
+            raise BridgeConflictError(f"Document: {document_name} block not found in INDEX.md; cannot insert status")
+        if any(
+            entry.filename == f"{document_name}-{version:03d}.md"
+            for existing in current_blocks
+            for entry in existing.entries
+        ):
+            raise BridgeConflictError(f"bridge/{document_name}-{version:03d}.md already exists in INDEX.md")
+        if block.latest_status == "DEFERRED" and status != "DEFERRED":
+            _validate_deferred_clear_file(document_name, version, project_root)
+
+        lines = raw_current.splitlines(keepends=True)
+        updated: list[str] = []
+        inserted = False
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if not inserted:
+                stripped = line.rstrip("\r\n").strip()
+                doc_match = _DOCUMENT_LINE_RE.match(stripped)
+                if doc_match and doc_match.group("name") == document_name:
+                    updated.append(line)
+                    newline_suffix = "\n" if not line.endswith("\r\n") else "\r\n"
+                    updated.append(new_line + newline_suffix)
+                    inserted = True
+                    i += 1
+                    continue
+            updated.append(line)
+            i += 1
         if not inserted:
-            stripped = line.rstrip("\r\n").strip()
-            doc_match = _DOCUMENT_LINE_RE.match(stripped)
-            if doc_match and doc_match.group("name") == document_name:
-                updated.append(line)
-                newline_suffix = "\n" if not line.endswith("\r\n") else "\r\n"
-                updated.append(new_line + newline_suffix)
-                inserted = True
-                i += 1
-                continue
-        updated.append(line)
-        i += 1
-    if not inserted:
-        raise BridgeConflictError(f"Document: {document_name} block not found in INDEX.md; cannot insert status")
-    new_content = "".join(updated)
-    index_path.write_text(new_content, encoding="utf-8")
+            raise BridgeConflictError(f"Document: {document_name} block not found in INDEX.md; cannot insert status")
+        return "".join(updated)
+
+    new_content = atomic_index_update(
+        index_path,
+        mutate,
+        state_dir=project_root / ".gtkb-state" / "bridge-index-writer",
+    )
     verified = index_path.read_text(encoding="utf-8")
     if verified != new_content:
         raise BridgeConflictError("post-write verification failed for INDEX.md")

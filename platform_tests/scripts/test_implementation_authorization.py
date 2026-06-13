@@ -6,7 +6,8 @@ Per ``bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygie
 - IP-1: filename-vs-document boundary-based parser hardening (per-bridge strict
   check in ``bridge_entry``; ``parse_bridge_index`` silently skips misattributed).
 - IP-2: named-packet cache at ``by-bridge/<bridge-id>.json``, ``activate`` and
-  ``list`` subcommands, legacy ``current.json``-only workflow preservation.
+  ``list`` subcommands, plus unique named-packet fallback when ``current.json``
+  points at the wrong bridge.
 
 Uses isolated tmp_path project roots; the only dependency on the live repo is
 the script import path.
@@ -485,7 +486,7 @@ def test_list_returns_empty_when_by_bridge_dir_absent(auth_module, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# F2-001 regression: legacy current.json-only workflow preserved
+# F2-001 / WI-4452 regression: current.json plus named-packet fallback
 # ---------------------------------------------------------------------------
 
 
@@ -502,6 +503,35 @@ def test_legacy_current_json_only_workflow_still_works(auth_module, tmp_path):
     result = auth_module.validate_targets(tmp_path, ["scripts/dummy.py"])
     assert result["packet"]["bridge_id"] == slug
     assert result["targets"] == ["scripts/dummy.py"]
+
+
+def test_validate_targets_falls_back_to_unique_named_packet_after_current_clobber(auth_module, tmp_path):
+    """WI-4452: bridge A remains authorized after bridge B overwrites current.json."""
+    _make_groundtruth_toml(tmp_path)
+    _write_proposal(tmp_path, "bridge-a", version=1, target_paths=["scripts/a.py"])
+    _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
+    _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/b.py"])
+    _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
+    _write_index(
+        tmp_path,
+        [
+            "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
+            "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b.md\n",
+        ],
+    )
+    _begin_packet(auth_module, tmp_path, "bridge-a")
+    _begin_packet(auth_module, tmp_path, "bridge-b")
+    current_path = auth_module.packet_path(tmp_path)
+    assert json.loads(current_path.read_text(encoding="utf-8"))["bridge_id"] == "bridge-b"
+
+    result_a = auth_module.validate_targets(tmp_path, ["scripts/a.py"])
+    assert result_a["packet"]["bridge_id"] == "bridge-a"
+    assert result_a["targets"] == ["scripts/a.py"]
+    assert json.loads(current_path.read_text(encoding="utf-8"))["bridge_id"] == "bridge-b"
+
+    result_b = auth_module.validate_targets(tmp_path, ["scripts/b.py"])
+    assert result_b["packet"]["bridge_id"] == "bridge-b"
+    assert result_b["targets"] == ["scripts/b.py"]
 
 
 def test_packet_path_for_bridge_rejects_path_traversal_bridge_id(auth_module, tmp_path):

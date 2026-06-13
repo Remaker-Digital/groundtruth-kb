@@ -5174,3 +5174,388 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-12T02:09:20.333285Z
   answer: "User has answered your questions: \"Given the 1-day Claude Code halt window, which path forward do you want for the standalone Codex Prime + LO sub-agent dispatch?\"=\"Finish -012 first (governance path)\". You can now continue with the user's answers in mind."
   notes: ""
+
+- id: DECISION-0539
+  asked_at: 2026-05-13T22:55:22.358578Z
+  question: "How would you like me to proceed from this investigation?"
+  options:
+    - "File the consumption-edge fix"
+    - "File the benchmark suite"
+    - "File both, sequenced"
+    - "Stop and let me think"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 747e5c654b6dc2f1
+  resolved_at: 2026-05-13T22:55:22.358578Z
+  answer: "User has answered your questions: \"How would you like me to proceed from this investigation?\"=\"File both, sequenced\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0540
+  asked_at: 2026-05-13T23:24:45.120094Z
+  question: "Both Slice-1 (advisory-router) and Slice-2 (benchmark-suite) were NO-GO'd on the same blocking finding: `DCL-CONCEPT-ON-CONTACT-001` requires the named load-bearing concepts to be added to `.claude/rules/canonical-terminology.md` (a protected narrative artifact), not to skill/procedure files. Authorize the Path A revision pattern (expand `target_paths` + scope formal-artifact-approval packets for canonical-terminology edits) for both proposals?"
+  options:
+    - "Path A both (Recommended)"
+    - "Path B both"
+    - "Mixed: A for advisory-router, B for benchmark"
+    - "Defer both"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: aac9166720001511
+  resolved_at: 2026-05-13T23:24:45.120094Z
+  answer: "Answer questions?"
+  notes: ""
+
+- id: DECISION-0541
+  asked_at: 2026-05-14T00:03:50.874506Z
+  question: "How should we resolve the dispatch suppression so Codex can re-review REVISED-003 (and what to do with the 2 other Prime-actionable threads)?"
+  options:
+    - "End my session; you trigger Codex manually"
+    - "Manually invoke cross_harness_bridge_trigger.py with override"
+    - "Address the 2 other Prime-actionable threads now"
+    - "Just wait; you'll check back later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 00df3e2d93fbe984
+  resolved_at: 2026-05-14T00:03:50.874506Z
+  answer: "User has answered your questions: \"How should we resolve the dispatch suppression so Codex can re-review REVISED-003 (and what to do with the 2 other Prime-actionable threads)?\"=\"Just wait; you'll check back later\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0542
+  asked_at: 2026-05-14T00:38:39.502778Z
+  question: "How would you like me to proceed with Slice 3 implementation?"
+  options:
+    - "Start Slice 3 implementation now"
+    - "Wait for all three slices to GO first"
+    - "Wrap session, defer all implementation"
+    - "Decompose and AUQ on a different next step"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d1c751c32002ecd1
+  resolved_at: 2026-05-14T00:38:39.502778Z
+  answer: "User has answered your questions: \"How would you like me to proceed with Slice 3 implementation?\"=\"Start Slice 3 implementation now\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0543
+  asked_at: 2026-05-14T00:47:48.396929Z
+  question: "Bridge auto-dispatch surfaced two GO'd slices: gtkb-self-diagnostic-leak-closure-slice-1-advisory-router (~1 router script + 11 tests + Stop hook + glossary edit + narrative packet) and slice-2-benchmark-suite (~9 scripts + 30+ tests + skill + glossary edit + tracking work_item). Implementation-start-gate stores ONE active packet, so slices serialize. Each new file Write needs your approval. How should I proceed?"
+  options:
+    - "Implement Slice 1 fully now (Recommended)"
+    - "Slice 1 router + tests only, then pause"
+    - "Defer both; file friction note"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ddb21d0758477470
+  resolved_at: 2026-05-14T00:47:48.396929Z
+  answer: "Answer questions?"
+  notes: ""
+
+- id: DECISION-0544
+  asked_at: 2026-05-14T00:59:21.412448Z
+  question: "How would you like to close S349?"
+  options:
+    - "Run /kb-session-wrap now"
+    - "Continue one more lightweight IP, then wrap"
+    - "Keep going on Slice 3"
+    - "Stop now without wrap, you'll handle it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 398707a6ce536806
+  resolved_at: 2026-05-14T00:59:21.412448Z
+  answer: "User has answered your questions: \"How would you like to close S349?\"=\"Continue one more lightweight IP, then wrap\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0545
+  asked_at: 2026-05-14T02:02:53.856494Z
+  question: "How should REVISED-1 of Slice 3 handle the `retire` mutation path (Codex F1)?"
+  options:
+    - "Defer retire to follow-on bridge (Recommended)"
+    - "Implement governed retirement"
+    - "Pause REVISED-1; wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f93a63a79a0d77bf
+  resolved_at: 2026-05-14T02:02:53.856494Z
+  answer: "User has answered your questions: \"How should REVISED-1 of Slice 3 handle the `retire` mutation path (Codex F1)?\"=\"Defer retire to follow-on bridge (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0546
+  asked_at: 2026-05-14T02:09:53.450754Z
+  question: "Which actionable bridge entry should I pick up next?"
+  options:
+    - "Slice 4 REVISED-1 (Recommended)"
+    - "Slice 1 implementation"
+    - "Slice 2 implementation"
+    - "Stale-GO triage"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eb809567d0c3524c
+  resolved_at: 2026-05-14T02:09:53.450754Z
+  answer: "User has answered your questions: \"Which actionable bridge entry should I pick up next?\"=\"Slice 4 REVISED-1 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0547
+  asked_at: 2026-05-14T02:51:35.704285Z
+  question: "Which Prime-actionable GO should I take up next?"
+  options:
+    - "Slice 4 hygiene first (Recommended)"
+    - "Self-diagnostic chain in order (1→4)"
+    - "gtkb-governed-spec-retirement NO-GO -002"
+    - "Wait for Codex on the topology proposal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 97538ec057b15c18
+  resolved_at: 2026-05-14T02:51:35.704285Z
+  answer: "User has answered your questions: \"Which Prime-actionable GO should I take up next?\"=\"Slice 4 hygiene first (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0548
+  asked_at: 2026-05-14T02:51:35.704285Z
+  question: "Slice 4 post-impl is filed and awaiting Codex VERIFIED. How should I handle the Codex NO-GO on the topology proposal?"
+  options:
+    - "REVISED-1 with next-session in Slice 1 (Recommended)"
+    - "REVISED-1 with explicit owner waiver"
+    - "Stop and wait for Codex VERIFIED on Slice 4 first"
+    - "Wrap up this session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 63390a1a3972980f
+  resolved_at: 2026-05-14T02:51:35.704285Z
+  answer: "User has answered your questions: \"Slice 4 post-impl is filed and awaiting Codex VERIFIED. How should I handle the Codex NO-GO on the topology proposal?\"=\"REVISED-1 with next-session in Slice 1 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0549
+  asked_at: 2026-05-14T03:19:58.927762Z
+  question: "The cross-harness trigger dispatched me on 2 entries: slice-2-benchmark-suite GO -010 (substantial implementation, would add ~20+ files to working tree) and governed-spec-retirement NO-GO -002 (REVISED-1 needed). Working tree has 75 staged files from S350 blocked by the gate-friction commit blocker. My attempted Write of bridge/gtkb-governed-spec-retirement-003.md was denied. How should I proceed?"
+  options:
+    - "File REVISED-1 only (Recommended)"
+    - "File REVISED + implement slice-2"
+    - "Resolve commit blocker first"
+    - "Just stop, owner directs next"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: aa72a67912e9e156
+  resolved_at: 2026-05-14T03:19:58.927762Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0550
+  asked_at: 2026-05-14T03:28:30.764851Z
+  question: "Which actionable item should I pick up next?"
+  options:
+    - "File Slice 3 implementation report (Recommended)"
+    - "Revise governed-spec-retirement"
+    - "Both, sequenced"
+    - "Slice 1 or 2 implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7fc75ab6c20bae11
+  resolved_at: 2026-05-14T03:28:30.764851Z
+  answer: "User has answered your questions: \"Which actionable item should I pick up next?\"=\"File Slice 3 implementation report (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0551
+  asked_at: 2026-05-14T03:28:30.764851Z
+  question: "Slice 3 implementation report was already filed by a parallel session. What should I pick up now?"
+  options:
+    - "Revise governed-spec-retirement (Recommended)"
+    - "Slice 1 implementation"
+    - "Slice 2 implementation"
+    - "Stop / wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3b4cca2f230a541b
+  resolved_at: 2026-05-14T03:28:30.764851Z
+  answer: "User has answered your questions: \"Slice 3 implementation report was already filed by a parallel session. What should I pick up now?\"=\"Revise governed-spec-retirement (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0552
+  asked_at: 2026-05-14T04:06:54.805707Z
+  question: "What action should I take regarding the Codex LO file-safety rule violation?"
+  options:
+    - "Capture as DA + backlog item; you handle Codex externally"
+    - "File a bridge proposing hook-enforced LO write-block"
+    - "Audit Codex's edits and propose targeted reverts"
+    - "Acknowledge only; you'll direct next steps"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6e154ef50499d266
+  resolved_at: 2026-05-14T04:06:54.805707Z
+  answer: "User has answered your questions: \"What action should I take regarding the Codex LO file-safety rule violation?\"=\"Capture as DA + backlog item; you handle Codex externally\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0553
+  asked_at: 2026-05-14T04:26:39.800178Z
+  question: "Three leak-closure slices are VERIFIED (mine + 2 parallel workers) and ready to commit, plus there are 2 NO-GOs and 5 GOs Prime-actionable. What's the priority?"
+  options:
+    - "Commit Slice 3 only (mine), then revise next NO-GO"
+    - "Commit all 3 VERIFIED slices (1+3+4) as one bundle"
+    - "Skip commits; implement Slice 2 (last leak-closure GO) first"
+    - "Revise gtkb-governed-spec-retirement NO-GO @-004 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 58e7a3a633e56f4c
+  resolved_at: 2026-05-14T04:26:39.800178Z
+  answer: "User has answered your questions: \"Three leak-closure slices are VERIFIED (mine + 2 parallel workers) and ready to commit, plus there are 2 NO-GOs and 5 GOs Prime-actionable. What's the priority?\"=\"Commit Slice 3 only (mine), then revise next NO-GO\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0554
+  asked_at: 2026-05-14T04:41:01.577682Z
+  question: "A parallel Prime Builder session is active and ahead of me on 2 of the 3 NO-GO threads (it filed -003 REVISED on friction-hygiene, and got Codex GO at -006 on governed-spec-retirement). INDEX wasn't synced. How should I proceed?"
+  options:
+    - "Sync INDEX + take operating-mode-transaction"
+    - "Stand down; let parallel session finish"
+    - "Investigate the parallel session first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d04c367773759244
+  resolved_at: 2026-05-14T04:41:01.577682Z
+  answer: "User has answered your questions: \"A parallel Prime Builder session is active and ahead of me on 2 of the 3 NO-GO threads (it filed -003 REVISED on friction-hygiene, and got Codex GO at -006 on governed-spec-retirement). INDEX wasn't synced. How should I proceed?\"=\"Investigate the parallel session first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0555
+  asked_at: 2026-05-14T04:41:01.577682Z
+  question: "Investigation suggests another Claude Code window is active on this workspace (same harness B, same Prime role, files authored at 21:25-21:34 PDT during my idle time). Active session locks confirm both Claude and Codex are running. How do you want me to coordinate?"
+  options:
+    - "Stand by; let the other window drive"
+    - "Sync INDEX from this window only"
+    - "Take operating-mode-transaction in this window"
+    - "Other window is wrong; consolidate to mine"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 65e85c6bacf3caa2
+  resolved_at: 2026-05-14T04:41:01.577682Z
+  answer: "User has answered your questions: \"Investigation suggests another Claude Code window is active on this workspace (same harness B, same Prime role, files authored at 21:25-21:34 PDT during my idle time). Active session locks confirm both Claude and Codex are running. How do you want me to coordinate?\"=\"Stand by; let the other window drive\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0556
+  asked_at: 2026-05-14T04:52:01.095227Z
+  question: "Codex just GO'd my REVISED-2 of gtkb-governed-spec-retirement (-006). The 4 corrections this turn already filed 2 REVISED proposals. What's the priority?"
+  options:
+    - "Implement governed-spec-retirement now"
+    - "Defer to next session, wrap up this one"
+    - "Revise operating-mode-transaction NO-GO instead"
+    - "Implement Slice 2 benchmark-suite (last leak-closure slice)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 90b3e280d5c0d755
+  resolved_at: 2026-05-14T04:52:01.095227Z
+  answer: "User has answered your questions: \"Codex just GO'd my REVISED-2 of gtkb-governed-spec-retirement (-006). The 4 corrections this turn already filed 2 REVISED proposals. What's the priority?\"=\"Implement governed-spec-retirement now\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0557
+  asked_at: 2026-05-14T05:36:38.616107Z
+  question: "Approve adding the four glossary entries above (`benchmark`, `linkage heat map`, `advisory latency`, `metric snapshot`) to `.claude/rules/canonical-terminology.md` immediately after the existing `### advisory-router` entry? This is the IP-6 protected-narrative-artifact edit per the slice-2-benchmark-suite GO at -010. Approval authorizes the specific text shown; any wording change would require a re-approval cycle."
+  options:
+    - "Approve as drafted"
+    - "Revise wording before approval"
+    - "Reject; stop IP-6"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8e9937bd99f3a492
+  resolved_at: 2026-05-14T05:36:38.616107Z
+  answer: "User has answered your questions: \"Approve adding the four glossary entries above (`benchmark`, `linkage heat map`, `advisory latency`, `metric snapshot`) to `.claude/rules/canonical-terminology.md` immediately after the existing `### advisory-router` entry? This is the IP-6 protected-narrative-artifact edit per the slice-2-benchmark-suite GO at -010. Approval authorizes the specific text shown; any wording change would require a re-approval cycle.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0558
+  asked_at: 2026-05-14T05:41:37.685068Z
+  question: "What scope should the startup-payload drift work item cover?"
+  options:
+    - "Audit + fix + regression test (Recommended)"
+    - "Audit + fix only"
+    - "Narrow fix only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 96da8b7858f8a04b
+  resolved_at: 2026-05-14T05:41:37.685068Z
+  answer: "User has answered your questions: \"What scope should the startup-payload drift work item cover?\"=\"Audit + fix + regression test (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0559
+  asked_at: 2026-05-14T05:45:08.914012Z
+  question: "Codex NO-GO -012 (benchmark suite report) F1: the formal approval packet for `.claude/rules/canonical-terminology.md` binds to content hash `e3c72f4d...` but the current worktree file is at `38c663a3...` (has additional concurrent glossary edits beyond the packet-authorized benchmark-suite entries). How should I reconcile?"
+  options:
+    - "New packet, current content"
+    - "Revert to packet content"
+    - "Investigate first, no decision yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 81e095841d56b0a8
+  resolved_at: 2026-05-14T05:45:08.914012Z
+  answer: "Answer questions?"
+  notes: ""
+
+- id: DECISION-0560
+  asked_at: 2026-05-14T05:54:09.938257Z
+  question: "How should F1 reconciliation proceed on the benchmark-suite NO-GO at -012? The protected canonical-terminology.md worktree state (sha 38c663a3) does not match the cited approval packet hash (e3c72f4d) because four concurrent 2026-05-13 narrative-artifact edits each have their own full-content packet but the composite final file has none."
+  options:
+    - "Approve new composite packet"
+    - "Revert to benchmark packet state"
+    - "Investigate further first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f8674421969174e3
+  resolved_at: 2026-05-14T05:54:09.938257Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0561
+  asked_at: 2026-05-14T06:05:03.827438Z
+  question: "The `gtkb-completed-bridge-wi-hygiene-2026-05-13` thread is VERIFIED. The implementation touched 8 bridge files + bridge/INDEX.md + groundtruth.db (6 work_item rows). How should I proceed with committing?"
+  options:
+    - "Commit now, scoped (Recommended)"
+    - "Commit + auto-commit future VERIFIED in this session"
+    - "Hold; batch all commits at session end"
+    - "Hold; you'll commit manually"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cc4c66424ba5b223
+  resolved_at: 2026-05-14T06:05:03.827438Z
+  answer: "User has answered your questions: \"The `gtkb-completed-bridge-wi-hygiene-2026-05-13` thread is VERIFIED. The implementation touched 8 bridge files + bridge/INDEX.md + groundtruth.db (6 work_item rows). How should I proceed with committing?\"=\"Commit now, scoped (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0562
+  asked_at: 2026-05-14T06:05:29.747074Z
+  question: "Two paths from the new verdicts. Slice-2 NO-GO revision is small but high-collision-risk (parallel window actively mutating same files); operating-mode-transaction GO authorizes substantial new implementation (6 modules + 4 hook edits + rule update + tests) in a thread the parallel window hasn't touched since -005. Context budget is tight. Which should I take?"
+  options:
+    - "Operating-mode-transaction (impl GO)"
+    - "Slice-2 NO-GO revision (small fix)"
+    - "Both, slice-2 first then op-mode"
+    - "Wrap session; let parallel finish"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7c837c5661b9c999
+  resolved_at: 2026-05-14T06:05:29.747074Z
+  answer: "User has answered your questions: \"Two paths from the new verdicts. Slice-2 NO-GO revision is small but high-collision-risk (parallel window actively mutating same files); operating-mode-transaction GO authorizes substantial new implementation (6 modules + 4 hook edits + rule update + tests) in a thread the parallel window hasn't touched since -005. Context budget is tight. Which should I take?\"=\"Operating-mode-transaction (impl GO)\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0563
+  asked_at: 2026-05-14T06:14:34.947108Z
+  question: "Two NO-GOs are dispatched. Which to remediate first?"
+  options:
+    - "Benchmark-suite first"
+    - "Gate-friction first"
+    - "Both in parallel"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 00571a2ab9ce5951
+  resolved_at: 2026-05-14T06:14:34.947108Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0564
+  asked_at: 2026-05-14T06:14:34.947108Z
+  question: "F1 fix for canonical-terminology.md packet drift — which path?"
+  options:
+    - "New packet matching current worktree"
+    - "Revert to packet-matching state"
+    - "Investigate concurrent edits first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 22dac585c42a1bba
+  resolved_at: 2026-05-14T06:14:34.947108Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0565
+  asked_at: 2026-05-14T06:21:31.072539Z
+  question: "Codex NO-GO'd benchmark-suite slice 2 at -012 because `.claude/rules/canonical-terminology.md` worktree SHA `38c663a3...` doesn't match the cited benchmark-terms approval packet (SHA `e3c72f4d...`). Worktree currently has unstaged entries from FOUR parallel slices (slice-1 advisory-router VERIFIED, slice-2 benchmark-suite NO-GO, slice-3 assertion-triage VERIFIED, slice-4 implementation-gate-hygiene VERIFIED). Three of the four are VERIFIED but uncommitted. Which reconciliation should I use before refiling the slice-2 report?"
+  options:
+    - "Stage+commit benchmark hunks only"
+    - "Mint combined packet"
+    - "Defer slice-2 until siblings commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0b6d4a7d3515a2f4
+  resolved_at: 2026-05-14T06:21:31.072539Z
+  answer: "Answer questions?"
+  notes: ""

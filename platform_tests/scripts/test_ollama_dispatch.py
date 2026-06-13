@@ -97,6 +97,7 @@ def test_build_dispatch_command_uses_registry_template(tmp_path: Path) -> None:
 def test_readiness_passes_with_mocked_tags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = _write_project(tmp_path)
     monkeypatch.setattr(verify, "call_ollama_tags", lambda endpoint, timeout: {OLLAMA_MODEL_ID})
+    monkeypatch.setattr(verify, "evaluate_ollama_autostart", lambda **_kwargs: {"checked": True, "configured": True})
     result = verify.evaluate_dispatch_readiness(root)
     assert result["ready"] is True
     assert result["route_key"] == "review-route"
@@ -104,6 +105,11 @@ def test_readiness_passes_with_mocked_tags(tmp_path: Path, monkeypatch: pytest.M
 
 def test_readiness_fails_closed_when_daemon_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = _write_project(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "evaluate_ollama_autostart",
+        lambda **_kwargs: {"checked": True, "configured": False, "warning": "missing"},
+    )
 
     def _raise_unavailable(endpoint: str, timeout: float) -> set[str]:
         raise verify.OllamaHarnessError("Ollama /api/tags unavailable")
@@ -113,6 +119,33 @@ def test_readiness_fails_closed_when_daemon_unavailable(tmp_path: Path, monkeypa
     assert result["ready"] is False
     assert result["checks"][-1]["name"] == "ollama /api/tags"
     assert result["checks"][-1]["passed"] is False
+
+
+def test_readiness_warns_when_autostart_missing_but_daemon_ready(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _write_project(tmp_path)
+    monkeypatch.setattr(verify, "call_ollama_tags", lambda endpoint, timeout: {OLLAMA_MODEL_ID})
+    monkeypatch.setattr(
+        verify,
+        "evaluate_ollama_autostart",
+        lambda **_kwargs: {
+            "checked": True,
+            "configured": False,
+            "warning": "No Windows scheduled task or service matching Ollama was detected.",
+        },
+    )
+
+    result = verify.evaluate_dispatch_readiness(root)
+
+    assert result["ready"] is True
+    assert result["autostart"]["configured"] is False
+    assert result["warnings"] == [
+        {
+            "name": "ollama autostart",
+            "detail": "No Windows scheduled task or service matching Ollama was detected.",
+        }
+    ]
 
 
 def test_readiness_fails_when_required_review_tool_missing(tmp_path: Path) -> None:

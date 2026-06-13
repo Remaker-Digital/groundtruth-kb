@@ -103,6 +103,56 @@ def test_reachability_probe_returns_true_when_endpoint_alive(verify_module, monk
     assert verify_module._ollama_reachable("http://localhost:11434") is True
 
 
+def test_autostart_probe_detects_windows_task(verify_module) -> None:
+    def _runner(args, **kwargs):  # noqa: ANN001, ANN202
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout='{"scheduled_tasks":["GTKB-Ollama-Serve"],"services":[]}',
+            stderr="",
+        )
+
+    result = verify_module.evaluate_ollama_autostart(
+        platform="win32",
+        executable_resolver=lambda _name: "powershell.exe",
+        command_runner=_runner,
+    )
+
+    assert result["checked"] is True
+    assert result["configured"] is True
+    assert result["scheduled_tasks"] == ["GTKB-Ollama-Serve"]
+    assert "warning" not in result
+
+
+def test_autostart_probe_warns_when_no_task_or_service(verify_module) -> None:
+    def _runner(args, **kwargs):  # noqa: ANN001, ANN202
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout='{"scheduled_tasks":[],"services":[]}',
+            stderr="",
+        )
+
+    result = verify_module.evaluate_ollama_autostart(
+        platform="win32",
+        executable_resolver=lambda _name: "powershell.exe",
+        command_runner=_runner,
+    )
+
+    assert result["checked"] is True
+    assert result["configured"] is False
+    assert "No Windows scheduled task or service" in result["warning"]
+
+
+def test_autostart_installer_script_is_guarded() -> None:
+    script = (_SCRIPTS_DIR / "ops" / "install_ollama_autostart_task.ps1").read_text(encoding="utf-8")
+
+    assert "SupportsShouldProcess" in script
+    assert "Register-ScheduledTask" in script
+    assert "ollama.exe" in script
+    assert '-Argument "serve"' in script
+
+
 # ── Live-mode: tool-loop round-trip ──────────────────────────────────────
 
 

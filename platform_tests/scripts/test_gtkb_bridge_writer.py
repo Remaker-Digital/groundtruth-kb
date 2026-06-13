@@ -357,12 +357,31 @@ def test_insert_index_status_prepends_in_document_block(tmp_path: Path) -> None:
     assert block.entries[1].version == 1
 
 
-def test_insert_index_status_detects_stale_snapshot(tmp_path: Path) -> None:
+def test_insert_index_status_merges_unrelated_snapshot_changes(tmp_path: Path) -> None:
     project = _build_project(tmp_path, _doc_block("race", [("NEW", 1)]))
     snapshot, _ = read_index(project)
     (project / "bridge" / "INDEX.md").write_text(snapshot + _doc_block("intruder", [("NEW", 1)]), encoding="utf-8")
-    with pytest.raises(BridgeConflictError, match="stale"):
-        insert_index_status("race", 2, "GO", project, expected_index_raw=snapshot)
+
+    insert_index_status("race", 2, "GO", project, expected_index_raw=snapshot)
+
+    _, blocks = read_index(project)
+    race = get_block(blocks, "race")
+    intruder = get_block(blocks, "intruder")
+    assert race is not None
+    assert race.latest_status == "GO"
+    assert race.latest_version == 2
+    assert intruder is not None
+    assert intruder.latest_status == "NEW"
+
+
+def test_insert_index_status_detects_same_document_stale_snapshot(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("race", [("NEW", 1)]))
+    snapshot, _ = read_index(project)
+    current = INDEX_HEADER + _doc_block("race", [("NO-GO", 2), ("NEW", 1)])
+    (project / "bridge" / "INDEX.md").write_text(current, encoding="utf-8")
+
+    with pytest.raises(BridgeConflictError, match="target document changed"):
+        insert_index_status("race", 3, "GO", project, expected_index_raw=snapshot)
 
 
 def test_insert_index_status_fails_when_document_block_missing(tmp_path: Path) -> None:

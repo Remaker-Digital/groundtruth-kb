@@ -38,6 +38,12 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
    (Prime Builder: confirm session focus; Loyal Opposition: process the
    actionable bridge queue by default per the LO overlay).
 
+## Antigravity (Harness ID C) Overrides
+
+To minimize token cost and resource consumption, the Antigravity harness modifies the canonical startup order:
+- **Skip Rules/Logs Reads**: Antigravity is exempt from reading the extensive Phase B rule/log payload. It only loads essential baseline files (`CLAUDE.md`, `AGENTS.md`, `canonical-terminology.md`, `file-bridge-protocol.md`, `memory/MEMORY.md`).
+- **Omit Heavy Subprocesses**: Any startup dispatching or background scripts (e.g. `session_self_initialization.py`) must be run with `--fast-hook` and `--skip-bridge-maintenance` to skip reachability probes and PDF exports.
+
 ## Role Overlays
 
 - **Prime Builder** → `config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md`.

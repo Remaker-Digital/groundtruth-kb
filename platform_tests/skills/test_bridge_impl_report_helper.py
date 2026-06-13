@@ -218,7 +218,7 @@ def test_credential_content_aborts_before_live_mutation(helper, tmp_path):
     assert "NEW: bridge/test-impl-report-003.md" not in (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
 
 
-def test_index_changed_during_write_is_detected(helper, tmp_path, monkeypatch):
+def test_unrelated_index_change_during_write_is_merged(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
     original_insert = helper.insert_index_status
 
@@ -226,6 +226,33 @@ def test_index_changed_during_write_is_detected(helper, tmp_path, monkeypatch):
         (bridge_dir / "INDEX.md").write_text(
             (expected_index_raw or "") + "\nDocument: other\nNEW: bridge/other-001.md\n", encoding="utf-8"
         )
+        return original_insert(
+            slug,
+            version,
+            status,
+            project_root,
+            expected_index_raw=expected_index_raw,
+        )
+
+    monkeypatch.setattr(helper, "insert_index_status", mutate_index_then_insert)
+
+    helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
+
+    index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
+    assert "NEW: bridge/test-impl-report-003.md" in index
+    assert "Document: other\nNEW: bridge/other-001.md" in index
+
+
+def test_same_document_index_change_during_write_is_detected(helper, tmp_path, monkeypatch):
+    bridge_dir = _stage_thread(tmp_path)
+    original_insert = helper.insert_index_status
+
+    def mutate_index_then_insert(slug, version, status, project_root, *, expected_index_raw=None):
+        changed = (expected_index_raw or "").replace(
+            "Document: test-impl-report\nGO: bridge/test-impl-report-002.md\n",
+            "Document: test-impl-report\nNO-GO: bridge/test-impl-report-009.md\nGO: bridge/test-impl-report-002.md\n",
+        )
+        (bridge_dir / "INDEX.md").write_text(changed, encoding="utf-8")
         return original_insert(
             slug,
             version,

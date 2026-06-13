@@ -557,3 +557,14 @@ chroma/
 # Nested harness-state spillover created by session tracking when commands run
 # from subdirectories. These are runtime byproducts, not bridge content.
 bridge/.claude/
+
+# =============================================================================
+# Archived git worktrees (added 2026-06-13 S438)
+# =============================================================================
+# archive/worktrees/ holds detached/archived git worktrees (full repo
+# checkouts; ~48.8k files observed S438). They are regenerable archive cruft,
+# carry their own .git gitfile, and must never be committed to the platform
+# repo or pushed. This pattern is scoped to archive/worktrees/ ONLY so the
+# legitimately-tracked archive/ subtrees (os-poller, smart-poller) are
+# unaffected.
+archive/worktrees/

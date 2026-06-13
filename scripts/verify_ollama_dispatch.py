@@ -22,10 +22,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +56,7 @@ OLLAMA_HARNESS_NAME = "ollama"
 OLLAMA_DISPATCH_SKILL = "bridge-review"
 OLLAMA_DISPATCH_REQUIRED_TOOLS = ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 OLLAMA_SHIM_RELATIVE = Path("scripts") / "ollama_harness.py"
+OLLAMA_AUTOSTART_PROBE_TIMEOUT_SECONDS = 5.0
 
 
 class VerificationError(RuntimeError):
@@ -75,10 +78,126 @@ def _ollama_reachable(endpoint: str = DEFAULT_ENDPOINT, timeout: float = 5.0) ->
         return False
 
 
+def _as_string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str) and item]
+    return []
+
+
+def evaluate_ollama_autostart(
+    *,
+    platform: str | None = None,
+    timeout: float = OLLAMA_AUTOSTART_PROBE_TIMEOUT_SECONDS,
+    executable_resolver: Callable[[str], str | None] | None = None,
+    command_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    """Return read-only Ollama host autostart evidence.
+
+    Autostart posture is diagnostic: missing service/task evidence should warn
+    operators but must not block dispatch when the daemon is already reachable.
+    """
+    active_platform = platform or sys.platform
+    if not active_platform.startswith("win"):
+        return {
+            "checked": False,
+            "configured": None,
+            "platform": active_platform,
+            "detail": "Ollama autostart check is Windows-specific and was skipped.",
+        }
+
+    resolver = executable_resolver or shutil.which
+    powershell = resolver("powershell.exe") or resolver("powershell") or resolver("pwsh.exe") or resolver("pwsh")
+    if not powershell:
+        return {
+            "checked": True,
+            "configured": False,
+            "platform": active_platform,
+            "scheduled_tasks": [],
+            "services": [],
+            "warning": "PowerShell is unavailable for the Ollama autostart probe.",
+        }
+
+    ps_script = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$tasks = @(Get-ScheduledTask | Where-Object {
+    $_.TaskName -match 'Ollama' -or $_.TaskPath -match 'Ollama'
+} | Select-Object -ExpandProperty TaskName)
+$services = @(Get-Service | Where-Object {
+    $_.Name -match 'Ollama' -or $_.DisplayName -match 'Ollama'
+} | Select-Object -ExpandProperty Name)
+[pscustomobject]@{
+    scheduled_tasks = $tasks
+    services = $services
+} | ConvertTo-Json -Compress
+"""
+    runner = command_runner or subprocess.run
+    try:
+        completed = runner(
+            [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "checked": True,
+            "configured": False,
+            "platform": active_platform,
+            "scheduled_tasks": [],
+            "services": [],
+            "warning": f"Ollama autostart probe failed: {exc}",
+        }
+
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()
+        return {
+            "checked": True,
+            "configured": False,
+            "platform": active_platform,
+            "scheduled_tasks": [],
+            "services": [],
+            "warning": f"Ollama autostart probe exited {completed.returncode}: {detail}",
+        }
+
+    try:
+        payload = json.loads((completed.stdout or "{}").strip() or "{}")
+    except json.JSONDecodeError as exc:
+        return {
+            "checked": True,
+            "configured": False,
+            "platform": active_platform,
+            "scheduled_tasks": [],
+            "services": [],
+            "warning": f"Ollama autostart probe returned non-JSON output: {exc}",
+        }
+
+    scheduled_tasks = _as_string_list(payload.get("scheduled_tasks"))
+    services = _as_string_list(payload.get("services"))
+    configured = bool(scheduled_tasks or services)
+    result: dict[str, Any] = {
+        "checked": True,
+        "configured": configured,
+        "platform": active_platform,
+        "scheduled_tasks": scheduled_tasks,
+        "services": services,
+    }
+    if not configured:
+        result["warning"] = "No Windows scheduled task or service matching Ollama was detected."
+    return result
+
+
 def _print_result(label: str, passed: bool, detail: str = "") -> None:
     status = "PASS" if passed else "FAIL"
     suffix = f" — {detail}" if detail else ""
     print(f"  [{status}] {label}{suffix}")
+
+
+def _print_warning(label: str, detail: str = "") -> None:
+    suffix = f" - {detail}" if detail else ""
+    print(f"  [WARN] {label}{suffix}")
 
 
 def load_harness_record(project_root: Path, recipient: str = OLLAMA_HARNESS_ID) -> dict[str, Any]:
@@ -159,9 +278,13 @@ def evaluate_dispatch_readiness(
     remain owned by the harness registry resolver.
     """
     checks: list[dict[str, Any]] = []
+    warnings: list[dict[str, str]] = []
 
     def add_check(name: str, passed: bool, detail: str = "") -> None:
         checks.append({"name": name, "passed": passed, "detail": detail})
+
+    def add_warning(name: str, detail: str = "") -> None:
+        warnings.append({"name": name, "detail": detail})
 
     try:
         command = build_dispatch_command(project_root, prompt, recipient=recipient)
@@ -199,11 +322,16 @@ def evaluate_dispatch_readiness(
         return {
             "ready": False,
             "checks": checks,
+            "warnings": warnings,
             "recipient": recipient,
             "argv": command,
             "model_id": model_route.model_id,
             "route_key": model_route.key,
         }
+
+    autostart = evaluate_ollama_autostart(timeout=min(timeout, OLLAMA_AUTOSTART_PROBE_TIMEOUT_SECONDS))
+    if autostart.get("checked") and autostart.get("warning"):
+        add_warning("ollama autostart", str(autostart["warning"]))
 
     if require_daemon:
         try:
@@ -213,6 +341,8 @@ def evaluate_dispatch_readiness(
             return {
                 "ready": False,
                 "checks": checks,
+                "warnings": warnings,
+                "autostart": autostart,
                 "recipient": recipient,
                 "argv": command,
                 "model_id": model_route.model_id,
@@ -224,6 +354,8 @@ def evaluate_dispatch_readiness(
             return {
                 "ready": False,
                 "checks": checks,
+                "warnings": warnings,
+                "autostart": autostart,
                 "recipient": recipient,
                 "argv": command,
                 "model_id": model_route.model_id,
@@ -233,6 +365,8 @@ def evaluate_dispatch_readiness(
     return {
         "ready": True,
         "checks": checks,
+        "warnings": warnings,
+        "autostart": autostart,
         "recipient": recipient,
         "argv": command,
         "model_id": model_route.model_id,
@@ -596,6 +730,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Ollama dispatch readiness: {status}")
             for check in result["checks"]:
                 _print_result(check["name"], bool(check["passed"]), str(check.get("detail") or ""))
+            for warning in result.get("warnings", []):
+                _print_warning(str(warning.get("name") or "warning"), str(warning.get("detail") or ""))
         return 0 if result["ready"] else 1
 
     print(f"Ollama dispatch verification — project root: {project_root}")

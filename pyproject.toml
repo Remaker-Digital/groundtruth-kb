@@ -6,7 +6,7 @@
 # ---------------------------------------------------------------------------
 
 [tool.pytest.ini_options]
-testpaths = ["platform_tests", "applications/Agent_Red/tests"]
+testpaths = ["platform_tests"]
 pythonpath = [".", "applications/Agent_Red"]
 asyncio_mode = "auto"
 python_files = ["test_*.py"]

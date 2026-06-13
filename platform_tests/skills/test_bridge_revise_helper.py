@@ -207,7 +207,7 @@ def test_preflight_failure_aborts_before_index_mutation(helper, tmp_path, monkey
     assert "REVISED: bridge/test-revision-003.md" not in (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
 
 
-def test_index_changed_during_write_is_detected(helper, tmp_path, monkeypatch):
+def test_unrelated_index_change_during_write_is_merged(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
     original_insert = helper.insert_index_status
 
@@ -215,6 +215,34 @@ def test_index_changed_during_write_is_detected(helper, tmp_path, monkeypatch):
         (bridge_dir / "INDEX.md").write_text(
             (expected_index_raw or "") + "\nDocument: other\nNEW: bridge/other-001.md\n", encoding="utf-8"
         )
+        return original_insert(
+            slug,
+            version,
+            status,
+            project_root,
+            expected_index_raw=expected_index_raw,
+        )
+
+    monkeypatch.setattr(helper, "_run_candidate_preflights", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(helper, "insert_index_status", mutate_index_then_insert)
+
+    helper.file_revision("test-revision", content=_completed_revision(), bridge_dir=bridge_dir)
+
+    index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
+    assert "REVISED: bridge/test-revision-003.md" in index
+    assert "Document: other\nNEW: bridge/other-001.md" in index
+
+
+def test_same_document_index_change_during_write_is_detected(helper, tmp_path, monkeypatch):
+    bridge_dir = _stage_thread(tmp_path)
+    original_insert = helper.insert_index_status
+
+    def mutate_index_then_insert(slug, version, status, project_root, *, expected_index_raw=None):
+        changed = (expected_index_raw or "").replace(
+            "Document: test-revision\nNO-GO: bridge/test-revision-002.md\n",
+            "Document: test-revision\nGO: bridge/test-revision-009.md\nNO-GO: bridge/test-revision-002.md\n",
+        )
+        (bridge_dir / "INDEX.md").write_text(changed, encoding="utf-8")
         return original_insert(
             slug,
             version,

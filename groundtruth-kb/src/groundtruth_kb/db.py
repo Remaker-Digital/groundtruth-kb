@@ -25,7 +25,7 @@ import re
 import sqlite3
 import threading
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -1095,6 +1095,14 @@ CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thr
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def _iso_plus_seconds(value: str, seconds: int) -> str:
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    parsed = datetime.fromisoformat(text)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return (parsed.astimezone(UTC) + timedelta(seconds=seconds)).isoformat(timespec="seconds")
 
 
 def spec_sort_key(spec_id: str) -> tuple[Any, ...]:
@@ -5497,6 +5505,255 @@ class KnowledgeDB:
         query += " ORDER BY stage_instance_id, changed_at, id"
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+    def _active_stage_lease_row(self, conn: sqlite3.Connection, stage_instance_id: str) -> sqlite3.Row | None:
+        return conn.execute(
+            """SELECT * FROM current_stage_leases
+               WHERE stage_instance_id = ? AND lease_status = 'active'
+               ORDER BY changed_at DESC, id
+               LIMIT 1""",
+            (stage_instance_id,),
+        ).fetchone()
+
+    def _append_stage_claim_state(
+        self,
+        conn: sqlite3.Connection,
+        stage: sqlite3.Row,
+        *,
+        claim_status: str,
+        claimed_by_harness_id: str | None,
+        claimed_by_session_id: str | None,
+        changed_by: str,
+        change_reason: str,
+    ) -> None:
+        version = self._next_stage_instance_version(stage["id"])
+        conn.execute(
+            """INSERT INTO stage_instances
+               (id, version, flow_instance_id, stage_id, stage_index, required_role,
+                status, claim_status, claimed_by_harness_id, claimed_by_session_id,
+                started_at, completed_at, metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                stage["id"],
+                version,
+                stage["flow_instance_id"],
+                stage["stage_id"],
+                stage["stage_index"],
+                stage["required_role"],
+                stage["status"],
+                claim_status,
+                claimed_by_harness_id,
+                claimed_by_session_id,
+                stage["started_at"],
+                stage["completed_at"],
+                stage["metadata"],
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+
+    def claim_stage_lease(
+        self,
+        stage_instance_id: str,
+        holder_harness_id: str,
+        holder_session_id: str,
+        ttl_seconds: int,
+        changed_by: str,
+        change_reason: str,
+        *,
+        lease_id: str | None = None,
+        acquired_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Acquire one active lease for a stage when no active lease exists."""
+        stage_id = _require_text("stage_instance_id", stage_instance_id)
+        holder_harness = _require_text("holder_harness_id", holder_harness_id)
+        holder_session = _require_text("holder_session_id", holder_session_id)
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+
+        conn = self._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            stage = conn.execute("SELECT * FROM current_stage_instances WHERE id = ?", (stage_id,)).fetchone()
+            if stage is None:
+                raise ValueError(f"unknown stage_instance_id: {stage_id}")
+            active = self._active_stage_lease_row(conn, stage_id)
+            if active is not None:
+                raise ValueError(f"stage already has active lease: {active['id']}")
+
+            now = acquired_at or _now()
+            next_lease_id = _require_text("stage lease id", lease_id or f"LEASE-{stage_id}")
+            version = self._next_stage_lease_version(next_lease_id)
+            conn.execute(
+                """INSERT INTO stage_leases
+                   (id, version, stage_instance_id, holder_harness_id, holder_session_id,
+                    lease_status, acquired_at, heartbeat_at, ttl_seconds, expires_at, released_at,
+                    metadata, changed_by, changed_at, change_reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    next_lease_id,
+                    version,
+                    stage_id,
+                    holder_harness,
+                    holder_session,
+                    "active",
+                    now,
+                    now,
+                    ttl_seconds,
+                    _iso_plus_seconds(now, ttl_seconds),
+                    None,
+                    _encode_json(metadata or {}),
+                    _require_text("changed_by", changed_by),
+                    _now(),
+                    _require_text("change_reason", change_reason),
+                ),
+            )
+            self._append_stage_claim_state(
+                conn,
+                stage,
+                claim_status="claimed",
+                claimed_by_harness_id=holder_harness,
+                claimed_by_session_id=holder_session,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.get_stage_lease(next_lease_id)
+
+    def release_stage_lease(
+        self,
+        stage_instance_id: str,
+        holder_harness_id: str,
+        holder_session_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        released_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Release the active stage lease when called by its current holder."""
+        stage_id = _require_text("stage_instance_id", stage_instance_id)
+        holder_harness = _require_text("holder_harness_id", holder_harness_id)
+        holder_session = _require_text("holder_session_id", holder_session_id)
+
+        conn = self._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            stage = conn.execute("SELECT * FROM current_stage_instances WHERE id = ?", (stage_id,)).fetchone()
+            if stage is None:
+                raise ValueError(f"unknown stage_instance_id: {stage_id}")
+            active = self._active_stage_lease_row(conn, stage_id)
+            if active is None:
+                raise ValueError(f"stage has no active lease: {stage_id}")
+            if active["holder_harness_id"] != holder_harness or active["holder_session_id"] != holder_session:
+                raise ValueError("lease holder mismatch")
+
+            now = released_at or _now()
+            version = self._next_stage_lease_version(active["id"])
+            conn.execute(
+                """INSERT INTO stage_leases
+                   (id, version, stage_instance_id, holder_harness_id, holder_session_id,
+                    lease_status, acquired_at, heartbeat_at, ttl_seconds, expires_at, released_at,
+                    metadata, changed_by, changed_at, change_reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    active["id"],
+                    version,
+                    stage_id,
+                    holder_harness,
+                    holder_session,
+                    "released",
+                    active["acquired_at"],
+                    active["heartbeat_at"],
+                    active["ttl_seconds"],
+                    active["expires_at"],
+                    now,
+                    active["metadata"],
+                    _require_text("changed_by", changed_by),
+                    _now(),
+                    _require_text("change_reason", change_reason),
+                ),
+            )
+            self._append_stage_claim_state(
+                conn,
+                stage,
+                claim_status="unclaimed",
+                claimed_by_harness_id=None,
+                claimed_by_session_id=None,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.get_stage_lease(active["id"])
+
+    def heartbeat_stage_lease(
+        self,
+        stage_instance_id: str,
+        holder_harness_id: str,
+        holder_session_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        ttl_seconds: int | None = None,
+        heartbeat_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Renew the active stage lease heartbeat for its current holder."""
+        stage_id = _require_text("stage_instance_id", stage_instance_id)
+        holder_harness = _require_text("holder_harness_id", holder_harness_id)
+        holder_session = _require_text("holder_session_id", holder_session_id)
+
+        conn = self._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT 1 FROM current_stage_instances WHERE id = ?", (stage_id,)).fetchone() is None:
+                raise ValueError(f"unknown stage_instance_id: {stage_id}")
+            active = self._active_stage_lease_row(conn, stage_id)
+            if active is None:
+                raise ValueError(f"stage has no active lease: {stage_id}")
+            if active["holder_harness_id"] != holder_harness or active["holder_session_id"] != holder_session:
+                raise ValueError("lease holder mismatch")
+
+            ttl = active["ttl_seconds"] if ttl_seconds is None else ttl_seconds
+            if ttl <= 0:
+                raise ValueError("ttl_seconds must be positive")
+            now = heartbeat_at or _now()
+            version = self._next_stage_lease_version(active["id"])
+            conn.execute(
+                """INSERT INTO stage_leases
+                   (id, version, stage_instance_id, holder_harness_id, holder_session_id,
+                    lease_status, acquired_at, heartbeat_at, ttl_seconds, expires_at, released_at,
+                    metadata, changed_by, changed_at, change_reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    active["id"],
+                    version,
+                    stage_id,
+                    holder_harness,
+                    holder_session,
+                    "active",
+                    active["acquired_at"],
+                    now,
+                    ttl,
+                    _iso_plus_seconds(now, ttl),
+                    None,
+                    active["metadata"],
+                    _require_text("changed_by", changed_by),
+                    _now(),
+                    _require_text("change_reason", change_reason),
+                ),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.get_stage_lease(active["id"])
 
     def _next_agent_capability_snapshot_version(self, snapshot_id: str) -> int:
         row = (

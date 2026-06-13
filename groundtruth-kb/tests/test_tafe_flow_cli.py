@@ -25,6 +25,45 @@ def _json_output(result) -> dict:
     return json.loads(result.output)
 
 
+def _create_cli_stage(project_dir: Path) -> str:
+    db = _db(project_dir)
+    try:
+        service = TypedArtifactFlowService(db)
+        definition = service.create_flow_definition(
+            id="FLOW-CLI-LEASE",
+            flow_type="implementation",
+            name="CLI lease flow",
+            stages=["propose", "review"],
+            required_roles={
+                "propose": "prime-builder",
+                "review": "loyal-opposition",
+            },
+            changed_by="test",
+            change_reason="seed CLI lease definition",
+            source_spec_ids=["SPEC-TAFE-R2", "SPEC-TAFE-R3", "SPEC-TAFE-R7"],
+        )
+        flow = service.create_flow_instance(
+            id="FLOWINST-CLI-LEASE",
+            flow_definition_id=definition["id"],
+            subject_type="bridge-thread",
+            subject_id="gtkb-tafe-flow-lease-commands",
+            changed_by="test",
+            change_reason="seed CLI lease flow",
+        )
+        stage = service.create_stage_instance(
+            id="STAGEINST-CLI-LEASE",
+            flow_instance_id=flow["id"],
+            stage_id="review",
+            stage_index=1,
+            required_role="loyal-opposition",
+            changed_by="test",
+            change_reason="seed CLI lease stage",
+        )
+        return stage["id"]
+    finally:
+        db.close()
+
+
 def test_flow_help_lists_phase_0_skeleton_commands(runner: CliRunner, project_dir: Path) -> None:
     result = runner.invoke(main, [*_config_args(project_dir), "flow", "--help"])
 
@@ -110,9 +149,6 @@ def test_flow_phase_0_noop_commands_do_not_mutate_db_or_bridge(runner: CliRunner
     db_path = project_dir / "groundtruth.db"
     commands = [
         ["flow", "start", "implementation", "--subject-type", "bridge-thread", "--subject-id", "sample", "--json"],
-        ["flow", "claim", "STAGE-1", "--json"],
-        ["flow", "release", "STAGE-1", "--json"],
-        ["flow", "heartbeat", "STAGE-1", "--json"],
         ["flow", "advance", "STAGE-1", "--to-stage", "verify", "--json"],
         ["flow", "dispatch", "tick", "--json"],
         ["flow", "dispatch", "health", "--json"],
@@ -127,3 +163,127 @@ def test_flow_phase_0_noop_commands_do_not_mutate_db_or_bridge(runner: CliRunner
 
     assert index_path.read_text(encoding="utf-8") == index_before
     assert not db_path.exists()
+
+
+def test_flow_lease_commands_claim_heartbeat_and_release_stage(runner: CliRunner, project_dir: Path) -> None:
+    stage_id = _create_cli_stage(project_dir)
+    config_args = _config_args(project_dir)
+
+    claimed = _json_output(
+        runner.invoke(
+            main,
+            [
+                *config_args,
+                "flow",
+                "claim",
+                stage_id,
+                "--holder-harness-id",
+                "A",
+                "--holder-session-id",
+                "session-001",
+                "--ttl-seconds",
+                "600",
+                "--json",
+            ],
+        )
+    )
+
+    assert claimed["mutated"] is True
+    assert claimed["phase"] == "phase-1"
+    assert claimed["status"] == "active"
+    assert claimed["lease_id"] == "LEASE-STAGEINST-CLI-LEASE"
+    assert claimed["holder_harness_id"] == "A"
+    assert claimed["holder_session_id"] == "session-001"
+
+    duplicate = runner.invoke(
+        main,
+        [
+            *config_args,
+            "flow",
+            "claim",
+            stage_id,
+            "--holder-harness-id",
+            "B",
+            "--holder-session-id",
+            "session-002",
+            "--json",
+        ],
+    )
+    assert duplicate.exit_code == 1
+    duplicate_payload = json.loads(duplicate.output)
+    assert duplicate_payload["mutated"] is False
+    assert duplicate_payload["status"] == "error"
+    assert "already has active lease" in duplicate_payload["summary"]
+
+    heartbeat = _json_output(
+        runner.invoke(
+            main,
+            [
+                *config_args,
+                "flow",
+                "heartbeat",
+                stage_id,
+                "--holder-harness-id",
+                "A",
+                "--holder-session-id",
+                "session-001",
+                "--ttl-seconds",
+                "900",
+                "--json",
+            ],
+        )
+    )
+    assert heartbeat["mutated"] is True
+    assert heartbeat["status"] == "active"
+    assert heartbeat["lease"]["version"] == 2
+    assert heartbeat["lease"]["ttl_seconds"] == 900
+
+    wrong_holder = runner.invoke(
+        main,
+        [
+            *config_args,
+            "flow",
+            "release",
+            stage_id,
+            "--holder-harness-id",
+            "B",
+            "--holder-session-id",
+            "session-002",
+            "--json",
+        ],
+    )
+    assert wrong_holder.exit_code == 1
+    wrong_holder_payload = json.loads(wrong_holder.output)
+    assert wrong_holder_payload["status"] == "error"
+    assert "lease holder mismatch" in wrong_holder_payload["summary"]
+
+    released = _json_output(
+        runner.invoke(
+            main,
+            [
+                *config_args,
+                "flow",
+                "release",
+                stage_id,
+                "--holder-harness-id",
+                "A",
+                "--holder-session-id",
+                "session-001",
+                "--json",
+            ],
+        )
+    )
+    assert released["mutated"] is True
+    assert released["status"] == "released"
+    assert released["lease"]["version"] == 3
+
+    db = _db(project_dir)
+    try:
+        service = TypedArtifactFlowService(db)
+        current_stage = service.get_stage_instance(stage_id)
+        assert current_stage is not None
+        assert current_stage["claim_status"] == "unclaimed"
+        assert current_stage["claimed_by_harness_id"] is None
+        assert current_stage["claimed_by_session_id"] is None
+    finally:
+        db.close()

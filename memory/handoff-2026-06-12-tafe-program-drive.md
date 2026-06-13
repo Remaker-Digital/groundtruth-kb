@@ -34,30 +34,107 @@ READ FIRST (authority pointers — this prompt is routing context, NOT state tru
    generated-view parity, non-mutating bookkeeping; bridge/INDEX.md canonical
    until a governed cutover is VERIFIED (Phase 7, owner AUQ).
 
-STATE AT S435 END (2026-06-12 ~22:00Z — verify by fresh reads before acting):
-- Reconciliation thread gtkb-tafe-backlog-reconciliation: WI-4495/WI-4496
-  superseded at v2 (PAUTH rowid 198; owner decision
-  DELIB-TAFE-BACKLOG-RECONCILIATION-PAUTH-20260612 v1+v2); post-impl report
-  -003 filed NEW, awaiting Codex VERIFIED.
-- Spec promotion thread gtkb-tafe-spec-promotion: proposal -001 filed NEW,
-  awaiting Codex GO. Owner approved all 8 candidate texts unchanged
-  (DELIB-TAFE-SPEC-PROMOTION-APPROVAL-20260612).
-- Commits: 47a9b5dd1 (sweep), 44197dde8 (TAFE filings). WI-4511 captured
-  (duplicate sub-project rows defect, P3).
+!!! SUPERSEDED — DO NOT ACT ON THE CODEX WRAP NOTE BELOW (S436 correction) !!!
+The "CODEX LO WRAP UPDATE" directive to implement on `-002` is OVERTURNED.
+The `-002` GO is INVALID: it was authored by harness C (antigravity), which
+the canonical registry (`harness-state/harness-registry.json`) records as
+durable role `prime-builder` + status `suspended` — NOT a loyal-opposition
+harness. D17 makes Codex (harness A) the MANDATORY reviewer; no Codex verdict
+exists. A 5-lens audit (workflow wf_5454ee82-50a) unanimously found `-002` does
+NOT authorize implementation (conf 0.88–0.92). Owner AUQ
+(DELIB-TAFE-PHASE-0-ENABLEMENT-GO-DEFERRAL-20260612) chose **Park DEFERRED
+pending Codex**. The thread is now DEFERRED @ `-003`. DO NOT implement until a
+genuine Codex (harness A) GO is filed as `-004`. Defects captured: WI-4513
+(impl-start gate is author-role-blind), WI-4515 (harness-C LO-self-label vs
+prime-builder/suspended registry role). The Codex wrap note trusted the `-002`
+self-label without checking the registry — that is the root error.
+
+CODEX LO WRAP UPDATE (A-2026-06-12T22-59-14Z) [SUPERSEDED — see block above]:
+- Live `bridge/INDEX.md` now has `gtkb-tafe-phase-0-enablement` at GO via
+  `bridge/gtkb-tafe-phase-0-enablement-002.md` (Antigravity LO, harness C).
+  Ignore stale "awaiting Codex GO" wording below. Next Prime Builder action is
+  to implement the bounded MemBase mutation authorized by proposal -001:
+  create the Phase-0 PAUTH, enrich WI-4487..WI-4491, read back, file the
+  post-implementation report, and drive it to VERIFIED.
+- The GO accepts deferring GOV-12/GOV-13 linked-test creation to each WI's own
+  implementation proposal under the GOV-10 rationale that the production
+  interfaces do not exist yet.
+- Live latest-status LO-actionable bridge scan at wrap: 0 latest NEW/REVISED.
+
+STATE AT S436 END (2026-06-12 ~22:55Z — verify by fresh reads before acting):
+- Reconciliation thread gtkb-tafe-backlog-reconciliation: VERIFIED @ -004
+  (terminal; WI-4495/WI-4496 superseded; PAUTH rowid 198).
+- Spec promotion thread gtkb-tafe-spec-promotion: VERIFIED @ -004 (terminal).
+  All 8 SPEC-TAFE specs now v2 status=specified, byte-identical to candidate
+  v1, v1 preserved. 8 promotion approval packets at
+  .groundtruth/formal-artifact-approvals/2026-06-12-<spec-id>-promotion.json
+  (-promotion suffix because candidate-INSERT packets occupy the plain names).
+  Driver: .gtkb-state/tafe_spec_promotion.py; evidence in
+  .gtkb-state/tafe-promotion-evidence/*.json. Codex hygiene note (advisory):
+  future packet-creating proposals should list packet paths in target_paths.
+- Phase-0 enablement thread gtkb-tafe-phase-0-enablement: **DEFERRED @ -003**
+  (owner-directed parking). Proposal -001 (governance_advisory) proposes (1)
+  create Phase-0 PAUTH (id PAUTH-...-TAFE-PHASE-0-SCHEMA-CLI-DOCTOR-WI-4487-4491)
+  scoped to WI-4487..4491, include the 8 formal specs, forbid cutover/
+  index-authority/pilot-expansion/phase-2/impl-flow-pilot/generated-view; (2)
+  enrich the 5 WIs (related_spec_ids, acceptance, implementation_order 1-5,
+  deps, approval_state->auq_resolved). Both preflights GREEN
+  (applicability sha256:ca7b7b22...; clause exit 0). **A -002 "GO" exists but is
+  INVALID** (harness C / antigravity = durable prime-builder + suspended, not a
+  valid LO; D17 makes Codex harness-A mandatory; no Codex verdict). Owner AUQ
+  chose Park DEFERRED. RESUME CONDITION: a genuine Codex (harness A) GO filed as
+  -004. The enrichment design (spec->WI mapping + acceptance per WI) is fully
+  written in -001 §"Proposed Work-Item Enrichment" — reuse it verbatim when
+  implementing post-Codex-GO. Codex already (informally, in the now-superseded
+  wrap note) accepted deferring GOV-12/13 test creation to each WI's impl
+  proposal under GOV-10; re-confirm in the real Codex verdict.
+  **HOLD DIRECTIVE SUPERSEDED (owner "Release all deferrals", 2026-06-13).** The
+  earlier 00:08Z "Keep DEFERRED, hold" was reversed. A CONCURRENT Claude Prime
+  session (7a602b01, opus-4-8) filed -004 REVISED (owner "Unblock TAFE Phase 0"
+  AUQ) clearing the DEFERRED park; enablement is now REVISED @ -004 and
+  Codex-actionable (awaiting a VALID Codex harness-A GO). The -004 carries -001
+  content verbatim and routes to Codex. NOTE: two interactive Claude PB sessions
+  ran concurrently (mine c76b3a89, the other 7a602b01); coordinate via
+  work-intent claims before touching shared threads. Next: a real Codex GO on
+  -004 → implement PAUTH + WI enrichment per -001/-004 §"Proposed Work-Item
+  Enrichment".
+- Owner decisions banked this session:
+  DELIB-TAFE-PHASE-0-ENABLEMENT-PAUTH-20260612 (AUQ "Authorize all 5 WIs");
+  DELIB-TAFE-PHASE-0-ENABLEMENT-GO-DEFERRAL-20260612 (AUQ "Park DEFERRED pending
+  Codex").
+- Governance defects captured S436: WI-4513 (impl-start gate author-role-blind,
+  P2 improvement); WI-4515 (harness-C LO self-label vs prime-builder/suspended
+  registry role, P2 defect).
+- DECISION-1165 moved Pending->Resolved (was mis-filed, re-surfacing each prompt).
+- Commits at S435: 47a9b5dd1, 44197dde8, c281bf2b5. S436 work UNCOMMITTED
+  (spec-promotion -003 report + 8 promotion packets + enablement -001 + -003
+  DEFERRED + INDEX + evidence scripts) — commit deferred per protocol until
+  owner sweep-commit. WI-4511 = duplicate sub-project rows defect (P3).
 
 DO NEXT, in order, each through its own gate:
-1. Check live INDEX for verdicts on both TAFE threads. NO-GO → revise per
-   findings. Reconciliation VERIFIED → thread closes.
-2. On spec-promotion GO: create 8 formal-artifact approval packets at
-   .groundtruth/formal-artifact-approvals/2026-06-12-<spec-id>.json citing
-   DELIB-TAFE-SPEC-PROMOTION-APPROVAL-20260612; promote each spec
-   candidate→specified, content byte-identical, append-only new version;
-   read-back all 8; file post-impl with dry-run/apply/read-back evidence;
-   drive to VERIFIED.
-3. Phase 0 enablement: owner AUQ → PAUTH scoped to WI-4487..WI-4491
-   (--include-spec the now-formal SPEC-TAFE-* IDs); enrich the 5 Phase-0 WIs
-   (related_spec_ids, acceptance_summary, implementation_order) and create
-   linked tests per GOV-12/GOV-13; progress approval_state with AUQ evidence.
+1. gtkb-tafe-phase-0-enablement is DEFERRED @ -003 pending a valid Codex
+   (harness A) GO. DO NOT implement on the invalid -002 harness-C GO.
+   - When a Codex harness-A verdict appears as -004:
+     - Codex GO → run `python scripts/implementation_authorization.py begin
+       --bridge-id gtkb-tafe-phase-0-enablement` from THAT GO, then implement
+       the bounded MemBase mutation: (a) create the Phase-0 PAUTH via
+       `python -m groundtruth_kb projects authorize PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE
+       --owner-decision DELIB-TAFE-PHASE-0-ENABLEMENT-PAUTH-20260612 --name <...>
+       --scope <...> --include-work-item WI-4487 ... --include-spec SPEC-TAFE-R1 ...
+       (×8) --allowed-mutation schema_table_creation ... --forbid bridge_rule_cutover ...
+       --change-reason <cites bridge + DELIB>`; (b) enrich the 5 WIs via
+       update_work_item (related_spec_ids_at_creation [JSON], acceptance_summary,
+       implementation_order 1-5, depends_on_work_items [JSON],
+       related_deliberation_ids, approval_state='auq_resolved') — values are in
+       -001 §"Proposed Work-Item Enrichment"; (c) read-back; (d) file post-impl
+       report; drive to VERIFIED. Write a .gtkb-state/*.py driver (no python -c).
+       update_work_item accepts these as **fields kwargs (WORK_ITEM_BACKLOG_FIELDS).
+     - Codex NO-GO → revise per findings and refile REVISED.
+   - Soliciting the Codex GO: while an interactive session is active the
+     cross-harness trigger suppresses headless Codex dispatch; let the session
+     idle (trigger fires) or owner runs a Codex bridge scan.
+2. (DONE: spec promotion VERIFIED @ -004.)
+3. (DONE: reconciliation VERIFIED @ -004.)
 4. File WI-4487 implementation proposal (flow_definitions table) — full spec
    linkage + spec-derived test plan + target_paths + `## Requirement
    Sufficiency` as a top-level h2. Resolve appraisal finding F5 inside it:

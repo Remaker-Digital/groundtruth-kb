@@ -447,6 +447,90 @@ class FlowRuntimeService(FlowDefinitionService):
             )
         ]
 
+    def claim_stage_lease(
+        self,
+        *,
+        stage_instance_id: str,
+        holder_harness_id: str,
+        holder_session_id: str,
+        ttl_seconds: int,
+        changed_by: str,
+        change_reason: str,
+        lease_id: str | None = None,
+        acquired_at: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Acquire one active lease for a stage when no active lease exists."""
+
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+        row = self.db.claim_stage_lease(
+            stage_instance_id=_require_non_empty("stage_instance_id", stage_instance_id),
+            holder_harness_id=_require_non_empty("holder_harness_id", holder_harness_id),
+            holder_session_id=_require_non_empty("holder_session_id", holder_session_id),
+            ttl_seconds=ttl_seconds,
+            changed_by=_require_non_empty("changed_by", changed_by),
+            change_reason=_require_non_empty("change_reason", change_reason),
+            lease_id=lease_id,
+            acquired_at=acquired_at,
+            metadata=dict(metadata) if metadata is not None else None,
+        )
+        if row is None:
+            raise RuntimeError(f"Claimed stage lease for {stage_instance_id!r} but could not read it back")
+        return dict(row)
+
+    def release_stage_lease(
+        self,
+        *,
+        stage_instance_id: str,
+        holder_harness_id: str,
+        holder_session_id: str,
+        changed_by: str,
+        change_reason: str,
+        released_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Release the active stage lease when called by its current holder."""
+
+        row = self.db.release_stage_lease(
+            stage_instance_id=_require_non_empty("stage_instance_id", stage_instance_id),
+            holder_harness_id=_require_non_empty("holder_harness_id", holder_harness_id),
+            holder_session_id=_require_non_empty("holder_session_id", holder_session_id),
+            changed_by=_require_non_empty("changed_by", changed_by),
+            change_reason=_require_non_empty("change_reason", change_reason),
+            released_at=released_at,
+        )
+        if row is None:
+            raise RuntimeError(f"Released stage lease for {stage_instance_id!r} but could not read it back")
+        return dict(row)
+
+    def heartbeat_stage_lease(
+        self,
+        *,
+        stage_instance_id: str,
+        holder_harness_id: str,
+        holder_session_id: str,
+        changed_by: str,
+        change_reason: str,
+        ttl_seconds: int | None = None,
+        heartbeat_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Renew the active stage lease heartbeat for its current holder."""
+
+        if ttl_seconds is not None and ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+        row = self.db.heartbeat_stage_lease(
+            stage_instance_id=_require_non_empty("stage_instance_id", stage_instance_id),
+            holder_harness_id=_require_non_empty("holder_harness_id", holder_harness_id),
+            holder_session_id=_require_non_empty("holder_session_id", holder_session_id),
+            changed_by=_require_non_empty("changed_by", changed_by),
+            change_reason=_require_non_empty("change_reason", change_reason),
+            ttl_seconds=ttl_seconds,
+            heartbeat_at=heartbeat_at,
+        )
+        if row is None:
+            raise RuntimeError(f"Renewed stage lease for {stage_instance_id!r} but could not read it back")
+        return dict(row)
+
     def record_capability_snapshot(
         self,
         *,

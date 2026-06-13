@@ -48,6 +48,7 @@ def _skip_l4b_probe(monkeypatch: pytest.MonkeyPatch) -> None:
     fixture's correctness.
     """
     monkeypatch.setenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", "1")
+    monkeypatch.setenv("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS", "1")
 
 
 def _write_clean_ollama_fixtures(root: Path) -> None:
@@ -332,3 +333,47 @@ def test_advertised_model_absent_via_api_tags(tmp_path: Path, monkeypatch: pytes
     )
     assert "L4b" in result.message, f"expected L4b finding when routing model absent; got: {result.message}"
     assert "not advertised" in result.message.lower(), f"expected 'not advertised' diagnostic; got: {result.message}"
+
+
+def test_api_tags_unreachable_returns_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """L4b: unreachable API is an explicit host-readiness warning."""
+    import urllib.error
+    import urllib.request as _urlreq
+
+    _write_clean_ollama_fixtures(tmp_path)
+    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
+
+    def _raise_url_error(_url: str, timeout: float = 2.0):  # noqa: ANN202
+        raise urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(_urlreq, "urlopen", _raise_url_error)
+
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L4b" in result.message
+    assert "/api/tags unreachable" in result.message
+
+
+def test_windows_autostart_missing_returns_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """L5: missing Windows task/service is a diagnostic warning."""
+    from groundtruth_kb.project import doctor as doctor_mod
+
+    _write_clean_ollama_fixtures(tmp_path)
+    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS", raising=False)
+    monkeypatch.setattr(doctor_mod.sys, "platform", "win32")
+    monkeypatch.setattr(doctor_mod.shutil, "which", lambda _name: "powershell.exe")
+
+    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        return doctor_mod.subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout='{"scheduled_tasks":[],"services":[]}',
+            stderr="",
+        )
+
+    monkeypatch.setattr(doctor_mod.subprocess, "run", _fake_run)
+
+    result = _check_ollama_harness(tmp_path)
+    assert result.status == "warning"
+    assert "L5" in result.message
+    assert "autostart not detected" in result.message

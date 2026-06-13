@@ -207,6 +207,33 @@ def _flow_noop_payload(command: str, *, detail: str) -> dict[str, Any]:
     }
 
 
+def _flow_lease_payload(command: str, stage_instance_id: str, lease: dict[str, Any], *, summary: str) -> dict[str, Any]:
+    return {
+        "command": command,
+        "holder_harness_id": lease["holder_harness_id"],
+        "holder_session_id": lease["holder_session_id"],
+        "lease": lease,
+        "lease_id": lease["id"],
+        "mutated": True,
+        "phase": "phase-1",
+        "stage_instance_id": stage_instance_id,
+        "status": lease["lease_status"],
+        "summary": summary,
+    }
+
+
+def _flow_lease_error_payload(command: str, stage_instance_id: str, error: Exception) -> dict[str, Any]:
+    return {
+        "command": command,
+        "error": str(error),
+        "mutated": False,
+        "phase": "phase-1",
+        "stage_instance_id": stage_instance_id,
+        "status": "error",
+        "summary": f"{command}: {error}",
+    }
+
+
 @main.group("flow")
 def flow_group() -> None:
     """Typed Artifact-Flow Engine command skeleton."""
@@ -378,32 +405,129 @@ def flow_start_cmd(flow_definition_id: str, subject_type: str, subject_id: str, 
 
 @flow_group.command("claim")
 @click.argument("stage_instance_id")
+@click.option("--holder-harness-id", required=True, help="Harness id acquiring the stage lease.")
+@click.option("--holder-session-id", required=True, help="Session/context id acquiring the stage lease.")
+@click.option("--ttl-seconds", type=int, default=600, show_default=True, help="Lease TTL in seconds.")
+@click.option("--lease-id", default=None, help="Optional explicit lease id; defaults to LEASE-<stage_instance_id>.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
-def flow_claim_cmd(stage_instance_id: str, json_output: bool) -> None:
-    """No-op Phase 0 placeholder for stage claims."""
-    payload = _flow_noop_payload("flow claim", detail="stage leases are reserved for WI-4492/WI-4493.")
-    payload["stage_instance_id"] = stage_instance_id
-    _emit_cli_payload(payload, json_output=json_output)
+@click.pass_context
+def flow_claim_cmd(
+    ctx: click.Context,
+    stage_instance_id: str,
+    holder_harness_id: str,
+    holder_session_id: str,
+    ttl_seconds: int,
+    lease_id: str | None,
+    json_output: bool,
+) -> None:
+    """Acquire one active TAFE stage lease."""
+    db, service = _flow_service(ctx)
+    try:
+        try:
+            lease = service.claim_stage_lease(
+                stage_instance_id=stage_instance_id,
+                holder_harness_id=holder_harness_id,
+                holder_session_id=holder_session_id,
+                ttl_seconds=ttl_seconds,
+                lease_id=lease_id,
+                changed_by="gt-flow-lease-cli",
+                change_reason="gt flow claim",
+            )
+        except ValueError as exc:
+            _emit_cli_payload(_flow_lease_error_payload("flow claim", stage_instance_id, exc), json_output=json_output)
+            raise SystemExit(1) from exc
+    finally:
+        db.close()
+    _emit_cli_payload(
+        _flow_lease_payload(
+            "flow claim", stage_instance_id, lease, summary=f"Claimed {lease['id']} for {stage_instance_id}."
+        ),
+        json_output=json_output,
+    )
 
 
 @flow_group.command("release")
 @click.argument("stage_instance_id")
+@click.option("--holder-harness-id", required=True, help="Harness id holding the stage lease.")
+@click.option("--holder-session-id", required=True, help="Session/context id holding the stage lease.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
-def flow_release_cmd(stage_instance_id: str, json_output: bool) -> None:
-    """No-op Phase 0 placeholder for stage release."""
-    payload = _flow_noop_payload("flow release", detail="stage leases are reserved for WI-4492/WI-4493.")
-    payload["stage_instance_id"] = stage_instance_id
-    _emit_cli_payload(payload, json_output=json_output)
+@click.pass_context
+def flow_release_cmd(
+    ctx: click.Context,
+    stage_instance_id: str,
+    holder_harness_id: str,
+    holder_session_id: str,
+    json_output: bool,
+) -> None:
+    """Release the active TAFE stage lease held by this holder."""
+    db, service = _flow_service(ctx)
+    try:
+        try:
+            lease = service.release_stage_lease(
+                stage_instance_id=stage_instance_id,
+                holder_harness_id=holder_harness_id,
+                holder_session_id=holder_session_id,
+                changed_by="gt-flow-lease-cli",
+                change_reason="gt flow release",
+            )
+        except ValueError as exc:
+            _emit_cli_payload(
+                _flow_lease_error_payload("flow release", stage_instance_id, exc), json_output=json_output
+            )
+            raise SystemExit(1) from exc
+    finally:
+        db.close()
+    _emit_cli_payload(
+        _flow_lease_payload(
+            "flow release", stage_instance_id, lease, summary=f"Released {lease['id']} for {stage_instance_id}."
+        ),
+        json_output=json_output,
+    )
 
 
 @flow_group.command("heartbeat")
 @click.argument("stage_instance_id")
+@click.option("--holder-harness-id", required=True, help="Harness id holding the stage lease.")
+@click.option("--holder-session-id", required=True, help="Session/context id holding the stage lease.")
+@click.option("--ttl-seconds", type=int, default=None, help="Optional replacement lease TTL in seconds.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
-def flow_heartbeat_cmd(stage_instance_id: str, json_output: bool) -> None:
-    """No-op Phase 0 placeholder for lease heartbeat."""
-    payload = _flow_noop_payload("flow heartbeat", detail="lease heartbeat is reserved for WI-4493.")
-    payload["stage_instance_id"] = stage_instance_id
-    _emit_cli_payload(payload, json_output=json_output)
+@click.pass_context
+def flow_heartbeat_cmd(
+    ctx: click.Context,
+    stage_instance_id: str,
+    holder_harness_id: str,
+    holder_session_id: str,
+    ttl_seconds: int | None,
+    json_output: bool,
+) -> None:
+    """Renew the active TAFE stage lease heartbeat for this holder."""
+    db, service = _flow_service(ctx)
+    try:
+        try:
+            lease = service.heartbeat_stage_lease(
+                stage_instance_id=stage_instance_id,
+                holder_harness_id=holder_harness_id,
+                holder_session_id=holder_session_id,
+                ttl_seconds=ttl_seconds,
+                changed_by="gt-flow-lease-cli",
+                change_reason="gt flow heartbeat",
+            )
+        except ValueError as exc:
+            _emit_cli_payload(
+                _flow_lease_error_payload("flow heartbeat", stage_instance_id, exc), json_output=json_output
+            )
+            raise SystemExit(1) from exc
+    finally:
+        db.close()
+    _emit_cli_payload(
+        _flow_lease_payload(
+            "flow heartbeat",
+            stage_instance_id,
+            lease,
+            summary=f"Renewed heartbeat for {lease['id']} on {stage_instance_id}.",
+        ),
+        json_output=json_output,
+    )
 
 
 @flow_group.command("advance")

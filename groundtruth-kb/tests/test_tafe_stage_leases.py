@@ -170,17 +170,99 @@ def test_stage_lease_service_rejects_unanchored_or_invalid_rows(tmp_path) -> Non
         db.close()
 
 
-def test_stage_lease_slice_does_not_expose_claim_release_or_heartbeat_api(tmp_path) -> None:
+def test_stage_lease_claim_release_and_heartbeat_enforce_single_holder(tmp_path) -> None:
     db, service = _service(tmp_path)
     try:
-        for forbidden_name in (
-            "claim_stage",
-            "release_stage",
-            "heartbeat_stage",
-            "claim_stage_lease",
-            "release_stage_lease",
-            "heartbeat_stage_lease",
-        ):
-            assert not hasattr(service, forbidden_name)
+        stage = _create_stage(service)
+
+        claimed = service.claim_stage_lease(
+            stage_instance_id=stage["id"],
+            holder_harness_id="A",
+            holder_session_id="session-001",
+            ttl_seconds=600,
+            acquired_at="2026-06-13T05:00:00Z",
+            changed_by="test",
+            change_reason="claim lease",
+        )
+
+        assert claimed["id"] == "LEASE-STAGEINST-LEASE-001"
+        assert claimed["version"] == 1
+        assert claimed["lease_status"] == "active"
+        assert claimed["heartbeat_at"] == "2026-06-13T05:00:00Z"
+        assert claimed["expires_at"] == "2026-06-13T05:10:00+00:00"
+        current_stage = service.get_stage_instance(stage["id"])
+        assert current_stage is not None
+        assert current_stage["claim_status"] == "claimed"
+        assert current_stage["claimed_by_harness_id"] == "A"
+        assert current_stage["claimed_by_session_id"] == "session-001"
+
+        with pytest.raises(ValueError, match="already has active lease"):
+            service.claim_stage_lease(
+                stage_instance_id=stage["id"],
+                holder_harness_id="B",
+                holder_session_id="session-002",
+                ttl_seconds=600,
+                changed_by="test",
+                change_reason="duplicate claim",
+            )
+
+        heartbeat = service.heartbeat_stage_lease(
+            stage_instance_id=stage["id"],
+            holder_harness_id="A",
+            holder_session_id="session-001",
+            ttl_seconds=900,
+            heartbeat_at="2026-06-13T05:05:00Z",
+            changed_by="test",
+            change_reason="heartbeat lease",
+        )
+
+        assert heartbeat["version"] == 2
+        assert heartbeat["lease_status"] == "active"
+        assert heartbeat["ttl_seconds"] == 900
+        assert heartbeat["heartbeat_at"] == "2026-06-13T05:05:00Z"
+        assert heartbeat["expires_at"] == "2026-06-13T05:20:00+00:00"
+
+        with pytest.raises(ValueError, match="lease holder mismatch"):
+            service.release_stage_lease(
+                stage_instance_id=stage["id"],
+                holder_harness_id="B",
+                holder_session_id="session-002",
+                changed_by="test",
+                change_reason="wrong holder release",
+            )
+
+        released = service.release_stage_lease(
+            stage_instance_id=stage["id"],
+            holder_harness_id="A",
+            holder_session_id="session-001",
+            released_at="2026-06-13T05:06:00Z",
+            changed_by="test",
+            change_reason="release lease",
+        )
+
+        assert released["version"] == 3
+        assert released["lease_status"] == "released"
+        assert released["released_at"] == "2026-06-13T05:06:00Z"
+        current_stage = service.get_stage_instance(stage["id"])
+        assert current_stage is not None
+        assert current_stage["claim_status"] == "unclaimed"
+        assert current_stage["claimed_by_harness_id"] is None
+        assert current_stage["claimed_by_session_id"] is None
+        assert [row["version"] for row in service.get_stage_lease_history(claimed["id"])] == [3, 2, 1]
+
+        reclaimed = service.claim_stage_lease(
+            stage_instance_id=stage["id"],
+            holder_harness_id="B",
+            holder_session_id="session-002",
+            ttl_seconds=300,
+            acquired_at="2026-06-13T05:07:00Z",
+            changed_by="test",
+            change_reason="reclaim after release",
+        )
+
+        assert reclaimed["version"] == 4
+        assert reclaimed["lease_status"] == "active"
+        assert reclaimed["holder_harness_id"] == "B"
+        assert reclaimed["holder_session_id"] == "session-002"
     finally:
         db.close()

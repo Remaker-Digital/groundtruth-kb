@@ -1255,13 +1255,60 @@ def path_authorized(packet: dict[str, Any], relative_path: str) -> bool:
     return False
 
 
+def _unauthorized_targets(packet: dict[str, Any], normalized_targets: list[str]) -> list[str]:
+    return [target for target in normalized_targets if not path_authorized(packet, target)]
+
+
+def _target_scope_error(unauthorized: list[str]) -> AuthorizationError:
+    return AuthorizationError("Target path outside implementation authorization scope: " + ", ".join(unauthorized))
+
+
+def _named_packets_authorizing_targets(project_root: Path, normalized_targets: list[str]) -> list[dict[str, Any]]:
+    by_bridge_dir = project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH
+    if not by_bridge_dir.is_dir():
+        return []
+
+    matches: list[dict[str, Any]] = []
+    for path in sorted(by_bridge_dir.glob("*.json")):
+        bridge_id = path.stem
+        try:
+            packet = load_named_packet(project_root, bridge_id)
+        except AuthorizationError:
+            continue
+        if not _unauthorized_targets(packet, normalized_targets):
+            matches.append(packet)
+    return matches
+
+
 def validate_targets(project_root: Path, targets: list[str]) -> dict[str, Any]:
-    packet = load_packet(project_root)
     normalized_targets = [normalize_relative_path(project_root, target) for target in targets]
-    unauthorized = [target for target in normalized_targets if not path_authorized(packet, target)]
-    if unauthorized:
-        raise AuthorizationError("Target path outside implementation authorization scope: " + ", ".join(unauthorized))
-    return {"packet": packet, "targets": normalized_targets}
+    current_error: AuthorizationError | None = None
+
+    try:
+        packet = load_packet(project_root)
+    except AuthorizationError as exc:
+        current_error = exc
+    else:
+        unauthorized = _unauthorized_targets(packet, normalized_targets)
+        if not unauthorized:
+            return {"packet": packet, "targets": normalized_targets}
+        current_error = _target_scope_error(unauthorized)
+
+    matches = _named_packets_authorizing_targets(project_root, normalized_targets)
+    if len(matches) == 1:
+        return {"packet": matches[0], "targets": normalized_targets}
+    if len(matches) > 1:
+        bridge_ids = ", ".join(sorted(str(packet.get("bridge_id") or "<unknown>") for packet in matches))
+        raise AuthorizationError(
+            "Ambiguous implementation authorization: multiple valid named packets authorize protected target(s): "
+            f"{bridge_ids}. Activate or re-issue the intended packet before mutating protected targets."
+        )
+
+    if current_error is not None:
+        raise current_error
+    raise AuthorizationError(
+        "Implementation authorization packet is missing; run implementation_authorization.py begin"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

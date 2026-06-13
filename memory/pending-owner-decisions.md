@@ -6,8 +6,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+(none)
+
 ## Resolved
 
+- id: DECISION-1191
+  asked_at: 2026-06-13T04:57:32.290915Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 9227d430edfef4b0
+  resolved_at: 2026-06-13
+  resolved_in_session: 2026-06-13 interactive PB (harness B, Opus 4.8)
+  answer: "Owner confirmed (2026-06-13): capture as a follow-on spec to the parallelism work. Already satisfied: SPEC-INTAKE-9cb2ee (claim-gated implementation-start) IS the follow-on spec to the parallelism work (SPEC-INTAKE-ca9165); WI-AUTO-SPEC-INTAKE-9CB2EE exists and is in active implementation via bridge gtkb-claim-gated-implementation-start (REVISED -003, GO-ready). Dependency re-sequenced this session so claim-gate precedes parallelism (WI-AUTO-SPEC-INTAKE-CA9165 now depends_on WI-AUTO-SPEC-INTAKE-9CB2EE)."
+  notes: "Was status:resolved but mis-filed under Pending (hook re-surfacing). Moved to Resolved and question text blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-1165
   asked_at: 2026-06-12T17:09:09.322874Z
   question: ""
@@ -18,7 +30,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: ab9e903c
   answer: "Owner directed: keep driving — prepare continuation prompt for fresh session to continue TAFE work. Re-confirmed by owner continuation prompt 2026-06-12T22:00Z (S436)."
   notes: "auto-detected prose anti-pattern; resolved by owner's explicit continuation directive; moved to Resolved section 2026-06-12 S436 (was mis-filed under Pending, causing hook re-surfacing). Question text blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-
 - id: DECISION-1147
   asked_at: 2026-06-12T02:21:51.667049Z
   question: ""
@@ -39,374 +50,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0539
-  asked_at: 2026-05-13T22:55:22.358578Z
-  question: "How would you like me to proceed from this investigation?"
-  options:
-    - "File the consumption-edge fix"
-    - "File the benchmark suite"
-    - "File both, sequenced"
-    - "Stop and let me think"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 747e5c654b6dc2f1
-  resolved_at: 2026-05-13T22:55:22.358578Z
-  answer: "User has answered your questions: \"How would you like me to proceed from this investigation?\"=\"File both, sequenced\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0540
-  asked_at: 2026-05-13T23:24:45.120094Z
-  question: "Both Slice-1 (advisory-router) and Slice-2 (benchmark-suite) were NO-GO'd on the same blocking finding: `DCL-CONCEPT-ON-CONTACT-001` requires the named load-bearing concepts to be added to `.claude/rules/canonical-terminology.md` (a protected narrative artifact), not to skill/procedure files. Authorize the Path A revision pattern (expand `target_paths` + scope formal-artifact-approval packets for canonical-terminology edits) for both proposals?"
-  options:
-    - "Path A both (Recommended)"
-    - "Path B both"
-    - "Mixed: A for advisory-router, B for benchmark"
-    - "Defer both"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: aac9166720001511
-  resolved_at: 2026-05-13T23:24:45.120094Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0541
-  asked_at: 2026-05-14T00:03:50.874506Z
-  question: "How should we resolve the dispatch suppression so Codex can re-review REVISED-003 (and what to do with the 2 other Prime-actionable threads)?"
-  options:
-    - "End my session; you trigger Codex manually"
-    - "Manually invoke cross_harness_bridge_trigger.py with override"
-    - "Address the 2 other Prime-actionable threads now"
-    - "Just wait; you'll check back later"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 00df3e2d93fbe984
-  resolved_at: 2026-05-14T00:03:50.874506Z
-  answer: "User has answered your questions: \"How should we resolve the dispatch suppression so Codex can re-review REVISED-003 (and what to do with the 2 other Prime-actionable threads)?\"=\"Just wait; you'll check back later\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0542
-  asked_at: 2026-05-14T00:38:39.502778Z
-  question: "How would you like me to proceed with Slice 3 implementation?"
-  options:
-    - "Start Slice 3 implementation now"
-    - "Wait for all three slices to GO first"
-    - "Wrap session, defer all implementation"
-    - "Decompose and AUQ on a different next step"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d1c751c32002ecd1
-  resolved_at: 2026-05-14T00:38:39.502778Z
-  answer: "User has answered your questions: \"How would you like me to proceed with Slice 3 implementation?\"=\"Start Slice 3 implementation now\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0543
-  asked_at: 2026-05-14T00:47:48.396929Z
-  question: "Bridge auto-dispatch surfaced two GO'd slices: gtkb-self-diagnostic-leak-closure-slice-1-advisory-router (~1 router script + 11 tests + Stop hook + glossary edit + narrative packet) and slice-2-benchmark-suite (~9 scripts + 30+ tests + skill + glossary edit + tracking work_item). Implementation-start-gate stores ONE active packet, so slices serialize. Each new file Write needs your approval. How should I proceed?"
-  options:
-    - "Implement Slice 1 fully now (Recommended)"
-    - "Slice 1 router + tests only, then pause"
-    - "Defer both; file friction note"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ddb21d0758477470
-  resolved_at: 2026-05-14T00:47:48.396929Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0544
-  asked_at: 2026-05-14T00:59:21.412448Z
-  question: "How would you like to close S349?"
-  options:
-    - "Run /kb-session-wrap now"
-    - "Continue one more lightweight IP, then wrap"
-    - "Keep going on Slice 3"
-    - "Stop now without wrap, you'll handle it"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 398707a6ce536806
-  resolved_at: 2026-05-14T00:59:21.412448Z
-  answer: "User has answered your questions: \"How would you like to close S349?\"=\"Continue one more lightweight IP, then wrap\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0545
-  asked_at: 2026-05-14T02:02:53.856494Z
-  question: "How should REVISED-1 of Slice 3 handle the `retire` mutation path (Codex F1)?"
-  options:
-    - "Defer retire to follow-on bridge (Recommended)"
-    - "Implement governed retirement"
-    - "Pause REVISED-1; wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f93a63a79a0d77bf
-  resolved_at: 2026-05-14T02:02:53.856494Z
-  answer: "User has answered your questions: \"How should REVISED-1 of Slice 3 handle the `retire` mutation path (Codex F1)?\"=\"Defer retire to follow-on bridge (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0546
-  asked_at: 2026-05-14T02:09:53.450754Z
-  question: "Which actionable bridge entry should I pick up next?"
-  options:
-    - "Slice 4 REVISED-1 (Recommended)"
-    - "Slice 1 implementation"
-    - "Slice 2 implementation"
-    - "Stale-GO triage"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: eb809567d0c3524c
-  resolved_at: 2026-05-14T02:09:53.450754Z
-  answer: "User has answered your questions: \"Which actionable bridge entry should I pick up next?\"=\"Slice 4 REVISED-1 (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0547
-  asked_at: 2026-05-14T02:51:35.704285Z
-  question: "Which Prime-actionable GO should I take up next?"
-  options:
-    - "Slice 4 hygiene first (Recommended)"
-    - "Self-diagnostic chain in order (1→4)"
-    - "gtkb-governed-spec-retirement NO-GO -002"
-    - "Wait for Codex on the topology proposal"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 97538ec057b15c18
-  resolved_at: 2026-05-14T02:51:35.704285Z
-  answer: "User has answered your questions: \"Which Prime-actionable GO should I take up next?\"=\"Slice 4 hygiene first (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0548
-  asked_at: 2026-05-14T02:51:35.704285Z
-  question: "Slice 4 post-impl is filed and awaiting Codex VERIFIED. How should I handle the Codex NO-GO on the topology proposal?"
-  options:
-    - "REVISED-1 with next-session in Slice 1 (Recommended)"
-    - "REVISED-1 with explicit owner waiver"
-    - "Stop and wait for Codex VERIFIED on Slice 4 first"
-    - "Wrap up this session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 63390a1a3972980f
-  resolved_at: 2026-05-14T02:51:35.704285Z
-  answer: "User has answered your questions: \"Slice 4 post-impl is filed and awaiting Codex VERIFIED. How should I handle the Codex NO-GO on the topology proposal?\"=\"REVISED-1 with next-session in Slice 1 (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0549
-  asked_at: 2026-05-14T03:19:58.927762Z
-  question: "The cross-harness trigger dispatched me on 2 entries: slice-2-benchmark-suite GO -010 (substantial implementation, would add ~20+ files to working tree) and governed-spec-retirement NO-GO -002 (REVISED-1 needed). Working tree has 75 staged files from S350 blocked by the gate-friction commit blocker. My attempted Write of bridge/gtkb-governed-spec-retirement-003.md was denied. How should I proceed?"
-  options:
-    - "File REVISED-1 only (Recommended)"
-    - "File REVISED + implement slice-2"
-    - "Resolve commit blocker first"
-    - "Just stop, owner directs next"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: aa72a67912e9e156
-  resolved_at: 2026-05-14T03:19:58.927762Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0550
-  asked_at: 2026-05-14T03:28:30.764851Z
-  question: "Which actionable item should I pick up next?"
-  options:
-    - "File Slice 3 implementation report (Recommended)"
-    - "Revise governed-spec-retirement"
-    - "Both, sequenced"
-    - "Slice 1 or 2 implementation"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7fc75ab6c20bae11
-  resolved_at: 2026-05-14T03:28:30.764851Z
-  answer: "User has answered your questions: \"Which actionable item should I pick up next?\"=\"File Slice 3 implementation report (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0551
-  asked_at: 2026-05-14T03:28:30.764851Z
-  question: "Slice 3 implementation report was already filed by a parallel session. What should I pick up now?"
-  options:
-    - "Revise governed-spec-retirement (Recommended)"
-    - "Slice 1 implementation"
-    - "Slice 2 implementation"
-    - "Stop / wrap session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 3b4cca2f230a541b
-  resolved_at: 2026-05-14T03:28:30.764851Z
-  answer: "User has answered your questions: \"Slice 3 implementation report was already filed by a parallel session. What should I pick up now?\"=\"Revise governed-spec-retirement (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0552
-  asked_at: 2026-05-14T04:06:54.805707Z
-  question: "What action should I take regarding the Codex LO file-safety rule violation?"
-  options:
-    - "Capture as DA + backlog item; you handle Codex externally"
-    - "File a bridge proposing hook-enforced LO write-block"
-    - "Audit Codex's edits and propose targeted reverts"
-    - "Acknowledge only; you'll direct next steps"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6e154ef50499d266
-  resolved_at: 2026-05-14T04:06:54.805707Z
-  answer: "User has answered your questions: \"What action should I take regarding the Codex LO file-safety rule violation?\"=\"Capture as DA + backlog item; you handle Codex externally\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0553
-  asked_at: 2026-05-14T04:26:39.800178Z
-  question: "Three leak-closure slices are VERIFIED (mine + 2 parallel workers) and ready to commit, plus there are 2 NO-GOs and 5 GOs Prime-actionable. What's the priority?"
-  options:
-    - "Commit Slice 3 only (mine), then revise next NO-GO"
-    - "Commit all 3 VERIFIED slices (1+3+4) as one bundle"
-    - "Skip commits; implement Slice 2 (last leak-closure GO) first"
-    - "Revise gtkb-governed-spec-retirement NO-GO @-004 first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 58e7a3a633e56f4c
-  resolved_at: 2026-05-14T04:26:39.800178Z
-  answer: "User has answered your questions: \"Three leak-closure slices are VERIFIED (mine + 2 parallel workers) and ready to commit, plus there are 2 NO-GOs and 5 GOs Prime-actionable. What's the priority?\"=\"Commit Slice 3 only (mine), then revise next NO-GO\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0554
-  asked_at: 2026-05-14T04:41:01.577682Z
-  question: "A parallel Prime Builder session is active and ahead of me on 2 of the 3 NO-GO threads (it filed -003 REVISED on friction-hygiene, and got Codex GO at -006 on governed-spec-retirement). INDEX wasn't synced. How should I proceed?"
-  options:
-    - "Sync INDEX + take operating-mode-transaction"
-    - "Stand down; let parallel session finish"
-    - "Investigate the parallel session first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d04c367773759244
-  resolved_at: 2026-05-14T04:41:01.577682Z
-  answer: "User has answered your questions: \"A parallel Prime Builder session is active and ahead of me on 2 of the 3 NO-GO threads (it filed -003 REVISED on friction-hygiene, and got Codex GO at -006 on governed-spec-retirement). INDEX wasn't synced. How should I proceed?\"=\"Investigate the parallel session first\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0555
-  asked_at: 2026-05-14T04:41:01.577682Z
-  question: "Investigation suggests another Claude Code window is active on this workspace (same harness B, same Prime role, files authored at 21:25-21:34 PDT during my idle time). Active session locks confirm both Claude and Codex are running. How do you want me to coordinate?"
-  options:
-    - "Stand by; let the other window drive"
-    - "Sync INDEX from this window only"
-    - "Take operating-mode-transaction in this window"
-    - "Other window is wrong; consolidate to mine"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 65e85c6bacf3caa2
-  resolved_at: 2026-05-14T04:41:01.577682Z
-  answer: "User has answered your questions: \"Investigation suggests another Claude Code window is active on this workspace (same harness B, same Prime role, files authored at 21:25-21:34 PDT during my idle time). Active session locks confirm both Claude and Codex are running. How do you want me to coordinate?\"=\"Stand by; let the other window drive\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0556
-  asked_at: 2026-05-14T04:52:01.095227Z
-  question: "Codex just GO'd my REVISED-2 of gtkb-governed-spec-retirement (-006). The 4 corrections this turn already filed 2 REVISED proposals. What's the priority?"
-  options:
-    - "Implement governed-spec-retirement now"
-    - "Defer to next session, wrap up this one"
-    - "Revise operating-mode-transaction NO-GO instead"
-    - "Implement Slice 2 benchmark-suite (last leak-closure slice)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 90b3e280d5c0d755
-  resolved_at: 2026-05-14T04:52:01.095227Z
-  answer: "User has answered your questions: \"Codex just GO'd my REVISED-2 of gtkb-governed-spec-retirement (-006). The 4 corrections this turn already filed 2 REVISED proposals. What's the priority?\"=\"Implement governed-spec-retirement now\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0557
-  asked_at: 2026-05-14T05:36:38.616107Z
-  question: "Approve adding the four glossary entries above (`benchmark`, `linkage heat map`, `advisory latency`, `metric snapshot`) to `.claude/rules/canonical-terminology.md` immediately after the existing `### advisory-router` entry? This is the IP-6 protected-narrative-artifact edit per the slice-2-benchmark-suite GO at -010. Approval authorizes the specific text shown; any wording change would require a re-approval cycle."
-  options:
-    - "Approve as drafted"
-    - "Revise wording before approval"
-    - "Reject; stop IP-6"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 8e9937bd99f3a492
-  resolved_at: 2026-05-14T05:36:38.616107Z
-  answer: "User has answered your questions: \"Approve adding the four glossary entries above (`benchmark`, `linkage heat map`, `advisory latency`, `metric snapshot`) to `.claude/rules/canonical-terminology.md` immediately after the existing `### advisory-router` entry? This is the IP-6 protected-narrative-artifact edit per the slice-2-benchmark-suite GO at -010. Approval authorizes the specific text shown; any wording change would require a re-approval cycle.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0558
-  asked_at: 2026-05-14T05:41:37.685068Z
-  question: "What scope should the startup-payload drift work item cover?"
-  options:
-    - "Audit + fix + regression test (Recommended)"
-    - "Audit + fix only"
-    - "Narrow fix only"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 96da8b7858f8a04b
-  resolved_at: 2026-05-14T05:41:37.685068Z
-  answer: "User has answered your questions: \"What scope should the startup-payload drift work item cover?\"=\"Audit + fix + regression test (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0559
-  asked_at: 2026-05-14T05:45:08.914012Z
-  question: "Codex NO-GO -012 (benchmark suite report) F1: the formal approval packet for `.claude/rules/canonical-terminology.md` binds to content hash `e3c72f4d...` but the current worktree file is at `38c663a3...` (has additional concurrent glossary edits beyond the packet-authorized benchmark-suite entries). How should I reconcile?"
-  options:
-    - "New packet, current content"
-    - "Revert to packet content"
-    - "Investigate first, no decision yet"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 81e095841d56b0a8
-  resolved_at: 2026-05-14T05:45:08.914012Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0560
-  asked_at: 2026-05-14T05:54:09.938257Z
-  question: "How should F1 reconciliation proceed on the benchmark-suite NO-GO at -012? The protected canonical-terminology.md worktree state (sha 38c663a3) does not match the cited approval packet hash (e3c72f4d) because four concurrent 2026-05-13 narrative-artifact edits each have their own full-content packet but the composite final file has none."
-  options:
-    - "Approve new composite packet"
-    - "Revert to benchmark packet state"
-    - "Investigate further first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f8674421969174e3
-  resolved_at: 2026-05-14T05:54:09.938257Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0561
-  asked_at: 2026-05-14T06:05:03.827438Z
-  question: "The `gtkb-completed-bridge-wi-hygiene-2026-05-13` thread is VERIFIED. The implementation touched 8 bridge files + bridge/INDEX.md + groundtruth.db (6 work_item rows). How should I proceed with committing?"
-  options:
-    - "Commit now, scoped (Recommended)"
-    - "Commit + auto-commit future VERIFIED in this session"
-    - "Hold; batch all commits at session end"
-    - "Hold; you'll commit manually"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: cc4c66424ba5b223
-  resolved_at: 2026-05-14T06:05:03.827438Z
-  answer: "User has answered your questions: \"The `gtkb-completed-bridge-wi-hygiene-2026-05-13` thread is VERIFIED. The implementation touched 8 bridge files + bridge/INDEX.md + groundtruth.db (6 work_item rows). How should I proceed with committing?\"=\"Commit now, scoped (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0562
-  asked_at: 2026-05-14T06:05:29.747074Z
-  question: "Two paths from the new verdicts. Slice-2 NO-GO revision is small but high-collision-risk (parallel window actively mutating same files); operating-mode-transaction GO authorizes substantial new implementation (6 modules + 4 hook edits + rule update + tests) in a thread the parallel window hasn't touched since -005. Context budget is tight. Which should I take?"
-  options:
-    - "Operating-mode-transaction (impl GO)"
-    - "Slice-2 NO-GO revision (small fix)"
-    - "Both, slice-2 first then op-mode"
-    - "Wrap session; let parallel finish"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7c837c5661b9c999
-  resolved_at: 2026-05-14T06:05:29.747074Z
-  answer: "User has answered your questions: \"Two paths from the new verdicts. Slice-2 NO-GO revision is small but high-collision-risk (parallel window actively mutating same files); operating-mode-transaction GO authorizes substantial new implementation (6 modules + 4 hook edits + rule update + tests) in a thread the parallel window hasn't touched since -005. Context budget is tight. Which should I take?\"=\"Operating-mode-transaction (impl GO)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0563
-  asked_at: 2026-05-14T06:14:34.947108Z
-  question: "Two NO-GOs are dispatched. Which to remediate first?"
-  options:
-    - "Benchmark-suite first"
-    - "Gate-friction first"
-    - "Both in parallel"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 00571a2ab9ce5951
-  resolved_at: 2026-05-14T06:14:34.947108Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0564
-  asked_at: 2026-05-14T06:14:34.947108Z
-  question: "F1 fix for canonical-terminology.md packet drift — which path?"
-  options:
-    - "New packet matching current worktree"
-    - "Revert to packet-matching state"
-    - "Investigate concurrent edits first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 22dac585c42a1bba
-  resolved_at: 2026-05-14T06:14:34.947108Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0565
-  asked_at: 2026-05-14T06:21:31.072539Z
-  question: "Codex NO-GO'd benchmark-suite slice 2 at -012 because `.claude/rules/canonical-terminology.md` worktree SHA `38c663a3...` doesn't match the cited benchmark-terms approval packet (SHA `e3c72f4d...`). Worktree currently has unstaged entries from FOUR parallel slices (slice-1 advisory-router VERIFIED, slice-2 benchmark-suite NO-GO, slice-3 assertion-triage VERIFIED, slice-4 implementation-gate-hygiene VERIFIED). Three of the four are VERIFIED but uncommitted. Which reconciliation should I use before refiling the slice-2 report?"
-  options:
-    - "Stage+commit benchmark hunks only"
-    - "Mint combined packet"
-    - "Defer slice-2 until siblings commit"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 0b6d4a7d3515a2f4
-  resolved_at: 2026-05-14T06:21:31.072539Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0566
   asked_at: 2026-05-14T13:16:20.373562Z
   question: "Which actionable bridge entry should I tackle first?"
@@ -7785,6 +7428,341 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 56e55c0948445520
   resolved_at: 2026-06-12T20:34:11.194608Z
   answer: "Your questions have been answered: \"develop is a clean fast-forward to main (866 ahead / 0 behind); the substantive work is committed; only one active worker's 7 in-flight files remain uncommitted. How should I do the merge?\"=\"Fast-forward main now (local)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1168
+  asked_at: 2026-06-12T23:20:04.737009Z
+  question: "The TAFE Phase-0 enablement GO (bridge/gtkb-tafe-phase-0-enablement-002.md) was authored by harness C (antigravity), which the canonical role registry records as durable role 'prime-builder' AND status 'suspended' — NOT a valid Loyal Opposition reviewer. The TAFE advisory's D17 makes Codex (harness A) the MANDATORY reviewer, and no Codex verdict exists on this thread (only my proposal -001 and the harness-C -002). A 5-lens independent audit unanimously found the GO does NOT validly authorize implementation. The proposed MemBase mutation (create PAUTH + enrich 5 WIs) is append-only/reversible, so waiting costs nothing; implementing on an invalid GO would be a sticky audit-trail defect. How should I proceed?"
+  options:
+    - "Await a real Codex GO"
+    - "You rule the C GO suffices"
+    - "Park DEFERRED pending Codex"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6e5b28bbd2eccb45
+  resolved_at: 2026-06-12T23:20:04.737009Z
+  answer: "Your questions have been answered: \"The TAFE Phase-0 enablement GO (bridge/gtkb-tafe-phase-0-enablement-002.md) was authored by harness C (antigravity), which the canonical role registry records as durable role 'prime-builder' AND status 'suspended' — NOT a valid Loyal Opposition reviewer. The TAFE advisory's D17 makes Codex (harness A) the MANDATORY reviewer, and no Codex verdict exists on this thread (only my proposal -001 and the harness-C -002). A 5-lens independent audit unanimously found the GO does NOT validly authorize implementation. The proposed MemBase mutation (create PAUTH + enrich 5 WIs) is append-only/reversible, so waiting costs nothing; implementing on an invalid GO would be a sticky audit-trail defect. How should I proceed?\"=\"Park DEFERRED pending Codex\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1169
+  asked_at: 2026-06-13T00:18:27.492469Z
+  question: "Timer check complete: the enablement thread is unchanged (DEFERRED @ -003, no Codex -004). Codex WAS dispatched during the idle window (00:04Z) but correctly skipped the DEFERRED thread as non-actionable — confirming that both auto-dispatch and manual Codex scans skip DEFERRED entries. So the resume condition ('Codex GO filed') cannot be met while the thread stays DEFERRED; it must be owner-directed re-activated first. The proposal content is sound and unchanged (the only problem was the invalid harness-C GO). How do you want to get Codex's mandatory review?"
+  options:
+    - "Re-activate as REVISED now"
+    - "Keep DEFERRED, hold"
+    - "Out-of-band Codex review"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b6220a11309ae879
+  resolved_at: 2026-06-13T00:18:27.492469Z
+  answer: "Your questions have been answered: \"Timer check complete: the enablement thread is unchanged (DEFERRED @ -003, no Codex -004). Codex WAS dispatched during the idle window (00:04Z) but correctly skipped the DEFERRED thread as non-actionable — confirming that both auto-dispatch and manual Codex scans skip DEFERRED entries. So the resume condition ('Codex GO filed') cannot be met while the thread stays DEFERRED; it must be owner-directed re-activated first. The proposal content is sound and unchanged (the only problem was the invalid harness-C GO). How do you want to get Codex's mandatory review?\"=\"Keep DEFERRED, hold\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1170
+  asked_at: 2026-06-13T00:46:39.614886Z
+  question: "The autonomous PB queue is drained — every remaining high-value item is owner-gated. Which blocked path should I unblock and drive next?"
+  options:
+    - "Unblock TAFE Phase 0"
+    - "Grill: dashboard cockpit"
+    - "Grill: scaffold fail-closed"
+    - "Stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cd2f7ea1f33acc18
+  resolved_at: 2026-06-13T00:46:39.614886Z
+  answer: "Your questions have been answered: \"The autonomous PB queue is drained — every remaining high-value item is owner-gated. Which blocked path should I unblock and drive next?\"=\"Unblock TAFE Phase 0\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1171
+  asked_at: 2026-06-13T00:48:56.289122Z
+  question: "Owner-grilling scope: which GO'd `adapt` disposition should we grill to a filed implementation proposal? (I'll then ask one scoped decision at a time, codebase-answering everything I can.)"
+  options:
+    - "Scaffold fail-closed (WI-4274)"
+    - "Dashboard cockpit (WI-3433)"
+    - "Both, sequentially"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fe4c0d5709407a1c
+  resolved_at: 2026-06-13T00:48:56.289122Z
+  answer: "Your questions have been answered: \"Owner-grilling scope: which GO'd `adapt` disposition should we grill to a filed implementation proposal? (I'll then ask one scoped decision at a time, codebase-answering everything I can.)\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1172
+  asked_at: 2026-06-13T01:26:49.562209Z
+  question: "On killing durable role assignment via the registry — is my target model right, and how far should I go now?"
+  options:
+    - "Capture the kill, make it stick"
+    - "Refine the target first"
+    - "Just stop reinforcing it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 30bf69611d4bccec
+  resolved_at: 2026-06-13T01:26:49.562209Z
+  answer: "Your questions have been answered: \"On killing durable role assignment via the registry — is my target model right, and how far should I go now?\"=\"Capture the kill, make it stick\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1173
+  asked_at: 2026-06-13T01:26:49.562209Z
+  question: "Approve inserting ADR-ELIMINATE-DURABLE-ROLE-ASSIGNMENT-001 + DCL-NO-DURABLE-ROLE-IN-REGISTRY-001 as drafted (and re-scoping the remediation WI to the 5 slices)?"
+  options:
+    - "Approve as drafted"
+    - "Approve with edits"
+    - "Don't insert yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 97c3d8f6622e7fc0
+  resolved_at: 2026-06-13T01:26:49.562209Z
+  answer: "Your questions have been answered: \"Approve inserting ADR-ELIMINATE-DURABLE-ROLE-ASSIGNMENT-001 + DCL-NO-DURABLE-ROLE-IN-REGISTRY-001 as drafted (and re-scoping the remediation WI to the 5 slices)?\"=\"Yes. To re-state: role assignment is declared by me, not detected. My declaration includes both the harness registry and the explicit hints in the first few lines of the session envelope.  In the future:  When I declare the contents of a harness registry entry, those become authoritative, even if they are non functional (warn me). The dispatching/dispatched agents should take explicit direction from the explicit hints in the the initial lines of the session envelope (authoritative) and direct examination of the harness registry (informative). If the session envelope contains an explicit hint that the dispatched session take a particular role (e.g., LO or PB), it will assume that role. If no role is specified in the session envelope's explicit hints, then it may choose to look at the harness registration information as guidance. The dispatcher will be treat the registry information as authoritative and dispatch bridge items according to deterministic rules.   In the far future:  We may place the rules and the contents of the registry under the supervision of an agent, but we have not planned that yet.\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1174
+  asked_at: 2026-06-13T01:26:49.562209Z
+  question: "Does the re-encoded model (registry kept as an owner-declaration channel; dispatcher=registry-authoritative, agent=envelope-authoritative/registry-informative; warn on non-functional declarations; agents never detect/override) capture your intent? Insert as canonical?"
+  options:
+    - "Insert as re-encoded"
+    - "Close but needs edits"
+    - "Hold insertion"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bccc83e30aad9bdf
+  resolved_at: 2026-06-13T01:26:49.562209Z
+  answer: "Your questions have been answered: \"Does the re-encoded model (registry kept as an owner-declaration channel; dispatcher=registry-authoritative, agent=envelope-authoritative/registry-informative; warn on non-functional declarations; agents never detect/override) capture your intent? Insert as canonical?\"=\"Close but needs edits\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1175
+  asked_at: 2026-06-13T02:00:24.196732Z
+  question: "Dispatched/interactive SESSION role resolution — confirm: a session's operating role is set by the explicit hint in the first lines of its session envelope (AUTHORITATIVE, e.g. '::init gtkb lo' or 'pb'). If the envelope carries no role hint, the harness registry is consulted as INFORMATIVE guidance only. The registry never overrides an explicit envelope role hint. Correct?"
+  options:
+    - "Confirmed"
+    - "Confirmed, with a refinement"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 94394dff31426627
+  resolved_at: 2026-06-13T02:00:24.196732Z
+  answer: "Your questions have been answered: \"Dispatched/interactive SESSION role resolution — confirm: a session's operating role is set by the explicit hint in the first lines of its session envelope (AUTHORITATIVE, e.g. '::init gtkb lo' or 'pb'). If the envelope carries no role hint, the harness registry is consulted as INFORMATIVE guidance only. The registry never overrides an explicit envelope role hint. Correct?\"=\"Confirmed\", \"DISPATCHER routing — confirm: the dispatcher (which decides which bridge items go to which harness) treats the harness registry as AUTHORITATIVE and dispatches bridge items by deterministic rules. This is a separate concern from how a running session resolves its own role (Q1). Correct?\"=\"Confirmed\", \"Declared-not-detected principle — confirm: roles are DECLARED by you (via the registry AND envelope hints), never DETECTED/overridden by agents. When a registry entry is non-functional, suspended, or mismatched, agents must WARN you and SUGGEST fixes, but must NOT override your declaration or invalidate work on that basis (the harness-C over-correction). Correct?\"=\"Confirmed\", \"How should I make this durable and enforced going forward? It refines the existing GOV-SESSION-ROLE-AUTHORITY-001 / DCL-SESSION-ROLE-RESOLUTION-001 / ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 set.\"=\"Draft ADR + DCL, approve via ceremony\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1176
+  asked_at: 2026-06-13T02:00:24.196732Z
+  question: "DISPATCHER routing — confirm: the dispatcher (which decides which bridge items go to which harness) treats the harness registry as AUTHORITATIVE and dispatches bridge items by deterministic rules. This is a separate concern from how a running session resolves its own role (Q1). Correct?"
+  options:
+    - "Confirmed"
+    - "Confirmed, with a refinement"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 695897e1267cc6c8
+  resolved_at: 2026-06-13T02:00:24.196732Z
+  answer: "Your questions have been answered: \"Dispatched/interactive SESSION role resolution — confirm: a session's operating role is set by the explicit hint in the first lines of its session envelope (AUTHORITATIVE, e.g. '::init gtkb lo' or 'pb'). If the envelope carries no role hint, the harness registry is consulted as INFORMATIVE guidance only. The registry never overrides an explicit envelope role hint. Correct?\"=\"Confirmed\", \"DISPATCHER routing — confirm: the dispatcher (which decides which bridge items go to which harness) treats the harness registry as AUTHORITATIVE and dispatches bridge items by deterministic rules. This is a separate concern from how a running session resolves its own role (Q1). Correct?\"=\"Confirmed\", \"Declared-not-detected principle — confirm: roles are DECLARED by you (via the registry AND envelope hints), never DETECTED/overridden by agents. When a registry entry is non-functional, suspended, or mismatched, agents must WARN you and SUGGEST fixes, but must NOT override your declaration or invalidate work on that basis (the harness-C over-correction). Correct?\"=\"Confirmed\", \"How should I make this durable and enforced going forward? It refines the existing GOV-SESSION-ROLE-AUTHORITY-001 / DCL-SESSION-ROLE-RESOLUTION-001 / ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 set.\"=\"Draft ADR + DCL, approve via ceremony\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1177
+  asked_at: 2026-06-13T02:00:24.196732Z
+  question: "Declared-not-detected principle — confirm: roles are DECLARED by you (via the registry AND envelope hints), never DETECTED/overridden by agents. When a registry entry is non-functional, suspended, or mismatched, agents must WARN you and SUGGEST fixes, but must NOT override your declaration or invalidate work on that basis (the harness-C over-correction). Correct?"
+  options:
+    - "Confirmed"
+    - "Confirmed, with a guardrail"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 62c48a5b69c5f876
+  resolved_at: 2026-06-13T02:00:24.196732Z
+  answer: "Your questions have been answered: \"Dispatched/interactive SESSION role resolution — confirm: a session's operating role is set by the explicit hint in the first lines of its session envelope (AUTHORITATIVE, e.g. '::init gtkb lo' or 'pb'). If the envelope carries no role hint, the harness registry is consulted as INFORMATIVE guidance only. The registry never overrides an explicit envelope role hint. Correct?\"=\"Confirmed\", \"DISPATCHER routing — confirm: the dispatcher (which decides which bridge items go to which harness) treats the harness registry as AUTHORITATIVE and dispatches bridge items by deterministic rules. This is a separate concern from how a running session resolves its own role (Q1). Correct?\"=\"Confirmed\", \"Declared-not-detected principle — confirm: roles are DECLARED by you (via the registry AND envelope hints), never DETECTED/overridden by agents. When a registry entry is non-functional, suspended, or mismatched, agents must WARN you and SUGGEST fixes, but must NOT override your declaration or invalidate work on that basis (the harness-C over-correction). Correct?\"=\"Confirmed\", \"How should I make this durable and enforced going forward? It refines the existing GOV-SESSION-ROLE-AUTHORITY-001 / DCL-SESSION-ROLE-RESOLUTION-001 / ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 set.\"=\"Draft ADR + DCL, approve via ceremony\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1178
+  asked_at: 2026-06-13T02:00:24.196732Z
+  question: "How should I make this durable and enforced going forward? It refines the existing GOV-SESSION-ROLE-AUTHORITY-001 / DCL-SESSION-ROLE-RESOLUTION-001 / ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 set."
+  options:
+    - "Draft ADR + DCL, approve via ceremony"
+    - "Deliberation now, formalize next session"
+    - "Amend the existing artifacts"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cec496d8244ed142
+  resolved_at: 2026-06-13T02:00:24.196732Z
+  answer: "Your questions have been answered: \"Dispatched/interactive SESSION role resolution — confirm: a session's operating role is set by the explicit hint in the first lines of its session envelope (AUTHORITATIVE, e.g. '::init gtkb lo' or 'pb'). If the envelope carries no role hint, the harness registry is consulted as INFORMATIVE guidance only. The registry never overrides an explicit envelope role hint. Correct?\"=\"Confirmed\", \"DISPATCHER routing — confirm: the dispatcher (which decides which bridge items go to which harness) treats the harness registry as AUTHORITATIVE and dispatches bridge items by deterministic rules. This is a separate concern from how a running session resolves its own role (Q1). Correct?\"=\"Confirmed\", \"Declared-not-detected principle — confirm: roles are DECLARED by you (via the registry AND envelope hints), never DETECTED/overridden by agents. When a registry entry is non-functional, suspended, or mismatched, agents must WARN you and SUGGEST fixes, but must NOT override your declaration or invalidate work on that basis (the harness-C over-correction). Correct?\"=\"Confirmed\", \"How should I make this durable and enforced going forward? It refines the existing GOV-SESSION-ROLE-AUTHORITY-001 / DCL-SESSION-ROLE-RESOLUTION-001 / ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 set.\"=\"Draft ADR + DCL, approve via ceremony\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1179
+  asked_at: 2026-06-13T02:47:08.854287Z
+  question: "A parallel session is driving the role-model ADR/DCL and TAFE WI implementation. How should I coordinate so we don't collide?"
+  options:
+    - "Stand down, hold"
+    - "Take a non-conflicting thread"
+    - "You assign lanes"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eb2d07b7e9de271c
+  resolved_at: 2026-06-13T02:47:08.854287Z
+  answer: "Your questions have been answered: \"A parallel session is driving the role-model ADR/DCL and TAFE WI implementation. How should I coordinate so we don't collide?\"=\"Take a non-conflicting thread\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1180
+  asked_at: 2026-06-13T03:37:06.662437Z
+  question: "Artifact 1 of 2 — approve the body of ADR-ROLE-AUTHORITY-DECLARED-NOT-DETECTED-001 (attached adr.md) for insertion into MemBase as type='architecture_decision', status='specified'? It records the declared-not-detected decision, the two-layer authority split, the harness-C over-detection as context, and the failed approaches / rejected alternatives. Inserted row body will be byte-identical to adr.md."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 21a60a311004e562
+  resolved_at: 2026-06-13T03:37:06.662437Z
+  answer: "Your questions have been answered: \"Artifact 1 of 2 — approve the body of ADR-ROLE-AUTHORITY-DECLARED-NOT-DETECTED-001 (attached adr.md) for insertion into MemBase as type='architecture_decision', status='specified'? It records the declared-not-detected decision, the two-layer authority split, the harness-C over-detection as context, and the failed approaches / rejected alternatives. Inserted row body will be byte-identical to adr.md.\"=\"Approve as drafted\", \"Artifact 2 of 2 — approve the body of DCL-ROLE-RESOLUTION-DECLARED-AUTHORITY-001 (attached dcl.md) for insertion into MemBase as type='design_constraint', status='specified'? It encodes rules R1–R5 (envelope-hint-authoritative session role, registry-informative fallback, registry-authoritative dispatch, warn-not-override, no-invalidation-on-registry-mismatch-alone) plus 4 machine-checkable assertions. Inserted row body will be byte-identical to dcl.md.\"=\"Approve as drafted\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1181
+  asked_at: 2026-06-13T03:37:06.662437Z
+  question: "Artifact 2 of 2 — approve the body of DCL-ROLE-RESOLUTION-DECLARED-AUTHORITY-001 (attached dcl.md) for insertion into MemBase as type='design_constraint', status='specified'? It encodes rules R1–R5 (envelope-hint-authoritative session role, registry-informative fallback, registry-authoritative dispatch, warn-not-override, no-invalidation-on-registry-mismatch-alone) plus 4 machine-checkable assertions. Inserted row body will be byte-identical to dcl.md."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits"
+    - "Walk through the rules via AUQ"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b9d41e15714843d3
+  resolved_at: 2026-06-13T03:37:06.662437Z
+  answer: "Your questions have been answered: \"Artifact 1 of 2 — approve the body of ADR-ROLE-AUTHORITY-DECLARED-NOT-DETECTED-001 (attached adr.md) for insertion into MemBase as type='architecture_decision', status='specified'? It records the declared-not-detected decision, the two-layer authority split, the harness-C over-detection as context, and the failed approaches / rejected alternatives. Inserted row body will be byte-identical to adr.md.\"=\"Approve as drafted\", \"Artifact 2 of 2 — approve the body of DCL-ROLE-RESOLUTION-DECLARED-AUTHORITY-001 (attached dcl.md) for insertion into MemBase as type='design_constraint', status='specified'? It encodes rules R1–R5 (envelope-hint-authoritative session role, registry-informative fallback, registry-authoritative dispatch, warn-not-override, no-invalidation-on-registry-mismatch-alone) plus 4 machine-checkable assertions. Inserted row body will be byte-identical to dcl.md.\"=\"Approve as drafted\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1182
+  asked_at: 2026-06-13T04:00:07.419937Z
+  question: "These 25 GO entries are mostly parked blocker-acks deferred to an owner-interactive Prime session (me), needing your narrative-artifact approval to finish. How should I take them over?"
+  options:
+    - "Audit all 25, then act"
+    - "Complete the role-enhancement slices now"
+    - "Pick highest-value, drive it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4a827d23776d045f
+  resolved_at: 2026-06-13T04:00:07.419937Z
+  answer: "Your questions have been answered: \"These 25 GO entries are mostly parked blocker-acks deferred to an owner-interactive Prime session (me), needing your narrative-artifact approval to finish. How should I take them over?\"=\"Pick highest-value, drive it\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1183
+  asked_at: 2026-06-13T04:00:07.419937Z
+  question: "Approve adding the 'Repeated NO-GO Cycle Escalation' clause (as quoted) to .claude/rules/file-bridge-protocol.md and its template, plus the parity test? This is the narrative-artifact approval needed to edit the protected rule."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits"
+    - "Reject / pick different"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 42931cfceedd6df1
+  resolved_at: 2026-06-13T04:00:07.419937Z
+  answer: "Your questions have been answered: \"Approve adding the 'Repeated NO-GO Cycle Escalation' clause (as quoted) to .claude/rules/file-bridge-protocol.md and its template, plus the parity test? This is the narrative-artifact approval needed to edit the protected rule.\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1184
+  asked_at: 2026-06-13T04:08:01.556624Z
+  question: "Default implementation deadline for a GO-implementation claim (time to produce the implementation report before the claim can lapse)?"
+  options:
+    - "30 minutes"
+    - "45 minutes"
+    - "60 minutes"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b6b0f1f148e7e4a4
+  resolved_at: 2026-06-13T04:08:01.556624Z
+  answer: "Your questions have been answered: \"Default implementation deadline for a GO-implementation claim (time to produce the implementation report before the claim can lapse)?\"=\"30 minutes\", \"How should deadline extensions be granted when an agent appends an extension request to its claim?\"=\"Self-service, capped\", \"When the deadline lapses (no implementation report filed, no extension granted), release timing?\"=\"Short grace, then release\", \"Where should lapsed / available GO-implementation work be surfaced so another agent picks it up?\"=\"Both AXIS-2 and doctor\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1185
+  asked_at: 2026-06-13T04:08:01.556624Z
+  question: "How should deadline extensions be granted when an agent appends an extension request to its claim?"
+  options:
+    - "Self-service, capped"
+    - "Self-service, uncapped"
+    - "Owner-approved extensions"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d3dfabdd9ca7a8c3
+  resolved_at: 2026-06-13T04:08:01.556624Z
+  answer: "Your questions have been answered: \"Default implementation deadline for a GO-implementation claim (time to produce the implementation report before the claim can lapse)?\"=\"30 minutes\", \"How should deadline extensions be granted when an agent appends an extension request to its claim?\"=\"Self-service, capped\", \"When the deadline lapses (no implementation report filed, no extension granted), release timing?\"=\"Short grace, then release\", \"Where should lapsed / available GO-implementation work be surfaced so another agent picks it up?\"=\"Both AXIS-2 and doctor\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1186
+  asked_at: 2026-06-13T04:08:01.556624Z
+  question: "When the deadline lapses (no implementation report filed, no extension granted), release timing?"
+  options:
+    - "Immediate release at deadline"
+    - "Short grace, then release"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9eb894fd62136d4f
+  resolved_at: 2026-06-13T04:08:01.556624Z
+  answer: "Your questions have been answered: \"Default implementation deadline for a GO-implementation claim (time to produce the implementation report before the claim can lapse)?\"=\"30 minutes\", \"How should deadline extensions be granted when an agent appends an extension request to its claim?\"=\"Self-service, capped\", \"When the deadline lapses (no implementation report filed, no extension granted), release timing?\"=\"Short grace, then release\", \"Where should lapsed / available GO-implementation work be surfaced so another agent picks it up?\"=\"Both AXIS-2 and doctor\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1187
+  asked_at: 2026-06-13T04:08:01.556624Z
+  question: "Where should lapsed / available GO-implementation work be surfaced so another agent picks it up?"
+  options:
+    - "AXIS-2 bridge surface"
+    - "Doctor/scan check"
+    - "Both AXIS-2 and doctor"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6b61092f7b8d0c8b
+  resolved_at: 2026-06-13T04:08:01.556624Z
+  answer: "Your questions have been answered: \"Default implementation deadline for a GO-implementation claim (time to produce the implementation report before the claim can lapse)?\"=\"30 minutes\", \"How should deadline extensions be granted when an agent appends an extension request to its claim?\"=\"Self-service, capped\", \"When the deadline lapses (no implementation report filed, no extension granted), release timing?\"=\"Short grace, then release\", \"Where should lapsed / available GO-implementation work be surfaced so another agent picks it up?\"=\"Both AXIS-2 and doctor\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1188
+  asked_at: 2026-06-13T04:54:55.562530Z
+  question: "The shared worktree is NOT settled: 2+ other Claude PB sessions were active seconds ago, and one filed `gtkb-tafe-stage-leases-schema` NEW 14 min ago — that is exactly your DO-NEXT #3 (F5 / stage_leases), and WI-4487 flow_definitions is already VERIFIED@-005. Any INDEX write I make now risks clobbering their live work. How should harness B proceed?"
+  options:
+    - "Monitor + repair INDEX"
+    - "Prep role-authority lane"
+    - "I'm sole driver now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 28ac54441467ef32
+  resolved_at: 2026-06-13T04:54:55.562530Z
+  answer: "Your questions have been answered: \"The shared worktree is NOT settled: 2+ other Claude PB sessions were active seconds ago, and one filed `gtkb-tafe-stage-leases-schema` NEW 14 min ago — that is exactly your DO-NEXT #3 (F5 / stage_leases), and WI-4487 flow_definitions is already VERIFIED@-005. Any INDEX write I make now risks clobbering their live work. How should harness B proceed?\"=\"Prep role-authority lane\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1189
+  asked_at: 2026-06-13T04:57:32.290915Z
+  question: "Per-role concurrency cap for parallel headless workers (the safeguard against S308-style runaway spawning while still getting real parallelism)?"
+  options:
+    - "Small cap (2–3 per role)"
+    - "Larger cap (5–8 per role)"
+    - "No cap — per-item dedup only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9edc52ac7864f952
+  resolved_at: 2026-06-13T04:57:32.290915Z
+  answer: "Your questions have been answered: \"Per-role concurrency cap for parallel headless workers (the safeguard against S308-style runaway spawning while still getting real parallelism)?\"=\"Small cap (2–3 per role)\", \"Sequencing: parallelism relies on per-item claim coordination to keep workers from colliding. The time-box claim system just went GO. How should I sequence the two?\"=\"Time-box first, then relax suppression\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1190
+  asked_at: 2026-06-13T04:57:32.290915Z
+  question: "Sequencing: parallelism relies on per-item claim coordination to keep workers from colliding. The time-box claim system just went GO. How should I sequence the two?"
+  options:
+    - "Time-box first, then relax suppression"
+    - "One coordinated change"
+    - "Parallelize now, independently"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dfbc2e04ee72972a
+  resolved_at: 2026-06-13T04:57:32.290915Z
+  answer: "Your questions have been answered: \"Per-role concurrency cap for parallel headless workers (the safeguard against S308-style runaway spawning while still getting real parallelism)?\"=\"Small cap (2–3 per role)\", \"Sequencing: parallelism relies on per-item claim coordination to keep workers from colliding. The time-box claim system just went GO. How should I sequence the two?\"=\"Time-box first, then relax suppression\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1192
+  asked_at: 2026-06-13T06:24:49.025829Z
+  question: "A concurrent Codex-PB session (harness A) is actively burning down TAFE — the apparent top-priority project — right now (its `dispatch-policy-engine` thread reached post-impl mid-conversation), and the backlog has 60+ active projects. For my autonomous loop to be productive instead of colliding, which lane should harness B own? (Once set, I loop it autonomously: claim → propose → Codex GO → implement → scoped-commit → report → Codex VERIFIED → next.)"
+  options:
+    - "Governance/role-authority lane"
+    - "Contend on TAFE"
+    - "A project you name"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8df054ed95d8f643
+  resolved_at: 2026-06-13T06:24:49.025829Z
+  answer: "Your questions have been answered: \"A concurrent Codex-PB session (harness A) is actively burning down TAFE — the apparent top-priority project — right now (its `dispatch-policy-engine` thread reached post-impl mid-conversation), and the backlog has 60+ active projects. For my autonomous loop to be productive instead of colliding, which lane should harness B own? (Once set, I loop it autonomously: claim → propose → Codex GO → implement → scoped-commit → report → Codex VERIFIED → next.)\"=\"Governance/role-authority lane\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1193
+  asked_at: 2026-06-13T06:24:49.025829Z
+  question: "WI-4513 ('harden impl-start gate to cross-check GO author against active loyal-opposition registry role') was captured in S436 from the harness-C over-detection incident, BEFORE the declared-not-detected model. As-captured (block GOs whose author's registry role/status doesn't match active-LO), it would violate the now-canonical DCL-ROLE-RESOLUTION-DECLARED-AUTHORITY-001 R5 (and the ADR's explicitly-rejected 'hard-fail on registry mismatch' alternative). How should the loop dispose of WI-4513?"
+  options:
+    - "Reframe to warn-not-block"
+    - "Retire as superseded by R5"
+    - "Amend R5 to permit this block"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: acd20300aff067fa
+  resolved_at: 2026-06-13T06:24:49.025829Z
+  answer: "Your questions have been answered: \"WI-4513 ('harden impl-start gate to cross-check GO author against active loyal-opposition registry role') was captured in S436 from the harness-C over-detection incident, BEFORE the declared-not-detected model. As-captured (block GOs whose author's registry role/status doesn't match active-LO), it would violate the now-canonical DCL-ROLE-RESOLUTION-DECLARED-AUTHORITY-001 R5 (and the ADR's explicitly-rejected 'hard-fail on registry mismatch' alternative). How should the loop dispose of WI-4513?\"=\"Retire as superseded by R5\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1194
+  asked_at: 2026-06-13T07:11:30.674641Z
+  question: "I triaged the backlog for the next authorization. Which ready, specced scope should I authorize next (DELIB + PAUTH, then the swarm executes via the bridge protocol)?"
+  options:
+    - "GT-KB platform hardening"
+    - "Deepen TAFE Phase-2"
+    - "Bring Agent Red into scope"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0a941d3a0adc5fb5
+  resolved_at: 2026-06-13T07:11:30.674641Z
+  answer: "Your questions have been answered: \"I triaged the backlog for the next authorization. Which ready, specced scope should I authorize next (DELIB + PAUTH, then the swarm executes via the bridge protocol)?\"=\"Deepen TAFE Phase-2\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

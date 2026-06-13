@@ -315,67 +315,42 @@ def test_update_bridge_index_inserts_after_header_comments(tmp_path: Path) -> No
     assert entry_pos > header_end, "entry must follow the header block, not precede it"
 
 
-def test_update_bridge_index_is_atomic_via_os_replace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """``_update_bridge_index`` writes via temp file + ``os.replace``.
-
-    Assertion: an ``os.replace`` call from temp file to the index path
-    occurs. We monkey-patch ``os.replace`` to record the transition.
-    """
-    import os as _os
-
+def test_update_bridge_index_uses_serialized_writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_update_bridge_index`` delegates the read/modify/write to the shared lock writer."""
     helper = _load_helper()
-    index_path = tmp_path / "INDEX.md"
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    index_path = bridge_dir / "INDEX.md"
     _write_fresh_index(index_path)
 
-    calls: list[tuple[str, str]] = []
-    orig_replace = _os.replace
+    calls: list[tuple[Path, Path]] = []
 
-    def _recording_replace(src: str | Path, dst: str | Path) -> None:
-        calls.append((str(src), str(dst)))
-        orig_replace(src, dst)
+    def _recording_atomic_index_update(index_arg: Path, mutate, *, state_dir: Path, **_kwargs: Any) -> str:
+        calls.append((Path(index_arg), Path(state_dir)))
+        written = mutate(Path(index_arg).read_text(encoding="utf-8"))
+        Path(index_arg).write_text(written, encoding="utf-8")
+        return written
 
-    monkeypatch.setattr(helper.os, "replace", _recording_replace)
+    monkeypatch.setattr(helper, "atomic_index_update", _recording_atomic_index_update)
     entry = "Document: atomic-topic\nNEW: bridge/atomic-topic-001.md\n"
     helper._update_bridge_index(index_path, entry, topic_slug="atomic-topic")
 
-    # Verify one replace call happened, from a temp file named with our INDEX stem.
-    assert len(calls) == 1, f"expected 1 os.replace call; got {calls}"
-    src, dst = calls[0]
-    assert Path(dst).name == "INDEX.md", f"replace dst must be INDEX.md; got {dst}"
-    assert ".tmp." in Path(src).name, f"replace src must be a temp file; got {src}"
+    assert calls == [(index_path, tmp_path / ".gtkb-state" / "bridge-index-writer")]
+    assert "Document: atomic-topic" in index_path.read_text(encoding="utf-8")
 
 
-def test_update_bridge_index_detects_concurrent_modification(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Content changes between read and rename → BridgeIndexConflictError, temp cleaned up."""
+def test_update_bridge_index_preserves_unrelated_current_document(tmp_path: Path) -> None:
+    """A current unrelated document block is preserved when inserting a new topic."""
     helper = _load_helper()
     index_path = tmp_path / "INDEX.md"
-    _write_fresh_index(index_path)
-
-    # Intercept read_bytes on the Path instance so the second read (pre-rename)
-    # sees different content from the first read.
-    original_read_bytes = Path.read_bytes
-    state = {"calls": 0}
-
-    def _racing_read_bytes(self: Path) -> bytes:
-        result = original_read_bytes(self)
-        state["calls"] += 1
-        if self == index_path and state["calls"] == 2:
-            # Between the first read (step 1) and the second read
-            # (step 5 pre-rename), simulate a concurrent writer by
-            # appending non-topic content to the file bytes in-flight.
-            return result + b"\n# Concurrent writer appended content.\n"
-        return result
-
-    monkeypatch.setattr(Path, "read_bytes", _racing_read_bytes)
+    index_path.write_text(_INDEX_HEADER + "Document: other-topic\nNEW: bridge/other-topic-001.md\n\n", encoding="utf-8")
 
     entry = "Document: racing-topic\nNEW: bridge/racing-topic-001.md\n"
-    with pytest.raises(helper.BridgeIndexConflictError) as excinfo:
-        helper._update_bridge_index(index_path, entry, topic_slug="racing-topic")
-    assert "changed during update" in str(excinfo.value).lower()
+    helper._update_bridge_index(index_path, entry, topic_slug="racing-topic")
 
-    # Temp file cleaned up.
-    leftover = list(tmp_path.glob("INDEX.md.tmp.*"))
-    assert not leftover, f"temp file not cleaned up on conflict; found {leftover}"
+    updated = index_path.read_text(encoding="utf-8")
+    assert "Document: racing-topic" in updated
+    assert "Document: other-topic" in updated
 
 
 def test_update_bridge_index_detects_concurrent_same_topic(tmp_path: Path) -> None:

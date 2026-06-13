@@ -20,7 +20,7 @@ Design contract:
   update. If the target file already exists,
   :class:`BridgeFileAlreadyExistsError` is raised before any INDEX
   touch.
-- INDEX update is atomic (``os.replace``) and retry-safe. Total
+- INDEX update is serialized through the bridge index lock and retry-safe. Total
   retry budget is **2 total attempts** (1 initial + 1 retry). On
   the second failure, :class:`BridgeIndexConflictError` surfaces
   with an actionable message.
@@ -31,7 +31,6 @@ Design contract:
 
 from __future__ import annotations
 
-import contextlib
 import importlib
 import json
 import os
@@ -61,6 +60,7 @@ _credential_patterns = importlib.import_module("groundtruth_kb.governance.creden
 BASH_EXTRAS = _credential_patterns.BASH_EXTRAS
 CREDENTIAL_PATTERNS = _credential_patterns.CREDENTIAL_PATTERNS
 ensure_author_metadata = importlib.import_module("scripts.bridge_author_metadata").ensure_author_metadata
+atomic_index_update = importlib.import_module("scripts.bridge_index_writer").atomic_index_update
 
 
 class BridgeFileAlreadyExistsError(RuntimeError):
@@ -705,29 +705,30 @@ def _compute_new_index_content(existing_lines: list[str], new_entry: str) -> str
     return head + entry + tail
 
 
+def _index_writer_state_dir(index_path: Path) -> Path:
+    return index_path.parent.parent / ".gtkb-state" / "bridge-index-writer"
+
+
 def _update_bridge_index(
     index_path: Path,
     new_entry: str,
     *,
     topic_slug: str,
 ) -> None:
-    """Insert ``new_entry`` at the top of ``index_path`` atomically.
+    """Insert ``new_entry`` at the top of ``index_path`` through the serialized writer.
 
     Steps:
 
-    1. Read the current bytes.
-    2. Idempotency check using **exact line match**: if any line,
+    1. Acquire the bridge-index writer lock.
+    2. Read the current text inside the lock.
+    3. Idempotency check using **exact line match**: if any line,
        once stripped, equals ``"Document: <topic_slug>"`` exactly
        (NOT substring match), raise :class:`BridgeIndexConflictError`
        with a concurrent-same-topic message.
-    3. Compute the new content via
+    4. Compute the new content via
        :func:`_compute_new_index_content`.
-    4. Write the new content to a same-directory temp file.
-    5. Re-read the INDEX bytes; if they differ from step 1, unlink
-       the temp file and raise :class:`BridgeIndexConflictError`
-       with an "INDEX changed during update" message.
-    6. Atomically rename the temp file onto the index via
-       :func:`os.replace`.
+    5. Atomically replace the index through
+       :func:`scripts.bridge_index_writer.atomic_index_update`.
 
     Args:
         index_path: Path to ``bridge/INDEX.md``.
@@ -735,52 +736,23 @@ def _update_bridge_index(
         topic_slug: The topic slug (for idempotency detection).
 
     Raises:
-        BridgeIndexConflictError: On concurrent same-topic insertion
-            or non-topic concurrent modification.
+        BridgeIndexConflictError: On concurrent same-topic insertion.
     """
-    # Step 1: Read.
-    original_bytes = index_path.read_bytes()
-    lines = original_bytes.decode("utf-8").splitlines(keepends=True)
 
-    # Step 2: Idempotency check — EXACT LINE MATCH per the skill contract.
-    # Substring matching would false-positive if a Document line shares a
-    # slug prefix (e.g., ``Document: foo-bar`` vs ``Document: foo``).
-    expected = f"Document: {topic_slug}"
-    for line in lines:
-        if line.strip() == expected:
-            raise BridgeIndexConflictError(
-                f"INDEX.md already has an entry for {expected!r}. "
-                f"Another writer inserted it concurrently. The bridge file "
-                f"at bridge/{topic_slug}-001.md is on disk; inspect and "
-                f"reconcile manually."
-            )
+    def mutate(current_text: str) -> str:
+        lines = current_text.splitlines(keepends=True)
+        expected = f"Document: {topic_slug}"
+        for line in lines:
+            if line.strip() == expected:
+                raise BridgeIndexConflictError(
+                    f"INDEX.md already has an entry for {expected!r}. "
+                    f"Another writer inserted it concurrently. The bridge file "
+                    f"at bridge/{topic_slug}-001.md is on disk; inspect and "
+                    f"reconcile manually."
+                )
+        return _compute_new_index_content(lines, new_entry)
 
-    # Step 3: Compute new content.
-    new_content = _compute_new_index_content(lines, new_entry)
-
-    # Step 4: Write to a same-directory temp file so the rename is atomic.
-    temp_path = index_path.with_name(f"{index_path.name}.tmp.{os.getpid()}")
-    temp_path.write_bytes(new_content.encode("utf-8"))
-
-    try:
-        # Step 5: Pre-rename check — INDEX must not have changed since step 1.
-        current_bytes = index_path.read_bytes()
-        if current_bytes != original_bytes:
-            temp_path.unlink()
-            raise BridgeIndexConflictError(
-                "INDEX.md changed during update — concurrent modification detected. Retry required."
-            )
-
-        # Step 6: Atomic rename.
-        os.replace(temp_path, index_path)
-    except BridgeIndexConflictError:
-        raise
-    except Exception:
-        # Best-effort cleanup of temp file on any unexpected error.
-        if temp_path.exists():
-            with contextlib.suppress(OSError):
-                temp_path.unlink()
-        raise
+    atomic_index_update(index_path, mutate, state_dir=_index_writer_state_dir(index_path))
 
 
 def propose_bridge(
