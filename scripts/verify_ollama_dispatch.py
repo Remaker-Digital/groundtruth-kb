@@ -9,7 +9,8 @@ Two operational modes:
   metadata against the routing TOML.
 - **Guard-only mode** (fallback when Ollama is unreachable): exercises the
   guard-adapter pipeline with mocked model responses to verify destructive
-  Bash denial, formal-artifact mutation denial, and out-of-root rejection.
+  Bash denial, formal-artifact mutation denial, out-of-root rejection, and
+  hard denial for Bash-based bridge artifact mutations.
 
 The script never modifies production ``bridge/INDEX.md``; all bridge filing
 proof uses a disposable fixture workspace under ``tempfile.mkdtemp``.
@@ -690,6 +691,69 @@ def _check_guard_out_of_root(project_root: Path, model_route: ModelRoute, endpoi
         return False
 
 
+def _check_guard_bridge_bash_denial(project_root: Path, model_route: ModelRoute, endpoint: str) -> bool:
+    """G4: Bash must not mutate bridge/*.md or bridge/INDEX.md."""
+    metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
+    fixture_root = Path(tempfile.mkdtemp(prefix="gtkb-ollama-bridge-bash-", dir=str(project_root)))
+    bridge_dir = fixture_root / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    (fixture_root / "groundtruth.toml").write_text('[project]\nname = "fixture"\n', encoding="utf-8")
+    index_path = bridge_dir / "INDEX.md"
+    original_index = "# Bridge Index\n"
+    index_path.write_text(original_index, encoding="utf-8")
+    fixture_bridge_file = bridge_dir / "gtkb-ollama-e2e-fixture-001.md"
+    records: list[str] = []
+    command_called = False
+
+    def _allowing_guard(script: Path, payload: dict[str, Any], env: Any, timeout: float) -> Any:
+        from ollama_harness import GuardExecutionResult
+
+        records.append(str(script))
+        return GuardExecutionResult(returncode=0, stdout='{"decision":"allow"}')
+
+    def _mutating_command(command: str, cwd: Path, env: Any, timeout: float) -> subprocess.CompletedProcess[str]:
+        nonlocal command_called
+        command_called = True
+        fixture_bridge_file.write_text("GO\n", encoding="utf-8")
+        index_path.write_text("mutated\n", encoding="utf-8")
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="mutated", stderr="")
+
+    try:
+        dispatch_tool_call(
+            "Bash",
+            {"command": "Set-Content bridge/gtkb-ollama-e2e-fixture-001.md 'GO'"},
+            metadata,
+            fixture_root,
+            guard_runner=_allowing_guard,
+            command_runner=_mutating_command,
+        )
+        _print_result("G4 bridge Bash mutation denial", False, "expected rejection but call succeeded")
+        return False
+    except OllamaHarnessError as exc:
+        passed = (
+            "Bash bridge artifact mutation denied" in str(exc)
+            and not records
+            and not command_called
+            and not fixture_bridge_file.exists()
+            and index_path.read_text(encoding="utf-8") == original_index
+        )
+        _print_result(
+            "G4 bridge Bash mutation denial",
+            passed,
+            (
+                f"denial={exc}, guards_invoked={len(records)}, command_called={command_called}, "
+                f"file_exists={fixture_bridge_file.exists()}, index_unchanged="
+                f"{index_path.read_text(encoding='utf-8') == original_index}"
+            ),
+        )
+        return passed
+    except Exception as exc:
+        _print_result("G4 bridge Bash mutation denial", False, f"unexpected error: {exc}")
+        return False
+    finally:
+        shutil.rmtree(fixture_root, ignore_errors=True)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -768,6 +832,7 @@ def main(argv: list[str] | None = None) -> int:
     results.append(_check_guard_destructive_bash(project_root, model_route, endpoint))
     results.append(_check_guard_formal_artifact(project_root, model_route, endpoint))
     results.append(_check_guard_out_of_root(project_root, model_route, endpoint))
+    results.append(_check_guard_bridge_bash_denial(project_root, model_route, endpoint))
 
     # Summary
     passed = sum(1 for r in results if r)

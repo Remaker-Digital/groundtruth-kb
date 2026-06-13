@@ -402,6 +402,86 @@ def test_formal_and_membase_bash_is_denied_before_subprocess(tmp_path: Path):
     assert command_called is False
 
 
+def test_bridge_bash_file_write_is_denied_before_guards_or_subprocess(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    records: list[tuple[str, dict, dict]] = []
+    command_called = False
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        nonlocal command_called
+        command_called = True
+        (cwd / "bridge" / "bypass-001.md").write_text("GO\n", encoding="utf-8")
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="wrote", stderr="")
+
+    with pytest.raises(oh.OllamaHarnessError, match="Bash bridge artifact mutation denied"):
+        oh.dispatch_tool_call(
+            "Bash",
+            {"command": "Set-Content bridge/bypass-001.md 'GO'"},
+            metadata(),
+            root,
+            guard_runner=allow_runner(records),
+            command_runner=command_runner,
+        )
+
+    assert records == []
+    assert command_called is False
+    assert not (root / "bridge" / "bypass-001.md").exists()
+
+
+def test_bridge_bash_index_write_is_denied_and_index_unchanged(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    index = root / "bridge" / "INDEX.md"
+    index.write_text("Document: fixture\nNEW: bridge/fixture-001.md\n", encoding="utf-8")
+    before = index.read_text(encoding="utf-8")
+    records: list[tuple[str, dict, dict]] = []
+    command_called = False
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        nonlocal command_called
+        command_called = True
+        index.write_text("bad\n", encoding="utf-8")
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="wrote", stderr="")
+
+    with pytest.raises(oh.OllamaHarnessError, match="Bash bridge artifact mutation denied"):
+        oh.dispatch_tool_call(
+            "Bash",
+            {"command": "echo bad > bridge/INDEX.md"},
+            metadata(),
+            root,
+            guard_runner=allow_runner(records),
+            command_runner=command_runner,
+        )
+
+    assert records == []
+    assert command_called is False
+    assert index.read_text(encoding="utf-8") == before
+
+
+def test_bridge_bash_read_reference_still_uses_bash_guards(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    (root / "bridge" / "INDEX.md").write_text("Document: fixture\n", encoding="utf-8")
+    records: list[tuple[str, dict, dict]] = []
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="Document: fixture\n", stderr="")
+
+    result = oh.dispatch_tool_call(
+        "Bash",
+        {"command": "Get-Content bridge/INDEX.md"},
+        metadata(),
+        root,
+        guard_runner=allow_runner(records),
+        command_runner=command_runner,
+    )
+
+    suffixes = [Path(path).as_posix().split("repo/")[-1] for path, _, _ in records]
+    assert result == "Document: fixture\n"
+    assert suffixes == [guard.as_posix() for guard in oh.BASH_GUARDS]
+
+
 @pytest.mark.parametrize(
     ("result", "message"),
     [

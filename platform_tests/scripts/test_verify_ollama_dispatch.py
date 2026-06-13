@@ -4,12 +4,13 @@ Spec-derived tests for ``scripts/verify_ollama_dispatch.py`` per the Phase-1
 Child 3 proposal (bridge/gtkb-ollama-integration-phase-1-verification-005.md)
 and the GO verdict (bridge/gtkb-ollama-integration-phase-1-verification-006.md).
 
-The script's verification surface has six check functions across two modes:
+The script's verification surface has seven check functions across two modes:
 
 - Live mode: ``_check_tool_loop_round_trip``, ``_check_author_metadata``,
   ``_check_bridge_filing_via_dispatch``.
 - Guard-only mode: ``_check_guard_destructive_bash``,
-  ``_check_guard_formal_artifact``, ``_check_guard_out_of_root``.
+  ``_check_guard_formal_artifact``, ``_check_guard_out_of_root``,
+  ``_check_guard_bridge_bash_denial``.
 
 Tests stub the live ``urllib.request`` reachability probe, inject deterministic
 mock chat functions through the shim, and exercise the dispatch path against
@@ -382,6 +383,18 @@ def test_guard_out_of_root_rejected(verify_module, ollama_harness_module, tmp_pa
     assert ok is True
 
 
+# ── Guard-only: bridge Bash mutation rejection ──────────────────────────
+
+
+def test_guard_bridge_bash_denial_blocks_file_and_index_mutation(
+    verify_module, ollama_harness_module, tmp_path
+) -> None:
+    """G4: Bash bridge writes are rejected before guards or subprocess execution."""
+    route = _fixture_route(ollama_harness_module, key="bridge-bash-route", allowed_tools=("Bash",))
+    ok = verify_module._check_guard_bridge_bash_denial(tmp_path, route, "http://localhost:11434")
+    assert ok is True
+
+
 # ── Smoke test: script importable with no side effects ──────────────────
 
 
@@ -394,4 +407,5 @@ def test_script_importable_without_side_effects() -> None:
     assert hasattr(mod, "_check_guard_destructive_bash")
     assert hasattr(mod, "_check_guard_formal_artifact")
     assert hasattr(mod, "_check_guard_out_of_root")
+    assert hasattr(mod, "_check_guard_bridge_bash_denial")
     assert callable(getattr(mod, "main", None))

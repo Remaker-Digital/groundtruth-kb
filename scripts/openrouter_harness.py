@@ -23,6 +23,11 @@ except ModuleNotFoundError:  # pragma: no cover
     from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 
 try:
+    from sdk_bridge_bash_guard import bridge_bash_mutation_reason
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.sdk_bridge_bash_guard import bridge_bash_mutation_reason
+
+try:
     import tomllib
 except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[import-not-found,no-redef]
@@ -181,7 +186,7 @@ def load_routing_config(project_root: Path) -> RoutingConfig:
     for key, row in models_raw.items():
         if not isinstance(key, str) or not key or not isinstance(row, dict):
             raise OpenRouterHarnessError("model rows must be named TOML tables")
-        
+
         # Only process models that map to openrouter
         provider = row.get("provider")
         if provider != "openrouter":
@@ -245,6 +250,10 @@ Run the preflight checks with Bash:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
 python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
 
+Do not use Bash to create, edit, overwrite, remove, or index bridge/*.md or
+bridge/INDEX.md. The harness hard-denies shell bridge mutations; use guarded
+Write/Edit dispatch or the deterministic bridge writer/helper path for bridge artifacts.
+
 Bridge verdict author metadata to include:
 author_identity: OpenRouter Loyal Opposition
 author_harness_id: F
@@ -307,7 +316,7 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
         ),
         "Bash": _schema(
             "Bash",
-            "Run a bounded local shell command after destructive/formal/implementation guards allow it.",
+            "Run a bounded local shell command after guards allow it; bridge/*.md and bridge/INDEX.md mutations are denied.",
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),
@@ -516,10 +525,14 @@ def invoke_guard_adapter(
                 f"guard emitted malformed JSON: {_relative_path(project_root, guard_path)}"
             ) from exc
         if not isinstance(data, dict):
-            raise OpenRouterHarnessError(f"guard output must be a JSON object: {_relative_path(project_root, guard_path)}")
+            raise OpenRouterHarnessError(
+                f"guard output must be a JSON object: {_relative_path(project_root, guard_path)}"
+            )
         reason = _decision_reason(data)
         if reason:
-            raise OpenRouterHarnessError(f"guard denied {tool_name}: {_relative_path(project_root, guard_path)}: {reason}")
+            raise OpenRouterHarnessError(
+                f"guard denied {tool_name}: {_relative_path(project_root, guard_path)}: {reason}"
+            )
 
 
 def _require_string(arguments: Mapping[str, Any], *names: str) -> str:
@@ -670,6 +683,9 @@ def _dispatch_bash(
 ) -> str:
     command = _require_string(arguments, "command")
     timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+    bridge_denial = bridge_bash_mutation_reason(command)
+    if bridge_denial:
+        raise OpenRouterHarnessError(bridge_denial)
     invoke_guard_adapter("Bash", {"command": command}, model_metadata, project_root, guard_runner=guard_runner)
     env = set_author_metadata_env(
         os.environ, model_metadata.model_id, model_metadata.model_version, model_metadata.endpoint
@@ -725,16 +741,16 @@ def dispatch_tool_call(
 def _tool_call_parts(call: Any, index: int) -> tuple[str, dict[str, Any], str]:
     if not isinstance(call, dict):
         raise OpenRouterHarnessError("tool_call entries must be JSON objects")
-    
+
     call_id = str(call.get("id") or f"tool_call_{index}")
     function = call.get("function")
     if not isinstance(function, dict):
         raise OpenRouterHarnessError("tool_call is missing function details")
-        
+
     name = function.get("name")
     if not isinstance(name, str) or not name:
         raise OpenRouterHarnessError("tool_call is missing function name")
-        
+
     raw_arguments = function.get("arguments", {})
     if isinstance(raw_arguments, str):
         try:
@@ -751,11 +767,11 @@ def _message_from_response(response: Mapping[str, Any]) -> dict[str, Any]:
     choices = response.get("choices")
     if not isinstance(choices, list) or not choices:
         raise OpenRouterHarnessError("OpenRouter response missing choices list")
-    
+
     first_choice = choices[0]
     if not isinstance(first_choice, dict):
         raise OpenRouterHarnessError("OpenRouter choice must be an object")
-        
+
     message = first_choice.get("message")
     if not isinstance(message, dict):
         raise OpenRouterHarnessError("OpenRouter response missing message object in choices[0]")
@@ -786,18 +802,14 @@ def run_tool_loop(
     schemas = build_tool_schemas(model_route.allowed_tools)
     chat = chat_func or call_openrouter_chat
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
-    
+
     for _turn in range(max_turns):
-        payload = {
-            "model": model_route.model_id, 
-            "messages": messages, 
-            "stream": False
-        }
+        payload = {"model": model_route.model_id, "messages": messages, "stream": False}
         if schemas:
             payload["tools"] = schemas
 
         response = chat(endpoint, api_key, payload, timeout)
-        
+
         # Handle potential error field in OpenRouter response
         if "error" in response:
             error_details = response["error"]
@@ -806,7 +818,7 @@ def run_tool_loop(
 
         message = _message_from_response(response)
         tool_calls = message.get("tool_calls") or []
-        
+
         if not tool_calls:
             content = message.get("content")
             if not isinstance(content, str):
@@ -819,10 +831,10 @@ def run_tool_loop(
         assistant_message: dict[str, Any] = {
             "role": "assistant",
             "content": message.get("content") or "",
-            "tool_calls": tool_calls
+            "tool_calls": tool_calls,
         }
         messages.append(assistant_message)
-        
+
         for index, call in enumerate(tool_calls):
             tool_name, arguments, call_id = _tool_call_parts(call, index)
             try:
@@ -853,7 +865,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to OpenRouter.")
     parser.add_argument("--model", help="Routing model key from .api-harness/routing.toml.")
     parser.add_argument("--skill", help="Skill or task route key from .api-harness/routing.toml.")
-    parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="OpenRouter endpoint; default is https://openrouter.ai/api/v1.")
+    parser.add_argument(
+        "--endpoint", default=DEFAULT_ENDPOINT, help="OpenRouter endpoint; default is https://openrouter.ai/api/v1."
+    )
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, help="Maximum tool loop turns.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP/guard/subprocess timeout.")
     return parser
@@ -863,13 +877,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     project_root = resolve_project_root(Path.cwd())
-    
+
     try:
         from scripts._env import load_env_local
+
         load_env_local()
     except ImportError:
         try:
             from _env import load_env_local
+
             load_env_local()
         except ImportError:
             pass

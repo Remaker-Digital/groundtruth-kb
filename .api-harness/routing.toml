@@ -12,6 +12,18 @@ provider = "ollama"
 tool_calling_supported = true
 allowed_tools = ["Read", "Grep", "Glob", "Write", "Edit"]
 
+[models.kimi-k2-7-code-cloud]
+model_id = "kimi-k2.7-code:cloud"
+provider = "ollama"
+tool_calling_supported = true
+allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+
+[models.qwen3-6-local]
+model_id = "qwen3.6:latest"
+provider = "ollama"
+tool_calling_supported = true
+allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+
 [models.deepseek-v4-pro]
 model_id = "deepseek/deepseek-v4-pro"
 provider = "openrouter"
@@ -25,13 +37,13 @@ tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [routing.ollama]
-default_model = "qwen3-coder-next-cloud"
+default_model = "kimi-k2-7-code-cloud"
 timeout_seconds = 180
 
 [routing.ollama.skills]
-bridge-review = "qwen3-coder-next-cloud"
-verification = "qwen3-coder-next-cloud"
-implementation = "qwen3-coder-next-cloud"
+bridge-review = "kimi-k2-7-code-cloud"
+verification = "kimi-k2-7-code-cloud"
+implementation = "kimi-k2-7-code-cloud"
 
 [routing.openrouter]
 default_model = "deepseek-v4-pro"

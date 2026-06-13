@@ -23,6 +23,11 @@ except ModuleNotFoundError:  # pragma: no cover - exercised when imported as scr
     from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 
 try:
+    from sdk_bridge_bash_guard import bridge_bash_mutation_reason
+except ModuleNotFoundError:  # pragma: no cover - exercised when imported as scripts.ollama_harness.
+    from scripts.sdk_bridge_bash_guard import bridge_bash_mutation_reason
+
+try:
     import tomllib
 except ImportError:  # pragma: no cover - Python <3.11 fallback is not expected in CI.
     import tomli as tomllib  # type: ignore[import-not-found,no-redef]
@@ -286,6 +291,10 @@ Run the preflight checks with Bash:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
 python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
 
+Do not use Bash to create, edit, overwrite, remove, or index bridge/*.md or
+bridge/INDEX.md. The harness hard-denies shell bridge mutations; use guarded
+Write/Edit dispatch or the deterministic bridge writer/helper path for bridge artifacts.
+
 Bridge verdict author metadata to include:
 author_identity: Ollama Loyal Opposition
 author_harness_id: D
@@ -348,7 +357,7 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
         ),
         "Bash": _schema(
             "Bash",
-            "Run a bounded local shell command after destructive/formal/implementation guards allow it.",
+            "Run a bounded local shell command after guards allow it; bridge/*.md and bridge/INDEX.md mutations are denied.",
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),
@@ -706,6 +715,9 @@ def _dispatch_bash(
 ) -> str:
     command = _require_string(arguments, "command")
     timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+    bridge_denial = bridge_bash_mutation_reason(command)
+    if bridge_denial:
+        raise OllamaHarnessError(bridge_denial)
     invoke_guard_adapter("Bash", {"command": command}, model_metadata, project_root, guard_runner=guard_runner)
     env = set_author_metadata_env(
         os.environ, model_metadata.model_id, model_metadata.model_version, model_metadata.endpoint

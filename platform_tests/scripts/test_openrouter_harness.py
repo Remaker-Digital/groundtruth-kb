@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from scripts import openrouter_harness as orh
+
+FIXTURE_MODEL_ID = "deepseek/fixture-model"
+FIXTURE_MODEL_VERSION = orh.infer_model_version(FIXTURE_MODEL_ID)
+
+
+def make_root(tmp_path: Path) -> Path:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
+    (root / ".api-harness").mkdir()
+    (root / ".claude" / "hooks").mkdir(parents=True)
+    (root / "scripts").mkdir()
+    for guard in {*orh.BRIDGE_WRITE_GUARDS, *orh.BRIDGE_EDIT_GUARDS, *orh.WRITE_EDIT_GUARDS, *orh.BASH_GUARDS}:
+        path = root / guard
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("print('{}')\n", encoding="utf-8")
+    (root / orh.ROUTING_CONFIG_PATH).write_text(
+        """
+schema_version = 1
+
+[models.fixture-full]
+model_id = "deepseek/fixture-model"
+provider = "openrouter"
+tool_calling_supported = true
+allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+
+[routing.openrouter]
+default_model = "fixture-full"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def route(root: Path) -> orh.ModelRoute:
+    return orh.resolve_model(orh.load_routing_config(root), None)
+
+
+def metadata() -> orh.ModelMetadata:
+    return orh.ModelMetadata(
+        model_id=FIXTURE_MODEL_ID,
+        model_version=FIXTURE_MODEL_VERSION,
+        endpoint="https://openrouter.test",
+        route_key="fixture-full",
+    )
+
+
+def allow_runner(records: list[tuple[str, dict, dict]]):
+    def run_guard(path: Path, payload: dict, env: dict, timeout: float) -> orh.GuardExecutionResult:
+        records.append((path.as_posix(), payload, dict(env)))
+        return orh.GuardExecutionResult(returncode=0, stdout="{}")
+
+    return run_guard
+
+
+def test_load_routing_config_parses_openrouter_model(tmp_path: Path):
+    root = make_root(tmp_path)
+    selected = route(root)
+
+    assert selected.key == "fixture-full"
+    assert selected.model_id == FIXTURE_MODEL_ID
+    assert selected.model_version == FIXTURE_MODEL_VERSION
+    assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
+
+
+def test_bridge_write_invokes_required_guard_sequence(tmp_path: Path):
+    root = make_root(tmp_path)
+    records: list[tuple[str, dict, dict]] = []
+    orh.invoke_guard_adapter(
+        "Write",
+        {"path": "bridge/example-001.md", "content": "NEW\n"},
+        metadata(),
+        root,
+        guard_runner=allow_runner(records),
+    )
+
+    suffixes = [Path(path).as_posix().split("repo/")[-1] for path, _, _ in records]
+    assert suffixes == [guard.as_posix() for guard in orh.BRIDGE_WRITE_GUARDS]
+
+
+def test_bridge_edit_invokes_required_guard_sequence(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    (root / "bridge" / "example-001.md").write_text("NEW\nold\n", encoding="utf-8")
+    records: list[tuple[str, dict, dict]] = []
+    orh.invoke_guard_adapter(
+        "Edit",
+        {"path": "bridge/example-001.md", "old_string": "old", "new_string": "new"},
+        metadata(),
+        root,
+        guard_runner=allow_runner(records),
+    )
+
+    suffixes = [Path(path).as_posix().split("repo/")[-1] for path, _, _ in records]
+    assert suffixes == [guard.as_posix() for guard in orh.BRIDGE_EDIT_GUARDS]
+
+
+def test_author_metadata_env_is_passed_to_bridge_write_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
+    records: list[tuple[str, dict, dict]] = []
+
+    orh.invoke_guard_adapter(
+        "Write",
+        {"path": "bridge/example-001.md", "content": "NEW\n"},
+        metadata(),
+        root,
+        guard_runner=allow_runner(records),
+    )
+
+    env = records[0][2]
+    payload = records[0][1]
+    assert env["GTKB_AUTHOR_IDENTITY"] == "OpenRouter F"
+    assert env["GTKB_AUTHOR_HARNESS_ID"] == "F"
+    assert env["GTKB_AUTHOR_MODEL"] == FIXTURE_MODEL_ID
+    assert env["GTKB_AUTHOR_MODEL_VERSION"] == FIXTURE_MODEL_VERSION
+    assert payload["session_id"] == "dispatch-run"
+
+
+def test_bridge_bash_file_write_is_denied_before_guards_or_subprocess(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    records: list[tuple[str, dict, dict]] = []
+    command_called = False
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        nonlocal command_called
+        command_called = True
+        (cwd / "bridge" / "bypass-001.md").write_text("GO\n", encoding="utf-8")
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="wrote", stderr="")
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="Bash bridge artifact mutation denied"):
+        orh.dispatch_tool_call(
+            "Bash",
+            {"command": "Set-Content bridge/bypass-001.md 'GO'"},
+            metadata(),
+            root,
+            guard_runner=allow_runner(records),
+            command_runner=command_runner,
+        )
+
+    assert records == []
+    assert command_called is False
+    assert not (root / "bridge" / "bypass-001.md").exists()
+
+
+def test_bridge_bash_index_write_is_denied_and_index_unchanged(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    index = root / "bridge" / "INDEX.md"
+    index.write_text("Document: fixture\nNEW: bridge/fixture-001.md\n", encoding="utf-8")
+    before = index.read_text(encoding="utf-8")
+    records: list[tuple[str, dict, dict]] = []
+    command_called = False
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        nonlocal command_called
+        command_called = True
+        index.write_text("bad\n", encoding="utf-8")
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="wrote", stderr="")
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="Bash bridge artifact mutation denied"):
+        orh.dispatch_tool_call(
+            "Bash",
+            {"command": "echo bad > bridge/INDEX.md"},
+            metadata(),
+            root,
+            guard_runner=allow_runner(records),
+            command_runner=command_runner,
+        )
+
+    assert records == []
+    assert command_called is False
+    assert index.read_text(encoding="utf-8") == before
+
+
+def test_bridge_bash_read_reference_still_uses_bash_guards(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    (root / "bridge" / "INDEX.md").write_text("Document: fixture\n", encoding="utf-8")
+    records: list[tuple[str, dict, dict]] = []
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="Document: fixture\n", stderr="")
+
+    result = orh.dispatch_tool_call(
+        "Bash",
+        {"command": "Get-Content bridge/INDEX.md"},
+        metadata(),
+        root,
+        guard_runner=allow_runner(records),
+        command_runner=command_runner,
+    )
+
+    suffixes = [Path(path).as_posix().split("repo/")[-1] for path, _, _ in records]
+    assert result == "Document: fixture\n"
+    assert suffixes == [guard.as_posix() for guard in orh.BASH_GUARDS]
