@@ -5,6 +5,7 @@ GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
 NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-001.md
 
 Document: gtkb-wi4452-impl-auth-named-packet-fallback
+VERIFIED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-007.md
 NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-006.md
 GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-005.md
 REVISED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-004.md
