@@ -440,3 +440,11 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a cluster dis
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | FAB-03 through FAB-07 all have latest `VERIFIED` bridge threads with no INDEX drift, but their MemBase rows remain open/backlogged with no completion evidence. | `show_thread_bridge.py` reports latest `VERIFIED` for `gtkb-fab-03-membase-backup`, `gtkb-fab-04-storage-reclamation`, `gtkb-fab-05-rule-file-retirement`, `gtkb-fab-06-narrative-corrections`, and `gtkb-fab-07-doctor-false-signals`; `gt backlog list --id WI-4415 ... WI-4419 --json` reports all five open/backlogged. | Prime should run a governed Fable backlog disposition pass, resolving satisfied rows or splitting any intentional residual scope into new work items. | Open |
+
+### 2026-06-13 - WI-4395 uv Cache Command Surface Disposition
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition investigation for `WI-4395`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4395-uv-cache-command-surface-disposition.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The original default uv cache outage does not reproduce in the current Codex LO shell, but GT-KB still lacks a canonical tracked command surface that pins `UV_CACHE_DIR`, temp paths, and optional tool dependencies for automation/verification commands. | Bare `uv run --project groundtruth-kb ...` and `uv --with pytest/ruff` probes now pass; `uv cache dir` still points to `C:\Users\micha\AppData\Local\uv\cache`; HYG-054 records ad hoc uv-cache/tmp sprawl; runtime retention only cleans `.gtkb-state` uv-cache dirs. | Prime should re-scope WI-4395 from "current outage" to a narrow command-wrapper/config proposal with denied-cache regression coverage and cleanup-pattern alignment. | Open |
