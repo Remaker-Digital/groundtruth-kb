@@ -19,14 +19,18 @@ try:
         AuthorizationError,
         canonical_project_root,
         normalize_relative_path,
+        resolve_work_intent_session_id,
         validate_targets,
+        work_intent_claim_block_reason,
     )
 except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import (
         AuthorizationError,
         canonical_project_root,
         normalize_relative_path,
+        resolve_work_intent_session_id,
         validate_targets,
+        work_intent_claim_block_reason,
     )
 
 
@@ -1008,7 +1012,13 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     if not protected:
         return {}
     try:
-        validate_targets(root, protected)
+        result = validate_targets(root, protected)
+        packet = result.get("packet", {})
+        bridge_id = str(packet.get("bridge_id") or "")
+        session_id = resolve_work_intent_session_id(payload)
+        block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
+        if block_reason:
+            raise AuthorizationError(block_reason)
     except AuthorizationError as exc:
         classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
         return {
@@ -1016,10 +1026,10 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "reason": (
                 f"BLOCKED (GTKB-IMPLEMENTATION-START-GATE): {BLOCKING_CLAUSE_ID}\n"
                 f"Reason: protected implementation mutation matched {classifications} and requires "
-                f"a live bridge GO authorization packet. {exc}\n"
+                f"a live bridge GO authorization packet plus matching bridge work-intent claim. {exc}\n"
                 "Suggested fix: acquire or activate an authorization packet with "
-                "`python scripts/implementation_authorization.py begin --bridge-id <id>` before mutating "
-                "protected targets."
+                "`python scripts/bridge_claim_cli.py claim <id>` and "
+                "`python scripts/implementation_authorization.py begin --bridge-id <id>` before mutating protected targets."
             ),
         }
     return {}

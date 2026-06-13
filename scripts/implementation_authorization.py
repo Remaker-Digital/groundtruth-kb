@@ -20,6 +20,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts import bridge_work_intent_registry, gtkb_session_id
+except ImportError:  # pragma: no cover - direct script execution from scripts/
+    import bridge_work_intent_registry  # type: ignore[no-redef]
+    import gtkb_session_id  # type: ignore[no-redef]
+
 DEFAULT_PACKET_RELATIVE_PATH = Path(".gtkb-state/implementation-authorizations/current.json")
 BY_BRIDGE_DIRECTORY_RELATIVE_PATH = Path(".gtkb-state/implementation-authorizations/by-bridge")
 DEFAULT_EXPIRY_MINUTES = 480
@@ -1311,6 +1317,55 @@ def validate_targets(project_root: Path, targets: list[str]) -> dict[str, Any]:
     )
 
 
+def resolve_work_intent_session_id(
+    payload: dict[str, Any] | None = None,
+    *,
+    explicit: str | None = None,
+    environ: dict[str, str] | None = None,
+) -> str:
+    """Resolve the session id used for bridge work-intent ownership checks."""
+    explicit_value = str(explicit or "").strip()
+    if explicit_value:
+        return explicit_value
+    resolved = gtkb_session_id.resolve_session_id(
+        order=gtkb_session_id.BRIDGE_WORK_INTENT_ORDER,
+        environ=environ,
+    )
+    if resolved:
+        return resolved
+    if payload:
+        return str(payload.get("session_id") or "").strip()
+    return ""
+
+
+def work_intent_claim_block_reason(project_root: Path, bridge_id: str, session_id: str) -> str | None:
+    """Return a denial reason unless ``session_id`` holds ``bridge_id``'s claim."""
+    if bridge_id in BOOTSTRAP_BRIDGE_IDS:
+        return None
+    if not session_id.strip():
+        return (
+            f"No session id is available for bridge work-intent claim check on {bridge_id!r}; "
+            "set a supported session id environment variable or pass --session-id."
+        )
+    try:
+        holder = bridge_work_intent_registry.current_holder(bridge_id, project_root=project_root)
+    except bridge_work_intent_registry.WorkIntentRegistryError as exc:
+        return f"Could not verify bridge work-intent claim for {bridge_id!r}: {exc}"
+    if holder is None:
+        return (
+            f"No active work-intent claim is held for bridge {bridge_id!r}; "
+            f"run `python scripts/bridge_claim_cli.py claim {bridge_id}` before implementation."
+        )
+    holder_session = str(holder.get("session_id") or "")
+    if holder_session != session_id:
+        expires = holder.get("ttl_expires_at", "unknown expiration")
+        return (
+            f"Bridge {bridge_id!r} is claimed by session {holder_session!r} until {expires}; "
+            f"current session {session_id!r} must not mutate this implementation scope."
+        )
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", default=None)
@@ -1319,6 +1374,7 @@ def main(argv: list[str] | None = None) -> int:
     begin = subparsers.add_parser("begin")
     begin.add_argument("--bridge-id", required=True)
     begin.add_argument("--expires-minutes", type=int, default=DEFAULT_EXPIRY_MINUTES)
+    begin.add_argument("--session-id", help="Override the resolved bridge work-intent session id")
     begin.add_argument(
         "--no-write", action="store_true", help="Print packet without writing current.json or the named-cache packet"
     )
@@ -1348,6 +1404,10 @@ def main(argv: list[str] | None = None) -> int:
     root = project_root_from_arg(args.project_root)
     try:
         if args.command == "begin":
+            session_id = resolve_work_intent_session_id(explicit=args.session_id)
+            block_reason = work_intent_claim_block_reason(root, args.bridge_id, session_id)
+            if block_reason:
+                raise AuthorizationError(block_reason)
             packet = create_authorization_packet(
                 root,
                 args.bridge_id,

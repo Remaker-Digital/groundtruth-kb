@@ -165,18 +165,114 @@ def _seed_owner_sufficiency_deliberation(root: Path) -> str:
     return deliberation_id
 
 
+def _claim_bridge(root: Path, bridge_id: str = "sample-implementation", session_id: str | None = None) -> None:
+    holder = session_id or auth.resolve_work_intent_session_id() or "session-1"
+    assert auth.bridge_work_intent_registry.acquire(bridge_id, holder, project_root=root)
+
+
+def _apply_patch_payload(
+    root: Path, target: str = "scripts/sample.py", session_id: str = "session-1"
+) -> dict[str, object]:
+    return {
+        "cwd": str(root),
+        "session_id": session_id,
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": f"*** Begin Patch\n*** Update File: {target}\n@@\n+pass\n*** End Patch\n"},
+    }
+
+
 def test_go_authorization_packet_allows_in_scope_apply_patch(tmp_path: Path) -> None:
     _write_thread(tmp_path)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
 
-    payload = {
-        "cwd": str(tmp_path),
-        "tool_name": "apply_patch",
-        "tool_input": {"patch": "*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n"},
-    }
+    assert gate.gate_decision(_apply_patch_payload(tmp_path)) == {}
 
-    assert gate.gate_decision(payload) == {}
+
+def test_valid_packet_blocks_when_work_intent_claim_missing(tmp_path: Path) -> None:
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert "No active work-intent claim" in result["reason"]
+
+
+def test_valid_packet_blocks_when_claim_held_by_other_session(tmp_path: Path) -> None:
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path, "sample-implementation", "other-session")
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, session_id="session-1"))
+
+    assert result["decision"] == "block"
+    assert "claimed by session 'other-session'" in result["reason"]
+
+
+def test_lapsed_claim_blocks_mutation(tmp_path: Path) -> None:
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path, "sample-implementation", "session-1")
+    conn = auth.bridge_work_intent_registry._get_conn(tmp_path)
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE work_intent_claims SET ttl_expires_at = ?, implementation_grace_expires_at = ? "
+                "WHERE thread_slug = ?",
+                ("2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "sample-implementation"),
+            )
+    finally:
+        conn.close()
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert "No active work-intent claim" in result["reason"]
+
+
+def test_gate_allows_when_holder_is_dispatch_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path, "sample-implementation", "dispatch-1")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-1")
+
+    assert gate.gate_decision(_apply_patch_payload(tmp_path, session_id="ambient-session")) == {}
+
+
+def test_gate_blocks_on_work_intent_registry_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path, "sample-implementation", "session-1")
+
+    def raise_registry_error(*_args, **_kwargs):
+        raise auth.bridge_work_intent_registry.WorkIntentRegistryError("registry unavailable")
+
+    monkeypatch.setattr(auth.bridge_work_intent_registry, "current_holder", raise_registry_error)
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert "Could not verify bridge work-intent claim" in result["reason"]
+
+
+def test_bootstrap_bridge_id_exempt_from_claim_check(tmp_path: Path) -> None:
+    bridge_id = "gtkb-implementation-start-authorization-gate"
+    _write_thread(
+        tmp_path,
+        bridge_id=bridge_id,
+        proposal=_proposal(bridge_id=bridge_id, target_paths=["scripts/sample.py"]),
+    )
+    packet = auth.create_authorization_packet(tmp_path, bridge_id)
+    auth.write_packet(tmp_path, packet)
+
+    assert gate.gate_decision(_apply_patch_payload(tmp_path, session_id="")) == {}
 
 
 def test_existing_packet_blocks_when_bridge_becomes_latest_deferred(tmp_path: Path) -> None:
@@ -245,10 +341,12 @@ def test_exact_file_target_path_authorizes_exact_protected_file(tmp_path: Path) 
     _write_thread(tmp_path, proposal=_proposal(target_paths=[exact_target]))
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
     sample_patch = f"*** Begin Patch\n*** Update File: {exact_target}\n@@\n+enabled = true\n*** End Patch\n"
 
     payload = {
         "cwd": str(tmp_path),
+        "session_id": "session-1",
         "tool_name": "apply_patch",
         "tool_input": {"patch": sample_patch},
     }
@@ -277,10 +375,12 @@ def test_requirement_sufficiency_are_sufficient_allows_gate_authorization(tmp_pa
     )
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
     sample_patch = "*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n"
 
     payload = {
         "cwd": str(tmp_path),
+        "session_id": "session-1",
         "tool_name": "apply_patch",
         "tool_input": {"patch": sample_patch},
     }
@@ -302,12 +402,14 @@ def test_owner_sufficiency_deliberation_packet_allows_gate_authorization(tmp_pat
         owner_sufficiency_deliberation_id=delib_id,
     )
     auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
     sample_patch = (
         "*** Begin Patch\n" + "*** " + "Update File: scripts/sample.py\n" + "@@\n" + "+pass\n" + "*** End Patch\n"
     )
 
     payload = {
         "cwd": str(tmp_path),
+        "session_id": "session-1",
         "tool_name": "apply_patch",
         "tool_input": {"patch": sample_patch},
     }
@@ -596,6 +698,7 @@ def test_gate_uses_unique_named_packet_when_current_json_absent(tmp_path: Path) 
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
 
     named_path = auth.write_named_packet(tmp_path, packet, "sample-implementation")
+    _claim_bridge(tmp_path)
     assert named_path.is_file(), "test setup: named packet must be on disk"
     assert not auth.packet_path(tmp_path).is_file(), (
         "test setup: current.json must be absent so any positive gate decision comes from the unique by-bridge packet"
@@ -603,6 +706,7 @@ def test_gate_uses_unique_named_packet_when_current_json_absent(tmp_path: Path) 
 
     payload = {
         "cwd": str(tmp_path),
+        "session_id": "session-1",
         "tool_name": "apply_patch",
         "tool_input": {"patch": ("*** Begin Patch\n*** Update File: scripts/sample.py\n@@\n+pass\n*** End Patch\n")},
     }

@@ -299,6 +299,10 @@ def _begin_packet(auth_module, tmp_path: Path, slug: str) -> dict[str, Any]:
     return packet
 
 
+def _claim_bridge(auth_module, tmp_path: Path, slug: str, session_id: str = "session-1") -> None:
+    assert auth_module.bridge_work_intent_registry.acquire(slug, session_id, project_root=tmp_path)
+
+
 def test_begin_writes_both_current_and_named_packet(auth_module, tmp_path):
     """write_packet + write_named_packet write identical packet content to both
     locations.
@@ -313,6 +317,78 @@ def test_begin_writes_both_current_and_named_packet(auth_module, tmp_path):
     assert named_path.is_file()
     assert current_path.read_text(encoding="utf-8") == named_path.read_text(encoding="utf-8")
     assert packet["bridge_id"] == slug
+
+
+def test_begin_cli_refuses_without_work_intent_claim(auth_module, tmp_path, capsys):
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+
+    rc = auth_module.main(
+        [
+            "--project-root",
+            str(tmp_path),
+            "begin",
+            "--bridge-id",
+            slug,
+            "--session-id",
+            "session-1",
+            "--no-write",
+        ]
+    )
+
+    assert rc == 2
+    output = json.loads(capsys.readouterr().out)
+    assert output["authorized"] is False
+    assert "No active work-intent claim" in output["error"]
+    assert not auth_module.packet_path(tmp_path).exists()
+
+
+def test_begin_cli_refuses_claim_held_by_other_session(auth_module, tmp_path, capsys):
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _claim_bridge(auth_module, tmp_path, slug, session_id="other-session")
+
+    rc = auth_module.main(
+        [
+            "--project-root",
+            str(tmp_path),
+            "begin",
+            "--bridge-id",
+            slug,
+            "--session-id",
+            "session-1",
+            "--no-write",
+        ]
+    )
+
+    assert rc == 2
+    output = json.loads(capsys.readouterr().out)
+    assert "claimed by session 'other-session'" in output["error"]
+    assert not auth_module.packet_path(tmp_path).exists()
+
+
+def test_begin_cli_succeeds_when_work_intent_claim_held(auth_module, tmp_path, capsys):
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _claim_bridge(auth_module, tmp_path, slug, session_id="session-1")
+
+    rc = auth_module.main(
+        [
+            "--project-root",
+            str(tmp_path),
+            "begin",
+            "--bridge-id",
+            slug,
+            "--session-id",
+            "session-1",
+            "--no-write",
+        ]
+    )
+
+    assert rc == 0
+    packet = json.loads(capsys.readouterr().out)
+    assert packet["bridge_id"] == slug
+    assert not auth_module.packet_path(tmp_path).exists()
 
 
 def test_activate_restores_named_packet_to_current_json(auth_module, tmp_path):
@@ -893,6 +969,7 @@ def test_begin_cli_passes_owner_sufficiency_deliberation_id(auth_module, tmp_pat
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
     _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
+    _claim_bridge(auth_module, tmp_path, slug, session_id="session-1")
 
     rc = auth_module.main(
         [
@@ -901,6 +978,8 @@ def test_begin_cli_passes_owner_sufficiency_deliberation_id(auth_module, tmp_pat
             "begin",
             "--bridge-id",
             slug,
+            "--session-id",
+            "session-1",
             "--owner-sufficiency-deliberation-id",
             delib_id,
             "--no-write",
