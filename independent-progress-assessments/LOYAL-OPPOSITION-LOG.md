@@ -377,4 +377,12 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 |------|---------|-------------------|------------------|--------|
 | Technical | The live root `spec-before-code.py` hook is currently a WI-4449 recovery stub, but the managed template still implements source_paths-only matching and reproduces the false advisory for bridge-linked `platform_tests/` files. | Live `.claude/hooks/spec-before-code.py` emits nothing; `groundtruth-kb/templates/hooks/spec-before-code.py` emits "No specification found covering platform_tests/scripts/test_gtkb_hygiene_investigation.py"; FAB-20 bridge report carries the test linkage through target_paths/spec-to-test mapping. | Do not restore the current template unchanged; choose bridge-derived test coverage, reviewed source_paths backfill, or explicit platform_tests deferral before re-enabling the hook. | Open |
 
+### 2026-06-13 - WI-4457 Governance Hook Tracking Doctor Gap
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4457`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4457-governance-hook-tracking-doctor-gap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Current `.claude/hooks/*.py` registrations all exist and are tracked, but `gt project doctor` still lacks a direct git-index tracking invariant for registered governance hook scripts. | `.gitignore` re-includes `.claude/hooks/*.py`; `.claude/settings.json` registers many hook scripts; doctor checks validate presence/registration/managed drift but do not compare registered hook paths to `git ls-files`. Targeted doctor tests passed (24). | Prime should file a narrow bridge proposal for an additive WARN-level doctor check covering registered-but-untracked and unregistered-untracked `.claude/hooks/*.py` files. | Open |
+
 
