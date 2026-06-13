@@ -11,6 +11,7 @@ Document: gtkb-lo-advisory-owner-grilling-gate-slice3-lint
 NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-001.md
 
 Document: gtkb-architecture-p2-stale-assertions-reconciliation
+GO: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-004.md
 REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-003.md
 REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-002.md
 NEW: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-001.md
