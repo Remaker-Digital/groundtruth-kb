@@ -393,4 +393,12 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 |------|---------|-------------------|------------------|--------|
 | Process | The WI-4449 `--no-verify` precedent was justified by a real governance deadlock, but GT-KB lacks a reusable emergency-bootstrap protocol with tight boundaries and explicit post-fix audit discipline. | `bridge/gtkb-commit-untracked-governance-hooks-002.md` records the hook/bridge deadlock and follow-on need; `e90b2f03` restored six tracked hook files; current bridge/claim/approval tests passed (31). | Prime should file a normal bridge proposal for a narrow rule/runbook addition defining allowed conditions, minimum scope, required audit artifact, and retroactive owner-decision capture when explicit prior approval was unavailable. | Open |
 
+### 2026-06-13 - WI-4452 Bridge INDEX Repair
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) repaired the canonical bridge INDEX entry for `gtkb-wi4452-impl-auth-named-packet-fallback`. The versioned files were already tracked on disk through `VERIFIED`; the missing `bridge/INDEX.md` document block made the thread invisible to live bridge scanners.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | `WI-4452` had a complete tracked bridge thread ending in `VERIFIED`, but no `Document:` block in `bridge/INDEX.md`. | `show_thread_bridge.py` initially reported all seven `gtkb-wi4452-impl-auth-named-packet-fallback-*.md` files as not referenced by INDEX; after serialized `gt bridge index` restoration, drift is empty and LO scan reports 194 terminal VERIFIED entries. | Treat the bridge repair as complete; downstream backlog/project reconciliation can now see the verified thread from canonical INDEX state. `WI-4443` remains related-only per the implementation report unless separately authorized. | Resolved |
+
 

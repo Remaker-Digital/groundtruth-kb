@@ -1,3 +1,12 @@
+Document: gtkb-wi4452-impl-auth-named-packet-fallback
+VERIFIED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-007.md
+NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-006.md
+GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-005.md
+REVISED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-004.md
+NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-003.md
+NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-002.md
+NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-001.md
+
 Document: gtkb-antigravity-startup-optimization-governance-docs
 ADVISORY: bridge/gtkb-antigravity-startup-optimization-governance-docs-001.md
 
