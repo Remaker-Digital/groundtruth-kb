@@ -1,4 +1,10 @@
+Document: gtkb-tafe-runtime-schema
+WITHDRAWN: bridge/gtkb-tafe-runtime-schema-002.md
+NEW: bridge/gtkb-tafe-runtime-schema-001.md
+
 Document: gtkb-tafe-runtime-tables-schema
+VERIFIED: bridge/gtkb-tafe-runtime-tables-schema-004.md
+NEW: bridge/gtkb-tafe-runtime-tables-schema-003.md
 GO: bridge/gtkb-tafe-runtime-tables-schema-002.md
 NEW: bridge/gtkb-tafe-runtime-tables-schema-001.md
 
