@@ -432,3 +432,11 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | FAB-01 / WI-4413 is latest `VERIFIED` in the live bridge and targeted launchability verification passes, but MemBase still reports the work item as open/backlogged with no completion evidence. | `show_thread_bridge.py gtkb-fab-01-dispatch-substrate-revival` reports no drift and latest `VERIFIED`; targeted FAB-01 pytest passed 51 tests; live launchability doctor reports all five active dispatch targets launchable; `gt backlog list --id WI-4413 --json` still reports open/backlogged. | Prime should perform governed backlog disposition for WI-4413 and dedupe or restate WI-4479 if its remaining scope is not already covered. | Open |
+
+### 2026-06-13 - Fable P1 Verified-Open Disposition Gap
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a cluster disposition-gap investigation for `WI-4415` through `WI-4419`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-FABLE-P1-verified-open-disposition-gap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | FAB-03 through FAB-07 all have latest `VERIFIED` bridge threads with no INDEX drift, but their MemBase rows remain open/backlogged with no completion evidence. | `show_thread_bridge.py` reports latest `VERIFIED` for `gtkb-fab-03-membase-backup`, `gtkb-fab-04-storage-reclamation`, `gtkb-fab-05-rule-file-retirement`, `gtkb-fab-06-narrative-corrections`, and `gtkb-fab-07-doctor-false-signals`; `gt backlog list --id WI-4415 ... WI-4419 --json` reports all five open/backlogged. | Prime should run a governed Fable backlog disposition pass, resolving satisfied rows or splitting any intentional residual scope into new work items. | Open |
