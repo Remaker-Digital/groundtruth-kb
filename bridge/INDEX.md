@@ -28,6 +28,7 @@ NO-GO: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-002.md
 NEW: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-001.md
 
 Document: gtkb-tafe-dispatch-tick-health
+GO: bridge/gtkb-tafe-dispatch-tick-health-004.md
 REVISED: bridge/gtkb-tafe-dispatch-tick-health-003.md
 NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
