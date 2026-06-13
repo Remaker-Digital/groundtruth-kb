@@ -1,8 +1,13 @@
+Document: gtkb-bounded-parallel-cross-harness-dispatch
+GO: bridge/gtkb-bounded-parallel-cross-harness-dispatch-002.md
+NEW: bridge/gtkb-bounded-parallel-cross-harness-dispatch-001.md
+
 Document: gtkb-tafe-flow-type-lifecycle-coverage
 GO: bridge/gtkb-tafe-flow-type-lifecycle-coverage-002.md
 NEW: bridge/gtkb-tafe-flow-type-lifecycle-coverage-001.md
 
 Document: gtkb-impl-auth-per-session-pointer-isolation
+NEW: bridge/gtkb-impl-auth-per-session-pointer-isolation-005.md
 GO: bridge/gtkb-impl-auth-per-session-pointer-isolation-004.md
 REVISED: bridge/gtkb-impl-auth-per-session-pointer-isolation-003.md
 NO-GO: bridge/gtkb-impl-auth-per-session-pointer-isolation-002.md
