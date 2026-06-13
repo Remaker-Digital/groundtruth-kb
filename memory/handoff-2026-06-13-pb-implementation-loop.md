@@ -49,10 +49,10 @@ author_model_configuration: Claude Code interactive session; Prime Builder role 
 - **Bridge `## Specification Links`** heading must be exact — `bridge_applicability_preflight.py` only matches the canonical form.
 - **Document-author-provenance gate**: new `memory/*.md` (and other governed Markdown) require the 6 `author_*` header lines (this file has them) per `GOV-DOCUMENT-AUTHOR-PROVENANCE-001`.
 
-## Process-improvement candidates to capture (MemBase `work_items`)
+## Process-improvement candidates — CAPTURED in MemBase (2026-06-13; do not re-file)
 
-1. **Claim TTL for `source`-scope implementations** — extend TTL or auto-extend on active heartbeat to prevent mid-build re-claim collisions.
-2. **Sweep-commit ordering** — co-commit source + its bridge review evidence; the sweep committed bridge artifacts separately this session, which then blocked the dependent source commit (hooks.json) at the inventory-drift gate.
+1. **`WI-4527`** — Claim TTL too short for `source`-scope implementations (extend TTL or auto-extend on active heartbeat to prevent mid-build re-claim collisions). `improvement`/`bridge-protocol`/P2.
+2. **`WI-4528`** — Sweep-commit should co-commit source + its bridge review evidence (the sweep committed bridge artifacts separately, blocking the dependent hooks.json commit at the inventory-drift gate). `improvement`/`tooling`/P3.
 
 ---
 

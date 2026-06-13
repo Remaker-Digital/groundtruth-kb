@@ -5559,3 +5559,265 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-14T06:21:31.072539Z
   answer: "Answer questions?"
   notes: ""
+
+- id: DECISION-0566
+  asked_at: 2026-05-14T13:16:20.373562Z
+  question: "Which actionable bridge entry should I tackle first?"
+  options:
+    - "Friction-hygiene REVISED-2 (Recommended)"
+    - "Operating-mode-transaction implementation"
+    - "Benchmark-suite reconciliation"
+    - "Triage the 4 sitting GOs"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f603023999e42351
+  resolved_at: 2026-05-14T13:16:20.373562Z
+  answer: "User has answered your questions: \"Which actionable bridge entry should I tackle first?\"=\"Friction-hygiene REVISED-2 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0567
+  asked_at: 2026-05-14T13:16:20.373562Z
+  question: "The existing -005 REVISED-2 (already filed in INDEX by a parallel/earlier session) will NO-GO on Codex review for missing in-root evidence. How should I handle it?"
+  options:
+    - "Preempt with Prime REVISED-3 at -006 (Recommended)"
+    - "Let Codex NO-GO -005, then revise at -007"
+    - "Replace with deeper-refactor REVISED-3 at -006"
+    - "Inspect -005's origin before deciding"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cc99c3491906b01f
+  resolved_at: 2026-05-14T13:16:20.373562Z
+  answer: "User has answered your questions: \"The existing -005 REVISED-2 (already filed in INDEX by a parallel/earlier session) will NO-GO on Codex review for missing in-root evidence. How should I handle it?\"=\"Preempt with Prime REVISED-3 at -006 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0568
+  asked_at: 2026-05-14T13:16:20.373562Z
+  question: "A parallel Prime Builder agent is actively driving bridge threads (friction-hygiene to -010 NO-GO, operating-mode-transaction to -012 REVISED). My interactive work is duplicating theirs. How should I proceed?"
+  options:
+    - "Pause; investigate parallel-session origin first (Recommended)"
+    - "Take over friction-hygiene at -011 only"
+    - "Continue full bridge work alongside parallel agent"
+    - "Pick a different focus entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9a79e97d348fef4c
+  resolved_at: 2026-05-14T13:16:20.373562Z
+  answer: "User has answered your questions: \"A parallel Prime Builder agent is actively driving bridge threads (friction-hygiene to -010 NO-GO, operating-mode-transaction to -012 REVISED). My interactive work is duplicating theirs. How should I proceed?\"=\"Pause; investigate parallel-session origin first (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0569
+  asked_at: 2026-05-14T13:41:38.343814Z
+  question: "Two bridge items are actionable for Prime in this auto-dispatched session: (1) slice-2-benchmark-suite NO-GO at -012 (3 findings; F1 turns out to be a CRLF-vs-LF line-ending mismatch, not content drift — decoded text matches the packet exactly), and (2) bridge-convenience-verbs GO at -002 (clean implementation work). Which should I tackle in this dispatch?"
+  options:
+    - "Refile slice-2 NO-GO first (Recommended)"
+    - "Implement convenience-verbs GO first"
+    - "Hold for owner-interactive session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 130819a62bb385ef
+  resolved_at: 2026-05-14T13:41:38.343814Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0570
+  asked_at: 2026-05-14T13:58:46.136462Z
+  question: "I can't apply this fix from my session: scripts/ is in PROTECTED_PREFIXES, my prior auth packet drifted invalid when slice-2 NO-GO'd, no current GO'd bridge covers this path, and there's no env-var override in the gate code. The fix itself is straightforward (surgical change shown above; ~30 lines, fully diff-able). How do you want to proceed?"
+  options:
+    - "You apply the change manually"
+    - "I file a bridge proposal for the fix"
+    - "Add to parallel window's friction-hygiene thread"
+    - "Stand down on this; wait for friction-hygiene to land"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9e8c6b04be936f68
+  resolved_at: 2026-05-14T13:58:46.136462Z
+  answer: "User has answered your questions: \"I can't apply this fix from my session: scripts/ is in PROTECTED_PREFIXES, my prior auth packet drifted invalid when slice-2 NO-GO'd, no current GO'd bridge covers this path, and there's no env-var override in the gate code. The fix itself is straightforward (surgical change shown above; ~30 lines, fully diff-able). How do you want to proceed?\"=\"You apply the change manually\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0571
+  asked_at: 2026-05-14T14:03:26.255920Z
+  question: "Codex NO-GO F1 on the benchmark-suite report: the canonical-terminology.md worktree (hash 38c663a3...) has S349 entries (assertion-category cluster, advisory-router, benchmark cluster) totalling 107 unstaged lines. Three packets exist for those blocks but each blesses an intermediate state — none of the three match the final worktree hash. How should I reconcile?"
+  options:
+    - "New cumulative packet (Recommended)"
+    - "Re-stage to match benchmark-terms packet"
+    - "Investigate intermediate-state hashes first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d342c91ae4057951
+  resolved_at: 2026-05-14T14:03:26.255920Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0573
+  asked_at: 2026-05-14T14:11:08.524476Z
+  question: "How to resolve the convenience-verbs -005 / adapter SHA conflict (my regen overwrote the file the parallel session's -005 describes)?"
+  options:
+    - "Revert my adapter overwrite + let -005 stand (Recommended)"
+    - "File -006 superseding -005 with my regen approach"
+    - "Investigate parallel-session origin first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 91478232ca79531f
+  resolved_at: 2026-05-14T14:11:08.524476Z
+  answer: "User has answered your questions: \"How to resolve the convenience-verbs -005 / adapter SHA conflict (my regen overwrote the file the parallel session's -005 describes)?\"=\"Revert my adapter overwrite + let -005 stand (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0574
+  asked_at: 2026-05-14T14:25:24.538028Z
+  question: "DECISION-0572: friction-hygiene -012 GO authorizes the full scope (2 files + 32 tests + 1 WI + post-impl report). Proceed with full scope or break into smaller phased iterations?"
+  options:
+    - "Full scope per Codex GO (Recommended)"
+    - "Phase by friction (F1, F2, F3 separate iterations)"
+    - "Skeleton only + return for second-pass planning"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 07e2e88fb9d0e277
+  resolved_at: 2026-05-14T14:25:24.538028Z
+  answer: "User has answered your questions: \"DECISION-0572: friction-hygiene -012 GO authorizes the full scope (2 files + 32 tests + 1 WI + post-impl report). Proceed with full scope or break into smaller phased iterations?\"=\"Full scope per Codex GO (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0575
+  asked_at: 2026-05-14T14:35:13.933184Z
+  question: "Approve adding this section to `.claude/rules/operating-role.md` to close Slice 1 criterion #4 (agent instructions direct agents to use the transaction component)? This is the deferred-from-`-018` item; the section would be inserted after the existing role-assignment guidance. Approval authorizes the exact text below for the protected-narrative-artifact approval packet."
+  options:
+    - "Approve as drafted"
+    - "Revise wording before approval"
+    - "Skip the rule update; let Codex decide"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 07d6355c6b5b8755
+  resolved_at: 2026-05-14T14:35:13.933184Z
+  answer: "User has answered your questions: \"Approve adding this section to `.claude/rules/operating-role.md` to close Slice 1 criterion #4 (agent instructions direct agents to use the transaction component)? This is the deferred-from-`-018` item; the section would be inserted after the existing role-assignment guidance. Approval authorizes the exact text below for the protected-narrative-artifact approval packet.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0576
+  asked_at: 2026-05-14T14:35:13.933184Z
+  question: "Owner approval for the rule text is banked, but applying it now is blocked by the auth-gate's review-snapshot-integrity check on `-018` (the post-impl report you're waiting on). The rule update is a single ~10-line section + criterion #4 test + amendment. How do you want to handle the queued rule update?"
+  options:
+    - "Wait for Codex on -018"
+    - "You apply the rule update manually"
+    - "File a fresh hygiene bridge thread for just this"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d2a9c067378a8879
+  resolved_at: 2026-05-14T14:35:13.933184Z
+  answer: "User has answered your questions: \"Owner approval for the rule text is banked, but applying it now is blocked by the auth-gate's review-snapshot-integrity check on `-018` (the post-impl report you're waiting on). The rule update is a single ~10-line section + criterion #4 test + amendment. How do you want to handle the queued rule update?\"=\"Wait for Codex on -018\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0577
+  asked_at: 2026-05-14T14:43:44.590240Z
+  question: "DECISION-0572: Codex NO-GO -014 on friction-hygiene confirms the GO'd IP-D scope was 32 regression tests; the implementation report delivered 5. Which path should I take to clear the NO-GO?"
+  options:
+    - "Complete to 32-test scope"
+    - "Scope-reduction REVISED proposal"
+    - "Park the thread, address ruff only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 09341ee8a44a92c1
+  resolved_at: 2026-05-14T14:43:44.590240Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0578
+  asked_at: 2026-05-14T15:01:09.579114Z
+  question: "Bridge auto-dispatch surfaced two NO-GOs. First: `gtkb-operating-mode-transaction-001-019` rejected the post-implementation report with two P1 blockers — (F1) acceptance criterion #4 from `SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001` is `DEFERRED` (the `.claude/rules/operating-role.md` rule update directing agents to use the new transaction component was not applied), and (F2) `test_workstream_focus.py::test_save_state_persists_topology_mode_default` fails (asserts `TOPOLOGY_MODE_SINGLE` but new implementation now persists `TOPOLOGY_MODE_DEFAULT`; the test file is outside the GO'd `target_paths`). Which direction should Prime take for the REVISED response?"
+  options:
+    - "Full Slice 1 closure now (Recommended)"
+    - "Scope-reduction REVISED proposal"
+    - "Owner waivers for both blockers"
+    - "Revert Slice 1 implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 74086c41ae068cda
+  resolved_at: 2026-05-14T15:01:09.579114Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0579
+  asked_at: 2026-05-14T15:38:04.550590Z
+  question: "Bridge auto-dispatch hit a gate cascade: the active implementation-authorization packet is stale (bound to friction-hygiene -012, superseded by REVISED -015), and the formal-artifact-approval-gate is firing on the bridge-revision draft path because it contains bridge/* references. The REVISED-003 content for startup-payload-canonical-state-drift is fully drafted (addresses all 3 Codex findings: P1 reuse canonical helper, P2 expand verification surface, P3 render-only scope), but I cannot persist it. How should I proceed?"
+  options:
+    - "Issue fresh auth packet from a current GO + retry write"
+    - "Authorize one-shot bypass for this dispatch turn"
+    - "Defer the bridge work; report blocked state and stand by"
+    - "AUQ both NO-GOs together for sequenced disposition"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 28371b7464ab441c
+  resolved_at: 2026-05-14T15:38:04.550590Z
+  answer: "Answer questions?"
+  notes: ""
+
+- id: DECISION-0580
+  asked_at: 2026-05-14T15:57:28.851917Z
+  question: "F2 (test_save_state_persists_topology_mode_default regression) needs owner waiver before I can file REVISED-1: the test file `platform_tests/hooks/test_workstream_focus.py` is not in this slice's target_paths, so I can't update it without a scope-expansion REVISED proposal. The test asserts the old canonical `single_harness` default; my code correctly derives `multi_harness` from the live role-map per the GO'd proposal contract (deliverable #7: 'workstream_focus.save_state writes derived topology rather than canonical default'). How do you want me to handle F2?"
+  options:
+    - "Grant waiver; cite it in REVISED-1"
+    - "Expand scope first via REVISED-8 of -016"
+    - "Revert the workstream_focus change"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f402893e463120b0
+  resolved_at: 2026-05-14T15:57:28.851917Z
+  answer: "User has answered your questions: \"F2 (test_save_state_persists_topology_mode_default regression) needs owner waiver before I can file REVISED-1: the test file `platform_tests/hooks/test_workstream_focus.py` is not in this slice's target_paths, so I can't update it without a scope-expansion REVISED proposal. The test asserts the old canonical `single_harness` default; my code correctly derives `multi_harness` from the live role-map per the GO'd proposal contract (deliverable #7: 'workstream_focus.save_state writes derived topology rather than canonical default'). How do you want me to handle F2?\"=\"Grant waiver; cite it in REVISED-1\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0581
+  asked_at: 2026-05-14T16:08:33.936866Z
+  question: "Which focus should drive this session?"
+  options:
+    - "Continue Last Session"
+    - "Repair Test/Tool Integrations"
+    - "Top Priority Actions"
+    - "Pick from Full Focus List"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eace11865335f193
+  resolved_at: 2026-05-14T16:08:33.936866Z
+  answer: "User has answered your questions: \"Which focus should drive this session?\"=\"Continue Last Session\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0582
+  asked_at: 2026-05-14T16:08:33.936866Z
+  question: "Which top-priority action should I start now?"
+  options:
+    - "Close friction-hygiene-016 NO-GO (Recommended)"
+    - "Fix startup-payload-canonical-state-drift NO-GO"
+    - "Triage remaining 4 NO-GOs first"
+    - "Different priority band"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a67f4b9386272dfc
+  resolved_at: 2026-05-14T16:08:33.936866Z
+  answer: "User has answered your questions: \"Which top-priority action should I start now?\"=\"Fix startup-payload-canonical-state-drift NO-GO\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0583
+  asked_at: 2026-05-14T16:15:29.465392Z
+  question: "DECISION-0572: Proceed with the full 2-file + 32-test + 1-WI + post-impl-report sequence, or pause for a smaller-scope plan?"
+  options:
+    - "Proceed with full sequence"
+    - "Pause for smaller-scope plan"
+    - "Need more context first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f846fcd7762c671
+  resolved_at: 2026-05-14T16:15:29.465392Z
+  answer: "User has answered your questions: \"DECISION-0572: Proceed with the full 2-file + 32-test + 1-WI + post-impl-report sequence, or pause for a smaller-scope plan?\"=\"Proceed with full sequence\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0584
+  asked_at: 2026-05-14T17:04:29.849789Z
+  question: "First parallel batch landed one GO (spec-lifecycle-slice-1) and surfaced fresh NO-GOs on others. The remaining Prime-actionable surface has both small proposal revisions and larger implementation work. Which direction for the next batch?"
+  options:
+    - "Continue parallel REVISED"
+    - "Implement spec-lifecycle GO"
+    - "Land friction-hygiene 13 tests"
+    - "Mix: revisions + implement"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3b2a7b53fcd95cfc
+  resolved_at: 2026-05-14T17:04:29.849789Z
+  answer: "User has answered your questions: \"First parallel batch landed one GO (spec-lifecycle-slice-1) and surfaced fresh NO-GOs on others. The remaining Prime-actionable surface has both small proposal revisions and larger implementation work. Which direction for the next batch?\"=\"Continue parallel REVISED\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0586
+  asked_at: 2026-05-14T17:11:56.952042Z
+  question: "Codex NO-GO'd friction-hygiene -018 because IP-D was approved at 32 regression tests but only 19 are landed. WI-3310 fix from -017 carries forward; only the IP-D scope blocks VERIFIED. Which resolution path do you want for the friction-hygiene thread?"
+  options:
+    - "Land 13 more IP-D tests (full 32)"
+    - "REVISED proposal narrowing IP-D to 19"
+    - "Owner waiver of IP-D scope (Recommended)"
+    - "Park friction-hygiene; focus on spec-lifecycle GO only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 459c1ce6b045b8b6
+  resolved_at: 2026-05-14T17:11:56.952042Z
+  answer: "Answer questions?"
+  notes: ""
