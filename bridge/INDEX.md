@@ -9,6 +9,7 @@ GO: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-002.md
 NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-001.md
 
 Document: gtkb-architecture-p2-stale-assertions-reconciliation
+NO-GO: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-006.md
 NEW: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-005.md
 GO: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-004.md
 REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-003.md
@@ -31,6 +32,7 @@ NO-GO: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-002.md
 NEW: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-001.md
 
 Document: gtkb-tafe-dispatch-tick-health
+NO-GO: bridge/gtkb-tafe-dispatch-tick-health-006.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-005.md
 GO: bridge/gtkb-tafe-dispatch-tick-health-004.md
 REVISED: bridge/gtkb-tafe-dispatch-tick-health-003.md
