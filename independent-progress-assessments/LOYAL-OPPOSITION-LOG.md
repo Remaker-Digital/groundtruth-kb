@@ -448,3 +448,11 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Technical | The original default uv cache outage does not reproduce in the current Codex LO shell, but GT-KB still lacks a canonical tracked command surface that pins `UV_CACHE_DIR`, temp paths, and optional tool dependencies for automation/verification commands. | Bare `uv run --project groundtruth-kb ...` and `uv --with pytest/ruff` probes now pass; `uv cache dir` still points to `C:\Users\micha\AppData\Local\uv\cache`; HYG-054 records ad hoc uv-cache/tmp sprawl; runtime retention only cleans `.gtkb-state` uv-cache dirs. | Prime should re-scope WI-4395 from "current outage" to a narrow command-wrapper/config proposal with denied-cache regression coverage and cleanup-pattern alignment. | Open |
+
+### 2026-06-13 - WI-4479 Codex Dispatch Disposition
+
+Loyal Opposition (Codex/lo automation resume) completed a disposition investigation for `WI-4479`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4479-codex-dispatch-disposition.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The original WI-4479 `codex_hooks` root-cause theory is stale, but headless Codex dispatch still has residual hook-failure and dispatch-state attribution risk. | Live `.codex/config.toml` uses `[features].hooks = true`; the historical Codex worker reached bridge-skill loading but emitted SessionStart/UserPromptSubmit/PreToolUse/PostToolUse failures; cross-harness trigger tests passed (77), while diagnose remains DEGRADED. | Prime should reframe WI-4479: close the deprecated-config portion, then either retain a narrowed Codex hook-failure smoke/regression item or add state-attribution checks for recipient-specific dispatch records. | Open |
