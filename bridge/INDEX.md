@@ -1,3 +1,6 @@
+Document: gtkb-wi-4529-windows-spawn-no-window-creationflags
+NEW: bridge/gtkb-wi-4529-windows-spawn-no-window-creationflags-001.md
+
 Document: gtkb-bounded-parallel-cross-harness-dispatch
 WITHDRAWN: bridge/gtkb-bounded-parallel-cross-harness-dispatch-003.md
 GO: bridge/gtkb-bounded-parallel-cross-harness-dispatch-002.md
