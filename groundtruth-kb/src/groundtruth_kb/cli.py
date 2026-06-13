@@ -234,6 +234,22 @@ def _flow_lease_error_payload(command: str, stage_instance_id: str, error: Excep
     }
 
 
+def _targets_canonical_bridge_index(candidate: Path, canonical_token: str) -> bool:
+    """Return True when ``candidate`` resolves to the canonical bridge index.
+
+    The comparison is case-insensitive and normalization-tolerant: it matches the
+    trailing path components against the canonical token's components, so
+    ``bridge/INDEX.md``, ``./bridge/INDEX.md``, ``BRIDGE/index.md`` and an
+    absolute ``E:/GT-KB/bridge/INDEX.md`` are all recognized. This is the
+    structural guard that keeps the preview generator from ever writing the
+    canonical workflow-state surface (GOV-FILE-BRIDGE-AUTHORITY-001).
+    """
+
+    canonical_parts = tuple(part.lower() for part in Path(canonical_token).parts)
+    candidate_parts = tuple(part.lower() for part in candidate.parts)
+    return candidate_parts[-len(canonical_parts) :] == canonical_parts
+
+
 @main.group("flow")
 def flow_group() -> None:
     """Typed Artifact-Flow Engine command skeleton."""
@@ -730,6 +746,91 @@ def flow_render_bridge_view_cmd(json_output: bool) -> None:
         _flow_noop_payload(
             "flow render bridge-view", detail="bridge/INDEX.md remains authoritative and is not written."
         ),
+        json_output=json_output,
+    )
+
+
+@flow_group.command("preview-bridge-index")
+@click.option(
+    "--out",
+    "out_path",
+    default=None,
+    help="Destination path for the preview (default: .gtkb-state/tafe-preview/bridge-index-preview.md).",
+)
+@click.option("--stdout", "to_stdout", is_flag=True, default=False, help="Print the preview to stdout; write no file.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_preview_bridge_index_cmd(
+    ctx: click.Context,
+    out_path: str | None,
+    to_stdout: bool,
+    json_output: bool,
+) -> None:
+    """Render a NON-AUTHORITATIVE bridge-INDEX-shaped preview of TAFE state.
+
+    Reads current TAFE flow + stage instances and renders them in the visual
+    shape of the bridge index for operator inspection. The output is a preview
+    artifact only: it is never read by any agent's bridge scan and never
+    participates in the workflow-state authority chain. The canonical bridge
+    index (bridge/INDEX.md) is never written and remains authoritative per
+    GOV-FILE-BRIDGE-AUTHORITY-001; this command refuses any output target that
+    resolves to it.
+    """
+    from datetime import UTC, datetime
+
+    from groundtruth_kb.tafe_index_preview import render_tafe_bridge_index_preview
+
+    canonical_bridge_index = "bridge/INDEX.md"
+    default_out = Path(".gtkb-state") / "tafe-preview" / "bridge-index-preview.md"
+    resolved_out = Path(out_path) if out_path is not None else default_out
+
+    if _targets_canonical_bridge_index(resolved_out, canonical_bridge_index):
+        _emit_cli_payload(
+            {
+                "command": "flow preview-bridge-index",
+                "error": (
+                    f"refusing to write the canonical bridge index ({canonical_bridge_index}); "
+                    "it remains authoritative per GOV-FILE-BRIDGE-AUTHORITY-001"
+                ),
+                "mutated": False,
+                "status": "refused",
+                "summary": f"Refused: {resolved_out} targets the canonical bridge index; nothing written.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(2)
+
+    db, service = _flow_service(ctx)
+    try:
+        flow_instances = service.list_flow_instances()
+        stage_instances = service.list_stage_instances()
+    finally:
+        db.close()
+
+    preview = render_tafe_bridge_index_preview(flow_instances, stage_instances, now=datetime.now(UTC))
+
+    if to_stdout:
+        click.echo(preview.text)
+        return
+
+    resolved_out.parent.mkdir(parents=True, exist_ok=True)
+    resolved_out.write_text(preview.text, encoding="utf-8")
+    _emit_cli_payload(
+        {
+            "command": "flow preview-bridge-index",
+            "authoritative": False,
+            "flow_instance_count": preview.flow_instance_count,
+            "stage_instance_count": preview.stage_instance_count,
+            "generated_at": preview.generated_at,
+            "mutated": False,
+            "out_path": str(resolved_out),
+            "status": "preview_written",
+            "summary": (
+                f"NON-AUTHORITATIVE TAFE preview written to {resolved_out} "
+                f"({preview.flow_instance_count} flows, {preview.stage_instance_count} stages); "
+                "bridge/INDEX.md remains canonical."
+            ),
+        },
         json_output=json_output,
     )
 
