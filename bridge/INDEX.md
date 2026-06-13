@@ -1,3 +1,13 @@
+Document: gtkb-ollama-phase2-subproject-completion-coverage
+VERIFIED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-008.md
+REVISED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-007.md
+NO-GO: bridge/gtkb-ollama-phase2-subproject-completion-coverage-006.md
+NEW: bridge/gtkb-ollama-phase2-subproject-completion-coverage-005.md
+GO: bridge/gtkb-ollama-phase2-subproject-completion-coverage-004.md
+REVISED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-003.md
+NO-GO: bridge/gtkb-ollama-phase2-subproject-completion-coverage-002.md
+NEW: bridge/gtkb-ollama-phase2-subproject-completion-coverage-001.md
+
 Document: gtkb-wi4452-impl-auth-named-packet-fallback
 VERIFIED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-007.md
 NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-006.md
