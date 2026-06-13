@@ -212,6 +212,48 @@ def _seed_phantom_fixture(db_path: Path) -> None:
         db.close()
 
 
+def _seed_tafe_subproject_phantom_fixture(db_path: Path) -> tuple[str, str]:
+    """Seed one TAFE-style doubled parent-segment phantom."""
+    canonical_id = "PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-PHASE-3-DISPATCH-POLICY-ENGINE"
+    phantom_id = (
+        "PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-PHASE-3-DISPATCH-POLICY-ENGINE"
+    )
+
+    db = KnowledgeDB(db_path=db_path)
+    try:
+        db.insert_project(
+            name="PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE/Phase-3-Dispatch-Policy-Engine",
+            id=canonical_id,
+            changed_by="seed",
+            change_reason="WI-4511 fixture: canonical TAFE sub-project",
+        )
+        db.insert_project(
+            name="PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE/Phase-3-Dispatch-Policy-Engine",
+            id=phantom_id,
+            changed_by="seed",
+            change_reason="WI-4511 fixture: phantom TAFE sub-project",
+        )
+        db.insert_work_item(
+            id="WI-4511-FIXTURE",
+            title="On TAFE doubled sub-project phantom only",
+            origin="defect",
+            component="governance",
+            resolution_status="open",
+            changed_by="seed",
+            change_reason="WI-4511 fixture WI",
+        )
+        db.link_project_work_item(
+            project_id=phantom_id,
+            work_item_id="WI-4511-FIXTURE",
+            changed_by="seed",
+            change_reason="WI-4511 fixture: phantom membership",
+        )
+    finally:
+        db.close()
+
+    return canonical_id, phantom_id
+
+
 def _file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -232,6 +274,14 @@ def test_canonical_id_derivation_strips_exactly_one_prefix() -> None:
     """The reverse of the doubling defect strips one PROJECT- prefix only."""
     assert _canonical_id_from_phantom("PROJECT-PROJECT-X") == "PROJECT-X"
     assert _canonical_id_from_phantom("PROJECT-PROJECT-GTKB-RELIABILITY-FIXES") == "PROJECT-GTKB-RELIABILITY-FIXES"
+    assert (
+        _canonical_id_from_phantom(
+            "PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-"
+            "PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-"
+            "PHASE-3-DISPATCH-POLICY-ENGINE"
+        )
+        == "PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-PHASE-3-DISPATCH-POLICY-ENGINE"
+    )
     # Triple-prefixed input would only collapse one level; the algorithm
     # explicitly does NOT regex-collapse arbitrary depth.
     assert _canonical_id_from_phantom("PROJECT-PROJECT-PROJECT-X") == "PROJECT-PROJECT-X"
@@ -521,3 +571,57 @@ def test_phantom_with_missing_canonical_is_skipped(tmp_path: Path) -> None:
     assert missing_results["canonical_links_created"] == []
     assert missing_results["phantom_memberships_superseded"] == []
     assert missing_results["phantom_retired"] is False
+
+
+# ---------------------------------------------------------------------------
+# WI-4511 — generalized doubled project-parent prefix + --project scope
+# ---------------------------------------------------------------------------
+
+
+def test_project_scoped_plan_detects_tafe_subproject_phantom_only(tmp_path: Path) -> None:
+    root, _ = _project(tmp_path)
+    _seed_phantom_fixture(root / "groundtruth.db")
+    canonical_id, phantom_id = _seed_tafe_subproject_phantom_fixture(root / "groundtruth.db")
+
+    report = build_reconcile_plan(
+        _config(root),
+        ReconcileRequest(apply=False, project_id="PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE"),
+    )
+
+    assert report["project_id"] == "PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE"
+    assert [entry["plan"]["phantom_id"] for entry in report["phantoms"]] == [phantom_id]
+    assert report["phantoms"][0]["plan"]["canonical_id"] == canonical_id
+    assert report["phantoms"][0]["plan"]["canonical_links_to_create"] == ["WI-4511-FIXTURE"]
+
+
+def test_project_scoped_apply_reconciles_tafe_without_touching_global_phantoms(tmp_path: Path) -> None:
+    root, _ = _project(tmp_path)
+    _seed_phantom_fixture(root / "groundtruth.db")
+    canonical_id, phantom_id = _seed_tafe_subproject_phantom_fixture(root / "groundtruth.db")
+
+    report = build_reconcile_plan(
+        _config(root),
+        ReconcileRequest(apply=True, project_id="PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE"),
+    )
+
+    assert report["totals"]["phantom_count"] == 1
+    assert report["totals"]["canonical_links_created"] == 1
+    assert report["totals"]["phantom_memberships_superseded"] == 1
+    assert report["totals"]["phantom_projects_retired"] == 1
+
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    try:
+        tafe_wis = {str(m["work_item_id"]) for m in db.list_project_work_items(canonical_id, include_inactive=False)}
+        old_global_status = str(db.get_project("PROJECT-PROJECT-CANON-A")["status"])
+        old_global_wis = {
+            str(m["work_item_id"])
+            for m in db.list_project_work_items("PROJECT-PROJECT-CANON-A", include_inactive=False)
+        }
+        tafe_phantom_status = str(db.get_project(phantom_id)["status"])
+    finally:
+        db.close()
+
+    assert "WI-4511-FIXTURE" in tafe_wis
+    assert tafe_phantom_status == "retired"
+    assert old_global_status == "active"
+    assert "WI-7001" in old_global_wis

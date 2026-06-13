@@ -53,15 +53,11 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.lifecycle import ProjectLifecycleService
 
-# The phantom doubled-prefix pattern. Projects whose id starts with this
-# string are reconciliation targets. The pattern is the deterministic
-# fingerprint of the pre-fix ``_project_id_from_names`` doubling defect.
+# The original literal phantom doubled-prefix pattern. Kept as a public
+# compatibility constant for the WI-3355 tests and for operator language, but
+# detection is now structural so project-specific doubled segments such as
+# ``PROJECT-X-PROJECT-X-*`` are also reconciled.
 PHANTOM_PREFIX = "PROJECT-PROJECT-"
-
-# Length of the single ``"PROJECT-"`` prefix stripped to derive the canonical
-# id from a phantom id. Pulling this into a constant makes the off-by-one
-# semantics ("strip exactly one prefix") visible at the call site.
-_SINGLE_PREFIX_LEN = len("PROJECT-")
 
 # Standard MemBase attribution for rows this CLI inserts. Both the
 # ``source`` (which appears in the membership row) and the ``changed_by``
@@ -82,31 +78,62 @@ class ReconcileRequest:
     """
 
     apply: bool = False
+    project_id: str | None = None
+
+
+def _repeated_leading_segment(project_id: str) -> str | None:
+    """Return the longest repeated leading ``*-`` segment, if any.
+
+    ``PROJECT-PROJECT-X`` returns ``PROJECT-``. A TAFE sub-project phantom
+    such as ``PROJECT-GTKB-...-ENGINE-PROJECT-GTKB-...-ENGINE-PHASE-1``
+    returns the full ``PROJECT-GTKB-...-ENGINE-`` segment. The longest match
+    matters because it prefers the project parent segment over shorter
+    incidental repeated prefixes.
+    """
+    matches = []
+    for index, char in enumerate(project_id):
+        if char != "-":
+            continue
+        segment = project_id[: index + 1]
+        if project_id.startswith(segment + segment):
+            matches.append(segment)
+    if not matches:
+        return None
+    return max(matches, key=len)
 
 
 def _canonical_id_from_phantom(phantom_id: str) -> str:
-    """Strip exactly one leading ``PROJECT-`` from a phantom id.
-
-    The doubling defect prepended an extra ``"PROJECT-"`` once. The inverse
-    is a single strip — NOT a regex that collapses arbitrarily many prefixes.
-    A triple-prefixed id (``PROJECT-PROJECT-PROJECT-X``), if it ever existed,
-    would reconcile in two rounds rather than one. The repository search
-    confirms no such triple-prefixed ids exist; this is documented invariant,
-    not an assumption.
-    """
-    if not phantom_id.startswith(PHANTOM_PREFIX):
+    """Strip one detected repeated leading segment from a phantom id."""
+    repeated_segment = _repeated_leading_segment(phantom_id)
+    if repeated_segment is None:
         raise ValueError(f"Not a phantom doubled-prefix id: {phantom_id!r}")
-    return phantom_id[_SINGLE_PREFIX_LEN:]
+    return phantom_id[len(repeated_segment) :]
 
 
-def _list_doubled_prefix_projects(db: KnowledgeDB) -> list[dict[str, Any]]:
+def _project_scope_matches(canonical_id: str, project_id: str | None) -> bool:
+    """Return whether a canonical project id is inside an optional scope."""
+    if not project_id:
+        return True
+    return canonical_id == project_id or canonical_id.startswith(f"{project_id}-")
+
+
+def _list_doubled_prefix_projects(db: KnowledgeDB, project_id: str | None = None) -> list[dict[str, Any]]:
     """Return all current projects whose id matches the phantom pattern.
 
     Includes terminal-status projects so an already-retired phantom (e.g.
     from a prior partial reconciliation attempt) is visible in the plan and
     can be detected as a no-op.
     """
-    return [p for p in db.list_projects(include_terminal=True) if str(p["id"]).startswith(PHANTOM_PREFIX)]
+    phantoms: list[dict[str, Any]] = []
+    for project in db.list_projects(include_terminal=True):
+        current_id = str(project["id"])
+        try:
+            canonical_id = _canonical_id_from_phantom(current_id)
+        except ValueError:
+            continue
+        if _project_scope_matches(canonical_id, project_id):
+            phantoms.append(project)
+    return phantoms
 
 
 def _canonical_has_active_membership(db: KnowledgeDB, canonical_id: str, work_item_id: str) -> bool:
@@ -271,9 +298,10 @@ def build_reconcile_plan(config: GTConfig, request: ReconcileRequest) -> dict[st
     db = KnowledgeDB(config.db_path)
     service = ProjectLifecycleService(db)
     try:
-        phantoms = _list_doubled_prefix_projects(db)
+        phantoms = _list_doubled_prefix_projects(db, request.project_id)
         report: dict[str, Any] = {
             "apply": request.apply,
+            "project_id": request.project_id,
             "phantoms": [],
         }
         totals = {

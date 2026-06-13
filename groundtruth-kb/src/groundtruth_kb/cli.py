@@ -2867,20 +2867,29 @@ def projects_retire(
     default=False,
     help="Execute the reconciliation. Without this flag the command is dry-run only.",
 )
+@click.option(
+    "--project",
+    "project_id",
+    default=None,
+    help="Limit reconciliation to phantoms whose canonical id is this project or one of its child ids.",
+)
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
 def projects_reconcile_doubled_prefix(
     ctx: click.Context,
     apply_flag: bool,
+    project_id: str | None,
     json_output: bool,
 ) -> None:
-    """Reconcile phantom ``PROJECT-PROJECT-*`` projects (WI-3355).
+    """Reconcile doubled-leading-segment phantom projects.
 
-    The phantoms are historical artifacts of the pre-fix
-    ``_project_id_from_names`` doubling defect (fixed in commit
-    ``281fa28f``). This one-shot CLI reconciles them: re-links each affected
-    work item to its canonical project (if needed), supersedes each phantom
-    membership row, and retires each phantom project. Idempotent on rerun.
+    The original phantoms are historical ``PROJECT-PROJECT-*`` artifacts of
+    the pre-fix ``_project_id_from_names`` doubling defect (fixed in commit
+    ``281fa28f``). The same service now also handles project-specific doubled
+    leading segments such as ``PROJECT-X-PROJECT-X-*``. It re-links each
+    affected work item to its canonical project (if needed), supersedes each
+    phantom membership row, and retires each phantom project. Idempotent on
+    rerun.
 
     Default mode (no ``--apply``) is dry-run: builds the per-phantom plan
     and prints/emits it without mutating MemBase.
@@ -2895,7 +2904,7 @@ def projects_reconcile_doubled_prefix(
     # Resolve the GTConfig the same way every other projects_cmd does;
     # ctx.obj["config"] holds the raw Path, not a config object.
     config = _resolve_config(ctx)
-    request = ReconcileRequest(apply=apply_flag)
+    request = ReconcileRequest(apply=apply_flag, project_id=project_id)
     report = build_reconcile_plan(config, request)
 
     if json_output:
@@ -2905,6 +2914,8 @@ def projects_reconcile_doubled_prefix(
     totals = report["totals"]
     mode = "APPLY" if report["apply"] else "DRY-RUN"
     click.echo(f"Phantom reconciliation [{mode}]")
+    if report.get("project_id"):
+        click.echo(f"  project scope: {report['project_id']}")
     click.echo(f"  phantoms found: {totals['phantom_count']} (skipped: {totals['skipped_count']})")
     if report["apply"]:
         click.echo(f"  canonical links created: {totals['canonical_links_created']}")
