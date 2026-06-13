@@ -8,6 +8,7 @@ Document: gtkb-tafe-phase-0-enablement
 VERIFIED: bridge/gtkb-tafe-phase-0-enablement-007.md
 
 Document: gtkb-lo-advisory-owner-grilling-gate-slice3-lint
+GO: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-002.md
 NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-001.md
 
 Document: gtkb-architecture-p2-stale-assertions-reconciliation
