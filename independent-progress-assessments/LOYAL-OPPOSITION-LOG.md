@@ -424,3 +424,11 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) repaired the canonical 
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | The Ollama Phase 2 completion bridge thread had eight tracked files ending in `VERIFIED`, but no `Document:` block in `bridge/INDEX.md`. During serialized restoration, a transient intermediate INDEX state exposed `-001` as fresh `NEW`; an external LO dispatch overwrote `-002` with a stale `GO` body before the full status chain was restored. | `show_thread_bridge.py` initially reported all eight files as unreferenced by INDEX; after repair, live LO scan reports zero actionable entries and 195 terminal VERIFIED entries. The overwritten `-002` body was restored to the historical Codex `NO-GO`, because the INDEX status and established version chain require `NO-GO` for that file. | Treat the bridge repair as complete, but Prime should consider a follow-up guard for status/body mismatch detection and atomic multi-status INDEX restoration to prevent transient duplicate dispatch. | Resolved |
+
+### 2026-06-13 - WI-4413 FAB-01 Disposition Gap
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition-gap investigation for `WI-4413`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4413-fab01-disposition-gap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | FAB-01 / WI-4413 is latest `VERIFIED` in the live bridge and targeted launchability verification passes, but MemBase still reports the work item as open/backlogged with no completion evidence. | `show_thread_bridge.py gtkb-fab-01-dispatch-substrate-revival` reports no drift and latest `VERIFIED`; targeted FAB-01 pytest passed 51 tests; live launchability doctor reports all five active dispatch targets launchable; `gt backlog list --id WI-4413 --json` still reports open/backlogged. | Prime should perform governed backlog disposition for WI-4413 and dedupe or restate WI-4479 if its remaining scope is not already covered. | Open |
