@@ -1,25 +1,10 @@
+Document: gtkb-dispatch-launchability-pre-spawn-gate
+GO: bridge/gtkb-dispatch-launchability-pre-spawn-gate-002.md
+NEW: bridge/gtkb-dispatch-launchability-pre-spawn-gate-001.md
+
 Document: gtkb-tafe-dashboard-observability
 GO: bridge/gtkb-tafe-dashboard-observability-002.md
 NEW: bridge/gtkb-tafe-dashboard-observability-001.md
-
-Document: gtkb-ollama-phase2-subproject-completion-coverage
-VERIFIED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-008.md
-REVISED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-007.md
-NO-GO: bridge/gtkb-ollama-phase2-subproject-completion-coverage-006.md
-NEW: bridge/gtkb-ollama-phase2-subproject-completion-coverage-005.md
-GO: bridge/gtkb-ollama-phase2-subproject-completion-coverage-004.md
-REVISED: bridge/gtkb-ollama-phase2-subproject-completion-coverage-003.md
-NO-GO: bridge/gtkb-ollama-phase2-subproject-completion-coverage-002.md
-NEW: bridge/gtkb-ollama-phase2-subproject-completion-coverage-001.md
-
-Document: gtkb-wi4452-impl-auth-named-packet-fallback
-VERIFIED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-007.md
-NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-006.md
-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-005.md
-REVISED: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-004.md
-NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-003.md
-NO-GO: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-002.md
-NEW: bridge/gtkb-wi4452-impl-auth-named-packet-fallback-001.md
 
 Document: gtkb-antigravity-startup-optimization-governance-docs
 ADVISORY: bridge/gtkb-antigravity-startup-optimization-governance-docs-001.md
@@ -92,16 +77,6 @@ GO: bridge/gtkb-tafe-dispatch-tick-health-004.md
 REVISED: bridge/gtkb-tafe-dispatch-tick-health-003.md
 NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
-
-Document: gtkb-claim-gated-implementation-start
-VERIFIED: bridge/gtkb-claim-gated-implementation-start-008.md
-REVISED: bridge/gtkb-claim-gated-implementation-start-007.md
-NO-GO: bridge/gtkb-claim-gated-implementation-start-006.md
-NEW: bridge/gtkb-claim-gated-implementation-start-005.md
-GO: bridge/gtkb-claim-gated-implementation-start-004.md
-REVISED: bridge/gtkb-claim-gated-implementation-start-003.md
-NO-GO: bridge/gtkb-claim-gated-implementation-start-002.md
-NEW: bridge/gtkb-claim-gated-implementation-start-001.md
 
 Document: gtkb-tafe-flow-lease-commands
 VERIFIED: bridge/gtkb-tafe-flow-lease-commands-004.md
