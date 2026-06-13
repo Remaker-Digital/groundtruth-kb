@@ -456,3 +456,11 @@ Loyal Opposition (Codex/lo automation resume) completed a disposition investigat
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Technical | The original WI-4479 `codex_hooks` root-cause theory is stale, but headless Codex dispatch still has residual hook-failure and dispatch-state attribution risk. | Live `.codex/config.toml` uses `[features].hooks = true`; the historical Codex worker reached bridge-skill loading but emitted SessionStart/UserPromptSubmit/PreToolUse/PostToolUse failures; cross-harness trigger tests passed (77), while diagnose remains DEGRADED. | Prime should reframe WI-4479: close the deprecated-config portion, then either retain a narrowed Codex hook-failure smoke/regression item or add state-attribution checks for recipient-specific dispatch records. | Open |
+
+### 2026-06-13 - WI-4529 Windows Dispatch Console Window Bridge Gap
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4529`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4529-windows-dispatch-console-window-bridge-gap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | The dirty worktree already contains the apparent `CREATE_NO_WINDOW` fix for `WI-4529`, but the live bridge has no matching indexed `WI-4529` proposal/GO and the current GO target paths do not authorize the two touched source files. | `git diff -- scripts/cross_harness_bridge_trigger.py groundtruth-kb/src/groundtruth_kb/bridge/worker.py`; current GO target-path checks for `gtkb-impl-auth-per-session-pointer-isolation`, `gtkb-prompt-role-hint-authority-emergency-fix`, and `gtkb-tafe-bridge-index-preview`; live LO scan had zero actionable entries. | Prime should file a narrow `WI-4529` bridge proposal, or revise an active thread to include `WI-4529` and both target paths, before committing the source change. | Open |
