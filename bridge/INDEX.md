@@ -50,6 +50,7 @@ NO-GO: bridge/gtkb-typed-artifact-flow-engine-advisory-002.md
 NEW: bridge/gtkb-typed-artifact-flow-engine-advisory-001.md
 
 Document: gtkb-bridge-index-atomic-write-integration-advisory
+VERIFIED: bridge/gtkb-bridge-index-atomic-write-integration-advisory-004.md
 NEW: bridge/gtkb-bridge-index-atomic-write-integration-advisory-003.md
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-002.md
 ADVISORY: bridge/gtkb-bridge-index-atomic-write-integration-advisory-001.md
