@@ -3,6 +3,8 @@ GO: bridge/gtkb-dispatch-launchability-pre-spawn-gate-002.md
 NEW: bridge/gtkb-dispatch-launchability-pre-spawn-gate-001.md
 
 Document: gtkb-tafe-dashboard-observability
+VERIFIED: bridge/gtkb-tafe-dashboard-observability-004.md
+NEW: bridge/gtkb-tafe-dashboard-observability-003.md
 GO: bridge/gtkb-tafe-dashboard-observability-002.md
 NEW: bridge/gtkb-tafe-dashboard-observability-001.md
 
