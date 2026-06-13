@@ -203,7 +203,7 @@ Next: [describe task].
 
 ### Session Start (Mandatory)
 
-Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`/`NO-GO`; Loyal Opposition on latest `NEW`/`REVISED`), then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The cross-harness event-driven trigger (PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval.
+Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`/`NO-GO`; Loyal Opposition on latest `NEW`/`REVISED`), then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The cross-harness event-driven trigger (PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval. **Antigravity startup optimization**: For the Antigravity harness (ID C), skip loading non-essential rules/logs (exempt from Phase B steps 9-18a) and run startup services with `--fast-hook` and `--skip-bridge-maintenance` to omit non-local checks.
 
 ### Protected Behaviors & Removal Rule
 

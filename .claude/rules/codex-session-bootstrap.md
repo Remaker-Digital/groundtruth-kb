@@ -25,7 +25,7 @@ this workspace and reads `AGENTS.md`:
   `bridge/`.
 - Both Prime Builder and Loyal Opposition startup procedures load
   `.claude/rules/canonical-terminology.md` so the live glossary is available
-  before ordinary role work.
+  before ordinary role work. **Antigravity Startup Optimization**: The Antigravity harness (ID C) is exempt from loading the full rules/logs payload at startup (exempt from Phase B steps 9-18a) to minimize startup resource consumption. It loads only the essential project metadata and baseline rules (`CLAUDE.md`, `AGENTS.md`, `canonical-terminology.md`, `file-bridge-protocol.md`, `MEMORY.md`), skipping non-essential runbooks and non-local background startup checks.
 - Both Prime Builder and Loyal Opposition startup disclosures surface the
   strategic self-improvement directive: noticed fix-worthy issues and useful
   workflow enhancements should be captured as standing backlog/work items for
