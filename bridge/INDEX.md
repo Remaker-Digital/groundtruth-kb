@@ -1,4 +1,6 @@
 Document: gtkb-tafe-flow-definition-seed-records
+VERIFIED: bridge/gtkb-tafe-flow-definition-seed-records-004.md
+NEW: bridge/gtkb-tafe-flow-definition-seed-records-003.md
 GO: bridge/gtkb-tafe-flow-definition-seed-records-002.md
 NEW: bridge/gtkb-tafe-flow-definition-seed-records-001.md
 
