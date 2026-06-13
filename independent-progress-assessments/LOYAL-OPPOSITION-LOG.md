@@ -472,3 +472,11 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | The open P1 backlog row still frames 22c078 around `STRICT_DROP` durable-role enforcement, but live dispatch code and tests already authorize role-mismatched dispatched keywords with audit evidence. | `session_start_dispatch_core.py` returns `DISPATCH_AUTHORIZED` with "authorized with audit" for role mismatch; targeted role-resolution tests passed 17; `.claude/rules/operating-role.md` still has stale `STRICT_DROP` wording. | Prime should disposition or restate `WI-AUTO-SPEC-INTAKE-22C078` before any implementation, and file a protected-narrative correction only through normal approval evidence. | Open |
+
+### 2026-06-13 - Automation Memory Write Path Radar
+
+Loyal Opposition (Codex/lo opportunity radar) filed an advisory on the recurring `$CODEX_HOME` automation-memory write-path mismatch. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-automation-memory-write-path-radar.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Automation instructions require writing `$CODEX_HOME/automations/<automation_id>/memory.md`, but GT-KB root-boundary guidance treats home auto-memory as non-authoritative and LO file-safety blocks normal shell/patch edit paths. | `CLAUDE.md:12`; `.claude/hooks/lo-file-safety-gate.py` blocks opaque, shell, and outside-allow-list mutations; current session required a Node REPL append workaround. | Prime should propose a deterministic `gt automation memory` helper or policy alignment that preserves any required in-root reconciliation surface. | Open |
