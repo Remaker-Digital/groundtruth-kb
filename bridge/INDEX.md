@@ -25,6 +25,7 @@ GO: bridge/gtkb-tafe-runtime-tables-schema-002.md
 NEW: bridge/gtkb-tafe-runtime-tables-schema-001.md
 
 Document: gtkb-role-authority-declared-not-detected
+VERIFIED: bridge/gtkb-role-authority-declared-not-detected-004.md
 NEW: bridge/gtkb-role-authority-declared-not-detected-003.md
 GO: bridge/gtkb-role-authority-declared-not-detected-002.md
 NEW: bridge/gtkb-role-authority-declared-not-detected-001.md
