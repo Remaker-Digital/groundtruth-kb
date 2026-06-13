@@ -24,6 +24,7 @@ GO: bridge/gtkb-tafe-stage-attempt-telemetry-002.md
 NEW: bridge/gtkb-tafe-stage-attempt-telemetry-001.md
 
 Document: gtkb-role-resolution-r1-r5-assertion-enforcement
+NO-GO: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-002.md
 NEW: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-001.md
 
 Document: gtkb-tafe-dispatch-tick-health
