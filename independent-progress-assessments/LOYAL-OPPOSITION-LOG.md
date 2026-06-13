@@ -385,4 +385,12 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 |------|---------|-------------------|------------------|--------|
 | Technical | Current `.claude/hooks/*.py` registrations all exist and are tracked, but `gt project doctor` still lacks a direct git-index tracking invariant for registered governance hook scripts. | `.gitignore` re-includes `.claude/hooks/*.py`; `.claude/settings.json` registers many hook scripts; doctor checks validate presence/registration/managed drift but do not compare registered hook paths to `git ls-files`. Targeted doctor tests passed (24). | Prime should file a narrow bridge proposal for an additive WARN-level doctor check covering registered-but-untracked and unregistered-untracked `.claude/hooks/*.py` files. | Open |
 
+### 2026-06-13 - WI-4458 Governance Emergency Bootstrap Protocol Advisory
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4458`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4458-governance-emergency-bootstrap-protocol.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | The WI-4449 `--no-verify` precedent was justified by a real governance deadlock, but GT-KB lacks a reusable emergency-bootstrap protocol with tight boundaries and explicit post-fix audit discipline. | `bridge/gtkb-commit-untracked-governance-hooks-002.md` records the hook/bridge deadlock and follow-on need; `e90b2f03` restored six tracked hook files; current bridge/claim/approval tests passed (31). | Prime should file a normal bridge proposal for a narrow rule/runbook addition defining allowed conditions, minimum scope, required audit artifact, and retroactive owner-decision capture when explicit prior approval was unavailable. | Open |
+
 
