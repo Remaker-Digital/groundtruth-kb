@@ -41,6 +41,8 @@ REVISED: bridge/gtkb-tafe-lease-recovery-cleanup-002.md
 NEW: bridge/gtkb-tafe-lease-recovery-cleanup-001.md
 
 Document: gtkb-tafe-stage-attempt-telemetry
+VERIFIED: bridge/gtkb-tafe-stage-attempt-telemetry-004.md
+NEW: bridge/gtkb-tafe-stage-attempt-telemetry-003.md
 GO: bridge/gtkb-tafe-stage-attempt-telemetry-002.md
 NEW: bridge/gtkb-tafe-stage-attempt-telemetry-001.md
 
