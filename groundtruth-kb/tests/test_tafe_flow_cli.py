@@ -250,22 +250,39 @@ def test_flow_phase_0_noop_commands_do_not_mutate_db_or_bridge(runner: CliRunner
     index_path.write_text(index_before, encoding="utf-8")
 
     db_path = project_dir / "groundtruth.db"
-    commands = [
+    # Genuine phase-0 no-op commands report "phase0_noop", create no database,
+    # and leave the canonical bridge index untouched.
+    phase0_noop_commands = [
         ["flow", "start", "implementation", "--subject-type", "bridge-thread", "--subject-id", "sample", "--json"],
         ["flow", "advance", "STAGE-1", "--to-stage", "verify", "--json"],
-        ["flow", "dispatch", "tick", "--json"],
-        ["flow", "dispatch", "health", "--json"],
         ["flow", "render", "bridge-view", "--json"],
         ["flow", "pilot", "--json"],
     ]
-
-    for command in commands:
+    for command in phase0_noop_commands:
         payload = _json_output(runner.invoke(main, [*_config_args(project_dir), *command]))
         assert payload["mutated"] is False
         assert payload["status"] == "phase0_noop"
 
-    assert index_path.read_text(encoding="utf-8") == index_before
+    # No phase-0 no-op command may create the database or alter the bridge index.
     assert not db_path.exists()
+    assert index_path.read_text(encoding="utf-8") == index_before
+
+    # The dispatch tick/health commands graduated to phase-1 evaluate-only
+    # (WI-4499). They open the database read-only to evaluate dispatch readiness
+    # and report "phase1_evaluate_only", but perform no logical mutation and
+    # never write the canonical bridge index.
+    phase1_evaluate_only_commands = [
+        ["flow", "dispatch", "tick", "--json"],
+        ["flow", "dispatch", "health", "--json"],
+    ]
+    for command in phase1_evaluate_only_commands:
+        payload = _json_output(runner.invoke(main, [*_config_args(project_dir), *command]))
+        assert payload["mutated"] is False
+        assert payload["status"] == "phase1_evaluate_only"
+
+    # Bridge authority (GOV-FILE-BRIDGE-AUTHORITY-001) is preserved: evaluate-only
+    # dispatch commands never mutate the canonical index.
+    assert index_path.read_text(encoding="utf-8") == index_before
 
 
 def test_flow_lease_commands_claim_heartbeat_and_release_stage(runner: CliRunner, project_dir: Path) -> None:

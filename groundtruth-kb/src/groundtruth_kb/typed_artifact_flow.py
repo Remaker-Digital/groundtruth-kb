@@ -447,6 +447,103 @@ class FlowRuntimeService(FlowDefinitionService):
             )
         ]
 
+    def record_stage_attempt_telemetry(
+        self,
+        *,
+        id: str,
+        flow_instance_id: str,
+        stage_instance_id: str,
+        changed_by: str,
+        change_reason: str,
+        attempt_number: int | None = None,
+        agent_harness_id: str | None = None,
+        agent_session_id: str | None = None,
+        agent_context_id: str | None = None,
+        model_identifier: str | None = None,
+        provider: str | None = None,
+        dispatch_decision: Mapping[str, Any] | None = None,
+        lease_id: str | None = None,
+        lease_lifecycle: Mapping[str, Any] | None = None,
+        started_at: str | None = None,
+        completed_at: str | None = None,
+        duration_ms: int | None = None,
+        token_count: int | None = None,
+        cost: float | None = None,
+        outcome: str | None = None,
+        verdict: str | None = None,
+        test_summary: Mapping[str, Any] | None = None,
+        failure_class: str | None = None,
+        cleanup_result: str | None = None,
+        recovery_actions: Sequence[Any] | Mapping[str, Any] | None = None,
+        artifact_links: Sequence[Any] | Mapping[str, Any] | None = None,
+        status: str = "active",
+        metadata: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Record one per-stage-attempt telemetry row (SPEC-TAFE-R6).
+
+        Pure recording surface: writes caller-supplied fields and computes
+        nothing. No rollups, no stuck-flow detection, no recovery actuation
+        (those are the later WI-4505/WI-4506 slices).
+        """
+        row = self.db.insert_stage_attempt_telemetry(
+            id=_require_non_empty("id", id),
+            flow_instance_id=_require_non_empty("flow_instance_id", flow_instance_id),
+            stage_instance_id=_require_non_empty("stage_instance_id", stage_instance_id),
+            changed_by=_require_non_empty("changed_by", changed_by),
+            change_reason=_require_non_empty("change_reason", change_reason),
+            attempt_number=attempt_number,
+            agent_harness_id=agent_harness_id,
+            agent_session_id=agent_session_id,
+            agent_context_id=agent_context_id,
+            model_identifier=model_identifier,
+            provider=provider,
+            dispatch_decision=dict(dispatch_decision) if dispatch_decision is not None else None,
+            lease_id=lease_id,
+            lease_lifecycle=dict(lease_lifecycle) if lease_lifecycle is not None else None,
+            started_at=started_at,
+            completed_at=completed_at,
+            duration_ms=duration_ms,
+            token_count=token_count,
+            cost=cost,
+            outcome=outcome,
+            verdict=verdict,
+            test_summary=dict(test_summary) if test_summary is not None else None,
+            failure_class=failure_class,
+            cleanup_result=cleanup_result,
+            recovery_actions=recovery_actions,
+            artifact_links=artifact_links,
+            status=_require_non_empty("status", status),
+            metadata=dict(metadata) if metadata is not None else None,
+        )
+        if row is None:
+            raise RuntimeError(f"Inserted stage attempt telemetry {id!r} but could not read it back")
+        return dict(row)
+
+    def get_stage_attempt_telemetry(self, telemetry_id: str) -> dict[str, Any] | None:
+        row = self.db.get_stage_attempt_telemetry(telemetry_id)
+        return dict(row) if row else None
+
+    def get_stage_attempt_telemetry_history(self, telemetry_id: str) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.db.get_stage_attempt_telemetry_history(telemetry_id)]
+
+    def list_stage_attempt_telemetry(
+        self,
+        *,
+        flow_instance_id: str | None = None,
+        stage_instance_id: str | None = None,
+        outcome: str | None = None,
+        failure_class: str | None = None,
+    ) -> list[dict[str, Any]]:
+        return [
+            dict(row)
+            for row in self.db.list_stage_attempt_telemetry(
+                flow_instance_id=flow_instance_id,
+                stage_instance_id=stage_instance_id,
+                outcome=outcome,
+                failure_class=failure_class,
+            )
+        ]
+
     def claim_stage_lease(
         self,
         *,

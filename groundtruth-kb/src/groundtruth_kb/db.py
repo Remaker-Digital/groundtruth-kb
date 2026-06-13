@@ -609,6 +609,41 @@ CREATE TABLE IF NOT EXISTS stage_leases (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS stage_attempt_telemetry (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    flow_instance_id TEXT NOT NULL,
+    stage_instance_id TEXT NOT NULL,
+    attempt_number INTEGER,
+    agent_harness_id TEXT,
+    agent_session_id TEXT,
+    agent_context_id TEXT,
+    model_identifier TEXT,
+    provider TEXT,
+    dispatch_decision TEXT,
+    lease_id TEXT,
+    lease_lifecycle TEXT,
+    started_at TEXT,
+    completed_at TEXT,
+    duration_ms INTEGER,
+    token_count INTEGER,
+    cost REAL,
+    outcome TEXT,
+    verdict TEXT,
+    test_summary TEXT,
+    failure_class TEXT,
+    cleanup_result TEXT,
+    recovery_actions TEXT,
+    artifact_links TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS agent_capability_snapshots (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -863,6 +898,11 @@ CREATE INDEX IF NOT EXISTS idx_stage_leases_stage ON stage_leases(stage_instance
 CREATE INDEX IF NOT EXISTS idx_stage_leases_status ON stage_leases(lease_status);
 CREATE INDEX IF NOT EXISTS idx_stage_leases_holder ON stage_leases(holder_harness_id, holder_session_id);
 CREATE INDEX IF NOT EXISTS idx_stage_leases_heartbeat ON stage_leases(heartbeat_at);
+CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_id_version ON stage_attempt_telemetry(id, version);
+CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_flow ON stage_attempt_telemetry(flow_instance_id);
+CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_stage ON stage_attempt_telemetry(stage_instance_id);
+CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_outcome ON stage_attempt_telemetry(outcome);
+CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_failure_class ON stage_attempt_telemetry(failure_class);
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_id_version ON agent_capability_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_harness ON agent_capability_snapshots(harness_id);
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_health ON agent_capability_snapshots(health_status);
@@ -981,6 +1021,11 @@ CREATE VIEW IF NOT EXISTS current_stage_leases AS
 SELECT l.* FROM stage_leases l
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_leases GROUP BY id) m
 ON l.id = m.id AND l.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_stage_attempt_telemetry AS
+SELECT t.* FROM stage_attempt_telemetry t
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_attempt_telemetry GROUP BY id) m
+ON t.id = m.id AND t.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_agent_capability_snapshots AS
 SELECT a.* FROM agent_capability_snapshots a
@@ -1689,6 +1734,102 @@ class KnowledgeDB:
         conn.commit()
         if added_capability_cols:
             _log.debug("Applied migration: TAFE agent capability snapshot columns %s", added_capability_cols)
+
+        # Migration 12: TAFE per-stage-attempt telemetry table substrate (WI-4504, SPEC-TAFE-R6).
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS stage_attempt_telemetry (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                flow_instance_id TEXT NOT NULL,
+                stage_instance_id TEXT NOT NULL,
+                attempt_number INTEGER,
+                agent_harness_id TEXT,
+                agent_session_id TEXT,
+                agent_context_id TEXT,
+                model_identifier TEXT,
+                provider TEXT,
+                dispatch_decision TEXT,
+                lease_id TEXT,
+                lease_lifecycle TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                duration_ms INTEGER,
+                token_count INTEGER,
+                cost REAL,
+                outcome TEXT,
+                verdict TEXT,
+                test_summary TEXT,
+                failure_class TEXT,
+                cleanup_result TEXT,
+                recovery_actions TEXT,
+                artifact_links TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                metadata TEXT,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id, version)
+            );
+            """
+        )
+        stage_attempt_telemetry_columns = {
+            "id": "TEXT",
+            "version": "INTEGER",
+            "flow_instance_id": "TEXT",
+            "stage_instance_id": "TEXT",
+            "attempt_number": "INTEGER",
+            "agent_harness_id": "TEXT",
+            "agent_session_id": "TEXT",
+            "agent_context_id": "TEXT",
+            "model_identifier": "TEXT",
+            "provider": "TEXT",
+            "dispatch_decision": "TEXT",
+            "lease_id": "TEXT",
+            "lease_lifecycle": "TEXT",
+            "started_at": "TEXT",
+            "completed_at": "TEXT",
+            "duration_ms": "INTEGER",
+            "token_count": "INTEGER",
+            "cost": "REAL",
+            "outcome": "TEXT",
+            "verdict": "TEXT",
+            "test_summary": "TEXT",
+            "failure_class": "TEXT",
+            "cleanup_result": "TEXT",
+            "recovery_actions": "TEXT",
+            "artifact_links": "TEXT",
+            "status": "TEXT",
+            "metadata": "TEXT",
+            "changed_by": "TEXT",
+            "changed_at": "TEXT",
+            "change_reason": "TEXT",
+        }
+        existing_telemetry_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(stage_attempt_telemetry)").fetchall()
+        }
+        added_telemetry_cols = []
+        for col_name, col_type in stage_attempt_telemetry_columns.items():
+            if col_name not in existing_telemetry_cols:
+                conn.execute(f"ALTER TABLE stage_attempt_telemetry ADD COLUMN {col_name} {col_type}")
+                added_telemetry_cols.append(col_name)
+        conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_id_version ON stage_attempt_telemetry(id, version);
+            CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_flow ON stage_attempt_telemetry(flow_instance_id);
+            CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_stage ON stage_attempt_telemetry(stage_instance_id);
+            CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_outcome ON stage_attempt_telemetry(outcome);
+            CREATE INDEX IF NOT EXISTS idx_stage_attempt_telemetry_failure_class ON stage_attempt_telemetry(failure_class);
+            CREATE VIEW IF NOT EXISTS current_stage_attempt_telemetry AS
+            SELECT t.* FROM stage_attempt_telemetry t
+            INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_attempt_telemetry GROUP BY id) m
+            ON t.id = m.id AND t.version = m.max_v;
+            """
+        )
+        conn.commit()
+        if added_telemetry_cols:
+            _log.debug("Applied migration: TAFE stage attempt telemetry columns %s", added_telemetry_cols)
 
     def _backfill_project_artifacts_from_work_items(self) -> None:
         """Backfill project rows from compatibility work-item project strings.
@@ -5510,6 +5651,151 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def _next_stage_attempt_telemetry_version(self, telemetry_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM stage_attempt_telemetry WHERE id = ?", (telemetry_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_stage_attempt_telemetry(
+        self,
+        id: str,
+        flow_instance_id: str,
+        stage_instance_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        attempt_number: int | None = None,
+        agent_harness_id: str | None = None,
+        agent_session_id: str | None = None,
+        agent_context_id: str | None = None,
+        model_identifier: str | None = None,
+        provider: str | None = None,
+        dispatch_decision: Any | None = None,
+        lease_id: str | None = None,
+        lease_lifecycle: Any | None = None,
+        started_at: str | None = None,
+        completed_at: str | None = None,
+        duration_ms: int | None = None,
+        token_count: int | None = None,
+        cost: float | None = None,
+        outcome: str | None = None,
+        verdict: str | None = None,
+        test_summary: Any | None = None,
+        failure_class: str | None = None,
+        cleanup_result: str | None = None,
+        recovery_actions: Any | None = None,
+        artifact_links: Any | None = None,
+        status: str = "active",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a versioned TAFE per-stage-attempt telemetry row (SPEC-TAFE-R6).
+
+        Pure recording substrate: the row is written from caller-supplied fields.
+        No detection, aggregation, rollup, or recovery logic runs here (those are
+        WI-4505/WI-4506). ``stage_instance_id`` must reference an existing stage
+        instance, mirroring ``insert_stage_lease`` referential integrity.
+        """
+        telemetry_id = _require_text("stage attempt telemetry id", id)
+        flow_id = _require_text("flow_instance_id", flow_instance_id)
+        stage_id = _require_text("stage_instance_id", stage_instance_id)
+        if self.get_stage_instance(stage_id) is None:
+            raise ValueError(f"unknown stage_instance_id: {stage_id}")
+        now = _now()
+        version = self._next_stage_attempt_telemetry_version(telemetry_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO stage_attempt_telemetry
+               (id, version, flow_instance_id, stage_instance_id, attempt_number,
+                agent_harness_id, agent_session_id, agent_context_id, model_identifier, provider,
+                dispatch_decision, lease_id, lease_lifecycle, started_at, completed_at,
+                duration_ms, token_count, cost, outcome, verdict, test_summary,
+                failure_class, cleanup_result, recovery_actions, artifact_links,
+                status, metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                telemetry_id,
+                version,
+                flow_id,
+                stage_id,
+                attempt_number,
+                agent_harness_id,
+                agent_session_id,
+                agent_context_id,
+                model_identifier,
+                provider,
+                _encode_json(dispatch_decision) if dispatch_decision is not None else None,
+                lease_id,
+                _encode_json(lease_lifecycle) if lease_lifecycle is not None else None,
+                started_at,
+                completed_at,
+                duration_ms,
+                token_count,
+                cost,
+                outcome,
+                verdict,
+                _encode_json(test_summary) if test_summary is not None else None,
+                failure_class,
+                cleanup_result,
+                _encode_json(recovery_actions) if recovery_actions is not None else None,
+                _encode_json(artifact_links) if artifact_links is not None else None,
+                _require_text("status", status),
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                now,
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_stage_attempt_telemetry(telemetry_id)
+
+    def get_stage_attempt_telemetry(self, telemetry_id: str) -> dict[str, Any] | None:
+        """Return the current version of a TAFE per-stage-attempt telemetry record."""
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_stage_attempt_telemetry WHERE id = ?", (telemetry_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def get_stage_attempt_telemetry_history(self, telemetry_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a TAFE per-stage-attempt telemetry record, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM stage_attempt_telemetry WHERE id = ? ORDER BY version DESC", (telemetry_id,))
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    def list_stage_attempt_telemetry(
+        self,
+        *,
+        flow_instance_id: str | None = None,
+        stage_instance_id: str | None = None,
+        outcome: str | None = None,
+        failure_class: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current TAFE per-stage-attempt telemetry records with optional filters."""
+        query = "SELECT * FROM current_stage_attempt_telemetry WHERE 1=1"
+        params: list[Any] = []
+        if flow_instance_id:
+            query += " AND flow_instance_id = ?"
+            params.append(flow_instance_id)
+        if stage_instance_id:
+            query += " AND stage_instance_id = ?"
+            params.append(stage_instance_id)
+        if outcome:
+            query += " AND outcome = ?"
+            params.append(outcome)
+        if failure_class:
+            query += " AND failure_class = ?"
+            params.append(failure_class)
+        query += " ORDER BY flow_instance_id, stage_instance_id, changed_at, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
     def _expired_active_stage_lease_rows(
         self,
         conn: sqlite3.Connection,
@@ -8271,6 +8557,11 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "metadata",
         "event_payload",
         "capabilities",
+        "dispatch_decision",
+        "lease_lifecycle",
+        "test_summary",
+        "recovery_actions",
+        "artifact_links",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:
