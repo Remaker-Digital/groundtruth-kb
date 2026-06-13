@@ -1,3 +1,7 @@
+Document: gtkb-tafe-doctor-checks
+GO: bridge/gtkb-tafe-doctor-checks-002.md
+NEW: bridge/gtkb-tafe-doctor-checks-001.md
+
 Document: gtkb-tafe-flow-cli-skeleton
 VERIFIED: bridge/gtkb-tafe-flow-cli-skeleton-004.md
 NEW: bridge/gtkb-tafe-flow-cli-skeleton-003.md
@@ -21,6 +25,7 @@ GO: bridge/gtkb-tafe-runtime-tables-schema-002.md
 NEW: bridge/gtkb-tafe-runtime-tables-schema-001.md
 
 Document: gtkb-role-authority-declared-not-detected
+NEW: bridge/gtkb-role-authority-declared-not-detected-003.md
 GO: bridge/gtkb-role-authority-declared-not-detected-002.md
 NEW: bridge/gtkb-role-authority-declared-not-detected-001.md
 
