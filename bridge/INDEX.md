@@ -1,8 +1,38 @@
+Document: gtkb-role-authority-declared-not-detected
+VERIFIED: bridge/gtkb-role-authority-declared-not-detected-004.md
+
+Document: gtkb-tafe-spec-promotion
+VERIFIED: bridge/gtkb-tafe-spec-promotion-004.md
+
+Document: gtkb-tafe-phase-0-enablement
+VERIFIED: bridge/gtkb-tafe-phase-0-enablement-007.md
+
+Document: gtkb-lo-advisory-owner-grilling-gate-slice3-lint
+NEW: bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-001.md
+
+Document: gtkb-architecture-p2-stale-assertions-reconciliation
+REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-003.md
+REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-002.md
+NEW: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-001.md
+
+Document: gtkb-tafe-lease-recovery-cleanup
+REVISED: bridge/gtkb-tafe-lease-recovery-cleanup-002.md
+NEW: bridge/gtkb-tafe-lease-recovery-cleanup-001.md
+
+Document: gtkb-tafe-stage-attempt-telemetry
+GO: bridge/gtkb-tafe-stage-attempt-telemetry-002.md
+NEW: bridge/gtkb-tafe-stage-attempt-telemetry-001.md
+
+Document: gtkb-role-resolution-r1-r5-assertion-enforcement
+NEW: bridge/gtkb-role-resolution-r1-r5-assertion-enforcement-001.md
+
 Document: gtkb-tafe-dispatch-tick-health
+REVISED: bridge/gtkb-tafe-dispatch-tick-health-003.md
 NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
 
 Document: gtkb-claim-gated-implementation-start
+REVISED: bridge/gtkb-claim-gated-implementation-start-003.md
 NO-GO: bridge/gtkb-claim-gated-implementation-start-002.md
 NEW: bridge/gtkb-claim-gated-implementation-start-001.md
 
