@@ -30,6 +30,8 @@ GO: bridge/gtkb-fab-10-codex-index-adapter-addendum-002.md
 NEW: bridge/gtkb-fab-10-codex-index-adapter-addendum-001.md
 
 Document: gtkb-tafe-phase-0-enablement
+VERIFIED: bridge/gtkb-tafe-phase-0-enablement-007.md
+NEW: bridge/gtkb-tafe-phase-0-enablement-006.md
 GO: bridge/gtkb-tafe-phase-0-enablement-005.md
 REVISED: bridge/gtkb-tafe-phase-0-enablement-004.md
 DEFERRED: bridge/gtkb-tafe-phase-0-enablement-003.md
