@@ -1,3 +1,7 @@
+Document: gtkb-tafe-agent-capability-snapshots-schema
+GO: bridge/gtkb-tafe-agent-capability-snapshots-schema-002.md
+NEW: bridge/gtkb-tafe-agent-capability-snapshots-schema-001.md
+
 Document: gtkb-tafe-doctor-checks
 GO: bridge/gtkb-tafe-doctor-checks-002.md
 NEW: bridge/gtkb-tafe-doctor-checks-001.md
