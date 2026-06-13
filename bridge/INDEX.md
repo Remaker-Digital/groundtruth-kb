@@ -1,3 +1,7 @@
+Document: gtkb-tafe-flow-definition-seed-records
+GO: bridge/gtkb-tafe-flow-definition-seed-records-002.md
+NEW: bridge/gtkb-tafe-flow-definition-seed-records-001.md
+
 Document: gtkb-tafe-runtime-schema
 WITHDRAWN: bridge/gtkb-tafe-runtime-schema-002.md
 NEW: bridge/gtkb-tafe-runtime-schema-001.md
