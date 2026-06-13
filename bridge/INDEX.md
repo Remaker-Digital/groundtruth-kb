@@ -34,6 +34,7 @@ NO-GO: bridge/gtkb-tafe-dispatch-tick-health-002.md
 NEW: bridge/gtkb-tafe-dispatch-tick-health-001.md
 
 Document: gtkb-claim-gated-implementation-start
+GO: bridge/gtkb-claim-gated-implementation-start-004.md
 REVISED: bridge/gtkb-claim-gated-implementation-start-003.md
 NO-GO: bridge/gtkb-claim-gated-implementation-start-002.md
 NEW: bridge/gtkb-claim-gated-implementation-start-001.md
