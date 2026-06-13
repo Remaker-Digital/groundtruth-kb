@@ -1,3 +1,10 @@
+Document: gtkb-impl-auth-per-session-pointer-isolation
+NO-GO: bridge/gtkb-impl-auth-per-session-pointer-isolation-002.md
+NEW: bridge/gtkb-impl-auth-per-session-pointer-isolation-001.md
+
+Document: gtkb-prompt-role-hint-authority-emergency-fix
+NEW: bridge/gtkb-prompt-role-hint-authority-emergency-fix-001.md
+
 Document: gtkb-tafe-bridge-index-preview
 GO: bridge/gtkb-tafe-bridge-index-preview-002.md
 NEW: bridge/gtkb-tafe-bridge-index-preview-001.md
