@@ -1,4 +1,5 @@
 Document: gtkb-wi-4477-ollama-readiness-autostart
+NO-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-005.md
 VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-004.md
 NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-003.md
 GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
