@@ -2,10 +2,10 @@
   "collector": {
     "name": "GT-KB development environment inventory collector",
     "script": "scripts/collect_dev_environment_inventory.py",
-    "script_hash": "sha256:87f8b705b680a239c6a81ccce3ed35a26e4f3e0ffbeefab062f6328f730c315f",
+    "script_hash": "sha256:61d23cb8e64e6a66d45eb02faf81eac9ebba575138a86c907369e89dfb6dbc12",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-13T01:34:16Z",
+  "generated_at": "2026-06-13T05:08:02Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -134,7 +134,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 2,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {

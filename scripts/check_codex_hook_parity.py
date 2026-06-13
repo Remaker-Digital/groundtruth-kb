@@ -177,6 +177,13 @@ def _load_toml(path: Path) -> dict[str, Any]:
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
+def _codex_hooks_enabled(codex_config: dict[str, Any]) -> bool:
+    features = codex_config.get("features")
+    if not isinstance(features, dict):
+        return False
+    return features.get("hooks") is True
+
+
 def _commands_for_event(hooks_document: dict[str, Any], event_name: str) -> list[str]:
     commands: list[str] = []
     for group in hooks_document.get("hooks", {}).get(event_name, []):
@@ -990,8 +997,11 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     codex_hooks = _load_json(codex_hooks_path)
     claude_settings = _load_json(claude_settings_path)
 
-    if codex_config.get("features", {}).get("codex_hooks") is not True:
-        errors.append(".codex/config.toml must set [features].codex_hooks = true")
+    codex_features = codex_config.get("features", {})
+    if isinstance(codex_features, dict) and "codex_hooks" in codex_features:
+        errors.append(".codex/config.toml must not use deprecated [features].codex_hooks; use [features].hooks")
+    if not _codex_hooks_enabled(codex_config):
+        errors.append(".codex/config.toml must set [features].hooks = true")
 
     claude_pre_tool_commands = _commands_for_event(claude_settings, "PreToolUse")
     if not any(_contains_hook_path(command, FORMAL_APPROVAL_HOOK) for command in claude_pre_tool_commands):
@@ -1108,7 +1118,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     claude_has_bridge_compliance = any(
         _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK) for command in claude_pre_tool_commands
     )
-    codex_hooks_enabled = codex_config.get("features", {}).get("codex_hooks") is True
+    codex_hooks_enabled = _codex_hooks_enabled(codex_config)
     if claude_has_bridge_compliance and codex_hooks_enabled:
         bridge_pre_groups = _codex_bridge_compliance_hook_groups(codex_hooks, "PreToolUse")
         if not bridge_pre_groups:

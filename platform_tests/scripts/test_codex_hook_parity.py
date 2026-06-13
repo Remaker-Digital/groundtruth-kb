@@ -390,7 +390,7 @@ def test_codex_parity_requires_bridge_compliance_gate_when_hooks_enabled(tmp_pat
     (tmp_path / ".claude").mkdir(exist_ok=True)
     (tmp_path / "scripts").mkdir()
     (tmp_path / "harness-state").mkdir()
-    (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
+    (tmp_path / ".codex" / "config.toml").write_text("[features]\nhooks = true\n", encoding="utf-8")
     (tmp_path / ".codex" / "hooks.json").write_text(
         json.dumps(
             {"hooks": {"PreToolUse": [], "PostToolUse": [], "SessionStart": [], "UserPromptSubmit": [], "Stop": []}}
@@ -461,7 +461,7 @@ def test_codex_parity_skips_bridge_compliance_gate_when_hooks_disabled(tmp_path)
     (tmp_path / ".claude").mkdir(exist_ok=True)
     (tmp_path / "scripts").mkdir()
     (tmp_path / "harness-state").mkdir()
-    (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = false\n", encoding="utf-8")
+    (tmp_path / ".codex" / "config.toml").write_text("[features]\nhooks = false\n", encoding="utf-8")
     (tmp_path / ".codex" / "hooks.json").write_text(json.dumps({"hooks": {}}), encoding="utf-8")
     (tmp_path / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text("print('{}')\n", encoding="utf-8")
     (tmp_path / ".claude" / "hooks" / "workstream-focus.py").write_text("print('{}')\n", encoding="utf-8")
@@ -504,12 +504,12 @@ def test_codex_parity_skips_bridge_compliance_gate_when_hooks_disabled(tmp_path)
     assert not any("bridge-compliance" in error.lower() for error in errors)
 
 
-def test_codex_hook_parity_reports_missing_codex_hooks(tmp_path) -> None:
+def test_codex_hook_parity_reports_missing_codex_hooks_file(tmp_path) -> None:
     module = _load_module()
     (tmp_path / ".codex").mkdir()
     (tmp_path / ".claude" / "hooks").mkdir(parents=True)
     (tmp_path / ".claude" / "settings.json").parent.mkdir(exist_ok=True)
-    (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
+    (tmp_path / ".codex" / "config.toml").write_text("[features]\nhooks = true\n", encoding="utf-8")
     (tmp_path / ".claude" / "settings.json").write_text(
         json.dumps(
             {
@@ -545,7 +545,7 @@ def test_codex_hook_parity_requires_bash_matcher(tmp_path) -> None:
     (tmp_path / ".claude" / "hooks").mkdir(parents=True)
     (tmp_path / ".claude" / "rules").mkdir()
     (tmp_path / "scripts").mkdir()
-    (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
+    (tmp_path / ".codex" / "config.toml").write_text("[features]\nhooks = true\n", encoding="utf-8")
     (tmp_path / "harness-state").mkdir()
     (tmp_path / "harness-state" / "harness-identities.json").write_text(
         json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}) + "\n",

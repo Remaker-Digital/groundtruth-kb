@@ -50,7 +50,7 @@ def _make_project(root: Path) -> None:
         encoding="utf-8",
     )
     (root / ".codex" / "gtkb-hooks").mkdir(parents=True)
-    (root / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
+    (root / ".codex" / "config.toml").write_text("[features]\nhooks = true\n", encoding="utf-8")
     (root / ".codex" / "hooks.json").write_text(json.dumps({"hooks": {"SessionStart": []}}), encoding="utf-8")
     (root / ".codex" / "gtkb-hooks" / "session_start_dispatch.py").write_text("# hook\n", encoding="utf-8")
     (root / ".claude" / "rules").mkdir(parents=True)

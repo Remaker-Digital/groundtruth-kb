@@ -195,7 +195,8 @@ def test_codex_config_registers_formal_artifact_approval_hook_intent() -> None:
     config = _load_toml(".codex/config.toml")
     hooks = json.loads(_read(".codex/hooks.json"))
 
-    assert config["features"]["codex_hooks"] is True
+    assert config["features"]["hooks"] is True
+    assert "codex_hooks" not in config["features"]
     pre_tool_groups = hooks["hooks"]["PreToolUse"]
     formal_groups = [
         group

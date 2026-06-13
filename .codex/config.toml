@@ -12,7 +12,7 @@
 
 approval_policy = "on-request"
 [features]
-codex_hooks = true
+hooks = true
 
 [sandbox_workspace_write]
 network_access = false

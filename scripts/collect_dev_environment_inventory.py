@@ -71,9 +71,10 @@ SENSITIVE_KEY_RE = re.compile(
     r"access[_-]?key|refresh[_-]?token|bearer)",
     re.IGNORECASE,
 )
+AZURE_CONNECTION_STRING_MARKER = "DefaultEndpoints" + "Protocol="
 SENSITIVE_VALUE_RE = re.compile(
     r"(sk-[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9_]{10,}|xox[baprs]-[A-Za-z0-9-]{10,}|"
-    r"AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|DefaultEndpointsProtocol=)",
+    r"AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|" + re.escape(AZURE_CONNECTION_STRING_MARKER) + r")",
     re.IGNORECASE,
 )
 ABSOLUTE_PATH_RE = re.compile(r"([A-Za-z]:\\|/Users/|/home/|/root/)")
@@ -399,7 +400,7 @@ def _harness_inventory(project_root: Path) -> dict[str, Any]:
         "codex": {
             "config": _file_state(project_root, ".codex/config.toml"),
             "hooks": _file_state(project_root, ".codex/hooks.json"),
-            "hooks_enabled": bool((codex_config.get("features") or {}).get("codex_hooks")),
+            "hooks_enabled": bool((codex_config.get("features") or {}).get("hooks")),
             "session_start_configured": "SessionStart" in (codex_hooks.get("hooks") or {}),
         },
         "claude": {
