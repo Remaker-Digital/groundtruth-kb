@@ -401,4 +401,11 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) repaired the canonical 
 |------|---------|-------------------|------------------|--------|
 | Process | `WI-4452` had a complete tracked bridge thread ending in `VERIFIED`, but no `Document:` block in `bridge/INDEX.md`. | `show_thread_bridge.py` initially reported all seven `gtkb-wi4452-impl-auth-named-packet-fallback-*.md` files as not referenced by INDEX; after serialized `gt bridge index` restoration, drift is empty and LO scan reports 194 terminal VERIFIED entries. | Treat the bridge repair as complete; downstream backlog/project reconciliation can now see the verified thread from canonical INDEX state. `WI-4443` remains related-only per the implementation report unless separately authorized. | Resolved |
 
+### 2026-06-13 - WI-4453 ChromaDB Latency Advisory
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4453`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4453-chromadb-latency-advisory.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Current Python 3.14 fallback paths make `deliberations search` and `bridge propose --dry-run` fast, but WI-4453 remains open because non-dry-run record indexing is still synchronous and there is no median-latency regression benchmark for all three named CLI surfaces. | Live runtime reports `HAS_CHROMADB=False`; direct search/propose probes returned quickly; `insert_deliberation()` commits SQLite then calls `_index_deliberation_in_chroma()` without a timeout wrapper; targeted tests passed (3/1 skipped import-budget, 50 CLI tests, 10 Chroma/fail-soft tests). | Prime should file a narrow defect-fix proposal for bounded/out-of-band record indexing, deterministic related-deliberation seeding in bridge propose, and the WI's `<= 10s` median-latency benchmark. | Open |
 
