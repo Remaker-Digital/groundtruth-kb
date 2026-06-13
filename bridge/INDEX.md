@@ -1,4 +1,6 @@
 Document: gtkb-cli-module-main-guard
+VERIFIED: bridge/gtkb-cli-module-main-guard-004.md
+NEW: bridge/gtkb-cli-module-main-guard-003.md
 GO: bridge/gtkb-cli-module-main-guard-002.md
 NEW: bridge/gtkb-cli-module-main-guard-001.md
 
@@ -9,6 +11,8 @@ GO: bridge/gtkb-go-impl-claim-timebox-002.md
 NEW: bridge/gtkb-go-impl-claim-timebox-001.md
 
 Document: gtkb-tafe-agent-capability-snapshots-schema
+VERIFIED: bridge/gtkb-tafe-agent-capability-snapshots-schema-004.md
+NEW: bridge/gtkb-tafe-agent-capability-snapshots-schema-003.md
 GO: bridge/gtkb-tafe-agent-capability-snapshots-schema-002.md
 NEW: bridge/gtkb-tafe-agent-capability-snapshots-schema-001.md
 

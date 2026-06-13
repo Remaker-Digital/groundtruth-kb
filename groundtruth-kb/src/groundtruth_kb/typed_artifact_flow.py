@@ -447,6 +447,78 @@ class FlowRuntimeService(FlowDefinitionService):
             )
         ]
 
+    def record_capability_snapshot(
+        self,
+        *,
+        id: str,
+        harness_id: str,
+        role: str,
+        changed_by: str,
+        change_reason: str,
+        harness_name: str | None = None,
+        subject_scope: str | None = None,
+        health_status: str = "unknown",
+        reviewer_precedence: int | None = None,
+        workspace_availability: str | None = None,
+        model_identifier: str | None = None,
+        capabilities: Mapping[str, Any] | None = None,
+        captured_at: str | None = None,
+        source: str | None = None,
+        status: str = "active",
+        metadata: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Append a capability-snapshot version without implementing dispatch policy.
+
+        Records a candidate harness's point-in-time capability/health/precedence
+        profile for the later WI-4498 dispatch policy engine. This helper performs
+        no eligibility evaluation, weighted scoring, or candidate selection.
+        """
+
+        row = self.db.insert_agent_capability_snapshot(
+            id=_require_non_empty("id", id),
+            harness_id=_require_non_empty("harness_id", harness_id),
+            role=_require_non_empty("role", role),
+            changed_by=_require_non_empty("changed_by", changed_by),
+            change_reason=_require_non_empty("change_reason", change_reason),
+            harness_name=harness_name,
+            subject_scope=subject_scope,
+            health_status=_require_non_empty("health_status", health_status),
+            reviewer_precedence=reviewer_precedence,
+            workspace_availability=workspace_availability,
+            model_identifier=model_identifier,
+            capabilities=dict(capabilities) if capabilities is not None else None,
+            captured_at=captured_at,
+            source=source,
+            status=_require_non_empty("status", status),
+            metadata=dict(metadata) if metadata is not None else None,
+        )
+        if row is None:
+            raise RuntimeError(f"Inserted agent capability snapshot {id!r} but could not read it back")
+        return dict(row)
+
+    def get_capability_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        row = self.db.get_agent_capability_snapshot(snapshot_id)
+        return dict(row) if row else None
+
+    def get_capability_snapshot_history(self, snapshot_id: str) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.db.get_agent_capability_snapshot_history(snapshot_id)]
+
+    def list_capability_snapshots(
+        self,
+        *,
+        harness_id: str | None = None,
+        health_status: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        return [
+            dict(row)
+            for row in self.db.list_agent_capability_snapshots(
+                harness_id=harness_id,
+                health_status=health_status,
+                status=status,
+            )
+        ]
+
     def record_flow_event(
         self,
         *,

@@ -6379,3 +6379,7 @@ def harness_show(ctx: click.Context, harness_id: str) -> None:
     if record is None:
         raise click.ClickException(f"unknown harness {harness_id!r}; no such harness in the registry")
     _harness_emit(record)
+
+
+if __name__ == "__main__":
+    main()

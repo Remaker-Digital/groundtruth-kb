@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -14,6 +15,28 @@ from click.testing import CliRunner
 
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
+
+
+def test_cli_module_invocation_dispatches_help() -> None:
+    package = subprocess.run(
+        [sys.executable, "-m", "groundtruth_kb", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    module = subprocess.run(
+        [sys.executable, "-m", "groundtruth_kb.cli", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert package.returncode == 0, package.stderr
+    assert module.returncode == 0, module.stderr
+    assert "Usage:" in module.stdout
+    assert "Commands:" in module.stdout
+    assert "backlog" in module.stdout
+    assert module.stdout.replace("groundtruth_kb.cli", "groundtruth_kb") == package.stdout
 
 
 def _force_rmtree(path: Path) -> None:

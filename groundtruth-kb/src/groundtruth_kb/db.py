@@ -609,6 +609,29 @@ CREATE TABLE IF NOT EXISTS stage_leases (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS agent_capability_snapshots (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    harness_id TEXT NOT NULL,
+    harness_name TEXT,
+    role TEXT NOT NULL,
+    subject_scope TEXT,
+    health_status TEXT NOT NULL DEFAULT 'unknown',
+    reviewer_precedence INTEGER,
+    workspace_availability TEXT,
+    model_identifier TEXT,
+    capabilities TEXT,
+    captured_at TEXT NOT NULL,
+    source TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS backlog_snapshots (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -840,6 +863,10 @@ CREATE INDEX IF NOT EXISTS idx_stage_leases_stage ON stage_leases(stage_instance
 CREATE INDEX IF NOT EXISTS idx_stage_leases_status ON stage_leases(lease_status);
 CREATE INDEX IF NOT EXISTS idx_stage_leases_holder ON stage_leases(holder_harness_id, holder_session_id);
 CREATE INDEX IF NOT EXISTS idx_stage_leases_heartbeat ON stage_leases(heartbeat_at);
+CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_id_version ON agent_capability_snapshots(id, version);
+CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_harness ON agent_capability_snapshots(harness_id);
+CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_health ON agent_capability_snapshots(health_status);
+CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_captured ON agent_capability_snapshots(captured_at);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
@@ -954,6 +981,11 @@ CREATE VIEW IF NOT EXISTS current_stage_leases AS
 SELECT l.* FROM stage_leases l
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_leases GROUP BY id) m
 ON l.id = m.id AND l.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_agent_capability_snapshots AS
+SELECT a.* FROM agent_capability_snapshots a
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM agent_capability_snapshots GROUP BY id) m
+ON a.id = m.id AND a.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
@@ -1574,6 +1606,77 @@ class KnowledgeDB:
         conn.commit()
         if added_lease_cols:
             _log.debug("Applied migration: TAFE stage lease columns %s", added_lease_cols)
+
+        # Migration 11: TAFE agent capability snapshot table substrate.
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS agent_capability_snapshots (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                harness_id TEXT NOT NULL,
+                harness_name TEXT,
+                role TEXT NOT NULL,
+                subject_scope TEXT,
+                health_status TEXT NOT NULL DEFAULT 'unknown',
+                reviewer_precedence INTEGER,
+                workspace_availability TEXT,
+                model_identifier TEXT,
+                capabilities TEXT,
+                captured_at TEXT NOT NULL,
+                source TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                metadata TEXT,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id, version)
+            );
+            """
+        )
+        capability_snapshot_columns = {
+            "id": "TEXT",
+            "version": "INTEGER",
+            "harness_id": "TEXT",
+            "harness_name": "TEXT",
+            "role": "TEXT",
+            "subject_scope": "TEXT",
+            "health_status": "TEXT",
+            "reviewer_precedence": "INTEGER",
+            "workspace_availability": "TEXT",
+            "model_identifier": "TEXT",
+            "capabilities": "TEXT",
+            "captured_at": "TEXT",
+            "source": "TEXT",
+            "status": "TEXT",
+            "metadata": "TEXT",
+            "changed_by": "TEXT",
+            "changed_at": "TEXT",
+            "change_reason": "TEXT",
+        }
+        existing_capability_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(agent_capability_snapshots)").fetchall()
+        }
+        added_capability_cols = []
+        for col_name, col_type in capability_snapshot_columns.items():
+            if col_name not in existing_capability_cols:
+                conn.execute(f"ALTER TABLE agent_capability_snapshots ADD COLUMN {col_name} {col_type}")
+                added_capability_cols.append(col_name)
+        conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_id_version ON agent_capability_snapshots(id, version);
+            CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_harness ON agent_capability_snapshots(harness_id);
+            CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_health ON agent_capability_snapshots(health_status);
+            CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_captured ON agent_capability_snapshots(captured_at);
+            CREATE VIEW IF NOT EXISTS current_agent_capability_snapshots AS
+            SELECT a.* FROM agent_capability_snapshots a
+            INNER JOIN (SELECT id, MAX(version) AS max_v FROM agent_capability_snapshots GROUP BY id) m
+            ON a.id = m.id AND a.version = m.max_v;
+            """
+        )
+        conn.commit()
+        if added_capability_cols:
+            _log.debug("Applied migration: TAFE agent capability snapshot columns %s", added_capability_cols)
 
     def _backfill_project_artifacts_from_work_items(self) -> None:
         """Backfill project rows from compatibility work-item project strings.
@@ -5395,6 +5498,120 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def _next_agent_capability_snapshot_version(self, snapshot_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM agent_capability_snapshots WHERE id = ?", (snapshot_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_agent_capability_snapshot(
+        self,
+        id: str,
+        harness_id: str,
+        role: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        harness_name: str | None = None,
+        subject_scope: str | None = None,
+        health_status: str = "unknown",
+        reviewer_precedence: int | None = None,
+        workspace_availability: str | None = None,
+        model_identifier: str | None = None,
+        capabilities: dict[str, Any] | None = None,
+        captured_at: str | None = None,
+        source: str | None = None,
+        status: str = "active",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a versioned TAFE agent capability snapshot row.
+
+        This is the bounded WI-4497 substrate: it records a point-in-time
+        capability/health/precedence profile for a candidate harness so the
+        later WI-4498 dispatch policy engine has governed inputs. It does not
+        score candidates, evaluate eligibility, or select dispatch targets.
+        """
+        snapshot_id = _require_text("agent capability snapshot id", id)
+        now = _now()
+        version = self._next_agent_capability_snapshot_version(snapshot_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO agent_capability_snapshots
+               (id, version, harness_id, harness_name, role, subject_scope,
+                health_status, reviewer_precedence, workspace_availability,
+                model_identifier, capabilities, captured_at, source, status,
+                metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                snapshot_id,
+                version,
+                _require_text("harness_id", harness_id),
+                harness_name,
+                _require_text("role", role),
+                subject_scope,
+                _require_text("health_status", health_status),
+                reviewer_precedence,
+                workspace_availability,
+                model_identifier,
+                _encode_json(capabilities or {}),
+                captured_at or now,
+                source,
+                _require_text("status", status),
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                now,
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_agent_capability_snapshot(snapshot_id)
+
+    def get_agent_capability_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        """Return the current version of a TAFE agent capability snapshot."""
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_agent_capability_snapshots WHERE id = ?", (snapshot_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def get_agent_capability_snapshot_history(self, snapshot_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a TAFE agent capability snapshot, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM agent_capability_snapshots WHERE id = ? ORDER BY version DESC",
+                (snapshot_id,),
+            )
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    def list_agent_capability_snapshots(
+        self,
+        *,
+        harness_id: str | None = None,
+        health_status: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current TAFE agent capability snapshots with optional filters."""
+        query = "SELECT * FROM current_agent_capability_snapshots WHERE 1=1"
+        params: list[Any] = []
+        if harness_id:
+            query += " AND harness_id = ?"
+            params.append(harness_id)
+        if health_status:
+            query += " AND health_status = ?"
+            params.append(health_status)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY harness_id, captured_at, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
     def insert_flow_event(
         self,
         id: str,
@@ -7678,6 +7895,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "source_spec_ids",
         "metadata",
         "event_payload",
+        "capabilities",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:
