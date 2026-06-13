@@ -498,6 +498,26 @@ CREATE TABLE IF NOT EXISTS project_authorizations (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS flow_definitions (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    flow_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    stage_sequence TEXT NOT NULL,
+    required_roles_by_stage TEXT NOT NULL,
+    auq_gate_positions TEXT,
+    never_self_review_stages TEXT,
+    deterministic_carve_outs TEXT,
+    workspace_isolation TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS backlog_snapshots (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -711,6 +731,8 @@ CREATE INDEX IF NOT EXISTS idx_project_authorizations_project ON project_authori
 CREATE INDEX IF NOT EXISTS idx_project_authorizations_status ON project_authorizations(status);
 CREATE INDEX IF NOT EXISTS idx_project_authorizations_owner_decision
     ON project_authorizations(owner_decision_deliberation_id);
+CREATE INDEX IF NOT EXISTS idx_flow_definitions_id_version ON flow_definitions(id, version);
+CREATE INDEX IF NOT EXISTS idx_flow_definitions_flow_type ON flow_definitions(flow_type);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
@@ -805,6 +827,11 @@ CREATE VIEW IF NOT EXISTS current_project_authorizations AS
 SELECT a.* FROM project_authorizations a
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM project_authorizations GROUP BY id) m
 ON a.id = m.id AND a.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_flow_definitions AS
+SELECT f.* FROM flow_definitions f
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM flow_definitions GROUP BY id) m
+ON f.id = m.id AND f.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
@@ -1162,6 +1189,38 @@ class KnowledgeDB:
 
         # Migration 7: first-class project layer over canonical work_items.
         self._backfill_project_artifacts_from_work_items()
+
+        # Migration 8: TAFE flow definition schema compatibility.
+        flow_cols = {row[1] for row in conn.execute("PRAGMA table_info(flow_definitions)").fetchall()}
+        flow_definition_columns = {
+            "title": "TEXT",
+            "name": "TEXT",
+            "status": "TEXT",
+            "lifecycle_status": "TEXT",
+            "stage_sequence": "TEXT",
+            "stages": "TEXT",
+            "required_roles_by_stage": "TEXT",
+            "required_roles": "TEXT",
+            "auq_gate_positions": "TEXT",
+            "never_self_review_stages": "TEXT",
+            "never_self_review_points": "TEXT",
+            "deterministic_carve_outs": "TEXT",
+            "deterministic_carveouts": "TEXT",
+            "workspace_isolation": "TEXT",
+            "source_spec_ids": "TEXT",
+        }
+        added_flow_cols = []
+        for col_name, col_type in flow_definition_columns.items():
+            if col_name not in flow_cols:
+                conn.execute(f"ALTER TABLE flow_definitions ADD COLUMN {col_name} {col_type}")
+                added_flow_cols.append(col_name)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_flow_definitions_status ON flow_definitions(status)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_flow_definitions_lifecycle_status ON flow_definitions(lifecycle_status)"
+        )
+        conn.commit()
+        if added_flow_cols:
+            _log.debug("Applied migration: TAFE flow definition columns %s", added_flow_cols)
 
     def _backfill_project_artifacts_from_work_items(self) -> None:
         """Backfill project rows from compatibility work-item project strings.
@@ -4558,6 +4617,135 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    # ------------------------------------------------------------------
+    # Typed Artifact-Flow Engine: flow definitions
+    # ------------------------------------------------------------------
+
+    def _next_flow_definition_version(self, definition_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM flow_definitions WHERE id = ?", (definition_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_flow_definition(
+        self,
+        id: str,
+        flow_type: str,
+        title: str,
+        stage_sequence: list[str],
+        required_roles_by_stage: dict[str, str],
+        changed_by: str,
+        change_reason: str,
+        *,
+        description: str | None = None,
+        status: str = "active",
+        auq_gate_positions: list[str] | None = None,
+        never_self_review_stages: list[str] | None = None,
+        deterministic_carve_outs: list[str] | dict[str, Any] | None = None,
+        workspace_isolation: dict[str, Any] | None = None,
+        source_spec_ids: list[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a versioned TAFE flow-definition record.
+
+        Flow definitions are schema-level templates for later TAFE runtime
+        work. This method stores JSON-shaped template metadata but does not
+        seed canonical flow records, start a flow instance, or affect bridge
+        dispatch authority.
+        """
+        if not id.strip():
+            raise ValueError("flow definition id is required")
+        if not flow_type.strip():
+            raise ValueError("flow_type is required")
+        if not title.strip():
+            raise ValueError("title is required")
+        if not stage_sequence:
+            raise ValueError("stage_sequence must contain at least one stage")
+        if not required_roles_by_stage:
+            raise ValueError("required_roles_by_stage is required")
+
+        missing_roles = [stage for stage in stage_sequence if stage not in required_roles_by_stage]
+        if missing_roles:
+            raise ValueError(f"required_roles_by_stage missing stages: {missing_roles}")
+
+        def encode(value: Any) -> str | None:
+            return json.dumps(value) if value is not None else None
+
+        definition_id = id.strip()
+        version = self._next_flow_definition_version(definition_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO flow_definitions
+               (id, version, flow_type, title, name, description, status, lifecycle_status,
+                stage_sequence, stages, required_roles_by_stage, required_roles,
+                auq_gate_positions, never_self_review_stages, never_self_review_points,
+                deterministic_carve_outs, deterministic_carveouts, workspace_isolation,
+                source_spec_ids, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                definition_id,
+                version,
+                flow_type.strip(),
+                title,
+                title,
+                description,
+                status,
+                status,
+                encode(stage_sequence),
+                encode(stage_sequence),
+                encode(required_roles_by_stage),
+                encode(required_roles_by_stage),
+                encode(auq_gate_positions or []),
+                encode(never_self_review_stages or []),
+                encode(never_self_review_stages or []),
+                encode(deterministic_carve_outs if deterministic_carve_outs is not None else []),
+                encode(deterministic_carve_outs if deterministic_carve_outs is not None else []),
+                encode(workspace_isolation or {}),
+                encode(source_spec_ids or []),
+                changed_by,
+                _now(),
+                change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_flow_definition(definition_id)
+
+    def get_flow_definition(self, definition_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a TAFE flow definition."""
+        row = (
+            self._get_conn().execute("SELECT * FROM current_flow_definitions WHERE id = ?", (definition_id,)).fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def list_flow_definitions(
+        self,
+        *,
+        flow_type: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current TAFE flow definitions with optional filters."""
+        query = "SELECT * FROM current_flow_definitions WHERE 1=1"
+        params: list[Any] = []
+        if flow_type:
+            query += " AND flow_type = ?"
+            params.append(flow_type)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY flow_type, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_flow_definition_history(self, definition_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a TAFE flow definition, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM flow_definitions WHERE id = ? ORDER BY version DESC", (definition_id,))
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
     def insert_harness(
         self,
         id: str,
@@ -6676,6 +6864,17 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "excluded_work_item_ids",
         "included_spec_ids",
         "excluded_spec_ids",
+        "stage_sequence",
+        "required_roles_by_stage",
+        "stages",
+        "required_roles",
+        "auq_gate_positions",
+        "never_self_review_stages",
+        "never_self_review_points",
+        "deterministic_carve_outs",
+        "deterministic_carveouts",
+        "workspace_isolation",
+        "source_spec_ids",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:

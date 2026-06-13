@@ -7,6 +7,7 @@ WITHDRAWN: bridge/gtkb-wi4487-flow-definitions-schema-002.md
 NEW: bridge/gtkb-wi4487-flow-definitions-schema-001.md
 
 Document: gtkb-tafe-flow-definitions-schema
+VERIFIED: bridge/gtkb-tafe-flow-definitions-schema-005.md
 VERIFIED: bridge/gtkb-tafe-flow-definitions-schema-004.md
 NEW: bridge/gtkb-tafe-flow-definitions-schema-003.md
 GO: bridge/gtkb-tafe-flow-definitions-schema-002.md
