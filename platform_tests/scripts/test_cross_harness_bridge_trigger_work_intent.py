@@ -104,7 +104,8 @@ def test_prime_dispatch_filters_held_work_intent_and_signs_unheld_batch(
     free = current_holder("free-thread", project_root=root)
     assert held is not None and held["session_id"] == "foreground-session"
     assert free is not None
-    assert free["session_id"].startswith("trigger-dispatched-")
+    assert result["work_intent_session_id"] == result["dispatch_id"]
+    assert free["session_id"] == result["work_intent_session_id"]
 
     failures = _failure_records(state_dir)
     assert any(

@@ -1,3 +1,9 @@
+Document: gtkb-wi4388-work-intent-session-test-drift
+VERIFIED: bridge/gtkb-wi4388-work-intent-session-test-drift-004.md
+NEW: bridge/gtkb-wi4388-work-intent-session-test-drift-003.md
+GO: bridge/gtkb-wi4388-work-intent-session-test-drift-002.md
+NEW: bridge/gtkb-wi4388-work-intent-session-test-drift-001.md
+
 Document: gtkb-ollama-server-readiness-autostart-advisory
 ADVISORY: bridge/gtkb-ollama-server-readiness-autostart-advisory-001.md
 
