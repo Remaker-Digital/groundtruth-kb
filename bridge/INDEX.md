@@ -7,19 +7,10 @@ WITHDRAWN: bridge/gtkb-wi4487-flow-definitions-schema-002.md
 NEW: bridge/gtkb-wi4487-flow-definitions-schema-001.md
 
 Document: gtkb-tafe-flow-definitions-schema
+VERIFIED: bridge/gtkb-tafe-flow-definitions-schema-004.md
+NEW: bridge/gtkb-tafe-flow-definitions-schema-003.md
 GO: bridge/gtkb-tafe-flow-definitions-schema-002.md
 NEW: bridge/gtkb-tafe-flow-definitions-schema-001.md
-
-Document: gtkb-wi-4477-ollama-readiness-autostart
-VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-009.md
-NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-008.md
-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-007.md
-REVISED: bridge/gtkb-wi-4477-ollama-readiness-autostart-006.md
-NO-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-005.md
-VERIFIED: bridge/gtkb-wi-4477-ollama-readiness-autostart-004.md
-NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-003.md
-GO: bridge/gtkb-wi-4477-ollama-readiness-autostart-002.md
-NEW: bridge/gtkb-wi-4477-ollama-readiness-autostart-001.md
 
 Document: gtkb-ollama-server-readiness-autostart-advisory
 ADVISORY: bridge/gtkb-ollama-server-readiness-autostart-advisory-001.md
