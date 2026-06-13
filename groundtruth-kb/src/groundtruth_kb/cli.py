@@ -88,6 +88,10 @@ from groundtruth_kb.project.sot_registry import (
 from groundtruth_kb.project.sot_registry import (
     load_toml as load_sot_toml,
 )
+from groundtruth_kb.typed_artifact_flow import (
+    TypedArtifactFlowService,
+    canonical_reviewed_task_flow_definitions,
+)
 
 if TYPE_CHECKING:
     from groundtruth_kb.dashboard import DashboardPaths
@@ -176,6 +180,294 @@ def main(ctx: click.Context, config_path: str | None) -> None:
 bridge_group.add_command(bridge_index_group)
 main.add_command(bridge_group)
 main.add_command(session_group)
+
+
+def _emit_cli_payload(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        summary = payload.get("summary")
+        if summary:
+            click.echo(summary)
+
+
+def _flow_service(ctx: click.Context) -> tuple[KnowledgeDB, TypedArtifactFlowService]:
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    return db, TypedArtifactFlowService(db)
+
+
+def _flow_noop_payload(command: str, *, detail: str) -> dict[str, Any]:
+    return {
+        "command": command,
+        "mutated": False,
+        "phase": "phase-0",
+        "status": "phase0_noop",
+        "summary": f"{command}: no-op in TAFE Phase 0; {detail}",
+    }
+
+
+@main.group("flow")
+def flow_group() -> None:
+    """Typed Artifact-Flow Engine command skeleton."""
+
+
+@flow_group.command("define")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_define_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Read canonical Phase 0 reviewed-task flow definitions."""
+    db, service = _flow_service(ctx)
+    try:
+        current_by_id = {row["id"]: row for row in service.list_flow_definitions(lifecycle_status="active")}
+        definitions = []
+        for seed in canonical_reviewed_task_flow_definitions():
+            current = current_by_id.get(seed["id"])
+            definitions.append(
+                {
+                    "id": seed["id"],
+                    "flow_type": seed["flow_type"],
+                    "stage_sequence": list(seed["stage_sequence"]),
+                    "seeded": current is not None,
+                    "version": current["version"] if current else None,
+                }
+            )
+    finally:
+        db.close()
+
+    payload = {
+        "definitions": definitions,
+        "mutated": False,
+        "status": "phase0_read_only",
+        "summary": "TAFE canonical definitions: " + ", ".join(row["id"] for row in definitions),
+    }
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.command("list")
+@click.option("--flow-definition-id", default=None, help="Filter by flow definition id.")
+@click.option("--flow-type", default=None, help="Filter by flow type.")
+@click.option("--status", "flow_status", default=None, help="Filter by flow-instance status.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_list_cmd(
+    ctx: click.Context,
+    flow_definition_id: str | None,
+    flow_type: str | None,
+    flow_status: str | None,
+    json_output: bool,
+) -> None:
+    """Read current TAFE flow instances."""
+    db, service = _flow_service(ctx)
+    try:
+        rows = service.list_flow_instances(
+            flow_definition_id=flow_definition_id,
+            flow_type=flow_type,
+            status=flow_status,
+        )
+    finally:
+        db.close()
+    if rows:
+        summary = "\n".join(f"{row['id']}: {row['flow_type']} {row['status']}" for row in rows)
+    else:
+        summary = "No TAFE flow instances found."
+    _emit_cli_payload(
+        {"flow_instances": rows, "mutated": False, "status": "phase0_read_only", "summary": summary},
+        json_output=json_output,
+    )
+
+
+@flow_group.command("show")
+@click.argument("flow_instance_id")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_show_cmd(ctx: click.Context, flow_instance_id: str, json_output: bool) -> None:
+    """Read one current TAFE flow instance."""
+    db, service = _flow_service(ctx)
+    try:
+        row = service.get_flow_instance(flow_instance_id)
+    finally:
+        db.close()
+    if row is None:
+        payload = {
+            "flow_instance": None,
+            "found": False,
+            "mutated": False,
+            "status": "not_found",
+            "summary": f"TAFE flow instance not found: {flow_instance_id}",
+        }
+        _emit_cli_payload(payload, json_output=json_output)
+        raise SystemExit(1)
+    _emit_cli_payload(
+        {
+            "flow_instance": row,
+            "found": True,
+            "mutated": False,
+            "status": "phase0_read_only",
+            "summary": f"{row['id']}: {row['flow_type']} {row['status']}",
+        },
+        json_output=json_output,
+    )
+
+
+@flow_group.command("status")
+@click.argument("flow_instance_id", required=False)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_status_cmd(ctx: click.Context, flow_instance_id: str | None, json_output: bool) -> None:
+    """Read a current TAFE flow status or an aggregate Phase 0 status."""
+    db, service = _flow_service(ctx)
+    try:
+        if flow_instance_id:
+            row = service.get_flow_instance(flow_instance_id)
+            if row is None:
+                payload = {
+                    "flow_instance": None,
+                    "found": False,
+                    "mutated": False,
+                    "status": "not_found",
+                    "summary": f"TAFE flow instance not found: {flow_instance_id}",
+                }
+                _emit_cli_payload(payload, json_output=json_output)
+                raise SystemExit(1)
+            payload = {
+                "flow_instance": row,
+                "found": True,
+                "mutated": False,
+                "status": row["status"],
+                "summary": f"{row['id']}: {row['status']}",
+            }
+        else:
+            rows = service.list_flow_instances()
+            by_status: dict[str, int] = {}
+            for row in rows:
+                by_status[row["status"]] = by_status.get(row["status"], 0) + 1
+            payload = {
+                "flow_instance_count": len(rows),
+                "mutated": False,
+                "phase": "phase-0",
+                "status": "phase0_read_only",
+                "status_counts": by_status,
+                "summary": f"TAFE Phase 0 flow status: {len(rows)} current instance(s).",
+            }
+    finally:
+        db.close()
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.command("start")
+@click.argument("flow_definition_id")
+@click.option("--subject-type", required=True, help="Future flow subject type.")
+@click.option("--subject-id", required=True, help="Future flow subject id.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_start_cmd(flow_definition_id: str, subject_type: str, subject_id: str, json_output: bool) -> None:
+    """No-op Phase 0 placeholder for starting a TAFE flow."""
+    payload = _flow_noop_payload(
+        "flow start",
+        detail="flow creation is reserved for a later governed runtime slice.",
+    )
+    payload.update(
+        {
+            "flow_definition_id": flow_definition_id,
+            "subject_id": subject_id,
+            "subject_type": subject_type,
+        }
+    )
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.command("claim")
+@click.argument("stage_instance_id")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_claim_cmd(stage_instance_id: str, json_output: bool) -> None:
+    """No-op Phase 0 placeholder for stage claims."""
+    payload = _flow_noop_payload("flow claim", detail="stage leases are reserved for WI-4492/WI-4493.")
+    payload["stage_instance_id"] = stage_instance_id
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.command("release")
+@click.argument("stage_instance_id")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_release_cmd(stage_instance_id: str, json_output: bool) -> None:
+    """No-op Phase 0 placeholder for stage release."""
+    payload = _flow_noop_payload("flow release", detail="stage leases are reserved for WI-4492/WI-4493.")
+    payload["stage_instance_id"] = stage_instance_id
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.command("heartbeat")
+@click.argument("stage_instance_id")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_heartbeat_cmd(stage_instance_id: str, json_output: bool) -> None:
+    """No-op Phase 0 placeholder for lease heartbeat."""
+    payload = _flow_noop_payload("flow heartbeat", detail="lease heartbeat is reserved for WI-4493.")
+    payload["stage_instance_id"] = stage_instance_id
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.command("advance")
+@click.argument("stage_instance_id")
+@click.option("--to-stage", default=None, help="Future destination stage id.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_advance_cmd(stage_instance_id: str, to_stage: str | None, json_output: bool) -> None:
+    """No-op Phase 0 placeholder for stage advancement."""
+    payload = _flow_noop_payload("flow advance", detail="stage transitions are reserved for later flow-engine work.")
+    payload["stage_instance_id"] = stage_instance_id
+    payload["to_stage"] = to_stage
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.group("dispatch")
+def flow_dispatch_group() -> None:
+    """No-op Phase 0 dispatch command skeleton."""
+
+
+@flow_dispatch_group.command("tick")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_dispatch_tick_cmd(json_output: bool) -> None:
+    """No-op Phase 0 placeholder for one dispatch evaluation cycle."""
+    _emit_cli_payload(
+        _flow_noop_payload("flow dispatch tick", detail="dispatch policy is reserved for later TAFE phases."),
+        json_output=json_output,
+    )
+
+
+@flow_dispatch_group.command("health")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_dispatch_health_cmd(json_output: bool) -> None:
+    """No-op Phase 0 placeholder for dispatcher health."""
+    _emit_cli_payload(
+        _flow_noop_payload("flow dispatch health", detail="dispatcher health is reserved for later TAFE phases."),
+        json_output=json_output,
+    )
+
+
+@flow_group.group("render")
+def flow_render_group() -> None:
+    """No-op Phase 0 generated-view command skeleton."""
+
+
+@flow_render_group.command("bridge-view")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_render_bridge_view_cmd(json_output: bool) -> None:
+    """No-op Phase 0 placeholder for generated bridge view rendering."""
+    _emit_cli_payload(
+        _flow_noop_payload(
+            "flow render bridge-view", detail="bridge/INDEX.md remains authoritative and is not written."
+        ),
+        json_output=json_output,
+    )
+
+
+@flow_group.command("pilot")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def flow_pilot_cmd(json_output: bool) -> None:
+    """No-op Phase 0 placeholder for pilot mode."""
+    _emit_cli_payload(
+        _flow_noop_payload("flow pilot", detail="pilot activation requires later governed eligibility and approval."),
+        json_output=json_output,
+    )
 
 
 @main.group("application")

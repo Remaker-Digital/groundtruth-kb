@@ -518,6 +518,97 @@ CREATE TABLE IF NOT EXISTS flow_definitions (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS flow_instances (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    flow_definition_id TEXT NOT NULL,
+    flow_definition_version INTEGER,
+    flow_type TEXT,
+    subject_type TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'created',
+    current_stage_instance_id TEXT,
+    started_at TEXT,
+    completed_at TEXT,
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS stage_instances (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    flow_instance_id TEXT NOT NULL,
+    stage_id TEXT NOT NULL,
+    stage_index INTEGER NOT NULL,
+    required_role TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    claim_status TEXT NOT NULL DEFAULT 'unclaimed',
+    claimed_by_harness_id TEXT,
+    claimed_by_session_id TEXT,
+    started_at TEXT,
+    completed_at TEXT,
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS flow_events (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    flow_instance_id TEXT NOT NULL,
+    stage_instance_id TEXT,
+    event_type TEXT NOT NULL,
+    event_at TEXT NOT NULL,
+    event_payload TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id)
+);
+
+CREATE TABLE IF NOT EXISTS flow_artifacts (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    flow_instance_id TEXT NOT NULL,
+    stage_instance_id TEXT,
+    artifact_type TEXT NOT NULL,
+    artifact_ref TEXT NOT NULL,
+    relationship TEXT NOT NULL DEFAULT 'related',
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id)
+);
+
+CREATE TABLE IF NOT EXISTS stage_leases (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    stage_instance_id TEXT NOT NULL,
+    holder_harness_id TEXT NOT NULL,
+    holder_session_id TEXT NOT NULL,
+    lease_status TEXT NOT NULL DEFAULT 'active',
+    acquired_at TEXT NOT NULL,
+    heartbeat_at TEXT,
+    ttl_seconds INTEGER NOT NULL,
+    expires_at TEXT,
+    released_at TEXT,
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS backlog_snapshots (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -733,6 +824,22 @@ CREATE INDEX IF NOT EXISTS idx_project_authorizations_owner_decision
     ON project_authorizations(owner_decision_deliberation_id);
 CREATE INDEX IF NOT EXISTS idx_flow_definitions_id_version ON flow_definitions(id, version);
 CREATE INDEX IF NOT EXISTS idx_flow_definitions_flow_type ON flow_definitions(flow_type);
+CREATE INDEX IF NOT EXISTS idx_flow_instances_id_version ON flow_instances(id, version);
+CREATE INDEX IF NOT EXISTS idx_flow_instances_definition ON flow_instances(flow_definition_id);
+CREATE INDEX IF NOT EXISTS idx_flow_instances_status ON flow_instances(status);
+CREATE INDEX IF NOT EXISTS idx_stage_instances_id_version ON stage_instances(id, version);
+CREATE INDEX IF NOT EXISTS idx_stage_instances_flow ON stage_instances(flow_instance_id);
+CREATE INDEX IF NOT EXISTS idx_stage_instances_status ON stage_instances(status);
+CREATE INDEX IF NOT EXISTS idx_flow_events_flow ON flow_events(flow_instance_id, rowid);
+CREATE INDEX IF NOT EXISTS idx_flow_events_stage ON flow_events(stage_instance_id, rowid);
+CREATE INDEX IF NOT EXISTS idx_flow_events_type ON flow_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_flow_artifacts_flow ON flow_artifacts(flow_instance_id, rowid);
+CREATE INDEX IF NOT EXISTS idx_flow_artifacts_artifact ON flow_artifacts(artifact_type, artifact_ref);
+CREATE INDEX IF NOT EXISTS idx_stage_leases_id_version ON stage_leases(id, version);
+CREATE INDEX IF NOT EXISTS idx_stage_leases_stage ON stage_leases(stage_instance_id);
+CREATE INDEX IF NOT EXISTS idx_stage_leases_status ON stage_leases(lease_status);
+CREATE INDEX IF NOT EXISTS idx_stage_leases_holder ON stage_leases(holder_harness_id, holder_session_id);
+CREATE INDEX IF NOT EXISTS idx_stage_leases_heartbeat ON stage_leases(heartbeat_at);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
@@ -832,6 +939,21 @@ CREATE VIEW IF NOT EXISTS current_flow_definitions AS
 SELECT f.* FROM flow_definitions f
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM flow_definitions GROUP BY id) m
 ON f.id = m.id AND f.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_flow_instances AS
+SELECT f.* FROM flow_instances f
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM flow_instances GROUP BY id) m
+ON f.id = m.id AND f.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_stage_instances AS
+SELECT s.* FROM stage_instances s
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_instances GROUP BY id) m
+ON s.id = m.id AND s.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_stage_leases AS
+SELECT l.* FROM stage_leases l
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_leases GROUP BY id) m
+ON l.id = m.id AND l.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
@@ -1221,6 +1343,237 @@ class KnowledgeDB:
         conn.commit()
         if added_flow_cols:
             _log.debug("Applied migration: TAFE flow definition columns %s", added_flow_cols)
+
+        # Migration 9: TAFE runtime table substrate.
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS flow_instances (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                flow_definition_id TEXT NOT NULL,
+                flow_definition_version INTEGER,
+                flow_type TEXT,
+                subject_type TEXT NOT NULL,
+                subject_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'created',
+                current_stage_instance_id TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                metadata TEXT,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id, version)
+            );
+            CREATE TABLE IF NOT EXISTS stage_instances (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                flow_instance_id TEXT NOT NULL,
+                stage_id TEXT NOT NULL,
+                stage_index INTEGER NOT NULL,
+                required_role TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                claim_status TEXT NOT NULL DEFAULT 'unclaimed',
+                claimed_by_harness_id TEXT,
+                claimed_by_session_id TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                metadata TEXT,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id, version)
+            );
+            CREATE TABLE IF NOT EXISTS flow_events (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                flow_instance_id TEXT NOT NULL,
+                stage_instance_id TEXT,
+                event_type TEXT NOT NULL,
+                event_at TEXT NOT NULL,
+                event_payload TEXT,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id)
+            );
+            CREATE TABLE IF NOT EXISTS flow_artifacts (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                flow_instance_id TEXT NOT NULL,
+                stage_instance_id TEXT,
+                artifact_type TEXT NOT NULL,
+                artifact_ref TEXT NOT NULL,
+                relationship TEXT NOT NULL DEFAULT 'related',
+                status TEXT NOT NULL DEFAULT 'active',
+                metadata TEXT,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id)
+            );
+            """
+        )
+        runtime_table_columns = {
+            "flow_instances": {
+                "id": "TEXT",
+                "version": "INTEGER",
+                "flow_definition_id": "TEXT",
+                "flow_definition_version": "INTEGER",
+                "flow_type": "TEXT",
+                "subject_type": "TEXT",
+                "subject_id": "TEXT",
+                "status": "TEXT",
+                "current_stage_instance_id": "TEXT",
+                "started_at": "TEXT",
+                "completed_at": "TEXT",
+                "metadata": "TEXT",
+                "changed_by": "TEXT",
+                "changed_at": "TEXT",
+                "change_reason": "TEXT",
+            },
+            "stage_instances": {
+                "id": "TEXT",
+                "version": "INTEGER",
+                "flow_instance_id": "TEXT",
+                "stage_id": "TEXT",
+                "stage_index": "INTEGER",
+                "required_role": "TEXT",
+                "status": "TEXT",
+                "claim_status": "TEXT",
+                "claimed_by_harness_id": "TEXT",
+                "claimed_by_session_id": "TEXT",
+                "started_at": "TEXT",
+                "completed_at": "TEXT",
+                "metadata": "TEXT",
+                "changed_by": "TEXT",
+                "changed_at": "TEXT",
+                "change_reason": "TEXT",
+            },
+            "flow_events": {
+                "id": "TEXT",
+                "flow_instance_id": "TEXT",
+                "stage_instance_id": "TEXT",
+                "event_type": "TEXT",
+                "event_at": "TEXT",
+                "event_payload": "TEXT",
+                "changed_by": "TEXT",
+                "changed_at": "TEXT",
+                "change_reason": "TEXT",
+            },
+            "flow_artifacts": {
+                "id": "TEXT",
+                "flow_instance_id": "TEXT",
+                "stage_instance_id": "TEXT",
+                "artifact_type": "TEXT",
+                "artifact_ref": "TEXT",
+                "relationship": "TEXT",
+                "status": "TEXT",
+                "metadata": "TEXT",
+                "changed_by": "TEXT",
+                "changed_at": "TEXT",
+                "change_reason": "TEXT",
+            },
+        }
+        added_runtime_cols: dict[str, list[str]] = {}
+        for table, columns in runtime_table_columns.items():
+            table_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            for col_name, col_type in columns.items():
+                if col_name not in table_cols:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
+                    added_runtime_cols.setdefault(table, []).append(col_name)
+        conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_flow_instances_id_version ON flow_instances(id, version);
+            CREATE INDEX IF NOT EXISTS idx_flow_instances_definition ON flow_instances(flow_definition_id);
+            CREATE INDEX IF NOT EXISTS idx_flow_instances_status ON flow_instances(status);
+            CREATE INDEX IF NOT EXISTS idx_stage_instances_id_version ON stage_instances(id, version);
+            CREATE INDEX IF NOT EXISTS idx_stage_instances_flow ON stage_instances(flow_instance_id);
+            CREATE INDEX IF NOT EXISTS idx_stage_instances_status ON stage_instances(status);
+            CREATE INDEX IF NOT EXISTS idx_flow_events_flow ON flow_events(flow_instance_id, rowid);
+            CREATE INDEX IF NOT EXISTS idx_flow_events_stage ON flow_events(stage_instance_id, rowid);
+            CREATE INDEX IF NOT EXISTS idx_flow_events_type ON flow_events(event_type);
+            CREATE INDEX IF NOT EXISTS idx_flow_artifacts_flow ON flow_artifacts(flow_instance_id, rowid);
+            CREATE INDEX IF NOT EXISTS idx_flow_artifacts_artifact ON flow_artifacts(artifact_type, artifact_ref);
+            CREATE VIEW IF NOT EXISTS current_flow_instances AS
+            SELECT f.* FROM flow_instances f
+            INNER JOIN (SELECT id, MAX(version) AS max_v FROM flow_instances GROUP BY id) m
+            ON f.id = m.id AND f.version = m.max_v;
+            CREATE VIEW IF NOT EXISTS current_stage_instances AS
+            SELECT s.* FROM stage_instances s
+            INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_instances GROUP BY id) m
+            ON s.id = m.id AND s.version = m.max_v;
+            """
+        )
+        conn.commit()
+        if added_runtime_cols:
+            _log.debug("Applied migration: TAFE runtime table columns %s", added_runtime_cols)
+
+        # Migration 10: TAFE stage lease table substrate.
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS stage_leases (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                stage_instance_id TEXT NOT NULL,
+                holder_harness_id TEXT NOT NULL,
+                holder_session_id TEXT NOT NULL,
+                lease_status TEXT NOT NULL DEFAULT 'active',
+                acquired_at TEXT NOT NULL,
+                heartbeat_at TEXT,
+                ttl_seconds INTEGER NOT NULL,
+                expires_at TEXT,
+                released_at TEXT,
+                metadata TEXT,
+                changed_by TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(id, version)
+            );
+            """
+        )
+        stage_lease_columns = {
+            "id": "TEXT",
+            "version": "INTEGER",
+            "stage_instance_id": "TEXT",
+            "holder_harness_id": "TEXT",
+            "holder_session_id": "TEXT",
+            "lease_status": "TEXT",
+            "acquired_at": "TEXT",
+            "heartbeat_at": "TEXT",
+            "ttl_seconds": "INTEGER",
+            "expires_at": "TEXT",
+            "released_at": "TEXT",
+            "metadata": "TEXT",
+            "changed_by": "TEXT",
+            "changed_at": "TEXT",
+            "change_reason": "TEXT",
+        }
+        existing_lease_cols = {row[1] for row in conn.execute("PRAGMA table_info(stage_leases)").fetchall()}
+        added_lease_cols = []
+        for col_name, col_type in stage_lease_columns.items():
+            if col_name not in existing_lease_cols:
+                conn.execute(f"ALTER TABLE stage_leases ADD COLUMN {col_name} {col_type}")
+                added_lease_cols.append(col_name)
+        conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_stage_leases_id_version ON stage_leases(id, version);
+            CREATE INDEX IF NOT EXISTS idx_stage_leases_stage ON stage_leases(stage_instance_id);
+            CREATE INDEX IF NOT EXISTS idx_stage_leases_status ON stage_leases(lease_status);
+            CREATE INDEX IF NOT EXISTS idx_stage_leases_holder ON stage_leases(holder_harness_id, holder_session_id);
+            CREATE INDEX IF NOT EXISTS idx_stage_leases_heartbeat ON stage_leases(heartbeat_at);
+            CREATE VIEW IF NOT EXISTS current_stage_leases AS
+            SELECT l.* FROM stage_leases l
+            INNER JOIN (SELECT id, MAX(version) AS max_v FROM stage_leases GROUP BY id) m
+            ON l.id = m.id AND l.version = m.max_v;
+            """
+        )
+        conn.commit()
+        if added_lease_cols:
+            _log.debug("Applied migration: TAFE stage lease columns %s", added_lease_cols)
 
     def _backfill_project_artifacts_from_work_items(self) -> None:
         """Backfill project rows from compatibility work-item project strings.
@@ -4746,6 +5099,443 @@ class KnowledgeDB:
         )
         return [_row_to_dict(r) for r in rows]
 
+    # ------------------------------------------------------------------
+    # Typed Artifact-Flow Engine: runtime substrate
+    # ------------------------------------------------------------------
+
+    def _next_flow_instance_version(self, instance_id: str) -> int:
+        row = (
+            self._get_conn().execute("SELECT MAX(version) FROM flow_instances WHERE id = ?", (instance_id,)).fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_flow_instance(
+        self,
+        id: str,
+        flow_definition_id: str,
+        subject_type: str,
+        subject_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        flow_definition_version: int | None = None,
+        flow_type: str | None = None,
+        status: str = "created",
+        current_stage_instance_id: str | None = None,
+        started_at: str | None = None,
+        completed_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a versioned TAFE flow-instance row."""
+        instance_id = _require_text("flow instance id", id)
+        definition_id = _require_text("flow_definition_id", flow_definition_id)
+        definition = self.get_flow_definition(definition_id)
+        if definition is None:
+            raise ValueError(f"unknown flow_definition_id: {definition_id}")
+        definition_version = flow_definition_version if flow_definition_version is not None else definition["version"]
+        instance_flow_type = flow_type or definition.get("flow_type")
+        version = self._next_flow_instance_version(instance_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO flow_instances
+               (id, version, flow_definition_id, flow_definition_version, flow_type,
+                subject_type, subject_id, status, current_stage_instance_id,
+                started_at, completed_at, metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                instance_id,
+                version,
+                definition_id,
+                definition_version,
+                instance_flow_type,
+                _require_text("subject_type", subject_type),
+                _require_text("subject_id", subject_id),
+                _require_text("status", status),
+                current_stage_instance_id,
+                started_at,
+                completed_at,
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_flow_instance(instance_id)
+
+    def get_flow_instance(self, instance_id: str) -> dict[str, Any] | None:
+        """Return the current version of a TAFE flow instance."""
+        row = self._get_conn().execute("SELECT * FROM current_flow_instances WHERE id = ?", (instance_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_flow_instance_history(self, instance_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a TAFE flow instance, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM flow_instances WHERE id = ? ORDER BY version DESC", (instance_id,))
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    def list_flow_instances(
+        self,
+        *,
+        flow_definition_id: str | None = None,
+        flow_type: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current TAFE flow instances with optional filters."""
+        query = "SELECT * FROM current_flow_instances WHERE 1=1"
+        params: list[Any] = []
+        if flow_definition_id:
+            query += " AND flow_definition_id = ?"
+            params.append(flow_definition_id)
+        if flow_type:
+            query += " AND flow_type = ?"
+            params.append(flow_type)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY changed_at, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def _next_stage_instance_version(self, stage_instance_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM stage_instances WHERE id = ?", (stage_instance_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_stage_instance(
+        self,
+        id: str,
+        flow_instance_id: str,
+        stage_id: str,
+        stage_index: int,
+        required_role: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        status: str = "pending",
+        claim_status: str = "unclaimed",
+        claimed_by_harness_id: str | None = None,
+        claimed_by_session_id: str | None = None,
+        started_at: str | None = None,
+        completed_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a versioned TAFE stage-instance row."""
+        stage_instance_id = _require_text("stage instance id", id)
+        instance_id = _require_text("flow_instance_id", flow_instance_id)
+        if self.get_flow_instance(instance_id) is None:
+            raise ValueError(f"unknown flow_instance_id: {instance_id}")
+        if stage_index < 0:
+            raise ValueError("stage_index must be non-negative")
+        version = self._next_stage_instance_version(stage_instance_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO stage_instances
+               (id, version, flow_instance_id, stage_id, stage_index, required_role,
+                status, claim_status, claimed_by_harness_id, claimed_by_session_id,
+                started_at, completed_at, metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                stage_instance_id,
+                version,
+                instance_id,
+                _require_text("stage_id", stage_id),
+                stage_index,
+                _require_text("required_role", required_role),
+                _require_text("status", status),
+                _require_text("claim_status", claim_status),
+                claimed_by_harness_id,
+                claimed_by_session_id,
+                started_at,
+                completed_at,
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_stage_instance(stage_instance_id)
+
+    def get_stage_instance(self, stage_instance_id: str) -> dict[str, Any] | None:
+        """Return the current version of a TAFE stage instance."""
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_stage_instances WHERE id = ?", (stage_instance_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def get_stage_instance_history(self, stage_instance_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a TAFE stage instance, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM stage_instances WHERE id = ? ORDER BY version DESC", (stage_instance_id,))
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    def list_stage_instances(
+        self,
+        *,
+        flow_instance_id: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current TAFE stage instances with optional filters."""
+        query = "SELECT * FROM current_stage_instances WHERE 1=1"
+        params: list[Any] = []
+        if flow_instance_id:
+            query += " AND flow_instance_id = ?"
+            params.append(flow_instance_id)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY flow_instance_id, stage_index, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def _next_stage_lease_version(self, lease_id: str) -> int:
+        row = self._get_conn().execute("SELECT MAX(version) FROM stage_leases WHERE id = ?", (lease_id,)).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_stage_lease(
+        self,
+        id: str,
+        stage_instance_id: str,
+        holder_harness_id: str,
+        holder_session_id: str,
+        ttl_seconds: int,
+        changed_by: str,
+        change_reason: str,
+        *,
+        lease_status: str = "active",
+        acquired_at: str | None = None,
+        heartbeat_at: str | None = None,
+        expires_at: str | None = None,
+        released_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a versioned TAFE stage-lease row without claim semantics."""
+        lease_id = _require_text("stage lease id", id)
+        stage_id = _require_text("stage_instance_id", stage_instance_id)
+        if self.get_stage_instance(stage_id) is None:
+            raise ValueError(f"unknown stage_instance_id: {stage_id}")
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+        now = _now()
+        version = self._next_stage_lease_version(lease_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO stage_leases
+               (id, version, stage_instance_id, holder_harness_id, holder_session_id,
+                lease_status, acquired_at, heartbeat_at, ttl_seconds, expires_at, released_at,
+                metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                lease_id,
+                version,
+                stage_id,
+                _require_text("holder_harness_id", holder_harness_id),
+                _require_text("holder_session_id", holder_session_id),
+                _require_text("lease_status", lease_status),
+                acquired_at or now,
+                heartbeat_at,
+                ttl_seconds,
+                expires_at,
+                released_at,
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                now,
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_stage_lease(lease_id)
+
+    def get_stage_lease(self, lease_id: str) -> dict[str, Any] | None:
+        """Return the current version of a TAFE stage lease."""
+        row = self._get_conn().execute("SELECT * FROM current_stage_leases WHERE id = ?", (lease_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_stage_lease_history(self, lease_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a TAFE stage lease, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM stage_leases WHERE id = ? ORDER BY version DESC", (lease_id,))
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    def list_stage_leases(
+        self,
+        *,
+        stage_instance_id: str | None = None,
+        lease_status: str | None = None,
+        holder_harness_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current TAFE stage leases with optional filters."""
+        query = "SELECT * FROM current_stage_leases WHERE 1=1"
+        params: list[Any] = []
+        if stage_instance_id:
+            query += " AND stage_instance_id = ?"
+            params.append(stage_instance_id)
+        if lease_status:
+            query += " AND lease_status = ?"
+            params.append(lease_status)
+        if holder_harness_id:
+            query += " AND holder_harness_id = ?"
+            params.append(holder_harness_id)
+        query += " ORDER BY stage_instance_id, changed_at, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def insert_flow_event(
+        self,
+        id: str,
+        flow_instance_id: str,
+        event_type: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        stage_instance_id: str | None = None,
+        event_at: str | None = None,
+        event_payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Insert an append-only TAFE flow event row."""
+        event_id = _require_text("flow event id", id)
+        instance_id = _require_text("flow_instance_id", flow_instance_id)
+        if self.get_flow_instance(instance_id) is None:
+            raise ValueError(f"unknown flow_instance_id: {instance_id}")
+        if stage_instance_id and self.get_stage_instance(stage_instance_id) is None:
+            raise ValueError(f"unknown stage_instance_id: {stage_instance_id}")
+        conn = self._get_conn()
+        now = _now()
+        conn.execute(
+            """INSERT INTO flow_events
+               (id, flow_instance_id, stage_instance_id, event_type, event_at,
+                event_payload, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                event_id,
+                instance_id,
+                stage_instance_id,
+                _require_text("event_type", event_type),
+                event_at or now,
+                _encode_json(event_payload or {}),
+                _require_text("changed_by", changed_by),
+                now,
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_flow_event(event_id)
+
+    def get_flow_event(self, event_id: str) -> dict[str, Any] | None:
+        """Return one TAFE flow event by ID."""
+        row = self._get_conn().execute("SELECT * FROM flow_events WHERE id = ?", (event_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_flow_events(
+        self,
+        *,
+        flow_instance_id: str | None = None,
+        stage_instance_id: str | None = None,
+        event_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List append-only TAFE flow events with optional filters."""
+        query = "SELECT * FROM flow_events WHERE 1=1"
+        params: list[Any] = []
+        if flow_instance_id:
+            query += " AND flow_instance_id = ?"
+            params.append(flow_instance_id)
+        if stage_instance_id:
+            query += " AND stage_instance_id = ?"
+            params.append(stage_instance_id)
+        if event_type:
+            query += " AND event_type = ?"
+            params.append(event_type)
+        query += " ORDER BY rowid"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def insert_flow_artifact(
+        self,
+        id: str,
+        flow_instance_id: str,
+        artifact_type: str,
+        artifact_ref: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        stage_instance_id: str | None = None,
+        relationship: str = "related",
+        status: str = "active",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Insert an append-only TAFE flow-artifact reference row."""
+        artifact_id = _require_text("flow artifact id", id)
+        instance_id = _require_text("flow_instance_id", flow_instance_id)
+        if self.get_flow_instance(instance_id) is None:
+            raise ValueError(f"unknown flow_instance_id: {instance_id}")
+        if stage_instance_id and self.get_stage_instance(stage_instance_id) is None:
+            raise ValueError(f"unknown stage_instance_id: {stage_instance_id}")
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO flow_artifacts
+               (id, flow_instance_id, stage_instance_id, artifact_type, artifact_ref,
+                relationship, status, metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                artifact_id,
+                instance_id,
+                stage_instance_id,
+                _require_text("artifact_type", artifact_type),
+                _require_text("artifact_ref", artifact_ref),
+                _require_text("relationship", relationship),
+                _require_text("status", status),
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_flow_artifact(artifact_id)
+
+    def get_flow_artifact(self, artifact_id: str) -> dict[str, Any] | None:
+        """Return one TAFE flow-artifact reference by ID."""
+        row = self._get_conn().execute("SELECT * FROM flow_artifacts WHERE id = ?", (artifact_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_flow_artifacts(
+        self,
+        *,
+        flow_instance_id: str | None = None,
+        stage_instance_id: str | None = None,
+        artifact_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List append-only TAFE flow-artifact references with optional filters."""
+        query = "SELECT * FROM flow_artifacts WHERE 1=1"
+        params: list[Any] = []
+        if flow_instance_id:
+            query += " AND flow_instance_id = ?"
+            params.append(flow_instance_id)
+        if stage_instance_id:
+            query += " AND stage_instance_id = ?"
+            params.append(stage_instance_id)
+        if artifact_type:
+            query += " AND artifact_type = ?"
+            params.append(artifact_type)
+        query += " ORDER BY rowid"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
     def insert_harness(
         self,
         id: str,
@@ -6831,6 +7621,17 @@ class KnowledgeDB:
         }
 
 
+def _require_text(field_name: str, value: str) -> str:
+    text = value.strip()
+    if not text:
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return text
+
+
+def _encode_json(value: Any) -> str:
+    return json.dumps(value)
+
+
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     d = dict(row)
     # Parse JSON fields — expose as both "field_parsed" (clean) and "_field_parsed" (legacy)
@@ -6875,6 +7676,8 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "deterministic_carveouts",
         "workspace_isolation",
         "source_spec_ids",
+        "metadata",
+        "event_payload",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:

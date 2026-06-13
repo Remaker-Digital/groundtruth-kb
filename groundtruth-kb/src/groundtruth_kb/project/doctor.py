@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 from contextlib import suppress
@@ -47,6 +48,146 @@ _ACTIVE_LEGACY_ROOT_SURFACES = (
     Path(".claude") / "settings.json",
     Path(".codex") / "hooks.json",
 )
+_TAFE_SCHEMA_REQUIRED_COLUMNS: dict[str, set[str]] = {
+    "flow_definitions": {
+        "id",
+        "version",
+        "flow_type",
+        "title",
+        "status",
+        "lifecycle_status",
+        "stage_sequence",
+        "required_roles_by_stage",
+        "auq_gate_positions",
+        "never_self_review_stages",
+        "deterministic_carve_outs",
+        "workspace_isolation",
+        "source_spec_ids",
+        "changed_by",
+        "changed_at",
+        "change_reason",
+    },
+    "flow_instances": {
+        "id",
+        "version",
+        "flow_definition_id",
+        "flow_definition_version",
+        "flow_type",
+        "subject_type",
+        "subject_id",
+        "status",
+        "current_stage_instance_id",
+        "metadata",
+        "changed_by",
+        "changed_at",
+        "change_reason",
+    },
+    "stage_instances": {
+        "id",
+        "version",
+        "flow_instance_id",
+        "stage_id",
+        "stage_index",
+        "required_role",
+        "status",
+        "claim_status",
+        "claimed_by_harness_id",
+        "claimed_by_session_id",
+        "metadata",
+        "changed_by",
+        "changed_at",
+        "change_reason",
+    },
+    "flow_events": {
+        "id",
+        "flow_instance_id",
+        "stage_instance_id",
+        "event_type",
+        "event_at",
+        "event_payload",
+        "changed_by",
+        "changed_at",
+        "change_reason",
+    },
+    "flow_artifacts": {
+        "id",
+        "flow_instance_id",
+        "stage_instance_id",
+        "artifact_type",
+        "artifact_ref",
+        "relationship",
+        "status",
+        "metadata",
+        "changed_by",
+        "changed_at",
+        "change_reason",
+    },
+}
+_TAFE_SCHEMA_REQUIRED_VIEWS = {
+    "current_flow_definitions",
+    "current_flow_instances",
+    "current_stage_instances",
+}
+
+
+def _coerce_string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str) and item]
+    return []
+
+
+def _ollama_windows_autostart_finding() -> str | None:
+    if not sys.platform.startswith("win"):
+        return None
+
+    powershell = (
+        shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh.exe") or shutil.which("pwsh")
+    )
+    if not powershell:
+        return "L5: PowerShell unavailable for Ollama autostart probe"
+
+    ps_script = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$tasks = @(Get-ScheduledTask | Where-Object {
+    $_.TaskName -match 'Ollama' -or $_.TaskPath -match 'Ollama'
+} | Select-Object -ExpandProperty TaskName)
+$services = @(Get-Service | Where-Object {
+    $_.Name -match 'Ollama' -or $_.DisplayName -match 'Ollama'
+} | Select-Object -ExpandProperty Name)
+[pscustomobject]@{
+    scheduled_tasks = $tasks
+    services = $services
+} | ConvertTo-Json -Compress
+"""
+    try:
+        result = subprocess.run(
+            [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"L5: Ollama autostart probe failed: {exc}"
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return f"L5: Ollama autostart probe exited {result.returncode}: {detail}"
+
+    try:
+        payload = json.loads((result.stdout or "{}").strip() or "{}")
+    except json.JSONDecodeError as exc:
+        return f"L5: Ollama autostart probe returned non-JSON output: {exc}"
+
+    scheduled_tasks = _coerce_string_list(payload.get("scheduled_tasks"))
+    services = _coerce_string_list(payload.get("services"))
+    if scheduled_tasks or services:
+        return None
+    return "L5: Ollama autostart not detected; no matching Windows scheduled task or service"
+
+
 _ACTIVE_LEGACY_ROOT_GLOBS = (
     "AGENTS.md",
     ".claude/rules/*.md",
@@ -428,6 +569,175 @@ def _check_db_schema(target: Path) -> ToolCheck:
         )
 
 
+def _connect_readonly_sqlite(db_path: Path) -> sqlite3.Connection:
+    return sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+
+
+def _check_tafe_schema(target: Path) -> ToolCheck:
+    db_path = target / "groundtruth.db"
+    if not db_path.exists():
+        return ToolCheck(
+            name="TAFE schema health",
+            required=False,
+            found=False,
+            status="warning",
+            message="TAFE schema health: groundtruth.db not found",
+        )
+    try:
+        conn = _connect_readonly_sqlite(db_path)
+        try:
+            table_rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            view_rows = conn.execute("SELECT name FROM sqlite_master WHERE type='view'").fetchall()
+            tables = {row[0] for row in table_rows}
+            views = {row[0] for row in view_rows}
+            findings: list[str] = []
+            missing_tables = sorted(set(_TAFE_SCHEMA_REQUIRED_COLUMNS) - tables)
+            if missing_tables:
+                findings.append(f"missing tables: {', '.join(missing_tables)}")
+            for table_name, required_columns in _TAFE_SCHEMA_REQUIRED_COLUMNS.items():
+                if table_name not in tables:
+                    continue
+                columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+                missing_columns = sorted(required_columns - columns)
+                if missing_columns:
+                    findings.append(f"{table_name} missing columns: {', '.join(missing_columns)}")
+            missing_views = sorted(_TAFE_SCHEMA_REQUIRED_VIEWS - views)
+            if missing_views:
+                findings.append(f"missing views: {', '.join(missing_views)}")
+        finally:
+            conn.close()
+    except Exception as exc:  # intentional-catch: diagnostic doctor check, error -> warning
+        return ToolCheck(
+            name="TAFE schema health",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"TAFE schema health: DB inspection failed: {exc}",
+        )
+
+    if findings:
+        return ToolCheck(
+            name="TAFE schema health",
+            required=False,
+            found=True,
+            status="warning",
+            message="TAFE schema health: " + "; ".join(findings),
+        )
+    return ToolCheck(
+        name="TAFE schema health",
+        required=False,
+        found=True,
+        status="pass",
+        message=(
+            "TAFE schema health: tables/views present "
+            f"({len(_TAFE_SCHEMA_REQUIRED_COLUMNS)} tables, {len(_TAFE_SCHEMA_REQUIRED_VIEWS)} views)"
+        ),
+    )
+
+
+def _decode_tafe_json(value: Any, *, field: str, flow_id: str, findings: list[str]) -> Any:
+    try:
+        return json.loads(value or "null")
+    except (TypeError, json.JSONDecodeError) as exc:
+        findings.append(f"{flow_id} {field} invalid JSON: {exc}")
+        return None
+
+
+def _check_tafe_flow_definitions(target: Path) -> ToolCheck:
+    db_path = target / "groundtruth.db"
+    if not db_path.exists():
+        return ToolCheck(
+            name="TAFE flow definitions health",
+            required=False,
+            found=False,
+            status="warning",
+            message="TAFE flow definitions health: groundtruth.db not found",
+        )
+    try:
+        from groundtruth_kb.typed_artifact_flow import canonical_reviewed_task_flow_definitions  # noqa: PLC0415
+
+        canonical = {seed["id"]: seed for seed in canonical_reviewed_task_flow_definitions()}
+        conn = _connect_readonly_sqlite(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            row_count = conn.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='view' AND name='current_flow_definitions'"
+            ).fetchone()[0]
+            if not row_count:
+                return ToolCheck(
+                    name="TAFE flow definitions health",
+                    required=False,
+                    found=True,
+                    status="warning",
+                    message="TAFE flow definitions health: current_flow_definitions view missing",
+                )
+            rows = {
+                row["id"]: row
+                for row in conn.execute(
+                    "SELECT * FROM current_flow_definitions WHERE COALESCE(lifecycle_status, status) = 'active'"
+                ).fetchall()
+            }
+        finally:
+            conn.close()
+    except Exception as exc:  # intentional-catch: diagnostic doctor check, error -> warning
+        return ToolCheck(
+            name="TAFE flow definitions health",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"TAFE flow definitions health: DB inspection failed: {exc}",
+        )
+
+    findings: list[str] = []
+    missing = sorted(set(canonical) - set(rows))
+    if missing:
+        findings.append(f"missing active canonical definitions: {', '.join(missing)}")
+    for flow_id, seed in canonical.items():
+        row = rows.get(flow_id)
+        if row is None:
+            continue
+        stage_sequence = _decode_tafe_json(
+            row["stage_sequence"], field="stage_sequence", flow_id=flow_id, findings=findings
+        )
+        required_roles = _decode_tafe_json(
+            row["required_roles_by_stage"],
+            field="required_roles_by_stage",
+            flow_id=flow_id,
+            findings=findings,
+        )
+        if row["flow_type"] != seed["flow_type"]:
+            findings.append(f"{flow_id} flow_type drift: {row['flow_type']} != {seed['flow_type']}")
+        if stage_sequence != seed["stage_sequence"]:
+            findings.append(f"{flow_id} stage_sequence drift")
+        if isinstance(stage_sequence, list) and len(stage_sequence) != len(set(stage_sequence)):
+            findings.append(f"{flow_id} stage_sequence contains duplicate stages")
+        if isinstance(required_roles, dict) and isinstance(stage_sequence, list):
+            missing_roles = [stage for stage in stage_sequence if stage not in required_roles]
+            extra_roles = sorted(set(required_roles) - set(stage_sequence))
+            if missing_roles:
+                findings.append(f"{flow_id} missing required roles: {', '.join(missing_roles)}")
+            if extra_roles:
+                findings.append(f"{flow_id} has roles for unknown stages: {', '.join(extra_roles)}")
+        if required_roles != seed["required_roles_by_stage"]:
+            findings.append(f"{flow_id} required_roles_by_stage drift")
+
+    if findings:
+        return ToolCheck(
+            name="TAFE flow definitions health",
+            required=False,
+            found=True,
+            status="warning",
+            message="TAFE flow definitions health: " + "; ".join(findings),
+        )
+    return ToolCheck(
+        name="TAFE flow definitions health",
+        required=False,
+        found=True,
+        status="pass",
+        message=f"TAFE flow definitions health: {len(canonical)} canonical definitions active and well-formed",
+    )
+
+
 def _orphan_citation_audit_script(target: Path) -> Path:
     target_script = target / "scripts" / "orphan_citation_audit.py"
     if target_script.exists():
@@ -732,8 +1042,7 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
     if ollama_id is None and registry_entry is not None:
         findings.append("Cross-store: registry has id=D but identities missing 'ollama'")
 
-    # ── Layer 4b — advertised-model verification (reachability-gated) ──
-    # Only runs when the local endpoint responds; absent endpoint is not a finding.
+    # ── Layer 4b — advertised-model verification and API reachability ──
     # Skipped entirely when GTKB_DOCTOR_OLLAMA_SKIP_PROBE is set (used by unit tests
     # to keep the fixture-only checks hermetic with respect to whatever the local
     # Ollama daemon happens to advertise).
@@ -755,8 +1064,12 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
                 if not any(name and (name == model_id or name.startswith(model_id + ":")) for name in advertised_names):
                     findings.append(f"L4b: routing model {model_id!r} not advertised by /api/tags")
         except (urllib.error.URLError, TimeoutError, OSError):
-            # Endpoint unreachable — Layer 4b is reachability-gated and skipped.
-            pass
+            findings.append("L4b: Ollama /api/tags unreachable")
+
+    if not os.environ.get("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS"):
+        autostart_finding = _ollama_windows_autostart_finding()
+        if autostart_finding:
+            findings.append(autostart_finding)
 
     if not findings:
         return ToolCheck(
@@ -4882,6 +5195,8 @@ def run_doctor(
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
         checks.append(_check_orphan_citations(target))
+        checks.append(_check_tafe_schema(target))
+        checks.append(_check_tafe_flow_definitions(target))
         # WI-4327 / WI-4329: harness-state SoT consistency. 3-layer check:
         # (L1) 3 SoT files parse cleanly through the canonical reader entrypoints;
         # (L2) grep_absent — no committed code outside groundtruth_kb.harness_projection

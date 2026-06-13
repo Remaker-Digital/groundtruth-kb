@@ -2,7 +2,15 @@ Document: gtkb-tafe-agent-capability-snapshots-schema
 GO: bridge/gtkb-tafe-agent-capability-snapshots-schema-002.md
 NEW: bridge/gtkb-tafe-agent-capability-snapshots-schema-001.md
 
+Document: gtkb-tafe-stage-leases-schema
+VERIFIED: bridge/gtkb-tafe-stage-leases-schema-004.md
+NEW: bridge/gtkb-tafe-stage-leases-schema-003.md
+GO: bridge/gtkb-tafe-stage-leases-schema-002.md
+NEW: bridge/gtkb-tafe-stage-leases-schema-001.md
+
 Document: gtkb-tafe-doctor-checks
+VERIFIED: bridge/gtkb-tafe-doctor-checks-004.md
+NEW: bridge/gtkb-tafe-doctor-checks-003.md
 GO: bridge/gtkb-tafe-doctor-checks-002.md
 NEW: bridge/gtkb-tafe-doctor-checks-001.md
 
