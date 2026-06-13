@@ -369,4 +369,12 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 |------|---------|-------------------|------------------|--------|
 | Technical | Shared Git index contamination remains a live P1 commit-safety risk; current staged state again mixes bridge, hook, and unrelated script/test work before this LO report. | `memory/recovery-2026-06-11-fab20-commit-collision.md`; live `git diff --cached --name-status`; full WI-4464 report. | Prime should file a bridge proposal for an explicit-path safe commit helper, mixed-index warning, and stale-HEAD reset guard before changing git tooling. | Open |
 
+### 2026-06-13 - WI-4455 spec-before-code Platform Tests Advisory
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4455`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4455-spec-before-code-platform-tests-advisory.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The live root `spec-before-code.py` hook is currently a WI-4449 recovery stub, but the managed template still implements source_paths-only matching and reproduces the false advisory for bridge-linked `platform_tests/` files. | Live `.claude/hooks/spec-before-code.py` emits nothing; `groundtruth-kb/templates/hooks/spec-before-code.py` emits "No specification found covering platform_tests/scripts/test_gtkb_hygiene_investigation.py"; FAB-20 bridge report carries the test linkage through target_paths/spec-to-test mapping. | Do not restore the current template unchanged; choose bridge-derived test coverage, reviewed source_paths backfill, or explicit platform_tests deferral before re-enabling the hook. | Open |
+
 
