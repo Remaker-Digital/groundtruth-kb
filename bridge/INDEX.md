@@ -1,4 +1,6 @@
 Document: gtkb-wi-4450-exact-target-path-regression
+VERIFIED: bridge/gtkb-wi-4450-exact-target-path-regression-004.md
+NEW: bridge/gtkb-wi-4450-exact-target-path-regression-003.md
 GO: bridge/gtkb-wi-4450-exact-target-path-regression-002.md
 NEW: bridge/gtkb-wi-4450-exact-target-path-regression-001.md
 

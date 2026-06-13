@@ -240,6 +240,23 @@ def test_authorization_accepts_bold_target_paths_metadata(tmp_path: Path) -> Non
     assert packet["target_path_globs"] == ["scripts/sample.py", "platform_tests/scripts/test_sample.py"]
 
 
+def test_exact_file_target_path_authorizes_exact_protected_file(tmp_path: Path) -> None:
+    exact_target = "config/governance/hygiene-baseline-registry.toml"
+    _write_thread(tmp_path, proposal=_proposal(target_paths=[exact_target]))
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    sample_patch = f"*** Begin Patch\n*** Update File: {exact_target}\n@@\n+enabled = true\n*** End Patch\n"
+
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": sample_patch},
+    }
+
+    assert packet["target_path_globs"] == [exact_target]
+    assert gate.gate_decision(payload) == {}
+
+
 def test_requirement_gap_blocks_authorization(tmp_path: Path) -> None:
     _write_thread(
         tmp_path,
