@@ -1,12 +1,20 @@
+Document: gtkb-claim-gated-implementation-start
+NEW: bridge/gtkb-claim-gated-implementation-start-001.md
+
 Document: gtkb-tafe-flow-lease-commands
+VERIFIED: bridge/gtkb-tafe-flow-lease-commands-004.md
+NEW: bridge/gtkb-tafe-flow-lease-commands-003.md
 GO: bridge/gtkb-tafe-flow-lease-commands-002.md
 NEW: bridge/gtkb-tafe-flow-lease-commands-001.md
 
 Document: gtkb-tafe-dispatch-policy-scoring-model
+WITHDRAWN: bridge/gtkb-tafe-dispatch-policy-scoring-model-003.md
 NO-GO: bridge/gtkb-tafe-dispatch-policy-scoring-model-002.md
 NEW: bridge/gtkb-tafe-dispatch-policy-scoring-model-001.md
 
 Document: gtkb-tafe-dispatch-policy-engine
+VERIFIED: bridge/gtkb-tafe-dispatch-policy-engine-006.md
+REVISED: bridge/gtkb-tafe-dispatch-policy-engine-005.md
 NO-GO: bridge/gtkb-tafe-dispatch-policy-engine-004.md
 NEW: bridge/gtkb-tafe-dispatch-policy-engine-003.md
 GO: bridge/gtkb-tafe-dispatch-policy-engine-002.md
