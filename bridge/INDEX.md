@@ -18,6 +18,7 @@ REVISED: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-002.md
 NEW: bridge/gtkb-architecture-p2-stale-assertions-reconciliation-001.md
 
 Document: gtkb-tafe-lease-recovery-cleanup
+NEW: bridge/gtkb-tafe-lease-recovery-cleanup-004.md
 GO: bridge/gtkb-tafe-lease-recovery-cleanup-003.md
 REVISED: bridge/gtkb-tafe-lease-recovery-cleanup-002.md
 NEW: bridge/gtkb-tafe-lease-recovery-cleanup-001.md

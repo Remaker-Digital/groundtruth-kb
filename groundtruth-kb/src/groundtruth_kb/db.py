@@ -1097,12 +1097,16 @@ def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def _iso_plus_seconds(value: str, seconds: int) -> str:
+def _parse_iso_utc(value: str) -> datetime:
     text = value[:-1] + "+00:00" if value.endswith("Z") else value
     parsed = datetime.fromisoformat(text)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
-    return (parsed.astimezone(UTC) + timedelta(seconds=seconds)).isoformat(timespec="seconds")
+    return parsed.astimezone(UTC)
+
+
+def _iso_plus_seconds(value: str, seconds: int) -> str:
+    return (_parse_iso_utc(value) + timedelta(seconds=seconds)).isoformat(timespec="seconds")
 
 
 def spec_sort_key(spec_id: str) -> tuple[Any, ...]:
@@ -5506,6 +5510,43 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def _expired_active_stage_lease_rows(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        as_of: str,
+        limit: int | None,
+    ) -> list[sqlite3.Row]:
+        if limit is not None and limit <= 0:
+            raise ValueError("limit must be positive")
+        as_of_dt = _parse_iso_utc(_require_text("as_of", as_of))
+        rows = conn.execute(
+            """SELECT * FROM current_stage_leases
+               WHERE lease_status = 'active' AND expires_at IS NOT NULL
+               ORDER BY expires_at, stage_instance_id, id"""
+        ).fetchall()
+        expired: list[sqlite3.Row] = []
+        for row in rows:
+            try:
+                expires_at = _parse_iso_utc(row["expires_at"])
+            except ValueError as exc:
+                raise ValueError(f"invalid expires_at for stage lease {row['id']}: {row['expires_at']}") from exc
+            if expires_at <= as_of_dt:
+                expired.append(row)
+                if limit is not None and len(expired) >= limit:
+                    break
+        return expired
+
+    def list_expired_stage_leases(self, *, as_of: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+        """List current active stage leases whose expiry is at or before ``as_of``."""
+
+        rows = self._expired_active_stage_lease_rows(
+            self._get_conn(),
+            as_of=as_of or _now(),
+            limit=limit,
+        )
+        return [_row_to_dict(row) for row in rows]
+
     def _active_stage_lease_row(self, conn: sqlite3.Connection, stage_instance_id: str) -> sqlite3.Row | None:
         return conn.execute(
             """SELECT * FROM current_stage_leases
@@ -5692,6 +5733,83 @@ class KnowledgeDB:
             conn.rollback()
             raise
         return self.get_stage_lease(active["id"])
+
+    def recover_expired_stage_leases(
+        self,
+        *,
+        as_of: str | None = None,
+        limit: int | None = None,
+        changed_by: str,
+        change_reason: str,
+    ) -> list[dict[str, Any]]:
+        """Append recovered lease versions and unclaim stages for expired active leases."""
+
+        recovery_as_of = as_of or _now()
+        actor = _require_text("changed_by", changed_by)
+        reason = _require_text("change_reason", change_reason)
+
+        conn = self._get_conn()
+        recovered_ids: list[str] = []
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            expired = self._expired_active_stage_lease_rows(conn, as_of=recovery_as_of, limit=limit)
+            recovered_at = _now()
+            for active in expired:
+                stage = conn.execute(
+                    "SELECT * FROM current_stage_instances WHERE id = ?",
+                    (active["stage_instance_id"],),
+                ).fetchone()
+                if stage is None:
+                    raise ValueError(f"unknown stage_instance_id: {active['stage_instance_id']}")
+
+                active_dict = _row_to_dict(active)
+                metadata = dict(active_dict.get("metadata_parsed") or {})
+                metadata["recovery"] = {
+                    "previous_lease_status": active["lease_status"],
+                    "recovered_as_of": recovery_as_of,
+                    "recovered_at": recovered_at,
+                }
+                version = self._next_stage_lease_version(active["id"])
+                conn.execute(
+                    """INSERT INTO stage_leases
+                       (id, version, stage_instance_id, holder_harness_id, holder_session_id,
+                        lease_status, acquired_at, heartbeat_at, ttl_seconds, expires_at, released_at,
+                        metadata, changed_by, changed_at, change_reason)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        active["id"],
+                        version,
+                        active["stage_instance_id"],
+                        active["holder_harness_id"],
+                        active["holder_session_id"],
+                        "recovered",
+                        active["acquired_at"],
+                        active["heartbeat_at"],
+                        active["ttl_seconds"],
+                        active["expires_at"],
+                        recovered_at,
+                        _encode_json(metadata),
+                        actor,
+                        recovered_at,
+                        reason,
+                    ),
+                )
+                self._append_stage_claim_state(
+                    conn,
+                    stage,
+                    claim_status="unclaimed",
+                    claimed_by_harness_id=None,
+                    claimed_by_session_id=None,
+                    changed_by=actor,
+                    change_reason=reason,
+                )
+                recovered_ids.append(active["id"])
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        return [lease for lease_id in recovered_ids if (lease := self.get_stage_lease(lease_id)) is not None]
 
     def heartbeat_stage_lease(
         self,

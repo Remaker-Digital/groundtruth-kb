@@ -77,6 +77,7 @@ def test_flow_help_lists_phase_0_skeleton_commands(runner: CliRunner, project_di
         "claim",
         "release",
         "heartbeat",
+        "recover-leases",
         "advance",
         "dispatch",
         "render",
@@ -104,6 +105,108 @@ def test_flow_define_reports_canonical_definitions_without_seeding(runner: CliRu
         assert db.list_flow_definitions(status="active") == []
     finally:
         db.close()
+
+
+def test_flow_recover_leases_dry_run_and_recover_stage(runner: CliRunner, project_dir: Path) -> None:
+    stage_id = _create_cli_stage(project_dir)
+    config_args = _config_args(project_dir)
+
+    claimed = _json_output(
+        runner.invoke(
+            main,
+            [
+                *config_args,
+                "flow",
+                "claim",
+                stage_id,
+                "--holder-harness-id",
+                "A",
+                "--holder-session-id",
+                "session-expired",
+                "--ttl-seconds",
+                "600",
+                "--json",
+            ],
+        )
+    )
+
+    assert claimed["status"] == "active"
+    dry_run = _json_output(
+        runner.invoke(
+            main,
+            [
+                *config_args,
+                "flow",
+                "recover-leases",
+                "--as-of",
+                "2999-01-01T00:00:00Z",
+                "--dry-run",
+                "--json",
+            ],
+        )
+    )
+
+    assert dry_run["mutated"] is False
+    assert dry_run["status"] == "dry_run"
+    assert dry_run["recovered_count"] == 0
+    assert [row["id"] for row in dry_run["candidates"]] == [claimed["lease_id"]]
+
+    db = _db(project_dir)
+    try:
+        service = TypedArtifactFlowService(db)
+        current_stage = service.get_stage_instance(stage_id)
+        assert current_stage is not None
+        assert current_stage["claim_status"] == "claimed"
+    finally:
+        db.close()
+
+    recovered = _json_output(
+        runner.invoke(
+            main,
+            [
+                *config_args,
+                "flow",
+                "recover-leases",
+                "--as-of",
+                "2999-01-01T00:00:00Z",
+                "--json",
+            ],
+        )
+    )
+
+    assert recovered["mutated"] is True
+    assert recovered["status"] == "recovered"
+    assert recovered["recovered_count"] == 1
+    assert recovered["recovered"][0]["lease_status"] == "recovered"
+
+    db = _db(project_dir)
+    try:
+        service = TypedArtifactFlowService(db)
+        current_stage = service.get_stage_instance(stage_id)
+        assert current_stage is not None
+        assert current_stage["claim_status"] == "unclaimed"
+        assert current_stage["claimed_by_harness_id"] is None
+        assert current_stage["claimed_by_session_id"] is None
+    finally:
+        db.close()
+
+    repeated = _json_output(
+        runner.invoke(
+            main,
+            [
+                *config_args,
+                "flow",
+                "recover-leases",
+                "--as-of",
+                "2999-01-01T00:00:00Z",
+                "--json",
+            ],
+        )
+    )
+
+    assert repeated["mutated"] is False
+    assert repeated["status"] == "no_expired_leases"
+    assert repeated["recovered_count"] == 0
 
 
 def test_flow_list_show_and_status_read_existing_instances(runner: CliRunner, project_dir: Path) -> None:

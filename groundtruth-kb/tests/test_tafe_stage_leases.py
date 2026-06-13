@@ -266,3 +266,83 @@ def test_stage_lease_claim_release_and_heartbeat_enforce_single_holder(tmp_path)
         assert reclaimed["holder_session_id"] == "session-002"
     finally:
         db.close()
+
+
+def test_stage_lease_recovery_recovers_only_expired_active_leases(tmp_path) -> None:
+    db, service = _service(tmp_path)
+    try:
+        expired_stage = _create_stage(service)
+        current_stage = service.create_stage_instance(
+            id="STAGEINST-LEASE-002",
+            flow_instance_id=expired_stage["flow_instance_id"],
+            stage_id="verify",
+            stage_index=2,
+            required_role="loyal-opposition",
+            changed_by="test",
+            change_reason="create non-expired lease stage",
+        )
+        expired_lease = service.claim_stage_lease(
+            stage_instance_id=expired_stage["id"],
+            holder_harness_id="A",
+            holder_session_id="session-expired",
+            ttl_seconds=600,
+            acquired_at="2026-06-13T05:00:00Z",
+            changed_by="test",
+            change_reason="claim expired lease",
+        )
+        active_lease = service.claim_stage_lease(
+            stage_instance_id=current_stage["id"],
+            holder_harness_id="B",
+            holder_session_id="session-active",
+            ttl_seconds=600,
+            acquired_at="2026-06-13T05:10:00Z",
+            changed_by="test",
+            change_reason="claim non-expired lease",
+        )
+
+        candidates = service.list_expired_stage_leases(as_of="2026-06-13T05:11:00Z")
+
+        assert [row["id"] for row in candidates] == [expired_lease["id"]]
+        recovered = service.recover_expired_stage_leases(
+            as_of="2026-06-13T05:11:00Z",
+            changed_by="test",
+            change_reason="recover expired lease",
+        )
+
+        assert [row["id"] for row in recovered] == [expired_lease["id"]]
+        assert recovered[0]["version"] == 2
+        assert recovered[0]["lease_status"] == "recovered"
+        assert recovered[0]["holder_harness_id"] == "A"
+        assert recovered[0]["holder_session_id"] == "session-expired"
+        assert recovered[0]["expires_at"] == "2026-06-13T05:10:00+00:00"
+        assert recovered[0]["metadata_parsed"]["recovery"]["recovered_as_of"] == "2026-06-13T05:11:00Z"
+
+        expired_current_stage = service.get_stage_instance(expired_stage["id"])
+        assert expired_current_stage is not None
+        assert expired_current_stage["claim_status"] == "unclaimed"
+        assert expired_current_stage["claimed_by_harness_id"] is None
+        assert expired_current_stage["claimed_by_session_id"] is None
+        assert [row["lease_status"] for row in service.get_stage_lease_history(expired_lease["id"])] == [
+            "recovered",
+            "active",
+        ]
+
+        active_current_stage = service.get_stage_instance(current_stage["id"])
+        assert active_current_stage is not None
+        assert active_current_stage["claim_status"] == "claimed"
+        assert service.get_stage_lease(active_lease["id"])["lease_status"] == "active"
+
+        reclaimed = service.claim_stage_lease(
+            stage_instance_id=expired_stage["id"],
+            holder_harness_id="C",
+            holder_session_id="session-reclaim",
+            ttl_seconds=300,
+            acquired_at="2026-06-13T05:12:00Z",
+            changed_by="test",
+            change_reason="reclaim after recovery",
+        )
+        assert reclaimed["version"] == 3
+        assert reclaimed["lease_status"] == "active"
+        assert reclaimed["holder_harness_id"] == "C"
+    finally:
+        db.close()

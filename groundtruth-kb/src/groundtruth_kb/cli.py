@@ -530,6 +530,75 @@ def flow_heartbeat_cmd(
     )
 
 
+@flow_group.command("recover-leases")
+@click.option("--as-of", default=None, help="Recover active leases expiring at or before this ISO timestamp.")
+@click.option("--limit", type=int, default=None, help="Maximum number of expired leases to recover.")
+@click.option("--dry-run", is_flag=True, default=False, help="Report recoverable leases without mutation.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_recover_leases_cmd(
+    ctx: click.Context,
+    as_of: str | None,
+    limit: int | None,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Recover expired active TAFE stage leases and requeue their stages."""
+
+    db, service = _flow_service(ctx)
+    try:
+        try:
+            if dry_run:
+                candidates = service.list_expired_stage_leases(as_of=as_of, limit=limit)
+                payload = {
+                    "as_of": as_of,
+                    "candidates": candidates,
+                    "command": "flow recover-leases",
+                    "limit": limit,
+                    "mutated": False,
+                    "phase": "phase-1",
+                    "recovered_count": 0,
+                    "status": "dry_run",
+                    "summary": f"Found {len(candidates)} expired active stage lease(s); no mutation performed.",
+                }
+            else:
+                recovered = service.recover_expired_stage_leases(
+                    as_of=as_of,
+                    limit=limit,
+                    changed_by="gt-flow-lease-cli",
+                    change_reason="gt flow recover-leases",
+                )
+                payload = {
+                    "as_of": as_of,
+                    "command": "flow recover-leases",
+                    "limit": limit,
+                    "mutated": bool(recovered),
+                    "phase": "phase-1",
+                    "recovered": recovered,
+                    "recovered_count": len(recovered),
+                    "status": "recovered" if recovered else "no_expired_leases",
+                    "summary": f"Recovered {len(recovered)} expired active stage lease(s).",
+                }
+        except ValueError as exc:
+            _emit_cli_payload(
+                {
+                    "as_of": as_of,
+                    "command": "flow recover-leases",
+                    "error": str(exc),
+                    "limit": limit,
+                    "mutated": False,
+                    "phase": "phase-1",
+                    "status": "error",
+                    "summary": f"flow recover-leases: {exc}",
+                },
+                json_output=json_output,
+            )
+            raise SystemExit(1) from exc
+    finally:
+        db.close()
+    _emit_cli_payload(payload, json_output=json_output)
+
+
 @flow_group.command("advance")
 @click.argument("stage_instance_id")
 @click.option("--to-stage", default=None, help="Future destination stage id.")

@@ -531,6 +531,36 @@ class FlowRuntimeService(FlowDefinitionService):
             raise RuntimeError(f"Renewed stage lease for {stage_instance_id!r} but could not read it back")
         return dict(row)
 
+    def list_expired_stage_leases(
+        self,
+        *,
+        as_of: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """List active leases whose expiry is at or before ``as_of``."""
+
+        return [dict(row) for row in self.db.list_expired_stage_leases(as_of=as_of, limit=limit)]
+
+    def recover_expired_stage_leases(
+        self,
+        *,
+        changed_by: str,
+        change_reason: str,
+        as_of: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Recover expired active leases and make their stages claimable again."""
+
+        return [
+            dict(row)
+            for row in self.db.recover_expired_stage_leases(
+                as_of=as_of,
+                limit=limit,
+                changed_by=_require_non_empty("changed_by", changed_by),
+                change_reason=_require_non_empty("change_reason", change_reason),
+            )
+        ]
+
     def record_capability_snapshot(
         self,
         *,
