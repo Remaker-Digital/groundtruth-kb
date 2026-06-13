@@ -243,11 +243,11 @@ def test_r5_no_gate_invalidates_on_registry_mismatch_alone() -> None:
     registry-vs-declared role disagreement.
 
     This is a clean grep_absent target locked against future regression. The
-    existing ``STRICT_DROP`` path is explicitly PERMITTED: it is keyed to
-    ``keyword_mode not in own_role_set`` — durable-role enforcement of the
-    DISPATCHED init keyword — which is NOT a registry status/role-mismatch
-    invalidation. If a future change legitimately needs one of these tokens, the
-    R5 guard must be revisited via a scoped REVISED proposal, not silently widened.
+    prompt-role authority emergency fix removed the prior strict-drop carve-out:
+    a registry-vs-declared role mismatch is audited, not used to invalidate the
+    explicit prompt/dispatch keyword. If a future change legitimately needs one
+    of these tokens, the R5 guard must be revisited via a scoped REVISED
+    proposal, not silently widened.
     """
     status_tokens = ("suspended", "non-functional", "non_functional")
     for path in GATE_SET:
@@ -258,12 +258,16 @@ def test_r5_no_gate_invalidates_on_registry_mismatch_alone() -> None:
                 "work solely on a registry status/role mismatch (DCL assertion 1)."
             )
 
-    # Anchor the permitted carve-out: STRICT_DROP keyed to the dispatched keyword
-    # vs. own durable role set (not a registry status) must remain the mechanism.
+    # Anchor the revised behavior: the dispatch keyword checker may resolve and
+    # audit the durable role set, but it must not use STRICT_DROP for mismatch.
     core = _read(CORE_PATH)
-    assert "STRICT_DROP" in core and "own_role_set" in core, (
-        "expected the permitted STRICT_DROP / own_role_set durable-role enforcement carve-out "
-        "to remain present; its removal would change the R5 reasoning basis."
+    core_body = _extract_function(core, "_bridge_dispatch_keyword_check")
+    assert "StartupDecision.STRICT_DROP" not in core_body, (
+        "_bridge_dispatch_keyword_check must not invalidate work via STRICT_DROP "
+        "on a registry-vs-declared role mismatch."
+    )
+    assert "own_role_set" in core_body and "_audit_log_misdirected_dispatch" in core_body, (
+        "expected durable-role mismatch to remain auditable while prompt keyword authorization proceeds."
     )
 
 

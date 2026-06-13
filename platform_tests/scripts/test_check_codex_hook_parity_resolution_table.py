@@ -472,12 +472,12 @@ def test_audit_log_kind_literal_missing(tmp_path: Path) -> None:
     project_root = _stage_relevant_files(tmp_path)
     _mutate_replace(
         project_root / _CORE,
-        '"misdirected_dispatch_strict_drop"',
+        '"dispatch_role_mismatch_authorized"',
         '"renamed_kind"',
     )
     errors = parity._resolution_table_parity_errors(project_root)
     assert any(
-        _CORE_LABEL in e and "audit-record kind literal" in e and "misdirected_dispatch_strict_drop" in e
+        _CORE_LABEL in e and "audit-record kind literal" in e and "dispatch_role_mismatch_authorized" in e
         for e in errors
     ), f"expected audit-log kind error for core in {errors!r}"
 

@@ -9,7 +9,7 @@ Codex side, focused on IP-4 ``StartupDecision`` enum-path coverage.
 Specs:
 
 - DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause — set-membership
-  check, mismatch -> STRICT_DROP with audit log.
+  check, mismatch -> DISPATCH_AUTHORIZED with audit log.
 - DCL-CROSS-HARNESS-ENFORCEMENT-001 — receiver enforcement must apply
   symmetrically to both Claude and Codex.
 """
@@ -180,26 +180,28 @@ def test_legacy_fallback_when_env_without_keyword(tmp_path: Path, monkeypatch: p
     assert decision == hook.StartupDecision.LEGACY_FALLBACK
 
 
-def test_strict_drop_when_mode_not_in_own_role_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """env-var + keyword + mode-NOT-in-role-set -> STRICT_DROP + audit log.
+def test_dispatch_authorized_with_audit_when_mode_not_in_own_role_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env-var + keyword + mode-NOT-in-role-set -> DISPATCH_AUTHORIZED + audit log.
 
     Codex has durable role 'loyal-opposition' ({'lo'}); a dispatch with
-    keyword 'pb' must be silently dropped.
+    keyword 'pb' must be honored and audited.
     """
     _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
-    hook = _load_codex_hook("strict_drop")
+    hook = _load_codex_hook("dispatch_role_mismatch")
     failures_path = tmp_path / "dispatch-failures.jsonl"
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-codex-misdirect")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
     decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
-    assert decision == hook.StartupDecision.STRICT_DROP
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
 
     # Audit log entry written with structured fields.
     assert failures_path.is_file()
     lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert lines
     record = json.loads(lines[-1])
-    assert record["kind"] == "misdirected_dispatch_strict_drop"
+    assert record["kind"] == "dispatch_role_mismatch_authorized"
     assert record["observed_keyword_mode"] == "pb"
     assert record["expected_role_set"] == ["lo"]
     assert record["own_harness_name"] == "codex"
@@ -211,20 +213,25 @@ def test_strict_drop_when_mode_not_in_own_role_set(tmp_path: Path, monkeypatch: 
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_strict_drop_on_unreadable_role_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """If own durable role is unreadable, treat dispatch as misdirected.
+def test_dispatch_authorized_with_audit_on_unreadable_role_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If own durable role is unreadable, authorize the explicit keyword and
+    audit the role-resolution failure.
 
-    Fail-closed semantic: cannot prove the keyword matches our role -> drop.
+    The durable registry remains diagnostic/fallback state, not a veto over
+    explicit prompt content.
     """
     # Intentionally do NOT write harness-state files. _resolve_own_role_set
-    # will raise FileNotFoundError; the keyword check must STRICT_DROP.
+    # will raise FileNotFoundError; the keyword check must authorize + audit.
     hook = _load_codex_hook("unreadable_role")
     failures_path = tmp_path / "dispatch-failures.jsonl"
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-codex-unreadable")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
     decision, reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
-    assert decision == hook.StartupDecision.STRICT_DROP
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
     assert "could not resolve own role set" in reason
+    assert "authorized with audit" in reason
 
 
 # ──────────────────────────────────────────────────────────────────────────

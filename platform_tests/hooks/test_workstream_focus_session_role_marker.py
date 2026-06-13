@@ -258,6 +258,76 @@ def test_marker_not_written_for_non_keyword_prompt(
 
 
 # ---------------------------------------------------------------------------
+# Explicit ordinary-prompt role hints: prompt declaration writes marker.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected_role"),
+    [
+        ("You are authorized to operate as an autonomous Prime Builder for GroundTruth-KB.", "prime-builder"),
+        ("You are now operating as Loyal Opposition for this advisory session.", "loyal-opposition"),
+    ],
+)
+def test_explicit_role_hint_prompt_writes_marker(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+    prompt: str,
+    expected_role: str,
+) -> None:
+    """An ordinary owner/automation prompt with an explicit role declaration
+    writes the same session-role marker as the init-keyword path."""
+    wsf.handle_user_prompt(prompt, tmp_path, session_id="sess-role-hint")
+    body = json.loads(_marker_path(tmp_path).read_text(encoding="utf-8"))
+    assert body["role"] == expected_role
+    assert body["session_id"] == "sess-role-hint"
+    assert body["session_id_source"] == "payload"
+    assert body["source"] == "prompt_explicit_role_hint"
+    state = wsf._read_lifecycle_guard(tmp_path)
+    assert state["prompt_role_hint_role"] == expected_role
+    assert state["prompt_role_hint_session_id_source"] == "payload"
+
+
+def test_explicit_role_hint_prompt_failsoft_when_ambiguous(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+) -> None:
+    """A prompt that explicitly names both roles writes no marker."""
+    wsf.handle_user_prompt(
+        (
+            "You are authorized to operate as an autonomous Prime Builder. "
+            "You are authorized to operate as Loyal Opposition."
+        ),
+        tmp_path,
+        session_id="sess-ambiguous",
+    )
+    assert not _marker_path(tmp_path).exists()
+    state = wsf._read_lifecycle_guard(tmp_path)
+    assert "prompt_role_hint_marker_written_at" not in state
+    assert "prompt_role_hint_marker_failsoft_at" not in state
+
+
+def test_explicit_role_hint_prompt_failsoft_when_no_session_id(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+) -> None:
+    """The ordinary prompt hint path does not persist a marker without a
+    resolvable session id."""
+    wsf.handle_user_prompt(
+        "You are authorized to operate as an autonomous Prime Builder.",
+        tmp_path,
+        session_id=None,
+    )
+    assert not _marker_path(tmp_path).exists()
+    state = wsf._read_lifecycle_guard(tmp_path)
+    assert state["prompt_role_hint_role"] == "prime-builder"
+    assert state["prompt_role_hint_marker_failsoft_reason"] == "session_id_unresolved"
+
+
+# ---------------------------------------------------------------------------
 # ADR Decision 4: mid-session re-typing overrides.
 # ---------------------------------------------------------------------------
 

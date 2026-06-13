@@ -79,8 +79,8 @@ _STARTUP_DECISION_MEMBER_LITERALS = (
 # Canonical init-keyword regex per ``SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001``.
 _CANONICAL_KEYWORD_RE_LITERAL = '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")'
 
-# Audit-log primitives (Slice 4 VERIFIED + scoping-003 receiver behavior).
-_AUDIT_LOG_KIND_LITERAL = '"misdirected_dispatch_strict_drop"'
+# Audit-log primitives (Slice 4 VERIFIED + prompt-role authority revision).
+_AUDIT_LOG_KIND_LITERAL = '"dispatch_role_mismatch_authorized"'
 _AUDIT_LOG_PATH_TOKEN = ".gtkb-state/bridge-poller/dispatch-failures.jsonl"
 
 # Intentional-difference guards (assertion 8): the precise OUT_DIR assignment
@@ -844,8 +844,10 @@ def _resolution_table_parity_errors(project_root: Path) -> list[str]:
         errors.append(order_error)
 
     # ----- Assertion 6: behavior-table parity -----------------------------
-    # The core's ``_bridge_dispatch_keyword_check`` must reference each of the
-    # five StartupDecision members AND document the behavior-table header row.
+    # The core's ``_bridge_dispatch_keyword_check`` must reference the active
+    # decision members AND document the behavior-table header row. STRICT_DROP
+    # remains an enum compatibility value but must not be used for prompt
+    # keyword / durable-registry mismatch.
     if "def _bridge_dispatch_keyword_check(" not in core_text:
         errors.append(f"{core_label} must define `_bridge_dispatch_keyword_check()` (resolution-table receiver)")
     else:
@@ -855,20 +857,25 @@ def _resolution_table_parity_errors(project_root: Path) -> list[str]:
             "StartupDecision.DISPATCH_AUTHORIZED",
             "StartupDecision.SPOOF_FALLBACK",
             "StartupDecision.LEGACY_FALLBACK",
-            "StartupDecision.STRICT_DROP",
         ):
             if member_name not in body_text:
                 errors.append(
                     f"{core_label} `_bridge_dispatch_keyword_check()` must reference "
                     f"`{member_name}` (IP-4 five-decision receiver vocabulary)"
                 )
+        if "StartupDecision.STRICT_DROP" in body_text:
+            errors.append(
+                f"{core_label} `_bridge_dispatch_keyword_check()` must not return "
+                "`StartupDecision.STRICT_DROP` for prompt keyword / registry mismatch "
+                "(prompt-role authority revision)"
+            )
         errors.extend(_bridge_dispatch_behavior_table_errors(core_text, core_label))
 
     # ----- Assertion 7: audit-log parity ----------------------------------
     # The core must define ``_audit_log_misdirected_dispatch`` and carry the
     # canonical kind literal + dispatch-failures path token.
     if "def _audit_log_misdirected_dispatch(" not in core_text:
-        errors.append(f"{core_label} must define `_audit_log_misdirected_dispatch()` (STRICT_DROP audit record)")
+        errors.append(f"{core_label} must define `_audit_log_misdirected_dispatch()` (dispatch mismatch audit record)")
     if _AUDIT_LOG_KIND_LITERAL not in core_text:
         errors.append(f"{core_label} must reference audit-record kind literal {_AUDIT_LOG_KIND_LITERAL}")
     if _AUDIT_LOG_PATH_TOKEN not in core_text:

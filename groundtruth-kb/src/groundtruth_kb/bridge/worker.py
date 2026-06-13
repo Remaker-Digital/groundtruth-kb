@@ -308,7 +308,7 @@ def _invoke_codex(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
         "timeout": timeout_seconds,
     }
     if sys.platform == "win32":
-        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+        popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **cast(Any, popen_kwargs)))
     return completed
 

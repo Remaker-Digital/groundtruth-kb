@@ -443,38 +443,43 @@ def test_legacy_fallback_when_env_without_keyword(tmp_path: Path, monkeypatch: p
     assert decision == hook.StartupDecision.LEGACY_FALLBACK
 
 
-def test_strict_drop_when_mode_not_in_own_role_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """env-var + keyword + mode-NOT-in-role-set -> STRICT_DROP + audit log
-    (Claude side).
+def test_dispatch_authorized_with_audit_when_mode_not_in_own_role_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env-var + keyword + mode-NOT-in-role-set -> DISPATCH_AUTHORIZED +
+    audit log (Claude side).
 
     Claude has durable role 'prime-builder' ({'pb'}); a dispatch with
-    keyword 'lo' must be silently dropped with an audit log entry.
+    keyword 'lo' must be honored and audited.
     """
     _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
-    hook = _load_claude_hook_isolated("strict_drop")
+    hook = _load_claude_hook_isolated("dispatch_role_mismatch")
     failures_path = tmp_path / "dispatch-failures.jsonl"
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-misdirect")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
     decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
-    assert decision == hook.StartupDecision.STRICT_DROP
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
 
     # Audit log written with structured fields.
     assert failures_path.is_file()
     lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert lines
     record = json.loads(lines[-1])
-    assert record["kind"] == "misdirected_dispatch_strict_drop"
+    assert record["kind"] == "dispatch_role_mismatch_authorized"
     assert record["observed_keyword_mode"] == "lo"
     assert record["expected_role_set"] == ["pb"]
     assert record["own_harness_name"] == "claude"
     assert record["own_harness_id"] == "B"
 
 
-def test_strict_drop_on_unreadable_role_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """If own durable role is unreadable, treat dispatch as misdirected
-    (Claude side).
+def test_dispatch_authorized_with_audit_on_unreadable_role_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If own durable role is unreadable, authorize the explicit keyword and
+    audit the role-resolution failure (Claude side).
 
-    Fail-closed semantic: cannot prove keyword matches our role -> drop.
+    The durable registry remains diagnostic/fallback state, not a veto over
+    explicit prompt content.
     """
     # Intentionally do NOT write harness-state files.
     hook = _load_claude_hook_isolated("unreadable_role")
@@ -482,8 +487,9 @@ def test_strict_drop_on_unreadable_role_record(tmp_path: Path, monkeypatch: pyte
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-unreadable")
     monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
     decision, reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path, failures_path=failures_path)
-    assert decision == hook.StartupDecision.STRICT_DROP
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
     assert "could not resolve own role set" in reason
+    assert "authorized with audit" in reason
 
 
 def test_claude_hook_has_envelope_parity_constants() -> None:

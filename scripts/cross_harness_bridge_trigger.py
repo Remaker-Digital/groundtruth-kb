@@ -2446,10 +2446,10 @@ def _spawn_harness(
     # Explicitly strip in case the parent has it set:
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
     if os.name == "nt":
-        creationflags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
     else:
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        creationflags = 0
 
     selected = _selected_oldest_first(items, max_items)
     sig = _signature(selected)

@@ -1052,6 +1052,37 @@ def system_message_for_state(state: dict[str, Any], *, changed: bool = False) ->
 
 _CANONICAL_DISPATCH_INIT_RE = re.compile(r"^::init\s+gtkb\s+(?P<role_mode>pb|lo)\s*$", re.IGNORECASE)
 
+_PROMPT_EXPLICIT_ROLE_HINTS = (
+    (
+        "pb",
+        re.compile(
+            r"\byou\s+are\s+authorized\s+to\s+operate\s+as\s+(?:an?\s+)?(?:autonomous\s+)?prime\s+builder\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "pb",
+        re.compile(
+            r"\byou\s+are\s+(?:now\s+)?(?:operating|acting|running)\s+as\s+(?:an?\s+)?prime\s+builder\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "lo",
+        re.compile(
+            r"\byou\s+are\s+authorized\s+to\s+operate\s+as\s+(?:an?\s+)?loyal\s+opposition\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "lo",
+        re.compile(
+            r"\byou\s+are\s+(?:now\s+)?(?:operating|acting|running)\s+as\s+(?:an?\s+)?loyal\s+opposition\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
 
 def _match_startup_init_keyword(prompt: str) -> InitKeywordMatch | None:
     match = match_init_keyword(prompt)
@@ -1067,6 +1098,21 @@ def _startup_role_mode_from_prompt(prompt: str) -> str | None:
     if match is None:
         return None
     return match.group("role_mode").lower()
+
+
+def _explicit_role_hint_mode_from_prompt(prompt: str) -> str | None:
+    """Return a role mode when the prompt explicitly declares this agent's role.
+
+    This is the ordinary-prompt counterpart to ``::init gtkb pb|lo``. The
+    prompt declaration is authoritative for the receiving agent; the durable
+    registry remains a fallback when no valid prompt/session hint exists.
+    Ambiguous prompts that explicitly match both roles are ignored fail-soft.
+    """
+
+    matches = {mode for mode, pattern in _PROMPT_EXPLICIT_ROLE_HINTS if pattern.search(prompt)}
+    if len(matches) == 1:
+        return next(iter(matches))
+    return None
 
 
 # Slice 2 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE
@@ -1124,6 +1170,8 @@ def _write_session_role_marker(
     session_id: str,
     session_id_source: str,
     project_root: Path | None = None,
+    *,
+    source: str = "init_keyword",
 ) -> bool:
     """Write the ephemeral session-state role marker; fail soft on OSError.
 
@@ -1143,7 +1191,7 @@ def _write_session_role_marker(
         return False
 
     acquired = False
-    for attempt in range(5):
+    for _attempt in range(5):
         try:
             with open(lock_path, "x") as f:
                 f.write(str(os.getpid()))
@@ -1183,7 +1231,7 @@ def _write_session_role_marker(
             "session_id": session_id,
             "session_id_source": session_id_source,
             "written_at": _now_iso(),
-            "source": "init_keyword",
+            "source": source,
         }
         marker_path.write_text(
             json.dumps(body, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
@@ -1198,6 +1246,41 @@ def _write_session_role_marker(
                 lock_path.unlink()
         except OSError:
             pass
+    return True
+
+
+def _record_explicit_role_hint_from_prompt(
+    prompt: str,
+    state: dict[str, Any],
+    project_root: Path | None = None,
+    *,
+    session_id: str | None = None,
+) -> bool:
+    role_mode = _explicit_role_hint_mode_from_prompt(prompt)
+    role_profile = _MODE_TO_ROLE_PROFILE.get(role_mode or "")
+    if not role_profile:
+        return False
+    resolved_id, source_label = _resolve_session_id(session_id)
+    if resolved_id is None:
+        state["prompt_role_hint_marker_failsoft_at"] = _now_iso()
+        state["prompt_role_hint_marker_failsoft_reason"] = "session_id_unresolved"
+        state["prompt_role_hint_role"] = role_profile
+        return True
+    wrote = _write_session_role_marker(
+        role_profile,
+        resolved_id,
+        source_label or "",
+        project_root,
+        source="prompt_explicit_role_hint",
+    )
+    if wrote:
+        state["prompt_role_hint_marker_written_at"] = _now_iso()
+        state["prompt_role_hint_role"] = role_profile
+        state["prompt_role_hint_session_id_source"] = source_label
+    else:
+        state["prompt_role_hint_marker_failsoft_at"] = _now_iso()
+        state["prompt_role_hint_marker_failsoft_reason"] = "marker_write_oserror"
+        state["prompt_role_hint_role"] = role_profile
     return True
 
 
@@ -1750,6 +1833,10 @@ def handle_user_prompt(
     startup_gate_response = _consume_discard_first_prompt_gate(prompt, project_root, session_id=session_id)
     if startup_gate_response is not None:
         return startup_gate_response
+
+    state = _read_lifecycle_guard(project_root)
+    if _record_explicit_role_hint_from_prompt(prompt, state, project_root, session_id=session_id):
+        _write_lifecycle_guard(state, project_root)
 
     _clear_startup_response_pending_for_followup(project_root)
 

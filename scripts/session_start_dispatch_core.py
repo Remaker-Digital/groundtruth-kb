@@ -22,8 +22,9 @@ canonical init-keyword recognition via `StartupDecision` enum +
 ``_bridge_dispatch_keyword_check`` per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 +
 DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001. The receiver reads its own durable
 role via the registry projection (``harness-state/harness-registry.json``) and
-applies set-membership against the keyword mode. Mismatch → silent drop with
-audit log entry to ``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
+audits set-membership against the keyword mode. Mismatch -> prompt keyword
+authorized with an audit log entry to
+``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
 """
 
 from __future__ import annotations
@@ -66,9 +67,9 @@ _MODE_TO_ROLE_PROFILE = {
     "pb": "prime-builder",
     "lo": "loyal-opposition",
 }
-# Audit log for misdirected dispatch silent-drops. Shared with the trigger's
-# dispatch-failures path so investigators see all dispatch-related failures
-# in one location.
+# Audit log for dispatch keyword / durable role mismatches. Shared with the
+# trigger's dispatch-failures path so investigators see all dispatch-related
+# failures in one location.
 DISPATCH_FAILURES_PATH = PROJECT_ROOT / ".gtkb-state" / "bridge-poller" / "dispatch-failures.jsonl"
 
 
@@ -211,36 +212,6 @@ def _bridge_auto_dispatch_context() -> str | None:
     )
 
 
-def _strict_drop_context(reason: str) -> str:
-    """Emit a clean-exit SessionStart context for misdirected dispatch.
-
-    Per IP-4 of bridge/gtkb-canonical-init-keyword-syntax-001-005.md
-    (Codex GO at -008) and DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001
-    "Mismatch behavior" clause: the session is NOT to treat the prompt as a
-    task; it exits cleanly per the harness's normal "no work to process"
-    path. The returned context tells the receiving model to ignore the
-    prompt without relaying any startup disclosure or dispatch payload.
-    """
-    return "\n".join(
-        [
-            "# GroundTruth-KB Bridge Auto-Dispatch — Misdirected (Silent Drop)",
-            "",
-            f"Reason: {reason}",
-            "",
-            "A cross-harness bridge dispatch arrived with a canonical init-keyword "
-            "mode that does NOT match this harness's durable operating role "
-            "(per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver-side "
-            "set-membership clause).",
-            "Do not relay the normal fresh-session startup disclosure.",
-            "Do not treat the initial prompt as an actionable task.",
-            "Exit this session cleanly without further bridge work.",
-            "An audit-log entry has been written to "
-            "`.gtkb-state/bridge-poller/dispatch-failures.jsonl` so the durable "
-            "role-map drift is investigable.",
-        ]
-    )
-
-
 def _read_first_prompt_line() -> str | None:
     """Return the canonical first-line keyword passed by the trigger.
 
@@ -319,12 +290,11 @@ def _audit_log_misdirected_dispatch(
     project_root: Path = PROJECT_ROOT,
     failures_path: Path | None = None,
 ) -> None:
-    """Append a JSONL audit record for a silently-dropped misdirected dispatch.
+    """Append a JSONL audit record for a dispatch role mismatch.
 
-    Per PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2: audit-log on
-    misdirected dispatch makes silent-drop visible to investigators, addressing
-    the S321 incident class where dispatch failures ran undetected for hours.
-    Fire-and-forget: audit-log write failures do not block the silent drop.
+    Historical helper name retained for parity callers. Per the prompt-role
+    authority correction, this audit record is diagnostic only; it must not
+    block the explicit dispatch keyword.
     """
     target = failures_path or DISPATCH_FAILURES_PATH
     try:
@@ -344,7 +314,7 @@ def _audit_log_misdirected_dispatch(
             own_harness_id = None
         record = {
             "ts": _now_iso(),
-            "kind": "misdirected_dispatch_strict_drop",
+            "kind": "dispatch_role_mismatch_authorized",
             "run_id": run_id,
             "expected_role_set": sorted(role_set),
             "observed_keyword_mode": observed_mode,
@@ -354,7 +324,7 @@ def _audit_log_misdirected_dispatch(
         with target.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, sort_keys=True) + "\n")
     except OSError:
-        # Fire-and-forget contract: audit-log failures must not block the drop.
+        # Fire-and-forget contract: audit-log failures must not block dispatch.
         pass
 
 
@@ -368,7 +338,8 @@ def _bridge_dispatch_keyword_check(
     Returns ``(decision, reason)``. The decision drives the emitted
     SessionStart context.
 
-    Behavior table (per bridge -005 IP-4):
+    Behavior table (per bridge -005 IP-4, revised by the prompt-role
+    authority emergency fix):
 
     ============  =========  ====================  ===================  ====================================================
     env-var       keyword    mode-in-role-set      Decision             Effect
@@ -377,7 +348,7 @@ def _bridge_dispatch_keyword_check(
     absent        present    n/a                   SPOOF_FALLBACK       warn; normal startup; do NOT bypass
     present       absent     n/a                   LEGACY_FALLBACK      warn; legacy env-var-only behavior
     present       present    yes                   DISPATCH_AUTHORIZED  bridge auto-dispatch context emitted
-    present       present    no                    STRICT_DROP          silent drop; audit log; clean exit
+    present       present    no                    DISPATCH_AUTHORIZED  bridge auto-dispatch context emitted; audit log
     ============  =========  ====================  ===================  ====================================================
     """
     run_id = os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV)
@@ -403,8 +374,6 @@ def _bridge_dispatch_keyword_check(
     try:
         own_role_set = _resolve_own_role_set(project_root=project_root)
     except (FileNotFoundError, OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
-        # Fail-closed: if our own durable role is unreadable, treat the
-        # dispatch as misdirected (cannot prove keyword matches our role).
         _audit_log_misdirected_dispatch(
             run_id,
             keyword_mode,
@@ -413,8 +382,8 @@ def _bridge_dispatch_keyword_check(
             failures_path=failures_path,
         )
         return (
-            StartupDecision.STRICT_DROP,
-            f"could not resolve own role set: {exc}; treating as misdirected",
+            StartupDecision.DISPATCH_AUTHORIZED,
+            f"could not resolve own role set: {exc}; prompt keyword authorized with audit",
         )
     if keyword_mode in own_role_set:
         return (StartupDecision.DISPATCH_AUTHORIZED, "canonical dispatch authorized")
@@ -426,8 +395,8 @@ def _bridge_dispatch_keyword_check(
         failures_path=failures_path,
     )
     return (
-        StartupDecision.STRICT_DROP,
-        f"keyword mode {keyword_mode!r} not in role set {sorted(own_role_set)!r}; silent drop",
+        StartupDecision.DISPATCH_AUTHORIZED,
+        f"keyword mode {keyword_mode!r} not in role set {sorted(own_role_set)!r}; prompt keyword authorized with audit",
     )
 
 
@@ -570,7 +539,7 @@ def main() -> int:
     # pre-existing session-state role marker before the dispatch fork and before
     # any role rendering, so the ephemeral interactive override does not survive
     # this SessionStart event (DCL-SESSION-ROLE-RESOLUTION-001 assertion 5). This
-    # runs on every SessionStart path (normal, bridge auto-dispatch, strict-drop)
+    # runs on every SessionStart path (normal or bridge auto-dispatch)
     # and does not disturb the mode-switch-drain -> dispatch ordering below.
     _invalidate_session_role_marker()
     # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
@@ -588,15 +557,6 @@ def main() -> int:
         pass
     # IP-4: receiver-side StartupDecision dispatch per bridge -005.
     decision, _reason = _bridge_dispatch_keyword_check()
-    if decision == StartupDecision.STRICT_DROP:
-        # Misdirected dispatch: emit silent-drop context. Audit log already
-        # written by _bridge_dispatch_keyword_check.
-        payload = _session_start_payload(_strict_drop_context(_reason))
-        serialized = _dump_payload(payload)
-        stdout_path.write_text(serialized, encoding="utf-8")
-        stderr_path.write_text("", encoding="utf-8")
-        print(serialized)
-        return 0
     if decision in (StartupDecision.DISPATCH_AUTHORIZED, StartupDecision.LEGACY_FALLBACK):
         # Canonical dispatch or env-var-only legacy dispatch: emit the
         # bridge auto-dispatch context (today's behavior).

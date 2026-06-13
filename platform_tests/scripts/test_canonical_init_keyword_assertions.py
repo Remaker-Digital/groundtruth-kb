@@ -11,7 +11,7 @@ Authority: bridge/gtkb-canonical-init-keyword-syntax-001-005.md IP-8 surface 5
      identity-map inversion) — emitter clause.
   2. Both SessionStart hooks check set-membership against own role set —
      receiver clause.
-  3. Audit-log path on STRICT_DROP branch is ``dispatch-failures.jsonl`` —
+  3. Audit-log path on role-mismatch branch is ``dispatch-failures.jsonl`` —
      PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 clause.
   4. NO occurrence of ``harness-state/<name>/operating-role.md`` as authority
      source — defends against the legacy harness-local override path.
@@ -100,31 +100,31 @@ def test_codex_session_start_checks_set_membership_against_own_role_set() -> Non
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Assertion 3 (audit log): STRICT_DROP path writes dispatch-failures.jsonl
+# Assertion 3 (audit log): role-mismatch path writes dispatch-failures.jsonl
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_claude_strict_drop_writes_dispatch_failures_jsonl() -> None:
+def test_claude_role_mismatch_writes_dispatch_failures_jsonl() -> None:
     """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Claude via core)."""
     src = _read(CORE_PATH)
     assert "dispatch-failures.jsonl" in src, (
-        "SessionStart core missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
+        "SessionStart core missing audit-log path `dispatch-failures.jsonl`; role mismatches would run undetected."
     )
     assert "_audit_log_misdirected_dispatch" in src, "SessionStart core missing _audit_log_misdirected_dispatch helper."
-    assert "STRICT_DROP" in src and "_audit_log_misdirected_dispatch(" in src
+    assert "dispatch_role_mismatch_authorized" in src and "_audit_log_misdirected_dispatch(" in src
 
 
-def test_codex_strict_drop_writes_dispatch_failures_jsonl() -> None:
+def test_codex_role_mismatch_writes_dispatch_failures_jsonl() -> None:
     """PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2 — audit-log clause (Codex via core)."""
     src = _read(CORE_PATH)
     assert "dispatch-failures.jsonl" in src, (
-        "SessionStart core missing audit-log path `dispatch-failures.jsonl`; silent drops would run undetected."
+        "SessionStart core missing audit-log path `dispatch-failures.jsonl`; role mismatches would run undetected."
     )
     assert "_audit_log_misdirected_dispatch" in src, "SessionStart core missing _audit_log_misdirected_dispatch helper."
-    assert "STRICT_DROP" in src and "_audit_log_misdirected_dispatch(" in src
+    assert "dispatch_role_mismatch_authorized" in src and "_audit_log_misdirected_dispatch(" in src
 
 
-def test_strict_drop_audit_path_matches_glossary_citation() -> None:
+def test_role_mismatch_audit_path_matches_glossary_citation() -> None:
     """The audit-log path cited in both hooks MUST match the glossary entry.
 
     canonical-terminology.md § canonical init keyword cites

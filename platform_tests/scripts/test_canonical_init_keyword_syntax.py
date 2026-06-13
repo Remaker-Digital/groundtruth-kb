@@ -16,8 +16,8 @@ regex is defined identically:
 - ``.codex/gtkb-hooks/session_start_dispatch.py`` (Codex receiver).
 
 The pin matters: any drift between emitter and either receiver breaks the
-strict-parse semantic and produces silent-drop dispatch failures
-indistinguishable from drift in the durable role map.
+strict-parse semantic and produces dispatch audit noise indistinguishable from
+drift in the durable role map.
 """
 
 from __future__ import annotations
