@@ -7,6 +7,8 @@ GO: bridge/gtkb-bridge-index-atomic-write-guard-002.md
 NEW: bridge/gtkb-bridge-index-atomic-write-guard-001.md
 
 Document: gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening
+VERIFIED: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-004.md
+NEW: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-003.md
 GO: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-002.md
 NEW: bridge/gtkb-wi-4516-openrouter-ollama-bash-bridge-hardening-001.md
 
