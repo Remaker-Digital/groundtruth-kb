@@ -1,3 +1,11 @@
+Document: gtkb-tafe-flow-lease-commands
+GO: bridge/gtkb-tafe-flow-lease-commands-002.md
+NEW: bridge/gtkb-tafe-flow-lease-commands-001.md
+
+Document: gtkb-tafe-dispatch-policy-scoring-model
+NO-GO: bridge/gtkb-tafe-dispatch-policy-scoring-model-002.md
+NEW: bridge/gtkb-tafe-dispatch-policy-scoring-model-001.md
+
 Document: gtkb-tafe-dispatch-policy-engine
 GO: bridge/gtkb-tafe-dispatch-policy-engine-002.md
 NEW: bridge/gtkb-tafe-dispatch-policy-engine-001.md
