@@ -171,6 +171,50 @@ def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dic
         conn.close()
 
 
+def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = None) -> str | None:
+    """Return the bridge thread slug currently claimed by ``session_id``, or None.
+
+    WI-4443: the implementation-start gate uses this to resolve the packet for
+    the session's OWN claimed bridge before consulting the global current.json
+    pointer (which thrashes under concurrent Prime Builders). Read-only over the
+    authoritative ``work_intent_claims`` SQLite table — the registry's canonical
+    store, not the legacy ``.gtkb-state/work-intent/*.json`` path. Expired (TTL)
+    and lapsed-past-grace GO-implementation claims are ignored. When a session
+    holds more than one active claim, a GO-implementation claim is preferred,
+    then the most recently acquired.
+    """
+    if not session_id:
+        return None
+    conn = _get_conn(project_root)
+    try:
+        rows = conn.execute(
+            "SELECT * FROM work_intent_claims WHERE session_id = ?",
+            (session_id,),
+        ).fetchall()
+    except sqlite3.Error as exc:
+        raise WorkIntentRegistryError(f"Database error during current_claimed_bridge_id: {exc}") from exc
+    finally:
+        conn.close()
+
+    now = now_utc()
+    active: list[dict[str, Any]] = []
+    for row in rows:
+        record = _row_to_record(row)
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(record, now=now):
+            continue
+        active.append(record)
+    if not active:
+        return None
+    active.sort(
+        key=lambda rec: (
+            1 if rec.get("claim_kind") == CLAIM_KIND_GO_IMPLEMENTATION else 0,
+            str(rec.get("acquired_at") or ""),
+        ),
+        reverse=True,
+    )
+    return str(active[0]["thread_slug"])
+
+
 def claim_status(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
     """Return the raw claim record, including expired/lapsed claims."""
     slug = _validate_slug(thread_slug)

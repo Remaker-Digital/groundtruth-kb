@@ -235,6 +235,59 @@ def test_lapsed_claim_blocks_mutation(tmp_path: Path) -> None:
     assert "No active work-intent claim" in result["reason"]
 
 
+def test_gate_allows_concurrent_authorized_implementers(tmp_path: Path) -> None:
+    """WI-4443: under concurrent Prime Builders, a session's valid in-scope
+    mutation is allowed even after a peer's ``begin`` clobbered current.json,
+    while a cross-scope mutation into the peer's bridge stays blocked.
+
+    bridge-a and bridge-b both authorize ``scripts/shared.py``; bridge-b also
+    authorizes ``scripts/b_only.py``. The ambient session claims bridge-a;
+    session-B claims bridge-b; bridge-b's ``begin`` clobbers current.json.
+    (a) ambient session mutating ``scripts/shared.py`` -> ALLOWED. Without the
+        session-aware fix, current.json (bridge-b) resolves the packet to
+        bridge-b and the ambient session (which holds no bridge-b claim) is
+        wrongly blocked -- this is the WI-4443 regression guard.
+    (c) ambient session mutating ``scripts/b_only.py`` (bridge-b's exclusive
+        scope) -> BLOCKED by the work-intent claim check (no claim on bridge-b).
+    """
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "bridge-a-001.md").write_text(
+        _proposal(bridge_id="bridge-a", target_paths=["scripts/shared.py"]), encoding="utf-8"
+    )
+    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-001.md").write_text(
+        _proposal(bridge_id="bridge-b", target_paths=["scripts/shared.py", "scripts/b_only.py"]),
+        encoding="utf-8",
+    )
+    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
+        "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Both begin; bridge-b's begin clobbers current.json to bridge-b.
+    packet_a = auth.create_authorization_packet(tmp_path, "bridge-a")
+    auth.write_packet(tmp_path, packet_a)
+    auth.write_named_packet(tmp_path, packet_a, "bridge-a")
+    packet_b = auth.create_authorization_packet(tmp_path, "bridge-b")
+    auth.write_packet(tmp_path, packet_b)
+    auth.write_named_packet(tmp_path, packet_b, "bridge-b")
+    assert json.loads(auth.packet_path(tmp_path).read_text(encoding="utf-8"))["bridge_id"] == "bridge-b"
+
+    # Two concurrent implementers: ambient session claims bridge-a; session-B claims bridge-b.
+    _claim_bridge(tmp_path, "bridge-a")
+    _claim_bridge(tmp_path, "bridge-b", "session-B")
+
+    # (a) ambient session's in-scope mutation of the overlapping target is allowed.
+    assert gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/shared.py")) == {}
+
+    # (c) ambient session mutating bridge-b's exclusive target is blocked (no claim on bridge-b).
+    cross = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/b_only.py"))
+    assert cross["decision"] == "block"
+
+
 def test_gate_allows_when_holder_is_dispatch_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_thread(tmp_path)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")

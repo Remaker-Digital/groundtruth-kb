@@ -1012,10 +1012,15 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     if not protected:
         return {}
     try:
-        result = validate_targets(root, protected)
+        # WI-4443: resolve the work-intent session BEFORE packet resolution so
+        # validate_targets can prefer this session's OWN claimed by-bridge packet
+        # over the global current.json pointer (which thrashes under concurrent
+        # Prime Builders). The block-reason check below is unchanged — it now
+        # operates on the session-correct packet.
+        session_id = resolve_work_intent_session_id(payload)
+        result = validate_targets(root, protected, session_id=session_id)
         packet = result.get("packet", {})
         bridge_id = str(packet.get("bridge_id") or "")
-        session_id = resolve_work_intent_session_id(payload)
         block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
         if block_reason:
             raise AuthorizationError(block_reason)

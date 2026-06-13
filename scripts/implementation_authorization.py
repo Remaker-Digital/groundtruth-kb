@@ -1286,9 +1286,34 @@ def _named_packets_authorizing_targets(project_root: Path, normalized_targets: l
     return matches
 
 
-def validate_targets(project_root: Path, targets: list[str]) -> dict[str, Any]:
+def validate_targets(project_root: Path, targets: list[str], *, session_id: str | None = None) -> dict[str, Any]:
     normalized_targets = [normalize_relative_path(project_root, target) for target in targets]
     current_error: AuthorizationError | None = None
+
+    # WI-4443: session-aware resolution. When the caller's session holds a
+    # work-intent claim for a bridge thread, prefer that session's OWN by-bridge
+    # packet before consulting the global current.json pointer, which thrashes
+    # under concurrent Prime Builders (a peer's `begin --bridge-id Y` clobbers
+    # the pointer, blocking this session's otherwise-valid mutation). Falls
+    # through to the legacy read path when no claim is held or the claimed packet
+    # does not authorize the targets, preserving single-session behavior and the
+    # WI-4452 named-packet fallback. A registry read error falls through silently
+    # — packet resolution must never break on a work-intent lookup failure.
+    if session_id:
+        claimed_bridge_id: str | None = None
+        try:
+            claimed_bridge_id = bridge_work_intent_registry.current_claimed_bridge_id(
+                session_id, project_root=project_root
+            )
+        except Exception:  # noqa: BLE001 - registry failure must not break packet resolution
+            claimed_bridge_id = None
+        if claimed_bridge_id:
+            try:
+                claimed_packet = load_named_packet(project_root, claimed_bridge_id)
+            except AuthorizationError:
+                claimed_packet = None
+            if claimed_packet is not None and not _unauthorized_targets(claimed_packet, normalized_targets):
+                return {"packet": claimed_packet, "targets": normalized_targets}
 
     try:
         packet = load_packet(project_root)

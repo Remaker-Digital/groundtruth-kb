@@ -610,6 +610,49 @@ def test_validate_targets_falls_back_to_unique_named_packet_after_current_clobbe
     assert result_b["targets"] == ["scripts/b.py"]
 
 
+def test_validate_targets_session_aware_prefers_claimed_bridge_packet(auth_module, tmp_path):
+    """WI-4443: when a session holds a work-intent claim, validate_targets prefers
+    that session's OWN by-bridge packet over the global current.json pointer.
+
+    Both bridge-a and bridge-b authorize the SAME target and current.json points
+    to bridge-b. A session that claims bridge-a must resolve to bridge-a's packet
+    (session-aware), while the same call with no session_id falls back to the
+    global pointer (bridge-b) -- proving the session lookup is what disambiguates
+    the concurrent-implementer thrash WI-4443 fixes.
+    """
+    _make_groundtruth_toml(tmp_path)
+    _write_proposal(tmp_path, "bridge-a", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
+    _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
+    _write_index(
+        tmp_path,
+        [
+            "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
+            "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b.md\n",
+        ],
+    )
+    _begin_packet(auth_module, tmp_path, "bridge-a")
+    _begin_packet(auth_module, tmp_path, "bridge-b")
+    current_path = auth_module.packet_path(tmp_path)
+    assert json.loads(current_path.read_text(encoding="utf-8"))["bridge_id"] == "bridge-b"
+
+    # Session A holds the bridge-a claim -> session-aware resolution returns bridge-a.
+    _claim_bridge(auth_module, tmp_path, "bridge-a", session_id="session-A")
+    result_session = auth_module.validate_targets(tmp_path, ["scripts/shared.py"], session_id="session-A")
+    assert result_session["packet"]["bridge_id"] == "bridge-a"
+    # The read does not mutate the global pointer.
+    assert json.loads(current_path.read_text(encoding="utf-8"))["bridge_id"] == "bridge-b"
+
+    # No session_id -> legacy path resolves the global current.json pointer (bridge-b).
+    result_no_session = auth_module.validate_targets(tmp_path, ["scripts/shared.py"])
+    assert result_no_session["packet"]["bridge_id"] == "bridge-b"
+
+    # A session that holds NO claim also falls through to the global pointer.
+    result_other = auth_module.validate_targets(tmp_path, ["scripts/shared.py"], session_id="session-unknown")
+    assert result_other["packet"]["bridge_id"] == "bridge-b"
+
+
 def test_packet_path_for_bridge_rejects_path_traversal_bridge_id(auth_module, tmp_path):
     """bridge_id with path separators or traversal segments is refused."""
     with pytest.raises(auth_module.AuthorizationError):
