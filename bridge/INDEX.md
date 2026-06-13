@@ -1,3 +1,11 @@
+Document: gtkb-role-authority-declared-not-detected
+GO: bridge/gtkb-role-authority-declared-not-detected-002.md
+NEW: bridge/gtkb-role-authority-declared-not-detected-001.md
+
+Document: gtkb-wi4487-flow-definitions-schema
+WITHDRAWN: bridge/gtkb-wi4487-flow-definitions-schema-002.md
+NEW: bridge/gtkb-wi4487-flow-definitions-schema-001.md
+
 Document: gtkb-tafe-flow-definitions-schema
 GO: bridge/gtkb-tafe-flow-definitions-schema-002.md
 NEW: bridge/gtkb-tafe-flow-definitions-schema-001.md
