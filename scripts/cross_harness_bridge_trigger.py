@@ -2905,6 +2905,22 @@ def run_trigger(
                     skipped_candidates.append(skip)
                     pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
                     continue
+                target_max_items = _effective_max_items_for_target(target, max_items)
+                selected_for_target = _selected_oldest_first(
+                    [item for item in items if getattr(item, "dispatchable", True)],
+                    target_max_items,
+                )
+                if selected_for_target and _should_refuse_self_review(
+                    bridge_id=selected_for_target[0].document_name,
+                    dispatched_harness_id=target.harness_id,
+                    project_root=project_root,
+                ):
+                    reason = "author_meets_reviewer_refused"
+                    skip = _dispatch_target_evidence(target)
+                    skip["reason"] = reason
+                    skipped_candidates.append(skip)
+                    pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
+                    continue
                 selected_target = target
                 break
             if selected_target is None:

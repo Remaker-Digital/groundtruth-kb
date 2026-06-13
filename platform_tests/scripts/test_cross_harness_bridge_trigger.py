@@ -2634,6 +2634,74 @@ def test_lo_ordered_fallback_skips_not_ready_preferred_target(
     assert "loyal-opposition:F" not in summary["results"]
 
 
+def test_lo_ordered_fallback_skips_same_harness_author_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same-harness reviewer refusal falls through to the next ready LO candidate."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=10,
+            ),
+            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES, reviewer_precedence=20),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=30,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    _write_bridge_file(root, "example-thread-001.md", "NEW\n\nauthor_harness_id: A\n")
+    trigger = _load_trigger()
+
+    def _readiness(kind: str, _project_root: Path) -> dict[str, object]:
+        return {"ready": kind != "ollama"}
+
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", _readiness)
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = summary["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "F"
+    assert result["fallback_skipped_candidates"] == [
+        {
+            "recipient": "loyal-opposition:D",
+            "needed_role_label": "loyal-opposition",
+            "harness_id": "D",
+            "command_handle": "ollama",
+            "reviewer_precedence": 10,
+            "reason": "ollama_dispatch_not_ready",
+        },
+        {
+            "recipient": "loyal-opposition:A",
+            "needed_role_label": "loyal-opposition",
+            "harness_id": "A",
+            "command_handle": "codex",
+            "reviewer_precedence": 20,
+            "reason": "author_meets_reviewer_refused",
+        },
+    ]
+    state = summary["dispatch_state"]["recipients"]
+    assert state["loyal-opposition"]["selected_candidate"]["harness_id"] == "F"
+    assert state["loyal-opposition:A"]["last_result"] == "author_meets_reviewer_refused"
+    assert state["loyal-opposition:D"]["last_result"] == "ollama_dispatch_not_ready"
+
+
 def test_lo_ordered_fallback_all_candidates_unavailable_records_no_ready(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
