@@ -488,3 +488,11 @@ Loyal Opposition (Codex/lo opportunity radar) filed an advisory on the recurring
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | Automation instructions require writing `$CODEX_HOME/automations/<automation_id>/memory.md`, but GT-KB root-boundary guidance treats home auto-memory as non-authoritative and LO file-safety blocks normal shell/patch edit paths. | `CLAUDE.md:12`; `.claude/hooks/lo-file-safety-gate.py` blocks opaque, shell, and outside-allow-list mutations; current session required a Node REPL append workaround. | Prime should propose a deterministic `gt automation memory` helper or policy alignment that preserves any required in-root reconciliation surface. | Open |
+
+### 2026-06-13 - WI-4460 Dispatch Run-ID Sanitization Disposition
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition investigation for `WI-4460`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4460-dispatch-run-id-sanitization-disposition.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | The original NTFS ADS risk from `:` in dispatch-run filenames appears fixed in live source, but the backlog row remains open/backlogged. | `_new_dispatch_id()` sanitizes `:` to `-`; `test_fab10_work_intent_claim_contract_uses_child_dispatch_id` asserts no colon in `prime-builder:A` dispatch IDs; targeted cross-harness trigger tests passed 78; normal `Get-ChildItem -Filter "*:*"` found no colon-named dispatch-run entries. | Prime should resolve `WI-4460` with completion evidence or supersede only a narrower residual artifact-path audit distinct from `WI-4479`. | Open |

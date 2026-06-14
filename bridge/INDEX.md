@@ -1,7 +1,22 @@
+Document: gtkb-tafe-dual-write-slice-c-ingestion
+NEW: bridge/gtkb-tafe-dual-write-slice-c-ingestion-001.md
+
+Document: gtkb-core-spec-intake-phase-4-cross-session-prompt-driver
+NEW: bridge/gtkb-core-spec-intake-phase-4-cross-session-prompt-driver-001.md
+
+Document: gtkb-tafe-dual-write-slice-c
+NEW: bridge/gtkb-tafe-dual-write-slice-c-001.md
+
 Document: gtkb-wi4464-commit-pathspec-safety-detector
+NO-GO: bridge/gtkb-wi4464-commit-pathspec-safety-detector-004.md
+NEW: bridge/gtkb-wi4464-commit-pathspec-safety-detector-003.md
+GO: bridge/gtkb-wi4464-commit-pathspec-safety-detector-002.md
 NEW: bridge/gtkb-wi4464-commit-pathspec-safety-detector-001.md
 
 Document: gtkb-tafe-live-impl-flow-pilot
+GO: bridge/gtkb-tafe-live-impl-flow-pilot-004.md
+REVISED: bridge/gtkb-tafe-live-impl-flow-pilot-003.md
+NO-GO: bridge/gtkb-tafe-live-impl-flow-pilot-002.md
 NEW: bridge/gtkb-tafe-live-impl-flow-pilot-001.md
 
 Document: gtkb-wi4453-deliberation-embedding-timeout
