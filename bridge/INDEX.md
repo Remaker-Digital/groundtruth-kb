@@ -1,3 +1,55 @@
+Document: gtkb-wi4464-commit-pathspec-safety-detector
+NEW: bridge/gtkb-wi4464-commit-pathspec-safety-detector-001.md
+
+Document: gtkb-tafe-live-impl-flow-pilot
+NEW: bridge/gtkb-tafe-live-impl-flow-pilot-001.md
+
+Document: gtkb-wi4453-deliberation-embedding-timeout
+VERIFIED: bridge/gtkb-wi4453-deliberation-embedding-timeout-004.md
+NEW: bridge/gtkb-wi4453-deliberation-embedding-timeout-003.md
+GO: bridge/gtkb-wi4453-deliberation-embedding-timeout-002.md
+NEW: bridge/gtkb-wi4453-deliberation-embedding-timeout-001.md
+
+Document: gtkb-tafe-dual-write-slice-b-oracle
+VERIFIED: bridge/gtkb-tafe-dual-write-slice-b-oracle-004.md
+NEW: bridge/gtkb-tafe-dual-write-slice-b-oracle-003.md
+GO: bridge/gtkb-tafe-dual-write-slice-b-oracle-002.md
+NEW: bridge/gtkb-tafe-dual-write-slice-b-oracle-001.md
+
+Document: gtkb-tafe-dual-write-slice-b-shadow-ingestion
+WITHDRAWN: bridge/gtkb-tafe-dual-write-slice-b-shadow-ingestion-003.md
+NO-GO: bridge/gtkb-tafe-dual-write-slice-b-shadow-ingestion-002.md
+NEW: bridge/gtkb-tafe-dual-write-slice-b-shadow-ingestion-001.md
+
+Document: gtkb-bridge-reconciliation-wrap-scan-check
+VERIFIED: bridge/gtkb-bridge-reconciliation-wrap-scan-check-004.md
+NEW: bridge/gtkb-bridge-reconciliation-wrap-scan-check-003.md
+GO: bridge/gtkb-bridge-reconciliation-wrap-scan-check-002.md
+NEW: bridge/gtkb-bridge-reconciliation-wrap-scan-check-001.md
+
+Document: gtkb-wi-4534-claim-role-eligibility-guard-slice-a
+WITHDRAWN: bridge/gtkb-wi-4534-claim-role-eligibility-guard-slice-a-003.md
+NO-GO: bridge/gtkb-wi-4534-claim-role-eligibility-guard-slice-a-002.md
+NEW: bridge/gtkb-wi-4534-claim-role-eligibility-guard-slice-a-001.md
+
+Document: gtkb-wi4534-claim-role-eligibility-guard
+VERIFIED: bridge/gtkb-wi4534-claim-role-eligibility-guard-010.md
+NEW: bridge/gtkb-wi4534-claim-role-eligibility-guard-009.md
+GO: bridge/gtkb-wi4534-claim-role-eligibility-guard-008.md
+REVISED: bridge/gtkb-wi4534-claim-role-eligibility-guard-007.md
+NO-GO: bridge/gtkb-wi4534-claim-role-eligibility-guard-006.md
+NEW: bridge/gtkb-wi4534-claim-role-eligibility-guard-005.md
+GO: bridge/gtkb-wi4534-claim-role-eligibility-guard-004.md
+REVISED: bridge/gtkb-wi4534-claim-role-eligibility-guard-003.md
+NO-GO: bridge/gtkb-wi4534-claim-role-eligibility-guard-002.md
+NEW: bridge/gtkb-wi4534-claim-role-eligibility-guard-001.md
+
+Document: gtkb-startup-payload-budget-report
+VERIFIED: bridge/gtkb-startup-payload-budget-report-004.md
+NEW: bridge/gtkb-startup-payload-budget-report-003.md
+GO: bridge/gtkb-startup-payload-budget-report-002.md
+NEW: bridge/gtkb-startup-payload-budget-report-001.md
+
 Document: gtkb-reconciler-wi-bridge-linkage-derivation
 VERIFIED: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-004.md
 NEW: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-003.md
@@ -5,6 +57,8 @@ GO: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-002.md
 NEW: bridge/gtkb-reconciler-wi-bridge-linkage-derivation-001.md
 
 Document: gtkb-tafe-dual-write-index-parity
+VERIFIED: bridge/gtkb-tafe-dual-write-index-parity-007.md
+NEW: bridge/gtkb-tafe-dual-write-index-parity-006.md
 GO: bridge/gtkb-tafe-dual-write-index-parity-005.md
 REVISED: bridge/gtkb-tafe-dual-write-index-parity-004.md
 NO-GO: bridge/gtkb-tafe-dual-write-index-parity-003.md
