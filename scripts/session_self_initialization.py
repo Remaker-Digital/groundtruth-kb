@@ -1232,16 +1232,22 @@ def _backlog_items_from_membase(project_root: Path) -> list[dict[str, Any]]:
     backlog is MemBase ``work_items``; the legacy markdown backlog view is retired.
     """
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "groundtruth_kb", "backlog", "list", "--json"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            cwd=str(project_root),
+        from groundtruth_kb.config import GTConfig
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.gates import GateRegistry
+
+        config = GTConfig.load(config_path=project_root / "groundtruth.toml")
+        registry = GateRegistry.from_config(
+            config.governance_gates,
+            include_builtins=True,
+            gate_config=config.gate_config,
+            project_root=config.project_root,
         )
-        if result.returncode != 0:
-            return []
-        raw_items: list[dict[str, Any]] = json.loads(result.stdout)
+        db = KnowledgeDB(db_path=config.db_path, gate_registry=registry)
+        try:
+            raw_items: list[dict[str, Any]] = db.get_open_work_items()
+        finally:
+            db.close()
     except Exception:
         return []
     items: list[dict[str, Any]] = []
@@ -1618,24 +1624,11 @@ def _release_blockers(project_root: Path) -> list[str]:
 
 
 def _git_drift(project_root: Path) -> dict[str, Any]:
-    try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=project_root,
-            text=True,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"available": False, "error": str(exc)}
+    status = _git_metadata(project_root).get("status", {})
+    if not status.get("ok"):
+        return {"available": False, "error": status.get("stderr") or "git status failed"}
 
-    if result.returncode != 0:
-        return {"available": False, "error": result.stderr.strip()}
-
-    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    lines = [line for line in str(status.get("stdout", "")).splitlines() if line.strip()]
     agent_red_lines = [
         line
         for line in lines
@@ -1765,6 +1758,29 @@ def _command_output(command: list[str], cwd: Path, timeout: int = 10) -> dict[st
         "stderr": result.stderr.strip(),
         "returncode": result.returncode,
     }
+
+
+_GIT_METADATA_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
+
+
+def _git_metadata(cwd: Path) -> dict[str, dict[str, Any]]:
+    try:
+        cache_key = str(cwd.resolve())
+    except OSError:
+        cache_key = str(cwd)
+    cached = _GIT_METADATA_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    metadata = {
+        "branch": _command_output(["git", "branch", "--show-current"], cwd),
+        "sha": _command_output(["git", "rev-parse", "HEAD"], cwd),
+        "short_sha": _command_output(["git", "rev-parse", "--short", "HEAD"], cwd),
+        "remote": _command_output(["git", "remote", "get-url", "origin"], cwd),
+        "status": _command_output(["git", "status", "--porcelain"], cwd, timeout=30),
+        "last_commit": _command_output(["git", "log", "-1", "--format=%cd%n%s", "--date=iso-strict"], cwd),
+    }
+    _GIT_METADATA_CACHE[cache_key] = metadata
+    return metadata
 
 
 def _read_toml(path: Path) -> dict[str, Any]:

@@ -49,7 +49,8 @@ HARNESS_NAME = None
 OUT_DIR = None
 STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
-STARTUP_SERVICE_TIMEOUT_SECONDS = 50.0
+STARTUP_SERVICE_TIMEOUT_ENV = "GTKB_STARTUP_SERVICE_TIMEOUT_SECONDS"
+STARTUP_SERVICE_TIMEOUT_SECONDS = 150.0
 # Parity marker for tests: Role: Prime Builder
 
 # IP-4: canonical init-keyword recognition (receiver side).
@@ -95,6 +96,17 @@ from scripts.harness_projection_reader import load_harness_projection  # noqa: E
 
 def _now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _startup_service_timeout_seconds() -> float:
+    raw = os.environ.get(STARTUP_SERVICE_TIMEOUT_ENV)
+    if raw is None or not raw.strip():
+        return STARTUP_SERVICE_TIMEOUT_SECONDS
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return STARTUP_SERVICE_TIMEOUT_SECONDS
+    return parsed if parsed > 0 else STARTUP_SERVICE_TIMEOUT_SECONDS
 
 
 def _parse_iso8601(value: str | None) -> datetime | None:
@@ -683,7 +695,7 @@ def main() -> int:
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=STARTUP_SERVICE_TIMEOUT_SECONDS,
+            timeout=_startup_service_timeout_seconds(),
             check=False,
             env=env,
         )

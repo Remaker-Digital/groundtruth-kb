@@ -61,6 +61,14 @@ _SUFFICIENT = "## Requirement Sufficiency\n\nExisting requirements sufficient. R
 _GAP_STATE = (
     "## Requirement Sufficiency\n\nNew or revised requirement required before implementation. Rationale prose here.\n"
 )
+# Both mutually exclusive operative states asserted in one section. The
+# file-bridge-protocol requires EXACTLY ONE; this must be DENIED (WI-3439
+# verification NO-GO -008: the prior presence-of-either check wrongly accepted it).
+_DUAL_STATE = (
+    "## Requirement Sufficiency\n\n"
+    "Existing requirements sufficient.\n"
+    "New or revised requirement required before implementation.\n"
+)
 
 
 def _load_gate(path: Path, module_name: str) -> ModuleType:
@@ -153,6 +161,18 @@ def test_second_operative_state_allowed(gate: ModuleType, tmp_path: Path) -> Non
     assert _deny(gate, content, tmp_path) is None
 
 
+def test_dual_state_requirement_sufficiency_denied(gate: ModuleType, tmp_path: Path) -> None:
+    # WI-3439 verification NO-GO -008: the file-bridge-protocol requires EXACTLY
+    # ONE operative state. A section that asserts BOTH mutually exclusive states
+    # must be DENIED at Write-time. The pre-fix presence-of-either check wrongly
+    # accepted this; the state-counting helper now rejects it. Exercised against
+    # BOTH hook copies via the parametrized ``gate`` fixture.
+    content = _proposal(requirement_sufficiency=_DUAL_STATE)
+    reason = _deny(gate, content, tmp_path)
+    assert reason is not None and _MARKER in reason
+    assert "Requirement Sufficiency" in reason
+
+
 def test_revised_status_also_gated(gate: ModuleType, tmp_path: Path) -> None:
     # GO constraint 5: the check is gated on the shared NEW/REVISED status set,
     # not hardcoded to NEW.
@@ -221,6 +241,9 @@ def test_requirement_sufficiency_gap_helper(gate: ModuleType) -> None:
         )
         is None
     )
+    # WI-3439 NO-GO -008: both states present is a gap (exactly one required).
+    dual = gate._requirement_sufficiency_section_gap(_DUAL_STATE)
+    assert dual is not None and "multiple operative states" in dual
 
 
 def test_shared_status_trigger_constant(gate: ModuleType) -> None:

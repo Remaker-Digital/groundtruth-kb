@@ -224,6 +224,23 @@ REQUIREMENT_SUFFICIENCY_OPERATIVE_RE = re.compile(
     r"|new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
     re.IGNORECASE,
 )
+# The two mutually exclusive operative states. The file-bridge-protocol requires
+# EXACTLY ONE; the gap helper counts distinct states present and rejects zero or
+# more than one (per WI-3439 verification NO-GO -008: the combined RE above only
+# proved presence-of-either, so a section asserting BOTH states was wrongly
+# accepted).
+REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE = re.compile(
+    r"existing\s+requirements?\s+(?:are\s+)?sufficient",
+    re.IGNORECASE,
+)
+REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE = re.compile(
+    r"new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
+    re.IGNORECASE,
+)
+REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES = (
+    REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE,
+    REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE,
+)
 BRIDGE_KIND_IMPLEMENTATION_PROPOSAL = frozenset({"prime_proposal", "implementation_proposal"})
 
 # WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
@@ -867,14 +884,17 @@ def _bridge_kind_is_implementation_proposal(content: str) -> bool:
 def _requirement_sufficiency_section_gap(content: str) -> str | None:
     """Return a short gap descriptor when an implementation proposal's
     ``## Requirement Sufficiency`` subsection is absent, placeholder-only, or
-    carries neither bounded operative state; return None when it is substantive.
+    does not carry EXACTLY ONE bounded operative state; return None when it is
+    substantive with a single operative state.
 
     Operative states per .claude/rules/file-bridge-protocol.md section "Mandatory
     Implementation-Start Authorization Metadata": exactly one of "Existing
     requirements sufficient" or "New or revised requirement required before
-    implementation". Mirrors the existing ``_has_concrete_spec_links`` /
-    ``_has_concrete_owner_decisions_section`` section-presence machinery (heading
-    scan + ``_collect_section_lines`` + placeholder-line rejection).
+    implementation". The two states are mutually exclusive, so a section that
+    asserts BOTH is a gap (WI-3439 verification NO-GO -008). Mirrors the existing
+    ``_has_concrete_spec_links`` / ``_has_concrete_owner_decisions_section``
+    section-presence machinery (heading scan + ``_collect_section_lines`` +
+    placeholder-line rejection).
     """
     lines = content.splitlines()
     start: int | None = None
@@ -890,10 +910,18 @@ def _requirement_sufficiency_section_gap(content: str) -> str | None:
         return "section empty"
     if not any(not SPEC_PLACEHOLDER_LINE_RE.match(ln) for ln in nonblank):
         return "section placeholder-only"
-    if not REQUIREMENT_SUFFICIENCY_OPERATIVE_RE.search("\n".join(section)):
+    joined = "\n".join(section)
+    states_present = sum(1 for state_re in REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES if state_re.search(joined))
+    if states_present == 0:
         return (
             "no operative state ('Existing requirements sufficient' or "
             "'New or revised requirement required before implementation')"
+        )
+    if states_present > 1:
+        return (
+            "multiple operative states (exactly one required: 'Existing "
+            "requirements sufficient' XOR 'New or revised requirement required "
+            "before implementation')"
         )
     return None
 

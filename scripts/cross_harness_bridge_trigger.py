@@ -129,11 +129,20 @@ BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
 DISPATCH_STATE_FILENAME = "dispatch-state.json"
 QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
+DISPATCH_SUPPRESSIONS_FILENAME = "dispatch-suppressions.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 DISPATCH_FAILURES_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_FAILURES_MAX_BYTES"
+DISPATCH_SUPPRESSIONS_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_SUPPRESSIONS_MAX_BYTES"
 DEFAULT_JSONL_MAX_BYTES = 10 * 1024 * 1024
 DEFAULT_JSONL_ROLLOVERS = 5
 DEFAULT_DISPATCH_FAILURES_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
+DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
+# WI-4396: expected, non-actionable lease/contention suppression reasons. These
+# are normal concurrency outcomes (launched: false with a holder), NOT actionable
+# dispatch failures, so the shared writer routes them to
+# dispatch-suppressions.jsonl instead of polluting dispatch-failures.jsonl and
+# burying real, actionable failures in the `diagnose` "Recent failures" view.
+EXPECTED_SUPPRESSION_REASONS = frozenset({"work_intent_already_held"})
 DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
 DEFAULT_DISPATCH_RUNS_MAX_BYTES = 200 * 1024 * 1024
 DEFAULT_GTKB_STATE_GC_AGE_DAYS = 14
@@ -554,11 +563,44 @@ def _circuit_breaker_half_open_allowed(recipient_state: dict[str, Any], retry_de
 
 
 def _record_dispatch_failure(state_dir: Path, payload: dict[str, Any]) -> None:
-    """Append a fire-and-forget failure record to the JSONL diagnosis log."""
+    """Append a fire-and-forget failure record to the JSONL diagnosis log.
+
+    WI-4396: records whose ``reason`` is an expected lease/contention suppression
+    (``EXPECTED_SUPPRESSION_REASONS``) are routed to
+    ``dispatch-suppressions.jsonl`` instead of ``dispatch-failures.jsonl``. The
+    routing decision lives in this single shared chokepoint so every call site --
+    in both the cross-harness trigger and the single-harness dispatcher, which
+    reuses this function -- is covered with no call-site changes. Routing is by
+    ``reason`` (not by ``launched``) because some ``launched: False`` records are
+    real failures (e.g. ``WorkIntentRegistryError``) that must stay actionable.
+    Records are routed, never dropped.
+    """
+    if payload.get("reason") in EXPECTED_SUPPRESSION_REASONS:
+        _record_dispatch_suppression(state_dir, payload)
+        return
     try:
         state_dir.mkdir(parents=True, exist_ok=True)
         target = state_dir / DISPATCH_FAILURES_FILENAME
         _rotate_dispatch_failures_if_needed(target)
+        with target.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def _record_dispatch_suppression(state_dir: Path, payload: dict[str, Any]) -> None:
+    """Append a fire-and-forget expected-suppression record to the sibling JSONL
+    audit log (WI-4396).
+
+    Mirrors ``_record_dispatch_failure``'s rotation + fire-and-forget discipline.
+    Expected lease/contention suppressions are durably recorded for audit/metrics
+    here, kept out of the actionable failure log so ``diagnose`` "Recent failures"
+    reports only real, actionable failures.
+    """
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        target = state_dir / DISPATCH_SUPPRESSIONS_FILENAME
+        _rotate_dispatch_suppressions_if_needed(target)
         with target.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
     except OSError:
@@ -866,6 +908,17 @@ def _dispatch_failures_max_bytes() -> int:
     except ValueError:
         return DEFAULT_DISPATCH_FAILURES_MAX_BYTES
     return parsed if parsed > 0 else DEFAULT_DISPATCH_FAILURES_MAX_BYTES
+
+
+def _dispatch_suppressions_max_bytes() -> int:
+    raw = os.environ.get(DISPATCH_SUPPRESSIONS_MAX_BYTES_ENV_VAR)
+    if raw is None or raw.strip() == "":
+        return DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES
+    return parsed if parsed > 0 else DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES
 
 
 def _runtime_retention_policy(project_root: Path) -> dict[str, int]:
@@ -1202,6 +1255,15 @@ def _rotate_dispatch_failures_if_needed(target: Path) -> None:
     _rotate_jsonl_if_needed(
         target,
         max_bytes=_dispatch_failures_max_bytes(),
+        max_rollovers=DEFAULT_JSONL_ROLLOVERS,
+    )
+
+
+def _rotate_dispatch_suppressions_if_needed(target: Path) -> None:
+    """Rotate dispatch-suppressions.jsonl through 5 rollovers when oversized (WI-4396)."""
+    _rotate_jsonl_if_needed(
+        target,
+        max_bytes=_dispatch_suppressions_max_bytes(),
         max_rollovers=DEFAULT_JSONL_ROLLOVERS,
     )
 
@@ -3497,6 +3559,30 @@ def _read_dispatch_failure_records(state_dir: Path, *, include_rotated_failures:
     return records
 
 
+def _read_dispatch_suppression_records(state_dir: Path, *, include_rotated: bool = False) -> list[dict[str, Any]]:
+    """Read expected-suppression records from dispatch-suppressions.jsonl (WI-4396)."""
+    paths = [state_dir / DISPATCH_SUPPRESSIONS_FILENAME]
+    if include_rotated:
+        paths.append(state_dir / f"{DISPATCH_SUPPRESSIONS_FILENAME}.1")
+
+    records: list[dict[str, Any]] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        try:
+            raw = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in raw:
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(rec, dict):
+                records.append(rec)
+    return records
+
+
 def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = False) -> str:
     """Render a structured liveness summary; read-only.
 
@@ -3620,6 +3706,27 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
         for cls in sorted(class_counts, key=lambda k: -class_counts[k]):
             last_ts = last_ts_by_class.get(cls, "(unknown)")
             lines.append(f"  - {cls}: {class_counts[cls]} (last: {last_ts})")
+    lines.append("")
+
+    # Expected suppressions (WI-4396): normal lease/contention outcomes routed
+    # out of the failure log; surfaced here so the data stays visibly auditable
+    # without polluting the actionable "Recent failures" distribution.
+    lines.append("== Expected suppressions ==")
+    suppressions_path = state_dir / DISPATCH_SUPPRESSIONS_FILENAME
+    if not suppressions_path.is_file():
+        lines.append("- dispatch-suppressions.jsonl absent (no suppressions recorded).")
+    else:
+        suppression_records = _read_dispatch_suppression_records(
+            state_dir,
+            include_rotated=include_rotated_failures,
+        )
+        lines.append(f"- Total in dispatch-suppressions.jsonl: {len(suppression_records)}")
+        reason_counts: dict[str, int] = {}
+        for rec in suppression_records:
+            reason = str(rec.get("reason") or "(unknown)")
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        for reason in sorted(reason_counts, key=lambda k: -reason_counts[k]):
+            lines.append(f"  - {reason}: {reason_counts[reason]}")
     lines.append("")
 
     # Liveness assessment

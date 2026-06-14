@@ -279,10 +279,15 @@ def test_fab10_prime_work_intent_held_logging_dedupes_per_holder_and_slug(tmp_pa
             holder=holder,
         )
 
-    records = _failure_records(state_dir)
+    # WI-4396: work_intent_already_held is an expected lease/contention
+    # suppression. It is routed to dispatch-suppressions.jsonl, NOT the
+    # actionable dispatch-failures.jsonl. The per-holder/per-slug dedupe still
+    # collapses the two identical calls to a single record.
+    records = _suppression_records(state_dir)
     assert len(records) == 1
     assert records[0]["reason"] == "work_intent_already_held"
     assert records[0]["holder_session_id"] == "dispatch-1"
+    assert _failure_records(state_dir) == []
 
     trigger._record_prime_work_intent_held(
         state_dir=state_dir,
@@ -291,7 +296,8 @@ def test_fab10_prime_work_intent_held_logging_dedupes_per_holder_and_slug(tmp_pa
         item=item,
         holder={"session_id": "dispatch-3"},
     )
-    assert len(_failure_records(state_dir)) == 2
+    assert len(_suppression_records(state_dir)) == 2
+    assert _failure_records(state_dir) == []
 
 
 def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) -> None:
@@ -2551,6 +2557,15 @@ def _rec(
 
 def _failure_records(state_dir: Path) -> list[dict]:
     path = state_dir / "dispatch-failures.jsonl"
+    if not path.is_file():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _suppression_records(state_dir: Path) -> list[dict]:
+    # WI-4396: expected lease/contention suppressions are routed to the sibling
+    # dispatch-suppressions.jsonl audit log, NOT dispatch-failures.jsonl.
+    path = state_dir / "dispatch-suppressions.jsonl"
     if not path.is_file():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]

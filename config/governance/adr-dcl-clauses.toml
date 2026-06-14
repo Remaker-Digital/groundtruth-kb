@@ -53,6 +53,12 @@ evidence_required = "Implementation must declare in-root output paths for all ge
 evidence_pattern = "(?i)(?:E:\\\\GT-KB|under .{0,40}root|in[- ]root|`E:/GT-KB`)"
 failure_condition = "Implementation report references an output path outside E:\\GT-KB."
 failure_pattern = "(?i)(?<![\\w./\\\\-])(?:C:\\\\Users\\\\|/tmp/(?!agent-red-rehearsal)|C:\\\\temp\\\\(?!agent-red-rehearsal))"
+# CLAUSE-IN-ROOT treats paired HTML-comment spans as disclosure-only context:
+#   <!-- in-root-disclosure --> ... <!-- /in-root-disclosure -->
+# The preflight removes those spans only for failure-pattern scanning, then
+# appends raw target_paths metadata lines back into the scan so declared
+# artifact paths remain fully enforced.
+failure_pattern_disclosure_exempt = true
 severity = "blocking"
 waiver_policy = "explicit_owner_waiver_required_in_bridge"
 enforcement_mode = "blocking"

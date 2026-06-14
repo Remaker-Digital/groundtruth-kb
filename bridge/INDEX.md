@@ -1,20 +1,49 @@
+Document: gtkb-wi4564-startup-service-timeout-and-fanout
+GO: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-004.md
+REVISED: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-003.md
+NO-GO: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-002.md
+NEW: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-001.md
+
+Document: gtkb-tafe-phase-b-acknowledged-archived
+VERIFIED: bridge/gtkb-tafe-phase-b-acknowledged-archived-004.md
+NEW: bridge/gtkb-tafe-phase-b-acknowledged-archived-003.md
+GO: bridge/gtkb-tafe-phase-b-acknowledged-archived-002.md
+NEW: bridge/gtkb-tafe-phase-b-acknowledged-archived-001.md
+
+Document: gtkb-tafe-completeness-phase-b-disposition
+WITHDRAWN: bridge/gtkb-tafe-completeness-phase-b-disposition-002.md
+NEW: bridge/gtkb-tafe-completeness-phase-b-disposition-001.md
+
+Document: gtkb-tafe-phase-b-residual-cleanup
+WITHDRAWN: bridge/gtkb-tafe-phase-b-residual-cleanup-002.md
+NEW: bridge/gtkb-tafe-phase-b-residual-cleanup-001.md
+
 Document: gtkb-wi3384-clause-in-root-disclosure-exemption
+VERIFIED: bridge/gtkb-wi3384-clause-in-root-disclosure-exemption-004.md
+NEW: bridge/gtkb-wi3384-clause-in-root-disclosure-exemption-003.md
 GO: bridge/gtkb-wi3384-clause-in-root-disclosure-exemption-002.md
 NEW: bridge/gtkb-wi3384-clause-in-root-disclosure-exemption-001.md
 
 Document: gtkb-wi4561-chromadb-py314-gate-fix
+VERIFIED: bridge/gtkb-wi4561-chromadb-py314-gate-fix-006.md
+REVISED: bridge/gtkb-wi4561-chromadb-py314-gate-fix-005.md
 NO-GO: bridge/gtkb-wi4561-chromadb-py314-gate-fix-004.md
 NEW: bridge/gtkb-wi4561-chromadb-py314-gate-fix-003.md
 GO: bridge/gtkb-wi4561-chromadb-py314-gate-fix-002.md
 NEW: bridge/gtkb-wi4561-chromadb-py314-gate-fix-001.md
 
 Document: gtkb-wi4396-dispatch-suppression-routing
+VERIFIED: bridge/gtkb-wi4396-dispatch-suppression-routing-006.md
+NEW: bridge/gtkb-wi4396-dispatch-suppression-routing-005.md
 GO: bridge/gtkb-wi4396-dispatch-suppression-routing-004.md
 REVISED: bridge/gtkb-wi4396-dispatch-suppression-routing-003.md
 GO: bridge/gtkb-wi4396-dispatch-suppression-routing-002.md
 NEW: bridge/gtkb-wi4396-dispatch-suppression-routing-001.md
 
 Document: gtkb-wi3439-requirement-sufficiency-presence-check
+VERIFIED: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-010.md
+REVISED: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-009.md
+NO-GO: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-008.md
 NEW: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-007.md
 GO: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-006.md
 REVISED: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-005.md
@@ -816,7 +845,7 @@ NEW: bridge/gtkb-architecture-governance-hygiene-investigation-001.md
 Document: ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings 
 ADVISORY: bridge/ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings-001.md 
  
-Document: sp1-dispatch-reliability-prime-handoff 
+Document: gtkb-sp1-dispatch-reliability-prime-handoff 
 ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md 
 
 Document: gtkb-bridge-advisory-message-type-implementation

@@ -504,3 +504,13 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | The original NTFS ADS risk from `:` in dispatch-run filenames appears fixed in live source, but the backlog row remains open/backlogged. | `_new_dispatch_id()` sanitizes `:` to `-`; `test_fab10_work_intent_claim_contract_uses_child_dispatch_id` asserts no colon in `prime-builder:A` dispatch IDs; targeted cross-harness trigger tests passed 78; normal `Get-ChildItem -Filter "*:*"` found no colon-named dispatch-run entries. | Prime should resolve `WI-4460` with completion evidence or supersede only a narrower residual artifact-path audit distinct from `WI-4479`. | Open |
+
+---
+
+### 2026-06-14 - Omnigent Alignment Project Review
+
+Loyal Opposition (Antigravity/lo role) completed a review of `PROJECT-OMNIGENT-ALIGNMENT`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-14-11-15-omnigent-alignment-review.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | `PROJECT-OMNIGENT-ALIGNMENT` was created with six backlogged consideration work items to emulate Omnigent's capability shapes (cost limits, registries, specs, cloud/worktree sandboxes) without runtime dependencies. | `groundtruth.db` `projects` and `work_items` search (WI-4550 through WI-4555); `DELIB-OMNIGENT-ADVISORY-20260614` + `DELIB-20263229` owner decisions. | Prime should proceed with WI-4550 (Cost/Token budget) as the P1 target to halt token-loop waste, while keeping other items as open design considerations. | Open |

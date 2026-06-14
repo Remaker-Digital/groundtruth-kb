@@ -63,6 +63,24 @@ def _index_for(*slugs: str) -> str:
     return "\n".join(blocks)
 
 
+def _write_acknowledged_config(project_dir: Path, *slugs: str) -> Path:
+    """Write the rule-3 acknowledged-archived config under the project root.
+
+    Mirrors ``config/governance/tafe-acknowledged-archived-bridges.toml`` with one
+    ``[[acknowledged]]`` entry per slug (each carrying a ``reason``).
+    """
+    config = project_dir / "config" / "governance" / "tafe-acknowledged-archived-bridges.toml"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    body = ["schema_version = 1", ""]
+    for slug in slugs:
+        body.append("[[acknowledged]]")
+        body.append(f'slug = "{slug}"')
+        body.append('reason = "test acknowledgement"')
+        body.append("")
+    config.write_text("\n".join(body), encoding="utf-8")
+    return config
+
+
 # --------------------------------------------------------------------------- #
 # scan_expected_documents
 # --------------------------------------------------------------------------- #
@@ -279,6 +297,145 @@ def test_as_dict_surfaces_archived_blocks(project_dir: Path) -> None:
     assert payload["archived_blocks"] == ["done"]
     assert payload["archived_count"] == 1
     assert payload["lost_blocks"] == ["orphan"]
+
+
+# --------------------------------------------------------------------------- #
+# Rule 2 -- implementation-sibling classification (DCL v2)
+# --------------------------------------------------------------------------- #
+
+
+def test_rule2_non_terminal_candidate_with_terminal_impl_sibling_archived(project_dir: Path) -> None:
+    """A non-terminal orphan whose ``-implementation`` sibling is terminal => archived."""
+    _write_bridge_file(project_dir, "feature-001.md", body="GO\n")  # non-terminal proposal
+    _write_bridge_file(project_dir, "feature-implementation-001.md", body="VERIFIED\n")  # terminal sibling
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert "feature" in report.archived_blocks
+    assert "feature" not in report.lost_blocks
+    # The terminal sibling is itself an orphan and archived by rule 1.
+    assert "feature-implementation" in report.archived_blocks
+
+
+def test_rule2_non_terminal_candidate_with_non_terminal_sibling_stays_lost(project_dir: Path) -> None:
+    """A non-terminal orphan whose ``-implementation`` sibling is also non-terminal stays lost."""
+    _write_bridge_file(project_dir, "feature-001.md", body="GO\n")
+    _write_bridge_file(project_dir, "feature-implementation-001.md", body="NEW\n")  # non-terminal sibling
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert "feature" in report.lost_blocks
+    assert "feature" not in report.archived_blocks
+
+
+def test_rule2_no_sibling_stays_lost(project_dir: Path) -> None:
+    """A non-terminal orphan with no ``-implementation`` sibling stays lost."""
+    _write_bridge_file(project_dir, "lonely-001.md", body="NO-GO\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.lost_blocks == ("lonely",)
+    assert report.archived_blocks == ()
+
+
+def test_rule2_sibling_latest_version_decides(project_dir: Path) -> None:
+    """Rule 2 uses the sibling's latest on-disk version, not an earlier one."""
+    _write_bridge_file(project_dir, "feature-001.md", body="GO\n")
+    _write_bridge_file(project_dir, "feature-implementation-001.md", body="NEW\n")
+    _write_bridge_file(project_dir, "feature-implementation-002.md", body="VERIFIED\n")  # latest terminal
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert "feature" in report.archived_blocks
+    assert "feature" not in report.lost_blocks
+
+
+# --------------------------------------------------------------------------- #
+# Rule 3 -- acknowledged-archived config classification (DCL v2)
+# --------------------------------------------------------------------------- #
+
+
+def test_rule3_acknowledged_slug_archived(project_dir: Path) -> None:
+    """A non-terminal orphan whose slug is in the acknowledged config => archived."""
+    _write_bridge_file(project_dir, "old-thread-001.md", body="NEW\n")
+    _write_acknowledged_config(project_dir, "old-thread")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.archived_blocks == ("old-thread",)
+    assert report.lost_blocks == ()
+    assert report.ok is True
+
+
+def test_rule3_not_listed_stays_lost(project_dir: Path) -> None:
+    """A non-terminal orphan NOT in the acknowledged config stays lost."""
+    _write_bridge_file(project_dir, "unlisted-001.md", body="NEW\n")
+    _write_acknowledged_config(project_dir, "some-other-slug")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.lost_blocks == ("unlisted",)
+    assert report.archived_blocks == ()
+
+
+def test_rule3_config_absent_graceful(project_dir: Path) -> None:
+    """No acknowledged config present => no crash; non-terminal orphan stays lost."""
+    _write_bridge_file(project_dir, "orphan-001.md", body="NEW\n")
+    # No config written.
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.lost_blocks == ("orphan",)
+    assert report.archived_blocks == ()
+
+
+def test_rule3_malformed_config_graceful(project_dir: Path) -> None:
+    """A malformed acknowledged config is ignored (graceful); orphan stays lost."""
+    config = project_dir / "config" / "governance" / "tafe-acknowledged-archived-bridges.toml"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text("this is = not valid toml ][", encoding="utf-8")
+    _write_bridge_file(project_dir, "orphan-001.md", body="NEW\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.lost_blocks == ("orphan",)
+    assert report.archived_blocks == ()
+
+
+# --------------------------------------------------------------------------- #
+# Rule precedence (DCL v2: terminal-token -> sibling -> acknowledged -> lost)
+# --------------------------------------------------------------------------- #
+
+
+def test_precedence_terminal_token_wins_over_config(project_dir: Path) -> None:
+    """Rule 1 (terminal token) classifies archived even when the slug is also acknowledged."""
+    _write_bridge_file(project_dir, "done-001.md", body="VERIFIED\n")
+    _write_acknowledged_config(project_dir, "done")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert "done" in report.archived_blocks
+    assert "done" not in report.lost_blocks
+
+
+def test_precedence_sibling_archives_before_config_needed(project_dir: Path) -> None:
+    """Rule 2 (terminal sibling) archives a candidate absent from the acknowledged config."""
+    _write_bridge_file(project_dir, "feature-001.md", body="GO\n")
+    _write_bridge_file(project_dir, "feature-implementation-001.md", body="VERIFIED\n")
+    _write_acknowledged_config(project_dir, "unrelated")  # feature not listed
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert "feature" in report.archived_blocks
+    assert "feature" not in report.lost_blocks
+
+
+def test_module_reads_acknowledged_config_path() -> None:
+    """The oracle module references the acknowledged-archived config path literal
+    (DCL v2 assertion 2) and the ``-implementation`` sibling token (assertion 1)."""
+    source = Path(completeness_module.__file__).read_text(encoding="utf-8")
+    assert "config/governance/tafe-acknowledged-archived-bridges.toml" in source
+    assert "-implementation" in source
 
 
 # --------------------------------------------------------------------------- #

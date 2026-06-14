@@ -1,0 +1,297 @@
+# config/governance/tafe-acknowledged-archived-bridges.toml
+#
+# Owner-curated, append-only record of reviewed historical/abandoned bridge
+# threads acknowledged as legitimately archived (NOT lost_blocks).
+#
+# This file is the auditable disposition record for TAFE Slice-B completeness
+# rule 3 (acknowledged-archived config) per
+# DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001 (v2). The completeness oracle
+# (groundtruth_kb.tafe_index_completeness) reads this file and classifies any
+# listed slug as `archived_blocks` rather than `lost_blocks`. The file is
+# reversible: removing an entry re-surfaces its slug as a lost_block on the next
+# oracle run, so this list never permanently suppresses a real completeness
+# defect.
+#
+# Owner decision: DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614 (owner chose
+# the acknowledged-archived + implementation-sibling disposition over per-thread
+# bulk-WITHDRAWN or re-index-all). Work item: WI-4566. Project:
+# PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE.
+#
+# The 68 slugs below are the residual non-terminal orphans (after rule 1
+# terminal-token and rule 2 implementation-sibling classification) that an
+# owner-reviewed, read-only characterization found to be historical/abandoned
+# with no live work. Each carries a `reason` per the DCL `SHOULD` guidance.
+
+schema_version = 1
+
+[[acknowledged]]
+slug = "agent-red-bridge-dispatcher-deferral-enforcement"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "agent-red-bridge-dispatcher-deferral-enforcement-implementation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "chromadb-semantic-search"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "codex-poller-misdiagnosis"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "commercial-readiness-spec-1831-startup-wiring"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "commercial-readiness-spec-1833-ready-propagation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "commercial-readiness-spec-verification"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "deliberation-archive-completion"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "deploy-scaling-full-coverage"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "external-poller-liveness-watcher"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-4c-ci-regression-fix"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-app-boundary-mechanism-audit"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-canonical-init-keyword-syntax"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-claude-code-bridge-status-thread-automation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-credential-patterns-canonical"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-cross-harness-trigger-active-session-suppression"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-dashboard-industry-alignment-slice2"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-dashboard-industry-alignment-slice2a-visibility"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-docs-memory-architecture-alignment"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-dora-telemetry-foundation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-f1f8-cross-check"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-harness-registry-parity-sweep"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-hook-scanner-safe-writer"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-impl-start-gate-quoted-arg-misclassification"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-index-role-sentinel-stale-reconciliation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-index-withdrawn-status-reconciliation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-kb-recovery-s311"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-lo-file-safety-rule-clarification"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-loyal-opposition-startup-symmetry"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-membase-effective-use-umbrella"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-operational-skills-tier-a"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-phase4b4-mypy-strict-public-api"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-phase4b5b-internal-helpers-mypy"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-phase4b6-ci-enforcement-gates"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-project-authorization-completion-keep-open"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-project-boundary-and-upgrade-hardening"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-project-boundary-and-upgrade-hardening-implementation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-s373-triage-umbrella"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-session-start-formalization"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-session-start-orientation-gate"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-single-harness-bridge-dispatcher"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-skills-tier-a-adoption"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f1"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f2"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f3"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f4"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f5"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f6"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f7"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-spec-pipeline-f8"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-startup-relay-cache-ttl-self-heal"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-startup-trigger-awareness-and-skill-reference"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "gtkb-wrapup-clear-impl-start-packet-at-verified"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "poller-batch-size-cap"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "poller-emergency-repair"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "por-step16a-verified-spec-closure"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "por-step16b-methodology-review"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "por-step16c-stream-a-alpha-refresh"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "por-step16c-stream-c-beta-triage"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "precommit-ps1-syntax-validation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "s291-phase1.5-verified-spec-audit"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "s291-prioritization-request"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "spec-hygiene-spa-investigation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "spec-hygiene-spa-remediation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "spec-hygiene-untested-verified"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "test-artifact-integrity-investigation"
+reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."

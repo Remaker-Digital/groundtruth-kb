@@ -166,3 +166,42 @@ def test_diagnose_reports_failure_distribution_not_collapsed(tmp_path: Path) -> 
     assert "WinError 2 (file not found): 1" in output
     assert "temp-path permission denied: 1" in output
     assert "Total in dispatch-failures.jsonl: 5" in output
+
+
+def test_diagnose_recent_failures_excludes_suppressions(tmp_path: Path) -> None:
+    """WI-4396: expected lease/contention suppressions routed through the shared
+    writer land in dispatch-suppressions.jsonl, so the "Recent failures" view
+    counts only real, actionable failures. The new "Expected suppressions"
+    section reports the suppression count separately."""
+    state_dir = tmp_path / "state"
+    _seed_state(state_dir)
+
+    # Seed a mix THROUGH the shared writer so routing applies (not by writing the
+    # files directly, which would bypass the fix under test).
+    cht._record_dispatch_failure(
+        state_dir,
+        {"ts": "2026-06-14T10:00:00+00:00", "reason": "work_intent_already_held", "launched": False},
+    )
+    cht._record_dispatch_failure(
+        state_dir,
+        {"ts": "2026-06-14T10:01:00+00:00", "reason": "work_intent_already_held", "launched": False},
+    )
+    cht._record_dispatch_failure(
+        state_dir,
+        {
+            "ts": "2026-06-14T10:02:00+00:00",
+            "reason": "implementation_authorization_packet_failed",
+            "error_message": "[WinError 5] access denied",
+            "error_type": "PermissionError",
+            "launched": False,
+        },
+    )
+
+    output = cht._emit_diagnose_summary(state_dir)
+
+    # Only the one real failure is counted in the failures distribution.
+    assert "Total in dispatch-failures.jsonl: 1" in output
+    # The two expected suppressions are surfaced in their own section.
+    assert "== Expected suppressions ==" in output
+    assert "Total in dispatch-suppressions.jsonl: 2" in output
+    assert "work_intent_already_held: 2" in output

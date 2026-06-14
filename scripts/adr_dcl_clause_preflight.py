@@ -14,6 +14,14 @@ asks a finer-grained question for each registered clause:
 - Are any failure-pattern markers present that would refute the evidence?
 - Is the clause owner-waived in the bridge content?
 
+CLAUSE-IN-ROOT may opt into disclosure-block handling for failure-pattern
+checks. When ``failure_pattern_disclosure_exempt`` is true, paired
+``<!-- in-root-disclosure -->`` ... ``<!-- /in-root-disclosure -->`` spans are
+removed before applying the failure pattern, then raw ``target_paths`` metadata
+lines from the original content are appended back into the scanned text. This
+allows honest non-artifact path disclosures while preserving enforcement on the
+declared artifact path surface.
+
 **Default invocation is mandatory.** Returns exit ``5`` when any must_apply
 clause with both ``severity = "blocking"`` and ``enforcement_mode = "blocking"``
 lacks satisfying evidence and is not explicitly owner-waived. Returns exit ``0``
@@ -46,6 +54,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CLAUSES_CONFIG = PROJECT_ROOT / "config" / "governance" / "adr-dcl-clauses.toml"
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 DEFAULT_INDEX_PATH = DEFAULT_BRIDGE_DIR / "INDEX.md"
+IN_ROOT_DISCLOSURE_BLOCK_RE = re.compile(
+    r"<!--\s*in-root-disclosure\s*-->.*?<!--\s*/in-root-disclosure\s*-->",
+    re.IGNORECASE | re.DOTALL,
+)
+TARGET_PATHS_DECLARATION_RE = re.compile(
+    r"^\s*(?:\*\*)?target_paths?(?:\*\*)?\s*[:=]",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -63,6 +79,7 @@ class Clause:
     severity: str
     waiver_policy: str
     enforcement_mode: str
+    failure_pattern_disclosure_exempt: bool = False
 
 
 @dataclass
@@ -91,6 +108,7 @@ def load_clauses(path: Path) -> list[Clause]:
                 evidence_pattern=entry.get("evidence_pattern"),
                 failure_condition=entry["failure_condition"],
                 failure_pattern=entry.get("failure_pattern"),
+                failure_pattern_disclosure_exempt=bool(entry.get("failure_pattern_disclosure_exempt", False)),
                 severity=entry.get("severity", "advisory"),
                 waiver_policy=entry.get("waiver_policy", "advisory_only"),
                 enforcement_mode=entry.get("enforcement_mode", "advisory_only_in_slice_1"),
@@ -179,6 +197,17 @@ def evaluate_applicability(clause: Clause, content: str, doc_name: str, paths: l
     return ("not_applicable", ["no applicability axis matched"])
 
 
+def _failure_pattern_scan_content(clause: Clause, content: str) -> str:
+    if not clause.failure_pattern_disclosure_exempt:
+        return content
+
+    stripped = IN_ROOT_DISCLOSURE_BLOCK_RE.sub("", content)
+    target_path_lines = [line for line in content.splitlines() if TARGET_PATHS_DECLARATION_RE.match(line)]
+    if not target_path_lines:
+        return stripped
+    return "\n".join([stripped, *target_path_lines])
+
+
 def evaluate_evidence(clause: Clause, content: str) -> tuple[bool, list[str], str | None]:
     """For a must_apply clause, check whether the bridge text shows satisfying evidence.
 
@@ -187,7 +216,8 @@ def evaluate_evidence(clause: Clause, content: str) -> tuple[bool, list[str], st
     reasons: list[str] = []
     if clause.failure_pattern:
         try:
-            if re.search(clause.failure_pattern, content):
+            scan_content = _failure_pattern_scan_content(clause, content)
+            if re.search(clause.failure_pattern, scan_content):
                 reasons.append(f"failure pattern `{clause.failure_pattern}` matched (refutes evidence)")
                 return (False, reasons, f"Failure marker present: {clause.failure_condition}")
         except re.error as e:

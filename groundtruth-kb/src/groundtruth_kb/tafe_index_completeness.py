@@ -42,6 +42,7 @@ INDEX preserved; no write surface).
 from __future__ import annotations
 
 import re
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -74,6 +75,21 @@ _CANONICAL_STATUS_TOKENS = _TERMINAL_STATUS_TOKENS | _NON_TERMINAL_STATUS_TOKENS
 # "# VERIFIED: ..." or "**NO-GO**" still surfaces its status token.
 _LEADING_MARKER_RE = re.compile(r"^[#>*\-\s`]+")
 _STATUS_TOKEN_RE = re.compile(r"^([A-Z][A-Z-]*)")
+
+# Per DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001 (v2) rule 3: a candidate slug
+# listed in this owner-curated, append-only governed config is classified
+# ``archived`` (legitimately absent), not ``lost``. The config is the auditable
+# disposition record for reviewed historical/abandoned threads; removing an
+# entry re-surfaces its slug as a ``lost_block`` (reversible). Read-only input.
+_ACKNOWLEDGED_CONFIG_REL = "config/governance/tafe-acknowledged-archived-bridges.toml"
+
+# Per DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001 (v2) rule 2: a non-terminal
+# candidate whose ``<slug>-implementation`` sibling's latest on-disk version is
+# terminal (by the rule-1 test) is classified ``archived``. GT-KB splits a
+# proposal thread from its implementation thread; a terminal ``-implementation``
+# sibling means the work completed, so the proposal thread's trimming from the
+# INDEX is protocol-sanctioned archival.
+_IMPLEMENTATION_SIBLING_SUFFIX = "-implementation"
 
 
 def _line_status_token(line: str) -> str | None:
@@ -117,6 +133,86 @@ def _classify_candidate(latest_file_text: str) -> str:
         if _line_status_token(raw) in _TERMINAL_STATUS_TOKENS:
             return "archived"
     return "lost"
+
+
+def _read_latest_text(doc: ExpectedDocument, project_root: Path) -> str | None:
+    """Read a document's latest on-disk version file, or ``None`` if unreadable.
+
+    Read-only: uses ``Path.read_text`` (the same sanctioned read the rule-1 path
+    uses); never calls ``open()`` or any write surface.
+    """
+    try:
+        return (project_root / doc.files[-1]).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def _load_acknowledged_slugs(project_root: Path) -> frozenset[str]:
+    """Load the owner-acknowledged-archived slug set (rule 3); empty when absent.
+
+    Reads ``config/governance/tafe-acknowledged-archived-bridges.toml`` via
+    ``Path.read_text`` + ``tomllib.loads`` (a string parse — no ``open()``, so the
+    module's read-only AST guard is preserved). Returns an empty frozenset when
+    the config is absent or malformed (config-absent => graceful: no acknowledged
+    entries, no crash, every such candidate stays ``lost``).
+    """
+    config_path = project_root / _ACKNOWLEDGED_CONFIG_REL
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return frozenset()
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return frozenset()
+    entries = data.get("acknowledged", [])
+    if not isinstance(entries, list):
+        return frozenset()
+    slugs: set[str] = set()
+    for entry in entries:
+        if isinstance(entry, dict):
+            slug = entry.get("slug")
+            if isinstance(slug, str) and slug:
+                slugs.add(slug)
+    return frozenset(slugs)
+
+
+def _candidate_is_archived(
+    slug: str,
+    expected_docs: dict[str, ExpectedDocument],
+    acknowledged: frozenset[str],
+    project_root: Path,
+) -> bool:
+    """Classify a completeness candidate as archived per DCL v2 rules 1->2->3.
+
+    Returns ``True`` (archived; legitimately absent, not a lost block) when ANY
+    rule holds, evaluated in precedence order:
+
+    1. Terminal-token rule (v1): the candidate's own latest version is terminal.
+    2. Implementation-sibling rule (v2): the candidate is non-terminal but a
+       ``<slug>-implementation`` sibling exists on disk whose latest version is
+       terminal (by the rule-1 test).
+    3. Acknowledged-archived config rule (v2): the candidate slug appears in the
+       governed acknowledged-archived config.
+
+    A candidate matching none of the three stays a lost block (conservative;
+    fail-toward-surfacing). An unreadable candidate file skips only rule 1; rules
+    2 and 3 are still evaluated (rule 3 is config-driven and needs no file read).
+    """
+    # Rule 1 -- terminal token on the candidate's own latest version.
+    latest_text = _read_latest_text(expected_docs[slug], project_root)
+    if latest_text is not None and _classify_candidate(latest_text) == "archived":
+        return True
+
+    # Rule 2 -- terminal implementation sibling.
+    sibling = expected_docs.get(f"{slug}{_IMPLEMENTATION_SIBLING_SUFFIX}")
+    if sibling is not None:
+        sibling_text = _read_latest_text(sibling, project_root)
+        if sibling_text is not None and _classify_candidate(sibling_text) == "archived":
+            return True
+
+    # Rule 3 -- owner-acknowledged-archived config.
+    return slug in acknowledged
 
 
 @dataclass(frozen=True)
@@ -218,25 +314,26 @@ def index_completeness_report(index_text: str, project_root: Path) -> IndexCompl
 
     The present set is taken from :func:`tafe_index_sync.parse_bridge_index`
     (the VERIFIED Slice A parser; no re-implementation). The expected set is
-    taken from :func:`scan_expected_documents`. ``lost_blocks`` = expected −
-    present; ``extra_blocks`` = present − expected. Pure over its two inputs
-    (the INDEX text and the on-disk scan result for ``project_root``).
+    taken from :func:`scan_expected_documents`. ``extra_blocks`` = present −
+    expected. Each candidate in ``expected − present`` is classified by
+    :func:`_candidate_is_archived` per DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001
+    v2 (rule 1 terminal-token -> rule 2 implementation-sibling -> rule 3
+    acknowledged-archived config); candidates matching a rule land in
+    ``archived_blocks`` (informational, ungated), the rest in ``lost_blocks`` (the
+    gated completeness set). Read-only: the additional v2 inputs are the sibling
+    thread's latest on-disk file and the acknowledged-archived config, both read
+    via ``Path.read_text``; no write surface, no subprocess, no MemBase mutation.
     """
     parsed = parse_bridge_index(index_text)
     present = {block.name for block in parsed.blocks}
     expected_docs = scan_expected_documents(project_root)
     expected = set(expected_docs)
+    acknowledged = _load_acknowledged_slugs(project_root)
 
     lost: list[str] = []
     archived: list[str] = []
     for slug in expected - present:
-        latest_rel = expected_docs[slug].files[-1]
-        try:
-            latest_text = (project_root / latest_rel).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            lost.append(slug)  # unreadable latest file -> surface conservatively
-            continue
-        if _classify_candidate(latest_text) == "archived":
+        if _candidate_is_archived(slug, expected_docs, acknowledged, project_root):
             archived.append(slug)
         else:
             lost.append(slug)

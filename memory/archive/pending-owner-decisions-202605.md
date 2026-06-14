@@ -6245,3 +6245,69 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-15T16:46:04.742986Z
   answer: "User has answered your questions: \"The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?\"=\"Continue — file -009\". You can now continue with the user's answers in mind."
   notes: ""
+
+- id: DECISION-0618
+  asked_at: 2026-05-15T17:14:51.674715Z
+  question: "The grill-me-for-clarification skill thread is VERIFIED (terminal). The change is ready to commit. How should I proceed?"
+  options:
+    - "Commit now (scoped)"
+    - "Hold the commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c176c7e9a0cea3b3
+  resolved_at: 2026-05-15T17:14:51.674715Z
+  answer: "User has answered your questions: \"The grill-me-for-clarification skill thread is VERIFIED (terminal). The change is ready to commit. How should I proceed?\"=\"Commit now (scoped)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0619
+  asked_at: 2026-05-15T17:21:04.717689Z
+  question: "DECISION-0593 (auto-captured 2026-05-14, prior session): 'address the WI-3314 NO-GO now, or continue with another action?' WI-3314's bridge-compliance-gate project-metadata enforcement is already live in the code, but the work item is still status=open and its bridge thread has rotated out of INDEX. How should this pending decision be resolved?"
+  options:
+    - "Investigate WI-3314 now"
+    - "Defer to a future session"
+    - "Dismiss as stale"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d78fdc77d17b0ab8
+  resolved_at: 2026-05-15T17:21:04.717689Z
+  answer: "User has answered your questions: \"DECISION-0593 (auto-captured 2026-05-14, prior session): 'address the WI-3314 NO-GO now, or continue with another action?' WI-3314's bridge-compliance-gate project-metadata enforcement is already live in the code, but the work item is still status=open and its bridge thread has rotated out of INDEX. How should this pending decision be resolved?\"=\"Dismiss as stale\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0620
+  asked_at: 2026-05-15T17:21:04.717689Z
+  question: "DECISION-0596 (auto-captured 2026-05-15T06:01, prior session): 'Want me to fold those into a follow-up commit, or leave them for the next checkpoint?' The referent of 'those' is not recoverable from the pending-decisions record or this session's context. How should this pending decision be resolved?"
+  options:
+    - "Dismiss as unrecoverable"
+    - "I'll tell you what 'those' were"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 724141eece248e79
+  resolved_at: 2026-05-15T17:21:04.717689Z
+  answer: "User has answered your questions: \"DECISION-0596 (auto-captured 2026-05-15T06:01, prior session): 'Want me to fold those into a follow-up commit, or leave them for the next checkpoint?' The referent of 'those' is not recoverable from the pending-decisions record or this session's context. How should this pending decision be resolved?\"=\"Dismiss as unrecoverable\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0621
+  asked_at: 2026-05-15T20:05:04.110589Z
+  question: "How should I resolve the blocked startup-relay fix (GO'd proposal has non-machine-readable target_paths)?"
+  options:
+    - "Re-file as a new bridge thread"
+    - "Pause the relay fix"
+    - "Patch the auth tool first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 093e38a9103e8c87
+  resolved_at: 2026-05-15T20:05:04.110589Z
+  answer: "User has answered your questions: \"How should I resolve the blocked startup-relay fix (GO'd proposal has non-machine-readable target_paths)?\"=\"Re-file as a new bridge thread\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0622
+  asked_at: 2026-05-15T20:26:15.364694Z
+  question: "Auto-dispatch surfaced friction-hygiene at NO-GO -018: Codex rejected VERIFIED because the approved IP-D scope was 32 regression tests but only 19 landed. Codex offers 3 paths to close the thread — which do you choose?"
+  options:
+    - "Scope-reduction REVISED proposal"
+    - "Owner waiver for 19-test reduction"
+    - "Land remaining 13 IP-D tests"
+    - "Park the thread; pick up next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6bc6de3e71023df2
+  resolved_at: 2026-05-15T20:26:15.364694Z
+  answer: "Answer questions?"
+  notes: ""

@@ -6,27 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-1251
-  asked_at: 2026-06-14T16:28:06.872776Z
-  question: "Want me to **stand this session down** now (cancel its loop, hand the wheel entirely to the fresh session), or **keep..."
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 89fa354447bf0130
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-1253
-  asked_at: 2026-06-14T16:32:52.620003Z
-  question: "Want me to run the full `/kb-session-wrap` and/or a sweep-commit before you close out, or is this handoff sufficient?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 0ddf1797c5210156
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-1255
-  asked_at: 2026-06-14T16:44:02.733394Z
-  question: "I'm standing by for your direction"
-  detected_via: prose:standing_by_for_first_person
-  status: pending
-  question_hash: 2116ea8f0c9f98aa
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -139,70 +119,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0618
-  asked_at: 2026-05-15T17:14:51.674715Z
-  question: "The grill-me-for-clarification skill thread is VERIFIED (terminal). The change is ready to commit. How should I proceed?"
-  options:
-    - "Commit now (scoped)"
-    - "Hold the commit"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c176c7e9a0cea3b3
-  resolved_at: 2026-05-15T17:14:51.674715Z
-  answer: "User has answered your questions: \"The grill-me-for-clarification skill thread is VERIFIED (terminal). The change is ready to commit. How should I proceed?\"=\"Commit now (scoped)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0619
-  asked_at: 2026-05-15T17:21:04.717689Z
-  question: "DECISION-0593 (auto-captured 2026-05-14, prior session): 'address the WI-3314 NO-GO now, or continue with another action?' WI-3314's bridge-compliance-gate project-metadata enforcement is already live in the code, but the work item is still status=open and its bridge thread has rotated out of INDEX. How should this pending decision be resolved?"
-  options:
-    - "Investigate WI-3314 now"
-    - "Defer to a future session"
-    - "Dismiss as stale"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d78fdc77d17b0ab8
-  resolved_at: 2026-05-15T17:21:04.717689Z
-  answer: "User has answered your questions: \"DECISION-0593 (auto-captured 2026-05-14, prior session): 'address the WI-3314 NO-GO now, or continue with another action?' WI-3314's bridge-compliance-gate project-metadata enforcement is already live in the code, but the work item is still status=open and its bridge thread has rotated out of INDEX. How should this pending decision be resolved?\"=\"Dismiss as stale\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0620
-  asked_at: 2026-05-15T17:21:04.717689Z
-  question: "DECISION-0596 (auto-captured 2026-05-15T06:01, prior session): 'Want me to fold those into a follow-up commit, or leave them for the next checkpoint?' The referent of 'those' is not recoverable from the pending-decisions record or this session's context. How should this pending decision be resolved?"
-  options:
-    - "Dismiss as unrecoverable"
-    - "I'll tell you what 'those' were"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 724141eece248e79
-  resolved_at: 2026-05-15T17:21:04.717689Z
-  answer: "User has answered your questions: \"DECISION-0596 (auto-captured 2026-05-15T06:01, prior session): 'Want me to fold those into a follow-up commit, or leave them for the next checkpoint?' The referent of 'those' is not recoverable from the pending-decisions record or this session's context. How should this pending decision be resolved?\"=\"Dismiss as unrecoverable\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0621
-  asked_at: 2026-05-15T20:05:04.110589Z
-  question: "How should I resolve the blocked startup-relay fix (GO'd proposal has non-machine-readable target_paths)?"
-  options:
-    - "Re-file as a new bridge thread"
-    - "Pause the relay fix"
-    - "Patch the auth tool first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 093e38a9103e8c87
-  resolved_at: 2026-05-15T20:05:04.110589Z
-  answer: "User has answered your questions: \"How should I resolve the blocked startup-relay fix (GO'd proposal has non-machine-readable target_paths)?\"=\"Re-file as a new bridge thread\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0622
-  asked_at: 2026-05-15T20:26:15.364694Z
-  question: "Auto-dispatch surfaced friction-hygiene at NO-GO -018: Codex rejected VERIFIED because the approved IP-D scope was 32 regression tests but only 19 landed. Codex offers 3 paths to close the thread — which do you choose?"
-  options:
-    - "Scope-reduction REVISED proposal"
-    - "Owner waiver for 19-test reduction"
-    - "Land remaining 13 IP-D tests"
-    - "Park the thread; pick up next session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6bc6de3e71023df2
-  resolved_at: 2026-05-15T20:26:15.364694Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0623
   asked_at: 2026-05-15T21:03:06.415277Z
   question: "How should the completed LO opportunity-radar project be transitioned?"
@@ -7915,6 +7831,84 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: b948ebf22321028e
   resolved_at: 2026-06-14T17:12:23.151954Z
   answer: "Your questions have been answered: \"Reading .driveignore shows part B (exclude DB/.git/chroma from sync) is already implemented from two prior corruption incidents, and OneDrive likely isn't even watching E:\\GT-KB. Part A (align the 50s inner timeout to the 180s async budget) remains the real, high-confidence fix. How should I re-scope?\"=\"A + C together\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1251
+  asked_at: 2026-06-14T16:28:06.872776Z
+  question: "Want me to **stand this session down** now (cancel its loop, hand the wheel entirely to the fresh session), or **keep..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 89fa354447bf0130
+  resolved_at: 2026-06-14T19:45:57.521792Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1253
+  asked_at: 2026-06-14T16:32:52.620003Z
+  question: "Want me to run the full `/kb-session-wrap` and/or a sweep-commit before you close out, or is this handoff sufficient?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 0ddf1797c5210156
+  resolved_at: 2026-06-14T19:45:57.521822Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1255
+  asked_at: 2026-06-14T16:44:02.733394Z
+  question: "I'm standing by for your direction"
+  detected_via: prose:standing_by_for_first_person
+  status: resolved
+  question_hash: 2116ea8f0c9f98aa
+  resolved_at: 2026-06-14T19:45:57.521827Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1258
+  asked_at: 2026-06-14T19:52:46.595067Z
+  question: "The corrupt ChromaDB index has created a lock cascade: ~8 hung 'deliberations search' processes + 2 hung ollama LO-dispatch processes are stuck on the bad hnsw segment and holding the index open, blocking any rebuild. This degrades DA semantic search and LO bridge dispatch system-wide, and blocks WI-4561's final verification. How should I clear it?"
+  options:
+    - "Full fix: kill hung procs + rebuild (Recommended)"
+    - "Free the lock now, rebuild later"
+    - "Don't kill anything yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 526b288708e75e0c
+  resolved_at: 2026-06-14T19:52:46.595067Z
+  answer: "Your questions have been answered: \"The corrupt ChromaDB index has created a lock cascade: ~8 hung 'deliberations search' processes + 2 hung ollama LO-dispatch processes are stuck on the bad hnsw segment and holding the index open, blocking any rebuild. This degrades DA semantic search and LO bridge dispatch system-wide, and blocks WI-4561's final verification. How should I clear it?\"=\"Full fix: kill hung procs + rebuild (Recommended)\", \"A Codex 'keep-working-lo' loop automation is actively running — it keeps spawning searches/dispatches into the corrupt index (worsening the cascade) and is itself asking to stand down (pending DECISION-1251). Should it be stood down as part of this cleanup?\"=\"Yes — stand the Codex loop down (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1259
+  asked_at: 2026-06-14T19:52:46.595067Z
+  question: "A Codex 'keep-working-lo' loop automation is actively running — it keeps spawning searches/dispatches into the corrupt index (worsening the cascade) and is itself asking to stand down (pending DECISION-1251). Should it be stood down as part of this cleanup?"
+  options:
+    - "Yes — stand the Codex loop down (Recommended)"
+    - "Leave it running"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4f1f66635f92eb99
+  resolved_at: 2026-06-14T19:52:46.595067Z
+  answer: "Your questions have been answered: \"The corrupt ChromaDB index has created a lock cascade: ~8 hung 'deliberations search' processes + 2 hung ollama LO-dispatch processes are stuck on the bad hnsw segment and holding the index open, blocking any rebuild. This degrades DA semantic search and LO bridge dispatch system-wide, and blocks WI-4561's final verification. How should I clear it?\"=\"Full fix: kill hung procs + rebuild (Recommended)\", \"A Codex 'keep-working-lo' loop automation is actively running — it keeps spawning searches/dispatches into the corrupt index (worsening the cascade) and is itself asking to stand down (pending DECISION-1251). Should it be stood down as part of this cleanup?\"=\"Yes — stand the Codex loop down (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1260
+  asked_at: 2026-06-14T19:52:46.595067Z
+  question: "The chroma rebuild needs a moment with nothing holding the index. The environment has ~16 bridge-trigger + ~11 reconciler + other processes storming the corrupt index, regenerating load faster than I can clear it. How do you want to create the quiet window to delete + rebuild the index (which then drains the storm)?"
+  options:
+    - "You quiesce your side, then I rebuild (Recommended)"
+    - "Authorize me to force-quiesce everything"
+    - "Stop here; document and defer"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bb04c7e55b0b52d9
+  resolved_at: 2026-06-14T19:52:46.595067Z
+  answer: "Your questions have been answered: \"The chroma rebuild needs a moment with nothing holding the index. The environment has ~16 bridge-trigger + ~11 reconciler + other processes storming the corrupt index, regenerating load faster than I can clear it. How do you want to create the quiet window to delete + rebuild the index (which then drains the storm)?\"=\"You quiesce your side, then I rebuild (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1261
+  asked_at: 2026-06-14T20:53:15.904569Z
+  question: "Closing Codex wasn't enough — the bridge auto-dispatch trigger keeps respawning hung workers that re-lock the corrupt index, and my own tool calls fire that trigger. Process-killing can't win. What's the cleanest way to get a quiet window to rebuild the index?"
+  options:
+    - "Restart the machine, then I rebuild (Recommended)"
+    - "Authorize me to disable the trigger + force-rebuild"
+    - "Stop here — source fix stands, defer verification"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 139ba86f8859bb08
+  resolved_at: 2026-06-14T20:53:15.904569Z
+  answer: "Your questions have been answered: \"Closing Codex wasn't enough — the bridge auto-dispatch trigger keeps respawning hung workers that re-lock the corrupt index, and my own tool calls fire that trigger. Process-killing can't win. What's the cleanest way to get a quiet window to rebuild the index?\"=\"Restart the machine, then I rebuild (Recommended)\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
