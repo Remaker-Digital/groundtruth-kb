@@ -42,7 +42,7 @@ openai>=1.55.0
 # Observability
 opentelemetry-api>=1.28.0
 opentelemetry-sdk>=1.28.0
-opentelemetry-instrumentation-fastapi>=0.49b0
+opentelemetry-instrumentation-fastapi>=0.63b1
 azure-monitor-opentelemetry-exporter>=1.0.0b31
 langfuse>=2.0.0,<4.0
 
