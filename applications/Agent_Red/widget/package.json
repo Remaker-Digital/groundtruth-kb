@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@pact-foundation/pact": "^16.3.0",
-    "@preact/preset-vite": "^2.9.0",
+    "@preact/preset-vite": "^2.10.5",
     "@storybook/addon-a11y": "^8.6.0",
     "@storybook/addon-essentials": "^8.6.0",
     "@storybook/preact-vite": "^8.6.0",
