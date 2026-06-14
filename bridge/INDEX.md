@@ -1,4 +1,10 @@
+Document: gtkb-bridge-index-remove-document
+GO: bridge/gtkb-bridge-index-remove-document-002.md
+NEW: bridge/gtkb-bridge-index-remove-document-001.md
+
 Document: gtkb-wi4564-startup-service-timeout-and-fanout
+VERIFIED: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-006.md
+NEW: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-005.md
 GO: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-004.md
 REVISED: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-003.md
 NO-GO: bridge/gtkb-wi4564-startup-service-timeout-and-fanout-002.md

@@ -3030,10 +3030,18 @@ def _token_metric() -> dict[str, Any]:
 
 
 def _repo_state(project_root: Path) -> dict[str, Any]:
-    branch = _command_output(["git", "branch", "--show-current"], project_root)
-    sha = _command_output(["git", "rev-parse", "HEAD"], project_root)
-    short_sha = _command_output(["git", "rev-parse", "--short", "HEAD"], project_root)
-    last_commit = _command_output(["git", "log", "-1", "--format=%cd%n%s", "--date=iso-strict"], project_root)
+    # Part C2 (WI-4564): read branch/sha/short_sha/last_commit from the memoized
+    # _git_metadata() helper instead of recomputing them with fresh git
+    # subprocesses. _git_metadata is cached per resolved cwd and is already
+    # populated for project_root earlier in the payload build (via _git_drift),
+    # so this is a cache hit that adds zero new git invocations under the
+    # cold-tree filter-driver tax. The commands are byte-identical to the prior
+    # direct calls, so the emitted payload values are unchanged.
+    metadata = _git_metadata(project_root)
+    branch = metadata["branch"]
+    sha = metadata["sha"]
+    short_sha = metadata["short_sha"]
+    last_commit = metadata["last_commit"]
     return {
         "branch": branch["stdout"] if branch["ok"] else None,
         "sha": sha["stdout"] if sha["ok"] else None,

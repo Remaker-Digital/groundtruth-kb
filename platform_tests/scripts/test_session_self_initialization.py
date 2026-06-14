@@ -3019,3 +3019,133 @@ def test_emit_request_started_matches_env_var(tmp_path) -> None:
         f"equal GTKB_STARTUP_REQUESTED_AT {fresh_request_started_at!r} "
         "(dispatcher freshness check is exact-equality)"
     )
+
+
+# ---------------------------------------------------------------------------
+# WI-4564 Part C: in-process backlog read + git-metadata call dedup.
+# Bridge thread gtkb-wi4564-startup-service-timeout-and-fanout (GO at -004).
+# ---------------------------------------------------------------------------
+
+
+def _load_raw_module():
+    """Load the real module WITHOUT the _load_module() test doubles.
+
+    ``_load_module`` replaces ``_backlog_items_from_membase`` and
+    ``_command_output`` with stubs; the Part C tests must exercise the real
+    implementations of those functions.
+    """
+    spec = importlib.util.spec_from_file_location("session_self_initialization", SCRIPT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["session_self_initialization"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_backlog_fetch_is_in_process_no_child_interpreter(monkeypatch) -> None:
+    """Part C1: backlog items come from an in-process DB call, not a child
+    ``python -m groundtruth_kb backlog list --json`` subprocess.
+
+    Linked specs (proposal -003 verification plan):
+      - DCL-SESSION-STARTUP-TOKEN-BUDGET-001 (per-startup cost reduction).
+      - GOV-SESSION-SELF-INITIALIZATION-001 (payload contract preserved).
+    """
+    import groundtruth_kb.config as gt_config
+    import groundtruth_kb.db as gt_db
+    import groundtruth_kb.gates as gt_gates
+
+    module = _load_raw_module()
+
+    class _FakeDB:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def get_open_work_items(self):
+            return [
+                {
+                    "id": "WI-9001",
+                    "title": "Synthetic item",
+                    "description": "body text",
+                    "approval_state": "auq_resolved",
+                    "resolution_status": "open",
+                    "priority": "P1",
+                }
+            ]
+
+        def close(self) -> None:
+            pass
+
+    class _FakeConfig:
+        project_root = REPO_ROOT
+        db_path = REPO_ROOT / "groundtruth.db"
+        governance_gates = None
+        gate_config = None
+
+    monkeypatch.setattr(gt_config.GTConfig, "load", classmethod(lambda cls, *a, **k: _FakeConfig()))
+    monkeypatch.setattr(gt_gates.GateRegistry, "from_config", classmethod(lambda cls, *a, **k: object()))
+    monkeypatch.setattr(gt_db, "KnowledgeDB", _FakeDB)
+
+    # Spy on subprocess.run within the module: the in-process path must not
+    # spawn any child interpreter for the backlog read.
+    calls: list[list[str]] = []
+    real_run = module.subprocess.run
+
+    def _spy_run(command, *args, **kwargs):
+        calls.append([str(c) for c in command])
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(module.subprocess, "run", _spy_run)
+
+    items = module._backlog_items_from_membase(REPO_ROOT)
+
+    # Shape preserved (id/title/body/approval_state/resolution_status/priority).
+    assert items == [
+        {
+            "id": "WI-9001",
+            "title": "Synthetic item",
+            "body": "body text",
+            "approval_state": "auq_resolved",
+            "resolution_status": "open",
+            "priority": "P1",
+        }
+    ]
+    # No child interpreter spawned for the backlog read.
+    child_interp = [c for c in calls if "-m" in c and any("groundtruth_kb" in part for part in c)]
+    assert child_interp == [], f"backlog read must be in-process; saw child interpreter call(s): {child_interp}"
+
+
+def test_repo_state_reuses_git_metadata_cache(monkeypatch) -> None:
+    """Part C2: _repo_state reads from the memoized _git_metadata cache, adding
+    zero new git subprocesses when the cache is already populated.
+
+    Linked spec: DCL-SESSION-STARTUP-TOKEN-BUDGET-001 (fewer serial git calls).
+    """
+    module = _load_raw_module()
+    module._GIT_METADATA_CACHE.clear()
+
+    git_calls: list[str] = []
+
+    def _counting_command_output(command, cwd, timeout=10):
+        if command and command[0] == "git":
+            git_calls.append(" ".join(str(c) for c in command))
+        # Minimal mock shape consumed by _git_metadata / _repo_state.
+        return {"ok": True, "stdout": "value", "stderr": "", "returncode": 0}
+
+    monkeypatch.setattr(module, "_command_output", _counting_command_output)
+
+    module._git_metadata(REPO_ROOT)
+    calls_after_metadata = len(git_calls)
+    assert calls_after_metadata > 0, "sanity: _git_metadata must issue git calls on a cold cache"
+
+    repo_state = module._repo_state(REPO_ROOT)
+    calls_after_repo_state = len(git_calls)
+
+    # _repo_state must not add new git invocations — it reuses the cache.
+    assert calls_after_repo_state == calls_after_metadata, (
+        f"_repo_state added {calls_after_repo_state - calls_after_metadata} git "
+        "call(s); it must reuse the _git_metadata cache (Part C2 dedup)"
+    )
+    # Values still derived from the metadata (shape preserved).
+    assert set(repo_state) == {"branch", "sha", "short_sha", "last_commit"}
+    assert repo_state["branch"] == "value"
+    assert repo_state["sha"] == "value"

@@ -119,46 +119,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0623
-  asked_at: 2026-05-15T21:03:06.415277Z
-  question: "How should the completed LO opportunity-radar project be transitioned?"
-  options:
-    - "Complete authorization + retire project"
-    - "Complete authorization, keep project open"
-    - "Defer the completion decision"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 86d9711aeb1b34e1
-  resolved_at: 2026-05-15T21:03:06.415277Z
-  answer: "User has answered your questions: \"How should the completed LO opportunity-radar project be transitioned?\"=\"Complete authorization, keep project open\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0625
-  asked_at: 2026-05-15T21:11:28.408105Z
-  question: "How would you like to proceed from here?"
-  options:
-    - "Wrap up the session"
-    - "Stand by for Codex re-review"
-    - "Pick up other backlog work"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 96fbd263b4281aea
-  resolved_at: 2026-05-15T21:11:28.408105Z
-  answer: "User has answered your questions: \"How would you like to proceed from here?\"=\"Stand by for Codex re-review\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0626
-  asked_at: 2026-05-15T21:14:13.303345Z
-  question: "Cross-harness trigger auto-dispatched two bridge entries: friction-hygiene NO-GO -018 (IP-D coverage 19 vs approved 32 tests) and spec-lifecycle-schema-slice-1 GO -004 (clear-path implementation). Session was 'standing by' after wrap-up. What direction?"
-  options:
-    - "Stand down, defer to next session (Recommended)"
-    - "Implement spec-lifecycle-schema-slice-1 GO only"
-    - "Land 13 missing IP-D tests on friction-hygiene"
-    - "File scope-reduction REVISED for friction-hygiene"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f03777a999597321
-  resolved_at: 2026-05-15T21:14:13.303345Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0627
   asked_at: 2026-05-15T22:36:02.891714Z
   question: "DECISION-0624 from the prior session is still unresolved — it concerns whether to wait on a pending Codex re-review or move on to other work. How would you like to direct this Prime Builder session?"
