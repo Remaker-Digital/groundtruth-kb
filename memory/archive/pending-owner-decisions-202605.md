@@ -5862,3 +5862,79 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-14T20:17:18.014823Z
   answer: "Answer questions?"
   notes: ""
+
+- id: DECISION-0572
+  asked_at: 2026-05-14T14:03:26.255920Z
+  question: "want me to proceed with the full 2-file + 32-test + 1-WI + post-impl-report sequence, or pause for a smaller-scope plan?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 6145cde53a12d31a
+  resolved_at: 2026-05-14T20:54:58.622471Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0585
+  asked_at: 2026-05-14T17:04:29.849789Z
+  question: "Want me to spawn another parallel REVISED batch on next-iteration NO-GOs as Codex returns them, or shift focus to imp..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: aed79e2ca5d36475
+  resolved_at: 2026-05-14T20:54:58.622498Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+
+- id: DECISION-0590
+  asked_at: 2026-05-14T21:41:01.750101Z
+  question: "Friction-hygiene IP-D is 13 tests short of the approved 32-test scope (delivered 19). How should Prime close the gap?"
+  options:
+    - "Land remaining tests (Recommended)"
+    - "REVISED-2 narrowing to 19"
+    - "Owner waiver for 19-test closure"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a7833e9c6a074360
+  resolved_at: 2026-05-14T21:41:01.750101Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0591
+  asked_at: 2026-05-14T21:41:01.750101Z
+  question: "Friction-hygiene IP-D is 13 tests short of the approved 32-test scope (19 delivered). How should Prime close the gap?"
+  options:
+    - "Land remaining tests (Recommended)"
+    - "REVISED-2 narrowing to 19"
+    - "Owner waiver for 19-test closure"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dfba12857b6d6bc5
+  resolved_at: 2026-05-14T21:41:01.750101Z
+  answer: "Answer questions?"
+  notes: ""
+
+- id: DECISION-0592
+  asked_at: 2026-05-14T22:26:54.849483Z
+  question: "Authorize additional project groups for parallel bridge dispatch (in addition to the 6 already in-flight)?"
+  options:
+    - "Authorize all 3 groups (7 WIs added)"
+    - "Authorize just GTKB-BRIDGE-TOOLING-ENHANCEMENTS (3 WIs)"
+    - "Authorize just GTKB-BACKLOG-CAPTURE-001 (2 WIs)"
+    - "Pause — wait for Codex to GO some of existing 6 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b52ed451ebd3d9da
+  resolved_at: 2026-05-14T22:26:54.849483Z
+  answer: "User has answered your questions: \"Authorize additional project groups for parallel bridge dispatch (in addition to the 6 already in-flight)?\"=\"Authorize all 3 groups (7 WIs added)\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0594
+  asked_at: 2026-05-14T22:39:19.018418Z
+  question: "Bridge thread `gtkb-implementation-gate-friction-hygiene` is at NO-GO `-018`. Codex's P1 finding: the approved IP-D scope from `-005` (carried forward through GO `-012` and REVISED `-017`) is 32 regression tests; live evidence substantiates only 19 IP-D-related tests. Which path do you want Prime Builder to take to close this thread?"
+  options:
+    - "Land the missing 13 IP-D tests"
+    - "File a REVISED-019 scope-reduction (32→19)"
+    - "Owner waiver: accept 19-test IP-D, close thread"
+    - "Defer; work on GO -004 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6c9dccf22d15908e
+  resolved_at: 2026-05-14T22:39:19.018418Z
+  answer: "Answer questions?"
+  notes: ""
