@@ -524,3 +524,13 @@ Loyal Opposition (Antigravity/lo role) audited, verified, and consolidated outst
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | Outstanding verification files for WI-4564 and WI-4566 were verified clean, staged, and local changes consolidated. The active bridge queue has been completely drained. | Bridge INDEX status set to GO for removal-document-002 and VERIFIED for startup-service-timeout-006; 79/79 pytest cases passed cleanly; pre-commit secrets and inventory drift checks green. | Prime should resolve WI-4564 in MemBase and proceed with evaluating the WI-4510 cutover preconditions. | Resolved |
+
+---
+
+### 2026-06-14 - Test Suite Regression & Drift Analysis
+
+Loyal Opposition (Antigravity/lo role) completed a regression audit on the full pytest suite. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-14-22-20-test-suite-audit.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The full test suite reports 25 failures out of 4,480 tests on `develop` due to schema drift from TAFE tables, canonical rules narrative packet mismatch, and host harness-role conflicts in mock paths. | platform_tests/unit/test_knowledge_db_artifacts.py (missing TAFE tables/views); platform_tests/scripts/test_ollama_governance_artifacts.py (narrative packet mismatch); WorkIntentRegistryError in start-gate tests. | Prime should update test schema lists, regenerate narrative packets, and isolate/stub host harness registry queries in tests. | Open |
