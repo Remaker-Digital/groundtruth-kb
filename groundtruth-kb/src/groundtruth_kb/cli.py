@@ -835,6 +835,217 @@ def flow_preview_bridge_index_cmd(
     )
 
 
+@flow_group.command("index-parity")
+@click.option(
+    "--index-path",
+    "index_path",
+    default=None,
+    help="Bridge index file to check (default: <project_root>/bridge/INDEX.md).",
+)
+@click.option(
+    "--out",
+    "out_path",
+    default=None,
+    help="Write the JSON integrity report to PATH (refuses the canonical bridge index).",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_index_parity_cmd(
+    ctx: click.Context,
+    index_path: str | None,
+    out_path: str | None,
+    json_output: bool,
+) -> None:
+    """Report lossless round-trip + text-observable integrity of the bridge index.
+
+    Reads the canonical bridge index (read-only), runs the WI-4508 Slice-A
+    round-trip integrity check (byte-fidelity, malformed lines, duplicate
+    document blocks, version-order anomalies), and prints a human summary or
+    --json. Exits non-zero when any anomaly is reported. The canonical bridge
+    index (bridge/INDEX.md) is never written and remains authoritative per
+    GOV-FILE-BRIDGE-AUTHORITY-001; an --out target resolving to it is refused.
+    """
+    from groundtruth_kb.tafe_index_sync import roundtrip_report
+
+    canonical_bridge_index = "bridge/INDEX.md"
+
+    if out_path is not None and _targets_canonical_bridge_index(Path(out_path), canonical_bridge_index):
+        _emit_cli_payload(
+            {
+                "command": "flow index-parity",
+                "error": (
+                    f"refusing to write the canonical bridge index ({canonical_bridge_index}); "
+                    "it remains authoritative per GOV-FILE-BRIDGE-AUTHORITY-001"
+                ),
+                "mutated": False,
+                "status": "refused",
+                "summary": f"Refused: {out_path} targets the canonical bridge index; nothing written.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(2)
+
+    config = _resolve_config(ctx)
+    resolved_index = Path(index_path) if index_path is not None else Path(config.project_root) / "bridge" / "INDEX.md"
+
+    if not resolved_index.is_file():
+        _emit_cli_payload(
+            {
+                "command": "flow index-parity",
+                "error": f"bridge index not found at {resolved_index}",
+                "index_path": str(resolved_index),
+                "mutated": False,
+                "status": "index_not_found",
+                "summary": f"No bridge index at {resolved_index}; nothing checked.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(3)
+
+    report = roundtrip_report(resolved_index.read_text(encoding="utf-8"))
+
+    if report.ok:
+        summary = (
+            f"INDEX integrity OK: {report.document_count} documents, round-trip byte-identical, "
+            "no text-observable anomalies."
+        )
+    else:
+        anomaly_bits: list[str] = []
+        if not report.byte_identical:
+            anomaly_bits.append("round-trip not byte-identical")
+        if report.malformed_lines:
+            anomaly_bits.append(f"{len(report.malformed_lines)} malformed line(s)")
+        if report.duplicate_documents:
+            dupes = ", ".join(report.duplicate_documents)
+            anomaly_bits.append(f"{len(report.duplicate_documents)} duplicate document(s): {dupes}")
+        if report.version_order_anomalies:
+            anomaly_bits.append(f"{len(report.version_order_anomalies)} version-order anomaly(ies)")
+        summary = f"INDEX integrity ANOMALIES ({report.document_count} documents): " + "; ".join(anomaly_bits) + "."
+
+    payload: dict[str, Any] = {
+        "command": "flow index-parity",
+        "index_path": str(resolved_index),
+        "mutated": False,
+        "status": "ok" if report.ok else "anomalies_found",
+        "summary": summary,
+        **report.as_dict(),
+    }
+
+    if out_path is not None:
+        resolved_out = Path(out_path)
+        resolved_out.parent.mkdir(parents=True, exist_ok=True)
+        resolved_out.write_text(json.dumps(report.as_dict(), indent=2, sort_keys=True), encoding="utf-8")
+        payload["out_path"] = str(resolved_out)
+
+    _emit_cli_payload(payload, json_output=json_output)
+    if not report.ok:
+        raise SystemExit(1)
+
+
+@flow_group.command("index-completeness")
+@click.option(
+    "--index-path",
+    "index_path",
+    default=None,
+    help="Bridge index file to check (default: <project_root>/bridge/INDEX.md).",
+)
+@click.option(
+    "--out",
+    "out_path",
+    default=None,
+    help="Write the JSON completeness report to PATH (refuses the canonical bridge index).",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_index_completeness_cmd(
+    ctx: click.Context,
+    index_path: str | None,
+    out_path: str | None,
+    json_output: bool,
+) -> None:
+    """Report lost-block / completeness diff of the bridge index vs. the bridge/ dir.
+
+    Reads the canonical bridge index (read-only) and scans the bridge/ directory
+    as the external expected-document oracle (WI-4508 Slice B), then reports
+    lost blocks (slugs with bridge files but no INDEX Document: entry) and extra
+    blocks (INDEX entries with no bridge files). Exits non-zero when lost blocks
+    are present. The canonical bridge index (bridge/INDEX.md) is never written
+    and remains authoritative per GOV-FILE-BRIDGE-AUTHORITY-001; an --out target
+    resolving to it is refused.
+    """
+    from groundtruth_kb.tafe_index_completeness import index_completeness_report
+
+    canonical_bridge_index = "bridge/INDEX.md"
+
+    if out_path is not None and _targets_canonical_bridge_index(Path(out_path), canonical_bridge_index):
+        _emit_cli_payload(
+            {
+                "command": "flow index-completeness",
+                "error": (
+                    f"refusing to write the canonical bridge index ({canonical_bridge_index}); "
+                    "it remains authoritative per GOV-FILE-BRIDGE-AUTHORITY-001"
+                ),
+                "mutated": False,
+                "status": "refused",
+                "summary": f"Refused: {out_path} targets the canonical bridge index; nothing written.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(2)
+
+    config = _resolve_config(ctx)
+    resolved_index = Path(index_path) if index_path is not None else Path(config.project_root) / "bridge" / "INDEX.md"
+
+    if not resolved_index.is_file():
+        _emit_cli_payload(
+            {
+                "command": "flow index-completeness",
+                "error": f"bridge index not found at {resolved_index}",
+                "index_path": str(resolved_index),
+                "mutated": False,
+                "status": "index_not_found",
+                "summary": f"No bridge index at {resolved_index}; nothing checked.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(3)
+
+    report = index_completeness_report(resolved_index.read_text(encoding="utf-8"), Path(config.project_root))
+
+    if report.ok:
+        extra_note = f", {len(report.extra_blocks)} extra block(s)" if report.extra_blocks else ""
+        summary = (
+            f"INDEX completeness OK: {len(report.present_slugs)} present, "
+            f"{len(report.expected_slugs)} expected on disk, no lost blocks{extra_note}."
+        )
+    else:
+        lost = ", ".join(report.lost_blocks)
+        extra_note = f"; {len(report.extra_blocks)} extra block(s)" if report.extra_blocks else ""
+        summary = (
+            f"INDEX completeness LOST BLOCKS ({len(report.lost_blocks)}): {lost}{extra_note}. "
+            "Lost blocks may include parked drafts (review candidates, not canonical mutations)."
+        )
+
+    payload: dict[str, Any] = {
+        "command": "flow index-completeness",
+        "index_path": str(resolved_index),
+        "mutated": False,
+        "status": "ok" if report.ok else "lost_blocks_found",
+        "summary": summary,
+        **report.as_dict(),
+    }
+
+    if out_path is not None:
+        resolved_out = Path(out_path)
+        resolved_out.parent.mkdir(parents=True, exist_ok=True)
+        resolved_out.write_text(json.dumps(report.as_dict(), indent=2, sort_keys=True), encoding="utf-8")
+        payload["out_path"] = str(resolved_out)
+
+    _emit_cli_payload(payload, json_output=json_output)
+    if not report.ok:
+        raise SystemExit(1)
+
+
 @flow_group.command("pilot")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 def flow_pilot_cmd(json_output: bool) -> None:
