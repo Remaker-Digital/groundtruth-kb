@@ -258,7 +258,7 @@ index file (after the header comments).
 | GO | Loyal Opposition | Proposal approved for implementation |
 | NO-GO | Loyal Opposition | Proposal requires changes before approval |
 | VERIFIED | Loyal Opposition | Post-implementation verification passed |
-| ADVISORY | Loyal Opposition | Owner-initiated advisory report; non-dispatchable; awaiting Prime acknowledgement and disposition decision (NOT awaiting GO/NO-GO/VERIFIED). |
+| ADVISORY | Loyal Opposition | Advisory report; actionable by Prime Builder in interactive sessions to trigger owner-deliberation / UAQ disposition; non-dispatchable for headless runs (`_derive_dispatchable` returns False). NOT awaiting GO/NO-GO/VERIFIED. |
 | DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the owner-directed clear/resume condition is met. |
 
 ## Body Status-Token Rule
@@ -287,11 +287,11 @@ Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 
 ## Advisory Reports
 
-**Purpose:** Owner-initiated advisory reports are first-class workflow state, not transport workarounds via `NO-GO@001`.
+**Purpose:** Advisory reports are first-class workflow state, not transport workarounds via `NO-GO@001`. They may be owner-initiated (owner asks LO to investigate a peer system) or LO-initiated (LO surfaces a finding during normal review).
 
-**Routing:** ADVISORY entries are Axis-2 (non-dispatchable). The cross-harness event-driven trigger SHOULD exclude ADVISORY rows from actionable-signature computation. Per-parser inventory is owned by the parallel `gtkb-bridge-advisory-status-001` runtime thread.
+**Routing:** ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs. `ACTIONABLE_STATUSES_FOR_PRIME` in `groundtruth_kb.bridge.notify` includes `ADVISORY`, so `compute_actionable_pending` surfaces them in the Prime actionable list; the `_derive_dispatchable` invariant returns False for non-GO/NEW/REVISED/NO-GO statuses, so every headless dispatch surface (cross-harness trigger, single-harness dispatcher) filters them out before spawning. Manual `/bridge` scans show them; `bridge-axis-2-surface.py` also filters non-dispatchable items, so AXIS-2 surfacing of ADVISORY status entries is a separate follow-on concern.
 
-**Authority:** Loyal Opposition authors ADVISORY entries; Prime acknowledges and either (a) files a normal NEW implementation proposal converting the advisory, (b) defers explicitly with documented defer-trigger, or (c) rejects with documented rationale.
+**Authority:** Loyal Opposition (or owner-direction) authors ADVISORY entries; Prime Builder acknowledges in an interactive session and dispositions through owner-deliberation / UAQ flows, producing one of: (a) a normal NEW implementation proposal converting the advisory (`adopt` / `adapt`), (b) an explicit deferral with documented defer-trigger, or (c) a documented rejection (`reject`).
 
 **Expected Prime response:** cite advisory in any follow-on conversion proposal's `Prior Deliberations` and `Source advisory` fields.
 
@@ -329,7 +329,7 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
    NEW: bridge/{name}-001.md
    ```
 3. Continue working on other tasks
-4. Periodically scan the index for GO or NO-GO responses; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Prime implementation/revision work.
+4. Periodically scan the index for GO, NO-GO, or ADVISORY responses; GO and NO-GO are dispatchable implementation/revision work, ADVISORY is interactive-only disposition work (non-dispatchable). Skip DEFERRED, WITHDRAWN, and VERIFIED as non-actionable.
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
    incremented version, and insert a REVISED line at the top of that entry:

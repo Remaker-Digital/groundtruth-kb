@@ -124,10 +124,7 @@ can be filed:
 
 ## Bridge Integration
 
-Peer-solution advisories enter the bridge through two paths depending on system state:
-
-- **Once `gtkb-bridge-advisory-status-001` reaches VERIFIED:** LO files the advisory as a standard `ADVISORY` status entry per the protocol extension authored under `gtkb-advisory-report-protocol-extension`. The advisory has its own bridge thread with conventional version chain (NEW, REVISED, etc.).
-- **Until then:** LO files the advisory as a NEW bridge entry with `NO-GO@001` as the transport convention. The leading `NO-GO` is semantic-only (it tells Prime this is an LO-initiated advisory, not a Prime-initiated proposal awaiting review). The `bridge_kind: loyal_opposition_advisory` header field disambiguates from genuine NO-GO verdicts on Prime proposals.
+Peer-solution advisories enter the bridge as standard `ADVISORY` status entries with `bridge_kind: loyal_opposition_advisory`. The advisory has its own bridge thread with a conventional version chain (e.g., `Version: 001`). ADVISORY entries surface in the Prime Builder actionable list (so an interactive Prime session sees them on the next `/bridge` scan) and are strictly non-dispatchable for headless runs.
 
 Prime responses (the classification + the follow-on artifact) are bridge-tracked:
 

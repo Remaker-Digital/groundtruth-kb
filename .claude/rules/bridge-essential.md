@@ -53,8 +53,13 @@ than on a fixed interval. When `bridge/INDEX.md` is modified by a tool
 call or the agent ends a turn, the trigger inspects the indexed state and
 dispatches the appropriate counterpart harness if a recipient's actionable
 queue signature has changed (Codex on latest NEW or REVISED; Prime on
-latest GO or NO-GO). VERIFIED is terminal, and ADVISORY, DEFERRED, and
-WITHDRAWN are non-actionable for dispatch. The trigger
+latest GO or NO-GO). ADVISORY entries are surfaced in the Prime actionable
+list by `compute_actionable_pending` for interactive sessions, but the
+`_derive_dispatchable` invariant in `groundtruth_kb.bridge.notify` returns
+False for ADVISORY, so every headless dispatch surface filters them out
+before the signature is computed and they never spawn a Prime worker.
+VERIFIED is terminal, and DEFERRED and WITHDRAWN are non-actionable for
+dispatch. The trigger
 is monitoring and dispatch infrastructure only; `bridge/INDEX.md` remains
 the canonical workflow state. Per-recipient dispatch state is recorded at
 `.gtkb-state/bridge-poller/dispatch-state.json` (path retained for
