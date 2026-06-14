@@ -1137,8 +1137,10 @@ _SESSION_ROLE_MARKER_NAME = "active-session-role.json"
 # this to the canonical order.
 try:
     from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER as _SESSION_ID_ENV_FALLBACKS
+    from scripts.gtkb_session_id import per_session_role_marker_path as _per_session_role_marker_path
 except ImportError:  # pragma: no cover - direct script execution path
     from gtkb_session_id import MARKER_CONTINUITY_ORDER as _SESSION_ID_ENV_FALLBACKS  # type: ignore[no-redef]
+    from gtkb_session_id import per_session_role_marker_path as _per_session_role_marker_path  # type: ignore[no-redef]
 _BRIDGE_DISPATCH_RUN_ID_ENV = "GTKB_BRIDGE_POLLER_RUN_ID"
 
 
@@ -1249,6 +1251,89 @@ def _write_session_role_marker(
     return True
 
 
+def _candidate_marker_session_ids(payload_session_id: Any) -> list[tuple[str, str]]:
+    """Return ``(session_id, source_label)`` pairs to key per-session markers under.
+
+    WI-4540 R-B1 (bridge -004): the per-session marker is written under the
+    resolved payload/transcript id AND, defensively, under each currently-set
+    session-id env candidate, so BOTH the resolver (which queries the raw
+    payload/transcript id) and the WI-4534 guard (which resolves
+    ``CLAUDE_CODE_SESSION_ID`` via the bridge work-intent order) find a marker
+    keyed to the id they look up during the additive transition. The list is
+    de-duplicated and order-stable: payload first, then ``MARKER_CONTINUITY_ORDER``.
+    """
+    pairs: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    if isinstance(payload_session_id, str) and payload_session_id.strip():
+        pid = payload_session_id.strip()
+        pairs.append((pid, "payload"))
+        seen.add(pid)
+    for env_name in _SESSION_ID_ENV_FALLBACKS:
+        value = os.environ.get(env_name)
+        if isinstance(value, str) and value.strip():
+            candidate = value.strip()
+            if candidate not in seen:
+                pairs.append((candidate, f"env:{env_name}"))
+                seen.add(candidate)
+    return pairs
+
+
+def _write_per_session_role_marker(
+    role_profile: str,
+    session_id: str,
+    session_id_source: str,
+    project_root: Path | None = None,
+    *,
+    source: str = "init_keyword",
+) -> bool:
+    """Write a per-session role marker keyed to ``session_id``; fail soft.
+
+    WI-4540: ``.claude/session/role-<sanitized_session_id>.json``. Per-session
+    keying means no cross-session contention, so there is NO clobber-rejection
+    heuristic (unlike the legacy shared single-file writer): the marker is the
+    property of exactly one session id and is freely (re-)written by that
+    session. Returns True on success, False on OSError.
+    """
+    root = project_root or _project_root_from_env()
+    marker_path = _per_session_role_marker_path(root, session_id)
+    try:
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        body = {
+            "role": role_profile,
+            "session_id": session_id,
+            "session_id_source": session_id_source,
+            "written_at": _now_iso(),
+            "source": source,
+        }
+        marker_path.write_text(
+            json.dumps(body, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    except OSError:
+        return False
+    return True
+
+
+def _write_per_session_role_markers(
+    role_profile: str,
+    candidates: list[tuple[str, str]],
+    project_root: Path | None = None,
+    *,
+    source: str = "init_keyword",
+) -> int:
+    """Write a per-session marker for each candidate id (R-B1 multi-key).
+
+    Returns the count of markers successfully written. Each write is
+    independent and fail-soft, so a single unwritable id never aborts the rest.
+    """
+    written = 0
+    for session_id, source_label in candidates:
+        if _write_per_session_role_marker(role_profile, session_id, source_label, project_root, source=source):
+            written += 1
+    return written
+
+
 def _record_explicit_role_hint_from_prompt(
     prompt: str,
     state: dict[str, Any],
@@ -1281,6 +1366,19 @@ def _record_explicit_role_hint_from_prompt(
         state["prompt_role_hint_marker_failsoft_at"] = _now_iso()
         state["prompt_role_hint_marker_failsoft_reason"] = "marker_write_oserror"
         state["prompt_role_hint_role"] = role_profile
+    # WI-4540: additively write the per-session marker(s) (R-B1 multi-key). The
+    # per-session marker is the new authority for the guard/resolver; it is NOT
+    # gated on the legacy single-file write result (per-session keying has no
+    # cross-session contention, so a legacy clobber-rejection must not suppress
+    # this session's own marker).
+    per_session_written = _write_per_session_role_markers(
+        role_profile,
+        _candidate_marker_session_ids(session_id),
+        project_root,
+        source="prompt_explicit_role_hint",
+    )
+    if per_session_written:
+        state["prompt_role_hint_per_session_markers_written"] = per_session_written
     return True
 
 
@@ -1616,6 +1714,16 @@ def _consume_discard_first_prompt_gate(
             else:
                 state["startup_session_role_marker_failsoft_at"] = _now_iso()
                 state["startup_session_role_marker_failsoft_reason"] = "marker_write_oserror"
+            # WI-4540: additively write the per-session marker(s) (R-B1
+            # multi-key) — the new authority for the guard/resolver, written
+            # independently of the legacy single-file clobber result.
+            per_session_written = _write_per_session_role_markers(
+                role_profile,
+                _candidate_marker_session_ids(session_id),
+                project_root,
+            )
+            if per_session_written:
+                state["startup_session_role_per_session_markers_written"] = per_session_written
     _write_lifecycle_guard(state, project_root)
     return _startup_gate_response(project_root, role_mode=role_mode)
 

@@ -49,6 +49,44 @@ def _parse_bridge_pending(index_path: Path) -> list[str]:
     return pending
 
 
+def _refresh_core_spec_intake(cwd: str) -> None:
+    """Best-effort: re-emit the next missing core-spec question into MEMORY.md.
+
+    Cross-session prompt driver (SPEC-CORE-INTAKE-001 / SPEC-CORE-INTAKE-002):
+    on each adopter session start, reconcile MEMORY.md to the current intake
+    state for the enrolled project (re-emit the next missing slot, or clear the
+    block once complete). Fail-safe by construction: any resolution, import, or
+    I/O failure is a silent no-op so this hook never breaks a session start.
+    Respects the explicit opt-out (DCL-CORE-INTAKE-001).
+    """
+    try:
+        root = Path(cwd)
+        db_path = root / "groundtruth.db"
+        memory_path = root / "MEMORY.md"
+        if not db_path.exists() or not memory_path.exists():
+            return
+
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.project.core_spec_intake import (
+            find_enrolled_project_id,
+            intake_enabled,
+            refresh_intake_prompt,
+        )
+
+        if not intake_enabled(root):
+            return
+        db = KnowledgeDB(db_path)
+        try:
+            project_id = find_enrolled_project_id(db)
+            if project_id is None:
+                return
+            refresh_intake_prompt(db, project_id, memory_path)
+        finally:
+            db.close()
+    except Exception:  # intentional-catch: hook must never break session start
+        return
+
+
 def main() -> None:
     try:
         from groundtruth_kb.governance.output import emit_additional_context, emit_pass
@@ -73,6 +111,7 @@ def main() -> None:
         payload = {}
 
     cwd = payload.get("cwd", ".")
+    _refresh_core_spec_intake(cwd)
     index_path = Path(cwd) / BRIDGE_INDEX_FILENAME
     pending = _parse_bridge_pending(index_path)
 

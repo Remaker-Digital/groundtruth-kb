@@ -29,7 +29,19 @@ OPTIONAL_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
     "author_model_context_window",
     "author_metadata_source",
 )
+# Retained one slice for out-of-band writers. WI-4522 removed the loader's READ
+# of this shared file: as last-writer-wins mutable state it stamped a
+# concurrently-dispatched headless worker with the previous harness's identity
+# (the S389 GOV-DOCUMENT-AUTHOR-PROVENANCE-001 incident). `load_author_metadata`
+# no longer reads it; a follow-on slice removes the constant + any write path
+# once no readers remain.
 AUTHOR_METADATA_RELATIVE_PATH = Path(".gtkb-state") / "bridge-author-metadata" / "current.json"
+
+# Three-source harness-name resolution shares this env var with
+# `scripts/_kb_attribution.ENV_VAR_HARNESS_NAME` (the canonical `changed_by`
+# resolver); kept as a local constant so this module imports no attribution code
+# at module scope (the durable-identity resolver imports locally to avoid a cycle).
+ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
 
 FIELD_ENV_NAMES: dict[str, tuple[str, ...]] = {
     "author_identity": ("GTKB_AUTHOR_IDENTITY", "GTKB_AUTHOR_NAME", "GTKB_HARNESS_NAME"),
@@ -221,21 +233,111 @@ def _metadata_from_env(env: Mapping[str, str]) -> dict[str, str]:
     return values
 
 
+def _resolve_durable_identity_fields(
+    project_root: Path,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Resolve ONLY the two durable author-metadata fields from the harness registry.
+
+    Returns ``{"author_identity": "<role>/<harness_name>", "author_harness_id":
+    "<id>"}`` resolved per call from the filing harness's own durable identity,
+    using the same ``<role>/<harness_name>`` label form as
+    ``scripts/_kb_attribution.resolve_changed_by``. The filing harness is
+    resolved with a two-source priority — ``GTKB_HARNESS_NAME`` env, then the
+    single ACTIVE Prime Builder in the registry projection at ``project_root`` —
+    threading ``project_root`` through the projection-backed loaders so callers
+    (and tests) read the intended registry rather than a module-global root.
+
+    Returns ``{}`` (never ``None``) when the filing harness cannot be resolved
+    unambiguously — no ``GTKB_HARNESS_NAME`` and zero or multiple active Prime
+    Builders, no registry id for the resolved name, or no role assignment — so it
+    contributes nothing rather than a wrong value, and an incomplete merged set
+    fails closed in ``validate_author_metadata`` instead of inheriting another
+    harness's values.
+
+    It NEVER returns the four per-session runtime fields
+    (``author_session_context_id``, ``author_model``, ``author_model_version``,
+    ``author_model_configuration``): those have no durable GT-KB store and can
+    only come from the filing harness's own runtime envelope (env/explicit).
+    """
+    # Local imports avoid a module import cycle (mirrors `_kb_attribution.py`).
+    from scripts.harness_identity import load_harness_identities
+    from scripts.harness_roles import (
+        ROLE_ACTING_PRIME_BUILDER,
+        ROLE_LOYAL_OPPOSITION,
+        ROLE_PRIME_BUILDER,
+        _normalize_role_field,
+        is_prime_builder,
+        load_role_assignments,
+    )
+
+    environ = env if env is not None else os.environ
+    assignments = load_role_assignments(project_root).get("harnesses", {})
+    identities = load_harness_identities(project_root).get("harnesses", {})
+
+    harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
+    if not harness_name:
+        prime_ids = [
+            hid for hid, record in assignments.items() if isinstance(record, dict) and is_prime_builder(record)
+        ]
+        if len(prime_ids) != 1:
+            return {}
+        harness_name = next(
+            (
+                name
+                for name, record in identities.items()
+                if isinstance(record, dict) and record.get("id") == prime_ids[0]
+            ),
+            "",
+        )
+        if not harness_name:
+            return {}
+
+    identity_record = identities.get(harness_name)
+    harness_id = identity_record.get("id") if isinstance(identity_record, dict) else None
+    if not isinstance(harness_id, str) or not harness_id:
+        return {}
+
+    role_record = assignments.get(harness_id)
+    if not isinstance(role_record, dict):
+        return {}
+    role_set = _normalize_role_field(role_record.get("role"))
+    if ROLE_PRIME_BUILDER in role_set or ROLE_ACTING_PRIME_BUILDER in role_set:
+        role = ROLE_PRIME_BUILDER
+    elif ROLE_LOYAL_OPPOSITION in role_set:
+        role = ROLE_LOYAL_OPPOSITION
+    else:
+        return {}
+
+    return {"author_identity": f"{role}/{harness_name}", "author_harness_id": harness_id}
+
+
 def load_author_metadata(
     project_root: Path | None = None,
     *,
     explicit: Mapping[str, Any] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    """Load required author metadata from session file, environment, and explicit values.
+    """Load required author metadata from the filing harness's own context.
 
-    Precedence is explicit > environment > project-local session file. The
-    returned mapping is validated and contains the required field names.
+    Precedence is explicit > environment runtime envelope > durable identity
+    (the registry projection at ``project_root``). The two durable fields
+    (``author_identity``, ``author_harness_id``) are resolved per call from the
+    registry; the four per-session runtime fields come ONLY from the env runtime
+    envelope or explicit values supplied by the filing harness — never from a
+    shared on-disk baseline. A missing runtime envelope therefore fails closed in
+    ``validate_author_metadata`` rather than inheriting another harness's cached
+    values (WI-4522: removes the ``current.json`` shared-mutable provenance
+    baseline; restores ``GOV-DOCUMENT-AUTHOR-PROVENANCE-001`` under concurrent
+    headless filing). The returned mapping is validated and contains the required
+    field names.
     """
     root = project_root or Path.cwd()
+    environ = env or os.environ
     merged: dict[str, Any] = {}
-    merged.update(normalize_author_metadata(_load_json_metadata(root / AUTHOR_METADATA_RELATIVE_PATH)))
-    merged.update(_metadata_from_env(env or os.environ))
+    merged.update(_resolve_durable_identity_fields(root, env=environ))
+    merged.update(_metadata_from_env(environ))
     if explicit:
         merged.update(normalize_author_metadata(explicit))
     return validate_author_metadata(merged)

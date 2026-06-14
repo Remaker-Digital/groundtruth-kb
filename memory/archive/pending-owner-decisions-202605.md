@@ -6106,3 +6106,128 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-15T08:24:28.627883Z
   answer: "Answer questions?"
   notes: ""
+
+- id: DECISION-0608
+  asked_at: 2026-05-15T13:08:08.092430Z
+  question: "Codex NO-GO'd friction-hygiene -018 because IP-D shipped 19 regression tests instead of the 32 carried in GO -005 (gap: ~13 redirect/sqlite/chain-walk tests). How should Prime resolve the IP-D scope discrepancy?"
+  options:
+    - "Land the missing ~13 tests"
+    - "REVISED proposal narrowing IP-D to 19"
+    - "Owner waiver for the scope reduction"
+    - "Park the thread; advance other work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f13a3fc03efb51e3
+  resolved_at: 2026-05-15T13:08:08.092430Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0609
+  asked_at: 2026-05-15T13:08:08.092430Z
+  question: "Concurrently, gtkb-spec-lifecycle-schema-slice-1 has GO -004 (specification_deliberation_sources table + link API + tracking WI + migration + tests). When should I start that implementation?"
+  options:
+    - "Start Slice 1 now (Recommended)"
+    - "Defer Slice 1 until friction-hygiene closes"
+    - "Defer Slice 1 to next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a22923e0971564e4
+  resolved_at: 2026-05-15T13:08:08.092430Z
+  answer: "Answer questions?"
+  notes: ""
+
+- id: DECISION-0610
+  asked_at: 2026-05-15T13:16:08.568663Z
+  question: "Bridge thread `gtkb-implementation-gate-friction-hygiene` is at NO-GO-018. Codex's F1 finding: the approved IP-D scope is 32 regression tests (11 null-sink/redirect + 12 sqlite + 9 chain-walk per -005), but the latest report substantiates 19 tests (14 IP-A/IP-B/F3 + 4 IP-C chain-walk + 1 drift). Closing the thread requires one of three paths. How should Prime Builder proceed?"
+  options:
+    - "Complete the 32-test scope"
+    - "REVISED to 19-test scope + new GO (Recommended)"
+    - "Owner waiver for IP-D scope reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c9973befb394d0cc
+  resolved_at: 2026-05-15T13:16:08.568663Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0611
+  asked_at: 2026-05-15T13:19:14.151971Z
+  question: "WI-3317 is implemented (report filed, awaiting Codex VERIFIED). WI-3316 is GO'd at -006 — the last unimplemented WI of GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001 — but it's a substantial 9-file feature (scanner + Claude/Codex parity hooks + lifecycle service method + 3 test files). The screenshot you shared shows four unrelated NEW bridge threads. What should I do next?"
+  options:
+    - "Implement WI-3316 now"
+    - "Triage the 4 shown threads"
+    - "Wrap up the session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 064f1224423bb136
+  resolved_at: 2026-05-15T13:19:14.151971Z
+  answer: "User has answered your questions: \"WI-3317 is implemented (report filed, awaiting Codex VERIFIED). WI-3316 is GO'd at -006 — the last unimplemented WI of GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001 — but it's a substantial 9-file feature (scanner + Claude/Codex parity hooks + lifecycle service method + 3 test files). The screenshot you shared shows four unrelated NEW bridge threads. What should I do next?\"=\"Wrap up the session\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0612
+  asked_at: 2026-05-15T15:41:09.753122Z
+  question: "Requirement candidate INTAKE-45c006c4 is captured at outcome=deferred. Confirming it promotes it to a KB spec (status=specified) and auto-creates the linked work item. How should I proceed?"
+  options:
+    - "Confirm into a spec"
+    - "Revise the text first"
+    - "Reject the candidate"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 783339e681a606ad
+  resolved_at: 2026-05-15T15:41:09.753122Z
+  answer: "User has answered your questions: \"Requirement candidate INTAKE-45c006c4 is captured at outcome=deferred. Confirming it promotes it to a KB spec (status=specified) and auto-creates the linked work item. How should I proceed?\"=\"Confirm into a spec\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0613
+  asked_at: 2026-05-15T16:11:49.606506Z
+  question: "Codex NO-GO F1: work item WI-AUTO-SPEC-INTAKE-1262C1 (the grill-me-for-clarification skill) must trace to a project with an active project authorization before the bridge proposal can get GO. None of the 23 existing project authorizations has a scope that fits a new owner-clarification skill. Where should this work item be homed?"
+  options:
+    - "New dedicated project"
+    - "Under SESSION-LIFECYCLE-UX"
+    - "Under SPEC-TEST-QUALITY"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 376da3cfc89321a2
+  resolved_at: 2026-05-15T16:11:49.606506Z
+  answer: "User has answered your questions: \"Codex NO-GO F1: work item WI-AUTO-SPEC-INTAKE-1262C1 (the grill-me-for-clarification skill) must trace to a project with an active project authorization before the bridge proposal can get GO. None of the 23 existing project authorizations has a scope that fits a new owner-clarification skill. Where should this work item be homed?\"=\"New dedicated project\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0614
+  asked_at: 2026-05-15T16:29:30.395534Z
+  question: "Implementation-gate friction hygiene NO-GO at bridge/gtkb-implementation-gate-friction-hygiene-018.md: how should IP-D coverage be closed (current 19 of approved 32 regression tests; the WI-3310 traceability fix from -017 is closed)?"
+  options:
+    - "Land 13 missing IP-D tests (Recommended)"
+    - "File scope-reduction REVISED proposal"
+    - "Explicit owner waiver"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 34418fbe0a2e30b6
+  resolved_at: 2026-05-15T16:29:30.395534Z
+  answer: "Answer questions?"
+  notes: ""
+
+- id: DECISION-0615
+  asked_at: 2026-05-15T16:30:18.958600Z
+  question: "The bridge auto-dispatch surfaced two actionable entries (GO at gtkb-spec-lifecycle-schema-slice-1-004; NO-GO at gtkb-implementation-gate-friction-hygiene-018). My first source-file Edit to db.py was permission-blocked (`Claude requested permissions... but you haven't granted it yet`). The system rule is to not re-attempt the exact same tool call after denial. How should I proceed in this dispatched session?"
+  options:
+    - "Retry source Edits — permission grant pending"
+    - "Defer impl; AUQ friction-hygiene only"
+    - "Report state; stand by"
+    - "Stop and end this turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1bfc399940470985
+  resolved_at: 2026-05-15T16:30:18.958600Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0616
+  asked_at: 2026-05-15T16:30:25.620540Z
+  question: "Codex NO-GO at bridge/gtkb-implementation-gate-friction-hygiene-018.md cites the IP-D regression-test count: the approved scope from -005/-011 is 32 tests (11 redirect/null-sink + 12 sqlite safe-read/disqualifier + 9 chain-walk), but the implementation report at -017 substantiates 19 tests (14 IP-A/IP-B/F3 start-gate + 4 IP-C chain-walk + 1 updated drift). The 52-test pytest sweep is green; the gap is approved-scope coverage, not failing tests. Which remediation path do you authorize for the next REVISED report?"
+  options:
+    - "Land remaining 13 tests (Recommended)"
+    - "REVISED proposal narrowing IP-D to 19"
+    - "Owner waiver for 32 to 19 reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 11831624399d5056
+  resolved_at: 2026-05-15T16:30:25.620540Z
+  answer: "Answer questions?"
+  notes: ""

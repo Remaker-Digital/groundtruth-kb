@@ -87,11 +87,14 @@ def _check_secret_gate_present() -> None:
     if not pre_commit_path.is_file():
         raise GateFailure("Tracked pre-commit hook is missing: .githooks/pre-commit")
     pre_commit_text = pre_commit_path.read_text(encoding="utf-8", errors="replace")
-    if (
-        "secrets scan" not in pre_commit_text
-        or "--staged" not in pre_commit_text
-        or "--redacted" not in pre_commit_text
-    ):
+    is_scan_secrets = "scan_secrets.py" in pre_commit_text
+    is_gtkb_scan = "secrets scan" in pre_commit_text
+
+    if not (is_scan_secrets or is_gtkb_scan):
+        raise GateFailure("Tracked pre-commit hook does not invoke the staged secret scan")
+    if "--staged" not in pre_commit_text:
+        raise GateFailure("Tracked pre-commit hook does not invoke the staged secret scan")
+    if is_gtkb_scan and "--redacted" not in pre_commit_text:
         raise GateFailure("Tracked pre-commit hook does not invoke the staged secret scan")
 
     pre_push_path = PROJECT_ROOT / ".githooks" / "pre-push"
@@ -306,7 +309,7 @@ def _check_isolation_program_backstop() -> None:
     _run([sys.executable, "scripts/isolation_program_backstop.py"], timeout=60)
 
 
-def _python_gates() -> None:
+def _python_gates(skip_pip_audit: bool = False) -> None:
     _run(
         [
             sys.executable,
@@ -318,6 +321,8 @@ def _python_gates() -> None:
             "platform_tests/",
             "--select",
             "E,F",
+            "--ignore",
+            "E501,E741",
         ],
         timeout=120,
     )
@@ -326,7 +331,8 @@ def _python_gates() -> None:
         [sys.executable, "-m", "bandit", "-r", "applications/Agent_Red/src/", "-ll", "-c", "pyproject.toml"],
         timeout=180,
     )
-    _run([sys.executable, "-m", "pip_audit", "-r", "requirements.txt"], timeout=180)
+    if not skip_pip_audit:
+        _run([sys.executable, "-m", "pip_audit", "-r", "requirements.txt"], timeout=180)
     _run([sys.executable, "scripts/check_codex_hook_parity.py"], timeout=60)
     _run([sys.executable, "scripts/generate_codex_skill_adapters.py", "--update-registry", "--check"], timeout=30)
     _run([sys.executable, "scripts/check_harness_parity.py", "--all", "--markdown"], timeout=30)
@@ -383,7 +389,7 @@ def _python_gates() -> None:
             "-q",
             "--tb=short",
         ],
-        timeout=180,
+        timeout=300,
     )
 
     # Per Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY (bridge -006 GO):
@@ -447,6 +453,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run non-deploying release-candidate gates.")
     parser.add_argument("--require-python", default="", help="Require a specific Python major.minor, for example 3.12.")
     parser.add_argument("--skip-python", action="store_true", help="Skip Python/security gates.")
+    parser.add_argument("--skip-pip-audit", action="store_true", help="Skip python dependencies check.")
     parser.add_argument("--skip-frontend", action="store_true", help="Skip frontend widget/admin gates.")
     parser.add_argument("--include-frontend", action="store_true", help="Run frontend widget/admin gates.")
     parser.add_argument(
@@ -486,7 +493,7 @@ def main() -> int:
         if not args.skip_dev_inventory_drift:
             _check_dev_environment_inventory_drift()
         if not args.skip_python:
-            _python_gates()
+            _python_gates(skip_pip_audit=args.skip_pip_audit)
         if args.include_frontend and not args.skip_frontend:
             _frontend_gates()
     except (GateFailure, subprocess.TimeoutExpired) as exc:

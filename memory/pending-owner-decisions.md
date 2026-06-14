@@ -6,6 +6,23 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+- id: DECISION-1251
+  asked_at: 2026-06-14T16:28:06.872776Z
+  question: "Want me to **stand this session down** now (cancel its loop, hand the wheel entirely to the fresh session), or **keep..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 89fa354447bf0130
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1253
+  asked_at: 2026-06-14T16:32:52.620003Z
+  question: "Want me to run the full `/kb-session-wrap` and/or a sweep-commit before you close out, or is this handoff sufficient?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 0ddf1797c5210156
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+
+## Resolved
+
 - id: DECISION-WI4481-PROJECT-LINKAGE
   asked_at: 2026-06-13T09:52:00Z
   question: "WI-4481 (P1 bridge-integrity defect, INDEX atomic-write guard) is implemented + verified green and was GO'd (bridge/gtkb-bridge-index-atomic-write-guard-002.md), but the post-implementation report cannot be filed: WI-4481 is a standalone work item (project_name=None) and is in no active PAUTH's included_work_item_ids list. The bridge-compliance-gate hard-blocks the NEW/REVISED implementation_report via DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001 (missing Project Authorization: / Project: lines) and the live membership check (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001). Owner decision needed: admit WI-4481 to a project (candidate: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY) and add it to that project's PAUTH included_work_item_ids via AUQ (precedent: PAUTH v4 'add WI-3380' = DELIB-S-LOOP-2026-06-04-WI3380-PAUTH-INCLUSION-AUQ). A dispatched worker cannot run AUQ or amend a PAUTH, so this blocks report-filing → VERIFIED → WI close."
@@ -47,28 +64,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   notes: "Resolved by owner direction + live swarm progress. Question blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-1219
   asked_at: 2026-06-13T23:11:09.145678Z
-  question: "Want me to **drive the contracted Slice C** (ADR + second-write), pick up something else, or hold?"
+  question: ""
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: e3092a6bb4b3c0ec
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-06-14
+  resolved_in_session: 2026-06-14 interactive PB (Codex harness A)
+  answer: "Owner selected Option A: close answered. DECISION-1219 is resolved as overtaken by completed owner authorization and TAFE Slice C swarm/bridge progress; no new work is authorized from this stale prose decision."
+  notes: "Resolved by owner reply 'DECISION-1219: A'. Bridge evidence already records the owner-decision lineage for TAFE Slice C ADR-first / second-write work, including DELIB-DECISION-1219-SLICE-C-DRIVE-ADR-FIRST and consolidated Slice C bridge activity. Question blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-1237
   asked_at: 2026-06-14T07:31:01.962777Z
-  question: "Want me to do anything with the broader bridge queue (the AXIS-2 surface flagged GO-ready threads WI-4521, plus claim..."
+  question: ""
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: 94a7c9f6b4417f3f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-06-14
+  resolved_in_session: 2026-06-14 interactive PB (Codex harness A)
+  answer: "Owner selected Option A: close stale. DECISION-1237 is resolved as overtaken by WI-4521 reaching VERIFIED; no fresh bridge-queue triage is authorized from this stale prose decision."
+  notes: "Resolved by owner reply 'DECISION-1237: A'. Live bridge/INDEX.md shows gtkb-wi4521-backlog-update-source-spec-id latest status VERIFIED at bridge/gtkb-wi4521-backlog-update-source-spec-id-006.md. Question blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-1239
   asked_at: 2026-06-14T07:43:20.396352Z
-  question: "Want me to (a) pursue the WI-4540 marker unblock so I can join the implementation swarm, (b) drive the TAFE NO-GO's f..."
+  question: ""
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: 4d6b8a4ef55a5fe0
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-
-## Resolved
-
+  resolved_at: 2026-06-14
+  resolved_in_session: 2026-06-14 interactive PB (Codex harness A)
+  answer: "Owner selected Option A: close stale. DECISION-1239 is resolved as overtaken by later owner AUQs and live bridge progress; no new WI-4540 or TAFE work is authorized from this stale prose decision."
+  notes: "Resolved by owner reply 'DECISION-1239: A'. WI-4540 was subsequently anchored by owner AUQ and is now represented by live bridge thread gtkb-wi4540-per-session-role-marker-context-envelope latest REVISED at -003; TAFE work has separate current bridge state. Question blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-1191
   asked_at: 2026-06-13T04:57:32.290915Z
   question: ""
@@ -109,125 +132,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0608
-  asked_at: 2026-05-15T13:08:08.092430Z
-  question: "Codex NO-GO'd friction-hygiene -018 because IP-D shipped 19 regression tests instead of the 32 carried in GO -005 (gap: ~13 redirect/sqlite/chain-walk tests). How should Prime resolve the IP-D scope discrepancy?"
-  options:
-    - "Land the missing ~13 tests"
-    - "REVISED proposal narrowing IP-D to 19"
-    - "Owner waiver for the scope reduction"
-    - "Park the thread; advance other work"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f13a3fc03efb51e3
-  resolved_at: 2026-05-15T13:08:08.092430Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0609
-  asked_at: 2026-05-15T13:08:08.092430Z
-  question: "Concurrently, gtkb-spec-lifecycle-schema-slice-1 has GO -004 (specification_deliberation_sources table + link API + tracking WI + migration + tests). When should I start that implementation?"
-  options:
-    - "Start Slice 1 now (Recommended)"
-    - "Defer Slice 1 until friction-hygiene closes"
-    - "Defer Slice 1 to next session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a22923e0971564e4
-  resolved_at: 2026-05-15T13:08:08.092430Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0610
-  asked_at: 2026-05-15T13:16:08.568663Z
-  question: "Bridge thread `gtkb-implementation-gate-friction-hygiene` is at NO-GO-018. Codex's F1 finding: the approved IP-D scope is 32 regression tests (11 null-sink/redirect + 12 sqlite + 9 chain-walk per -005), but the latest report substantiates 19 tests (14 IP-A/IP-B/F3 + 4 IP-C chain-walk + 1 drift). Closing the thread requires one of three paths. How should Prime Builder proceed?"
-  options:
-    - "Complete the 32-test scope"
-    - "REVISED to 19-test scope + new GO (Recommended)"
-    - "Owner waiver for IP-D scope reduction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c9973befb394d0cc
-  resolved_at: 2026-05-15T13:16:08.568663Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0611
-  asked_at: 2026-05-15T13:19:14.151971Z
-  question: "WI-3317 is implemented (report filed, awaiting Codex VERIFIED). WI-3316 is GO'd at -006 — the last unimplemented WI of GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001 — but it's a substantial 9-file feature (scanner + Claude/Codex parity hooks + lifecycle service method + 3 test files). The screenshot you shared shows four unrelated NEW bridge threads. What should I do next?"
-  options:
-    - "Implement WI-3316 now"
-    - "Triage the 4 shown threads"
-    - "Wrap up the session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 064f1224423bb136
-  resolved_at: 2026-05-15T13:19:14.151971Z
-  answer: "User has answered your questions: \"WI-3317 is implemented (report filed, awaiting Codex VERIFIED). WI-3316 is GO'd at -006 — the last unimplemented WI of GTKB-SPEC-PROJECT-WI-BRIDGE-ENFORCEMENT-001 — but it's a substantial 9-file feature (scanner + Claude/Codex parity hooks + lifecycle service method + 3 test files). The screenshot you shared shows four unrelated NEW bridge threads. What should I do next?\"=\"Wrap up the session\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0612
-  asked_at: 2026-05-15T15:41:09.753122Z
-  question: "Requirement candidate INTAKE-45c006c4 is captured at outcome=deferred. Confirming it promotes it to a KB spec (status=specified) and auto-creates the linked work item. How should I proceed?"
-  options:
-    - "Confirm into a spec"
-    - "Revise the text first"
-    - "Reject the candidate"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 783339e681a606ad
-  resolved_at: 2026-05-15T15:41:09.753122Z
-  answer: "User has answered your questions: \"Requirement candidate INTAKE-45c006c4 is captured at outcome=deferred. Confirming it promotes it to a KB spec (status=specified) and auto-creates the linked work item. How should I proceed?\"=\"Confirm into a spec\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0613
-  asked_at: 2026-05-15T16:11:49.606506Z
-  question: "Codex NO-GO F1: work item WI-AUTO-SPEC-INTAKE-1262C1 (the grill-me-for-clarification skill) must trace to a project with an active project authorization before the bridge proposal can get GO. None of the 23 existing project authorizations has a scope that fits a new owner-clarification skill. Where should this work item be homed?"
-  options:
-    - "New dedicated project"
-    - "Under SESSION-LIFECYCLE-UX"
-    - "Under SPEC-TEST-QUALITY"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 376da3cfc89321a2
-  resolved_at: 2026-05-15T16:11:49.606506Z
-  answer: "User has answered your questions: \"Codex NO-GO F1: work item WI-AUTO-SPEC-INTAKE-1262C1 (the grill-me-for-clarification skill) must trace to a project with an active project authorization before the bridge proposal can get GO. None of the 23 existing project authorizations has a scope that fits a new owner-clarification skill. Where should this work item be homed?\"=\"New dedicated project\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0614
-  asked_at: 2026-05-15T16:29:30.395534Z
-  question: "Implementation-gate friction hygiene NO-GO at bridge/gtkb-implementation-gate-friction-hygiene-018.md: how should IP-D coverage be closed (current 19 of approved 32 regression tests; the WI-3310 traceability fix from -017 is closed)?"
-  options:
-    - "Land 13 missing IP-D tests (Recommended)"
-    - "File scope-reduction REVISED proposal"
-    - "Explicit owner waiver"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 34418fbe0a2e30b6
-  resolved_at: 2026-05-15T16:29:30.395534Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0615
-  asked_at: 2026-05-15T16:30:18.958600Z
-  question: "The bridge auto-dispatch surfaced two actionable entries (GO at gtkb-spec-lifecycle-schema-slice-1-004; NO-GO at gtkb-implementation-gate-friction-hygiene-018). My first source-file Edit to db.py was permission-blocked (`Claude requested permissions... but you haven't granted it yet`). The system rule is to not re-attempt the exact same tool call after denial. How should I proceed in this dispatched session?"
-  options:
-    - "Retry source Edits — permission grant pending"
-    - "Defer impl; AUQ friction-hygiene only"
-    - "Report state; stand by"
-    - "Stop and end this turn"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 1bfc399940470985
-  resolved_at: 2026-05-15T16:30:18.958600Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0616
-  asked_at: 2026-05-15T16:30:25.620540Z
-  question: "Codex NO-GO at bridge/gtkb-implementation-gate-friction-hygiene-018.md cites the IP-D regression-test count: the approved scope from -005/-011 is 32 tests (11 redirect/null-sink + 12 sqlite safe-read/disqualifier + 9 chain-walk), but the implementation report at -017 substantiates 19 tests (14 IP-A/IP-B/F3 start-gate + 4 IP-C chain-walk + 1 updated drift). The 52-test pytest sweep is green; the gap is approved-scope coverage, not failing tests. Which remediation path do you authorize for the next REVISED report?"
-  options:
-    - "Land remaining 13 tests (Recommended)"
-    - "REVISED proposal narrowing IP-D to 19"
-    - "Owner waiver for 32 to 19 reduction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 11831624399d5056
-  resolved_at: 2026-05-15T16:30:25.620540Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0617
   asked_at: 2026-05-15T16:46:04.742986Z
   question: "The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?"
@@ -7820,6 +7724,175 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 1175cdd493a7728f
   resolved_at: 2026-06-14T07:43:20.396352Z
   answer: "Your questions have been answered: \"WI-4441 (defect: Antigravity skill-adapter generator emitted 0 of 36 adapters) is VERIFIED on the bridge (gtkb-wi4441-antigravity-adapter-generation-004.md — 'Antigravity harness parity is PASS, no stale/missing adapter surfaces, generator reports no drift, focused generator tests pass'). Closure is blocked by the GOV-15 defect-origin owner-approval gate. Approve closing WI-4441?\"=\"Approve — resolve now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1240
+  asked_at: 2026-06-14T15:03:56.920491Z
+  question: "The landed DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001 (v1, owner-approved via a parallel session) uses terminal set {VERIFIED, WITHDRAWN, DEFERRED, ADVISORY, ACCEPTED} — broader than the {VERIFIED, WITHDRAWN, ADVISORY} you approved in this conversation, including a non-canonical token (ACCEPTED) and a protocol-debatable one (DEFERRED). Both yield the same ~43 residual today. How should I proceed?"
+  options:
+    - "Accept landed DCL — proceed"
+    - "Supersede with corrected v2"
+    - "Accept now, fix later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c4cfe7b3659eefa6
+  resolved_at: 2026-06-14T15:03:56.920491Z
+  answer: "Your questions have been answered: \"The landed DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001 (v1, owner-approved via a parallel session) uses terminal set {VERIFIED, WITHDRAWN, DEFERRED, ADVISORY, ACCEPTED} — broader than the {VERIFIED, WITHDRAWN, ADVISORY} you approved in this conversation, including a non-canonical token (ACCEPTED) and a protocol-debatable one (DEFERRED). Both yield the same ~43 residual today. How should I proceed?\"=\"Accept landed DCL — proceed\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1241
+  asked_at: 2026-06-14T15:07:51.518995Z
+  question: "Cycle-14 (new cluster, post-reliability): per your 'continue seeding' choice I targeted PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY. Coverage check: only the P1 (WI-AUTO-SPEC-INTAKE-22C078) has an active PAUTH — but it's a big multi-surface governance remediation (rescind a GO-validity convention, scope operating-role.md, fix dispatch routing + STRICT_DROP + verdict-validation; touches narrative_artifact) needing owner grilling + slicing. The 4 clean P2/P3 bridge-compliance/dispatch WIs (3439, 3448, 4396, 3384 — the last is the CLAUSE-IN-ROOT false-positive that bit my WI-4530 this session) are project members but have NO covering PAUTH, so I can't seed them without authorization. How should I proceed?"
+  options:
+    - "Authorize a PAUTH for the 4 clean P2/P3s"
+    - "Scope the P1 (WI-AUTO-SPEC-INTAKE-22C078) first"
+    - "Different direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b7949566b2d62e31
+  resolved_at: 2026-06-14T15:07:51.518995Z
+  answer: "Your questions have been answered: \"Cycle-14 (new cluster, post-reliability): per your 'continue seeding' choice I targeted PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY. Coverage check: only the P1 (WI-AUTO-SPEC-INTAKE-22C078) has an active PAUTH — but it's a big multi-surface governance remediation (rescind a GO-validity convention, scope operating-role.md, fix dispatch routing + STRICT_DROP + verdict-validation; touches narrative_artifact) needing owner grilling + slicing. The 4 clean P2/P3 bridge-compliance/dispatch WIs (3439, 3448, 4396, 3384 — the last is the CLAUSE-IN-ROOT false-positive that bit my WI-4530 this session) are project members but have NO covering PAUTH, so I can't seed them without authorization. How should I proceed?\"=\"Authorize a PAUTH for the 4 clean P2/P3s\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1242
+  asked_at: 2026-06-14T15:12:46.186610Z
+  question: "Your PRIMARY (WI-4540 per-session marker) is already driven to REVISED-003 by the swarm and is awaiting Loyal Opposition — not Prime-actionable, and not self-reviewable by harness B. How should this interactive session proceed?"
+  options:
+    - "Interactive-value pass"
+    - "Shepherd WI-4540"
+    - "Pivot to adjacent GO work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 19edcd33965b1690
+  resolved_at: 2026-06-14T15:12:46.186610Z
+  answer: "Your questions have been answered: \"Your PRIMARY (WI-4540 per-session marker) is already driven to REVISED-003 by the swarm and is awaiting Loyal Opposition — not Prime-actionable, and not self-reviewable by harness B. How should this interactive session proceed?\"=\"Interactive-value pass\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1243
+  asked_at: 2026-06-14T15:30:46.458771Z
+  question: "DECISION-WI4481-PROJECT-LINKAGE: the INDEX atomic-write-guard work item. Live state now shows WI-4481 is a member of PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY (stage=resolved) and its bridge thread reached VERIFIED (-004); the project-linkage/PAUTH blocker that stalled three dispatched workers is fully cleared. How should I dispose of it?"
+  options:
+    - "Confirm closed (Recommended)"
+    - "Reopen / re-verify"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3bacfbb9e1a9d4cd
+  resolved_at: 2026-06-14T15:30:46.458771Z
+  answer: "Your questions have been answered: \"DECISION-WI4481-PROJECT-LINKAGE: the INDEX atomic-write-guard work item. Live state now shows WI-4481 is a member of PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY (stage=resolved) and its bridge thread reached VERIFIED (-004); the project-linkage/PAUTH blocker that stalled three dispatched workers is fully cleared. How should I dispose of it?\"=\"Confirm closed (Recommended)\", \"DECISION-1199, DECISION-1217, DECISION-1218: three auto-detected prose false-positives (the tracker flagged conversational phrasing). Each is already recorded resolved with no recoverable decision content — 1199 had no referent, 1217's 'seeding' work was unrecoverable (you already chose 'close as stale'), 1218 was overtaken by WI-4534 swarm progress. Disposition?\"=\"Close all 3 as stale (Recommended)\", \"DECISION-1219, DECISION-1237, DECISION-1239: three prose false-positives you ALREADY answered 'A: close stale' in a Codex-harness session on 2026-06-14, but they keep re-surfacing because they were never moved out of the ## Pending block. (1219 = TAFE Slice C drive; 1237 = WI-4521 now VERIFIED; 1239 = WI-4540 now anchored by later AUQ.) Disposition?\"=\"Confirm closed — reconcile filing (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1244
+  asked_at: 2026-06-14T15:30:46.458771Z
+  question: "DECISION-1199, DECISION-1217, DECISION-1218: three auto-detected prose false-positives (the tracker flagged conversational phrasing). Each is already recorded resolved with no recoverable decision content — 1199 had no referent, 1217's 'seeding' work was unrecoverable (you already chose 'close as stale'), 1218 was overtaken by WI-4534 swarm progress. Disposition?"
+  options:
+    - "Close all 3 as stale (Recommended)"
+    - "Review individually"
+    - "Reopen all"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8544da2cae46a304
+  resolved_at: 2026-06-14T15:30:46.458771Z
+  answer: "Your questions have been answered: \"DECISION-WI4481-PROJECT-LINKAGE: the INDEX atomic-write-guard work item. Live state now shows WI-4481 is a member of PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY (stage=resolved) and its bridge thread reached VERIFIED (-004); the project-linkage/PAUTH blocker that stalled three dispatched workers is fully cleared. How should I dispose of it?\"=\"Confirm closed (Recommended)\", \"DECISION-1199, DECISION-1217, DECISION-1218: three auto-detected prose false-positives (the tracker flagged conversational phrasing). Each is already recorded resolved with no recoverable decision content — 1199 had no referent, 1217's 'seeding' work was unrecoverable (you already chose 'close as stale'), 1218 was overtaken by WI-4534 swarm progress. Disposition?\"=\"Close all 3 as stale (Recommended)\", \"DECISION-1219, DECISION-1237, DECISION-1239: three prose false-positives you ALREADY answered 'A: close stale' in a Codex-harness session on 2026-06-14, but they keep re-surfacing because they were never moved out of the ## Pending block. (1219 = TAFE Slice C drive; 1237 = WI-4521 now VERIFIED; 1239 = WI-4540 now anchored by later AUQ.) Disposition?\"=\"Confirm closed — reconcile filing (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1245
+  asked_at: 2026-06-14T15:30:46.458771Z
+  question: "DECISION-1219, DECISION-1237, DECISION-1239: three prose false-positives you ALREADY answered 'A: close stale' in a Codex-harness session on 2026-06-14, but they keep re-surfacing because they were never moved out of the ## Pending block. (1219 = TAFE Slice C drive; 1237 = WI-4521 now VERIFIED; 1239 = WI-4540 now anchored by later AUQ.) Disposition?"
+  options:
+    - "Confirm closed — reconcile filing (Recommended)"
+    - "Review individually"
+    - "Reopen all"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3dc2500a6fc1aa0d
+  resolved_at: 2026-06-14T15:30:46.458771Z
+  answer: "Your questions have been answered: \"DECISION-WI4481-PROJECT-LINKAGE: the INDEX atomic-write-guard work item. Live state now shows WI-4481 is a member of PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY (stage=resolved) and its bridge thread reached VERIFIED (-004); the project-linkage/PAUTH blocker that stalled three dispatched workers is fully cleared. How should I dispose of it?\"=\"Confirm closed (Recommended)\", \"DECISION-1199, DECISION-1217, DECISION-1218: three auto-detected prose false-positives (the tracker flagged conversational phrasing). Each is already recorded resolved with no recoverable decision content — 1199 had no referent, 1217's 'seeding' work was unrecoverable (you already chose 'close as stale'), 1218 was overtaken by WI-4534 swarm progress. Disposition?\"=\"Close all 3 as stale (Recommended)\", \"DECISION-1219, DECISION-1237, DECISION-1239: three prose false-positives you ALREADY answered 'A: close stale' in a Codex-harness session on 2026-06-14, but they keep re-surfacing because they were never moved out of the ## Pending block. (1219 = TAFE Slice C drive; 1237 = WI-4521 now VERIFIED; 1239 = WI-4540 now anchored by later AUQ.) Disposition?\"=\"Confirm closed — reconcile filing (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1246
+  asked_at: 2026-06-14T16:02:25.436011Z
+  question: "Cycle-15 triage: WI-3448 (P2 defect, bridge-compliance metadata gate never fires on heading-first proposals) is ALREADY-FIXED. The bridge-compliance-gate now runs a body-status-token rule (line 1157, GTKB-GOV-PROPOSAL-STANDARDS Slice 1) that hard-blocks any proposal Write whose first non-blank line isn't a canonical status token — so heading-first proposals are rejected before reaching the metadata gate, and by line 1228 the status is guaranteed accurate. That's WI-3448's candidate fix (b), landed after the WI was observed (Slice 1 = S382 > WI's S364) and documented in file-bridge-protocol.md. Closing it needs your GOV-15 approval. How should I disposition it?"
+  options:
+    - "Close as resolved"
+    - "Keep open for the residual"
+    - "Skip for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5670726b869d1c84
+  resolved_at: 2026-06-14T16:02:25.436011Z
+  answer: "Your questions have been answered: \"Cycle-15 triage: WI-3448 (P2 defect, bridge-compliance metadata gate never fires on heading-first proposals) is ALREADY-FIXED. The bridge-compliance-gate now runs a body-status-token rule (line 1157, GTKB-GOV-PROPOSAL-STANDARDS Slice 1) that hard-blocks any proposal Write whose first non-blank line isn't a canonical status token — so heading-first proposals are rejected before reaching the metadata gate, and by line 1228 the status is guaranteed accurate. That's WI-3448's candidate fix (b), landed after the WI was observed (Slice 1 = S382 > WI's S364) and documented in file-bridge-protocol.md. Closing it needs your GOV-15 approval. How should I disposition it?\"=\"Close as resolved\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1247
+  asked_at: 2026-06-14T16:17:59.227263Z
+  question: "Dedupe is clean — all seven survive as non-duplicates (adjacencies: #1↔WI-4438 cost-aware routing; #2↔WI-4305/4342/4543 individual hooks; #6↔the bridge-orchestrator vision). #7 ('monitor Omnigent') I'll record as the decision-capture DA record regardless. Which capability candidates #1–#6 enter the 'Omnigent Alignment' project as consideration WIs?"
+  options:
+    - "All six #1–#6 (Recommended)"
+    - "All six + a 'watch/track Omnigent' WI"
+    - "Trim — I'll name which to drop"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 76549fdef62320a3
+  resolved_at: 2026-06-14T16:17:59.227263Z
+  answer: "Your questions have been answered: \"Dedupe is clean — all seven survive as non-duplicates (adjacencies: #1↔WI-4438 cost-aware routing; #2↔WI-4305/4342/4543 individual hooks; #6↔the bridge-orchestrator vision). #7 ('monitor Omnigent') I'll record as the decision-capture DA record regardless. Which capability candidates #1–#6 enter the 'Omnigent Alignment' project as consideration WIs?\"=\"All six #1–#6 (Recommended)\", \"Which is the first alignment target (the project's P1)? This sets sequencing only — all remain consideration-level until a per-WI implementation proposal is filed with this grilling evidence.\"=\"#1 Cost/token budget (Recommended)\", \"Your directive is to emulate/align so eventual adoption is cheap. How closely should GT-KB-native builds mirror Omnigent's actual design (API shapes, schema, naming) versus borrowing only the ideas?\"=\"Mirror its shapes closely where sane (Recommended)\", \"Omnigent is a 3-day-old v0.1.0 alpha. What is the boundary on taking an actual runtime dependency on it (vs. emulating its patterns inside GT-KB)? This also sets the defer-trigger on the monitor decision.\"=\"Patterns only until mature (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1248
+  asked_at: 2026-06-14T16:17:59.227263Z
+  question: "Which is the first alignment target (the project's P1)? This sets sequencing only — all remain consideration-level until a per-WI implementation proposal is filed with this grilling evidence."
+  options:
+    - "#1 Cost/token budget (Recommended)"
+    - "#2 Unified policy registry"
+    - "#4 Phone/web approval surface"
+    - "No P1 yet — all parked"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 329213e36672cb18
+  resolved_at: 2026-06-14T16:17:59.227263Z
+  answer: "Your questions have been answered: \"Dedupe is clean — all seven survive as non-duplicates (adjacencies: #1↔WI-4438 cost-aware routing; #2↔WI-4305/4342/4543 individual hooks; #6↔the bridge-orchestrator vision). #7 ('monitor Omnigent') I'll record as the decision-capture DA record regardless. Which capability candidates #1–#6 enter the 'Omnigent Alignment' project as consideration WIs?\"=\"All six #1–#6 (Recommended)\", \"Which is the first alignment target (the project's P1)? This sets sequencing only — all remain consideration-level until a per-WI implementation proposal is filed with this grilling evidence.\"=\"#1 Cost/token budget (Recommended)\", \"Your directive is to emulate/align so eventual adoption is cheap. How closely should GT-KB-native builds mirror Omnigent's actual design (API shapes, schema, naming) versus borrowing only the ideas?\"=\"Mirror its shapes closely where sane (Recommended)\", \"Omnigent is a 3-day-old v0.1.0 alpha. What is the boundary on taking an actual runtime dependency on it (vs. emulating its patterns inside GT-KB)? This also sets the defer-trigger on the monitor decision.\"=\"Patterns only until mature (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1249
+  asked_at: 2026-06-14T16:17:59.227263Z
+  question: "Your directive is to emulate/align so eventual adoption is cheap. How closely should GT-KB-native builds mirror Omnigent's actual design (API shapes, schema, naming) versus borrowing only the ideas?"
+  options:
+    - "Mirror its shapes closely where sane (Recommended)"
+    - "Borrow ideas; GT-KB-native design"
+    - "Thin adapter/shim toward delegating later"
+    - "Decide per-WI at proposal time"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a08a4e5bc1f8711e
+  resolved_at: 2026-06-14T16:17:59.227263Z
+  answer: "Your questions have been answered: \"Dedupe is clean — all seven survive as non-duplicates (adjacencies: #1↔WI-4438 cost-aware routing; #2↔WI-4305/4342/4543 individual hooks; #6↔the bridge-orchestrator vision). #7 ('monitor Omnigent') I'll record as the decision-capture DA record regardless. Which capability candidates #1–#6 enter the 'Omnigent Alignment' project as consideration WIs?\"=\"All six #1–#6 (Recommended)\", \"Which is the first alignment target (the project's P1)? This sets sequencing only — all remain consideration-level until a per-WI implementation proposal is filed with this grilling evidence.\"=\"#1 Cost/token budget (Recommended)\", \"Your directive is to emulate/align so eventual adoption is cheap. How closely should GT-KB-native builds mirror Omnigent's actual design (API shapes, schema, naming) versus borrowing only the ideas?\"=\"Mirror its shapes closely where sane (Recommended)\", \"Omnigent is a 3-day-old v0.1.0 alpha. What is the boundary on taking an actual runtime dependency on it (vs. emulating its patterns inside GT-KB)? This also sets the defer-trigger on the monitor decision.\"=\"Patterns only until mature (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1250
+  asked_at: 2026-06-14T16:17:59.227263Z
+  question: "Omnigent is a 3-day-old v0.1.0 alpha. What is the boundary on taking an actual runtime dependency on it (vs. emulating its patterns inside GT-KB)? This also sets the defer-trigger on the monitor decision."
+  options:
+    - "Patterns only until mature (Recommended)"
+    - "Allow optional flagged integration now"
+    - "Set an explicit maturity bar now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 79468784fa30f8ca
+  resolved_at: 2026-06-14T16:17:59.227263Z
+  answer: "Your questions have been answered: \"Dedupe is clean — all seven survive as non-duplicates (adjacencies: #1↔WI-4438 cost-aware routing; #2↔WI-4305/4342/4543 individual hooks; #6↔the bridge-orchestrator vision). #7 ('monitor Omnigent') I'll record as the decision-capture DA record regardless. Which capability candidates #1–#6 enter the 'Omnigent Alignment' project as consideration WIs?\"=\"All six #1–#6 (Recommended)\", \"Which is the first alignment target (the project's P1)? This sets sequencing only — all remain consideration-level until a per-WI implementation proposal is filed with this grilling evidence.\"=\"#1 Cost/token budget (Recommended)\", \"Your directive is to emulate/align so eventual adoption is cheap. How closely should GT-KB-native builds mirror Omnigent's actual design (API shapes, schema, naming) versus borrowing only the ideas?\"=\"Mirror its shapes closely where sane (Recommended)\", \"Omnigent is a 3-day-old v0.1.0 alpha. What is the boundary on taking an actual runtime dependency on it (vs. emulating its patterns inside GT-KB)? This also sets the defer-trigger on the monitor decision.\"=\"Patterns only until mature (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1252
+  asked_at: 2026-06-14T16:29:42.326539Z
+  question: "I've handed off TAFE-cutover driving to a fresh session (prompt + memory/handoff-2026-06-14-tafe-cutover-driver.md). What should THIS session (c2f8c28a) do now? It currently holds a ~16:37Z loop tick and the WI-4546 marker authorization."
+  options:
+    - "Stand down now"
+    - "Keep monitoring as safety net"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eca5736c672e47d9
+  resolved_at: 2026-06-14T16:29:42.326539Z
+  answer: "Your questions have been answered: \"I've handed off TAFE-cutover driving to a fresh session (prompt + memory/handoff-2026-06-14-tafe-cutover-driver.md). What should THIS session (c2f8c28a) do now? It currently holds a ~16:37Z loop tick and the WI-4546 marker authorization.\"=\"Keep monitoring as safety net\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1254
+  asked_at: 2026-06-14T16:33:53.706428Z
+  question: "The handoff prompt is created and the session is prepared for a fresh start (clean envelope). Do you want any closing action before you close out?"
+  options:
+    - "Handoff sufficient — stop"
+    - "Full /kb-session-wrap"
+    - "Sweep-commit only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1974c3479c185164
+  resolved_at: 2026-06-14T16:33:53.706428Z
+  answer: "Your questions have been answered: \"The handoff prompt is created and the session is prepared for a fresh start (clean envelope). Do you want any closing action before you close out?\"=\"Handoff sufficient — stop\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

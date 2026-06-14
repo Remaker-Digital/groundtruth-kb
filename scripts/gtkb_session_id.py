@@ -47,7 +47,9 @@ Authority: WI-4270; PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY;
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 
 # Canonical membership SET: the union of every session-id env var any GT-KB
 # surface resolves. Frozen so a caller cannot mutate the authority in place.
@@ -95,6 +97,71 @@ MARKER_CONTINUITY_ORDER: tuple[str, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# WI-4540: per-session/per-context session-role marker path authority.
+#
+# bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md (GO at
+# -004; R-B1 + additive transition). The single-file marker
+# ``.claude/session/active-session-role.json`` is a shared slot across all
+# concurrent sessions on a workstation, which produced cross-session clobber
+# (WI-4463) and mid-context vanish (advisory Defect 2). The fix keys the marker
+# per session: ``.claude/session/role-<sanitized_session_id>.json``. This
+# module is the single home for the per-session path + sanitizer so the writer
+# (scripts/workstream_focus.py), the WI-4534 guard reader
+# (scripts/bridge_work_intent_registry.py), the resolver
+# (scripts/session_role_resolution.py), and the SessionStart sweeper
+# (scripts/session_start_dispatch_core.py) cannot drift apart. Parity tests
+# bind every consumer to these helpers.
+#
+# stdlib-only (re + pathlib), no import-time side effects: the hook-safe
+# contract above still holds.
+SESSION_MARKER_DIR_PARTS: tuple[str, ...] = (".claude", "session")
+PER_SESSION_ROLE_MARKER_PREFIX = "role-"
+PER_SESSION_ROLE_MARKER_SUFFIX = ".json"
+# Glob that matches every per-session role marker (used by the SessionStart
+# stale-marker sweeper). The legacy single-file marker
+# ("active-session-role.json") deliberately does NOT match this glob, so the
+# sweeper never touches it.
+PER_SESSION_ROLE_MARKER_GLOB = f"{PER_SESSION_ROLE_MARKER_PREFIX}*{PER_SESSION_ROLE_MARKER_SUFFIX}"
+_UNSAFE_SESSION_ID_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
+# Defensive cap so a pathological env value cannot produce an over-long path
+# component on any platform.
+_MAX_SANITIZED_SESSION_ID_LEN = 128
+
+
+def sanitize_session_id(session_id: str) -> str:
+    """Return a filesystem-safe token for ``session_id``.
+
+    Collapses any run of characters outside ``[A-Za-z0-9._-]`` to a single
+    ``-`` and trims leading/trailing ``-``/``.`` so the result is a clean path
+    component. Transcript UUIDs and dispatch ids
+    (``<ts>-<role>-<harness>-<hash>``) pass through essentially unchanged.
+    """
+    cleaned = _UNSAFE_SESSION_ID_CHARS.sub("-", str(session_id)).strip("-.")
+    if not cleaned:
+        cleaned = "unknown"
+    return cleaned[:_MAX_SANITIZED_SESSION_ID_LEN]
+
+
+def per_session_role_marker_name(session_id: str) -> str:
+    """Return the per-session role-marker filename for ``session_id``."""
+    return f"{PER_SESSION_ROLE_MARKER_PREFIX}{sanitize_session_id(session_id)}{PER_SESSION_ROLE_MARKER_SUFFIX}"
+
+
+def session_marker_dir(project_root: Path | str) -> Path:
+    """Return the ``.claude/session`` directory under ``project_root``."""
+    return Path(project_root).joinpath(*SESSION_MARKER_DIR_PARTS)
+
+
+def per_session_role_marker_path(project_root: Path | str, session_id: str) -> Path:
+    """Return the per-session role-marker path for ``session_id``.
+
+    The single authoritative path builder shared by the WI-4540 writer, the
+    guard reader, the resolver, and the SessionStart sweeper.
+    """
+    return session_marker_dir(project_root) / per_session_role_marker_name(session_id)
+
+
 def resolve_session_id(
     explicit: str | None = None,
     *,
@@ -123,6 +190,14 @@ def resolve_session_id(
 __all__ = [
     "BRIDGE_WORK_INTENT_ORDER",
     "MARKER_CONTINUITY_ORDER",
+    "PER_SESSION_ROLE_MARKER_GLOB",
+    "PER_SESSION_ROLE_MARKER_PREFIX",
+    "PER_SESSION_ROLE_MARKER_SUFFIX",
     "SESSION_ID_ENV_VARS",
+    "SESSION_MARKER_DIR_PARTS",
+    "per_session_role_marker_name",
+    "per_session_role_marker_path",
     "resolve_session_id",
+    "sanitize_session_id",
+    "session_marker_dir",
 ]

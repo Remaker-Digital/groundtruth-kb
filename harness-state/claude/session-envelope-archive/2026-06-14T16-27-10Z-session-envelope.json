@@ -1,0 +1,65 @@
+{
+  "active_work_item_id": "WI-4546",
+  "application_id": null,
+  "closed_at": "2026-06-14T16:27:10Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": "::init gtkb pb",
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-14T16:26:36Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": "prime-builder",
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-14T16-26-36Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": "gtkb_infrastructure",
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [
+    "WI-4546"
+  ],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .claude/hooks/bridge-axis-2-surface.py\n M bridge/INDEX.md\nA  bridge/gtkb-tafe-shadow-index-reconciliation-004.md\nA  bridge/gtkb-wi3439-requirement-sufficiency-presence-check-002.md\nA  bridge/gtkb-wi4519-da-search-always-on-like-merge-004.md\nA  bridge/gtkb-wi4522-author-metadata-per-harness-resolution-004.md\nA  bridge/gtkb-wi4522-author-metadata-per-harness-resolution-006.md\nA  bridge/gtkb-wi4524-test-session-id-leak-hardening-004.md\nA  bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-004.md\nA  bridge/gtkb-wi4530-gt-cli-path-install-shim-004.md\n M groundtruth-kb/templates/hooks/session-start-governance.py\n M harness-state/harness-registry.json\nA  independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-14-15-43-wi4528-shared-bridge-evidence-batch-defect.md\nA  independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-14-16-05-wi4522-author-identity-env-alias-defect.md\n M memory/archive/pending-owner-decisions-202605.md\n M memory/pending-owner-decisions.md\n M platform_tests/hooks/test_bridge_axis_2_surface_governance_review_terminal.py\n M platform_tests/scripts/test_bridge_author_metadata.py\n M scripts/bridge_author_metadata.py\n M scripts/release_candidate_gate.py\n?? .tmp_auth_test_err.txt\n?? .tmp_auth_test_err2.txt\n?? .tmp_auth_test_full.txt\n?? .tmp_auth_test_out.txt\n?? .tmp_auth_test_out2.txt\n?? _lo_extract.py\n?? _tmp_cli_ingest_snippet.md\n?? _tmp_tafe_bridge_ingestion_full.py\n?? bridge/gtkb-tafe-shadow-index-reconciliation-003.md\n?? bridge/gtkb-wi3439-requirement-sufficiency-presence-check-001.md\n?? bridge/gtkb-wi4519-da-search-always-on-like-merge-003.md\n?? bridge/gtkb-wi4522-author-metadata-per-harness-resolution-005.md\n?? bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-003.md\n?? bridge/gtkb-wi4530-gt-cli-path-install-shim-003.md\n?? bridge/gtkb-wi4540-per-session-role-marker-context-envelope-004.md\n?? bridge/gtkb-wi4548-axis-2-advisory-surface-001.md\n?? bridge/gtkb-wi4548-axis-2-advisory-surface-002.md\n?? bridge/gtkb-wi4548-axis-2-advisory-surface-003.md\n?? bridge/gtkb-wi4548-axis-2-advisory-surface-004.md\n?? bridge/gtkb-wi4548-axis-2-advisory-surface-005.md\n?? harness-state/claude/session-envelope.json\n?? platform_tests/scripts/test_install_gt_path_shim.py\n?? platform_tests/scripts/test_sweep_commit_helpers.py\n?? scripts/install_gt_path_shim.py\n?? scripts/sweep_commit_helpers.py\n?? temp-slice-b-smoke.json",
+        "short_line_count": 46,
+        "short_line_limit": 80,
+        "short_truncated": false
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

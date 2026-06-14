@@ -1,26 +1,51 @@
+Document: gtkb-wi4548-axis-2-advisory-surface
+VERIFIED: bridge/gtkb-wi4548-axis-2-advisory-surface-005.md
+NEW: bridge/gtkb-wi4548-axis-2-advisory-surface-004.md
+GO: bridge/gtkb-wi4548-axis-2-advisory-surface-003.md
+REVISED: bridge/gtkb-wi4548-axis-2-advisory-surface-002.md
+NEW: bridge/gtkb-wi4548-axis-2-advisory-surface-001.md
+
+Document: gtkb-wi4396-dispatch-suppression-routing
+NEW: bridge/gtkb-wi4396-dispatch-suppression-routing-001.md
+
+Document: gtkb-wi3439-requirement-sufficiency-presence-check
+GO: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-002.md
+NEW: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-001.md
+
 Document: gtkb-wi4530-gt-cli-path-install-shim
+VERIFIED: bridge/gtkb-wi4530-gt-cli-path-install-shim-004.md
+NEW: bridge/gtkb-wi4530-gt-cli-path-install-shim-003.md
 GO: bridge/gtkb-wi4530-gt-cli-path-install-shim-002.md
 NEW: bridge/gtkb-wi4530-gt-cli-path-install-shim-001.md
 
 Document: gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper
+VERIFIED: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-004.md
+NEW: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-003.md
 GO: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-002.md
 NEW: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-001.md
 
 Document: gtkb-tafe-shadow-index-reconciliation
+GO: bridge/gtkb-tafe-shadow-index-reconciliation-004.md
+REVISED: bridge/gtkb-tafe-shadow-index-reconciliation-003.md
 NO-GO: bridge/gtkb-tafe-shadow-index-reconciliation-002.md
 NEW: bridge/gtkb-tafe-shadow-index-reconciliation-001.md
 
 Document: gtkb-wi4540-per-session-role-marker-context-envelope
+GO: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-004.md
 REVISED: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md
 GO: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-002.md
 NEW: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-001.md
 
 Document: gtkb-wi4522-author-metadata-per-harness-resolution
+VERIFIED: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-006.md
+NEW: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-005.md
+GO: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-004.md
 REVISED: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-003.md
 NO-GO: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-002.md
 NEW: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-001.md
 
 Document: gtkb-wi4524-test-session-id-leak-hardening
+VERIFIED: bridge/gtkb-wi4524-test-session-id-leak-hardening-004.md
 NEW: bridge/gtkb-wi4524-test-session-id-leak-hardening-003.md
 GO: bridge/gtkb-wi4524-test-session-id-leak-hardening-002.md
 NEW: bridge/gtkb-wi4524-test-session-id-leak-hardening-001.md
@@ -41,6 +66,8 @@ GO: bridge/gtkb-wi4521-backlog-update-source-spec-id-002.md
 NEW: bridge/gtkb-wi4521-backlog-update-source-spec-id-001.md
 
 Document: gtkb-wi4519-da-search-always-on-like-merge
+VERIFIED: bridge/gtkb-wi4519-da-search-always-on-like-merge-004.md
+NEW: bridge/gtkb-wi4519-da-search-always-on-like-merge-003.md
 GO: bridge/gtkb-wi4519-da-search-always-on-like-merge-002.md
 NEW: bridge/gtkb-wi4519-da-search-always-on-like-merge-001.md
 

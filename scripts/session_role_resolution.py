@@ -106,6 +106,32 @@ def _read_marker(project_root: Path) -> dict[str, Any] | None:
     return body if isinstance(body, dict) else None
 
 
+def _read_per_session_marker(project_root: Path, session_id: str) -> dict[str, Any] | None:
+    """Read the WI-4540 per-session marker keyed under ``session_id``.
+
+    Returns the parsed body dict, or None when the per-session marker is
+    absent/unreadable/malformed. The path is built by the single shared
+    authority in ``scripts/gtkb_session_id.py`` so the read target cannot drift
+    from the Slice-2/WI-4540 writer. Fail-soft import so a UserPromptSubmit
+    consumer never raises.
+    """
+    try:
+        from scripts.gtkb_session_id import per_session_role_marker_path
+    except ImportError:  # pragma: no cover - direct script execution path
+        from gtkb_session_id import per_session_role_marker_path  # type: ignore[no-redef]
+
+    marker_path = per_session_role_marker_path(project_root, session_id)
+    try:
+        raw = marker_path.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return None
+    try:
+        body = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return body if isinstance(body, dict) else None
+
+
 def resolve_interactive_session_role(
     project_root: Path,
     *,
@@ -125,6 +151,23 @@ def resolve_interactive_session_role(
     Slice 2 writer's stored raw id.
     """
     durable = _durable_role(project_root, harness_name)
+
+    # WI-4540 (bridge -004, R-B1 + additive transition): the per-session marker
+    # is the authority. When a current_session_id is available, prefer the
+    # per-session marker keyed under it; it survives a SessionStart that carries
+    # a different context id (no shared single-file slot to clobber). When no
+    # per-session marker exists, fall back to the legacy single-file marker for
+    # the additive transition window (existing resolver behavior, unchanged).
+    if current_session_id is not None:
+        per_session = _read_per_session_marker(project_root, current_session_id)
+        if per_session is not None:
+            role = per_session.get("role")
+            if role not in _VALID_ROLES:  # assertion 7
+                return durable, "durable_marker_invalid_role"
+            marker_session_id = per_session.get("session_id")
+            if not (isinstance(marker_session_id, str) and marker_session_id == current_session_id):
+                return durable, "durable_marker_stale_session"  # assertion 6
+            return role, "marker"
 
     body = _read_marker(project_root)
     if body is None:

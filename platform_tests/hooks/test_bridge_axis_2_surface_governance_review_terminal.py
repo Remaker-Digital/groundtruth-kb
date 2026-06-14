@@ -10,8 +10,9 @@ Verifies that .claude/hooks/bridge-axis-2-surface.py honors the
 centrally-computed `dispatchable` flag attached by
 groundtruth_kb.bridge.notify.compute_actionable_pending, so terminal-kind GO
 threads (governance_review, scoping, closure, parking, index/thread
-reconciliation, operational_state_change, candidate_spec_intake,
-loyal_opposition_advisory) no longer re-fire the in-session AXIS 2 surface.
+reconciliation, operational_state_change, candidate_spec_intake) no longer
+re-fire the in-session AXIS 2 surface. ADVISORY remains visible because it is
+non-dispatchable Axis-2 work for interactive Prime disposition.
 
 The fix is consumer-side: the upstream `_KIND_TERMINAL_TOKENS` /
 `_derive_dispatchable` rule already published dispatchable=False for these
@@ -83,8 +84,10 @@ def _write_fixture(
     (bridge_dir / "INDEX.md").write_text("".join(index_lines), encoding="utf-8")
 
     # Operative file with bridge_kind header.
+    operative_status = top_status if top_version == operative_version else "NEW"
     operative_body = (
-        f"NEW\n\nbridge_kind: {bridge_kind}\nDocument: {slug}\nVersion: {operative_version}\n\nFixture proposal body.\n"
+        f"{operative_status}\n\nbridge_kind: {bridge_kind}\n"
+        f"Document: {slug}\nVersion: {operative_version}\n\nFixture proposal body.\n"
     )
     (bridge_dir / f"{slug}-{operative_version}.md").write_text(operative_body, encoding="utf-8")
 
@@ -145,6 +148,25 @@ def test_implementation_proposal_go_remains_actionable(tmp_path: Path) -> None:
     assert items[0].document_name == "fixture-impl-go"
     assert items[0].top_status == "GO"
     assert signature, "Signature must be non-empty when items are present."
+
+
+def test_advisory_entry_surfaces_despite_non_dispatchable(tmp_path: Path) -> None:
+    """WI-4548 regression: ADVISORY is non-dispatchable but Prime-visible."""
+    mod = _load_hook(tmp_path)
+    _write_fixture(
+        tmp_path,
+        slug="fixture-advisory",
+        top_status="ADVISORY",
+        bridge_kind="loyal_opposition_advisory",
+        operative_version="001",
+    )
+
+    signature, items = mod._compute_actionable_for_role(mod.ROLE_PRIME)
+
+    assert len(items) == 1, "ADVISORY must remain visible to the Prime AXIS-2 surface."
+    assert items[0].document_name == "fixture-advisory"
+    assert items[0].top_status == "ADVISORY"
+    assert signature, "Signature must be non-empty when ADVISORY items are present."
 
 
 def test_no_go_entry_remains_actionable_regardless_of_kind(tmp_path: Path) -> None:
