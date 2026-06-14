@@ -1,16 +1,89 @@
+Document: gtkb-session-role-marker-architecture-advisory
+ADVISORY: bridge/gtkb-session-role-marker-architecture-advisory-001.md
+
+Document: gtkb-wi4521-backlog-update-source-spec-id
+NEW: bridge/gtkb-wi4521-backlog-update-source-spec-id-001.md
+
+Document: gtkb-wi4519-da-search-always-on-like-merge
+GO: bridge/gtkb-wi4519-da-search-always-on-like-merge-002.md
+NEW: bridge/gtkb-wi4519-da-search-always-on-like-merge-001.md
+
+Document: gtkb-wi4512-db-snapshot-launcher-in-root
+GO: bridge/gtkb-wi4512-db-snapshot-launcher-in-root-002.md
+NEW: bridge/gtkb-wi4512-db-snapshot-launcher-in-root-001.md
+
+Document: gtkb-wi4542-spec-link-heading-qualifier-tolerance
+VERIFIED: bridge/gtkb-wi4542-spec-link-heading-qualifier-tolerance-004.md
+NEW: bridge/gtkb-wi4542-spec-link-heading-qualifier-tolerance-003.md
+GO: bridge/gtkb-wi4542-spec-link-heading-qualifier-tolerance-002.md
+NEW: bridge/gtkb-wi4542-spec-link-heading-qualifier-tolerance-001.md
+
+Document: gtkb-wi4527-go-claim-auto-extend
+GO: bridge/gtkb-wi4527-go-claim-auto-extend-004.md
+REVISED: bridge/gtkb-wi4527-go-claim-auto-extend-003.md
+NO-GO: bridge/gtkb-wi4527-go-claim-auto-extend-002.md
+NEW: bridge/gtkb-wi4527-go-claim-auto-extend-001.md
+
+Document: gtkb-advisory-prime-actionability-surfacing
+GO: bridge/gtkb-advisory-prime-actionability-surfacing-002.md
+NEW: bridge/gtkb-advisory-prime-actionability-surfacing-001.md
+
+Document: gtkb-wi4509-cutover-evidence
+VERIFIED: bridge/gtkb-wi4509-cutover-evidence-006.md
+REVISED: bridge/gtkb-wi4509-cutover-evidence-005.md
+NO-GO: bridge/gtkb-wi4509-cutover-evidence-004.md
+NEW: bridge/gtkb-wi4509-cutover-evidence-003.md
+GO: bridge/gtkb-wi4509-cutover-evidence-002.md
+NEW: bridge/gtkb-wi4509-cutover-evidence-001.md
+
+Document: gtkb-core-spec-intake-phase-5-docs-and-adoption-evidence
+VERIFIED: bridge/gtkb-core-spec-intake-phase-5-docs-and-adoption-evidence-006.md
+NEW: bridge/gtkb-core-spec-intake-phase-5-docs-and-adoption-evidence-005.md
+GO: bridge/gtkb-core-spec-intake-phase-5-docs-and-adoption-evidence-004.md
+REVISED: bridge/gtkb-core-spec-intake-phase-5-docs-and-adoption-evidence-003.md
+NO-GO: bridge/gtkb-core-spec-intake-phase-5-docs-and-adoption-evidence-002.md
+NEW: bridge/gtkb-core-spec-intake-phase-5-docs-and-adoption-evidence-001.md
+
+Document: gtkb-wi4441-antigravity-adapter-generation
+VERIFIED: bridge/gtkb-wi4441-antigravity-adapter-generation-004.md
+NEW: bridge/gtkb-wi4441-antigravity-adapter-generation-003.md
+GO: bridge/gtkb-wi4441-antigravity-adapter-generation-002.md
+NEW: bridge/gtkb-wi4441-antigravity-adapter-generation-001.md
+
+Document: gtkb-wi4480-dispatch-starvation-telemetry
+VERIFIED: bridge/gtkb-wi4480-dispatch-starvation-telemetry-004.md
+NEW: bridge/gtkb-wi4480-dispatch-starvation-telemetry-003.md
+GO: bridge/gtkb-wi4480-dispatch-starvation-telemetry-002.md
+NEW: bridge/gtkb-wi4480-dispatch-starvation-telemetry-001.md
+
+Document: gtkb-tafe-slice-c-ingestion-consolidated
+VERIFIED: bridge/gtkb-tafe-slice-c-ingestion-consolidated-004.md
+NEW: bridge/gtkb-tafe-slice-c-ingestion-consolidated-003.md
+GO: bridge/gtkb-tafe-slice-c-ingestion-consolidated-002.md
+NEW: bridge/gtkb-tafe-slice-c-ingestion-consolidated-001.md
+
+Document: gtkb-hourly-quality-scout-advisory
+ADVISORY: bridge/gtkb-hourly-quality-scout-advisory-001.md
+
 Document: gtkb-tafe-dual-write-slice-c-ingestion
+WITHDRAWN: bridge/gtkb-tafe-dual-write-slice-c-ingestion-003.md
 GO: bridge/gtkb-tafe-dual-write-slice-c-ingestion-002.md
 NEW: bridge/gtkb-tafe-dual-write-slice-c-ingestion-001.md
 
 Document: gtkb-core-spec-intake-phase-4-cross-session-prompt-driver
+VERIFIED: bridge/gtkb-core-spec-intake-phase-4-cross-session-prompt-driver-004.md
+NEW: bridge/gtkb-core-spec-intake-phase-4-cross-session-prompt-driver-003.md
 GO: bridge/gtkb-core-spec-intake-phase-4-cross-session-prompt-driver-002.md
 NEW: bridge/gtkb-core-spec-intake-phase-4-cross-session-prompt-driver-001.md
 
 Document: gtkb-tafe-dual-write-slice-c
+WITHDRAWN: bridge/gtkb-tafe-dual-write-slice-c-003.md
 NO-GO: bridge/gtkb-tafe-dual-write-slice-c-002.md
 NEW: bridge/gtkb-tafe-dual-write-slice-c-001.md
 
 Document: gtkb-wi4464-commit-pathspec-safety-detector
+VERIFIED: bridge/gtkb-wi4464-commit-pathspec-safety-detector-006.md
+REVISED: bridge/gtkb-wi4464-commit-pathspec-safety-detector-005.md
 NO-GO: bridge/gtkb-wi4464-commit-pathspec-safety-detector-004.md
 NEW: bridge/gtkb-wi4464-commit-pathspec-safety-detector-003.md
 GO: bridge/gtkb-wi4464-commit-pathspec-safety-detector-002.md
