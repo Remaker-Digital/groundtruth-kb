@@ -1,10 +1,13 @@
 Document: gtkb-tafe-dual-write-slice-c-ingestion
+GO: bridge/gtkb-tafe-dual-write-slice-c-ingestion-002.md
 NEW: bridge/gtkb-tafe-dual-write-slice-c-ingestion-001.md
 
 Document: gtkb-core-spec-intake-phase-4-cross-session-prompt-driver
+GO: bridge/gtkb-core-spec-intake-phase-4-cross-session-prompt-driver-002.md
 NEW: bridge/gtkb-core-spec-intake-phase-4-cross-session-prompt-driver-001.md
 
 Document: gtkb-tafe-dual-write-slice-c
+NO-GO: bridge/gtkb-tafe-dual-write-slice-c-002.md
 NEW: bridge/gtkb-tafe-dual-write-slice-c-001.md
 
 Document: gtkb-wi4464-commit-pathspec-safety-detector
