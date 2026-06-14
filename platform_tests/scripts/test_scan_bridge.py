@@ -259,3 +259,21 @@ def test_terminal_tokens_parity_with_canonical_notify(helper) -> None:
     from groundtruth_kb.bridge import notify
 
     assert set(helper._KIND_TERMINAL_TOKENS) == set(notify._KIND_TERMINAL_TOKENS)
+
+
+def test_advisory_actionable_for_prime_not_lo(helper) -> None:
+    """ADVISORY status entries surface in the Prime actionable list (so manual
+    `/bridge` scans show them for owner-deliberation/UAQ disposition) but never
+    surface for Loyal Opposition. Per gtkb-advisory-prime-actionability-
+    surfacing-002 (Codex GO 2026-06-14) Condition 1.
+    """
+    index = """\
+Document: gtkb-foo-advisory
+ADVISORY: bridge/gtkb-foo-advisory-001.md
+"""
+    prime_result = helper.scan(role="prime-builder", index_text=index)
+    lo_result = helper.scan(role="loyal-opposition", index_text=index)
+    assert len(prime_result["actionable"]) == 1
+    assert prime_result["actionable"][0]["document"] == "gtkb-foo-advisory"
+    assert prime_result["actionable"][0]["latest_status"] == "ADVISORY"
+    assert lo_result["actionable"] == []

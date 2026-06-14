@@ -379,6 +379,64 @@ gt serve --host 0.0.0.0 --port 8080
 
 ---
 
+## Core Specification Intake
+
+GT-KB prompts new projects for a baseline set of core application specifications
+(product identity, application type, tenancy, users/roles, data classification,
+compliance, security posture, reliability posture, external integrations, AI usage,
+operational/release path, and first-release non-goals) and re-surfaces the next
+missing question in `MEMORY.md` at each session start until the baseline is captured,
+then ceases. Completion is derived from persisted MemBase evidence — a slot counts as
+captured only when the owner states it or explicitly marks it not applicable; an
+AI-inferred candidate does not suppress the prompt until the owner confirms it.
+
+New projects are enrolled by default. To opt out, pass `--opt-out-core-spec-intake`
+to `gt project init`, set `GTKB_CORE_SPEC_INTAKE_OPT_OUT=1`, or add a
+`[core_spec_intake]` table with `enabled = false` to `groundtruth.toml`. Non-interactive
+and JSON-safe paths never emit interactive prompts.
+
+### gt core-specs status
+
+Report the baseline core-spec intake completion state for a project.
+
+```
+gt core-specs status (--project-id <id> | --project-name <name>) [--json] [--no-fail]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--project-id` | string | — | Project id to inspect (mutually exclusive with `--project-name`) |
+| `--project-name` | string | — | Project name to inspect |
+| `--json` | flag | off | Emit machine-readable JSON |
+| `--no-fail` | flag | off | Exit zero even when intake is incomplete |
+
+The command exits non-zero when intake is incomplete unless `--no-fail` is given, so
+it can gate CI without blocking automation when paired with `--no-fail`.
+
+### gt core-specs next-question
+
+Print the single next unanswered core-spec question for a project, or report that the
+baseline is complete.
+
+```
+gt core-specs next-question (--project-id <id> | --project-name <name>) [--json]
+```
+
+**Examples:**
+
+```bash
+# Human-readable status
+gt core-specs status --project-name "My App"
+
+# Automation-safe JSON; never blocks
+gt core-specs status --project-id PROJECT-MY-APP --json --no-fail
+
+# The single next question to answer
+gt core-specs next-question --project-name "My App"
+```
+
+---
+
 ## Dashboard Commands
 
 Generate and run the local Grafana operations dashboard. These commands are

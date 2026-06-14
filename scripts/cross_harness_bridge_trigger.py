@@ -95,6 +95,14 @@ from implementation_authorization import (  # noqa: E402
     issue_dispatch_authorization_packets,
 )
 
+# WI-4480 Slice A: per-entry dispatch-starvation telemetry (observational).
+# Guarded so a telemetry-module import failure can never break trigger import
+# or dispatch; the call site is additionally exception-swallowed.
+try:
+    from bridge_dispatch_starvation_telemetry import record_starvation  # noqa: E402, I001
+except Exception:  # noqa: BLE001 - telemetry import must never break dispatch
+    record_starvation = None  # type: ignore[assignment]
+
 # Manual-disable env var. When set to "1", this script no-ops immediately.
 # Used as an OPERATOR opt-out (debugging, emergency stop, test harness),
 # NOT as automatic loop prevention.
@@ -3027,6 +3035,25 @@ def run_trigger(
         # changing the dispatch payload, causing redundant dispatches.
         selected = _selected_oldest_first(filtered, target_max_items)
         signature = _signature(selected)
+
+        # WI-4480 Slice A: observational dispatch-starvation telemetry. Reads
+        # the already-computed (and signed) ``filtered``/``selected`` lists and
+        # writes only to a separate ``starvation-telemetry.json``. It does NOT
+        # mutate ``filtered``, ``selected``, ``signature``, dispatch-state's
+        # signature-bearing fields, or any dispatch decision. Fail-safe by
+        # construction: ``record_starvation`` swallows its own errors and the
+        # call is exception-guarded so telemetry can never perturb dispatch.
+        if record_starvation is not None:
+            try:
+                record_starvation(
+                    recipient,
+                    [it.document_name for it in filtered],
+                    [it.document_name for it in selected],
+                    project_root=project_root,
+                    now_iso=_now_iso(),
+                )
+            except Exception:  # noqa: BLE001 - telemetry must never break dispatch
+                pass
 
         prior = recipients_state.get(recipient) if isinstance(recipients_state.get(recipient), dict) else {}
         # Active-session suppression state model:

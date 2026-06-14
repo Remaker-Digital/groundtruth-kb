@@ -1090,3 +1090,29 @@ def test_kind_aware_routing_enabled_when_env_var_one(monkeypatch) -> None:
     k = _kind_aware()
     monkeypatch.setenv(k.KIND_AWARE_ROUTING_ENV_VAR, "1")
     assert k._kind_aware_routing_enabled() is True
+
+
+def test_compute_pending_prime_ADVISORY_is_actionable_but_not_dispatchable(tmp_path: Path) -> None:
+    """ADVISORY status entries appear in actionable_for_prime so manual scans /
+    interactive surfaces can present them for owner-deliberation/UAQ disposition,
+    but ``dispatchable`` MUST be False so they never spawn a headless Prime
+    session. Per gtkb-advisory-prime-actionability-surfacing-002 (Codex GO
+    2026-06-14) Conditions 1 + 3: the dispatchability invariant in
+    ``_derive_dispatchable`` already forces False for any status other than
+    NEW/REVISED/NO-GO and conditionally GO. We intentionally do NOT assert any
+    specific ``classification`` token (per Codex Condition 2: do not conflate
+    ADVISORY with the VERIFIED-terminal label).
+    """
+    n = _notify()
+    # ADVISORY entries have no NEW/REVISED operative version in this thread shape;
+    # construct an INDEX that only has the ADVISORY line + on-disk file.
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "foo-001.md").write_text("ADVISORY\nbridge_kind: loyal_opposition_advisory\n", encoding="utf-8")
+    text = "Document: foo\nADVISORY: bridge/foo-001.md\n"
+    parsed = n.parse_index(text)
+    prime, codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    assert len(prime) == 1
+    assert prime[0].top_status == "ADVISORY"
+    assert prime[0].dispatchable is False
+    assert codex == []

@@ -64,6 +64,22 @@ This creates two files:
 - `groundtruth.toml` — project configuration
 - `groundtruth.db` — empty MemBase
 
+### Core specification intake (default)
+
+Projects scaffolded with `gt project init` are enrolled in **core application
+specification intake** by default. After initialization — and at each later session
+start — GT-KB surfaces the next missing baseline question (product identity,
+application type, tenancy, users/roles, and so on) in `MEMORY.md`, and stops once the
+baseline is captured. This keeps the owner's job to *answering* the core
+specifications rather than remembering to write them. Completion is tracked in
+persisted MemBase evidence, so the prompt does not reappear once a slot is answered or
+explicitly marked not applicable.
+
+To decline the behavior, pass `--opt-out-core-spec-intake` to `gt project init`, set
+`GTKB_CORE_SPEC_INTAKE_OPT_OUT=1`, or add a `[core_spec_intake]` table with
+`enabled = false` to `groundtruth.toml`. See `gt core-specs status` in the CLI
+reference for the per-slot view.
+
 ## Step 3: Seed governance rules
 
 ```bash

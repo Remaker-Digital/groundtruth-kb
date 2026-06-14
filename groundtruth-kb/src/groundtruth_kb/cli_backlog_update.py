@@ -46,6 +46,7 @@ class BacklogUpdateRequest:
     dry_run: bool
     title: str | None = None
     description: str | None = None
+    source_spec_id: str | None = None
 
 
 def _resolve_changed_by() -> str:
@@ -175,6 +176,8 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
         fields["title"] = request.title
     if request.description is not None:
         fields["description"] = request.description
+    if request.source_spec_id is not None:
+        fields["source_spec_id"] = request.source_spec_id
 
     # Test the stage transition against the database logic
     current_stage = current.get("stage", "created")

@@ -569,6 +569,51 @@ def _check_db_schema(target: Path) -> ToolCheck:
         )
 
 
+def _check_core_spec_intake(target: Path) -> ToolCheck:
+    """Doctor-style health surface for core-spec intake (SPEC-CORE-INTAKE-001).
+
+    Read-only: reports the next missing core application specification slot for an
+    enrolled adopter project, or pass when complete / not enrolled / opted out.
+    """
+    name = "Core spec intake"
+    db_path = target / "groundtruth.db"
+    if not db_path.exists():
+        return ToolCheck(name=name, required=False, found=False, status="info", message="No groundtruth.db")
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.project.core_spec_intake import (
+            find_enrolled_project_id,
+            intake_enabled,
+            next_question,
+        )
+
+        if not intake_enabled(target):
+            return ToolCheck(name=name, required=False, found=True, status="info", message="Opted out")
+        db = KnowledgeDB(db_path)
+        try:
+            project_id = find_enrolled_project_id(db)
+            if project_id is None:
+                return ToolCheck(
+                    name=name, required=False, found=True, status="pass", message="No enrolled intake project"
+                )
+            nxt = next_question(db, project_id)
+        finally:
+            db.close()
+        if nxt is None:
+            return ToolCheck(
+                name=name, required=False, found=True, status="pass", message=f"{project_id}: core specs complete"
+            )
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"{project_id}: next missing slot '{nxt['label']}' ({nxt['name']})",
+        )
+    except Exception as e:  # intentional-catch: validation tool, error -> info status
+        return ToolCheck(name=name, required=False, found=True, status="info", message=f"Check error: {e}")
+
+
 def _connect_readonly_sqlite(db_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
 
@@ -5192,6 +5237,7 @@ def run_doctor(
     # Project-level checks
     checks.append(_check_groundtruth_toml(target))
     checks.append(_check_db_schema(target))
+    checks.append(_check_core_spec_intake(target))
     checks.append(_check_hooks(target, profile))
     checks.append(_check_rules(target, profile))
     checks.append(_check_canonical_terminology(target, profile))

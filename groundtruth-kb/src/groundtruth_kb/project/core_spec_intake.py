@@ -230,6 +230,131 @@ def append_initial_prompt(memory_path: Path, slot: str) -> None:
     memory_path.write_text(content + render_initial_prompt(slot), encoding="utf-8")
 
 
+# ── Cross-session prompt driver (Phase 4) ──────────────────────────────
+# SPEC-CORE-INTAKE-001 (re-emit next missing question during later startup or
+# doctor-style health checks), SPEC-CORE-INTAKE-002 (stop at persisted
+# completion), ADR-CORE-INTAKE-001 (completion from persisted MemBase evidence),
+# DCL-CORE-INTAKE-001 (non-interactive, opt-out, scaffold/automation compatible).
+
+_INTAKE_BLOCK_START = "<!-- gtkb:core-spec-intake:start -->"
+_INTAKE_BLOCK_END = "<!-- gtkb:core-spec-intake:end -->"
+_INTAKE_OPT_OUT_ENV = "GTKB_CORE_SPEC_INTAKE_OPT_OUT"
+
+
+def _render_pending_block(slot_def: CoreSpecSlot) -> str:
+    """Render the delimited pending-prompt block for the current slot."""
+    return (
+        f"{_INTAKE_BLOCK_START}\n"
+        "## Pending Core Spec Intake\n\n"
+        f"- Next slot: {slot_def.label} (`{slot_def.name}`)\n"
+        f"- Prompt: {slot_def.prompt}\n"
+        "- Completion: record the answer with owner_stated provenance, or mark the slot not_applicable.\n"
+        f"{_INTAKE_BLOCK_END}\n"
+    )
+
+
+def _strip_intake_block(content: str) -> str:
+    """Remove any existing intake block (delimited form or legacy heading form)."""
+    delimited = re.compile(
+        re.escape(_INTAKE_BLOCK_START) + r".*?" + re.escape(_INTAKE_BLOCK_END) + r"\n?",
+        re.DOTALL,
+    )
+    content = delimited.sub("", content)
+    # Backward compatibility: migrate the Slice-1 render_initial_prompt block.
+    legacy = re.compile(
+        r"\n*## Pending Core Spec Intake\n\n"
+        r"- Next slot: [^\n]*\n"
+        r"- Prompt: [^\n]*\n"
+        r"- Completion: [^\n]*\n"
+    )
+    content = legacy.sub("\n", content)
+    return content
+
+
+def intake_enabled(target: Path) -> bool:
+    """Resolve the explicit opt-out (env or ``groundtruth.toml``); default enabled."""
+    import os
+
+    if os.environ.get(_INTAKE_OPT_OUT_ENV):
+        return False
+    toml_path = target / "groundtruth.toml"
+    if toml_path.exists():
+        try:
+            import tomllib
+
+            data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+            section = data.get("core_spec_intake")
+            if isinstance(section, dict) and section.get("enabled") is False:
+                return False
+        except Exception:  # intentional-catch: opt-out resolution must never raise
+            return True
+    return True
+
+
+def _project_intake_enabled(project: dict[str, object] | None) -> bool:
+    if not project:
+        return False
+    notes = project.get("notes")
+    if not notes:
+        return False
+    try:
+        payload = json.loads(notes)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return bool(isinstance(payload, dict) and payload.get(_ENROLLMENT_NOTES_KEY))
+
+
+def is_enrolled(db: KnowledgeDB, project_id: str) -> bool:
+    """Return True when the project has core-spec-intake enrollment evidence."""
+    return _project_intake_enabled(db.get_project(project_id))
+
+
+def find_enrolled_project_id(db: KnowledgeDB) -> str | None:
+    """Return the single enrolled intake project id, or None (zero/ambiguous)."""
+    enrolled = [
+        str(project["id"]) for project in db.list_projects(include_terminal=False) if _project_intake_enabled(project)
+    ]
+    return enrolled[0] if len(enrolled) == 1 else None
+
+
+def refresh_intake_prompt(
+    db: KnowledgeDB,
+    project_id: str,
+    memory_path: Path,
+    *,
+    enabled: bool = True,
+) -> dict[str, str]:
+    """Reconcile ``MEMORY.md`` to the current intake state.
+
+    Re-emits exactly one pending block for the next missing slot while any
+    required slot is missing (SPEC-CORE-INTAKE-001), and removes the block once
+    every required slot is owner-stated or explicitly not-applicable
+    (SPEC-CORE-INTAKE-002). Completion derives from persisted MemBase evidence
+    via :func:`next_question` (ADR-CORE-INTAKE-001). Pure file + MemBase reads;
+    no interactive I/O and no canonical ``groundtruth.db`` mutation
+    (DCL-CORE-INTAKE-001). Returns a JSON-safe status dict.
+    """
+    if not enabled:
+        return {"status": "disabled"}
+
+    nxt = next_question(db, project_id)
+    original = memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
+    stripped = _strip_intake_block(original)
+
+    if nxt is None:
+        if stripped != original:
+            memory_path.write_text(stripped, encoding="utf-8")
+        return {"status": "complete"}
+
+    slot_def = _slot_for_name(nxt["name"])
+    body = stripped.rstrip("\n")
+    block = _render_pending_block(slot_def)
+    new_content = f"{body}\n\n{block}" if body else block
+    if new_content != original:
+        memory_path.write_text(new_content, encoding="utf-8")
+    return {"status": "prompted", "slot": nxt["name"]}
+
+
 def _slot_completion(db: KnowledgeDB, project_id: str, slot: str) -> dict[str, object] | None:
     spec = db.get_spec(slot_spec_id(project_id, slot))
     if spec is None or spec.get("status") == "retired":

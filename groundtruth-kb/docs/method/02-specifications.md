@@ -97,6 +97,12 @@ This applies whenever you encounter specification language — words like "must"
 
 This discipline prevents the common failure mode where code is written first and specifications are retrofitted to match — which defeats the purpose of specifications entirely.
 
+### Core specification intake
+
+GroundTruth operationalizes spec-first at *project start*, not only when the owner happens to describe a requirement. New projects are enrolled in **core specification intake** by default: GroundTruth detects which of a fixed baseline catalog of application specifications (product identity, application type, tenancy, users/roles, data classification, compliance, security posture, reliability posture, external integrations, AI usage, operational/release path, and first-release non-goals) are still missing, and re-surfaces the single next missing question in `MEMORY.md` at each session start until the baseline is captured, then ceases.
+
+Completion is derived from **persisted MemBase evidence**, not a transient session flag: a slot counts as captured only when the owner states it or explicitly marks it not applicable, and an AI-inferred candidate does not suppress the prompt until the owner confirms it. The loop is automation-safe — non-interactive and JSON-safe paths never emit prompts — and carries an explicit opt-out. It is the spec-first discipline applied to the baseline every application needs before implementation begins.
+
 ## Spec hierarchies
 
 Specifications can be organized hierarchically using dot notation:

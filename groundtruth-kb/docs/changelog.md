@@ -15,12 +15,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.groundtruth/dashboard/gtkb-dashboard.sqlite` reporting database.
 - CTO evaluation guide covering pip install, dashboard setup, session lifecycle,
   third-party services, and Prime Builder / Loyal Opposition role boundaries.
+- **Core Application Specification Intake** — GT-KB prompts new projects for the
+  baseline application specifications and re-surfaces the next missing question each
+  session until the baseline is captured, then ceases prompting.
+  - Baseline slot catalog (product identity, application type, tenancy, users/roles,
+    data classification, compliance, security posture, reliability posture, external
+    integrations, AI usage, operational/release path, first-release non-goals) in
+    `groundtruth_kb.project.core_spec_intake`.
+  - `gt core-specs status` and `gt core-specs next-question` read commands.
+  - Cross-session prompt driver `refresh_intake_prompt()` (re-emits the next missing
+    slot into `MEMORY.md`, or clears it on completion, deriving completion from
+    persisted MemBase evidence), a `_check_core_spec_intake` doctor health check, and
+    adopter session-start wiring in the scaffolded `session-start-governance.py` hook.
+  - Default-on for new projects; explicit opt-out via `gt project init
+    --opt-out-core-spec-intake`, `GTKB_CORE_SPEC_INTAKE_OPT_OUT=1`, or
+    `groundtruth.toml [core_spec_intake] enabled=false`.
 
 ### Changed
 
 - README, Start Here, Desktop Setup, Sessions, Dual-Agent, and CLI reference
   docs now describe the package-generated dashboard and the owner-assigned
   Prime Builder role model.
+
+### Migration notes
+
+- Existing projects gain the core-spec-intake session-start wiring automatically on
+  `gt project upgrade` (the `session-start-governance.py` hook is overwrite-policy);
+  the wiring is fail-safe (no-ops if the project is not enrolled or opted out). Run
+  `gt project doctor` to view core-spec intake status, or
+  `gt core-specs status` for the per-slot breakdown. To decline the behavior, set the
+  opt-out (`GTKB_CORE_SPEC_INTAKE_OPT_OUT=1` or `groundtruth.toml
+  [core_spec_intake] enabled=false`).
 
 ## [0.4.0] - 2026-04-14
 

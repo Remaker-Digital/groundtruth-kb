@@ -192,6 +192,72 @@ def test_execute_upgrade_add_action_copies_template(tmp_path: Path) -> None:
     assert (tmp_path / ".claude" / "hooks" / "assertion-check.py").exists()
 
 
+def test_upgrade_existing_project_gains_core_spec_intake_wiring(tmp_path: Path) -> None:
+    """GTKB-CORE-001 Phase 5 adoption evidence (DCL-CORE-INTAKE-001): an existing project
+    gains the cross-session core-spec-intake wiring on upgrade (the session-start hook is
+    overwrite-policy) without corrupting pre-existing project specs."""
+    from groundtruth_kb import get_templates_dir
+    from groundtruth_kb.db import KnowledgeDB
+
+    _write_minimal_toml(tmp_path, version="0.0.1")
+    templates = get_templates_dir()
+    hook_template = templates / "hooks" / "session-start-governance.py"
+    if not hook_template.exists():
+        pytest.skip("session-start-governance.py template not available")
+    # Sanity: the current template carries the Phase-4 intake wiring.
+    assert "_refresh_core_spec_intake" in hook_template.read_text(encoding="utf-8")
+
+    # Existing project: an OLD session-start hook that predates the intake wiring.
+    hooks_dir = tmp_path / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    old_hook = hooks_dir / "session-start-governance.py"
+    old_hook.write_text(
+        "#!/usr/bin/env python3\n# old session-start hook (no core-spec intake wiring)\n",
+        encoding="utf-8",
+    )
+    assert "_refresh_core_spec_intake" not in old_hook.read_text(encoding="utf-8")
+
+    # Pre-existing project data that must survive the upgrade.
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.insert_spec(
+            id="SPEC-PREEXISTING-INTAKE-UPGRADE",
+            title="Pre-existing spec",
+            status="specified",
+            changed_by="test",
+            change_reason="upgrade adoption fixture",
+            description="Pre-existing project spec that must survive upgrade.",
+            type="requirement",
+            authority="stated",
+            testability="observable",
+        )
+    finally:
+        db.close()
+
+    action = UpgradeAction(
+        file=".claude/hooks/session-start-governance.py",
+        action="add",
+        reason="core-spec intake wiring",
+    )
+    _setup_git_for_upgrade(tmp_path)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
+
+    # The upgraded hook now carries the cross-session intake wiring.
+    assert any("UPDATED" in r for r in results)
+    upgraded = old_hook.read_text(encoding="utf-8")
+    assert "_refresh_core_spec_intake" in upgraded
+    assert "core_spec_intake" in upgraded
+
+    # Pre-existing spec is uncorrupted by the upgrade.
+    db2 = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        spec = db2.get_spec("SPEC-PREEXISTING-INTAKE-UPGRADE")
+        assert spec is not None
+        assert spec["title"] == "Pre-existing spec"
+    finally:
+        db2.close()
+
+
 def test_execute_upgrade_template_not_found_skips(tmp_path: Path) -> None:
     """Template not found → 'SKIPPED' in results."""
     _write_minimal_toml(tmp_path, version="0.0.1")

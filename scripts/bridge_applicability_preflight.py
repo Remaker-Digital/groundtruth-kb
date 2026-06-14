@@ -37,7 +37,22 @@ INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
 )
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
-    r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
+    # Strict harvest heading. Tolerates a trailing qualifier ONLY when it is
+    # introduced by a separator -- "(" (parenthetical), ":", en-dash, em-dash,
+    # or hyphen -- e.g. "## Specification Links (carried forward)". Bare trailing
+    # words (e.g. "## Specification Format Guide") still do NOT match, so the
+    # widening cannot over-harvest from unrelated headings (WI-4542).
+    r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?"
+    r"specification(?:\s+links?|\s+references?)?"
+    r"(?:\s*[(:–—-].*)?\s*$",
+    re.IGNORECASE,
+)
+# Loose detector for spec-links-like headings the STRICT regex rejects (e.g. the
+# prefix form "## Carried-Forward Specification Links" or a pluralized
+# "## Specifications Links"). Used ONLY by the advisory diagnostic
+# classify_spec_links_section(); it never widens spec-id harvesting (WI-4542).
+SPEC_LINK_HEADING_LOOSE_RE: Final[re.Pattern[str]] = re.compile(
+    r"^#{1,6}\s+.*\bspecification.*\b(?:link|reference)",
     re.IGNORECASE,
 )
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
@@ -153,6 +168,37 @@ def extract_spec_links(content: str) -> set[str]:
         section.append(line)
     text = "\n".join(section)
     return set(SPEC_ID_RE.findall(text)) | set(RULE_PATH_RE.findall(text))
+
+
+def classify_spec_links_section(content: str) -> dict[str, str | None]:
+    """Diagnose the Specification-Links section WITHOUT changing harvesting.
+
+    Distinguishes a strictly-recognized section (``harvested`` /
+    ``section_empty``) from a present-but-unrecognized spec-links-like heading
+    (``heading_unrecognized``, with the offending heading text in
+    ``candidate_heading``) and from the genuine absence of any such heading
+    (``no_section``). Advisory only: this MUST NOT be used to widen spec-id
+    harvesting or to change ``preflight_passed`` (WI-4542).
+    """
+    lines = _strip_code_fences(content.splitlines())
+    for idx, line in enumerate(lines):
+        if SPEC_LINK_HEADING_RE.match(line.strip()):
+            section: list[str] = []
+            for tail in lines[idx + 1 :]:
+                if tail.strip().startswith("#"):
+                    break
+                section.append(tail)
+            text = "\n".join(section)
+            harvested = set(SPEC_ID_RE.findall(text)) | set(RULE_PATH_RE.findall(text))
+            return {
+                "status": "harvested" if harvested else "section_empty",
+                "candidate_heading": None,
+            }
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("#") and SPEC_LINK_HEADING_LOOSE_RE.match(stripped):
+            return {"status": "heading_unrecognized", "candidate_heading": stripped}
+    return {"status": "no_section", "candidate_heading": None}
 
 
 def extract_target_paths(content: str) -> set[str]:
@@ -379,6 +425,7 @@ def build_packet(
         "target_paths": sorted(target_paths),
         "warnings": {
             "missing_parent_dirs": compute_missing_parent_dir_warnings(project_root, cited_implementation_paths),
+            "spec_links_section": classify_spec_links_section(content),
         },
         "work_items": work_items,
         "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
@@ -403,6 +450,7 @@ def format_markdown(packet: dict[str, Any]) -> str:
     operative = packet.get("operative_version")
     operative_path = operative["path"] if isinstance(operative, dict) else "(none)"
     content_source = packet.get("content_source") or {}
+    spec_links_diag = (packet.get("warnings") or {}).get("spec_links_section") or {}
     lines = [
         "## Applicability Preflight",
         "",
@@ -413,8 +461,19 @@ def format_markdown(packet: dict[str, Any]) -> str:
         f"- operative_file: `{operative_path}`",
         f"- preflight_passed: `{str(packet['preflight_passed']).lower()}`",
         f"- warnings.missing_parent_dirs: {json.dumps(packet.get('warnings', {}).get('missing_parent_dirs', []))}",
+        f"- warnings.spec_links_section: {json.dumps(spec_links_diag)}",
         f"- missing_required_specs: {json.dumps(packet['missing_required_specs'])}",
         f"- missing_advisory_specs: {json.dumps(packet['missing_advisory_specs'])}",
+    ]
+    if packet.get("missing_required_specs") and spec_links_diag.get("status") == "heading_unrecognized":
+        lines.append(
+            "- NOTE: a Specification-Links-like heading "
+            f"({json.dumps(spec_links_diag.get('candidate_heading'))}) was found "
+            "but not recognized by SPEC_LINK_HEADING_RE; spec ids under it were "
+            "NOT harvested. Use a canonical heading or a tolerated trailing "
+            "qualifier, e.g. '## Specification Links (carried forward)'."
+        )
+    lines += [
         "",
         "| Spec | Severity | Cited | Matched By |",
         "|------|----------|-------|------------|",

@@ -1210,7 +1210,7 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     history = json.loads(history_path.read_text(encoding="utf-8"))
 
     panel_titles = set(_panel_titles(dashboard_json["panels"]))
-    assert dashboard_json["title"] == "GroundTruth-KB Dashboard"
+    assert dashboard_json["title"] == "Agent Red GT-KB Dashboard"
     assert "Shortcuts" in panel_titles
     assert "Health Signals" in panel_titles
     assert [panel["title"] for panel in dashboard_json["panels"][:10]] == [

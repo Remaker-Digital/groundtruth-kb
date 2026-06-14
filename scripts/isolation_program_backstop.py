@@ -108,6 +108,9 @@ ALLOWED_REFERENCE_PATTERNS: tuple[tuple[str, str], ...] = (
     ("scripts/_capture_scaffold_golden.py", "scaffold golden capture helper"),
     ("scripts/_verify_slice8_closeout.py", "isolation closeout smoke helper"),
     ("scripts/release_candidate_gate.py", "release-gate application check inventory"),
+    ("scripts/fab11_assertion_corpus_remediation.py", "assertion corpus remediation helper"),
+    ("scripts/membase_ci_seed.py", "membase CI seed helper"),
+    ("scripts/session_self_initialization.py", "session self-initialization helper"),
 )
 
 

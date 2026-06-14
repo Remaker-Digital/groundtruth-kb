@@ -37,11 +37,12 @@ import sqlite3
 import sys
 from pathlib import Path
 from types import ModuleType
-
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNNER_PATH = REPO_ROOT / "scripts" / "run_spec_derived_tests.py"
+
+pytestmark = pytest.mark.timeout(180)
 
 
 def _load_runner() -> ModuleType:

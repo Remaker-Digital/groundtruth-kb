@@ -1024,6 +1024,21 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
         if block_reason:
             raise AuthorizationError(block_reason)
+        # WI-4527: the edit is authorized. As a fail-soft side-effect on the
+        # already-allowed path, auto-extend an active GO-implementation claim
+        # whose deadline is near so a long build does not lose its claim
+        # mid-edit. This NEVER changes the gate's allow/deny verdict: it runs
+        # only after authorization succeeds, swallows every error, and the
+        # extension itself is bounded by the existing 2 h MAX_HOLD cap.
+        if bridge_id:
+            try:
+                try:
+                    from scripts.bridge_work_intent_registry import maybe_auto_extend
+                except ImportError:  # pragma: no cover - direct script execution path
+                    from bridge_work_intent_registry import maybe_auto_extend
+                maybe_auto_extend(bridge_id, session_id, project_root=root)
+            except Exception:
+                pass
     except AuthorizationError as exc:
         classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
         return {

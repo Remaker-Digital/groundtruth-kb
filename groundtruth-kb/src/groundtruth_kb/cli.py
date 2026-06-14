@@ -1046,6 +1046,269 @@ def flow_index_completeness_cmd(
         raise SystemExit(1)
 
 
+@flow_group.command("ingest-bridge-index")
+@click.option(
+    "--index-path",
+    "index_path",
+    default=None,
+    help="Bridge index file to ingest (default: <project_root>/bridge/INDEX.md).",
+)
+@click.option(
+    "--apply",
+    "apply_writes",
+    is_flag=True,
+    default=False,
+    help="Apply the shadow second-write (default: dry-run, writes nothing).",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_ingest_bridge_index_cmd(
+    ctx: click.Context,
+    index_path: str | None,
+    apply_writes: bool,
+    json_output: bool,
+) -> None:
+    """Second-write the canonical bridge index into the TAFE shadow store (WI-4508 Slice C).
+
+    Reads the canonical bridge index (read-only) and materializes each bridge
+    thread into the append-only flow_instances + flow_artifacts tables as a
+    non-authoritative SHADOW per ADR-TAFE-SLICE-C-INGESTION-001. Dry-run by
+    default (writes nothing); pass --apply to perform the fingerprint-gated,
+    idempotent shadow writes. The canonical bridge index (bridge/INDEX.md) is
+    never written and remains authoritative per GOV-FILE-BRIDGE-AUTHORITY-001.
+    """
+    from groundtruth_kb.tafe_bridge_ingestion import ingest_bridge_index
+
+    config = _resolve_config(ctx)
+    resolved_index = Path(index_path) if index_path is not None else Path(config.project_root) / "bridge" / "INDEX.md"
+
+    if not resolved_index.is_file():
+        _emit_cli_payload(
+            {
+                "command": "flow ingest-bridge-index",
+                "error": f"bridge index not found at {resolved_index}",
+                "index_path": str(resolved_index),
+                "mutated": False,
+                "status": "index_not_found",
+                "summary": f"No bridge index at {resolved_index}; nothing ingested.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(3)
+
+    index_text = resolved_index.read_text(encoding="utf-8")
+    db, service = _flow_service(ctx)
+    try:
+        result = ingest_bridge_index(
+            index_text,
+            service,
+            apply=apply_writes,
+            changed_by="gt-flow-ingest-bridge-index-cli",
+        )
+    finally:
+        db.close()
+
+    mode = "applied" if result.applied else "dry-run"
+    skipped_note = f", {len(result.threads_skipped)} skipped" if result.threads_skipped else ""
+    summary = (
+        f"flow ingest-bridge-index ({mode}): {result.threads_total} thread(s), "
+        f"{result.instances_written} flow-instance version(s), "
+        f"{result.artifacts_written} artifact(s){skipped_note}."
+    )
+    payload: dict[str, Any] = {
+        "command": "flow ingest-bridge-index",
+        "index_path": str(resolved_index),
+        "mutated": result.applied and (result.instances_written > 0 or result.artifacts_written > 0),
+        "status": "applied" if result.applied else "dry_run",
+        "summary": summary,
+        **result.as_dict(),
+    }
+    _emit_cli_payload(payload, json_output=json_output)
+
+
+@flow_group.command("cutover-evidence")
+@click.option(
+    "--index-path",
+    "index_path",
+    default=None,
+    help="Bridge index file to assess (default: <project_root>/bridge/INDEX.md).",
+)
+@click.option(
+    "--write-evidence",
+    "write_evidence",
+    is_flag=True,
+    default=False,
+    help="Write a regenerable <run_id> JSON + markdown report under the evidence dir.",
+)
+@click.option(
+    "--evidence-dir",
+    "evidence_dir",
+    default=None,
+    help="Evidence dir (default: <project_root>/.gtkb-state/cutover-evidence); refuses the canonical bridge index.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_cutover_evidence_cmd(
+    ctx: click.Context,
+    index_path: str | None,
+    write_evidence: bool,
+    evidence_dir: str | None,
+    json_output: bool,
+) -> None:
+    """Gather read-only TAFE cutover evidence for WI-4509 (Phase-7 governed cutover).
+
+    Reads the canonical bridge index (read-only) and the stored TAFE shadow, then
+    reports the four WI-4509 evidence categories — parallel-run parity, completeness
+    (lost/extra blocks), contention-zero idempotence, and compatibility-view
+    fidelity — plus the informational flow-completion distribution. Exits non-zero
+    when the report is not cutover-clean. This is evidence gathering only; it does
+    NOT perform the WI-4510 cutover. The canonical bridge index (bridge/INDEX.md)
+    is never written and no shadow/MemBase row is mutated, per
+    GOV-FILE-BRIDGE-AUTHORITY-001; an --evidence-dir resolving to it is refused.
+    """
+    from datetime import UTC, datetime
+
+    from groundtruth_kb.tafe_cutover_evidence import gather_cutover_evidence
+
+    canonical_bridge_index = "bridge/INDEX.md"
+
+    if evidence_dir is not None and _targets_canonical_bridge_index(Path(evidence_dir), canonical_bridge_index):
+        _emit_cli_payload(
+            {
+                "command": "flow cutover-evidence",
+                "error": (
+                    f"refusing to write the canonical bridge index ({canonical_bridge_index}); "
+                    "it remains authoritative per GOV-FILE-BRIDGE-AUTHORITY-001"
+                ),
+                "mutated": False,
+                "status": "refused",
+                "summary": f"Refused: {evidence_dir} targets the canonical bridge index; nothing written.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(2)
+
+    config = _resolve_config(ctx)
+    resolved_index = Path(index_path) if index_path is not None else Path(config.project_root) / "bridge" / "INDEX.md"
+
+    if not resolved_index.is_file():
+        _emit_cli_payload(
+            {
+                "command": "flow cutover-evidence",
+                "error": f"bridge index not found at {resolved_index}",
+                "index_path": str(resolved_index),
+                "mutated": False,
+                "status": "index_not_found",
+                "summary": f"No bridge index at {resolved_index}; no evidence gathered.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(3)
+
+    index_text = resolved_index.read_text(encoding="utf-8")
+    db, service = _flow_service(ctx)
+    try:
+        report = gather_cutover_evidence(index_text, service, project_root=Path(config.project_root))
+    finally:
+        db.close()
+
+    report_dict = report.as_dict()
+    if report.ok:
+        summary = (
+            f"cutover evidence OK: parity {report.parity.derived_instances}/{report.parity.index_threads} threads, "
+            f"contention-zero, fidelity {report.fidelity.threads_checked} checked, "
+            "no lost/extra blocks. Evidence supports a cutover proposal (WI-4510 owner-gated)."
+        )
+    else:
+        gaps: list[str] = []
+        if not report.parity.ok:
+            gaps.append(
+                f"{len(report.parity.parity_mismatches)} parity mismatch(es), "
+                f"{len(report.parity.threads_skipped)} skipped"
+            )
+        if not report.contention.contention_zero:
+            gaps.append(
+                f"non-zero re-plan writes ({report.contention.replan_instances_written} instance(s), "
+                f"{report.contention.replan_artifacts_written} artifact(s))"
+            )
+        if not report.fidelity.ok:
+            gaps.append(f"{len(report.fidelity.fidelity_mismatches)} fidelity mismatch(es)")
+        if report.lost_blocks:
+            gaps.append(f"{len(report.lost_blocks)} lost block(s)")
+        if report.extra_blocks:
+            gaps.append(f"{len(report.extra_blocks)} extra block(s)")
+        summary = "cutover evidence GAPS: " + "; ".join(gaps) + ". Not cutover-clean."
+
+    payload: dict[str, Any] = {
+        "command": "flow cutover-evidence",
+        "index_path": str(resolved_index),
+        "mutated": False,
+        "status": "ok" if report.ok else "evidence_gaps",
+        "summary": summary,
+        **report_dict,
+    }
+
+    if write_evidence:
+        base_dir = (
+            Path(evidence_dir)
+            if evidence_dir is not None
+            else Path(config.project_root) / ".gtkb-state" / "cutover-evidence"
+        )
+        run_id = f"cutover-evidence-{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+        run_dir = base_dir / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        json_path = run_dir / "evidence.json"
+        md_path = run_dir / "evidence.md"
+        json_path.write_text(json.dumps(report_dict, indent=2, sort_keys=True), encoding="utf-8")
+        md_path.write_text(_render_cutover_evidence_markdown(run_id, str(resolved_index), report), encoding="utf-8")
+        payload["run_id"] = run_id
+        payload["evidence_json"] = str(json_path)
+        payload["evidence_md"] = str(md_path)
+
+    _emit_cli_payload(payload, json_output=json_output)
+    if not report.ok:
+        raise SystemExit(1)
+
+
+def _render_cutover_evidence_markdown(run_id: str, index_path: str, report: Any) -> str:
+    """Render a regenerable markdown summary of a cutover-evidence report."""
+    lines = [
+        f"# TAFE Cutover Evidence — {run_id}",
+        "",
+        f"- Index: `{index_path}`",
+        f"- Overall: **{'OK' if report.ok else 'GAPS'}**",
+        "",
+        "## Parallel-run parity",
+        f"- index_threads: {report.parity.index_threads}",
+        f"- index_version_lines: {report.parity.index_version_lines}",
+        f"- derived_instances: {report.parity.derived_instances}",
+        f"- derived_artifacts: {report.parity.derived_artifacts}",
+        f"- threads_skipped: {list(report.parity.threads_skipped)}",
+        f"- parity_mismatches: {len(report.parity.parity_mismatches)}",
+        "",
+        "## Contention-zero (idempotence)",
+        f"- contention_zero: {report.contention.contention_zero}",
+        f"- action_distribution: {report.contention.action_distribution}",
+        f"- replan_instances_written: {report.contention.replan_instances_written}",
+        f"- replan_artifacts_written: {report.contention.replan_artifacts_written}",
+        "",
+        "## Flow completion rates",
+        f"- distribution: {report.flow_completion}",
+        "",
+        "## Compatibility-view fidelity",
+        f"- threads_checked: {report.fidelity.threads_checked}",
+        f"- fidelity_mismatches: {len(report.fidelity.fidelity_mismatches)}",
+        "",
+        "## Completeness",
+        f"- lost_blocks: {list(report.lost_blocks)}",
+        f"- extra_blocks: {list(report.extra_blocks)}",
+        "",
+        "_Regenerable non-canonical evidence; bridge/INDEX.md remains authoritative (GOV-FILE-BRIDGE-AUTHORITY-001)._",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 @flow_group.command("pilot")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 def flow_pilot_cmd(json_output: bool) -> None:
@@ -2568,6 +2831,7 @@ def backlog_status(
     default=None,
     help="New description. Subject to the disjunctive text-edit gate (WI-4357).",
 )
+@click.option("--source-spec-id", default=None, help="New source specification id (set, backfill, or correct).")
 @click.option("--owner-approved", is_flag=True, help="Flag proving owner approval.")
 @click.option("--change-reason", required=True, help="History reason for the update.")
 @click.option("--dry-run", is_flag=True, help="Validate and report would-be changes without writing.")
@@ -2583,6 +2847,7 @@ def backlog_update(
     status_detail: str | None,
     title: str | None,
     description: str | None,
+    source_spec_id: str | None,
     owner_approved: bool,
     change_reason: str,
     dry_run: bool,
@@ -2602,6 +2867,7 @@ def backlog_update(
         dry_run=dry_run,
         title=title,
         description=description,
+        source_spec_id=source_spec_id,
     )
     try:
         result = update_backlog_item(config, request)

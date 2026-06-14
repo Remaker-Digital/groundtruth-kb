@@ -15,8 +15,12 @@ Filter rules (per ``.claude/rules/file-bridge-protocol.md``):
   must revise).
 - ``loyal-opposition`` acts on latest ``NEW`` and latest ``REVISED`` (review),
   unaffected by terminal-kind classification.
-- ``VERIFIED`` is terminal for both roles. ``ADVISORY``, ``DEFERRED``, and
-  ``WITHDRAWN`` are non-actionable for both roles. VERIFIED threads are surfaced in
+- ``ADVISORY`` is actionable for ``prime-builder`` only (advisory disposition
+  requires Prime owner-deliberation/UAQ work); it is non-actionable for
+  ``loyal-opposition`` and is non-dispatchable for headless dispatch (see the
+  ``_derive_dispatchable`` invariant in ``groundtruth_kb.bridge.notify``).
+- ``VERIFIED`` is terminal for both roles. ``DEFERRED`` and ``WITHDRAWN`` are
+  non-actionable for both roles. VERIFIED threads are surfaced in
   ``terminal_verified`` for context, not in ``actionable``.
 
 The terminal-kind classification mirrors the canonical dispatchability model in
@@ -53,7 +57,7 @@ DEFAULT_INDEX_PATH = PROJECT_ROOT / "bridge" / "INDEX.md"
 
 Role = Literal["prime-builder", "loyal-opposition"]
 
-PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO"})
+PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO", "ADVISORY"})
 LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED"})
 TERMINAL_STATUSES = frozenset({"VERIFIED"})
 

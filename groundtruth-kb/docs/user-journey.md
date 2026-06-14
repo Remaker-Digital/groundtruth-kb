@@ -58,6 +58,12 @@ This generates ~30 seed specifications covering governance rules,
 infrastructure, security baselines, and frontend patterns. All are
 `authority='inferred'` — templates Sarah will review, confirm, or discard.
 
+After `gt project init`, the project is also enrolled in **core specification intake**
+by default: GroundTruth-KB records that a baseline set of application specifications
+(product identity, users, data classification, security posture, and so on) is still
+missing. She can opt out at init with `--opt-out-core-spec-intake` if she prefers to
+drive intake herself.
+
 ### What Sarah does NOT need to know
 
 How SQLite works, what the spec schema looks like, Python programming,
@@ -122,6 +128,12 @@ Claude: From your mockup "chat-widget-v1.png", I can see:
 
 Shall I create UI specifications for these elements?
 ```
+
+Alongside requirement capture, GroundTruth-KB keeps the **core specification intake**
+loop running: at each session start it re-surfaces the single next missing baseline
+question in `MEMORY.md` (for example, "Who are the user roles and what can each do?")
+until Sarah has answered — or explicitly dismissed — every baseline slot, then it
+stops prompting. The opt-out from Phase 0 applies here too.
 
 ### What Sarah IS doing (irreplaceable contributions)
 
@@ -413,6 +425,7 @@ Sarah: Deploy to production.
 | F6 | Scaffold Generator | Generates seed specs and project structure | 0 |
 | F7 | Session Health Dashboard | Shows progress metrics at session boundaries | 4, 5 |
 | F8 | Provenance Reconciliation | Catches orphans, duplicates, authority conflicts | 5 |
+| F9 | Core Specification Intake | Prompts for missing baseline application specs each session until captured, then ceases | 0, 1 |
 
 ---
 

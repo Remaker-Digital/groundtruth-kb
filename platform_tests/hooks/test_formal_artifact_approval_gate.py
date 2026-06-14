@@ -128,18 +128,20 @@ def test_python_membase_mutation_blocks_without_packet() -> None:
     assert "formal artifact mutation" in response["reason"]
 
 
-def test_high_level_spec_record_command_is_not_hook_matched() -> None:
+def test_high_level_spec_record_command_is_hook_matched() -> None:
     response = _run_hook("python -m groundtruth_kb spec record --id GOV-EXAMPLE-001")
 
-    assert response == {}
+    assert response["decision"] == "block"
+    assert "Command matches a formal artifact write path" in response["reason"]
 
 
-def test_high_level_spec_update_command_is_not_hook_matched() -> None:
-    # T-HG-SU-1: the governed `gt spec update` CLI path writes its own approval
-    # packet, so it must NOT be matched by FORMAL_MUTATION_PATTERNS.
+def test_high_level_spec_update_command_is_hook_matched() -> None:
+    # T-HG-SU-1: the governed `gt spec update` CLI path is now hook-matched
+    # to enforce packet auto-discovery or explicit packet referencing.
     response = _run_hook("python -m groundtruth_kb spec update --id GOV-EXAMPLE-001 --content-file content.md")
 
-    assert response == {}
+    assert response["decision"] == "block"
+    assert "Command matches a formal artifact write path" in response["reason"]
 
 
 def test_raw_update_spec_call_is_still_hook_matched() -> None:

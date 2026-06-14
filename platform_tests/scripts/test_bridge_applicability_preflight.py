@@ -321,3 +321,148 @@ def test_preflight_declared_and_rooted_paths_still_harvested() -> None:
     harvested = preflight.extract_target_paths(content)
     assert "scripts/foo.py" in harvested, f"declared target_paths entry not harvested: {sorted(harvested)}"
     assert "config/governance/sample.toml" in harvested, f"repo-rooted path mention not harvested: {sorted(harvested)}"
+
+
+# WI-4542: SPEC_LINK_HEADING_RE was `$`-anchored immediately after the optional
+# ` links?`/` references?` suffix, so a trailing qualifier (e.g.
+# `## Specification Links (carried forward)`) failed to match and
+# extract_spec_links returned an empty set -- the pre-filing gate then
+# hard-blocked the Write with a misleading missing_required_specs list. The fix
+# tolerates separator-introduced qualifiers and adds an advisory diagnostic that
+# distinguishes an unrecognized heading from a genuinely-empty section, WITHOUT
+# changing preflight_passed.
+
+
+def test_extract_spec_links_tolerates_trailing_qualifier_headings() -> None:
+    """WI-4542: separator-introduced trailing qualifiers (parenthetical, colon,
+    en-dash, em-dash, hyphen) on the spec-links heading are tolerated and the
+    cited spec id is harvested (the unfixed regex returned an empty set).
+    """
+    for heading in (
+        "## Specification Links (carried forward)",
+        "## Specification References (updated)",
+        "## Specification Links: carried forward",
+        "## Specification Links — inherited",  # em-dash
+        "## Specification Links – inherited",  # en-dash
+        "## Specification Links - inherited",  # hyphen
+    ):
+        content = f"# Proposal\n\n{heading}\n\n- ADR-ISOLATION-APPLICATION-PLACEMENT-001\n"
+        harvested = preflight.extract_spec_links(content)
+        assert "ADR-ISOLATION-APPLICATION-PLACEMENT-001" in harvested, (
+            f"qualifier heading not harvested: {heading!r} -> {sorted(harvested)}"
+        )
+
+
+def test_extract_spec_links_preserves_canonical_and_bare_headings() -> None:
+    """WI-4542: the widening preserves prior behavior -- canonical, bare, and
+    prefixed `specification` headings still match exactly as before.
+    """
+    for heading in (
+        "## Specification Links",
+        "## Specification",
+        "## Relevant Specification Links",
+        "## Governing Specification References",
+    ):
+        content = f"# Proposal\n\n{heading}\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+        assert "GOV-FILE-BRIDGE-AUTHORITY-001" in preflight.extract_spec_links(content), heading
+
+
+def test_extract_spec_links_does_not_over_harvest_unrelated_heading() -> None:
+    """WI-4542 no-over-harvest guard: a heading that starts with 'Specification'
+    but is not a links section (bare trailing words, no separator) is NOT
+    treated as the spec-links section, so spec-shaped tokens under it are not
+    harvested.
+    """
+    content = "# Proposal\n\n## Specification Format Guide\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    assert preflight.extract_spec_links(content) == set()
+
+
+def test_classify_spec_links_section_distinguishes_statuses() -> None:
+    """WI-4542 advisory diagnostic: classify distinguishes harvested /
+    section_empty / heading_unrecognized (with the offending heading) /
+    no_section.
+    """
+    harvested = preflight.classify_spec_links_section(
+        "# P\n\n## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    )
+    assert harvested["status"] == "harvested"
+    assert harvested["candidate_heading"] is None
+
+    empty = preflight.classify_spec_links_section("# P\n\n## Specification Links\n\n(none yet)\n")
+    assert empty["status"] == "section_empty"
+
+    unrecognized = preflight.classify_spec_links_section(
+        "# P\n\n## Carried-Forward Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    )
+    assert unrecognized["status"] == "heading_unrecognized"
+    assert unrecognized["candidate_heading"] == "## Carried-Forward Specification Links"
+
+    absent = preflight.classify_spec_links_section("# P\n\nNo spec links section here.\n")
+    assert absent["status"] == "no_section"
+
+
+def test_preflight_passes_with_carried_forward_qualifier_heading(tmp_path: Path) -> None:
+    """WI-4542 end-to-end: a required cross-cutting spec cited under
+    `## Specification Links (carried forward)` now passes the gate (the bug
+    previously hard-blocked it with a misleading missing_required_specs).
+    """
+    bridge_id = "application-move"
+    _write_bridge(
+        tmp_path,
+        bridge_id,
+        """
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Specification Links (carried forward)
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+""",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        index_path=tmp_path / "bridge" / "INDEX.md",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+    )
+    assert packet["preflight_passed"] is True
+    assert packet["missing_required_specs"] == []
+    assert packet["warnings"]["spec_links_section"]["status"] == "harvested"
+
+
+def test_preflight_unrecognized_heading_surfaces_diagnostic_without_relaxing_gate(tmp_path: Path) -> None:
+    """WI-4542: a prefix-form spec-links heading the STRICT regex rejects keeps
+    the gate FAILING (harvesting stays strict) AND surfaces the advisory
+    heading_unrecognized diagnostic -- proving the diagnostic does not weaken
+    enforcement.
+    """
+    bridge_id = "application-move"
+    _write_bridge(
+        tmp_path,
+        bridge_id,
+        """
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Carried-Forward Specification Links
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+""",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        index_path=tmp_path / "bridge" / "INDEX.md",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+    )
+    assert packet["preflight_passed"] is False
+    assert packet["missing_required_specs"] == ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+    diag = packet["warnings"]["spec_links_section"]
+    assert diag["status"] == "heading_unrecognized"
+    assert diag["candidate_heading"] == "## Carried-Forward Specification Links"

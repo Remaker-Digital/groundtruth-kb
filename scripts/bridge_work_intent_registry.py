@@ -24,6 +24,12 @@ GO_IMPLEMENTATION_DEADLINE_SECONDS: Final[int] = 30 * 60
 GO_IMPLEMENTATION_EXTENSION_SECONDS: Final[int] = 30 * 60
 GO_IMPLEMENTATION_MAX_HOLD_SECONDS: Final[int] = 2 * 60 * 60
 GO_IMPLEMENTATION_GRACE_SECONDS: Final[int] = 10 * 60
+# WI-4527: auto-extend an active GO-implementation claim only as the deadline
+# nears. ``maybe_auto_extend`` is a no-op until the remaining time to the
+# implementation deadline drops below this threshold, so a long build is
+# rescued without extending on every single edit. Defaulting to the grace
+# window keeps the behavior bounded and aligned with the existing timebox.
+GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = GO_IMPLEMENTATION_GRACE_SECONDS
 
 CLAIM_KIND_DRAFT: Final[str] = "draft"
 CLAIM_KIND_GO_IMPLEMENTATION: Final[str] = "go_implementation"
@@ -510,6 +516,69 @@ def extend(
         conn.close()
 
 
+def maybe_auto_extend(
+    thread_slug: str,
+    session_id: str,
+    *,
+    project_root: Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """Best-effort, fail-soft auto-extension of an active GO-implementation claim.
+
+    WI-4527: a go_implementation claim's 30 min deadline (+10 min grace) is too
+    short for large multi-module builds, so a live build can lose its claim
+    mid-edit. This helper rescues *active* work: when the holding session is
+    making an authorized edit and its deadline is near, it calls the existing
+    capped :func:`extend` so the claim survives. It is a side-effect of an
+    already-authorized edit and never alters any gate's allow/deny verdict.
+
+    Returns the updated claim record on a successful extension, or ``None`` when
+    no extension was made -- which is the case for ALL of the following no-op
+    conditions (each fail-soft, never raising):
+
+    - no active claim exists for ``thread_slug`` (or it is TTL-expired / lapsed
+      past grace and must be reacquired);
+    - the claim is held by a different session (no unauthorized extension);
+    - the claim is not a ``go_implementation`` claim (draft claims are ignored);
+    - the latest bridge status for the thread is not ``GO``;
+    - the remaining time to the implementation deadline is still at or above
+      ``GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS`` (deadline not near);
+    - :func:`extend` raises (e.g. the 2 h ``MAX_HOLD`` cap is reached, or a
+      concurrent race) -- the existing cap/lapse behavior then governs.
+
+    The extension itself is pure reuse of :func:`extend`, so it inherits that
+    primitive's ``MAX_HOLD`` cap and ``extensions_used`` accounting; abandoned
+    claims still expire at the cap.
+    """
+    if not session_id.strip():
+        return None
+    now_value = now or now_utc()
+    try:
+        holder = current_holder(thread_slug, project_root=project_root)
+    except WorkIntentRegistryError:
+        return None
+    if holder is None:
+        return None
+    if str(holder.get("session_id") or "") != session_id:
+        return None
+    if holder.get("claim_kind") != CLAIM_KIND_GO_IMPLEMENTATION:
+        return None
+    if _is_lapsed_go_implementation(holder, now=now_value):
+        return None
+    if _latest_status(thread_slug, project_root=project_root) != "GO":
+        return None
+    deadline = _parse_iso(str(holder.get("implementation_deadline") or ""))
+    if deadline is None:
+        return None
+    remaining_seconds = (deadline - now_value).total_seconds()
+    if remaining_seconds >= GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS:
+        return None
+    try:
+        return extend(thread_slug, session_id, project_root=project_root)
+    except WorkIntentRegistryError:
+        return None
+
+
 def release(thread_slug: str, session_id: str, *, project_root: Path | None = None) -> None:
     """Release a per-thread work-intent record when held by ``session_id``."""
     slug = _validate_slug(thread_slug)
@@ -605,6 +674,7 @@ def revalidate_thread_version(thread_slug: str, project_root: Path) -> dict[str,
 __all__ = [
     "CLAIM_KIND_DRAFT",
     "CLAIM_KIND_GO_IMPLEMENTATION",
+    "GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS",
     "GO_IMPLEMENTATION_DEADLINE_SECONDS",
     "GO_IMPLEMENTATION_EXTENSION_SECONDS",
     "GO_IMPLEMENTATION_GRACE_SECONDS",
@@ -615,6 +685,7 @@ __all__ = [
     "current_holder",
     "extend",
     "lapsed_go_implementation_claims",
+    "maybe_auto_extend",
     "revalidate_thread_version",
     "release",
 ]

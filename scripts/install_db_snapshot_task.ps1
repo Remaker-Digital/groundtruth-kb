@@ -42,12 +42,18 @@ result = create_snapshot(cfg)
 print(json.dumps(result.to_json_dict(), indent=2))
 "@
 
-$tempScript = Join-Path $env:TEMP "gtkb_db_snapshot_task.py"
-Set-Content -Path $tempScript -Value $scriptBody -Encoding UTF8
+# WI-4512: the launcher is an active runtime dependency (the scheduled task
+# executes it daily), so it must live in-root and survive Temp cleaning rather
+# than under $env:TEMP. The snapshot OUTPUT path (%LOCALAPPDATA%\gtkb-snapshots)
+# is governed by the separate DB-Snapshot Output Exception and is unchanged.
+$launcherDir = Join-Path $ProjectRoot ".gtkb-state\db-snapshot"
+$launcherScript = Join-Path $launcherDir "gtkb_db_snapshot_task.py"
+New-Item -ItemType Directory -Force -Path $launcherDir | Out-Null
+Set-Content -Path $launcherScript -Value $scriptBody -Encoding UTF8
 
 $action = New-ScheduledTaskAction `
     -Execute $pythonExe `
-    -Argument "`"$tempScript`"" `
+    -Argument "`"$launcherScript`"" `
     -WorkingDirectory $ProjectRoot
 
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time
@@ -74,5 +80,5 @@ Register-ScheduledTask `
 
 Write-Host "Scheduled task '$TaskName' registered: daily at $Time."
 Write-Host "Python: $pythonExe"
-Write-Host "Script: $tempScript"
+Write-Host "Script: $launcherScript"
 Write-Host "Working directory: $ProjectRoot"

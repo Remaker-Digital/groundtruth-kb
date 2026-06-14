@@ -27,8 +27,29 @@ from groundtruth_kb import get_templates_dir
 _HELPER_PATH = Path(get_templates_dir()) / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
 
 
+def _delenv_all_real_session_id_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear every work-intent session-id env var before a controlled ``setenv``.
+
+    The precedence-bearing var list is sourced from the live helper's
+    ``WORK_INTENT_SESSION_ENV_VARS`` (consumed by
+    ``resolve_work_intent_session_id``), so this isolation stays in lockstep
+    with the helper's precedence order — most importantly
+    ``CLAUDE_CODE_SESSION_ID``, which outranks the fixture's
+    ``CLAUDE_SESSION_ID`` inside a live Claude Code session and otherwise
+    produces a false-positive FAIL (WI-4524). ``raising=False`` makes the
+    clear a no-op when a var is already absent (clean CI env).
+    """
+    helper = _load_helper()
+    for name in helper.WORK_INTENT_SESSION_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture(autouse=True)
 def _work_intent_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Clear any real host session-id leakage first (WI-4524) so every test
+    # resolves work-intent session ids deterministically, then set the single
+    # controlled fallback used by tests that do not declare their own id.
+    _delenv_all_real_session_id_vars(monkeypatch)
     monkeypatch.setenv("CODEX_THREAD_ID", "gtkb-template-helper-test-session")
 
 
@@ -677,6 +698,9 @@ def test_template_propose_bridge_acquires_and_releases_work_intent(
             self.events.append(("release", thread_slug, session_id, project_root))
 
     fake_registry = _RecordingRegistry()
+    # The autouse ``_work_intent_session_env`` fixture has already cleared every
+    # higher-precedence real session-id var (incl. ``CLAUDE_CODE_SESSION_ID``),
+    # so this controlled value is the unambiguous resolution winner (WI-4524).
     monkeypatch.setenv("CLAUDE_SESSION_ID", "template-session")
     monkeypatch.setattr(helper, "_load_work_intent_registry", lambda project_root: fake_registry)
 

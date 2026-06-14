@@ -78,8 +78,13 @@ NOTIFY_SUBDIR: Final[str] = "notifications"
 NOTIFY_SCHEMA_VERSION: Final[int] = 3
 
 # Per AGENTS.md:153-159 + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION.
-# VERIFIED/ADVISORY/DEFERRED/WITHDRAWN are non-actionable for both Prime and Codex.
-ACTIONABLE_STATUSES_FOR_PRIME: Final[frozenset[str]] = frozenset({BridgeStatus.GO.value, BridgeStatus.NO_GO.value})
+# VERIFIED/DEFERRED/WITHDRAWN are non-actionable for both Prime and Codex.
+# ADVISORY is actionable for Prime only (advisory disposition requires Prime
+# owner-deliberation/UAQ work) but remains non-dispatchable via
+# ``_derive_dispatchable`` so it never spawns a headless Prime session.
+ACTIONABLE_STATUSES_FOR_PRIME: Final[frozenset[str]] = frozenset(
+    {BridgeStatus.GO.value, BridgeStatus.NO_GO.value, BridgeStatus.ADVISORY.value}
+)
 ACTIONABLE_STATUSES_FOR_CODEX: Final[frozenset[str]] = frozenset({BridgeStatus.NEW.value, BridgeStatus.REVISED.value})
 
 # Feature flag for kind-aware routing. =0 disables filtering and matches

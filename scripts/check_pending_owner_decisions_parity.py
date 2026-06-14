@@ -95,6 +95,10 @@ def _unquote(value: str) -> str:
 
 def main() -> int:
     """Always returns 0; informational only."""
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(errors="replace")
     if not PENDING_FILE.exists():
         return 0
     try:

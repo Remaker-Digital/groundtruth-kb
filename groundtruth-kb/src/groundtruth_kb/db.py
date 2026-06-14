@@ -8291,11 +8291,25 @@ class KnowledgeDB:
         return seen_delib_ids
 
     def search_deliberations(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
-        """Search deliberations semantically via ChromaDB with SQLite LIKE fallback.
+        """Search deliberations via ChromaDB semantic search merged with an
+        always-on SQLite LIKE pass.
 
-        Uses ChromaDB semantic search if available, with distance-threshold
-        filtering. Falls back to SQLite LIKE if ChromaDB is unavailable or
-        if no semantic results survive the relevance filter.
+        On every call this runs BOTH a bounded ChromaDB semantic search
+        (FAB-17 / HYG-048) AND an in-process SQLite LIKE pass, then merges the
+        two result sets deduped by deliberation ``id``. Semantic results come
+        first (preserving relevance ordering); LIKE-only rows are appended by
+        recency (``rowid DESC``) for any id the semantic pass did not surface.
+        The merged output is capped to ``limit``.
+
+        The always-on LIKE merge (WI-4519) is the read-side complement to the
+        WI-4453 embedding-timeout guard: when ``insert_deliberation`` persists a
+        row in SQLite but its ChromaDB index step is deferred by a timeout, the
+        row would otherwise be silently crowded out by any successful semantic
+        search. Running LIKE on every call guarantees such fresh-but-unindexed
+        deliberations are surfaced by the very next search, protecting the
+        mandatory pre-proposal/pre-review Deliberation Archive search contract
+        (``.claude/rules/deliberation-protocol.md``). LIKE is in-process
+        SQLite: fast and cannot hang.
 
         Returns list of dicts with all deliberation row fields plus:
           - search_method: "semantic" | "text_match"
@@ -8303,9 +8317,11 @@ class KnowledgeDB:
           - matched_chunk_id: str | None
           - matched_chunk_preview: str | None (first 200 chars of matched chunk)
         """
-        # Try semantic search first — bounded so chroma contention degrades to
-        # the SQLite-LIKE fallback (FAB-17 / HYG-048) instead of crashing (the
-        # count() probe was previously OUTSIDE the try) or hanging indefinitely.
+        # Semantic pass — bounded so chroma contention degrades to an empty
+        # semantic set (FAB-17 / HYG-048) instead of crashing (the count() probe
+        # was previously OUTSIDE the try) or hanging indefinitely. The SQLite
+        # LIKE pass below always runs regardless of the semantic outcome.
+        semantic_results: list[dict[str, Any]] = []
         collection = self._get_chroma_collection()
         if collection is not None:
             seen_delib_ids: dict[str, dict[str, Any]] = {}
@@ -8338,7 +8354,6 @@ class KnowledgeDB:
             if seen_delib_ids:
                 # Fetch full deliberation rows on the calling thread (SQLite is
                 # thread-affine) and merge the semantic metadata.
-                semantic_results = []
                 for delib_id, match_info in sorted(seen_delib_ids.items(), key=lambda x: x[1]["score"])[:limit]:
                     row = self.get_deliberation(delib_id)
                     if row:
@@ -8347,10 +8362,10 @@ class KnowledgeDB:
                         row["matched_chunk_id"] = match_info["matched_chunk_id"]
                         row["matched_chunk_preview"] = match_info["matched_chunk_preview"]
                         semantic_results.append(row)
-                if semantic_results:
-                    return semantic_results
 
-        # SQLite LIKE fallback
+        # Always-on SQLite LIKE pass (WI-4519). Runs on every call — not only as
+        # a fallback — so fresh-but-unindexed deliberations are never crowded out
+        # by a successful semantic search.
         conn = self._get_conn()
         pattern = f"%{query}%"
         rows = conn.execute(
@@ -8359,15 +8374,26 @@ class KnowledgeDB:
                ORDER BY rowid DESC LIMIT ?""",
             (pattern, pattern, pattern, limit),
         ).fetchall()
-        results_list = []
+        like_results = []
         for r in rows:
             d = _row_to_dict(r)
             d["search_method"] = "text_match"
             d["score"] = None
             d["matched_chunk_id"] = None
             d["matched_chunk_preview"] = None
-            results_list.append(d)
-        return results_list
+            like_results.append(d)
+
+        # Merge & dedupe by deliberation id: semantic results first (relevance
+        # ordering preserved), then LIKE-only rows by recency for any id the
+        # semantic pass did not already surface. Cap to ``limit``.
+        merged: list[dict[str, Any]] = list(semantic_results)
+        seen_ids = {row.get("id") for row in merged}
+        for row in like_results:
+            row_id = row.get("id")
+            if row_id not in seen_ids:
+                merged.append(row)
+                seen_ids.add(row_id)
+        return merged[:limit]
 
     def rebuild_deliberation_index(self) -> dict[str, Any]:
         """Rebuild ChromaDB collection from SQLite canonical data.

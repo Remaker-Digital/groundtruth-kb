@@ -127,6 +127,19 @@ lossy.
 Prime Builder writes proposals; Loyal Opposition writes GO / NO-GO reviews;
 both agents poll the index independently. The filesystem is the audit trail.
 
+### Core Specification Intake
+
+**Problem:** New adopters often start building before the *baseline* application
+specifications exist — what the system is, who its users are, the data it holds, the
+compliance and security posture. Those gaps surface late, as rework.
+
+**Solution:** GroundTruth-KB enrolls new projects by default and re-surfaces the next
+missing core-spec question in `MEMORY.md` at each session start until the baseline is
+captured, then stops. Completion is read from persisted MemBase evidence, so a slot
+you have answered — or explicitly marked not applicable — never re-prompts. The
+behavior is automation-safe and opt-out (`gt project init --opt-out-core-spec-intake`);
+check progress any time with `gt core-specs status`.
+
 ## 3. Block Diagram: Where Things Live
 
 ```mermaid
