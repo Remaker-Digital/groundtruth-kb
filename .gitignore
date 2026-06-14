@@ -568,3 +568,26 @@ bridge/.claude/
 # legitimately-tracked archive/ subtrees (os-poller, smart-poller) are
 # unaffected.
 archive/worktrees/
+
+# =============================================================================
+# Root-level session-scratch artifacts (AI-session byproducts)
+# =============================================================================
+# Per-session debug/scratch files that AI sessions drop at the repo root. They
+# are not source-of-truth and must never be committed (several were manually
+# excluded from sweeps before this pattern existed). Root-anchored so legit
+# nested files are unaffected.
+/.tmp_auth_test_*
+/_lo_*.py
+/_tmp_*.py
+/_tmp_*.md
+/temp-slice-*.json
+/temp-*-smoke.json
+# Errant cache/temp directories created by mis-quoted commands (e.g. a literal
+# "$cache" dir, or root-level pytest basetemp residue).
+/$cache/
+/pytest-kpi-retro-codex/
+# Pathological root directories whose names are literal shell-command/path
+# fragments (created when a mis-quoted command was interpreted as a mkdir
+# target). These must never be tracked.
+/C:Users*
+/print(*

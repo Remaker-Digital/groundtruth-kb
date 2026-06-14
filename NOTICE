@@ -1,0 +1,20 @@
+GroundTruth KB (GT-KB)
+Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
+
+This product comprises two license surfaces:
+
+  * The published "groundtruth-kb" package (everything under groundtruth-kb/)
+    is licensed under the GNU Affero General Public License, version 3 or later
+    (AGPL-3.0-or-later). See groundtruth-kb/LICENSE for the full text.
+
+  * The repository root carries a separate proprietary license covering
+    platform-host material outside the package. See LICENSE.
+
+This software depends on third-party open-source components, each distributed
+under its own license. Those licenses and copyright notices are retained in the
+respective packages as installed via the project's dependency manifests
+(see groundtruth-kb/ packaging metadata).
+
+When redistributing the "groundtruth-kb" package or derivative works, retain
+this NOTICE file and the AGPL-3.0-or-later license text as required by the
+license.

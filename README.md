@@ -1,86 +1,116 @@
 # GroundTruth KB (GT-KB)
 
-> **An Internal Developer Platform for AI-assisted software development.** GT-KB reduces an owner's routine role to specifications, clarifications, and decisions while AI agents preserve durable artifacts, create tests, implement approved work, verify outcomes, and maintain release-readiness evidence.
+> **An Internal Developer Platform for AI-assisted software development.**
+> You supply specifications, clarifications, and decisions. GT-KB and its AI agents preserve the durable artifacts, draft and review the work, implement what's approved, and verify it against the specs — so the project's *truth* and its *reasoning* both survive past any single session.
 
 [![Python Tests](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml)
 [![Lint](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
+![Version 0.7.0-rc1](https://img.shields.io/badge/version-0.7.0--rc1-orange)
+![License AGPL-3.0-or-later](https://img.shields.io/badge/package%20license-AGPL--3.0--or--later-green)
 
 ---
 
-## What GT-KB is
+## Why GT-KB?
 
-In GT-KB terminology, an **application** is the lifecycle object the platform manages — a software project under governance. The **platform** is GT-KB itself, the lifecycle infrastructure. A **hosted application** is an application deployed and running in service, distinct from its lifecycle record.
+Most AI-assisted development loses the plot between sessions: decisions live in chat scrollback, "done" means "the model said so," and the next session re-derives context that was already settled. GT-KB makes the project a network of **durable, traceable artifacts** instead of a conversation.
 
-Application development progresses through **backlog selection**: the unified view of all known work for an application or platform, organized by project and sub-project groupings. Owner direction surfaces requirements; AI agents draft implementation proposals reviewed via the file bridge; only approved proposals are implemented; only specification-derived tests can verify completion.
+- 🧭 **Owner role stays small.** Your job is specifications, clarifications, and trade-off decisions. Routine implementation, traceability, and verification are the platform's job.
+- 🗄️ **One source of truth.** Specifications, tests, work items, and decisions live in an append-only knowledge database (**MemBase**) — every change versioned with *who*, *when*, and *why*. No silent overwrites.
+- 🧠 **Reasoning is preserved.** The **Deliberation Archive** records *why* the project is the way it is — decisions, reviews, and rejected alternatives — so future sessions inherit judgement, not just state.
+- 🤝 **Two AI roles, checks and balances.** A **Prime Builder** proposes and implements; a **Loyal Opposition** reviews, critiques, and verifies. Nothing ships without independent review.
+- ✅ **"Verified" means verified.** Completion requires specification-derived tests that actually ran — not an assertion that a spec exists.
+- 🔌 **Harness-agnostic.** The Prime Builder and Loyal Opposition roles attach to whatever AI coding harness you assign (Claude Code, Codex CLI, and others) — swap or combine harnesses without rewriting the governance.
 
-Two AI roles coordinate through versioned bridge artifacts: **Prime Builder** proposes and implements; **Loyal Opposition** reviews, critiques, and verifies. Owner decisions, deliberations, and rationale are preserved in the **Deliberation Archive** so future sessions inherit the project's reasoning, not just its current state.
+---
+
+## How it works
+
+```
+ owner direction ─▶ specification ─▶ implementation proposal ─▶ review (GO / NO-GO)
+                                                                      │
+                          VERIFIED ◀─ verification ◀─ implementation ─┘
+```
+
+1. **Owner direction** surfaces requirements; candidate requirements become specifications only with your visible confirmation.
+2. **Prime Builder** drafts an implementation proposal citing the governing specifications and the tests that will prove it.
+3. **Loyal Opposition** reviews via the **file bridge** and records `GO` or `NO-GO`. Implementation never starts without `GO`.
+4. **Prime Builder** implements and files a report; **Loyal Opposition** runs the specification-derived tests and records `VERIFIED`.
+
+Every step is a versioned artifact. The owner reads results and makes decisions — not boilerplate.
+
+---
+
+## Quick start
+
+GT-KB is published as the Python package `groundtruth-kb`:
+
+```sh
+pip install groundtruth-kb
+
+# Scaffold a new governed project (rules, MemBase, bridge protocol)
+gt project init my-project
+cd my-project
+
+# Daily operating commands
+gt summary                    # current state of specs, tests, work items
+gt backlog list               # the standing backlog
+gt deliberations search "…"   # why was this decided?
+gt project doctor             # health checks across the platform
+```
+
+`gt project init` places the governance rules (canonical terminology, file-bridge protocol, project-root boundary) under your project root and initializes MemBase. See **[start-here.md](groundtruth-kb/docs/start-here.md)** for the full first-run flow, the dual-agent topology, and the operating-model walkthrough.
 
 ---
 
 ## Key components
 
-- **MemBase** — the canonical, append-only knowledge database for governed records (specifications, tests, work items, procedures, documents, environment configuration). Implemented as `groundtruth.db` (SQLite). Every mutation creates a new versioned row with `changed_by`, `changed_at`, and `change_reason`. See [`MEMBASE-4-CLAUDE.md`](MEMBASE-4-CLAUDE.md).
-
-- **Deliberation Archive** — the design-reasoning tier. A searchable archive of decisions, reviews, and rejected alternatives that answers *why* the project is the way it is. Implemented as the `deliberations` table in `groundtruth.db` with semantic indexing.
-
-- **File bridge protocol** — the dual-agent coordination surface (Prime Builder ↔ Loyal Opposition) implemented via versioned markdown files under `bridge/` and the canonical [`bridge/INDEX.md`](bridge/INDEX.md). Statuses: NEW → GO/NO-GO → NEW post-impl → VERIFIED. See [`.claude/rules/file-bridge-protocol.md`](.claude/rules/file-bridge-protocol.md).
-
-- **`gt` CLI** — the platform command surface. `gt project init` scaffolds a project; `gt summary`, `gt assert`, `gt deliberations search`, `gt status`, `gt project doctor`, and `gt project upgrade` are daily operating commands. See [`groundtruth-kb/docs/start-here.md`](groundtruth-kb/docs/start-here.md).
-
-- **Dashboard** — the KPI surface for governance, release-readiness, drift, and bridge state. Optional Grafana integration; basic surfaces always available via the `gt` CLI.
+| Component | What it is |
+|-----------|-----------|
+| **MemBase** | The canonical, append-only knowledge database for governed records — specifications, tests, work items, procedures, documents, environment config. Implemented as `groundtruth.db` (SQLite); every mutation is a new versioned row with `changed_by` / `changed_at` / `change_reason`. See [MEMBASE-4-CLAUDE.md](MEMBASE-4-CLAUDE.md). |
+| **Deliberation Archive** | The design-reasoning tier: a searchable archive of decisions, reviews, and rejected alternatives that answers *why*. Implemented as the `deliberations` table with semantic indexing. |
+| **File bridge protocol** | The dual-agent coordination surface (Prime Builder ↔ Loyal Opposition), versioned markdown under `bridge/` with [`bridge/INDEX.md`](bridge/INDEX.md) as canonical state. See [file-bridge-protocol.md](.claude/rules/file-bridge-protocol.md). |
+| **`gt` CLI** | The platform command surface — `gt project init`, `gt summary`, `gt assert`, `gt backlog`, `gt deliberations`, `gt project doctor`, `gt project upgrade`. |
+| **Dashboard** | KPI surface for governance, release-readiness, drift, and bridge state. Optional Grafana integration; core surfaces are always available via the CLI. |
 
 ---
 
-## Quick links
+## Documentation
 
-| Resource | Path |
-|----------|------|
-| **Repository** | [github.com/Remaker-Digital/groundtruth-kb](https://github.com/Remaker-Digital/groundtruth-kb) |
-| **Package README & quick-start** | [`groundtruth-kb/README.md`](groundtruth-kb/README.md) |
-| **New-adopter guide** | [`groundtruth-kb/docs/start-here.md`](groundtruth-kb/docs/start-here.md) |
-| **Evaluator guide** | [`groundtruth-kb/docs/cto-evaluation.md`](groundtruth-kb/docs/cto-evaluation.md) |
-| **Harness governance** | [`AGENTS.md`](AGENTS.md), [`.claude/rules/`](.claude/rules/) |
-| **Contributing** | [`groundtruth-kb/CONTRIBUTING.md`](groundtruth-kb/CONTRIBUTING.md) |
-| **Security policy** | [`SECURITY.md`](SECURITY.md) |
-| **Package license (AGPL-3.0-or-later)** | [`groundtruth-kb/LICENSE`](groundtruth-kb/LICENSE) |
-| **Root license (legacy)** | [`LICENSE`](LICENSE) |
-
----
-
-## Adopting GT-KB
-
-Adopters install the package and scaffold a project:
-
-```sh
-pip install groundtruth-kb
-gt project init <project-name>
-```
-
-The scaffold places governance rules (canonical terminology, file bridge protocol, root-boundary contract) under your project root and initializes MemBase. See [`groundtruth-kb/docs/start-here.md`](groundtruth-kb/docs/start-here.md) for the full first-run flow, the dual-agent (Prime Builder / Loyal Opposition) topology, and the operating-model walkthrough.
+| Resource | Where |
+|----------|-------|
+| **New-adopter guide** | [groundtruth-kb/docs/start-here.md](groundtruth-kb/docs/start-here.md) |
+| **Evaluator guide** | [groundtruth-kb/docs/cto-evaluation.md](groundtruth-kb/docs/cto-evaluation.md) |
+| **Package README** | [groundtruth-kb/README.md](groundtruth-kb/README.md) |
+| **MemBase concepts** | [MEMBASE-4-CLAUDE.md](MEMBASE-4-CLAUDE.md) |
+| **Harness governance** | [AGENTS.md](AGENTS.md), [.claude/rules/](.claude/rules/) |
+| **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
+| **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| **Security policy** | [SECURITY.md](SECURITY.md) |
 
 ---
 
-## Repository status
+## Project status
 
-This repository builds the GT-KB platform itself. Current platform version: **`0.7.0rc1`** (release candidate). The version source of truth is [`groundtruth-kb/src/groundtruth_kb/__init__.py`](groundtruth-kb/src/groundtruth_kb/__init__.py); release-readiness evidence is gated by [`scripts/release_candidate_gate.py`](scripts/release_candidate_gate.py). Documentation references to earlier `0.6.0` / `0.6.1` versions in `groundtruth-kb/docs/` are scheduled for harmonization in an upcoming docs slice.
+GT-KB is at **`0.7.0-rc1`** (release candidate). The version source of truth is [`groundtruth-kb/src/groundtruth_kb/__init__.py`](groundtruth-kb/src/groundtruth_kb/__init__.py); release-readiness is gated by [`scripts/release_candidate_gate.py`](scripts/release_candidate_gate.py). This repository builds and governs the GT-KB platform itself — it is, by design, a working example of the platform applied to its own development.
 
 ---
 
 ## Contributing
 
-GT-KB development uses the file bridge protocol: every implementation proposal is reviewed before code is written, every implementation is verified against linked specifications before it is treated as done. See [`groundtruth-kb/CONTRIBUTING.md`](groundtruth-kb/CONTRIBUTING.md) for contributor onboarding and [`.claude/rules/file-bridge-protocol.md`](.claude/rules/file-bridge-protocol.md) for the protocol details.
+GT-KB development uses the file-bridge protocol: every implementation proposal is reviewed before code is written, and every implementation is verified against linked specifications before it is treated as done. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for contributor onboarding and **[.claude/rules/file-bridge-protocol.md](.claude/rules/file-bridge-protocol.md)** for the protocol details.
 
 ---
 
-## Licensing
+## License
 
 GT-KB has two license surfaces:
 
-- The **GT-KB package** distributed under [`groundtruth-kb/`](groundtruth-kb/) is licensed under [**AGPL-3.0-or-later**](groundtruth-kb/LICENSE). New code added under `groundtruth-kb/` inherits the package AGPL terms. This is the license under which GT-KB is published as a Python package.
+- The published **`groundtruth-kb` package** (everything under [`groundtruth-kb/`](groundtruth-kb/)) is licensed under **[AGPL-3.0-or-later](groundtruth-kb/LICENSE)**. New code added under `groundtruth-kb/` inherits the package terms.
+- The **repository root** carries a separate **proprietary** [`LICENSE`](LICENSE) covering platform-host material outside the package.
 
-- The **repository-root [`LICENSE`](LICENSE)** is a separate proprietary file that predates this repository's role as the GT-KB platform host. It is pending license-coherence reconciliation in a future bridge slice. The proprietary signal is *not* the canonical license for new GT-KB platform code; it remains in place as a legacy artifact while reconciliation work is scoped.
+For code added elsewhere in the repository, consult both license files or contact the maintainer via the [project repository](https://github.com/Remaker-Digital/groundtruth-kb).
 
-For code added elsewhere in the repository (outside `groundtruth-kb/`), consult both license files and contact the maintainer at the [project repository](https://github.com/Remaker-Digital/groundtruth-kb) for clarification.
+---
 
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved with respect to the proprietary signal at [`LICENSE`](LICENSE); GT-KB package contributions are governed by the AGPL terms at [`groundtruth-kb/LICENSE`](groundtruth-kb/LICENSE).
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. The `groundtruth-kb` package is distributed under AGPL-3.0-or-later; all other rights reserved with respect to the proprietary root [`LICENSE`](LICENSE).
