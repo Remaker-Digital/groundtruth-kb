@@ -1,7 +1,43 @@
+Document: gtkb-wi4530-gt-cli-path-install-shim
+GO: bridge/gtkb-wi4530-gt-cli-path-install-shim-002.md
+NEW: bridge/gtkb-wi4530-gt-cli-path-install-shim-001.md
+
+Document: gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper
+GO: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-002.md
+NEW: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-001.md
+
+Document: gtkb-tafe-shadow-index-reconciliation
+NO-GO: bridge/gtkb-tafe-shadow-index-reconciliation-002.md
+NEW: bridge/gtkb-tafe-shadow-index-reconciliation-001.md
+
+Document: gtkb-wi4540-per-session-role-marker-context-envelope
+REVISED: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md
+GO: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-002.md
+NEW: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-001.md
+
+Document: gtkb-wi4522-author-metadata-per-harness-resolution
+REVISED: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-003.md
+NO-GO: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-002.md
+NEW: bridge/gtkb-wi4522-author-metadata-per-harness-resolution-001.md
+
+Document: gtkb-wi4524-test-session-id-leak-hardening
+NEW: bridge/gtkb-wi4524-test-session-id-leak-hardening-003.md
+GO: bridge/gtkb-wi4524-test-session-id-leak-hardening-002.md
+NEW: bridge/gtkb-wi4524-test-session-id-leak-hardening-001.md
+
+Document: gtkb-tafe-phase-7-cutover-prep
+WITHDRAWN: bridge/gtkb-tafe-phase-7-cutover-prep-002.md
+NEW: bridge/gtkb-tafe-phase-7-cutover-prep-001.md
+
 Document: gtkb-session-role-marker-architecture-advisory
 ADVISORY: bridge/gtkb-session-role-marker-architecture-advisory-001.md
 
 Document: gtkb-wi4521-backlog-update-source-spec-id
+VERIFIED: bridge/gtkb-wi4521-backlog-update-source-spec-id-006.md
+REVISED: bridge/gtkb-wi4521-backlog-update-source-spec-id-005.md
+NO-GO: bridge/gtkb-wi4521-backlog-update-source-spec-id-004.md
+NEW: bridge/gtkb-wi4521-backlog-update-source-spec-id-003.md
+GO: bridge/gtkb-wi4521-backlog-update-source-spec-id-002.md
 NEW: bridge/gtkb-wi4521-backlog-update-source-spec-id-001.md
 
 Document: gtkb-wi4519-da-search-always-on-like-merge
@@ -9,6 +45,8 @@ GO: bridge/gtkb-wi4519-da-search-always-on-like-merge-002.md
 NEW: bridge/gtkb-wi4519-da-search-always-on-like-merge-001.md
 
 Document: gtkb-wi4512-db-snapshot-launcher-in-root
+VERIFIED: bridge/gtkb-wi4512-db-snapshot-launcher-in-root-004.md
+NEW: bridge/gtkb-wi4512-db-snapshot-launcher-in-root-003.md
 GO: bridge/gtkb-wi4512-db-snapshot-launcher-in-root-002.md
 NEW: bridge/gtkb-wi4512-db-snapshot-launcher-in-root-001.md
 
@@ -19,14 +57,12 @@ GO: bridge/gtkb-wi4542-spec-link-heading-qualifier-tolerance-002.md
 NEW: bridge/gtkb-wi4542-spec-link-heading-qualifier-tolerance-001.md
 
 Document: gtkb-wi4527-go-claim-auto-extend
+VERIFIED: bridge/gtkb-wi4527-go-claim-auto-extend-006.md
+NEW: bridge/gtkb-wi4527-go-claim-auto-extend-005.md
 GO: bridge/gtkb-wi4527-go-claim-auto-extend-004.md
 REVISED: bridge/gtkb-wi4527-go-claim-auto-extend-003.md
 NO-GO: bridge/gtkb-wi4527-go-claim-auto-extend-002.md
 NEW: bridge/gtkb-wi4527-go-claim-auto-extend-001.md
-
-Document: gtkb-advisory-prime-actionability-surfacing
-GO: bridge/gtkb-advisory-prime-actionability-surfacing-002.md
-NEW: bridge/gtkb-advisory-prime-actionability-surfacing-001.md
 
 Document: gtkb-wi4509-cutover-evidence
 VERIFIED: bridge/gtkb-wi4509-cutover-evidence-006.md
@@ -90,6 +126,10 @@ GO: bridge/gtkb-wi4464-commit-pathspec-safety-detector-002.md
 NEW: bridge/gtkb-wi4464-commit-pathspec-safety-detector-001.md
 
 Document: gtkb-tafe-live-impl-flow-pilot
+VERIFIED: bridge/gtkb-tafe-live-impl-flow-pilot-008.md
+REVISED: bridge/gtkb-tafe-live-impl-flow-pilot-007.md
+NO-GO: bridge/gtkb-tafe-live-impl-flow-pilot-006.md
+NEW: bridge/gtkb-tafe-live-impl-flow-pilot-005.md
 GO: bridge/gtkb-tafe-live-impl-flow-pilot-004.md
 REVISED: bridge/gtkb-tafe-live-impl-flow-pilot-003.md
 NO-GO: bridge/gtkb-tafe-live-impl-flow-pilot-002.md
