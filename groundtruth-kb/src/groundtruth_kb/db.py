@@ -89,6 +89,16 @@ _CHROMA_COLLECTION_NAME = "deliberations"
 _CHROMA_QUERY_TIMEOUT_SECONDS = float(os.environ.get("GTKB_CHROMA_QUERY_TIMEOUT_SECONDS") or "10")
 _CHROMA_QUERY_RETRIES = int(os.environ.get("GTKB_CHROMA_QUERY_RETRIES") or "1")
 
+# WI-4453: the index/record path (collection.add) triggers the SAME first-embed
+# DefaultEmbeddingFunction model load as the query path, so `gt deliberations
+# record` and any `gt bridge propose` that indexes a deliberation could hang
+# indefinitely on an offline/stalled embedding step. Bound the add under the
+# same daemon-worker timeout used for the query path (FAB-17). On timeout the
+# canonical SQLite DA row — already committed by insert_deliberation before
+# indexing — is preserved and only the rebuildable semantic index is deferred
+# (recoverable via rebuild_deliberation_index). Overridable via env.
+_CHROMA_INDEX_TIMEOUT_SECONDS = float(os.environ.get("GTKB_CHROMA_INDEX_TIMEOUT_SECONDS") or "15")
+
 # FAB-17 (Area 3): the single canonical on-disk Chroma store directory name,
 # declared in config/governance/chroma-read-path.toml so every read path
 # resolves to ONE index and no stray default-path store (e.g. ./chroma) is
@@ -8227,7 +8237,25 @@ class KnowledgeDB:
             documents.append(chunk)
             metadatas.append(metadata)
 
-        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        # WI-4453: bound the embedding-triggering add so record/propose cannot
+        # hang on a first-use model load. On timeout, degrade to a deferred
+        # semantic index (sentinel 0 chunks) rather than raising — the canonical
+        # SQLite DA row is already committed and the index is rebuildable.
+        try:
+            _call_with_timeout(
+                lambda: collection.add(ids=ids, documents=documents, metadatas=metadatas),
+                _CHROMA_INDEX_TIMEOUT_SECONDS,
+            )
+        except TimeoutError as _chroma_index_timeout:  # intentional-catch: degrade to deferred index
+            _log.warning(
+                "ChromaDB index add timed out after %.1fs for %s; deferring semantic "
+                "index (canonical SQLite row preserved, rebuildable via "
+                "rebuild_deliberation_index): %s",
+                _CHROMA_INDEX_TIMEOUT_SECONDS,
+                delib_id,
+                _chroma_index_timeout,
+            )
+            return 0
         return len(chunks)
 
     def _chroma_query_matches(self, collection: Any, query: str, limit: int) -> dict[str, dict[str, Any]]:
