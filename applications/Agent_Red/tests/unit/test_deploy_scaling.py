@@ -37,7 +37,12 @@ from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SCRIPT = PROJECT_ROOT / "scripts" / "deploy.py"
+if not DEPLOY_SCRIPT.exists():
+    DEPLOY_SCRIPT = PROJECT_ROOT.parent.parent / "scripts" / "deploy.py"
+
 TERRAFORM_MAIN = PROJECT_ROOT / "infrastructure" / "terraform" / "main.tf"
+if not TERRAFORM_MAIN.exists():
+    TERRAFORM_MAIN = PROJECT_ROOT.parent.parent / "infrastructure" / "terraform" / "main.tf"
 
 
 # Mapping from Terraform container_apps key -> deploy.py Azure Container App name.
@@ -45,14 +50,14 @@ TERRAFORM_MAIN = PROJECT_ROOT / "infrastructure" / "terraform" / "main.tf"
 # container app that is NOT in this table (currently only `nats`) is out of scope
 # for deploy.py scaling enforcement per WI-3171.
 TF_TO_AZURE_NAME: dict[str, str] = {
-    "api-gateway":          "agent-red-api-gateway",
-    "intent-classifier":    "agent-red-intent-classifier",
-    "knowledge-retrieval":  "agent-red-knowledge-retrieval",
-    "response-generator":   "agent-red-response-generator",
-    "critic-supervisor":    "agent-red-critic-supervisor",
-    "escalation":           "agent-red-escalation-handler",
-    "analytics":            "agent-red-analytics-collector",
-    "slim-gateway":         "agent-red-slim",
+    "api-gateway": "agent-red-api-gateway",
+    "intent-classifier": "agent-red-intent-classifier",
+    "knowledge-retrieval": "agent-red-knowledge-retrieval",
+    "response-generator": "agent-red-response-generator",
+    "critic-supervisor": "agent-red-critic-supervisor",
+    "escalation": "agent-red-escalation-handler",
+    "analytics": "agent-red-analytics-collector",
+    "slim-gateway": "agent-red-slim",
     # "nats" intentionally omitted — TF-managed, not deploy.py-managed.
 }
 
@@ -99,9 +104,7 @@ def _parse_terraform_scaling() -> dict[str, dict[str, int | bool]]:
         re.DOTALL,
     )
     if not block_match:
-        raise AssertionError(
-            "Could not locate container_apps block in main.tf; test needs update."
-        )
+        raise AssertionError("Could not locate container_apps block in main.tf; test needs update.")
     block = block_match.group(1)
 
     # Each entry looks like:
@@ -114,8 +117,8 @@ def _parse_terraform_scaling() -> dict[str, dict[str, int | bool]]:
     #       ...
     #     }
     entry_pattern = re.compile(
-        r"(?P<name>[a-z][a-z0-9\-]*)\s*=\s*\{"       # name = {
-        r"(?P<body>[^}]*?)"                            # body (non-greedy, no nested braces)
+        r"(?P<name>[a-z][a-z0-9\-]*)\s*=\s*\{"  # name = {
+        r"(?P<body>[^}]*?)"  # body (non-greedy, no nested braces)
         r"\}",
         re.DOTALL,
     )
@@ -132,7 +135,7 @@ def _parse_terraform_scaling() -> dict[str, dict[str, int | bool]]:
         parsed[name] = {
             "min_replicas": int(min_match.group(1)),
             "max_replicas": int(max_match.group(1)),
-            "critical":     crit_match.group(1) == "true",
+            "critical": crit_match.group(1) == "true",
         }
     return parsed
 
@@ -155,16 +158,10 @@ class TestScalingConfigTerraformReconciliation:
         # Every TF entry that maps into the deploy-managed set must exist in SCALING_CONFIG
         # with identical min/max values. NATS is intentionally excluded.
         for tf_key, azure_name in TF_TO_AZURE_NAME.items():
-            assert tf_key in tf, (
-                f"TF container {tf_key!r} missing from main.tf — "
-                f"update TF_TO_AZURE_NAME or main.tf"
-            )
+            assert tf_key in tf, f"TF container {tf_key!r} missing from main.tf — update TF_TO_AZURE_NAME or main.tf"
             tf_cfg = tf[tf_key]
             cfg = mod.SCALING_CONFIG.get(azure_name)
-            assert cfg is not None, (
-                f"SCALING_CONFIG missing entry for {azure_name!r} "
-                f"(corresponds to TF {tf_key!r})"
-            )
+            assert cfg is not None, f"SCALING_CONFIG missing entry for {azure_name!r} (corresponds to TF {tf_key!r})"
             assert cfg["min_replicas"] == tf_cfg["min_replicas"], (
                 f"{azure_name}: min_replicas {cfg['min_replicas']} != "
                 f"Terraform {tf_cfg['min_replicas']} (TF key {tf_key!r})"
@@ -179,10 +176,7 @@ class TestScalingConfigTerraformReconciliation:
         mod = _load_deploy_module()
         # Any key containing 'nats' (case-insensitive) is a violation.
         nats_keys = [k for k in mod.SCALING_CONFIG if "nats" in k.lower()]
-        assert nats_keys == [], (
-            f"NATS must be excluded from SCALING_CONFIG (TF-managed); "
-            f"found: {nats_keys}"
-        )
+        assert nats_keys == [], f"NATS must be excluded from SCALING_CONFIG (TF-managed); found: {nats_keys}"
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +190,7 @@ class TestScalingConfigCoversDeployedApps:
     def test_scaling_config_covers_all_deployed_apps(self) -> None:
         mod = _load_deploy_module()
         deployed_apps: set[str] = set()
-        deployed_apps.update(mod.CONTAINER_APPS.values())        # both gateways
+        deployed_apps.update(mod.CONTAINER_APPS.values())  # both gateways
         deployed_apps.update(mod.AGENT_CONTAINER_APPS.values())  # 6 agents
         deployed_apps.update(mod.INFRA_CONTAINER_APPS.values())  # slim
 
@@ -291,9 +285,7 @@ class TestEnforceAllScaling:
 
         # Production gateway values must match Terraform.
         gw_call = next(c for c in calls if c[0] == "agent-red-api-gateway")
-        assert gw_call[1:] == (2, 8), (
-            f"production gateway scaled to {gw_call[1:]}, expected (2, 8) per Terraform"
-        )
+        assert gw_call[1:] == (2, 8), f"production gateway scaled to {gw_call[1:]}, expected (2, 8) per Terraform"
 
     def test_enforce_all_scaling_staging_uses_staging_gateway(self) -> None:
         mod = _load_deploy_module()
@@ -340,9 +332,7 @@ class TestEnforceAllScaling:
             results = mod.enforce_all_scaling("production")
 
         # Loop completed — all 8 targets attempted.
-        assert call_count["n"] == 8, (
-            f"expected 8 attempts despite failure, got {call_count['n']}"
-        )
+        assert call_count["n"] == 8, f"expected 8 attempts despite failure, got {call_count['n']}"
         # Exactly one entry in the result dict is False.
         failed = [name for name, ok in results.items() if not ok]
         succeeded = [name for name, ok in results.items() if ok]

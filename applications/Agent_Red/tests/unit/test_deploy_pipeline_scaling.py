@@ -41,8 +41,16 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_PIPELINE = PROJECT_ROOT / "scripts" / "deploy_pipeline.py"
+if not DEPLOY_PIPELINE.exists():
+    DEPLOY_PIPELINE = PROJECT_ROOT.parent.parent / "scripts" / "deploy_pipeline.py"
+
 DEPLOY_SCRIPT = PROJECT_ROOT / "scripts" / "deploy.py"
+if not DEPLOY_SCRIPT.exists():
+    DEPLOY_SCRIPT = PROJECT_ROOT.parent.parent / "scripts" / "deploy.py"
+
 TERRAFORM_MAIN = PROJECT_ROOT / "infrastructure" / "terraform" / "main.tf"
+if not TERRAFORM_MAIN.exists():
+    TERRAFORM_MAIN = PROJECT_ROOT.parent.parent / "infrastructure" / "terraform" / "main.tf"
 
 
 def _load_deploy_pipeline():
@@ -52,14 +60,11 @@ def _load_deploy_pipeline():
     sys.path, neutralize the Windows stdout-wrapper guard via platform
     patch, then exec_module.
     """
-    for p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "scripts"),
-              str(PROJECT_ROOT / "tools" / "knowledge-db")]:
+    for p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "scripts"), str(PROJECT_ROOT / "tools" / "knowledge-db")]:
         if p not in sys.path:
             sys.path.insert(0, p)
     with patch.object(sys, "platform", "linux"):
-        spec = importlib.util.spec_from_file_location(
-            "deploy_pipeline_scaling_test", DEPLOY_PIPELINE
-        )
+        spec = importlib.util.spec_from_file_location("deploy_pipeline_scaling_test", DEPLOY_PIPELINE)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
     return mod
@@ -80,6 +85,7 @@ def _load_deploy_script():
 def _make_args(env: str = "production", dry_run: bool = False, version: str = "v1.99.0"):
     """Construct an argparse.Namespace-like object for phase_15_enforce_scaling."""
     import argparse
+
     return argparse.Namespace(env=env, dry_run=dry_run, version=version)
 
 
@@ -90,11 +96,13 @@ def _fake_run_shell_success(_cmd, timeout=120):
 
 def _fake_run_shell_fail_for(failing_apps: set[str]):
     """Return a _run_shell stand-in that fails (returncode 1) for cmds matching any failing app."""
+
     def runner(cmd, timeout=120):
         for app in failing_apps:
             if app in cmd:
                 return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="failure", stderr="")
         return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
     return runner
 
 
@@ -115,6 +123,7 @@ def test_phase_15_production_returns_pass_when_all_succeed() -> None:
     )
     # One az invocation per target in get_scaling_targets("production")
     from lib.scaling_targets import get_scaling_targets
+
     expected_n = len(get_scaling_targets("production"))
     assert mock_run.call_count == expected_n, (
         f"Expected {expected_n} _run_shell calls (one per target); got {mock_run.call_count}"
@@ -200,7 +209,10 @@ def test_phase_15_drift_appears_in_final_summary_when_status_is_pass() -> None:
 
     # Construct a synthetic PhaseResult mirroring what phase_15 produces on drift.
     drift_result = pipeline.PhaseResult(
-        15, "Enforce Scaling Baseline", "PASS", 12.4,
+        15,
+        "Enforce Scaling Baseline",
+        "PASS",
+        12.4,
         detail="failed=2 ok=6 total=8 names=agent-red-slim,agent-red-staging",
         extra="DRIFT: 2/8 failed (agent-red-slim,agent-red-staging)",
     )
@@ -218,12 +230,12 @@ def test_phase_15_drift_appears_in_final_summary_when_status_is_pass() -> None:
         # Use a finite start_time so the duration math doesn't blow up; pass
         # None for log_path and defect_wi (their formatting handles None).
         import time as _time
+
         pipeline._print_summary([drift_result], args, _time.time() - 1.0, None, None)
 
     summary_text = "\n".join(captured)
     assert "DRIFT: 2/8 failed (agent-red-slim,agent-red-staging)" in summary_text, (
-        f"Final summary must surface DRIFT marker for operator visibility.\n"
-        f"Captured output:\n{summary_text}"
+        f"Final summary must surface DRIFT marker for operator visibility.\nCaptured output:\n{summary_text}"
     )
     # Status row must also still show PASS (proving drift visibility doesn't
     # regress to FAIL):

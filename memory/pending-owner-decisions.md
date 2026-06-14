@@ -11,8 +11,8 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question: "WI-4481 (P1 bridge-integrity defect, INDEX atomic-write guard) is implemented + verified green and was GO'd (bridge/gtkb-bridge-index-atomic-write-guard-002.md), but the post-implementation report cannot be filed: WI-4481 is a standalone work item (project_name=None) and is in no active PAUTH's included_work_item_ids list. The bridge-compliance-gate hard-blocks the NEW/REVISED implementation_report via DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001 (missing Project Authorization: / Project: lines) and the live membership check (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001). Owner decision needed: admit WI-4481 to a project (candidate: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY) and add it to that project's PAUTH included_work_item_ids via AUQ (precedent: PAUTH v4 'add WI-3380' = DELIB-S-LOOP-2026-06-04-WI3380-PAUTH-INCLUSION-AUQ). A dispatched worker cannot run AUQ or amend a PAUTH, so this blocks report-filing → VERIFIED → WI close."
   detected_via: prime_dispatched_worker_blocker
   status: resolved
-  resolved_in_session: 2026-06-13T09-48-16Z-prime-builder-B-9cea65 (dispatched)
   resolved_at: 2026-06-14
+  resolved_in_session: 2026-06-13T09-48-16Z-prime-builder-B-9cea65 (dispatched)
   answer: "OVERTAKEN BY EVENTS — confirmed against live state by interactive PB session 7752bc97 at 2026-06-14T00:19Z. WI-4481 is now a member of PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY (stage=resolved); bridge thread gtkb-bridge-index-atomic-write-guard reached VERIFIED (-004) after implementation report -003 was filed. Because report -003 could not be written without passing DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001, WI-4481 was project-homed AND PAUTH-included by the swarm. The project-linkage blocker is fully cleared; no owner AUQ required. (The verbose notes below describe the historical blocker that is now resolved.)"
   notes: "Implementation artifacts are complete and uncommitted on disk: .claude/hooks/bridge-index-write-serializer.py (+181), platform_tests/hooks/test_bridge_index_write_serializer.py (+164, 16/16 pass), .claude/settings.json (+5 registration on Write|Edit|MultiEdit|Bash), .codex/hooks.json (+28 Bash + apply_patch registrations). Verification green this session: guard 16/16, serialized-writer regression 12/12 (incl. T4 20-thread no-lost-update), ruff check + format clean, both config files valid JSON. Once WI-4481 is project-homed + PAUTH-included, file bridge/gtkb-bridge-index-atomic-write-guard-003.md (implementation_report, NEW) with the carried-forward spec links + spec-to-test mapping already drafted this session. CORROBORATION (2026-06-13T10:01Z, dispatched session 2026-06-13T09-58-18Z-prime-builder-B-20606e): a SECOND dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16, writer 12/12 incl. T4, ruff clean, JSON valid). Both PAUTH-BATCH variants use explicit included_work_item_ids allowlists omitting WI-4481 (membership gate -> wi-not-included-by-authorization); no durable S437/WI-4481 DELIB exists. RECURRING DISPATCH DEAD-END: the cross-harness trigger will keep re-dispatching this latest-GO entry to fresh Prime workers on every fire (burning ~30-50K tokens each) until an owner-present session captures the S437 decision as a DELIB, admits WI-4481 to PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY, and amends a PAUTH to include it. Substrate-hygiene candidate: park/defer this GO entry to stop the re-dispatch loop pending the owner authorization. CORROBORATION-2 (2026-06-13T11:05Z, dispatched session 2026-06-13T11-03-34Z-prime-builder-B-b1274b): a THIRD dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16 in 0.22s, serialized-writer 12/12 incl. T4, ruff check + format clean, gt bridge index CLI present with add-document/set-status). Confirmed PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY is the natural home (already contains sibling WI-3513 'Serialize agent-tool INDEX.md edits' resolved). Deliberation search returned no S437/WI-4481 owner-decision DELIB (only DELIB-20263131, an unrelated advisory thread). Three dispatched workers now blocked at this identical gate (~estimated 90-130K cumulative tokens). The re-dispatch loop will continue until an owner-present session (a) captures the S437 'Proceed' decision as a DELIB, (b) runs `gt projects add-item PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY WI-4481`, and (c) amends a PAUTH (or mints PAUTH-WI-4481-INDEX-ATOMIC-WRITE-GUARD) to include WI-4481, then re-dispatches so a worker can file -003. STRONG RECOMMENDATION: owner should DEFER this GO entry now to halt the loop until the authorization lands."
 - id: DECISION-1199
@@ -27,11 +27,14 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   notes: "auto-detected prose anti-pattern; no actionable decision content."
 - id: DECISION-1217
   asked_at: 2026-06-13T22:15:33.133586Z
-  question: "Want me to resume seeding now, hold for WI-4238 to verify, or shift focus somewhere specific?"
+  question: ""
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: 0edfaa36ef8f8068
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-06-14
+  resolved_in_session: 2026-06-13 interactive PB (harness B, Opus 4.8, session 7752bc97)
+  answer: "Closed as stale per owner AUQ 2026-06-14. WI-4238 (the 'hold' dependency) is resolved; the 'seeding' referent was not recoverable from any tracked WI/deliberation/handoff (ephemeral prior-session work). Owner chose 'Close as stale'; if seeding is still wanted it will be re-raised explicitly. Question blanked per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+  notes: "auto-detected prose anti-pattern; closed stale by owner decision."
 - id: DECISION-1218
   asked_at: 2026-06-13T22:17:07.746243Z
   question: ""
@@ -48,6 +51,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   detected_via: prose:offering_or_choice
   status: pending
   question_hash: e3092a6bb4b3c0ec
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1237
+  asked_at: 2026-06-14T07:31:01.962777Z
+  question: "Want me to do anything with the broader bridge queue (the AXIS-2 surface flagged GO-ready threads WI-4521, plus claim..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 94a7c9f6b4417f3f
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1239
+  asked_at: 2026-06-14T07:43:20.396352Z
+  question: "Want me to (a) pursue the WI-4540 marker unblock so I can join the implementation swarm, (b) drive the TAFE NO-GO's f..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 4d6b8a4ef55a5fe0
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
@@ -92,165 +109,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0595
-  asked_at: 2026-05-15T01:58:51.049003Z
-  question: "How should we operationalize the deterministic-services preference for artifact production?"
-  options:
-    - "Promote prototype scripts to gt CLI"
-    - "Widen CLI-DISCOVERABILITY REVISED-1"
-    - "Reframe session: stop LLM-bridge-proposals, build gt-bridge-propose-template CLI"
-    - "Different approach — I'll specify"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 9c14783d1c412626
-  resolved_at: 2026-05-15T01:58:51.049003Z
-  answer: "User has answered your questions: \"How should we operationalize the deterministic-services preference for artifact production?\"=\"Reframe session: stop LLM-bridge-proposals, build gt-bridge-propose-template CLI\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0597
-  asked_at: 2026-05-15T06:04:35.812279Z
-  question: "Uncommitted work has accumulated since commit 1f4e30e2 (the WI-3315 IP-3 test edit, the WI-3314 -013 and WI-3315 -009 post-implementation reports, INDEX.md updates, plus inbound parallel-session bridge files). How should I handle it?"
-  options:
-    - "Commit now"
-    - "Leave for next checkpoint"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d3627f0485a4e534
-  resolved_at: 2026-05-15T06:04:35.812279Z
-  answer: "User has answered your questions: \"Uncommitted work has accumulated since commit 1f4e30e2 (the WI-3315 IP-3 test edit, the WI-3314 -013 and WI-3315 -009 post-implementation reports, INDEX.md updates, plus inbound parallel-session bridge files). How should I handle it?\"=\"Commit now\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0598
-  asked_at: 2026-05-15T07:03:29.790217Z
-  question: "Bridge thread `gtkb-implementation-gate-friction-hygiene` is at NO-GO -018. Codex blocks VERIFIED because the approved IP-D scope was 32 regression tests, while live tests substantiate 19. The `WI-3310` field gap is closed; only the IP-D test-count gap remains. How should I resolve it?"
-  options:
-    - "Land remaining 13 IP-D tests"
-    - "REVISED proposal scoping IP-D to 19"
-    - "Explicit owner waiver for 19"
-    - "Withdraw / retire the thread"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 4d6c5bca34abbf53
-  resolved_at: 2026-05-15T07:03:29.790217Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0599
-  asked_at: 2026-05-15T07:20:15.385491Z
-  question: "How should `gtkb-implementation-gate-friction-hygiene` IP-D close? Codex NO-GO `-018` F1: approved scope is 32 regression tests (per `-005`), live implementation has 19. The three closure paths preserve the audit trail; the choice is which one."
-  options:
-    - "Land remaining IP-D tests (full 32) (Recommended)"
-    - "Scope-reduction REVISED proposal + new GO"
-    - "Owner waiver + `-019` closure"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c22c79183a8ee059
-  resolved_at: 2026-05-15T07:20:15.385491Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0600
-  asked_at: 2026-05-15T07:20:35.273292Z
-  question: "Friction-hygiene NO-GO @ -018: S351 AUQ chose 'Full original scope' (32 IP-D tests) but only 19 landed. IP-C self-trap (chain-walk denies any post-GO REVISED) blocks landing the remaining 13 via a clean auth-packet. How should the thread close? (Entry 2 slice-1 is separately blocked by chromadb-lazy REVISED-005 overlap on db.py; that resolves automatically once Codex reviews chromadb-lazy.)"
-  options:
-    - "Waiver bypass IP-C once (Recommended)"
-    - "Sibling fix IP-C first"
-    - "Reverse S351: narrow IP-D 32→19"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 0d84b0fdef31ccce
-  resolved_at: 2026-05-15T07:20:35.273292Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0601
-  asked_at: 2026-05-15T07:42:17.686411Z
-  question: "Codex NO-GO on bridge/gtkb-implementation-gate-friction-hygiene-018.md cites a single P1 finding: the approved IP-D scope (-005) was 32 regression tests (11 null-sink + 12 sqlite + 9 chain-walk), but only 19 IP-D-related tests landed. The previous -014 NO-GO already made full IP-D coverage a closure condition. How should I resolve the scope gap?"
-  options:
-    - "File scope-reduction REVISED (19-test matrix) (Recommended)"
-    - "Land the missing 13 IP-D regression tests"
-    - "Cite explicit owner waiver for IP-D scope reduction"
-    - "Retire the thread, file fresh foundational proposal"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: edf887c03841b594
-  resolved_at: 2026-05-15T07:42:17.686411Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0602
-  asked_at: 2026-05-15T08:05:28.507575Z
-  question: "Codex NO-GO -018 on gtkb-implementation-gate-friction-hygiene: approved IP-D was 32 regression tests (11 null-sink / 12 sqlite / 9 chain-walk per -005). Current state has 19 IP-D tests landed. F1 is the only open finding; WI-3310 v2 fix is closed. How should I close the thread?"
-  options:
-    - "Land remaining ~13 IP-D tests"
-    - "REVISED proposal narrowing IP-D to 19"
-    - "Owner waiver for 19-test scope"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 84b3c84f95b860cd
-  resolved_at: 2026-05-15T08:05:28.507575Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0603
-  asked_at: 2026-05-15T08:12:15.496456Z
-  question: "Friction-hygiene NO-GO -018 surfaces an IP-D scope contradiction: DECISION-0572 said 'Full original scope' (32 tests) but the -017 post-impl report only landed 19 IP-D tests + the IP-C self-trap waiver, which Codex correctly notes does NOT cover IP-D scope reduction. Which resolution path do you want for REVISED-019?"
-  options:
-    - "Land the 13 missing tests (Recommended)"
-    - "Scope-reduction REVISED to 19"
-    - "Explicit IP-D waiver REVISED-019"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 65d4e43949caa5a0
-  resolved_at: 2026-05-15T08:12:15.496456Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0604
-  asked_at: 2026-05-15T08:17:25.039580Z
-  question: "Codex NO-GO at `bridge/gtkb-implementation-gate-friction-hygiene-018.md` requires resolution of the IP-D test-scope gap (approved: 32 regression tests in -005; landed: 19 tests; 52 total currently pass including unchanged tests). The WI-3310 v2 field fix from -017 is closed. Which path should Prime take?"
-  options:
-    - "Scope-reduction REVISED (Recommended)"
-    - "Land the missing IP-D tests"
-    - "Explicit owner waiver"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 18db272297875dac
-  resolved_at: 2026-05-15T08:17:25.039580Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0605
-  asked_at: 2026-05-15T08:19:11.728597Z
-  question: "Bridge auto-dispatch surfaced two Prime-actionable entries. The NO-GO at gtkb-implementation-gate-friction-hygiene-018 cites IP-D scope drift (approved 32 regression tests, current implementation has 19). Codex documented three closure paths. Which should Prime pursue?"
-  options:
-    - "Land remaining 13 IP-D tests"
-    - "REVISED proposal narrowing scope"
-    - "Cite owner waiver"
-    - "Defer friction-hygiene this session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 562ae387ddc1762e
-  resolved_at: 2026-05-15T08:19:11.728597Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0606
-  asked_at: 2026-05-15T08:19:11.728597Z
-  question: "Should Prime begin implementing the GO at gtkb-spec-lifecycle-schema-slice-1-004 (specification_deliberation_sources table + link API + tracking work-item) this session, regardless of the friction-hygiene choice above?"
-  options:
-    - "Yes, start now"
-    - "Yes, but after friction-hygiene"
-    - "Defer slice-1 to next session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 4a096697d2b64bd3
-  resolved_at: 2026-05-15T08:19:11.728597Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0607
-  asked_at: 2026-05-15T08:24:28.627883Z
-  question: "How should I close `gtkb-implementation-gate-friction-hygiene` after Codex's 9th NO-GO at -018? Codex enforces the approved IP-D scope (32 regression tests; -005 specified 11 redirect + 12 sqlite + 9 chain-walk). The live test files contain ~19 IP-D tests, leaving a ~13-test gap. Three paths satisfy the protocol per memory `feedback_codex_full_ip_d_test_coverage_strict`:"
-  options:
-    - "Land remaining 13 IP-D tests"
-    - "Scope-reduction REVISED proposal (Recommended)"
-    - "Cite explicit owner waiver"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f979236e1f5e4ef8
-  resolved_at: 2026-05-15T08:24:28.627883Z
-  answer: "Answer questions?"
-  notes: ""
 - id: DECISION-0608
   asked_at: 2026-05-15T13:08:08.092430Z
   question: "Codex NO-GO'd friction-hygiene -018 because IP-D shipped 19 regression tests instead of the 32 carried in GO -005 (gap: ~13 redirect/sqlite/chain-walk tests). How should Prime resolve the IP-D scope discrepancy?"
@@ -7740,6 +7598,228 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 30dc3cb736233199
   resolved_at: 2026-06-13T23:14:32.418163Z
   answer: "Your questions have been answered: \"Codex's verification NO-GO (-006) on the WI-4534 implementation found a real regression: the new role-eligibility guard correctly makes go_implementation claims Prime-only (your F3 directive), which breaks the existing test_go_impl_claim_timebox.py suite (6 failures) — those tests use synthetic non-dispatch session ids that the guard now rejects. The GO'd scope didn't include editing that test file. How should I resolve it to reach VERIFIED?\"=\"Expand scope; fix the timebox tests\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1221
+  asked_at: 2026-06-14T01:13:54.332631Z
+  question: "DECISION-1217 (from a 22:15Z session 2026-06-13) asked whether to resume 'seeding', hold for WI-4238, or shift focus. I verified WI-4238 is now resolved (so the 'hold' branch is moot), but I can't recover what 'seeding' referred to — no tracked work item, deliberation, or handoff surfaces it, which suggests ephemeral session work. How should I dispose of DECISION-1217?"
+  options:
+    - "Close as stale"
+    - "Resume seeding — I'll clarify"
+    - "Investigate prior session first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d1167700ab0da386
+  resolved_at: 2026-06-14T01:13:54.332631Z
+  answer: "Your questions have been answered: \"DECISION-1217 (from a 22:15Z session 2026-06-13) asked whether to resume 'seeding', hold for WI-4238, or shift focus. I verified WI-4238 is now resolved (so the 'hold' branch is moot), but I can't recover what 'seeding' referred to — no tracked work item, deliberation, or handoff surfaces it, which suggests ephemeral session work. How should I dispose of DECISION-1217?\"=\"Close as stale\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1222
+  asked_at: 2026-06-14T01:14:29.593356Z
+  question: "Cycle-2 dedup result: WI-4479 (P1, 'headless Codex dispatch crashes on startup, exit 0xFFFFFFFF; AXIS-1 auto-dispatch non-functional') names `.codex/config.toml` `[features].codex_hooks` as its candidate root cause. Live state shows that key is already migrated to `[features].hooks` (DELIB-FAB15-REMEDIATION), and dispatch-state.json shows loyal-opposition:A with circuit-breaker cleared and failure_count 0 — the documented crash signature has cleared. The named fix has already landed, so there is no distinct source/test work to seed. How should I dispose of WI-4479?"
+  options:
+    - "Close as resolved"
+    - "Keep open; reverify first"
+    - "Skip for now, leave open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4d7ca667b6c73d48
+  resolved_at: 2026-06-14T01:14:29.593356Z
+  answer: "Your questions have been answered: \"Cycle-2 dedup result: WI-4479 (P1, 'headless Codex dispatch crashes on startup, exit 0xFFFFFFFF; AXIS-1 auto-dispatch non-functional') names `.codex/config.toml` `[features].codex_hooks` as its candidate root cause. Live state shows that key is already migrated to `[features].hooks` (DELIB-FAB15-REMEDIATION), and dispatch-state.json shows loyal-opposition:A with circuit-breaker cleared and failure_count 0 — the documented crash signature has cleared. The named fix has already landed, so there is no distinct source/test work to seed. How should I dispose of WI-4479?\"=\"Close as resolved\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1223
+  asked_at: 2026-06-14T01:31:10.484754Z
+  question: "Cycle-3 finding: the batch-1 P2 reliability cluster is largely STALE — fixed by registry/config corrections that landed after the WIs were filed (2026-06-12) but never closed. Confirmed already-resolved this cycle: WI-4483 (attribution mis-stamp — live resolver in this Claude-B session returns 'prime-builder/claude', correct) and WI-4514 (harness-C role divergence — registry now shows C = loyal-opposition/active, divergence gone). Both share WI-4479's already-fixed root. Closing them needs your GOV-15 approval. How should I proceed?"
+  options:
+    - "Close 4483+4514 + triage rest"
+    - "Close 4483+4514, seed rest in order"
+    - "Close 4483+4514, then redirect"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 70087d0c94159af4
+  resolved_at: 2026-06-14T01:31:10.484754Z
+  answer: "Your questions have been answered: \"Cycle-3 finding: the batch-1 P2 reliability cluster is largely STALE — fixed by registry/config corrections that landed after the WIs were filed (2026-06-12) but never closed. Confirmed already-resolved this cycle: WI-4483 (attribution mis-stamp — live resolver in this Claude-B session returns 'prime-builder/claude', correct) and WI-4514 (harness-C role divergence — registry now shows C = loyal-opposition/active, divergence gone). Both share WI-4479's already-fixed root. Closing them needs your GOV-15 approval. How should I proceed?\"=\"Close 4483+4514 + triage rest\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1224
+  asked_at: 2026-06-14T02:00:59.897665Z
+  question: "Cycle-4 triage: WI-4480 (P2, cross-harness dispatch cap-2 oldest-first starvation) is GENUINELY OPEN — confirmed in code: cross_harness_bridge_trigger.py `_selected_oldest_first()` still selects the oldest N entries with NO fairness/aging, and the circuit-breaker is per-recipient (doesn't address per-entry starvation). No in-flight thread covers it. The catch: the fix changes dispatch SELECTION, which feeds the byte-identical actionable-signature invariant (regression-tested, load-bearing for the multi-harness swarm). How should I scope it?"
+  options:
+    - "Detector-first (zero-risk) slice"
+    - "Actual selection-fairness fix now"
+    - "Defer to a dedicated dispatch-fairness effort"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 898dcfc519e5482d
+  resolved_at: 2026-06-14T02:00:59.897665Z
+  answer: "Your questions have been answered: \"Cycle-4 triage: WI-4480 (P2, cross-harness dispatch cap-2 oldest-first starvation) is GENUINELY OPEN — confirmed in code: cross_harness_bridge_trigger.py `_selected_oldest_first()` still selects the oldest N entries with NO fairness/aging, and the circuit-breaker is per-recipient (doesn't address per-entry starvation). No in-flight thread covers it. The catch: the fix changes dispatch SELECTION, which feeds the byte-identical actionable-signature invariant (regression-tested, load-bearing for the multi-harness swarm). How should I scope it?\"=\"Detector-first (zero-risk) slice\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1225
+  asked_at: 2026-06-14T02:21:03.266742Z
+  question: "GTKB-CORE-001 Phase 4 (cross-session prompt driver) is implemented and Codex-VERIFIED — your TOP-priority item's core functional requirement is met. No other clean autonomous Prime work remains right now (bridge fresh threads sibling-claimed; backlog otherwise owner-gated). What's the next priority for the loop?"
+  options:
+    - "Build CORE-001 Phase 5"
+    - "Unblock & close WI-4481"
+    - "Close CORE-001 as done"
+    - "Pause the loop"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 816f2813a0e76e53
+  resolved_at: 2026-06-14T02:21:03.266742Z
+  answer: "Your questions have been answered: \"GTKB-CORE-001 Phase 4 (cross-session prompt driver) is implemented and Codex-VERIFIED — your TOP-priority item's core functional requirement is met. No other clean autonomous Prime work remains right now (bridge fresh threads sibling-claimed; backlog otherwise owner-gated). What's the next priority for the loop?\"=\"Build CORE-001 Phase 5\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1226
+  asked_at: 2026-06-14T03:46:35.078850Z
+  question: "Cycle-6 triage: both remaining batch-1 WIs are conclusively already-fixed. WI-4412 (bridge INDEX literal-\\n malformed entries) — doctor's required _bridge_index_well_formedness_error flags '\\n' literals + malformed status lines (+ the WI-4481 atomic writer + status-token gate). WI-4523 (session handoff hardcoded antigravity archive dir) — _resolve_active_harness_name now derives the archive dir from harness-identities.json with directory-presence filtering, explicitly avoiding the antigravity-alphabetic-default that was the bug. Closing both needs your GOV-15 approval. That finishes batch-1: 6 closed-as-already-fixed, 3 genuinely-open seeded. Given ~2/3 of batch-1 turned out already-fixed, how should I handle batch-2 (8 WIs)?"
+  options:
+    - "Close both; per-WI triage batch-2"
+    - "Close both; fast spot-check batch-2"
+    - "Close both; pause & redirect"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 362e05a4c98c29e4
+  resolved_at: 2026-06-14T03:46:35.078850Z
+  answer: "Your questions have been answered: \"Cycle-6 triage: both remaining batch-1 WIs are conclusively already-fixed. WI-4412 (bridge INDEX literal-\\n malformed entries) — doctor's required _bridge_index_well_formedness_error flags '\\n' literals + malformed status lines (+ the WI-4481 atomic writer + status-token gate). WI-4523 (session handoff hardcoded antigravity archive dir) — _resolve_active_harness_name now derives the archive dir from harness-identities.json with directory-presence filtering, explicitly avoiding the antigravity-alphabetic-default that was the bug. Closing both needs your GOV-15 approval. That finishes batch-1: 6 closed-as-already-fixed, 3 genuinely-open seeded. Given ~2/3 of batch-1 turned out already-fixed, how should I handle batch-2 (8 WIs)?\"=\"Close both; per-WI triage batch-2\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1227
+  asked_at: 2026-06-14T03:52:59.051821Z
+  question: "The swarm has saturated all dispatchable Prime work (TAFE pilot → peer be9daf, wi4480 → peer 53be73, both actively building; Slice C → LO review). The other ~26 'latest GO' threads are stale umbrellas/scoping/advisory already handled. There's no clean unclaimed thread for this interactive session to take without racing the swarm (which wins), and DECISION-1219 (drive Slice C) is moot since Slice C is swarm-driven. What should this session focus on?"
+  options:
+    - "Stand by; re-engage when work frees"
+    - "Audit the 28 stale-GO threads"
+    - "Pick a fresh backlog item to drive"
+    - "Wrap the session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 45316322f67e299a
+  resolved_at: 2026-06-14T03:52:59.051821Z
+  answer: "Your questions have been answered: \"The swarm has saturated all dispatchable Prime work (TAFE pilot → peer be9daf, wi4480 → peer 53be73, both actively building; Slice C → LO review). The other ~26 'latest GO' threads are stale umbrellas/scoping/advisory already handled. There's no clean unclaimed thread for this interactive session to take without racing the swarm (which wins), and DECISION-1219 (drive Slice C) is moot since Slice C is swarm-driven. What should this session focus on?\"=\"Audit the 28 stale-GO threads\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1228
+  asked_at: 2026-06-14T04:43:53.075302Z
+  question: "Cycle-7 triage: WI-4527 (P2, go-implementation claim TTL too short for large builds) is genuinely OPEN. The claim system has a manual `extend` command (bounded by a 2h max-hold cap), but the default is only 30min deadline + 10min grace, with NO auto-extend on activity and NO deadline nudge — so a dispatched worker on a long build silently loses its claim mid-build (the WI-4499 collision). It's the swarm's coordination backbone, so the fix is a policy tradeoff. How should I scope it?"
+  options:
+    - "Auto-extend while holder is active"
+    - "Bump the default deadline"
+    - "Detector-first (zero-risk)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8cf32ef222890eec
+  resolved_at: 2026-06-14T04:43:53.075302Z
+  answer: "Your questions have been answered: \"Cycle-7 triage: WI-4527 (P2, go-implementation claim TTL too short for large builds) is genuinely OPEN. The claim system has a manual `extend` command (bounded by a 2h max-hold cap), but the default is only 30min deadline + 10min grace, with NO auto-extend on activity and NO deadline nudge — so a dispatched worker on a long build silently loses its claim mid-build (the WI-4499 collision). It's the swarm's coordination backbone, so the fix is a policy tradeoff. How should I scope it?\"=\"Auto-extend while holder is active\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1229
+  asked_at: 2026-06-14T06:29:40.837127Z
+  question: "TAFE chain status: Slice A/B/C all VERIFIED and WI-4509 cutover-evidence VERIFIED. Live `gt flow cutover-evidence` ran cleanly (INDEX byte-identical, read-only contract honored). But the evidence shows the TAFE shadow is NOT a faithful mirror of canonical INDEX: 634 lost_blocks (on-disk bridge files absent from INDEX.md), 14 fidelity_mismatches (latest-status disagrees between INDEX and shadow), and 10 threads with `created`/`updated` actions on a re-plan (idempotence churn). Parity is clean (0 mismatches over 328 derived instances + 1864 artifacts). My read: WI-4510 is NOT safe to cut over now — making the shadow authoritative would silently lock in INDEX's historical drift. How would you like to proceed?"
+  options:
+    - "Hold cutover; reconcile first"
+    - "Investigate first, no decision yet"
+    - "Approve cutover anyway"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b9d6516360f84df0
+  resolved_at: 2026-06-14T06:29:40.837127Z
+  answer: "Your questions have been answered: \"TAFE chain status: Slice A/B/C all VERIFIED and WI-4509 cutover-evidence VERIFIED. Live `gt flow cutover-evidence` ran cleanly (INDEX byte-identical, read-only contract honored). But the evidence shows the TAFE shadow is NOT a faithful mirror of canonical INDEX: 634 lost_blocks (on-disk bridge files absent from INDEX.md), 14 fidelity_mismatches (latest-status disagrees between INDEX and shadow), and 10 threads with `created`/`updated` actions on a re-plan (idempotence churn). Parity is clean (0 mismatches over 328 derived instances + 1864 artifacts). My read: WI-4510 is NOT safe to cut over now — making the shadow authoritative would silently lock in INDEX's historical drift. How would you like to proceed?\"=\"Hold cutover; reconcile first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1230
+  asked_at: 2026-06-14T06:48:33.667771Z
+  question: "FIX DIRECTION for the single-file-marker contention defect. The marker `.claude/session/active-session-role.json` is one file representing multi-session state; multiple concurrent sessions compete; the time-based freshness heuristic mis-fires (today's lockout). Which architectural fix becomes the committed direction this advisory records?"
+  options:
+    - "Per-session marker files (A)"
+    - "Multi-entry manifest (B)"
+    - "Active-session detection (C)"
+    - "Defer — gather more evidence first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c64456093d544e4b
+  resolved_at: 2026-06-14T06:48:33.667771Z
+  answer: "Your questions have been answered: \"FIX DIRECTION for the single-file-marker contention defect. The marker `.claude/session/active-session-role.json` is one file representing multi-session state; multiple concurrent sessions compete; the time-based freshness heuristic mis-fires (today's lockout). Which architectural fix becomes the committed direction this advisory records?\"=\"Per-session marker files (A)\", \"SCOPE of this advisory. There are two architectural defects: (1) the contention/freshness issue (above), and (2) the marker getting silently wiped between owner turns (separate root cause; unknown which hook does it). Should this advisory cover both or split them?\"=\"One umbrella advisory (Recommended)\", \"POSTURE / next-action priority for this advisory. What follow-on should the advisory recommend?\"=\"Drive implementation next available session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1231
+  asked_at: 2026-06-14T06:48:33.667771Z
+  question: "SCOPE of this advisory. There are two architectural defects: (1) the contention/freshness issue (above), and (2) the marker getting silently wiped between owner turns (separate root cause; unknown which hook does it). Should this advisory cover both or split them?"
+  options:
+    - "One umbrella advisory (Recommended)"
+    - "Two separate advisories"
+    - "Contention only; defer marker-wiping"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e09437efbce38136
+  resolved_at: 2026-06-14T06:48:33.667771Z
+  answer: "Your questions have been answered: \"FIX DIRECTION for the single-file-marker contention defect. The marker `.claude/session/active-session-role.json` is one file representing multi-session state; multiple concurrent sessions compete; the time-based freshness heuristic mis-fires (today's lockout). Which architectural fix becomes the committed direction this advisory records?\"=\"Per-session marker files (A)\", \"SCOPE of this advisory. There are two architectural defects: (1) the contention/freshness issue (above), and (2) the marker getting silently wiped between owner turns (separate root cause; unknown which hook does it). Should this advisory cover both or split them?\"=\"One umbrella advisory (Recommended)\", \"POSTURE / next-action priority for this advisory. What follow-on should the advisory recommend?\"=\"Drive implementation next available session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1232
+  asked_at: 2026-06-14T06:48:33.667771Z
+  question: "POSTURE / next-action priority for this advisory. What follow-on should the advisory recommend?"
+  options:
+    - "Drive implementation next available session"
+    - "Advisory-only; backlog-queue the implementation"
+    - "Advisory-only; passive (P3)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6505c684ad12e2b3
+  resolved_at: 2026-06-14T06:48:33.667771Z
+  answer: "Your questions have been answered: \"FIX DIRECTION for the single-file-marker contention defect. The marker `.claude/session/active-session-role.json` is one file representing multi-session state; multiple concurrent sessions compete; the time-based freshness heuristic mis-fires (today's lockout). Which architectural fix becomes the committed direction this advisory records?\"=\"Per-session marker files (A)\", \"SCOPE of this advisory. There are two architectural defects: (1) the contention/freshness issue (above), and (2) the marker getting silently wiped between owner turns (separate root cause; unknown which hook does it). Should this advisory cover both or split them?\"=\"One umbrella advisory (Recommended)\", \"POSTURE / next-action priority for this advisory. What follow-on should the advisory recommend?\"=\"Drive implementation next available session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1233
+  asked_at: 2026-06-14T06:55:59.834304Z
+  question: "WI-4510 TAFE governed cutover — IRREVERSIBLE owner-AUQ-gated step. Prerequisites complete: Slice A/B/C VERIFIED, WI-4509 cutover-evidence VERIFIED. Live `gt flow cutover-evidence --json` ran read-only (INDEX SHA-256 byte-identical before/after) and reports: parity 0 mismatches (328 instances + 1864 artifacts derived); BUT 634 lost_blocks (on-disk bridge files absent from INDEX.md), 14 fidelity_mismatches (latest-status disagrees between INDEX and shadow), and 10 created/updated actions on a re-plan (idempotence churn on an unpopulated shadow). My recommendation: NOT safe to cut over now — cutting over with 634 lost_blocks would silently lock the shadow in as a strict subset of INDEX. Earlier this session you chose HOLD/reconcile (recorded as DELIB-WI4510-CUTOVER-HOLD-PRE-RECONCILIATION-20260614; WI-4546 opened). Confirm or change?"
+  options:
+    - "Confirm HOLD (prior choice)"
+    - "Investigate before deciding"
+    - "Approve cutover anyway"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f11af147e04f0987
+  resolved_at: 2026-06-14T06:55:59.834304Z
+  answer: "Your questions have been answered: \"WI-4510 TAFE governed cutover — IRREVERSIBLE owner-AUQ-gated step. Prerequisites complete: Slice A/B/C VERIFIED, WI-4509 cutover-evidence VERIFIED. Live `gt flow cutover-evidence --json` ran read-only (INDEX SHA-256 byte-identical before/after) and reports: parity 0 mismatches (328 instances + 1864 artifacts derived); BUT 634 lost_blocks (on-disk bridge files absent from INDEX.md), 14 fidelity_mismatches (latest-status disagrees between INDEX and shadow), and 10 created/updated actions on a re-plan (idempotence churn on an unpopulated shadow). My recommendation: NOT safe to cut over now — cutting over with 634 lost_blocks would silently lock the shadow in as a strict subset of INDEX. Earlier this session you chose HOLD/reconcile (recorded as DELIB-WI4510-CUTOVER-HOLD-PRE-RECONCILIATION-20260614; WI-4546 opened). Confirm or change?\"=\"Confirm HOLD (prior choice)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1234
+  asked_at: 2026-06-14T07:19:01.781865Z
+  question: "I read your statement as a tracked requirement: the `::init gtkb *` envelope persists for the lifetime of one contiguous model context (all turns + compaction/resume that preserve it), invalidated only by a real context reset. The marker vanishing mid-context is a defect against it. How do you want me to proceed?"
+  options:
+    - "Capture spec + scope fix now"
+    - "Capture spec + backlog fix"
+    - "Refine the requirement first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 66adcba8add491b7
+  resolved_at: 2026-06-14T07:19:01.781865Z
+  answer: "Your questions have been answered: \"I read your statement as a tracked requirement: the `::init gtkb *` envelope persists for the lifetime of one contiguous model context (all turns + compaction/resume that preserve it), invalidated only by a real context reset. The marker vanishing mid-context is a defect against it. How do you want me to proceed?\"=\"Capture spec + scope fix now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1235
+  asked_at: 2026-06-14T07:19:01.781865Z
+  question: "Your context-lifetime requirement is captured (DELIB-20263212 → WI-4540) and the root cause is confirmed. Next is converting the prior advisory (`gtkb-session-role-marker-architecture-advisory-001`) into an implementation proposal that merges per-session marker files + your compaction-survival invariant + a session-id-validating WI-4534 reader. How should I anchor and proceed?"
+  options:
+    - "Author now, anchor on WI-4540"
+    - "Author now, fresh umbrella WI"
+    - "Hold — I'll review the advisory first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 78adecaa0097d329
+  resolved_at: 2026-06-14T07:19:01.781865Z
+  answer: "Your questions have been answered: \"Your context-lifetime requirement is captured (DELIB-20263212 → WI-4540) and the root cause is confirmed. Next is converting the prior advisory (`gtkb-session-role-marker-architecture-advisory-001`) into an implementation proposal that merges per-session marker files + your compaction-survival invariant + a session-id-validating WI-4534 reader. How should I anchor and proceed?\"=\"Author now, anchor on WI-4540\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1236
+  asked_at: 2026-06-14T07:31:01.962777Z
+  question: "WI-4542 (defect: bridge_applicability_preflight trailing-qualifier heading tolerance) is VERIFIED on the bridge (gtkb-wi4542-spec-link-heading-qualifier-tolerance-004.md, Codex harness A, all preflights + ruff + 14 pytest PASS). Its MemBase closure is blocked by the GOV-15 owner-approval gate for defect/regression items. Approve resolving WI-4542 now?"
+  options:
+    - "Approve — resolve now"
+    - "Hold — leave open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f7c8f8a384c44662
+  resolved_at: 2026-06-14T07:31:01.962777Z
+  answer: "Your questions have been answered: \"WI-4542 (defect: bridge_applicability_preflight trailing-qualifier heading tolerance) is VERIFIED on the bridge (gtkb-wi4542-spec-link-heading-qualifier-tolerance-004.md, Codex harness A, all preflights + ruff + 14 pytest PASS). Its MemBase closure is blocked by the GOV-15 owner-approval gate for defect/regression items. Approve resolving WI-4542 now?\"=\"Approve — resolve now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1238
+  asked_at: 2026-06-14T07:43:20.396352Z
+  question: "WI-4441 (defect: Antigravity skill-adapter generator emitted 0 of 36 adapters) is VERIFIED on the bridge (gtkb-wi4441-antigravity-adapter-generation-004.md — 'Antigravity harness parity is PASS, no stale/missing adapter surfaces, generator reports no drift, focused generator tests pass'). Closure is blocked by the GOV-15 defect-origin owner-approval gate. Approve closing WI-4441?"
+  options:
+    - "Approve — resolve now"
+    - "Hold — leave open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1175cdd493a7728f
+  resolved_at: 2026-06-14T07:43:20.396352Z
+  answer: "Your questions have been answered: \"WI-4441 (defect: Antigravity skill-adapter generator emitted 0 of 36 adapters) is VERIFIED on the bridge (gtkb-wi4441-antigravity-adapter-generation-004.md — 'Antigravity harness parity is PASS, no stale/missing adapter surfaces, generator reports no drift, focused generator tests pass'). Closure is blocked by the GOV-15 defect-origin owner-approval gate. Approve closing WI-4441?\"=\"Approve — resolve now\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
