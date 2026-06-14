@@ -364,7 +364,7 @@ THIRD_PARTY_SERVICES = [
         "Optional semantic search for the Deliberation Archive.",
         "None for local embedded use.",
         "Derived local embeddings/index content.",
-        'Install with pip install "groundtruth-kb[search]" when semantic search is needed.',
+        "Install into the gt venv with uv pip install chromadb when semantic search is needed.",
         "Project owner",
     ),
     (
@@ -1022,7 +1022,7 @@ def _insert_integrations(conn: sqlite3.Connection) -> None:
             "Deliberation Archive search.",
             "search extra",
             "optional",
-            'pip install "groundtruth-kb[search]"',
+            "uv pip install chromadb",
             "SQLite LIKE fallback works without it.",
             7,
         ),

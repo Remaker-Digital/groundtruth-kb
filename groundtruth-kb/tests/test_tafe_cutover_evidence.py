@@ -200,6 +200,31 @@ def test_fidelity_mismatch_detected(tmp_path: Path) -> None:
     assert report.fidelity.ok is False
 
 
+# --- Terminal-archived completeness (DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001) ---
+
+
+def test_archived_blocks_separated_from_lost_blocks(tmp_path: Path) -> None:
+    """Terminal-status orphans surface as archived_blocks, not lost_blocks; as_dict carries both."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "archived-thread-001.md").write_text("VERIFIED\n", encoding="utf-8")
+    (bridge_dir / "lost-thread-001.md").write_text("NEW\n", encoding="utf-8")
+
+    db, service = _service(tmp_path)
+    try:
+        text = _index(("extra-thread", [("NEW", 1)]))
+        report = gather_cutover_evidence(text, service, project_root=tmp_path)
+    finally:
+        db.close()
+
+    assert "archived-thread" in report.archived_blocks
+    assert "archived-thread" not in report.lost_blocks
+    assert "lost-thread" in report.lost_blocks
+    payload = report.as_dict()
+    assert "archived-thread" in payload["completeness"]["archived_blocks"]
+    assert payload["completeness"]["archived_count"] >= 1
+
+
 # --- GOV-FILE-BRIDGE-AUTHORITY-001: read-only contract --------------------------
 
 

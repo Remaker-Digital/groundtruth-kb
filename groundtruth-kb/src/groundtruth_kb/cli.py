@@ -5571,7 +5571,7 @@ def deliberations_rebuild_index(ctx: click.Context) -> None:
     )
     result = db.rebuild_deliberation_index()
     if result.get("errors") and result["errors"] == ["ChromaDB not installed"]:
-        click.echo('Error: ChromaDB is not installed. Install with:\n  pip install "groundtruth-kb[search]"')
+        click.echo("Error: ChromaDB is not installed. Install it into the gt venv with:\n  uv pip install chromadb")
         raise SystemExit(1)
     click.echo(f"Indexed {result['indexed']} deliberation(s), {result['chunks']} chunk(s).")
     if result.get("errors"):
@@ -5991,7 +5991,7 @@ def deliberations_search(
 
         if not getattr(_db_mod, "HAS_CHROMADB", False):
             click.echo(
-                'Error: --semantic-only requires ChromaDB. Install with:\n  pip install "groundtruth-kb[search]"'
+                "Error: --semantic-only requires ChromaDB. Install it into the gt venv with:\n  uv pip install chromadb"
             )
             raise SystemExit(1)
 

@@ -20,6 +20,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: 0ddf1797c5210156
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1255
+  asked_at: 2026-06-14T16:44:02.733394Z
+  question: "I'm standing by for your direction"
+  detected_via: prose:standing_by_for_first_person
+  status: pending
+  question_hash: 2116ea8f0c9f98aa
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -132,19 +139,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0617
-  asked_at: 2026-05-15T16:46:04.742986Z
-  question: "The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?"
-  options:
-    - "Continue — file -009"
-    - "Ship Claude-side only"
-    - "Pause this thread"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 65f5172fafe465ab
-  resolved_at: 2026-05-15T16:46:04.742986Z
-  answer: "User has answered your questions: \"The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?\"=\"Continue — file -009\". You can now continue with the user's answers in mind."
-  notes: ""
 - id: DECISION-0618
   asked_at: 2026-05-15T17:14:51.674715Z
   question: "The grill-me-for-clarification skill thread is VERIFIED (terminal). The change is ready to commit. How should I proceed?"
@@ -7893,6 +7887,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 1974c3479c185164
   resolved_at: 2026-06-14T16:33:53.706428Z
   answer: "Your questions have been answered: \"The handoff prompt is created and the session is prepared for a fresh start (clean envelope). Do you want any closing action before you close out?\"=\"Handoff sufficient — stop\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1256
+  asked_at: 2026-06-14T17:12:23.151954Z
+  question: "I confirmed the startup timeout is cold-start sync-watcher contention (not DB size), with the inner 50s subprocess timeout firing ~3.6x short of the hook's 180s async budget. How should I pursue the long-term fix?"
+  options:
+    - "Layered A+B (recommended)"
+    - "Minimal timeout fix only"
+    - "Deeper structural refactor"
+    - "Capture to backlog only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cdc099391e2a2392
+  resolved_at: 2026-06-14T17:12:23.151954Z
+  answer: "Your questions have been answered: \"I confirmed the startup timeout is cold-start sync-watcher contention (not DB size), with the inner 50s subprocess timeout firing ~3.6x short of the hook's 180s async budget. How should I pursue the long-term fix?\"=\"Layered A+B (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1257
+  asked_at: 2026-06-14T17:12:23.151954Z
+  question: "Reading .driveignore shows part B (exclude DB/.git/chroma from sync) is already implemented from two prior corruption incidents, and OneDrive likely isn't even watching E:\\GT-KB. Part A (align the 50s inner timeout to the 180s async budget) remains the real, high-confidence fix. How should I re-scope?"
+  options:
+    - "Ship A; defer C; clean tree (rec)"
+    - "A + C together"
+    - "Measure contention first"
+    - "Capture only; pause"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b948ebf22321028e
+  resolved_at: 2026-06-14T17:12:23.151954Z
+  answer: "Your questions have been answered: \"Reading .driveignore shows part B (exclude DB/.git/chroma from sync) is already implemented from two prior corruption incidents, and OneDrive likely isn't even watching E:\\GT-KB. Part A (align the 50s inner timeout to the 180s async budget) remains the real, high-confidence fix. How should I re-scope?\"=\"A + C together\". You can now continue with these answers in mind."
   notes: ""
 
 ## History

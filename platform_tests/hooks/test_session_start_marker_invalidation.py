@@ -24,7 +24,9 @@ drift apart.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 
@@ -170,3 +172,70 @@ def test_invalidation_ordered_before_dispatch_in_main() -> None:
     assert i_purge < i_invalidate, "invalidation must run after diagnostics purge"
     assert i_invalidate < i_apply_pending, "invalidation must run before the mode-switch drain"
     assert i_apply_pending < i_dispatch, "mode-switch drain must still precede the dispatch check"
+
+
+# ---------------------------------------------------------------------------
+# WI-4540: per-session marker sweep (context-id-scoped + freshness retention).
+# bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md (GO -004).
+# ---------------------------------------------------------------------------
+
+
+def _per_session_path(project_root: Path, session_id: str) -> Path:
+    from scripts.gtkb_session_id import per_session_role_marker_path
+
+    return per_session_role_marker_path(project_root, session_id)
+
+
+def _write_per_session(
+    project_root: Path, session_id: str, *, role: str = "prime-builder", age_seconds: int = 0
+) -> Path:
+    path = _per_session_path(project_root, session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    written_at = (datetime.now(UTC) - timedelta(seconds=age_seconds)).isoformat().replace("+00:00", "Z")
+    path.write_text(
+        json.dumps({"role": role, "session_id": session_id, "written_at": written_at}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_per_session_marker_retained_for_current_context(dispatcher: ModuleType, tmp_path: Path) -> None:
+    """DELIB-20263212: the current context's per-session marker SURVIVES a
+    SessionStart that carries the same context id (even if it is old)."""
+    marker = _write_per_session(tmp_path, "ctx-current", age_seconds=10 * 24 * 3600)  # very old
+    dispatcher._sweep_stale_per_session_role_markers(tmp_path, current_session_id="ctx-current")
+    assert marker.is_file(), "current context's per-session marker must survive the sweep"
+
+
+def test_per_session_marker_concurrent_live_session_retained(dispatcher: ModuleType, tmp_path: Path) -> None:
+    """WI-4463: a peer session's SessionStart does NOT delete another LIVE
+    session's per-session marker (it is fresh, so freshness retention keeps it)."""
+    peer = _write_per_session(tmp_path, "ctx-peer-live", age_seconds=5)  # fresh
+    dispatcher._sweep_stale_per_session_role_markers(tmp_path, current_session_id="ctx-other")
+    assert peer.is_file(), "a concurrent live session's marker must not be swept by a peer SessionStart"
+
+
+def test_per_session_marker_stale_swept_live_retained(dispatcher: ModuleType, tmp_path: Path) -> None:
+    """A stale per-session marker (older than the freshness window) is swept,
+    while a fresh one is retained."""
+    stale = _write_per_session(tmp_path, "ctx-stale", age_seconds=48 * 3600)
+    fresh = _write_per_session(tmp_path, "ctx-fresh", age_seconds=30)
+    dispatcher._sweep_stale_per_session_role_markers(tmp_path, current_session_id=None)
+    assert not stale.exists(), "stale per-session marker should be swept"
+    assert fresh.is_file(), "fresh per-session marker should be retained"
+
+
+def test_legacy_invalidation_leaves_per_session_markers(dispatcher: ModuleType, tmp_path: Path) -> None:
+    """The legacy single-file invalidation deletes only ``active-session-role.json``;
+    per-session markers are untouched by it (the additive-transition separation)."""
+    legacy = _write_marker(tmp_path)  # legacy single file
+    per_session = _write_per_session(tmp_path, "ctx-keep", age_seconds=5)
+    dispatcher._invalidate_session_role_marker(tmp_path)
+    assert not legacy.exists(), "legacy single-file marker must be invalidated"
+    assert per_session.is_file(), "per-session marker must NOT be touched by legacy invalidation"
+
+
+def test_per_session_sweep_failsoft_on_missing_dir(dispatcher: ModuleType, tmp_path: Path) -> None:
+    """The sweep is a silent no-op when the session dir does not exist."""
+    dispatcher._sweep_stale_per_session_role_markers(tmp_path / "nonexistent", current_session_id=None)
+    # No raise == pass.

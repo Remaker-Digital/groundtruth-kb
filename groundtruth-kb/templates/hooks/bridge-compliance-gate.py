@@ -203,6 +203,29 @@ BRIDGE_KIND_METADATA_EXEMPT = frozenset(
 )
 PROJECT_METADATA_STATUSES = frozenset({"NEW", "REVISED"})
 
+# Requirement Sufficiency presence gate (WI-3439).
+# .claude/rules/file-bridge-protocol.md section "Mandatory Implementation-Start
+# Authorization Metadata" requires every implementation proposal that requests
+# source/test/script/hook/config/deploy/repo-state/KB-mutation work to carry a
+# "## Requirement Sufficiency" subsection with exactly one operative state. This
+# Write-time gate enforces presence + a bounded operative state BEFORE GO, so the
+# omission is caught here rather than post-GO at implementation-start. Scoped to
+# implementation-proposal bridge_kind tokens (canonical prime_proposal plus the
+# colloquial implementation_proposal used via the helper path), NOT
+# implementation_report (post-implementation reports correctly lack the
+# subsection). See the GO at
+# bridge/gtkb-wi3439-requirement-sufficiency-presence-check-002.md constraint 1.
+REQUIREMENT_SUFFICIENCY_HEADING_RE = re.compile(
+    r"^#{1,6}\s*requirement\s+sufficiency\s*$",
+    re.IGNORECASE,
+)
+REQUIREMENT_SUFFICIENCY_OPERATIVE_RE = re.compile(
+    r"existing\s+requirements?\s+(?:are\s+)?sufficient"
+    r"|new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
+    re.IGNORECASE,
+)
+BRIDGE_KIND_IMPLEMENTATION_PROPOSAL = frozenset({"prime_proposal", "implementation_proposal"})
+
 # WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
 # CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-
 # MANDATORY-001/CLAUSE-PROJECT-AUTH-LIVE-CHECK).
@@ -821,6 +844,60 @@ def _bridge_kind_is_metadata_exempt(content: str) -> bool:
     return match.group(1).strip().lower() in BRIDGE_KIND_METADATA_EXEMPT
 
 
+def _bridge_kind_is_implementation_proposal(content: str) -> bool:
+    """Return True when the proposal's bridge_kind denotes an implementation
+    proposal (canonical ``prime_proposal`` or the colloquial
+    ``implementation_proposal`` token used via the helper path).
+
+    Used by the WI-3439 Requirement Sufficiency gate so the check fires ONLY for
+    implementation proposals -- never for implementation reports, verdicts, or
+    advisories, which legitimately lack the subsection. This is a POSITIVE
+    predicate, deliberately NOT the negative ``_bridge_kind_is_metadata_exempt``
+    set: that set does not contain ``implementation_report`` and so would wrongly
+    gate post-implementation reports (GO constraint 1). A proposal that omits the
+    bridge_kind line returns False (conservative; the project-linkage gate still
+    catches missing metadata).
+    """
+    match = BRIDGE_KIND_LINE_RE.search(content)
+    if not match:
+        return False
+    return match.group(1).strip().lower() in BRIDGE_KIND_IMPLEMENTATION_PROPOSAL
+
+
+def _requirement_sufficiency_section_gap(content: str) -> str | None:
+    """Return a short gap descriptor when an implementation proposal's
+    ``## Requirement Sufficiency`` subsection is absent, placeholder-only, or
+    carries neither bounded operative state; return None when it is substantive.
+
+    Operative states per .claude/rules/file-bridge-protocol.md section "Mandatory
+    Implementation-Start Authorization Metadata": exactly one of "Existing
+    requirements sufficient" or "New or revised requirement required before
+    implementation". Mirrors the existing ``_has_concrete_spec_links`` /
+    ``_has_concrete_owner_decisions_section`` section-presence machinery (heading
+    scan + ``_collect_section_lines`` + placeholder-line rejection).
+    """
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if REQUIREMENT_SUFFICIENCY_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return "section absent"
+    section = _collect_section_lines(lines, start)
+    nonblank = [stripped for stripped in (ln.strip() for ln in section) if stripped]
+    if not nonblank:
+        return "section empty"
+    if not any(not SPEC_PLACEHOLDER_LINE_RE.match(ln) for ln in nonblank):
+        return "section placeholder-only"
+    if not REQUIREMENT_SUFFICIENCY_OPERATIVE_RE.search("\n".join(section)):
+        return (
+            "no operative state ('Existing requirements sufficient' or "
+            "'New or revised requirement required before implementation')"
+        )
+    return None
+
+
 def _project_metadata_gaps(content: str) -> list[str]:
     """Return the list of missing project-linkage metadata lines.
 
@@ -1250,6 +1327,22 @@ def _deny_reason_for_content(
                     "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
                     "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
                     "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
+                )
+        if (
+            first_line in PROJECT_METADATA_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
+            and _target_paths_from_content(content)
+        ):
+            req_suff_gap = _requirement_sufficiency_section_gap(content)
+            if req_suff_gap:
+                return (
+                    "[Governance] Implementation proposals that request implementation work "
+                    "must include a substantive ## Requirement Sufficiency subsection with "
+                    "exactly one operative state ('Existing requirements sufficient' or "
+                    "'New or revised requirement required before implementation'). "
+                    f"Gap: {req_suff_gap}. "
+                    "(Hard-block per .claude/rules/file-bridge-protocol.md "
+                    "'Mandatory Implementation-Start Authorization Metadata'; WI-3439.)"
                 )
         if run_pending_preflight and first_line in PENDING_PREFLIGHT_STATUSES:
             bridge_id = _extract_bridge_id_from_path(file_path)

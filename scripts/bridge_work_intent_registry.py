@@ -324,14 +324,41 @@ def _harness_projection_reader():  # pragma: no cover - import shim
     return reader
 
 
-def _interactive_marker_role(project_root: Path | None) -> str | None:
+def _interactive_marker_role(project_root: Path | None, session_id: str | None = None) -> str | None:
     """Return the session-stated role from the owner-declared marker, or ``None``.
 
-    Reads ``.claude/session/active-session-role.json``. A missing, unreadable,
-    or malformed marker yields ``None`` (no positive Prime evidence). The marker
-    is SessionStart-invalidated, so a present marker belongs to the current
-    interactive session.
+    WI-4540 (bridge -004, R-B1 + additive transition): prefer the per-session
+    marker keyed under ``session_id`` (validating that the stored ``session_id``
+    matches the querying id — assertion 6), then fall back to the legacy shared
+    single-file marker ``.claude/session/active-session-role.json`` for the
+    additive transition window. A missing/unreadable/malformed marker yields
+    ``None`` (no positive Prime evidence). Keying the marker per session means a
+    peer session's SessionStart can no longer clobber THIS session's marker, so
+    the guard's interactive branch finds the marker written from the same
+    interactive context under the canonical id.
     """
+    # Per-session marker (WI-4540 authority) — only consulted when the querying
+    # id is known. The path is built by the single shared authority in
+    # scripts/gtkb_session_id.py so the read target cannot drift from the writer.
+    if session_id:
+        try:
+            from scripts.gtkb_session_id import per_session_role_marker_path
+        except ImportError:  # pragma: no cover - direct script execution path
+            from gtkb_session_id import per_session_role_marker_path  # type: ignore[no-redef]
+
+        per_session_path = per_session_role_marker_path(_root(project_root), session_id)
+        try:
+            per_session_body = json.loads(per_session_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            per_session_body = None
+        if isinstance(per_session_body, dict):
+            marker_session_id = per_session_body.get("session_id")
+            role = per_session_body.get("role")
+            if isinstance(marker_session_id, str) and marker_session_id == session_id and isinstance(role, str):
+                return role
+            # A present-but-mismatched per-session marker is not positive Prime
+            # evidence for THIS session; fall through to the legacy marker.
+
     marker_path = _root(project_root).joinpath(*SESSION_ROLE_MARKER_PARTS)
     try:
         body = json.loads(marker_path.read_text(encoding="utf-8"))
@@ -365,7 +392,7 @@ def _resolve_go_implementation_eligibility(session_id: str, *, project_root: Pat
         eligible = bool(role_set & PRIME_ELIGIBLE_ROLES)
         roles_desc = ", ".join(sorted(role_set)) if role_set else "<harness id absent from registry>"
         return eligible, f"dispatch harness {harness_id!r} durable role-set {{{roles_desc}}}"
-    marker_role = _interactive_marker_role(project_root)
+    marker_role = _interactive_marker_role(project_root, session_id)
     eligible = marker_role == "prime-builder"
     return eligible, f"interactive session marker role {marker_role!r}"
 

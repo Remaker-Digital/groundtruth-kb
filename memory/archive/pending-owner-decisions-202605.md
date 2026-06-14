@@ -6231,3 +6231,17 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-15T16:30:25.620540Z
   answer: "Answer questions?"
   notes: ""
+
+- id: DECISION-0617
+  asked_at: 2026-05-15T16:46:04.742986Z
+  question: "The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?"
+  options:
+    - "Continue — file -009"
+    - "Ship Claude-side only"
+    - "Pause this thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 65f5172fafe465ab
+  resolved_at: 2026-05-15T16:46:04.742986Z
+  answer: "User has answered your questions: \"The grill-me-for-clarification bridge thread has taken 4 narrow Codex NO-GOs over target_paths scope completeness. How should I proceed?\"=\"Continue — file -009\". You can now continue with the user's answers in mind."
+  notes: ""

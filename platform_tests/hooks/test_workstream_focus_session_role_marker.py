@@ -581,3 +581,126 @@ def test_marker_lock_cleanup_on_exception(
         )
 
     assert not lock_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# WI-4540: per-session/per-context marker keying (additive transition, R-B1).
+# bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md (GO -004).
+# ---------------------------------------------------------------------------
+
+
+def _per_session_marker_path(project_root: Path, session_id: str) -> Path:
+    from scripts.gtkb_session_id import per_session_role_marker_path
+
+    return per_session_role_marker_path(project_root, session_id)
+
+
+def test_per_session_marker_written_on_interactive_init_keyword(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+) -> None:
+    """WI-4540: an interactive ``::init gtkb pb`` writes a per-session marker
+    keyed to the payload session id, carrying the role + the same session id."""
+    wsf._consume_discard_first_prompt_gate("::init gtkb pb", tmp_path, session_id="sess-payload-abc")
+    per_session = _per_session_marker_path(tmp_path, "sess-payload-abc")
+    assert per_session.is_file(), "per-session marker was not written"
+    body = json.loads(per_session.read_text(encoding="utf-8"))
+    assert body["role"] == "prime-builder"
+    assert body["session_id"] == "sess-payload-abc"
+    assert body["session_id_source"] == "payload"
+    assert body["source"] == "init_keyword"
+
+
+def test_per_session_marker_legacy_single_file_still_written(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+) -> None:
+    """Additive transition: the legacy single-file marker AND the per-session
+    marker are both written (no regression of the legacy authority)."""
+    wsf._consume_discard_first_prompt_gate("::init gtkb pb", tmp_path, session_id="sess-additive")
+    assert _marker_path(tmp_path).is_file(), "legacy single-file marker missing"
+    assert _per_session_marker_path(tmp_path, "sess-additive").is_file(), "per-session marker missing"
+
+
+def test_per_session_marker_multikey_includes_env_candidate(
+    wsf: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    clean_env: None,
+) -> None:
+    """R-B1 defensive multi-key: with a payload id AND a CLAUDE_CODE_SESSION_ID
+    env candidate, a per-session marker is written under BOTH, so the resolver
+    (payload/transcript id) and the WI-4534 guard (CLAUDE_CODE_SESSION_ID) each
+    find a marker keyed to the id they look up."""
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "cc-env-value")
+    wsf._consume_discard_first_prompt_gate("::init gtkb pb", tmp_path, session_id="transcript-uuid-1")
+    assert _per_session_marker_path(tmp_path, "transcript-uuid-1").is_file()
+    assert _per_session_marker_path(tmp_path, "cc-env-value").is_file()
+
+
+def test_per_session_marker_no_cross_session_clobber(
+    wsf: ModuleType,
+    tmp_path: Path,
+) -> None:
+    """Per-session keying has no clobber-rejection: a second session writing its
+    own per-session marker does NOT fail even though another session's
+    per-session marker already exists (the WI-4463 root-cause fix)."""
+    assert (
+        wsf._write_per_session_role_marker(
+            role_profile="prime-builder",
+            session_id="session-A",
+            session_id_source="payload",
+            project_root=tmp_path,
+        )
+        is True
+    )
+    # A DIFFERENT session writes its own per-session marker — must succeed
+    # (contrast with the legacy single-file clobber-rejection behavior).
+    assert (
+        wsf._write_per_session_role_marker(
+            role_profile="loyal-opposition",
+            session_id="session-B",
+            session_id_source="payload",
+            project_root=tmp_path,
+        )
+        is True
+    )
+    # Both markers coexist; neither clobbered the other.
+    a_body = json.loads(_per_session_marker_path(tmp_path, "session-A").read_text(encoding="utf-8"))
+    b_body = json.loads(_per_session_marker_path(tmp_path, "session-B").read_text(encoding="utf-8"))
+    assert a_body["role"] == "prime-builder"
+    assert b_body["role"] == "loyal-opposition"
+
+
+def test_per_session_marker_written_on_explicit_role_hint(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+) -> None:
+    """The ordinary explicit-role-hint path also writes the per-session marker."""
+    wsf.handle_user_prompt(
+        "You are authorized to operate as an autonomous Prime Builder for GroundTruth-KB.",
+        tmp_path,
+        session_id="sess-role-hint",
+    )
+    per_session = _per_session_marker_path(tmp_path, "sess-role-hint")
+    assert per_session.is_file()
+    body = json.loads(per_session.read_text(encoding="utf-8"))
+    assert body["role"] == "prime-builder"
+    assert body["source"] == "prompt_explicit_role_hint"
+
+
+def test_per_session_marker_not_written_under_headless_dispatch(
+    wsf: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    clean_env: None,
+) -> None:
+    """Headless dispatch (GTKB_BRIDGE_POLLER_RUN_ID set) writes neither the
+    legacy single-file marker nor any per-session marker."""
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "run-id-xyz")
+    wsf._consume_discard_first_prompt_gate("::init gtkb lo", tmp_path, session_id="should-not-matter")
+    assert not _marker_path(tmp_path).exists()
+    assert not _per_session_marker_path(tmp_path, "should-not-matter").exists()

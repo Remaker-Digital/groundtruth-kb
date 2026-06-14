@@ -173,6 +173,115 @@ def test_uses_slice_a_parser(project_dir: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Terminal-archived classification (DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001)
+# --------------------------------------------------------------------------- #
+
+
+def test_terminal_latest_token_classified_archived(project_dir: Path) -> None:
+    """A terminal-status slug absent from INDEX is archived, not lost (and ok stays True)."""
+    _write_bridge_file(project_dir, "present-001.md")
+    _write_bridge_file(project_dir, "done-001.md", body="VERIFIED\n")
+
+    report = index_completeness_report(_index_for("present"), project_dir)
+
+    assert report.archived_blocks == ("done",)
+    assert report.lost_blocks == ()
+    assert report.ok is True
+
+
+def test_all_terminal_token_variants_archived(project_dir: Path) -> None:
+    """Every terminal token (VERIFIED/WITHDRAWN/DEFERRED/ADVISORY/ACCEPTED) => archived."""
+    for slug, token in (
+        ("v", "VERIFIED"),
+        ("w", "WITHDRAWN"),
+        ("d", "DEFERRED"),
+        ("a", "ADVISORY"),
+        ("acc", "ACCEPTED"),
+    ):
+        _write_bridge_file(project_dir, f"{slug}-001.md", body=f"{token}\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert set(report.archived_blocks) == {"v", "w", "d", "a", "acc"}
+    assert report.lost_blocks == ()
+
+
+def test_non_terminal_tokens_remain_lost(project_dir: Path) -> None:
+    """Non-terminal tokens (NEW/REVISED/GO/NO-GO) keep an absent slug in lost_blocks."""
+    for slug, token in (("n", "NEW"), ("r", "REVISED"), ("g", "GO"), ("ng", "NO-GO")):
+        _write_bridge_file(project_dir, f"{slug}-001.md", body=f"{token}\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert set(report.lost_blocks) == {"n", "r", "g", "ng"}
+    assert report.archived_blocks == ()
+    assert report.ok is False
+
+
+def test_heading_marker_prefixed_terminal_archived(project_dir: Path) -> None:
+    """A markdown-heading status line (``# VERIFIED: ...``) is read as terminal."""
+    _write_bridge_file(project_dir, "hdg-001.md", body="# VERIFIED: closed out\n\nbody\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.archived_blocks == ("hdg",)
+    assert report.lost_blocks == ()
+
+
+def test_status_indeterminate_with_terminal_token_archived(project_dir: Path) -> None:
+    """First line prose but a later terminal-token line => archived (full-file scan)."""
+    _write_bridge_file(project_dir, "old-001.md", body="Some historical note prose.\n\n## VERIFIED\n\ndetails\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.archived_blocks == ("old",)
+    assert report.lost_blocks == ()
+
+
+def test_status_indeterminate_without_terminal_token_lost(project_dir: Path) -> None:
+    """First line prose and no terminal token anywhere => lost (conservative)."""
+    _write_bridge_file(project_dir, "prose-001.md", body="Just a note.\n\nNo status token here.\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.lost_blocks == ("prose",)
+    assert report.archived_blocks == ()
+
+
+def test_latest_version_status_decides(project_dir: Path) -> None:
+    """Classification uses the latest on-disk version, not earlier ones."""
+    _write_bridge_file(project_dir, "evolve-001.md", body="NEW\n")
+    _write_bridge_file(project_dir, "evolve-002.md", body="VERIFIED\n")
+
+    report = index_completeness_report(_index_for(), project_dir)
+
+    assert report.archived_blocks == ("evolve",)
+    assert report.lost_blocks == ()
+
+
+def test_present_slug_is_neither_archived_nor_lost(project_dir: Path) -> None:
+    """A slug present in INDEX is never classified as archived or lost."""
+    _write_bridge_file(project_dir, "here-001.md", body="VERIFIED\n")
+
+    report = index_completeness_report(_index_for("here"), project_dir)
+
+    assert "here" not in report.archived_blocks
+    assert "here" not in report.lost_blocks
+
+
+def test_as_dict_surfaces_archived_blocks(project_dir: Path) -> None:
+    """as_dict exposes archived_blocks + archived_count alongside lost_blocks."""
+    _write_bridge_file(project_dir, "done-001.md", body="VERIFIED\n")
+    _write_bridge_file(project_dir, "orphan-001.md", body="NEW\n")
+
+    payload = index_completeness_report(_index_for(), project_dir).as_dict()
+
+    assert payload["archived_blocks"] == ["done"]
+    assert payload["archived_count"] == 1
+    assert payload["lost_blocks"] == ["orphan"]
+
+
+# --------------------------------------------------------------------------- #
 # Read-only CLI
 # --------------------------------------------------------------------------- #
 

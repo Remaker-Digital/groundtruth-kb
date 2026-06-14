@@ -144,14 +144,89 @@ def _session_role_marker_path(project_root: Path = PROJECT_ROOT) -> Path:
 
 
 def _invalidate_session_role_marker(project_root: Path = PROJECT_ROOT) -> None:
-    """Delete any pre-existing session-state role marker before SessionStart
-    renders. Fail-soft: a missing marker or an OSError must not abort startup."""
+    """Delete any pre-existing LEGACY single-file session-state role marker
+    before SessionStart renders. Fail-soft: a missing marker or an OSError must
+    not abort startup.
+
+    WI-4540 note: this continues to unconditionally delete the legacy shared
+    single-file marker (``active-session-role.json``). The per-session markers
+    (``role-*.json``) — the WI-4540 authority that must survive compaction/resume
+    for the current context — are NOT touched here; they are handled by the
+    context-id-scoped/freshness sweep in ``_sweep_stale_per_session_role_markers``.
+    """
     try:
         _session_role_marker_path(project_root).unlink()
     except FileNotFoundError:
         return
     except OSError:
         return
+
+
+# WI-4540 (bridge -004): generous freshness window so a contiguous interactive
+# context (which can span many hours) keeps its per-session marker alive across
+# every SessionStart it triggers (compaction/resume), honoring the
+# DELIB-20263212 context-lifetime invariant, while genuinely abandoned markers
+# from prior sessions are reclaimed. A transcript-mtime signal is a documented
+# follow-on hardening.
+_PER_SESSION_ROLE_MARKER_STALE_SECONDS = 24 * 3600
+
+
+def _per_session_marker_is_fresh(body: dict, reference: datetime, stale_seconds: int) -> bool:
+    """Return True when a per-session marker body's ``written_at`` is within the
+    freshness window (i.e., a concurrent live session that must be retained)."""
+    written_at = body.get("written_at")
+    if not isinstance(written_at, str):
+        return False
+    try:
+        parsed = datetime.fromisoformat(written_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return (reference - parsed).total_seconds() <= stale_seconds
+
+
+def _sweep_stale_per_session_role_markers(
+    project_root: Path = PROJECT_ROOT,
+    *,
+    current_session_id: str | None = None,
+    now: datetime | None = None,
+    stale_seconds: int = _PER_SESSION_ROLE_MARKER_STALE_SECONDS,
+) -> None:
+    """Sweep stale WI-4540 per-session role markers at SessionStart; fail-soft.
+
+    Unlike the legacy single-file invalidation, per-session markers
+    (``.claude/session/role-*.json``) are NOT deleted unconditionally — that
+    would reintroduce the cross-session clobber (WI-4463) the per-session keying
+    exists to fix. A marker is RETAINED when it belongs to ``current_session_id``
+    OR is younger than ``stale_seconds`` (a concurrent live session), and
+    DELETED otherwise. Every step is fail-soft so a SessionStart never aborts.
+    """
+    try:
+        from scripts.gtkb_session_id import PER_SESSION_ROLE_MARKER_GLOB, session_marker_dir
+    except ImportError:  # pragma: no cover - direct script execution path
+        from gtkb_session_id import PER_SESSION_ROLE_MARKER_GLOB, session_marker_dir  # type: ignore[no-redef]
+
+    session_dir = session_marker_dir(project_root)
+    try:
+        entries = list(session_dir.glob(PER_SESSION_ROLE_MARKER_GLOB))
+    except OSError:
+        return
+    reference = now or datetime.now(UTC)
+    for entry in entries:
+        try:
+            body = json.loads(entry.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            body = None
+        marker_session_id = body.get("session_id") if isinstance(body, dict) else None
+        if current_session_id is not None and marker_session_id == current_session_id:
+            continue  # the current context's marker — always retained
+        if isinstance(body, dict) and _per_session_marker_is_fresh(body, reference, stale_seconds):
+            continue  # a concurrent live session's marker — retained
+        try:
+            entry.unlink()
+        except OSError:
+            pass
 
 
 def _persistent_harness_id() -> str:
@@ -542,6 +617,21 @@ def main() -> int:
     # runs on every SessionStart path (normal or bridge auto-dispatch)
     # and does not disturb the mode-switch-drain -> dispatch ordering below.
     _invalidate_session_role_marker()
+    # WI-4540: sweep stale per-session role markers (role-*.json) without
+    # touching the current context's marker. current_session_id is resolved
+    # best-effort from the marker-continuity env order; when unavailable the
+    # sweep falls back to freshness-only retention (never deletes a fresh
+    # marker). Fail-soft: a sweep error must not abort SessionStart.
+    try:
+        try:
+            from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id
+        except ImportError:  # pragma: no cover - direct script execution path
+            from gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id  # type: ignore[no-redef]
+
+        _swept_current_id = resolve_session_id(order=MARKER_CONTINUITY_ORDER) or None
+        _sweep_stale_per_session_role_markers(current_session_id=_swept_current_id)
+    except Exception:  # noqa: BLE001 - lifecycle hook must fail soft.
+        pass
     # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
     # mode-switch transactions BEFORE role resolution, so a next-session-
     # effective mode/role switch takes effect for the dispatch decision

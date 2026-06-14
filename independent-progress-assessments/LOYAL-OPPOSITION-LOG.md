@@ -417,6 +417,14 @@ Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory i
 |------|---------|-------------------|------------------|--------|
 | Technical | Current Python 3.14 fallback paths make `deliberations search` and `bridge propose --dry-run` fast, but WI-4453 remains open because non-dry-run record indexing is still synchronous and there is no median-latency regression benchmark for all three named CLI surfaces. | Live runtime reports `HAS_CHROMADB=False`; direct search/propose probes returned quickly; `insert_deliberation()` commits SQLite then calls `_index_deliberation_in_chroma()` without a timeout wrapper; targeted tests passed (3/1 skipped import-budget, 50 CLI tests, 10 Chroma/fail-soft tests). | Prime should file a narrow defect-fix proposal for bounded/out-of-band record indexing, deterministic related-deliberation seeding in bridge propose, and the WI's `<= 10s` median-latency benchmark. | Open |
 
+### 2026-06-14 - WI-4402 FAB-18 Post-Verification Reconciliation
+
+Loyal Opposition (Codex/lo automation `keep-working-lo`) completed a disposition-gap investigation for `WI-4402`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-14-10-30-WI4402-FAB18-post-verification-reconciliation.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | `WI-4402` remains open/backlogged even though the VERIFIED FAB-18 bridge thread explicitly absorbed the Advisory Backlog Drain Policy scope and called for post-VERIFIED reconciliation. | `bridge/gtkb-fab-18-backlog-dignity-004.md` names `WI-4402` as absorbed; `bridge/gtkb-fab-18-backlog-dignity-008.md` is VERIFIED with tests passing; live `gt backlog show WI-4402 --json` still reports open/backlogged. | Prime should perform governed backlog disposition: resolve/supersede `WI-4402` against FAB-18 evidence, or narrow it to explicit residual scope. | Open |
+
 ### 2026-06-13 - WI-4443 Implementation Authorization Current Pointer Disposition
 
 Loyal Opposition (Codex/lo automation `keep-working-lo`) completed an advisory investigation for `WI-4443`. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-13-WI-4443-impl-auth-current-pointer-disposition.md`.

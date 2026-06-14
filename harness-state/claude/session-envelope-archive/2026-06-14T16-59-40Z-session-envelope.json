@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-14T16:59:40Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-14T16:59:40Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-14T16-59-40Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M bridge/INDEX.md\n M groundtruth-kb/src/groundtruth_kb/tafe_cutover_evidence.py\n M groundtruth-kb/src/groundtruth_kb/tafe_index_completeness.py\n M groundtruth-kb/tests/test_tafe_cutover_evidence.py\n M groundtruth-kb/tests/test_tafe_index_completeness.py\n M memory/MEMORY.md\n M memory/archive/pending-owner-decisions-202605.md\n M memory/pending-owner-decisions.md\n M platform_tests/hooks/test_session_start_marker_invalidation.py\n M platform_tests/hooks/test_workstream_focus_session_role_marker.py\n M scripts/bridge_work_intent_registry.py\n M scripts/session_start_dispatch_core.py\n?? .tmp_auth_test_err.txt\n?? .tmp_auth_test_err2.txt\n?? .tmp_auth_test_full.txt\n?? .tmp_auth_test_out.txt\n?? .tmp_auth_test_out2.txt\n?? _lo_extract.py\n?? _tmp_cli_ingest_snippet.md\n?? _tmp_tafe_bridge_ingestion_full.py\n?? bridge/gtkb-tafe-shadow-index-reconciliation-005.md\n?? bridge/gtkb-wi4540-per-session-role-marker-context-envelope-005.md\n?? bridge/gtkb-wi4561-chromadb-py314-gate-fix-001.md\n?? harness-state/claude/session-envelope.json\n?? platform_tests/scripts/test_bridge_work_intent_registry.py\n?? platform_tests/scripts/test_session_role_resolution.py\n?? temp-slice-b-smoke.json",
+        "short_line_count": 27,
+        "short_line_limit": 80,
+        "short_truncated": false
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

@@ -189,6 +189,7 @@ class CutoverEvidenceReport:
     flow_completion: dict[str, int]
     lost_blocks: tuple[str, ...]
     extra_blocks: tuple[str, ...]
+    archived_blocks: tuple[str, ...]
     present_count: int
     expected_count: int
 
@@ -219,6 +220,8 @@ class CutoverEvidenceReport:
             "completeness": {
                 "lost_blocks": list(self.lost_blocks),
                 "extra_blocks": list(self.extra_blocks),
+                "archived_blocks": list(self.archived_blocks),
+                "archived_count": len(self.archived_blocks),
                 "present_count": self.present_count,
                 "expected_count": self.expected_count,
             },
@@ -357,6 +360,7 @@ def gather_cutover_evidence(
         flow_completion=flow_completion,
         lost_blocks=completeness.lost_blocks,
         extra_blocks=completeness.extra_blocks,
+        archived_blocks=completeness.archived_blocks,
         present_count=len(completeness.present_slugs),
         expected_count=len(completeness.expected_slugs),
     )

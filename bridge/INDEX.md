@@ -1,14 +1,25 @@
-Document: gtkb-wi4548-axis-2-advisory-surface
-VERIFIED: bridge/gtkb-wi4548-axis-2-advisory-surface-005.md
-NEW: bridge/gtkb-wi4548-axis-2-advisory-surface-004.md
-GO: bridge/gtkb-wi4548-axis-2-advisory-surface-003.md
-REVISED: bridge/gtkb-wi4548-axis-2-advisory-surface-002.md
-NEW: bridge/gtkb-wi4548-axis-2-advisory-surface-001.md
+Document: gtkb-wi3384-clause-in-root-disclosure-exemption
+GO: bridge/gtkb-wi3384-clause-in-root-disclosure-exemption-002.md
+NEW: bridge/gtkb-wi3384-clause-in-root-disclosure-exemption-001.md
+
+Document: gtkb-wi4561-chromadb-py314-gate-fix
+NO-GO: bridge/gtkb-wi4561-chromadb-py314-gate-fix-004.md
+NEW: bridge/gtkb-wi4561-chromadb-py314-gate-fix-003.md
+GO: bridge/gtkb-wi4561-chromadb-py314-gate-fix-002.md
+NEW: bridge/gtkb-wi4561-chromadb-py314-gate-fix-001.md
 
 Document: gtkb-wi4396-dispatch-suppression-routing
+GO: bridge/gtkb-wi4396-dispatch-suppression-routing-004.md
+REVISED: bridge/gtkb-wi4396-dispatch-suppression-routing-003.md
+GO: bridge/gtkb-wi4396-dispatch-suppression-routing-002.md
 NEW: bridge/gtkb-wi4396-dispatch-suppression-routing-001.md
 
 Document: gtkb-wi3439-requirement-sufficiency-presence-check
+NEW: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-007.md
+GO: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-006.md
+REVISED: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-005.md
+NO-GO: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-004.md
+NEW: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-003.md
 GO: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-002.md
 NEW: bridge/gtkb-wi3439-requirement-sufficiency-presence-check-001.md
 
@@ -25,12 +36,16 @@ GO: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-002.md
 NEW: bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-001.md
 
 Document: gtkb-tafe-shadow-index-reconciliation
+VERIFIED: bridge/gtkb-tafe-shadow-index-reconciliation-006.md
+NEW: bridge/gtkb-tafe-shadow-index-reconciliation-005.md
 GO: bridge/gtkb-tafe-shadow-index-reconciliation-004.md
 REVISED: bridge/gtkb-tafe-shadow-index-reconciliation-003.md
 NO-GO: bridge/gtkb-tafe-shadow-index-reconciliation-002.md
 NEW: bridge/gtkb-tafe-shadow-index-reconciliation-001.md
 
 Document: gtkb-wi4540-per-session-role-marker-context-envelope
+VERIFIED: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-006.md
+NEW: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-005.md
 GO: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-004.md
 REVISED: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md
 GO: bridge/gtkb-wi4540-per-session-role-marker-context-envelope-002.md

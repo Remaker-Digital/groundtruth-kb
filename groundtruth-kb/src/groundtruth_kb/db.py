@@ -39,17 +39,33 @@ if TYPE_CHECKING:
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
 
+
 # ChromaDB optional dependency (ignore_missing_imports configured in pyproject.toml).
 # Availability is resolved cheaply at import time via find_spec, which locates the
 # module spec WITHOUT executing the package (~17ms vs. chromadb's ~6s import chain).
 # The chromadb module itself is imported lazily on first semantic-search use via
 # _load_chromadb(), so `import groundtruth_kb` stays fast for hooks and the CLI.
-try:
-    import sys
+def _compute_has_chromadb() -> bool:
+    """Return True when the chromadb module spec can be located.
 
-    HAS_CHROMADB = importlib.util.find_spec("chromadb") is not None and sys.version_info < (3, 14)
-except (ImportError, ValueError):
-    HAS_CHROMADB = False
+    Availability is gated solely on whether ``chromadb`` is importable, resolved
+    cheaply via ``find_spec`` (no package execution). WI-4561 removed the stale
+    static Python-version ceiling (a ``sys.version_info`` upper-bound comparison
+    against 3.14): it force-disabled an installed, functional chromadb on Python
+    3.14 even though chromadb 1.5.9 embeds and queries correctly on that
+    interpreter. Genuine
+    import breakage on any current or future interpreter remains handled at
+    lazy-import time by ``_load_chromadb()``, which flips ``HAS_CHROMADB`` to
+    False on ``ImportError`` and falls back to SQLite LIKE search — so removing
+    the version ceiling preserves graceful degradation.
+    """
+    try:
+        return importlib.util.find_spec("chromadb") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+HAS_CHROMADB = _compute_has_chromadb()
 
 chromadb = None  # type: ignore[assignment]  # populated lazily by _load_chromadb()
 
