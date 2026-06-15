@@ -6564,3 +6564,83 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-16T06:11:51.227066Z
   answer: "User has answered your questions: \"The working tree holds multiple parallel sessions' uncommitted work (2 pre-staged files, ~19 modified files, INDEX.md mixing my 2 edits with 4 others). A clean commit of ONLY my cleanup isn't possible - git can't partial-stage a shared file. How should I handle the commit?\"=\"Checkpoint uncommitted (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+
+- id: DECISION-0642
+  asked_at: 2026-05-16T14:23:10.226876Z
+  question: "The Codex / Loyal Opposition harness is temporarily unavailable. How should I operate while it is down?"
+  options:
+    - "Session-scoped dual-role"
+    - "Durable single-harness migration"
+    - "Pause bridge-gated work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 945282e34120362d
+  resolved_at: 2026-05-16T14:23:10.226876Z
+  answer: "User has answered your questions: \"The Codex / Loyal Opposition harness is temporarily unavailable. How should I operate while it is down?\"=\"Durable single-harness migration\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0643
+  asked_at: 2026-05-16T14:23:10.226876Z
+  question: "A durable single-harness topology-record migration is not reachable through supported GT-KB tooling while Codex is still an installed harness. How should I proceed?"
+  options:
+    - "Stand-alone, records intact"
+    - "Force the topology records"
+    - "Pause bridge-gated work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b21f25dc8532fd4f
+  resolved_at: 2026-05-16T14:23:10.226876Z
+  answer: "User has answered your questions: \"A durable single-harness topology-record migration is not reachable through supported GT-KB tooling while Codex is still an installed harness. How should I proceed?\"=\"Stand-alone, records intact\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0644
+  asked_at: 2026-05-16T14:46:57.853917Z
+  question: "Triage shows only 6 of 45 NO-GO threads are clean GO candidates; 12 are duplicates/superseded (a GO would re-introduce closed work), 21 need substantive rework (many dependency-blocked), 6 are advisories. How should I focus the effort?"
+  options:
+    - "Mechanical wins, then checkpoint"
+    - "Mechanical + tractable substantive"
+    - "Only the 6 mechanical"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ebabe2f832af0a8a
+  resolved_at: 2026-05-16T14:46:57.853917Z
+  answer: "User has answered your questions: \"Triage shows only 6 of 45 NO-GO threads are clean GO candidates; 12 are duplicates/superseded (a GO would re-introduce closed work), 21 need substantive rework (many dependency-blocked), 6 are advisories. How should I focus the effort?\"=\"Mechanical wins, then checkpoint\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0645
+  asked_at: 2026-05-16T14:46:57.853917Z
+  question: "A dispatched Codex worker independently reviewed and GO'd my REVISED proposal, so Codex bridge review is functional despite the reported outage. How should I handle the remaining ~21 NO-GO threads?"
+  options:
+    - "Normal flow — let Codex review"
+    - "Continue self-authoring verdicts"
+    - "Pause for Codex-status clarification"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 89f5333ca8947f0a
+  resolved_at: 2026-05-16T14:46:57.853917Z
+  answer: "User has answered your questions: \"A dispatched Codex worker independently reviewed and GO'd my REVISED proposal, so Codex bridge review is functional despite the reported outage. How should I handle the remaining ~21 NO-GO threads?\"=\"Pause for Codex-status clarification\". You can now continue with the user's answers in mind."
+  notes: ""
+
+- id: DECISION-0646
+  asked_at: 2026-05-16T15:35:51.684743Z
+  question: "Amendment: \"all 3 harnesses active; any harness may take either LO or PB role at any time.\" What is the exact role invariant the mechanism must enforce?"
+  options:
+    - "Single PB, freely reassignable"
+    - "Allow a harness to hold both roles"
+    - "Free reassignment, no enforced invariant"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 848a301ca6608a5e
+  resolved_at: 2026-05-16T15:35:51.684743Z
+  answer: "User has answered your questions: \"Amendment: \"all 3 harnesses active; any harness may take either LO or PB role at any time.\" What is the exact role invariant the mechanism must enforce?\"=\"Single PB, freely reassignable\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0647
+  asked_at: 2026-05-16T16:05:13.402603Z
+  question: "WI-3337's proposal is GO'd by an independent dispatched Codex review. What should I do next?"
+  options:
+    - "Implement WI-3337 now"
+    - "File the rest of sub-project A first"
+    - "Pause — resolve Codex posture first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 96066daa0c061379
+  resolved_at: 2026-05-16T16:05:13.402603Z
+  answer: "User has answered your questions: \"WI-3337's proposal is GO'd by an independent dispatched Codex review. What should I do next?\"=\"Implement WI-3337 now\". You can now continue with the user's answers in mind."
+  notes: ""

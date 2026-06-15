@@ -1527,6 +1527,63 @@ def flow_regen_verify_cmd(
         raise SystemExit(1)
 
 
+@flow_group.command("publish-reconcile")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_publish_reconcile_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Reconcile the generated bridge INDEX with the authoritative TAFE shadow (WI-4510 Phase 3).
+
+    Under tafe_canonical authority this is the publish-reconcile recovery surface
+    for the cross-store fail-closed write contract: it compares the live
+    bridge/INDEX.md to the authoritative shadow and heals a bounded TAFE-ahead
+    split by republishing the INDEX from the append-only shadow (lossless and
+    idempotent — a second run is a no-op). An INDEX-ahead state (the live INDEX
+    carries a thread or version the shadow never recorded) is NOT auto-applied: it
+    is quarantined and reported as a repair-required defect (exit non-zero). A
+    no-op when the stores are already in sync. Honors DCL-INDEX-GENERATED-VIEW-001
+    #10/#11 and GOV-FILE-BRIDGE-AUTHORITY-001 (bridge/INDEX.md remains the
+    canonical read surface).
+    """
+    import sys as _sys
+
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root)
+    scripts_dir = str(project_root / "scripts")
+    if scripts_dir not in _sys.path:
+        _sys.path.insert(0, scripts_dir)
+    try:
+        import bridge_index_writer  # noqa: PLC0415 - lazy, project-root-relative import
+    except ImportError as exc:  # pragma: no cover - defensive
+        raise click.ClickException(f"cannot load serialized bridge INDEX writer: {exc}") from exc
+
+    result = bridge_index_writer.reconcile_publish(project_root)
+    state = result["state"]
+    repaired = bool(result["repaired"])
+    if state == "in_sync":
+        summary = "flow publish-reconcile: in sync; bridge/INDEX.md is a faithful view of the TAFE shadow."
+    elif state == "tafe_ahead":
+        summary = (
+            "flow publish-reconcile: TAFE-ahead split healed; bridge/INDEX.md republished from the shadow."
+            if repaired
+            else "flow publish-reconcile: TAFE-ahead split detected but not repaired."
+        )
+    else:  # index_ahead
+        summary = (
+            "flow publish-reconcile: INDEX-ahead contamination quarantined (NOT auto-applied); "
+            "the live bridge/INDEX.md carries content the authoritative shadow never recorded — resolve it."
+        )
+    payload: dict[str, Any] = {
+        "command": "flow publish-reconcile",
+        "status": state,
+        "mutated": repaired,
+        "summary": summary,
+        **result,
+    }
+    _emit_cli_payload(payload, json_output=json_output)
+    if state == "index_ahead":
+        raise SystemExit(1)
+
+
 @flow_group.command("pilot")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 def flow_pilot_cmd(json_output: bool) -> None:

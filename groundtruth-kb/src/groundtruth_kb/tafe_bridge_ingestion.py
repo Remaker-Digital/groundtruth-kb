@@ -47,20 +47,32 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from groundtruth_kb.tafe_index_sync import DocumentBlock, IndexVersionLine, parse_bridge_index
 from groundtruth_kb.typed_artifact_flow import TypedArtifactFlowService
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from groundtruth_kb.db import KnowledgeDB
+
 __all__ = [
     "ArtifactResult",
     "IngestionResult",
+    "PublishReconcileVerdict",
     "ThreadResult",
+    "assess_publish_state",
+    "build_prospective_shadow",
     "compute_thread_fingerprint",
     "derive_bridge_kind",
     "derive_flow_status",
     "ingest_bridge_index",
+    "make_archived_extra_oracle",
+    "open_flow_service",
+    "plan_bridge_thread_writes",
+    "planned_to_db_kwargs",
 ]
 
 #: The seeded flow_definition every bridge thread maps to (ADR D1).
@@ -419,3 +431,265 @@ def ingest_bridge_index(
         threads_skipped=skipped,
         results=results,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WI-4510 Phase 3 — tafe_canonical authoritative write path helpers
+#
+# These functions support the cross-store fail-closed publish contract
+# (``bridge/gtkb-wi4510-phase-3-authority-flip-003.md``, Loyal Opposition GO at
+# ``-004``; ``ADR-TAFE-AUTHORITATIVE-BRIDGE-STATE-001``;
+# ``DCL-INDEX-GENERATED-VIEW-001``). They are consumed by the
+# ``atomic_index_update`` ``tafe_canonical`` branch in
+# ``scripts/bridge_index_writer.py`` and by the publish-reconcile entry points
+# (``gt flow publish-reconcile`` / ``scripts/bridge_authority_cutover.py
+# reconcile``). They are deliberately I/O-light: ``open_flow_service`` opens the
+# canonical shadow DB, but the plan/project/assess functions take already-read
+# rows + text so they stay unit-testable without the filesystem.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def plan_bridge_thread_writes(intended_text: str, service: TypedArtifactFlowService) -> list[ThreadResult]:
+    """Plan the shadow writes that make the TAFE shadow reflect ``intended_text``.
+
+    Runs the existing read-only ingestion planner (``apply=False``) and returns
+    only the threads that would actually append a row — a new/updated
+    ``flow_instance`` version or at least one not-yet-present ``flow_artifact``.
+    Fingerprint-unchanged threads (the common case for an unrelated thread in the
+    full INDEX) are filtered out, so a single status write yields a single
+    changed thread.
+    """
+    plan = ingest_bridge_index(intended_text, service, apply=False)
+    return [result for result in plan.results if result.instance_written or result.artifacts_written > 0]
+
+
+def planned_to_db_kwargs(
+    planned: Sequence[ThreadResult],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Convert planned threads into ``insert_bridge_thread_atomic`` kwarg dicts.
+
+    Produces ``(planned_instances, planned_artifacts)`` whose dicts (minus
+    ``changed_by`` / ``change_reason``, supplied by the atomic helper) match the
+    exact ``create_flow_instance`` / ``link_flow_artifact`` shape used by
+    :func:`_apply_thread`, so an atomic commit produces byte-identical rows to the
+    per-row apply path — only in one transaction.
+    """
+    planned_instances: list[dict[str, Any]] = []
+    planned_artifacts: list[dict[str, Any]] = []
+    for thread in planned:
+        if thread.instance_written:
+            planned_instances.append(
+                {
+                    "id": thread.flow_instance_id,
+                    "flow_definition_id": FLOW_DEFINITION_ID,
+                    "subject_type": SUBJECT_TYPE,
+                    "subject_id": thread.slug,
+                    "status": thread.flow_status,
+                    "metadata": {
+                        "bridge_kind": thread.bridge_kind,
+                        "ingest_fingerprint": thread.fingerprint,
+                        "shadow": True,
+                        "source": "bridge_index_second_write",
+                    },
+                }
+            )
+        for artifact in thread.artifacts:
+            if artifact.existed:
+                continue
+            planned_artifacts.append(
+                {
+                    "id": artifact.artifact_id,
+                    "flow_instance_id": thread.flow_instance_id,
+                    "artifact_type": ARTIFACT_TYPE,
+                    "artifact_ref": artifact.artifact_ref,
+                    "relationship": ARTIFACT_RELATIONSHIP,
+                    "metadata": {"status_token": artifact.status_token},
+                }
+            )
+    return planned_instances, planned_artifacts
+
+
+def build_prospective_shadow(
+    service: TypedArtifactFlowService,
+    planned: Sequence[ThreadResult],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Project the post-write shadow in memory (no DB write).
+
+    Overlays the planned rows on the current ``flow_instances`` /
+    ``flow_artifacts`` to produce the row sequences the byte-faithful generator
+    would render after the write. Only the fields the generator reads are
+    populated for synthetic rows (``subject_type`` / ``subject_id`` / ``id`` for
+    instances; ``artifact_type`` / ``flow_instance_id`` / ``artifact_ref`` /
+    ``metadata_parsed.status_token`` for artifacts). Existing instances keep their
+    rendered identity, so an ``updated`` thread (status change) needs only its new
+    artifact appended; a ``created`` thread also gets a synthetic instance row.
+    """
+    instances: list[dict[str, Any]] = [dict(row) for row in service.list_flow_instances()]
+    artifacts: list[dict[str, Any]] = [dict(row) for row in service.list_flow_artifacts(artifact_type=ARTIFACT_TYPE)]
+    known_instance_ids = {str(row.get("id")) for row in instances}
+    for thread in planned:
+        if thread.instance_action == "created" and thread.flow_instance_id not in known_instance_ids:
+            instances.append(
+                {
+                    "id": thread.flow_instance_id,
+                    "subject_type": SUBJECT_TYPE,
+                    "subject_id": thread.slug,
+                    "status": thread.flow_status,
+                    "metadata_parsed": {
+                        "bridge_kind": thread.bridge_kind,
+                        "ingest_fingerprint": thread.fingerprint,
+                        "shadow": True,
+                        "source": "bridge_index_second_write",
+                    },
+                }
+            )
+            known_instance_ids.add(thread.flow_instance_id)
+        for artifact in thread.artifacts:
+            if artifact.existed:
+                continue
+            artifacts.append(
+                {
+                    "artifact_type": ARTIFACT_TYPE,
+                    "flow_instance_id": thread.flow_instance_id,
+                    "artifact_ref": artifact.artifact_ref,
+                    "relationship": ARTIFACT_RELATIONSHIP,
+                    "metadata_parsed": {"status_token": artifact.status_token},
+                }
+            )
+    return instances, artifacts
+
+
+@dataclass(frozen=True)
+class PublishReconcileVerdict:
+    """Direction-aware assessment of live INDEX vs the authoritative TAFE shadow.
+
+    ``state`` is one of:
+
+    - ``in_sync`` — the live INDEX is a byte-faithful generated view of the shadow
+      (only terminal-archived residue tolerated); nothing to do.
+    - ``tafe_ahead`` — the shadow carries an authoritative write the published
+      INDEX does not yet reflect (the bounded F1 commit→publish window, or a
+      crashed prior writer). Losslessly repairable by republishing INDEX from the
+      append-only shadow.
+    - ``index_ahead`` — the live INDEX shows a thread or version the authoritative
+      shadow never recorded (chokepoint-bypassing contamination). MUST be
+      quarantined (never auto-ingested into authority); surfaced as a
+      repair-required defect.
+
+    ``DCL-INDEX-GENERATED-VIEW-001`` #9 / #10 / #11.
+    """
+
+    state: str
+    regen_verify: Any  # RegenVerifyResult (typed loosely to avoid a generator import cycle)
+
+    @property
+    def in_sync(self) -> bool:
+        return self.state == "in_sync"
+
+    @property
+    def needs_republish(self) -> bool:
+        """True for ``tafe_ahead``: repair by republishing INDEX from the shadow."""
+        return self.state == "tafe_ahead"
+
+    @property
+    def index_ahead(self) -> bool:
+        """True for ``index_ahead``: quarantine; never auto-apply into authority."""
+        return self.state == "index_ahead"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"state": self.state, "regen_verify": self.regen_verify.as_dict()}
+
+
+def assess_publish_state(
+    index_text: str,
+    flow_instances: Sequence[Mapping[str, Any]],
+    flow_artifacts: Sequence[Mapping[str, Any]],
+    *,
+    header: str = "",
+    is_archived_extra: Callable[[str], bool] | None = None,
+) -> PublishReconcileVerdict:
+    """Compare the live INDEX text to the shadow render and classify the split.
+
+    Pure (no I/O, no subprocess, no mutation): it renders the shadow via the
+    byte-faithful generator and runs :func:`verify_against_index`, then classifies
+    the *direction* of any divergence so the caller knows whether to republish
+    (TAFE-ahead, lossless) or quarantine (INDEX-ahead, unrecoverable).
+
+    INDEX-ahead is detected both at block granularity (``missing_in_generated`` —
+    a whole thread present in the INDEX but absent from the shadow) and at version
+    granularity (a shared thread whose INDEX version-line set contains a line the
+    regenerated set lacks). Everything else non-equal is TAFE-ahead. ``is_archived_extra``
+    is threaded so legitimately-trimmed terminal-archived residue does not gate
+    (matching ``gt flow regen-verify``); when ``None`` the underlying verify
+    fail-safe gates all extras.
+    """
+    # Local import avoids the generator<->ingestion module import cycle
+    # (tafe_index_generator imports ARTIFACT_TYPE/SUBJECT_TYPE from this module).
+    from groundtruth_kb.tafe_index_generator import verify_against_index
+
+    result = verify_against_index(
+        index_text,
+        flow_instances,
+        flow_artifacts,
+        header=header,
+        is_archived_extra=is_archived_extra,
+    )
+
+    if result.semantic_equal:
+        return PublishReconcileVerdict(state="in_sync", regen_verify=result)
+
+    index_ahead = bool(result.missing_in_generated)
+    if not index_ahead:
+        for mismatch in result.version_line_mismatches:
+            index_versions = {tuple(line) for line in mismatch.get("index_version_lines", [])}
+            generated_versions = {tuple(line) for line in mismatch.get("generated_version_lines", [])}
+            if index_versions - generated_versions:
+                # The INDEX carries a version line the authoritative shadow lacks.
+                index_ahead = True
+                break
+
+    return PublishReconcileVerdict(state="index_ahead" if index_ahead else "tafe_ahead", regen_verify=result)
+
+
+def make_archived_extra_oracle(project_root: str | Path) -> Callable[[str], bool]:
+    """Build the terminal-archived-extra classifier used by the regen verify.
+
+    Mirrors ``gt flow regen-verify``'s wiring of the shared on-disk oracle
+    (``DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001``): a shadow-only thread is
+    tolerated (ungated) when the completeness oracle classifies it terminal-
+    archived, or when it is owner-acknowledged. A slug with no on-disk file is
+    absent from ``expected_docs`` (so the ``slug in expected`` guard is load-bearing)
+    but is still honored via the ``acknowledged`` fallback.
+    """
+    from groundtruth_kb.tafe_index_completeness import (
+        _candidate_is_archived,
+        _load_acknowledged_slugs,
+        scan_expected_documents,
+    )
+
+    root = Path(project_root)
+    expected = scan_expected_documents(root)
+    acknowledged = _load_acknowledged_slugs(root)
+
+    def is_archived_extra(slug: str) -> bool:
+        if slug in expected and _candidate_is_archived(slug, expected, acknowledged, root):
+            return True
+        return slug in acknowledged
+
+    return is_archived_extra
+
+
+def open_flow_service(project_root: str | Path) -> tuple[KnowledgeDB, TypedArtifactFlowService]:
+    """Open the canonical TAFE shadow DB + service for ``project_root``.
+
+    Returns ``(db, service)``; the caller owns ``db.close()``. The canonical
+    MemBase is ``<project_root>/groundtruth.db`` (the same store the read-only
+    ``gt flow`` commands open). No governance gate registry is wired: the
+    ``flow_instances`` / ``flow_artifacts`` tables are not a gated artifact class,
+    and the ``tafe_canonical`` write path is the bridge-state authority, not a
+    spec/governance mutation.
+    """
+    from groundtruth_kb.db import KnowledgeDB
+
+    db = KnowledgeDB(db_path=Path(project_root) / "groundtruth.db")
+    return db, TypedArtifactFlowService(db)

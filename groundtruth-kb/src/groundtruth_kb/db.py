@@ -5409,6 +5409,55 @@ class KnowledgeDB:
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Append a versioned TAFE flow-instance row."""
+        instance_id = self._insert_flow_instance_row(
+            id,
+            flow_definition_id,
+            subject_type,
+            subject_id,
+            changed_by,
+            change_reason,
+            flow_definition_version=flow_definition_version,
+            flow_type=flow_type,
+            status=status,
+            current_stage_instance_id=current_stage_instance_id,
+            started_at=started_at,
+            completed_at=completed_at,
+            metadata=metadata,
+        )
+        self._get_conn().commit()
+        return self.get_flow_instance(instance_id)
+
+    def _insert_flow_instance_row(
+        self,
+        id: str,
+        flow_definition_id: str,
+        subject_type: str,
+        subject_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        flow_definition_version: int | None = None,
+        flow_type: str | None = None,
+        status: str = "created",
+        current_stage_instance_id: str | None = None,
+        started_at: str | None = None,
+        completed_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """No-commit core for the flow-instance INSERT (transaction-composable).
+
+        Executes the append on the shared connection WITHOUT calling
+        ``conn.commit()``, so it can be composed inside the single
+        ``BEGIN IMMEDIATE … COMMIT`` of :meth:`insert_bridge_thread_atomic`. The
+        public :meth:`insert_flow_instance` wraps this core with a commit, so its
+        single-commit behavior is preserved byte-for-byte for every existing
+        caller. Returns the inserted instance id.
+
+        WI-4510 Phase 3 (``DCL-INDEX-GENERATED-VIEW-001`` #7): the
+        ``tafe_canonical`` write path must persist the affected ``flow_instance``
+        row and all its ``flow_artifacts`` rows in exactly one DB transaction; the
+        per-row self-committing public methods must not be used on that path.
+        """
         instance_id = _require_text("flow instance id", id)
         definition_id = _require_text("flow_definition_id", flow_definition_id)
         definition = self.get_flow_definition(definition_id)
@@ -5442,8 +5491,49 @@ class KnowledgeDB:
                 _require_text("change_reason", change_reason),
             ),
         )
-        conn.commit()
-        return self.get_flow_instance(instance_id)
+        return instance_id
+
+    def insert_bridge_thread_atomic(
+        self,
+        planned_instances: list[dict[str, Any]],
+        planned_artifacts: list[dict[str, Any]],
+        *,
+        changed_by: str,
+        change_reason: str,
+    ) -> None:
+        """Persist a bridge thread's shadow rows for ONE authoritative write atomically.
+
+        Writes every planned ``flow_instances`` version and every planned
+        ``flow_artifacts`` row for a single authoritative ``tafe_canonical`` bridge
+        write inside one ``BEGIN IMMEDIATE … COMMIT`` transaction, fixing the
+        independent-commit hazard where ``insert_flow_instance`` /
+        ``insert_flow_artifact`` each commit separately (a crash between them could
+        leave a half-written thread). Instances are inserted before artifacts so an
+        artifact's instance-existence check passes within the same uncommitted
+        transaction.
+
+        ``planned_instances`` / ``planned_artifacts`` are lists of keyword-argument
+        dicts for the no-commit cores (without ``changed_by`` / ``change_reason``,
+        which are supplied uniformly here). The lists are usually length 1 / N for a
+        single status write; an empty pair is a no-op. On any exception the whole
+        transaction is rolled back and re-raised, so a divergent or interrupted
+        write leaves zero rows from the attempt.
+
+        WI-4510 Phase 3; ``DCL-INDEX-GENERATED-VIEW-001`` #7 (single DB commit) and
+        the atomicity regression. Mirrors the ``BEGIN IMMEDIATE`` idiom already used
+        by the stage-lease methods.
+        """
+        conn = self._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for instance_kwargs in planned_instances:
+                self._insert_flow_instance_row(changed_by=changed_by, change_reason=change_reason, **instance_kwargs)
+            for artifact_kwargs in planned_artifacts:
+                self._insert_flow_artifact_row(changed_by=changed_by, change_reason=change_reason, **artifact_kwargs)
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
 
     def get_flow_instance(self, instance_id: str) -> dict[str, Any] | None:
         """Return the current version of a TAFE flow instance."""
@@ -6383,6 +6473,46 @@ class KnowledgeDB:
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Insert an append-only TAFE flow-artifact reference row."""
+        artifact_id = self._insert_flow_artifact_row(
+            id,
+            flow_instance_id,
+            artifact_type,
+            artifact_ref,
+            changed_by,
+            change_reason,
+            stage_instance_id=stage_instance_id,
+            relationship=relationship,
+            status=status,
+            metadata=metadata,
+        )
+        self._get_conn().commit()
+        return self.get_flow_artifact(artifact_id)
+
+    def _insert_flow_artifact_row(
+        self,
+        id: str,
+        flow_instance_id: str,
+        artifact_type: str,
+        artifact_ref: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        stage_instance_id: str | None = None,
+        relationship: str = "related",
+        status: str = "active",
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """No-commit core for the flow-artifact INSERT (transaction-composable).
+
+        Executes the append on the shared connection WITHOUT calling
+        ``conn.commit()`` so it composes inside :meth:`insert_bridge_thread_atomic`'s
+        single transaction. The public :meth:`insert_flow_artifact` wraps it with a
+        commit, preserving its exact single-commit behavior for every existing
+        caller. Returns the inserted artifact id. The ``flow_instance`` existence
+        check reads the shared connection, so an instance inserted earlier in the
+        same uncommitted transaction is visible. WI-4510 Phase 3
+        (``DCL-INDEX-GENERATED-VIEW-001`` #7).
+        """
         artifact_id = _require_text("flow artifact id", id)
         instance_id = _require_text("flow_instance_id", flow_instance_id)
         if self.get_flow_instance(instance_id) is None:
@@ -6409,8 +6539,7 @@ class KnowledgeDB:
                 _require_text("change_reason", change_reason),
             ),
         )
-        conn.commit()
-        return self.get_flow_artifact(artifact_id)
+        return artifact_id
 
     def get_flow_artifact(self, artifact_id: str) -> dict[str, Any] | None:
         """Return one TAFE flow-artifact reference by ID."""

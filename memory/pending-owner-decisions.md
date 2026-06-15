@@ -128,84 +128,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0642
-  asked_at: 2026-05-16T14:23:10.226876Z
-  question: "The Codex / Loyal Opposition harness is temporarily unavailable. How should I operate while it is down?"
-  options:
-    - "Session-scoped dual-role"
-    - "Durable single-harness migration"
-    - "Pause bridge-gated work"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 945282e34120362d
-  resolved_at: 2026-05-16T14:23:10.226876Z
-  answer: "User has answered your questions: \"The Codex / Loyal Opposition harness is temporarily unavailable. How should I operate while it is down?\"=\"Durable single-harness migration\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0643
-  asked_at: 2026-05-16T14:23:10.226876Z
-  question: "A durable single-harness topology-record migration is not reachable through supported GT-KB tooling while Codex is still an installed harness. How should I proceed?"
-  options:
-    - "Stand-alone, records intact"
-    - "Force the topology records"
-    - "Pause bridge-gated work"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b21f25dc8532fd4f
-  resolved_at: 2026-05-16T14:23:10.226876Z
-  answer: "User has answered your questions: \"A durable single-harness topology-record migration is not reachable through supported GT-KB tooling while Codex is still an installed harness. How should I proceed?\"=\"Stand-alone, records intact\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0644
-  asked_at: 2026-05-16T14:46:57.853917Z
-  question: "Triage shows only 6 of 45 NO-GO threads are clean GO candidates; 12 are duplicates/superseded (a GO would re-introduce closed work), 21 need substantive rework (many dependency-blocked), 6 are advisories. How should I focus the effort?"
-  options:
-    - "Mechanical wins, then checkpoint"
-    - "Mechanical + tractable substantive"
-    - "Only the 6 mechanical"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ebabe2f832af0a8a
-  resolved_at: 2026-05-16T14:46:57.853917Z
-  answer: "User has answered your questions: \"Triage shows only 6 of 45 NO-GO threads are clean GO candidates; 12 are duplicates/superseded (a GO would re-introduce closed work), 21 need substantive rework (many dependency-blocked), 6 are advisories. How should I focus the effort?\"=\"Mechanical wins, then checkpoint\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0645
-  asked_at: 2026-05-16T14:46:57.853917Z
-  question: "A dispatched Codex worker independently reviewed and GO'd my REVISED proposal, so Codex bridge review is functional despite the reported outage. How should I handle the remaining ~21 NO-GO threads?"
-  options:
-    - "Normal flow — let Codex review"
-    - "Continue self-authoring verdicts"
-    - "Pause for Codex-status clarification"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 89f5333ca8947f0a
-  resolved_at: 2026-05-16T14:46:57.853917Z
-  answer: "User has answered your questions: \"A dispatched Codex worker independently reviewed and GO'd my REVISED proposal, so Codex bridge review is functional despite the reported outage. How should I handle the remaining ~21 NO-GO threads?\"=\"Pause for Codex-status clarification\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0646
-  asked_at: 2026-05-16T15:35:51.684743Z
-  question: "Amendment: \"all 3 harnesses active; any harness may take either LO or PB role at any time.\" What is the exact role invariant the mechanism must enforce?"
-  options:
-    - "Single PB, freely reassignable"
-    - "Allow a harness to hold both roles"
-    - "Free reassignment, no enforced invariant"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 848a301ca6608a5e
-  resolved_at: 2026-05-16T15:35:51.684743Z
-  answer: "User has answered your questions: \"Amendment: \"all 3 harnesses active; any harness may take either LO or PB role at any time.\" What is the exact role invariant the mechanism must enforce?\"=\"Single PB, freely reassignable\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0647
-  asked_at: 2026-05-16T16:05:13.402603Z
-  question: "WI-3337's proposal is GO'd by an independent dispatched Codex review. What should I do next?"
-  options:
-    - "Implement WI-3337 now"
-    - "File the rest of sub-project A first"
-    - "Pause — resolve Codex posture first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 96066daa0c061379
-  resolved_at: 2026-05-16T16:05:13.402603Z
-  answer: "User has answered your questions: \"WI-3337's proposal is GO'd by an independent dispatched Codex review. What should I do next?\"=\"Implement WI-3337 now\". You can now continue with the user's answers in mind."
-  notes: ""
 - id: DECISION-0648
   asked_at: 2026-05-16T19:10:55.164152Z
   question: "WI-3339's lifecycle FSM implements REQ-HARNESS-REGISTRY-001 FR2 as the literal four-edge graph (registered→active, active⇄suspended, suspended→retired) with no direct active→retired edge. Before WI-3340 finalizes the `gt harness retire` verb, how should retiring an *active* harness behave?"
@@ -7735,6 +7657,45 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: af65cecb01df134f
   resolved_at: 2026-06-15T03:21:14.983648Z
   answer: "Your questions have been answered: \"WI-4510 Phases 0-2 are implemented (by co-driving session 39c8c5) and I've independently verified them GREEN: 15/15 tests pass, ruff clean, Phase-0 cutover-evidence ok=True, regen-verify CLI wired. But 39c8c5 holds a go_implementation claim that MISSED its implementation deadline (02:23:39Z, no extension) and is in grace until 02:33:39Z (~7 min). The thread is one impl report (-007) from Codex VERIFIED. Protocol bars me from forcing an active claim without your call. How should I proceed?\"=\"Wait for lapse, then file\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1267
+  asked_at: 2026-06-15T13:26:13.054492Z
+  question: "Codex GO'd the Phase-3 design (-004). The now-authorized work is the large, default-OFF switch implementation (~9 files incl. a high-risk hot db.py transaction refactor); the irreversible flip stays gate-2. How should I pace the Phase-3 implementation?"
+  options:
+    - "Hold for a dedicated session"
+    - "Begin lowest-risk slice now"
+    - "Begin full implementation now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a97114b42e88bae5
+  resolved_at: 2026-06-15T13:26:13.054492Z
+  answer: "Your questions have been answered: \"Codex GO'd the Phase-3 design (-004). The now-authorized work is the large, default-OFF switch implementation (~9 files incl. a high-risk hot db.py transaction refactor); the irreversible flip stays gate-2. How should I pace the Phase-3 implementation?\"=\"Begin lowest-risk slice now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1268
+  asked_at: 2026-06-15T14:49:11.547069Z
+  question: "WI-4510 Phase-3's default-OFF code is now VERIFIED (-008) and WI-4510 remains open, pending the irreversible TAFE-authoritative flip. The bridge dispatcher is OFF (a favorable, swarm-quiesced execution window). How do you want to proceed?"
+  options:
+    - "Proceed to gate-2 now"
+    - "Checkpoint the code first"
+    - "Hold"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1c5fa1b6491b69c4
+  resolved_at: 2026-06-15T14:49:11.547069Z
+  answer: "Your questions have been answered: \"WI-4510 Phase-3's default-OFF code is now VERIFIED (-008) and WI-4510 remains open, pending the irreversible TAFE-authoritative flip. The bridge dispatcher is OFF (a favorable, swarm-quiesced execution window). How do you want to proceed?\"=\"Proceed to gate-2 now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1269
+  asked_at: 2026-06-15T14:49:11.547069Z
+  question: "Approve amending GOV-FILE-BRIDGE-AUTHORITY-001 v1 → v2 (shown above): the authoritative source for bridge queue state becomes the TAFE shadow, and bridge/INDEX.md becomes a byte-faithful generated view — with the re-read-live-INDEX read-discipline and the LO permanent bridge-repair authority preserved verbatim? On approval I create the formal-artifact-approval packet and record v2 via the governed spec service."
+  options:
+    - "Approve GOV v2"
+    - "Reject"
+    - "Modify wording"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7499759d0d9f327e
+  resolved_at: 2026-06-15T14:49:11.547069Z
+  answer: "PreToolUse:AskUserQuestion hook error: [python .claude/hooks/bridge-compliance-gate.py]: C:\\Python314\\python.exe: can't open file 'E:\\\\GT-KB\\\\groundtruth-kb\\\\.claude\\\\hooks\\\\bridge-compliance-gate.py': [Errno 2] No such file or directory"
   notes: ""
 
 ## History

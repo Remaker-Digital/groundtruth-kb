@@ -7,15 +7,205 @@ author_model_configuration: Claude Code interactive Prime Builder session c2f8c2
 
 # Handoff — Drive TAFE to Governed Cutover (WI-4510)
 
-**Updated:** 2026-06-15 ~07:30Z by autonomous Prime session `c50a9788` (harness B, Opus 4.8).
-**State:** **Phases 0-2 VERIFIED** (`bridge/gtkb-wi4510-tafe-authoritative-cutover-008.md`) and
-**WI-4574 VERIFIED + auto-resolved**. Owner authorized **"Commit verified baseline, then Phase 3."**
-Baseline swept into local commit **`760de9746`** (55 files; NOT pushed; all 4 pre-commit gates green;
-199 staged tests pass). **WI-4510 is still `open`** (reconciler left it open — `-008` verified only the
-Phases-0-2 *partial* scope per the report's explicit Phase-3-excluded text). **Phase 3 (the irreversible
-flip) PROPOSAL FILED** on a dedicated thread `gtkb-wi4510-phase-3-authority-flip` (NEW `-001`); both
-preflights GREEN (applicability `sha256:e5644568…`, `missing_required_specs:[]`; clause exit 0, 0
-blocking gaps). **Awaiting MANUAL Codex review** (dispatcher off). After GO → owner gate-2 package.
+**Updated:** 2026-06-15 ~15:50Z by Prime session `11c6b2a8` (harness B, Opus 4.8).
+**State:** ✅ **WI-4510 PHASE-3 CUTOVER COMPLETE — FLIP EXECUTED; WI-4510 RESOLVED.** Switch is now
+`tafe_canonical` (TAFE shadow authoritative; `bridge/INDEX.md` a byte-faithful generated view).
+Default-OFF code VERIFIED at `-008`; gate-2 fully approved + executed interactively. Source is
+**UNCOMMITTED** (no commit requested yet; -007 VERIFIED so the no-commit rule is now satisfied —
+commit is a pending follow-up, INDEX.md to be consolidated deliberately per Codex). Prior state was
+`NEW@-007` awaiting Codex; Codex VERIFIED at `-008`.
+**Boundary (Codex):** the GO does NOT authorize the irreversible flip / GOV amendment / DCL insert /
+PAUTH expansion / `formal_spec_promotion` — all remain gate-2. Codex attached 4 impl conditions (include
+the new failure-injection tests not just the 59 prereqs; show final pre-cutover GREEN
+`cutover-evidence`/`regen-verify`; separate WI-4508 vs WI-4510 closure evidence; GO ≠ flip).
+**Phase-3 implementation STARTED — owner chose lowest-risk slice first (this session):** the default-OFF
+switch surface is implemented + verified (**11 tests pass, ruff clean**) under impl-start packet for
+`gtkb-wi4510-phase-3-authority-flip`:
+- `scripts/bridge_authority_cutover.py` — direction reader (`read_authority_direction`, fail-safe to
+  `index_canonical`) + `freeze_index`/`flip_to_tafe_canonical`/`revert_to_index_canonical` + guarded CLI
+  (`status`/`freeze`/`flip --confirm-irreversible`/`revert`). The deferred chokepoint imports the reader
+  from here (it is in `target_paths`; a standalone reader module would not be).
+- `harness-state/bridge-authority-direction.json` — the switch, default `index_canonical` (behavior-inert).
+- `groundtruth-kb/tests/test_bridge_authority_direction.py` — DCL-INDEX-GENERATED-VIEW-001 #3 (safe default)
+  + #4 (reversibility backstop).
+
+**DEFERRED to a focused follow-on slice** (the risky half): `db.py` `insert_bridge_thread_atomic` +
+no-commit cores (touches the hot `insert_flow_instance`/`insert_flow_artifact` surface), the
+`atomic_index_update` chokepoint authority-branch (`bridge_index_writer.py`; imports
+`read_authority_direction`), the publish-reconcile guard (`tafe_bridge_ingestion.py`), the
+`gt flow publish-reconcile` CLI (`cli.py`), the writer migrations (`gtkb_bridge_writer.py`,
+`bridge/index_mutation.py`, `cli_bridge_index.py`), and `test_tafe_authoritative_write_path.py`
+(failure-injection: the 3 Codex scenarios + atomicity + INDEX-ahead-quarantine + index_canonical
+byte-identity). **NO impl report filed yet** — the single impl report must cover the FULL target_paths +
+the failure-injection tests (Codex condition #2), so it is filed only after the follow-on completes.
+Slice files are UNCOMMITTED (no commit until the full Phase-3 is VERIFIED).
+
+## Turn @ ~15:50Z (session 11c6b2a8): Codex VERIFIED -008; GATE-2 EXECUTED; FLIP DONE; WI-4510 RESOLVED
+
+Codex VERIFIED the default-OFF impl report `-007` at `-008` (thread now terminal VERIFIED). Owner then
+drove the full gate-2 sequence interactively (after a mid-session tooling recovery — see below):
+
+- **Gate-2 step 1 (GOV v2):** owner AUQ "Approve GOV v2" → `GOV-FILE-BRIDGE-AUTHORITY-001 v2` recorded
+  (governance, verified) via `gt spec update` + formal packet; owner decision `DELIB-20263432`.
+  v2 = TAFE-authoritative source; INDEX a byte-faithful generated view; read-discipline + LO repair
+  authority preserved verbatim.
+- **Gate-2 step 2 (DCL):** owner AUQ "Approve DCL" → `DCL-INDEX-GENERATED-VIEW-001` created
+  (design_constraint, specified, 11 assertions) via `gt spec record` + formal packet; `DELIB-20263433`.
+  Gotcha: DCL-* content MUST contain a `## Constraint` (or "constraint statement") section or
+  `gt spec record` errors "DCL-* specs require an explicit constraint section".
+- **Gate-2 step 3 (PAUTH):** owner AUQ "Approve PAUTH" → new bounded authorization
+  `PAUTH-PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE-TAFE-PHASE-3-CUTOVER-EXECUTION-WI-4510` (allows
+  `cutover` + `formal_spec_promotion`, scoped WI-4510) via `gt projects authorize`; `DELIB-20263434`.
+- **FLIP EXECUTED** (owner AUQ "Execute the flip"): pre-flip final re-ingest `gt flow ingest-bridge-index
+  --apply` (3 instances/10 artifacts) → `cutover-evidence ok=True` (348/348, contention-zero) +
+  `regen-verify ok=True` (reformat_only, missing=[], extra_divergent=[]) → `bridge_authority_cutover.py
+  flip --confirm-irreversible`. Frozen backstop: `bridge/.authority-cutover/INDEX.frozen-20260615T154739Z.md`.
+  Switch now `tafe_canonical`. `DELIB-20263435` (execution record). Post-flip smoke CLEAN
+  (status=tafe_canonical; regen-verify ok=True; publish-reconcile in_sync no-op).
+- **WI-4510 RESOLVED** (`gt backlog resolve WI-4510 --owner-approved`; stage=resolved).
+
+**KNOWN POST-CUTOVER CONSEQUENCE (flag + follow-up):** the generated view = render(append-only shadow),
+which has **351 threads vs the live INDEX's 348** (3 terminal-archived: gtkb-wi4572, gtkb-wi4574, sp1).
+The FIRST `tafe_canonical` bridge write will reformat the whole INDEX AND **re-add those 3 archived
+threads** (regen renders all shadow threads). Bigger principle: INDEX archival-trimming
+(`bridge_index_archival`) is now defeated — regen re-adds trimmed threads, so the INDEX grows with
+terminal threads over time unless an archival-aware generator or shadow-retirement policy is added.
+Visible+tolerated in the approved GREEN evidence (extra_archived ungated), so by-design, not a hidden
+defect — but captured as a backlog follow-up. Until the first write, the system is STABLE
+(regen-verify reformat_only / publish-reconcile in_sync; INDEX stays 348-block old-format, shadow
+authoritative).
+
+**TOOLING-RECOVERY LESSON (cost 1 session-blocking incident):** a `cd groundtruth-kb` inside a Bash
+command PERSISTED as the shell cwd; the relative-path PreToolUse hooks (`.claude/hooks/...`) then
+failed to resolve and **fail-closed-blocked every Read/Bash/PowerShell/Edit/Write/AskUserQuestion**
+(deadlock: cwd reset needs a shell command, which is blocked). Recovered after the cwd reset to
+`E:\GT-KB`. RULE: never `cd` into a subdir in a Bash command in this repo — use absolute paths /
+`sys.path.insert`. (Also: the spec-links harvest gotcha from the prior turn still applies.)
+
+**REMAINING FOLLOW-UPS (non-blocking):** (1) commit the now-VERIFIED Phase-3 work (source uncommitted;
+`gtkb-sweep-commit`, INDEX.md consolidated deliberately per Codex) — owner-gated; (2) post-cutover
+INDEX archival/growth policy (backlog WI captured); (3) the first tafe_canonical bridge write will
+apply the one-time reformat + re-add 3 archived threads (can be triggered deliberately or left to the
+next natural write); (4) optional Codex post-hoc review of the executed cutover (dispatcher OFF/manual).
+
+## Turn @ ~14:10Z (session 11c6b2a8): Phase-3 risky-half IMPLEMENTED + impl report -007 filed
+
+Implemented the FULL deferred default-OFF `tafe_canonical` write path under GO `-004` + impl-start
+packet `sha256:780659e8…` (claim rowid 2660/2661). All within `-003` `target_paths`; **uncommitted**;
+live switch still `index_canonical` (`bridge_authority_cutover.py status` confirms). Edits:
+- **`db.py`** (HIGHEST RISK): extracted no-commit cores `_insert_flow_instance_row`/`_insert_flow_artifact_row`;
+  public `insert_flow_instance`/`insert_flow_artifact` delegate to core+commit (byte-for-byte preserved,
+  proven by unchanged 59 prereq tests). Added `insert_bridge_thread_atomic(planned_instances,
+  planned_artifacts,...)` = one `BEGIN IMMEDIATE … COMMIT` (mirrors `acquire_stage_lease` idiom).
+- **`tafe_bridge_ingestion.py`**: `plan_bridge_thread_writes` / `planned_to_db_kwargs` /
+  `build_prospective_shadow` / `assess_publish_state` + `PublishReconcileVerdict` (in_sync/tafe_ahead/
+  index_ahead, INDEX-ahead detected at block AND per-version) / `make_archived_extra_oracle` /
+  `open_flow_service`. All I/O-light (lazy `verify_against_index` import avoids the generator cycle).
+- **`bridge_index_writer.py`**: `atomic_index_update` authority branch (default index_canonical
+  byte-identical; tafe_canonical → `_tafe_canonical_publish`: reconcile-guard → mutate → plan →
+  project → regen → verify-BEFORE-commit → `insert_bridge_thread_atomic` → atomic publish →
+  `_post_publish_self_check`). Added `reconcile_publish` (lock-holding), `_read_authority_direction`
+  (fail-safe), optional `project_root` param, `CrossStorePublishError`. ruff `--fix` modernized 3
+  pre-existing `timezone.utc`→`UTC` (untouched helpers; behavior-preserving).
+- **`cli.py`**: `gt flow publish-reconcile`. **`bridge_authority_cutover.py`**: `reconcile` subcommand.
+- **Writers NOT edited** (gtkb_bridge_writer / index_mutation / cli_bridge_index): all route through
+  `atomic_index_update`, inherit the switch — zero edits (lowest-risk; matches proposal's chokepoint design).
+- **NEW `test_tafe_authoritative_write_path.py`** (13 tests): DCL #6-#11 + Codex's 3 scenarios +
+  atomicity ROLLBACK + index_canonical byte-identity. Failure injection via monkeypatch on the lazy
+  import seams (`plan_bridge_thread_writes`, `_atomic_write`, `_insert_flow_artifact_row`).
+
+**Verification (all GREEN):** 63 passed (new suite + direction + ingestion + generator); 20 (cutover-evidence
++ generator-cli); 36 (new + chokepoint `platform_tests/scripts/test_bridge_index_writer.py` + direction);
+ruff check + format --check clean on all 6 changed .py; py_compile OK. Broad `-k` run: **792 passed, 3
+PRE-EXISTING failures** in untouched subsystems (test_bridge_status_driver ADVISORY-routing vs live INDEX;
+test_governance_hooks claim-step-before-spec-links ×2) — documented in -007.
+
+**Report -007 addresses all 4 Codex GO conditions:** (1) flip stays gate-2; (2) failure-injection tests
+included; (3) flip-readiness NOT claimed — final GREEN re-ingest deferred to gate-2 window (current
+read-only cutover-evidence/regen-verify RED = phase-3 thread not yet shadow-ingested, expected per -004);
+(4) WI-4508 vs WI-4510 closure separated (no WI resolved). Both/all 3 preflights GREEN on indexed -007
+(applicability passed, missing_required=[]; clause exit 0; citation-freshness clean).
+
+**NEXT (for the next driver): owner triggers MANUAL Codex VERIFIED on `-007`** (dispatcher OFF). After
+VERIFIED → bring owner the GATE-2 package via **AskUserQuestion ONLY** (4 decisions: final-execute flip
+AUQ; GOV-FILE-BRIDGE-AUTHORITY-001 v2 amendment formal packet; DCL-INDEX-GENERATED-VIEW-001 creation
+formal packet incl. assertions 1-11; PAUTH expansion for `cutover` + `formal_spec_promotion`). Then
+gate-2 execution (swarm-quiesced): `gt flow ingest-bridge-index --apply` → GREEN cutover-evidence/regen-verify
+→ freeze → `bridge_authority_cutover.py flip --confirm-irreversible` → post-flip smoke → resolve WI-4510.
+On anomaly: `bridge_authority_cutover.py revert [--restore-frozen <frozen>]` or `reconcile`.
+
+**NEW GATE LESSON (reusable):** the applicability-preflight spec-link harvester
+(`bridge_applicability_preflight.extract_spec_links`) stops the `## Specification Links` harvest at ANY
+line whose stripped form starts with `#` — NOT just real headings. A wrapped bullet whose continuation
+line begins with a `#`-prefixed token (e.g. a DCL assertion ref `#6–#11`, or `#3 / #4`) silently
+truncates the harvest, dropping every spec cited after it → `missing_required_specs` hard-block at Write
+even though the IDs are present. `classify_spec_links_section` still says `harvested` (heading-only check),
+so it's invisible there. FIX: inside `## Specification Links`, never let a line start with `#` — spell out
+assertion numbers ("assertions 6 through 11"). Debug via `extract_spec_links(content)` directly. This cost
+2 blocked Writes on -007 before diagnosis.
+
+## Turn @ ~13:10Z (session b5f59b69): standing ADVISORY backlog triage + R1-R5 unblock
+
+Owner directed triage of the 15 standing bridge `ADVISORY` entries (separate workstream from WI-4510).
+
+- **Triage (4 parallel read-only agents):** 5 close-stale/acknowledged (antigravity-startup-gov-docs,
+  antigravity-implements-link, antigravity-insight-stale, owner-role-switch-codex-lo, delib-2500);
+  ~10 convert-to-WI were **already tracked by the advisory-router** (dashboard→WI-3433, arch-audit→
+  WI-4409/4411 + PROJECT-ARCHITECTURE-IMPROVEMENT P3/P4, antigravity-consolidation→WI-3505, sp1→
+  WI-4400/4401, fable→WI-4436, session-role-marker→WI-4540, parity-gap→WI-4543, ollama→WI-4477/4556/4558);
+  **WI-4575** created as the one genuinely-new capture (2026-06-14 quality-scout's 3 doctor-hygiene repairs,
+  reliability fast-lane). KEY LESSON: the advisory-router auto-converts advisories to backlog WIs, so the
+  ADVISORY pileup is a *disposition* gap, not a *capture* gap.
+- **R1-R5 enforcement UNBLOCKED (owner AUQ Option 1).** The GO'd+green `gtkb-role-resolution-r1-r5-
+  assertion-enforcement` report was gate-blocked for missing project linkage. Executed the mint path:
+  `DELIB-20263427` (owner decision) → **WI-4576** (admitted to `PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-
+  OVERRIDE`) → bounded PAUTH `...-R1-R5-ENFORCEMENT-GUARD-TEST-ADDITION-AUTHORIZATION` (test_addition,
+  cites DELIB-20263427) → re-filed report **`-006` NEW** with full linkage. Re-verified the guard green
+  (7 passed, ruff clean) before filing. Both preflights GREEN on `-006` (applicability `sha256:e6bae9a7…`;
+  clause 0 blocking gaps after adding a Bridge-Protocol-Compliance evidence line for CLAUSE-INDEX-IS-CANONICAL).
+  Thread now `NEW -006` → **Codex actionable for VERIFIED**. Test file stays untracked until VERIFIED + sweep-commit.
+- **Held but tracked (owner chose Hold one-at-a-time):** arch-audit P1 (7 Agent-Red-vs-governance ADRs;
+  PROJECT-ARCHITECTURE-IMPROVEMENT / WI-4409/4411), Fable program (PROJECT-FABLE-INVESTIGATION, 23 WIs,
+  chartered), dashboard cockpit (WI-3433, has a 4-question grilling gate before first slice). No mutations
+  for the held items.
+- Gate lessons reconfirmed: every `bridge/**` file must cite `GOV-FILE-BRIDGE-AUTHORITY-001` (applicability
+  preflight); WI-collision detector flags any bare `WI-NNNN` != declared; CLAUSE-INDEX-IS-CANONICAL needs an
+  explicit `bridge/INDEX.md` append-only evidence line; the claim gate fires on **Edit** too, not just Write;
+  INDEX writes only via `gt bridge index set-status`.
+
+## Turn @ ~12:45Z (session b5f59b69): recovered design panel + REVISED -003 filed (resolves NO-GO -002 F1)
+
+- **Context recovery.** Prior session `c50a9788` filed Phase-3 NEW `-001`, got Codex **NO-GO `-002`**
+  (single P1 **F1** — the `tafe_canonical` write path needs an explicit cross-store fail-closed + recovery
+  contract between the TAFE DB write and the generated INDEX publish), launched a background design workflow
+  (`wf_5b32bc33-32a`), then **died** while waiting. This session recovered the workflow's persisted result
+  from the transcript dir (`c50a9788…/workflows/wf_5b32bc33-32a.json`): `result.synth` was **null** and the
+  adversary `verdicts` were **empty** (the synthesis stage failed — likely the crash cause), BUT the two
+  design-stage outputs (Strategy A "transactional-no-publish", Strategy B "write-ahead-recoverable") were
+  fully persisted and high-quality. Did NOT re-run the 9-min workflow; synthesized the F1 resolution from
+  the two designs.
+- **REVISED `-003` FILED** via `revise_bridge.file_revision` (NO-GO-gated; candidate preflights passed
+  internally). Lowest-regret hybrid: **prepare → single-transaction commit → atomic publish**, exploiting
+  `INDEX = render(TAFE)`. New §"Cross-store fail-closed publish contract": (1) pre-commit byte/semantic
+  verify so the common divergence fails closed with BOTH stores byte-identical to pre-write; (2)
+  `insert_bridge_thread_atomic` = one `BEGIN IMMEDIATE … COMMIT` for instance + all artifacts (fixes the
+  independent-commit hazard at db.py:5445/:6412 via no-commit cores; public methods unchanged); (3) the only
+  post-commit failure mode is a bounded, self-healing **TAFE-ahead** window (lossless republish from the
+  append-only shadow); (4) **INDEX-ahead is structurally impossible** through the chokepoint, quarantined
+  (never auto-ingested) otherwise; (5) a publish-reconcile guard at write-start / `gt flow publish-reconcile`
+  / startup / `--reconcile`. Added DCL-INDEX-GENERATED-VIEW-001 assertions **#6–#11** + failure-injection
+  tests (Codex's 3 scenarios + atomicity + INDEX-ahead-quarantine + index_canonical byte-identity) targeting
+  `test_tafe_authoritative_write_path.py`.
+- **target_paths expanded** to add `groundtruth-kb/src/groundtruth_kb/db.py` (transaction helper),
+  `tafe_bridge_ingestion.py` (reconcile guard), and `cli.py` (`gt flow publish-reconcile`).
+- **Post-filing preflights GREEN** on indexed `-003`: applicability `sha256:039df126…`,
+  `missing_required_specs:[]` + `missing_advisory_specs:[]`; clause exit 0, 0 blocking gaps; citation
+  freshness clean. INDEX: `REVISED -003 / NO-GO -002 / NEW -001`. Author metadata = this session.
+- **Mechanics.** Work-intent claim acquired (`rowid 2656`) + released. WI-4522 author env vars set in-session
+  (helper requires `session_context_id`/`model`/`model_version`/`model_configuration`; identity + harness
+  auto-resolved). **No commit** (bridge filing only). Zero MemBase mutation. Gate-2 AUQ stays blocked on
+  Codex GO — presenting it pre-review would collapse two safety gates. Draft body cached at
+  `.gtkb-state/bridge-revisions/drafts/gtkb-wi4510-phase-3-authority-flip-003.md`.
 
 ## Turn @ ~07:30Z (session c50a9788): baseline commit + Phase-3 proposal filed
 

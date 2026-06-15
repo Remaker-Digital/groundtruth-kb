@@ -24,7 +24,7 @@ import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Default bounded-wait acquisition ceiling: an INDEX mutation is a brief,
@@ -59,8 +59,25 @@ class IndexWriteLockTimeout(RuntimeError):
     """Raised when the INDEX-write lock cannot be acquired within the timeout."""
 
 
+class CrossStorePublishError(RuntimeError):
+    """Raised when the ``tafe_canonical`` cross-store publish fails closed.
+
+    Covers a pre-commit divergence (the regenerated INDEX would not match the
+    intended write — nothing is committed or published) and INDEX-ahead
+    contamination (the live INDEX carries content the authoritative shadow lacks —
+    quarantined, never auto-ingested). WI-4510 Phase 3
+    (``DCL-INDEX-GENERATED-VIEW-001`` #8 / #11).
+    """
+
+
+# WI-4510 Phase 3 authority-direction tokens (mirrors
+# scripts/bridge_authority_cutover.py; the reader fails safe to index_canonical).
+_DIRECTION_INDEX_CANONICAL = "index_canonical"
+_DIRECTION_TAFE_CANONICAL = "tafe_canonical"
+
+
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _lock_path(state_dir: Path) -> Path:
@@ -96,8 +113,8 @@ def _is_stale(record: dict, ttl_seconds: float) -> bool:
     except ValueError:
         return True
     if heartbeat_dt.tzinfo is None:
-        heartbeat_dt = heartbeat_dt.replace(tzinfo=timezone.utc)
-    age_seconds = (datetime.now(timezone.utc) - heartbeat_dt).total_seconds()
+        heartbeat_dt = heartbeat_dt.replace(tzinfo=UTC)
+    age_seconds = (datetime.now(UTC) - heartbeat_dt).total_seconds()
     return age_seconds > ttl_seconds
 
 
@@ -277,6 +294,34 @@ def index_write_lock(
         _release(lock_path, token)
 
 
+def _project_root_from_index(index_path: Path) -> Path:
+    """Derive the GT-KB project root from a ``<root>/bridge/INDEX.md`` path.
+
+    Every real caller passes ``<project_root>/bridge/INDEX.md`` (so ``parents[1]``
+    is the root); test fixtures build ``<tmp>/bridge/INDEX.md`` the same way.
+    """
+    return Path(index_path).resolve().parents[1]
+
+
+def _read_authority_direction(project_root: Path) -> str:
+    """Read the bridge authority direction, failing safe to ``index_canonical``.
+
+    The reader lives in ``scripts/bridge_authority_cutover.py`` (the WI-4510
+    Phase-3 default-OFF switch). ANY failure — import error, unreadable / malformed
+    state, unrecognized value — resolves to ``index_canonical`` so the default
+    write path can never be broken or silently flipped by this code
+    (``DCL-INDEX-GENERATED-VIEW-001`` #3, safe default).
+    """
+    try:
+        try:
+            from scripts.bridge_authority_cutover import read_authority_direction
+        except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+            from bridge_authority_cutover import read_authority_direction
+        return read_authority_direction(project_root)
+    except Exception:  # noqa: BLE001 - the switch must fail safe, never break the writer
+        return _DIRECTION_INDEX_CANONICAL
+
+
 def atomic_index_update(
     index_path: str | Path,
     mutate,
@@ -284,6 +329,7 @@ def atomic_index_update(
     state_dir: str | Path,
     timeout_seconds: float = DEFAULT_LOCK_TIMEOUT_SECONDS,
     ttl_seconds: float = DEFAULT_LOCK_TTL_SECONDS,
+    project_root: str | Path | None = None,
 ) -> str:
     """Serialized atomic read-modify-write of a bridge index file.
 
@@ -299,9 +345,21 @@ def atomic_index_update(
 
     Raises IndexWriteLockTimeout if the lock cannot be acquired in time. If
     mutate raises, the lock is released and index_path is left unchanged.
+
+    WI-4510 Phase 3: under the ``tafe_canonical`` authority direction (a separate
+    gate-2 owner decision; default ``index_canonical``), this chokepoint instead
+    records the authoritative write in the TAFE shadow first and regenerates a
+    byte-faithful INDEX from it, via the cross-store fail-closed publish contract
+    (see :func:`_tafe_canonical_publish`). All higher-level writers inherit the
+    switch here. Under ``index_canonical`` the path below is byte-identical to the
+    pre-flip behavior. ``project_root`` (optional) overrides the root derived from
+    ``index_path`` for the direction read + shadow location.
     """
     index_path = Path(index_path)
     with index_write_lock(state_dir=state_dir, timeout_seconds=timeout_seconds, ttl_seconds=ttl_seconds):
+        root = Path(project_root) if project_root is not None else _project_root_from_index(index_path)
+        if _read_authority_direction(root) == _DIRECTION_TAFE_CANONICAL:
+            return _tafe_canonical_publish(index_path, root, mutate)
         try:
             current_text = index_path.read_text(encoding="utf-8")
         except FileNotFoundError:
@@ -311,3 +369,218 @@ def atomic_index_update(
             raise TypeError("mutate must return a str")
         _atomic_write(index_path, new_text)
         return new_text
+
+
+def _reconcile_before_write(index_path: Path, service, is_archived_extra) -> str:
+    """Write-start reconcile guard: heal a leftover TAFE-ahead split before writing.
+
+    Runs at the top of every ``tafe_canonical`` write (lock already held). If a
+    previous writer committed to the shadow but crashed before publishing, the
+    live INDEX is one authoritative write behind; this republishes it from the
+    append-only shadow (lossless) so the new write builds on a faithful read
+    surface. INDEX-ahead contamination (the INDEX carries content the authoritative
+    shadow lacks) is refused — quarantined, never auto-ingested
+    (``DCL-INDEX-GENERATED-VIEW-001`` #11). Returns the (possibly repaired) INDEX text.
+    """
+    from groundtruth_kb.tafe_bridge_ingestion import ARTIFACT_TYPE, assess_publish_state
+    from groundtruth_kb.tafe_index_generator import render_index_from_flow_artifacts
+    from groundtruth_kb.tafe_index_sync import parse_bridge_index
+
+    try:
+        current_text = index_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        current_text = ""
+    header = "".join(parse_bridge_index(current_text).preamble_raw)
+    instances = service.list_flow_instances()
+    artifacts = service.list_flow_artifacts(artifact_type=ARTIFACT_TYPE)
+    verdict = assess_publish_state(
+        current_text, instances, artifacts, header=header, is_archived_extra=is_archived_extra
+    )
+    if verdict.index_ahead:
+        raise CrossStorePublishError(
+            "INDEX-ahead contamination before write: live bridge/INDEX.md carries content the "
+            f"authoritative TAFE shadow lacks (missing_in_generated="
+            f"{list(verdict.regen_verify.missing_in_generated)}); refusing to build on it. "
+            "Run `gt flow publish-reconcile` and resolve the quarantined entry."
+        )
+    if verdict.needs_republish:
+        repaired = render_index_from_flow_artifacts(instances, artifacts, header=header)
+        _atomic_write(index_path, repaired)
+        return repaired
+    return current_text
+
+
+def _post_publish_self_check(index_path: Path, service, expected_text: str, header: str, is_archived_extra) -> None:
+    """In-lock post-publish self-check (``DCL-INDEX-GENERATED-VIEW-001`` #6/#9).
+
+    Re-reads the published INDEX; if it does not equal the already-verified text
+    (e.g. a transient FS issue during publish), retries the publish once from the
+    in-memory text. Then re-verifies the live INDEX against the committed shadow.
+    A residual ``tafe_ahead`` state is left for the next-writer guard /
+    ``gt flow publish-reconcile`` (TAFE is durable and lossless to repair — never
+    rolled back). An ``index_ahead`` state would be structurally impossible after a
+    committed write and is surfaced as a defect.
+    """
+    from groundtruth_kb.tafe_bridge_ingestion import ARTIFACT_TYPE, assess_publish_state
+
+    try:
+        live = index_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        live = ""
+    if live != expected_text:
+        _atomic_write(index_path, expected_text)
+        try:
+            live = index_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            live = ""
+    instances = service.list_flow_instances()
+    artifacts = service.list_flow_artifacts(artifact_type=ARTIFACT_TYPE)
+    verdict = assess_publish_state(live, instances, artifacts, header=header, is_archived_extra=is_archived_extra)
+    if verdict.index_ahead:
+        raise CrossStorePublishError(
+            "post-publish self-check found an INDEX-ahead state (structurally impossible after a "
+            f"committed tafe_canonical write): missing_in_generated={list(verdict.regen_verify.missing_in_generated)}"
+        )
+
+
+def _tafe_canonical_publish(index_path: Path, project_root: Path, mutate) -> str:
+    """The ``tafe_canonical`` cross-store fail-closed publish path (WI-4510 Phase 3).
+
+    Implements the prepare -> single-transaction commit -> atomic publish contract
+    from ``bridge/gtkb-wi4510-phase-3-authority-flip-003.md`` (GO at ``-004``).
+    Runs entirely inside the INDEX-write lock (held by the caller). Ordering, which
+    ``DCL-INDEX-GENERATED-VIEW-001`` #6 asserts: verify the prospective INDEX BEFORE
+    the DB commit, commit the affected thread in ONE transaction
+    (``insert_bridge_thread_atomic``), then atomically publish the already-verified
+    regenerated bytes. A pre-commit divergence fails closed with both stores
+    unchanged (#8); the only post-commit failure mode is a bounded, self-healing
+    TAFE-ahead window (#9/#10).
+    """
+    # local import keeps the verify symbol adjacent to the ordering it gates
+    from groundtruth_kb.tafe_bridge_ingestion import (
+        assess_publish_state,
+        build_prospective_shadow,
+        make_archived_extra_oracle,
+        open_flow_service,
+        plan_bridge_thread_writes,
+        planned_to_db_kwargs,
+    )
+    from groundtruth_kb.tafe_index_generator import render_index_from_flow_artifacts
+    from groundtruth_kb.tafe_index_sync import parse_bridge_index
+
+    index_path = Path(index_path)
+    root = Path(project_root)
+    is_archived_extra = make_archived_extra_oracle(root)
+    db, service = open_flow_service(root)
+    try:
+        # write-start reconcile guard, then read the (possibly repaired) surface
+        current_text = _reconcile_before_write(index_path, service, is_archived_extra)
+        header = "".join(parse_bridge_index(current_text).preamble_raw)
+
+        # the writer's intended INDEX text (same in-memory transform as index_canonical)
+        intended_text = mutate(current_text)
+        if not isinstance(intended_text, str):
+            raise TypeError("mutate must return a str")
+
+        # plan the TAFE mutation from the intended text, project it, regenerate the INDEX
+        planned = plan_bridge_thread_writes(intended_text, service)
+        prospective_instances, prospective_artifacts = build_prospective_shadow(service, planned)
+        prospective_text = render_index_from_flow_artifacts(prospective_instances, prospective_artifacts, header=header)
+
+        # verify BEFORE any commit: fail closed on divergence (no DB write, no FS write)
+        verdict = assess_publish_state(
+            intended_text,
+            prospective_instances,
+            prospective_artifacts,
+            header=header,
+            is_archived_extra=is_archived_extra,
+        )
+        if not verdict.in_sync:
+            rv = verdict.regen_verify
+            raise CrossStorePublishError(
+                "tafe_canonical write diverges from the intended INDEX; failing closed "
+                f"(no DB commit, no INDEX publish): state={verdict.state}, "
+                f"missing_in_generated={list(rv.missing_in_generated)}, "
+                f"extra_divergent={list(rv.extra_divergent_in_generated)}, "
+                f"version_line_mismatches={len(rv.version_line_mismatches)}"
+            )
+
+        # single-transaction DB commit (only when the write actually appends rows)
+        planned_instances, planned_artifacts = planned_to_db_kwargs(planned)
+        if planned_instances or planned_artifacts:
+            db.insert_bridge_thread_atomic(
+                planned_instances,
+                planned_artifacts,
+                changed_by="bridge-index-writer-tafe-canonical",
+                change_reason="WI-4510 Phase-3 tafe_canonical authoritative bridge write",
+            )
+
+        # atomic publish of the already-verified regenerated INDEX (commit precedes publish)
+        _atomic_write(index_path, prospective_text)
+
+        # in-lock self-check; leaves a residual TAFE-ahead window for the guard to heal
+        _post_publish_self_check(index_path, service, prospective_text, header, is_archived_extra)
+        return prospective_text
+    finally:
+        db.close()
+
+
+def reconcile_publish(
+    project_root: str | Path,
+    *,
+    timeout_seconds: float = DEFAULT_LOCK_TIMEOUT_SECONDS,
+    ttl_seconds: float = DEFAULT_LOCK_TTL_SECONDS,
+) -> dict:
+    """Heal a TAFE-ahead publish split (or quarantine INDEX-ahead) under the lock.
+
+    The standalone publish-reconcile entry point behind ``gt flow publish-reconcile``
+    and ``scripts/bridge_authority_cutover.py reconcile``. Acquires the INDEX-write
+    lock, compares the live INDEX to the authoritative shadow, and:
+
+    - ``in_sync`` -> no-op;
+    - ``tafe_ahead`` -> republish INDEX from the append-only shadow (lossless,
+      idempotent: a second run is ``in_sync``);
+    - ``index_ahead`` -> refuse to auto-apply; report a repair-required defect.
+
+    Returns a JSON-serializable verdict dict. ``DCL-INDEX-GENERATED-VIEW-001`` #10/#11.
+    """
+    from groundtruth_kb.tafe_bridge_ingestion import (
+        ARTIFACT_TYPE,
+        assess_publish_state,
+        make_archived_extra_oracle,
+        open_flow_service,
+    )
+    from groundtruth_kb.tafe_index_generator import render_index_from_flow_artifacts
+    from groundtruth_kb.tafe_index_sync import parse_bridge_index
+
+    root = Path(project_root)
+    index_path = root / "bridge" / "INDEX.md"
+    state_dir = root / ".gtkb-state" / "bridge-index-writer"
+    is_archived_extra = make_archived_extra_oracle(root)
+    with index_write_lock(state_dir=state_dir, timeout_seconds=timeout_seconds, ttl_seconds=ttl_seconds):
+        try:
+            current_text = index_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            current_text = ""
+        header = "".join(parse_bridge_index(current_text).preamble_raw)
+        db, service = open_flow_service(root)
+        try:
+            instances = service.list_flow_instances()
+            artifacts = service.list_flow_artifacts(artifact_type=ARTIFACT_TYPE)
+            verdict = assess_publish_state(
+                current_text, instances, artifacts, header=header, is_archived_extra=is_archived_extra
+            )
+            repaired = False
+            if verdict.needs_republish:
+                regenerated = render_index_from_flow_artifacts(instances, artifacts, header=header)
+                _atomic_write(index_path, regenerated)
+                repaired = True
+            return {
+                "state": verdict.state,
+                "repaired": repaired,
+                "index_ahead": verdict.index_ahead,
+                "index_path": str(index_path),
+                "regen_verify": verdict.regen_verify.as_dict(),
+            }
+        finally:
+            db.close()
