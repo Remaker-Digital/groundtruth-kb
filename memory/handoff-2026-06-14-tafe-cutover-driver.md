@@ -7,13 +7,62 @@ author_model_configuration: Claude Code interactive Prime Builder session c2f8c2
 
 # Handoff — Drive TAFE to Governed Cutover (WI-4510)
 
-**Updated:** 2026-06-15 ~03:40Z by autonomous Prime session `c50a9788` (harness B, Opus 4.8).
-**State:** Thread reached **GO `-006`** (swarm drove `-003`→NO-GO`-004`→REVISED`-005`→GO`-006`); a
-concurrent session implemented Phase-1/2 then lapsed without filing the report. I took over the lapsed
-claim (owner-approved), and **live regen-verify exposed a real defect**: the GO'd verify gated on ALL
-extras, and the append-only shadow holds a phantom orphan (`sp1-dispatch-reliability-prime-handoff`).
-I implemented the correct gate fix and filed the root-cause precursor. **WI-4510 is now BLOCKED on
-WI-4574 (sp1 reconciliation)** — regen-verify is legitimately RED until the phantom is reconciled.
+**Updated:** 2026-06-15 ~07:30Z by autonomous Prime session `c50a9788` (harness B, Opus 4.8).
+**State:** **Phases 0-2 VERIFIED** (`bridge/gtkb-wi4510-tafe-authoritative-cutover-008.md`) and
+**WI-4574 VERIFIED + auto-resolved**. Owner authorized **"Commit verified baseline, then Phase 3."**
+Baseline swept into local commit **`760de9746`** (55 files; NOT pushed; all 4 pre-commit gates green;
+199 staged tests pass). **WI-4510 is still `open`** (reconciler left it open — `-008` verified only the
+Phases-0-2 *partial* scope per the report's explicit Phase-3-excluded text). **Phase 3 (the irreversible
+flip) PROPOSAL FILED** on a dedicated thread `gtkb-wi4510-phase-3-authority-flip` (NEW `-001`); both
+preflights GREEN (applicability `sha256:e5644568…`, `missing_required_specs:[]`; clause exit 0, 0
+blocking gaps). **Awaiting MANUAL Codex review** (dispatcher off). After GO → owner gate-2 package.
+
+## Turn @ ~07:30Z (session c50a9788): baseline commit + Phase-3 proposal filed
+
+- **Baseline commit `760de9746`** (`chore(gtkb): consolidate VERIFIED TAFE cutover baseline …`) via the
+  governed `gtkb-sweep-commit` path. Bundled the two VERIFIED prerequisites (WI-4510 Phases 0-2 + WI-4574)
+  + their bridge audit trail + in-flight swarm infra (WI-4572 deploy-FQDN config-ization, bridge-substrate
+  dispatcher-disable, inventory/memory). Verification: whitespace clean, `scan_secrets.py` 0 findings (the
+  6 Azure-FQDN candidate-highs are public hostnames, not credentials; the actual stdlib gate found 0),
+  inventory drift PASS, narrative-artifact PASS, ruff-format PASS, `py_compile` clean, 199 tests pass. The
+  only `ruff check` lint warnings (4) are in unrelated swarm files (`deploy.py`/`repair_widget_hash.py`/
+  `test_run.py`) — left untouched per the sweep no-touch-unrelated rule; the pre-commit hook gates on
+  ruff-FORMAT (passed), not ruff-check. Not pushed.
+- **Phase-3 proposal FILED:** `bridge/gtkb-wi4510-phase-3-authority-flip-001.md` (NEW), dedicated thread
+  (Phases-0-2 thread is VERIFIED-terminal; NEW dedicated thread > REVISED-after-VERIFIED). Filed via
+  `write_bridge.propose_bridge` (WI-4522 author env vars set; `pre_populate=False`, `db=None` to avoid the
+  corrupt ChromaDB; self-acquired+released work-intent claim). Contents (the gate-2 review package):
+  the authority-direction switch design at the `atomic_index_update` chokepoint (`index_canonical` default
+  unchanged / `tafe_canonical` = TAFE-first write → regenerate INDEX byte-faithful → verify-or-fail-closed);
+  the full proposed **GOV-FILE-BRIDGE-AUTHORITY-001 v2** amended text (authority-source clause only; LO
+  repair authority + re-read-live-INDEX read-discipline PRESERVED); the new **DCL-INDEX-GENERATED-VIEW-001**
+  (5 machine-checkable assertions); writer-migration inventory; reversibility backstop (frozen timestamped
+  immutable INDEX copy + `scripts/bridge_authority_cutover.py --revert`); swarm-quiesce + final-re-ingest
+  runbook; `## Specification Links` (exact heading); Prior Deliberations; Requirement Sufficiency
+  ("Existing requirements sufficient" — ADR is the governing requirement; GOV amendment + DCL are derived
+  formalization); spec-to-test plan; Owner Decisions / Input (the 4-item gate-2 package).
+- **Phase-3 target_paths** (execution scope, gate-2-gated): `bridge_index_writer.py`,
+  `gtkb_bridge_writer.py`, `bridge/index_mutation.py`, `cli_bridge_index.py`, `tafe_index_generator.py`,
+  new `scripts/bridge_authority_cutover.py`, new `harness-state/bridge-authority-direction.json`,
+  + 2 new test files.
+
+## Next steps — Phase-3 gate sequence (CURRENT; supersedes the older "Next steps" below)
+
+1. **Owner triggers MANUAL Codex review** of `gtkb-wi4510-phase-3-authority-flip` (dispatcher off).
+   Codex GO or NO-GO. On NO-GO → file REVISED `-003` addressing findings (keep both preflights green).
+2. **After GO → owner gate-2 package (the irreversible flip), all via AskUserQuestion:** (a) gate-2
+   final-execute AUQ confirming the flip; (b) GOV-FILE-BRIDGE-AUTHORITY-001 v2 amendment formal-artifact-
+   approval packet; (c) DCL-INDEX-GENERATED-VIEW-001 creation formal packet; (d) PAUTH expansion to permit
+   `cutover` + `formal_spec_promotion` (the PHASE-6-7-CUTOVER PAUTH currently forbids both).
+3. **Execute Phase 3** (post-gate-2, swarm-quiesced): final `gt flow ingest-bridge-index --apply` +
+   `cutover-evidence`/`regen-verify` GREEN → freeze backstop + flip via `bridge_authority_cutover.py` →
+   post-flip smoke (write through each writer path; INDEX stays byte-faithful). Insert the amended GOV v2
+   + new DCL via formal packets. impl-start packet from the GO first; stay within `target_paths`.
+4. **Impl report** (carry spec links + spec-to-test evidence + the executed runbook) → Codex VERIFIED →
+   **resolve WI-4510** (the reconciler should auto-resolve once the Phase-3 thread is VERIFIED and the
+   report no longer scopes itself partial).
+5. **Do NOT rush; it is irreversible.** Re-verify LIVE state each cycle. On any post-flip anomaly:
+   `scripts/bridge_authority_cutover.py --revert`.
 
 ## Turn @ ~03:40Z (session c50a9788): gate fix + root-cause investigation
 

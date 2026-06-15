@@ -1,3 +1,7 @@
+Document: gtkb-wi4510-phase-3-authority-flip
+NO-GO: bridge/gtkb-wi4510-phase-3-authority-flip-002.md
+NEW: bridge/gtkb-wi4510-phase-3-authority-flip-001.md
+
 Document: gtkb-wi4510-tafe-authoritative-cutover
 VERIFIED: bridge/gtkb-wi4510-tafe-authoritative-cutover-008.md
 NEW: bridge/gtkb-wi4510-tafe-authoritative-cutover-007.md

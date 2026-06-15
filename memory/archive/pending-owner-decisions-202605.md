@@ -6498,3 +6498,69 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-16T05:34:04.416353Z
   answer: "User has answered your questions: \"The original config.toml is unrecoverable and MCP server definitions can't be auto-recovered from any intact source. How should I rebuild ~/.codex/config.toml?\"=\"Core config now (Recommended)\" selected preview: # ~/.codex/config.toml # Rebuilt 2026-05-15 after the original was lost to zero-fill corruption. # Core settings recovered from ~/.codex/.codex-global-state.json.  model = \"gpt-5.5\" model_reasoning_effort = \"medium\" approval_policy = \"on-request\" sandbox_mode = \"workspace-write\"  [sandbox_workspace_write] network_access = false. You can now continue with the user's answers in mind."
   notes: ""
+
+- id: DECISION-0637
+  asked_at: 2026-05-16T06:11:51.227066Z
+  question: "INDEX has 287 threads (~85 Prime-actionable), the backlog is mostly bridge-machinery changes, and the fix that makes parallel sessions safe (bridge-parallel-session-collision) is itself an unimplemented GO. Parallelizing now hits a known collision bug. How should I drain the queue?"
+  options:
+    - "Triage then serial (Recommended)"
+    - "Serial now, skip triage"
+    - "Owner-scoped cluster"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4884abc469d6776a
+  resolved_at: 2026-05-16T06:11:51.227066Z
+  answer: "User has answered your questions: \"INDEX has 287 threads (~85 Prime-actionable), the backlog is mostly bridge-machinery changes, and the fix that makes parallel sessions safe (bridge-parallel-session-collision) is itself an unimplemented GO. Parallelizing now hits a known collision bug. How should I drain the queue?\"=\"Triage then serial (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0638
+  asked_at: 2026-05-16T06:11:51.227066Z
+  question: "Triage is complete: 287 threads, ~86 actionable but ~5-6 are superseded (real total ~80), and INDEX is ~12x over its line cap. The full drain is a multi-session program. What's the next concrete unit of work?"
+  options:
+    - "Verify-and-clean first (Recommended)"
+    - "Drain now, clean as I go"
+    - "Pause at the triage report"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3b4f9af9bb803c1a
+  resolved_at: 2026-05-16T06:11:51.227066Z
+  answer: "User has answered your questions: \"Triage is complete: 287 threads, ~86 actionable but ~5-6 are superseded (real total ~80), and INDEX is ~12x over its line cap. The full drain is a multi-session program. What's the next concrete unit of work?\"=\"Verify-and-clean first (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0639
+  asked_at: 2026-05-16T06:11:51.227066Z
+  question: "Verification refined the clean scope: 2 threads to withdraw (not ~6), and the INDEX trim turns out to need a full filter-rewrite of canonical state (actionable entries are interleaved with terminal ones, so no safe bottom-chop). How should I execute the clean step?"
+  options:
+    - "Withdraw 2, defer INDEX trim (Recommended)"
+    - "Full clean now"
+    - "Skip mutations, start the drain"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3cff98cd76721f30
+  resolved_at: 2026-05-16T06:11:51.227066Z
+  answer: "User has answered your questions: \"Verification refined the clean scope: 2 threads to withdraw (not ~6), and the INDEX trim turns out to need a full filter-rewrite of canonical state (actionable entries are interleaved with terminal ones, so no safe bottom-chop). How should I execute the clean step?\"=\"Withdraw 2, defer INDEX trim (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0640
+  asked_at: 2026-05-16T06:11:51.227066Z
+  question: "Verify-and-clean is complete: 2 threads withdrawn, ~82 live actionable threads remain, cleanup uncommitted. The serial drain is a multi-session program. How do you want to proceed?"
+  options:
+    - "Commit cleanup, checkpoint here (Recommended)"
+    - "Start the serial drain now"
+    - "Stop now, commit later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 224ead4ec0492aae
+  resolved_at: 2026-05-16T06:11:51.227066Z
+  answer: "User has answered your questions: \"Verify-and-clean is complete: 2 threads withdrawn, ~82 live actionable threads remain, cleanup uncommitted. The serial drain is a multi-session program. How do you want to proceed?\"=\"Commit cleanup, checkpoint here (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0641
+  asked_at: 2026-05-16T06:11:51.227066Z
+  question: "The working tree holds multiple parallel sessions' uncommitted work (2 pre-staged files, ~19 modified files, INDEX.md mixing my 2 edits with 4 others). A clean commit of ONLY my cleanup isn't possible - git can't partial-stage a shared file. How should I handle the commit?"
+  options:
+    - "Checkpoint uncommitted (Recommended)"
+    - "Commit the whole bridge-state batch"
+    - "Commit only my 2 withdrawal files"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 860ec28aefd6d0b5
+  resolved_at: 2026-05-16T06:11:51.227066Z
+  answer: "User has answered your questions: \"The working tree holds multiple parallel sessions' uncommitted work (2 pre-staged files, ~19 modified files, INDEX.md mixing my 2 edits with 4 others). A clean commit of ONLY my cleanup isn't possible - git can't partial-stage a shared file. How should I handle the commit?\"=\"Checkpoint uncommitted (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
