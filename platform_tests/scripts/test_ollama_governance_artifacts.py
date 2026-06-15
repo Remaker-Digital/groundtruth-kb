@@ -40,7 +40,7 @@ OLLAMA_SPECS = {
 _PACKET_DIR = PROJECT_ROOT / ".groundtruth" / "formal-artifact-approvals"
 FORMAL_PACKETS = {spec_id: _PACKET_DIR / f"2026-06-05-{spec_id}.json" for spec_id in OLLAMA_SPECS}
 NARRATIVE_PACKETS = {
-    ".claude/rules/canonical-terminology.md": _PACKET_DIR / "2026-06-09-claude-rules-canonical-terminology-md.json",
+    ".claude/rules/canonical-terminology.md": _PACKET_DIR / "2026-06-12-fab09-canonical-terminology.json",
     ".claude/rules/operating-model.md": _PACKET_DIR / "2026-06-05-operating-model-ollama-narrative.json",
 }
 

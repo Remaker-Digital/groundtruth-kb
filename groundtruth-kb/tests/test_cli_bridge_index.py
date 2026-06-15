@@ -17,6 +17,8 @@ from groundtruth_kb.cli import main
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 WRITER_SOURCE = PROJECT_ROOT / "scripts" / "bridge_index_writer.py"
+GTKB_WRITER_SOURCE = PROJECT_ROOT / "scripts" / "gtkb_bridge_writer.py"
+AUTHOR_METADATA_SOURCE = PROJECT_ROOT / "scripts" / "bridge_author_metadata.py"
 
 
 def _config_path(project_dir: Path) -> Path:
@@ -27,6 +29,21 @@ def _install_writer(project_dir: Path) -> None:
     scripts_dir = project_dir / "scripts"
     scripts_dir.mkdir()
     (scripts_dir / "bridge_index_writer.py").write_text(WRITER_SOURCE.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def _install_remove_document_writer(project_dir: Path) -> None:
+    """Install the standalone serialized writer plus its scripts-dir siblings.
+
+    ``gt bridge index remove-document`` loads ``scripts/gtkb_bridge_writer.py``,
+    which imports ``bridge_index_writer`` and ``bridge_author_metadata`` from the
+    same scripts directory, so all three must be present in the temp project.
+    """
+    _install_writer(project_dir)
+    scripts_dir = project_dir / "scripts"
+    (scripts_dir / "gtkb_bridge_writer.py").write_text(GTKB_WRITER_SOURCE.read_text(encoding="utf-8"), encoding="utf-8")
+    (scripts_dir / "bridge_author_metadata.py").write_text(
+        AUTHOR_METADATA_SOURCE.read_text(encoding="utf-8"), encoding="utf-8"
+    )
 
 
 def _write_index(project_dir: Path, text: str) -> Path:
@@ -380,6 +397,72 @@ def test_set_status_clearing_deferred_accepts_owner_clear_evidence(project_dir: 
         "Document: alpha-thread",
         "NEW: bridge/alpha-thread-003.md",
     ]
+
+
+def test_cli_remove_document_removes_phantom(project_dir: Path) -> None:
+    _install_remove_document_writer(project_dir)
+    # "phantom-thread" has an INDEX entry but no backing bridge file on disk.
+    index = _write_index(
+        project_dir,
+        "# Bridge Index\n\n"
+        "Document: keep-thread\nGO: bridge/keep-thread-002.md\nNEW: bridge/keep-thread-001.md\n\n"
+        "Document: phantom-thread\nNEW: bridge/phantom-thread-001.md\n",
+    )
+
+    result = _runner_result(
+        project_dir,
+        "bridge",
+        "index",
+        "remove-document",
+        "phantom-thread",
+        "--json",
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["document"] == "phantom-thread"
+    assert payload["removed"] is True
+    assert "index_path" in payload
+    text = index.read_text(encoding="utf-8")
+    assert "Document: phantom-thread" not in text
+    assert "Document: keep-thread" in text
+
+
+def test_cli_remove_document_refuses_backed_slug(project_dir: Path) -> None:
+    _install_remove_document_writer(project_dir)
+    index = _write_index(project_dir, "Document: real-thread\nNEW: bridge/real-thread-001.md\n")
+    _write_bridge_file(project_dir, "real-thread-001.md", "NEW\n\nbody\n")
+    before = index.read_text(encoding="utf-8")
+
+    result = _runner_result(
+        project_dir,
+        "bridge",
+        "index",
+        "remove-document",
+        "real-thread",
+    )
+
+    assert result.exit_code == 1
+    assert "backing bridge file" in result.output
+    assert index.read_text(encoding="utf-8") == before
+
+
+def test_cli_remove_document_absent_slug_fails_closed(project_dir: Path) -> None:
+    _install_remove_document_writer(project_dir)
+    index = _write_index(project_dir, "Document: present-thread\nNEW: bridge/present-thread-001.md\n")
+    before = index.read_text(encoding="utf-8")
+
+    result = _runner_result(
+        project_dir,
+        "bridge",
+        "index",
+        "remove-document",
+        "missing-thread",
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output
+    assert index.read_text(encoding="utf-8") == before
 
 
 def test_cli_bridge_index_help_resolves() -> None:

@@ -21,8 +21,8 @@ import json
 import os
 import sys
 from pathlib import Path
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 # Load .env.local
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -32,13 +32,17 @@ from scripts._env import load_env_local
 
 load_env_local()
 
+# SPEC-1882: deploy_config is the single source of truth for environment FQDNs.
+# Read the FQDN from the SoT instead of hardcoding it here (WI-4572).
+from scripts.deploy_config import get_environment as _dc_get_environment  # noqa: E402
+
 ENVIRONMENTS = {
     "staging": {
-        "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "fqdn": _dc_get_environment("staging")["fqdn"],
         "spa_key": os.environ.get("STAGING_SPA_KEY", ""),
     },
     "production": {
-        "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "fqdn": _dc_get_environment("production")["fqdn"],
         "spa_key": os.environ.get("PRODUCTION_SPA_KEY", ""),
     },
 }
@@ -105,7 +109,7 @@ def main():
         print(f"  ERROR: {env_prefix}_REMAKER_TENANT_KEY not set")
         sys.exit(1)
 
-    print(f"[2/4] Fetching widget key from config...")
+    print("[2/4] Fetching widget key from config...")
     s, cfg_data = api_call(fqdn, f"/api/config?tenant={tenant_id}", tenant_key)
     if s != 200:
         print(f"  ERROR: Config fetch failed: HTTP {s}")
@@ -126,7 +130,7 @@ def main():
         return
 
     # Step 4: Patch via the superadmin tenant update endpoint
-    print(f"[4/4] Patching tenant document...")
+    print("[4/4] Patching tenant document...")
     s, result = api_call(
         fqdn,
         f"/api/superadmin/tenants/{tenant_id}/patch",
@@ -151,7 +155,7 @@ def main():
         else:
             print(f"  ERROR: Could not patch tenant: HTTP {s2}")
             print(f"  Response: {result2}")
-            print(f"\n  MANUAL FIX: Use Azure Cosmos DB Data Explorer to set")
+            print("\n  MANUAL FIX: Use Azure Cosmos DB Data Explorer to set")
             print(f"  widget_key_hash = {key_hash}")
             print(f"  on tenant document id={tenant_id} in the tenants container.")
             sys.exit(1)
@@ -160,7 +164,7 @@ def main():
     print("\nVerifying...")
     s, verify_data = api_call(fqdn, "/api/config?page_type=all", api_key=None)
     # This won't work without widget key auth, but we can test widget auth
-    print(f"Repair complete. Test widget auth by refreshing the admin UI.")
+    print("Repair complete. Test widget auth by refreshing the admin UI.")
 
 
 if __name__ == "__main__":

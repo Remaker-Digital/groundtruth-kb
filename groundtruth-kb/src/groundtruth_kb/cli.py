@@ -1309,6 +1309,224 @@ def _render_cutover_evidence_markdown(run_id: str, index_path: str, report: Any)
     return "\n".join(lines)
 
 
+@flow_group.command("regen-verify")
+@click.option(
+    "--index-path",
+    "index_path",
+    default=None,
+    help="Bridge index file to verify against (default: <project_root>/bridge/INDEX.md).",
+)
+@click.option(
+    "--apply-refresh",
+    "apply_refresh",
+    is_flag=True,
+    default=False,
+    help=(
+        "Refresh the TAFE shadow first via the append-only dual_write ingest "
+        "(default: off — verify against the stored shadow as-is)."
+    ),
+)
+@click.option(
+    "--write-evidence",
+    "write_evidence",
+    is_flag=True,
+    default=False,
+    help="Write a regenerable <run_id> JSON verdict under the evidence dir.",
+)
+@click.option(
+    "--evidence-dir",
+    "evidence_dir",
+    default=None,
+    help=(
+        "Evidence dir (default: <project_root>/.gtkb-state/cutover-evidence/regen-verify); "
+        "refuses the canonical bridge index."
+    ),
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def flow_regen_verify_cmd(
+    ctx: click.Context,
+    index_path: str | None,
+    apply_refresh: bool,
+    write_evidence: bool,
+    evidence_dir: str | None,
+    json_output: bool,
+) -> None:
+    """Regenerate the bridge INDEX from the TAFE shadow and verify it (WI-4510 Phase 2).
+
+    Reads the canonical bridge index (read-only), reconstructs it from the stored
+    flow_instances + flow_artifacts via the byte-faithful generator, and reports
+    whether the regenerated view is semantically equal to the canonical INDEX
+    (same Document blocks + version lines) and whether it is byte-identical. A
+    semantic divergence (lost/extra thread or a changed status token/path) exits
+    non-zero; a reformat-only difference (line terminators, document-block
+    ordering, non-version footer prose) is the documented one-time reformat and
+    is NOT a failure. With --apply-refresh the shadow is first refreshed via the
+    append-only dual_write ingest (groundtruth.db); the canonical bridge index
+    (bridge/INDEX.md) is never written, per GOV-FILE-BRIDGE-AUTHORITY-001, and an
+    --evidence-dir resolving to it is refused. This is verification only; it does
+    NOT perform the WI-4510 cutover (gate-2 owner-AUQ-gated).
+    """
+    from datetime import UTC, datetime
+
+    from groundtruth_kb.tafe_bridge_ingestion import ARTIFACT_TYPE, ingest_bridge_index
+    from groundtruth_kb.tafe_index_completeness import (
+        _candidate_is_archived,
+        _load_acknowledged_slugs,
+        scan_expected_documents,
+    )
+    from groundtruth_kb.tafe_index_generator import verify_against_index
+    from groundtruth_kb.tafe_index_sync import parse_bridge_index
+
+    canonical_bridge_index = "bridge/INDEX.md"
+
+    if evidence_dir is not None and _targets_canonical_bridge_index(Path(evidence_dir), canonical_bridge_index):
+        _emit_cli_payload(
+            {
+                "command": "flow regen-verify",
+                "error": (
+                    f"refusing to write the canonical bridge index ({canonical_bridge_index}); "
+                    "it remains authoritative per GOV-FILE-BRIDGE-AUTHORITY-001"
+                ),
+                "mutated": False,
+                "status": "refused",
+                "summary": f"Refused: {evidence_dir} targets the canonical bridge index; nothing written.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(2)
+
+    config = _resolve_config(ctx)
+    resolved_index = Path(index_path) if index_path is not None else Path(config.project_root) / "bridge" / "INDEX.md"
+
+    if not resolved_index.is_file():
+        _emit_cli_payload(
+            {
+                "command": "flow regen-verify",
+                "error": f"bridge index not found at {resolved_index}",
+                "index_path": str(resolved_index),
+                "mutated": False,
+                "status": "index_not_found",
+                "summary": f"No bridge index at {resolved_index}; nothing verified.",
+            },
+            json_output=json_output,
+        )
+        raise SystemExit(3)
+
+    index_text = resolved_index.read_text(encoding="utf-8")
+    header = "".join(parse_bridge_index(index_text).preamble_raw)
+
+    db, service = _flow_service(ctx)
+    refreshed = False
+    try:
+        if apply_refresh:
+            ingest_result = ingest_bridge_index(
+                index_text,
+                service,
+                apply=True,
+                changed_by="gt-flow-regen-verify-cli",
+                change_reason="WI-4510 Phase-2 regen-verify shadow refresh (append-only dual_write)",
+            )
+            refreshed = ingest_result.instances_written > 0 or ingest_result.artifacts_written > 0
+        instances = service.list_flow_instances()
+        artifacts = service.list_flow_artifacts(artifact_type=ARTIFACT_TYPE)
+    finally:
+        db.close()
+
+    # WI-4510 Refined Option B: classify extra (shadow-only) threads via the shared
+    # on-disk terminal-archived oracle (DCL-TAFE-COMPLETENESS-TERMINAL-ARCHIVED-001), so
+    # legitimately-trimmed archival residue does NOT gate while phantom / non-terminal
+    # shadow rows still do. A slug with no on-disk file is absent from ``expected_docs``
+    # (``_candidate_is_archived`` would KeyError on ``expected_docs[slug]``), so the
+    # ``slug in expected_docs`` guard is load-bearing; an owner-acknowledged no-file slug
+    # is still honored via the ``acknowledged`` fallback.
+    _root = Path(config.project_root)
+    _expected_docs = scan_expected_documents(_root)
+    _acknowledged = _load_acknowledged_slugs(_root)
+
+    def _is_archived_extra(slug: str) -> bool:
+        if slug in _expected_docs and _candidate_is_archived(slug, _expected_docs, _acknowledged, _root):
+            return True
+        return slug in _acknowledged
+
+    verdict = verify_against_index(
+        index_text, instances, artifacts, header=header, is_archived_extra=_is_archived_extra
+    )
+    verdict_dict = verdict.as_dict()
+
+    if verdict.byte_identical:
+        summary = (
+            f"regen-verify OK (byte-identical): {verdict.generated_document_count} "
+            f"document block(s) reproduce the canonical INDEX exactly."
+        )
+    elif verdict.semantic_equal:
+        reformat_bits = []
+        if verdict.ordering_differs:
+            reformat_bits.append("document-block ordering")
+        reformat_bits.append("line terminators / non-version prose")
+        archived_note = (
+            f" {len(verdict.extra_archived_in_generated)} terminal-archived shadow thread(s) "
+            "tolerated (append-only residue, ungated)."
+            if verdict.extra_archived_in_generated
+            else ""
+        )
+        summary = (
+            f"regen-verify OK (reformat-only): {verdict.generated_document_count} "
+            f"document block(s) are semantically equal; the one-time reformat would normalize "
+            f"{', '.join(reformat_bits)} (surfaced for the WI-4510 gate-2 decision)." + archived_note
+        )
+    else:
+        gaps: list[str] = []
+        if verdict.missing_in_generated:
+            gaps.append(f"{len(verdict.missing_in_generated)} thread(s) missing from the regenerated view")
+        if verdict.extra_divergent_in_generated:
+            gaps.append(
+                f"{len(verdict.extra_divergent_in_generated)} divergent extra thread(s) "
+                "(phantom / non-terminal shadow rows) in the regenerated view"
+            )
+        if verdict.version_line_mismatches:
+            gaps.append(f"{len(verdict.version_line_mismatches)} thread(s) with version-line mismatches")
+        archived_note = (
+            f" ({len(verdict.extra_archived_in_generated)} terminal-archived shadow thread(s) tolerated)"
+            if verdict.extra_archived_in_generated
+            else ""
+        )
+        summary = (
+            "regen-verify DIVERGENT: "
+            + "; ".join(gaps)
+            + archived_note
+            + ". The shadow does not reconstruct the INDEX."
+        )
+
+    payload: dict[str, Any] = {
+        "command": "flow regen-verify",
+        "index_path": str(resolved_index),
+        "mutated": refreshed,
+        "shadow_refreshed": refreshed,
+        "status": verdict.status,
+        "summary": summary,
+        **verdict_dict,
+    }
+
+    if write_evidence:
+        base_dir = (
+            Path(evidence_dir)
+            if evidence_dir is not None
+            else Path(config.project_root) / ".gtkb-state" / "cutover-evidence" / "regen-verify"
+        )
+        run_id = f"regen-verify-{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+        run_dir = base_dir / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        json_path = run_dir / "verdict.json"
+        json_path.write_text(json.dumps(verdict_dict, indent=2, sort_keys=True), encoding="utf-8")
+        payload["run_id"] = run_id
+        payload["verdict_json"] = str(json_path)
+
+    _emit_cli_payload(payload, json_output=json_output)
+    if not verdict.ok:
+        raise SystemExit(1)
+
+
 @flow_group.command("pilot")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 def flow_pilot_cmd(json_output: bool) -> None:

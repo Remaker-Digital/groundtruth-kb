@@ -26,7 +26,13 @@ from click.testing import CliRunner
 
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.tafe_bridge_ingestion import derive_flow_status, ingest_bridge_index
+from groundtruth_kb.tafe_bridge_ingestion import (
+    _file_slug_from_path,
+    _plan_thread,
+    derive_flow_status,
+    ingest_bridge_index,
+)
+from groundtruth_kb.tafe_index_sync import DocumentBlock, IndexVersionLine
 from groundtruth_kb.typed_artifact_flow import TypedArtifactFlowService
 
 
@@ -289,6 +295,112 @@ def test_cli_ingest_dry_run_default_writes_nothing(runner: CliRunner, project_di
         db.close()
 
     assert index_file.read_bytes() == before  # canonical INDEX byte-identical
+
+
+# --- WI-4574: ingestion phantom-guard (Document-name vs file-slug consistency) --
+#
+# Derived from the ``ADR-TAFE-SLICE-C-INGESTION-001`` D2 identity contract: a
+# thread's ``subject_id`` (``Document:`` name) must be consistent with the slug of
+# its version-line ``artifact_ref``. A mismatch (the historical ``sp1`` phantom)
+# must never create a mismatched-``subject_id`` orphan flow_instance.
+
+
+def test_mismatched_document_name_is_skipped(tmp_path: Path) -> None:
+    """A ``Document:`` block whose name != its version-line file slug is skipped.
+
+    Regression for the WI-4574 phantom orphan: a malformed block named
+    ``sp1-dispatch-reliability-prime-handoff`` pointing at the correctly-slugged
+    ``bridge/gtkb-sp1-...`` file must not create a mismatched-``subject_id``
+    flow_instance; the block name is recorded in ``threads_skipped``.
+    """
+    db, service = _service(tmp_path)
+    try:
+        index_text = (
+            "# Bridge INDEX\n\n"
+            "Document: sp1-dispatch-reliability-prime-handoff\n"
+            "NEW: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md\n\n"
+        )
+        result = ingest_bridge_index(index_text, service, apply=True)
+        assert "sp1-dispatch-reliability-prime-handoff" in result.threads_skipped
+        assert service.get_flow_instance("flow-bridge-sp1-dispatch-reliability-prime-handoff") is None
+        # No instance is created under the file slug either: the guard skips the
+        # whole malformed block rather than silently rewriting its identity.
+        assert service.get_flow_instance("flow-bridge-gtkb-sp1-dispatch-reliability-prime-handoff") is None
+        assert result.instances_written == 0
+    finally:
+        db.close()
+
+
+def test_matching_document_name_ingests_unchanged(tmp_path: Path) -> None:
+    """A ``Document:`` block whose name matches its version-line file slug ingests.
+
+    The guard skips ONLY clear mismatches; a consistent block is unaffected.
+    """
+    db, service = _service(tmp_path)
+    try:
+        index_text = (
+            "# Bridge INDEX\n\n"
+            "Document: gtkb-sp1-dispatch-reliability-prime-handoff\n"
+            "NEW: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md\n\n"
+        )
+        result = ingest_bridge_index(index_text, service, apply=True)
+        assert "gtkb-sp1-dispatch-reliability-prime-handoff" not in result.threads_skipped
+        inst = service.get_flow_instance("flow-bridge-gtkb-sp1-dispatch-reliability-prime-handoff")
+        assert inst is not None
+        assert inst["subject_id"] == "gtkb-sp1-dispatch-reliability-prime-handoff"
+        assert result.instances_written == 1
+    finally:
+        db.close()
+
+
+def test_file_slug_derivation_fails_open_on_unparseable_path() -> None:
+    """``_file_slug_from_path`` returns the slug for a normal path, None otherwise.
+
+    The Slice A version-line regex guarantees the ``bridge/<slug>-NNN.md`` shape
+    for any parsed version line, so an unparseable ``latest.path`` cannot arise
+    through the parser; the ``None`` (fail-open) branch is exercised here directly.
+    """
+    assert _file_slug_from_path("bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md") == (
+        "gtkb-sp1-dispatch-reliability-prime-handoff"
+    )
+    assert _file_slug_from_path("bridge/gtkb-spec-pipeline-f8-012.md") == "gtkb-spec-pipeline-f8"
+    # No determinable ``-NNN.md`` version suffix -> not determinable -> fail open.
+    assert _file_slug_from_path("bridge/oddball-thread.md") is None
+    assert _file_slug_from_path("bridge/-001.md") is None
+    assert _file_slug_from_path("bridge/no-extension") is None
+
+
+def test_unparseable_version_path_is_not_skipped(tmp_path: Path) -> None:
+    """Fail-open at the ``_plan_thread`` boundary: an unparseable path never skips.
+
+    Drives ``_plan_thread`` directly with a hand-built ``DocumentBlock`` whose
+    version-line path has no determinable ``-NNN.md`` suffix (a shape the parser
+    itself would never emit). The block must still plan a flow_instance rather
+    than be dropped, proving the guard skips ONLY clear, determinable mismatches.
+    """
+    db, service = _service(tmp_path)
+    try:
+        line = IndexVersionLine(
+            status="NEW",
+            path="bridge/oddball-thread.md",  # no -NNN.md suffix -> file slug undeterminable
+            version=1,
+            line_number=2,
+            raw="NEW: bridge/oddball-thread.md\n",
+        )
+        block = DocumentBlock(
+            name="oddball-thread",
+            document_line_number=1,
+            document_raw="Document: oddball-thread\n",
+            body_raw=(line.raw,),
+            version_lines=(line,),
+            malformed_lines=(),
+        )
+        plan = _plan_thread(block, service)
+        assert plan is not None  # fail-open: not skipped
+        assert plan.slug == "oddball-thread"
+        assert plan.flow_instance_id == "flow-bridge-oddball-thread"
+    finally:
+        db.close()
 
 
 def test_cli_ingest_apply_writes_shadow_and_leaves_index(runner: CliRunner, project_dir: Path) -> None:

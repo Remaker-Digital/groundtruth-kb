@@ -29,14 +29,16 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+# SPEC-1882: deploy_config is the single source of truth for environment FQDNs.
+# Read the FQDN from the SoT instead of hardcoding it here (WI-4572).
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from scripts.deploy_config import get_environment as _dc_get_environment  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-FQDNS = {
-    "staging": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-    "production": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-}
 
 KEY_ENV_VARS = {
     "staging": "STAGING_SPA_KEY",
@@ -145,7 +147,7 @@ def trigger_run(base_url: str, api_key: str, suite: str, env: str) -> str | None
         log(f"  Run queued: {run_id}")
         return run_id
     elif status == 409:
-        log(f"  ERROR: A test run is already in progress.")
+        log("  ERROR: A test run is already in progress.")
         log(f"  {data}")
         return None
     elif status == 0:
@@ -175,7 +177,7 @@ def poll_until_complete(base_url: str, api_key: str, run_id: str) -> dict:
         if status_code == 0:
             retries += 1
             if retries > 3:
-                log(f"  ERROR: 3 consecutive connection failures. Aborting.")
+                log("  ERROR: 3 consecutive connection failures. Aborting.")
                 return {"status": "connection_error", "passed": 0, "failed": 0}
             log(f"  Connection error (retry {retries}/3)...")
             time.sleep(POLL_INTERVAL_S)
@@ -262,7 +264,7 @@ def main() -> int:
 
     _init_log()
 
-    log(f"Agent Red Test Runner")
+    log("Agent Red Test Runner")
     log(f"  Environment: {args.environment}")
     log(f"  Suite: {args.suite}")
     log("")
@@ -273,7 +275,7 @@ def main() -> int:
         _close_log()
         return 1
 
-    base_url = FQDNS[args.environment]
+    base_url = _dc_get_environment(args.environment)["fqdn"]
 
     # 2. Trigger the run
     run_id = trigger_run(base_url, api_key, args.suite, args.environment)

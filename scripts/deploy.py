@@ -43,17 +43,22 @@ if str(_SCRIPTS_DIR) not in sys.path:
 # Existing in-tree callers and tests that do `from scripts.deploy import
 # SCALING_CONFIG` (or via spec_from_file_location) continue to work
 # byte-identically; the canonical pipeline now imports the same symbols.
-from lib.scaling_targets import (  # noqa: E402  (after sys.path bootstrap)
-    RESOURCE_GROUP,
-    CONTAINER_APPS,
-    AGENT_CONTAINER_APPS,
-    INFRA_CONTAINER_APPS,
-    SCALING_CONFIG,
-    get_scaling_targets,
-)
+# SPEC-1882: deploy_config is the single source of truth for environment FQDNs.
+# No hardcoded FQDN literal here (WI-4572); read via get_environment().
+import deploy_config  # noqa: E402  (after sys.path bootstrap)
 from lib.scaling_enforcement import (  # noqa: E402
     _enforce_one as _lib_enforce_one,
+)
+from lib.scaling_enforcement import (
     enforce_all_scaling as _lib_enforce_all_scaling,
+)
+from lib.scaling_targets import (  # noqa: E402  (after sys.path bootstrap)
+    AGENT_CONTAINER_APPS,
+    CONTAINER_APPS,
+    INFRA_CONTAINER_APPS,
+    RESOURCE_GROUP,
+    SCALING_CONFIG,
+    get_scaling_targets,
 )
 
 # ---------------------------------------------------------------------------
@@ -67,11 +72,6 @@ ACR_NAME = "acragentredeastus"
 TEST_HOST_APPS = {
     "staging": "agent-red-test-host",
     "production": "agent-red-test-host-prod",
-}
-
-FQDNS = {
-    "staging": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-    "production": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
 }
 
 HEALTH_TIMEOUT_S = 120
@@ -150,7 +150,7 @@ def verify_acr_tag(repo: str, tag: str) -> bool:
     cmd = f"az acr repository show-tags --name {ACR_NAME} --repository {repo} --query \"[?@=='{tag}']\" -o tsv"
     code, output = _run(cmd, timeout=30)
     if code != 0:
-        log(f"  WARNING: Could not verify ACR tag (az CLI issue)")
+        log("  WARNING: Could not verify ACR tag (az CLI issue)")
         return True  # proceed anyway — deploy will fail if image missing
     return tag in output
 
@@ -217,7 +217,7 @@ def deploy_container(app_name: str, image: str) -> bool:
     if code != 0:
         log(f"  ERROR: Deploy failed: {output}")
         return False
-    log(f"  Deploy command completed.")
+    log("  Deploy command completed.")
     return True
 
 
@@ -446,7 +446,7 @@ def verify_chat_conversation(fqdn: str, environment: str) -> bool:
             return False
 
         log(f"  [PASS] Pipeline: {' → '.join(stages_completed)}")
-        log(f"    Tokens: yes, Done: yes, Errors: none")
+        log("    Tokens: yes, Done: yes, Errors: none")
         return True
 
     except Exception as exc:
@@ -551,7 +551,7 @@ def main() -> int:
     log("")
 
     app_name = CONTAINER_APPS[args.environment]
-    fqdn = FQDNS[args.environment]
+    fqdn = deploy_config.get_environment(args.environment)["fqdn"]
     gw_image = f"{ACR_LOGIN_SERVER}/api-gateway:{args.tag}"
     expected_version = args.tag.lstrip("v")  # v1.95.6 → 1.95.6
 
@@ -688,9 +688,9 @@ def main() -> int:
     if not version_ok:
         log(f"  ❌ Version mismatch: expected {expected_version}, got {actual}")
     if not chat_ok:
-        log(f"  ❌ Widget chat smoke test FAILED — deployment is NOT verified")
+        log("  ❌ Widget chat smoke test FAILED — deployment is NOT verified")
     if args.skip_widget_check:
-        log(f"  ⚠️  Widget check was SKIPPED (--skip-widget-check)")
+        log("  ⚠️  Widget check was SKIPPED (--skip-widget-check)")
     log("=" * 50)
 
     _close_log()

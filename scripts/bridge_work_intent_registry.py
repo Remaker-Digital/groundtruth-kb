@@ -95,6 +95,18 @@ def _root(project_root: Path | None = None) -> Path:
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
+    import sys
+
+    src_path = str(PROJECT_ROOT / "groundtruth-kb" / "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    try:
+        from groundtruth_kb.db import SCHEMA_SQL
+
+        conn.executescript(SCHEMA_SQL)
+    except ImportError:
+        pass
+
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS work_intent_claims (

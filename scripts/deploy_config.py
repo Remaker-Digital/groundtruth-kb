@@ -31,7 +31,10 @@ load_env_local()
 
 ENVIRONMENTS: dict[str, dict[str, str]] = {
     "staging": {
-        "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "fqdn": os.environ.get(
+            "STAGING_FQDN",
+            "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        ),
         "container_app": "agent-red-staging",
         "tenant_id": os.environ.get("STAGING_REMAKER_TENANT_ID", "remaker-digital-001"),
         "api_key": os.environ.get("STAGING_REMAKER_TENANT_KEY", ""),
@@ -41,7 +44,10 @@ ENVIRONMENTS: dict[str, dict[str, str]] = {
         "cosmos_db_database": "agentred-staging",
     },
     "production": {
-        "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "fqdn": os.environ.get(
+            "PRODUCTION_FQDN",
+            "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        ),
         "container_app": "agent-red-api-gateway",
         "tenant_id": os.environ.get("PRODUCTION_REMAKER_TENANT_ID", ""),
         "api_key": os.environ.get("PRODUCTION_REMAKER_TENANT_KEY", ""),

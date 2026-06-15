@@ -34,6 +34,7 @@ from scripts.gtkb_bridge_writer import (
     next_file_number,
     parse_index,
     read_index,
+    remove_document,
     validate_transition,
     write_bridge_file,
 )
@@ -478,3 +479,79 @@ def test_insert_index_status_deferred_accepts_owner_evidence_for_x_thread(tmp_pa
     _, blocks = read_index(project)
     assert blocks[0].latest_status == "DEFERRED"
     assert blocks[0].latest_version == 2
+
+
+# ---------- remove_document (phantom-only INDEX entry removal) ----------
+
+
+def test_remove_document_removes_phantom_block(tmp_path: Path) -> None:
+    # "phantom" has no backing bridge/phantom-*.md file on disk.
+    project = _build_project(
+        tmp_path,
+        _doc_block("keep", [("GO", 2), ("NEW", 1)]) + _doc_block("phantom", [("NEW", 1)]),
+    )
+
+    remove_document("phantom", project)
+
+    _, blocks = read_index(project)
+    names = [block.name for block in blocks]
+    assert "phantom" not in names
+    assert "keep" in names
+    keep = get_block(blocks, "keep")
+    assert keep is not None
+    assert keep.latest_status == "GO"
+    assert keep.latest_version == 2
+
+
+def test_remove_document_guardrail_refuses_backed_slug(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("real", [("NEW", 1)]))
+    _make_bridge_file(project, "real", 1, "NEW\nbody\n")
+    before = (project / "bridge" / "INDEX.md").read_text(encoding="utf-8")
+
+    with pytest.raises(BridgeConflictError, match="backing bridge file"):
+        remove_document("real", project)
+
+    # Guardrail must leave INDEX untouched.
+    assert (project / "bridge" / "INDEX.md").read_text(encoding="utf-8") == before
+    _, blocks = read_index(project)
+    assert get_block(blocks, "real") is not None
+
+
+def test_remove_document_absent_slug_raises_not_found(tmp_path: Path) -> None:
+    project = _build_project(tmp_path, _doc_block("present", [("NEW", 1)]))
+    before = (project / "bridge" / "INDEX.md").read_text(encoding="utf-8")
+
+    with pytest.raises(BridgeConflictError, match="not found"):
+        remove_document("ghost", project)
+
+    assert (project / "bridge" / "INDEX.md").read_text(encoding="utf-8") == before
+
+
+def test_remove_document_is_surgical_and_preserves_order(tmp_path: Path) -> None:
+    project = _build_project(
+        tmp_path,
+        _doc_block("first", [("NEW", 1)])
+        + _doc_block("middle-phantom", [("NO-GO", 2), ("NEW", 1)])
+        + _doc_block("last", [("VERIFIED", 1)]),
+    )
+
+    remove_document("middle-phantom", project)
+
+    _, blocks = read_index(project)
+    assert [block.name for block in blocks] == ["first", "last"]
+    # No double-blank artifact: INDEX still parses cleanly with both survivors.
+    first = get_block(blocks, "first")
+    last = get_block(blocks, "last")
+    assert first is not None and first.latest_status == "NEW"
+    assert last is not None and last.latest_status == "VERIFIED"
+
+
+def test_remove_document_guardrail_ignores_prefix_sharing_sibling(tmp_path: Path) -> None:
+    # "foo-bar-001.md" must NOT count as a backing file for the phantom "foo".
+    project = _build_project(tmp_path, _doc_block("foo", [("NEW", 1)]))
+    _make_bridge_file(project, "foo-bar", 1, "NEW\nbody\n")
+
+    remove_document("foo", project)
+
+    _, blocks = read_index(project)
+    assert get_block(blocks, "foo") is None

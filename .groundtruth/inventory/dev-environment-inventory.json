@@ -5,7 +5,7 @@
     "script_hash": "sha256:61d23cb8e64e6a66d45eb02faf81eac9ebba575138a86c907369e89dfb6dbc12",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-13T09:11:03Z",
+  "generated_at": "2026-06-15T01:16:50Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -134,7 +134,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 2,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -689,11 +689,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "verified",
-      "version": "26.1.2"
+      "status": "unknown",
+      "version": "unknown"
     },
     "playwright": {
       "classification": "unsupported",
@@ -707,7 +707,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -721,7 +721,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.12"
     }
   },
   "verification": {

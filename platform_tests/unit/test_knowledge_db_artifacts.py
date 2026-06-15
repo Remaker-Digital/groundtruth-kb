@@ -65,6 +65,7 @@ class TestSchemaExists:
         )
         expected = sorted(
             [
+                "agent_capability_snapshots",
                 "assertion_runs",
                 "backlog_snapshots",
                 "canonical_terms",
@@ -74,6 +75,10 @@ class TestSchemaExists:
                 "dispatch_events",
                 "documents",
                 "environment_config",
+                "flow_artifacts",
+                "flow_definitions",
+                "flow_events",
+                "flow_instances",
                 "harnesses",
                 "operational_procedures",
                 "pipeline_events",
@@ -89,6 +94,9 @@ class TestSchemaExists:
                 "spec_quality_scores",
                 "specification_deliberation_sources",
                 "specifications",
+                "stage_attempt_telemetry",
+                "stage_instances",
+                "stage_leases",
                 "test_coverage",
                 "test_plan_phases",
                 "test_plans",
@@ -106,11 +114,14 @@ class TestSchemaExists:
         views = sorted(r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='view'").fetchall())
         expected = sorted(
             [
+                "current_agent_capability_snapshots",
                 "current_backlog_snapshots",
                 "current_canonical_terms",
                 "current_deliberations",
                 "current_documents",
                 "current_environment_config",
+                "current_flow_definitions",
+                "current_flow_instances",
                 "current_harnesses",
                 "current_operational_procedures",
                 "current_project_artifact_links",
@@ -120,6 +131,9 @@ class TestSchemaExists:
                 "current_projects",
                 "current_sot_artifacts",
                 "current_specifications",
+                "current_stage_attempt_telemetry",
+                "current_stage_instances",
+                "current_stage_leases",
                 "current_test_plan_phases",
                 "current_test_plans",
                 "current_test_procedures",

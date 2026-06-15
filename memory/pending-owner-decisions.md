@@ -10,6 +10,15 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-1264
+  asked_at: 2026-06-14T23:26:10.112237Z
+  question: "Want me to dismiss the stale decisions, or is there anything else for the repo before I stand down?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 81fa8647b8637d12
+  resolved_at: 2026-06-14T23:26:10Z
+  answer: "Superseded by the cycle-19 AskUserQuestion; owner chose: dismiss stale decisions, then /kb-session-wrap. The 'stale decisions' (DECISION-1251/1253/1255) were already resolved 2026-06-14T19:45:57Z; this prose precursor is dismissed."
+  notes: "Dismissed per owner cycle-19 direction; prose precursor formalized into AUQ."
 - id: DECISION-WI4481-PROJECT-LINKAGE
   asked_at: 2026-06-13T09:52:00Z
   question: "WI-4481 (P1 bridge-integrity defect, INDEX atomic-write guard) is implemented + verified green and was GO'd (bridge/gtkb-bridge-index-atomic-write-guard-002.md), but the post-implementation report cannot be filed: WI-4481 is a standalone work item (project_name=None) and is in no active PAUTH's included_work_item_ids list. The bridge-compliance-gate hard-blocks the NEW/REVISED implementation_report via DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001 (missing Project Authorization: / Project: lines) and the live membership check (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001). Owner decision needed: admit WI-4481 to a project (candidate: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY) and add it to that project's PAUTH included_work_item_ids via AUQ (precedent: PAUTH v4 'add WI-3380' = DELIB-S-LOOP-2026-06-04-WI3380-PAUTH-INCLUSION-AUQ). A dispatched worker cannot run AUQ or amend a PAUTH, so this blocks report-filing → VERIFIED → WI close."
@@ -119,136 +128,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0627
-  asked_at: 2026-05-15T22:36:02.891714Z
-  question: "DECISION-0624 from the prior session is still unresolved — it concerns whether to wait on a pending Codex re-review or move on to other work. How would you like to direct this Prime Builder session?"
-  options:
-    - "Stand by for re-review"
-    - "Continue last session"
-    - "Pick a new focus"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 227bf5336736a38b
-  resolved_at: 2026-05-15T22:36:02.891714Z
-  answer: "User has answered your questions: \"DECISION-0624 from the prior session is still unresolved — it concerns whether to wait on a pending Codex re-review or move on to other work. How would you like to direct this Prime Builder session?\"=\"Stand by for re-review\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0628
-  asked_at: 2026-05-15T23:32:43.662054Z
-  question: "Codex's re-review confirms the decision-tracker suppression thread is Prime-actionable at NO-GO -002; the Codex-endorsed next step is a Prime-authored -003 REVISED refile. How should I proceed?"
-  options:
-    - "Refile -003 REVISED now (Recommended)"
-    - "Refile both relay threads"
-    - "Keep holding"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: bfb241c3c946b24b
-  resolved_at: 2026-05-15T23:32:43.662054Z
-  answer: "User has answered your questions: \"Codex's re-review confirms the decision-tracker suppression thread is Prime-actionable at NO-GO -002; the Codex-endorsed next step is a Prime-authored -003 REVISED refile. How should I proceed?\"=\"Refile -003 REVISED now (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0629
-  asked_at: 2026-05-16T00:27:43.061434Z
-  question: "Friction-hygiene -018 NO-GO requires 13 more IP-D tests (32 approved, 19 substantiated) — but landing them through a post-impl REVISED hits the IP-C chain-walk self-trap that the thread itself introduced. How should Prime Builder proceed on this thread?"
-  options:
-    - "Owner waiver: IP-D 32→19 scope reduction"
-    - "Land remaining 13 tests + self-trap workaround"
-    - "Fix IP-C self-trap first via sibling thread"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 107657239f370623
-  resolved_at: 2026-05-16T00:27:43.061434Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0630
-  asked_at: 2026-05-16T01:13:13.083442Z
-  question: "Thread #1 (cross-harness-trigger dispatch-state diagnostics) is Codex-VERIFIED and ready to commit; thread #7's report is filed and awaiting VERIFIED; more will follow as the backlog drains. The commit-safety rule says I don't commit without your explicit authorization. How should I handle commits for VERIFIED bridge threads this session?"
-  options:
-    - "Commit each VERIFIED thread, no push"
-    - "Hold all commits"
-    - "Commit and push each VERIFIED thread"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e9b2fe9483952f44
-  resolved_at: 2026-05-16T01:13:13.083442Z
-  answer: "User has answered your questions: \"Thread #1 (cross-harness-trigger dispatch-state diagnostics) is Codex-VERIFIED and ready to commit; thread #7's report is filed and awaiting VERIFIED; more will follow as the backlog drains. The commit-safety rule says I don't commit without your explicit authorization. How should I handle commits for VERIFIED bridge threads this session?\"=\"Commit each VERIFIED thread, no push\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0631
-  asked_at: 2026-05-16T01:29:10.277778Z
-  question: "Bridge auto-dispatch (PB harness) selected two entries. Entry 1 — `gtkb-implementation-gate-friction-hygiene-018` — is a Codex NO-GO citing IP-D scope: the approved 32-test regression matrix from `-005` is currently substantiated by ~19 tests in the live test files. Codex requires one of three paths before VERIFIED can close this thread. Which path should Prime Builder take?"
-  options:
-    - "Land remaining IP-D tests (Recommended)"
-    - "REVISED proposal narrowing to 19"
-    - "Owner waiver for 19-test scope"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: cdc9d49f72e3e506
-  resolved_at: 2026-05-16T01:29:10.277778Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0632
-  asked_at: 2026-05-16T01:41:25.688810Z
-  question: "Committing the VERIFIED bridge threads is blocked by the release-blocker pre-commit hook 'Inventory drift check': the repo's dev-environment-inventory.json baseline (generated 2026-05-08) is stale versus accumulated repo_configured_surfaces. The hook refuses ALL commits until the inventory baseline is refreshed. How should I clear it so the VERIFIED work can land?"
-  options:
-    - "Regenerate + commit the inventory"
-    - "Defer all commits to wrap-up"
-    - "Investigate the drift first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a7c97f7729553ef6
-  resolved_at: 2026-05-16T01:41:25.688810Z
-  answer: "User has answered your questions: \"Committing the VERIFIED bridge threads is blocked by the release-blocker pre-commit hook 'Inventory drift check': the repo's dev-environment-inventory.json baseline (generated 2026-05-08) is stale versus accumulated repo_configured_surfaces. The hook refuses ALL commits until the inventory baseline is refreshed. How should I clear it so the VERIFIED work can land?\"=\"Regenerate + commit the inventory\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0633
-  asked_at: 2026-05-16T02:08:01.243559Z
-  question: "Codex's -018 NO-GO on gtkb-implementation-gate-friction-hygiene cites IP-D scope drift: the approved -005/-011 plan calls for 32 regression tests (11 null-sink/redirect + 12 sqlite + 9 chain-walk); the implementation lands 19. The thread cannot reach VERIFIED without one of three resolutions. Which path?"
-  options:
-    - "Land remaining 13 IP-D tests"
-    - "File REVISED -019 narrowing IP-D to 19"
-    - "Cite explicit owner waiver -019"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 74f6d82d8afda562
-  resolved_at: 2026-05-16T02:08:01.243559Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0634
-  asked_at: 2026-05-16T02:16:22.855205Z
-  question: "Codex NO-GO on `gtkb-implementation-gate-friction-hygiene-018` says IP-D was approved as 32 regression tests at proposal -005 but only 19 IP-D tests landed (52 total pass). Codex requires one of three closure paths. Which path should Prime take?"
-  options:
-    - "Land remaining 13 tests (Recommended)"
-    - "Revised proposal narrowing IP-D to 19"
-    - "Owner waiver for the scope reduction"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: bd45be2c09203c59
-  resolved_at: 2026-05-16T02:16:22.855205Z
-  answer: "Answer questions?"
-  notes: ""
-- id: DECISION-0635
-  asked_at: 2026-05-16T05:14:37.865646Z
-  question: "Codex's global config (~/.codex/config.toml) is 100% zero-filled with no backup, so the original settings can't be recovered from the file. How do you want to restore Codex?"
-  options:
-    - "Reset now (Recommended)"
-    - "Try Previous Versions first"
-    - "Rebuild from your input"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 9a3ab80098657086
-  resolved_at: 2026-05-16T05:14:37.865646Z
-  answer: "User has answered your questions: \"Codex's global config (~/.codex/config.toml) is 100% zero-filled with no backup, so the original settings can't be recovered from the file. How do you want to restore Codex?\"=\"Reset now (Recommended)\". You can now continue with the user's answers in mind."
-  notes: ""
-- id: DECISION-0636
-  asked_at: 2026-05-16T05:34:04.416353Z
-  question: "The original config.toml is unrecoverable and MCP server definitions can't be auto-recovered from any intact source. How should I rebuild ~/.codex/config.toml?"
-  options:
-    - "Core config now (Recommended)"
-    - "Full rebuild with MCP"
-    - "Try deeper MCP recovery"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f83b78f11dea06de
-  resolved_at: 2026-05-16T05:34:04.416353Z
-  answer: "User has answered your questions: \"The original config.toml is unrecoverable and MCP server definitions can't be auto-recovered from any intact source. How should I rebuild ~/.codex/config.toml?\"=\"Core config now (Recommended)\" selected preview: # ~/.codex/config.toml # Rebuilt 2026-05-15 after the original was lost to zero-fill corruption. # Core settings recovered from ~/.codex/.codex-global-state.json.  model = \"gpt-5.5\" model_reasoning_effort = \"medium\" approval_policy = \"on-request\" sandbox_mode = \"workspace-write\"  [sandbox_workspace_write] network_access = false. You can now continue with the user's answers in mind."
-  notes: ""
 - id: DECISION-0637
   asked_at: 2026-05-16T06:11:51.227066Z
   question: "INDEX has 287 threads (~85 Prime-actionable), the backlog is mostly bridge-machinery changes, and the fix that makes parallel sessions safe (bridge-parallel-session-collision) is itself an unimplemented GO. Parallelizing now hits a known collision bug. How should I drain the queue?"
@@ -7870,6 +7749,58 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-14T20:53:15.904569Z
   answer: "Your questions have been answered: \"Closing Codex wasn't enough — the bridge auto-dispatch trigger keeps respawning hung workers that re-lock the corrupt index, and my own tool calls fire that trigger. Process-killing can't win. What's the cleanest way to get a quiet window to rebuild the index?\"=\"Restart the machine, then I rebuild (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1262
+  asked_at: 2026-06-14T23:13:27.283955Z
+  question: "TAFE shadow-vs-INDEX reconciliation is complete: cutover-evidence is substantively clean (lost_blocks=0, extra_blocks=0, parity=True), with only a 2-thread transient shadow-currency lag (cleared by the standard pre-cutover re-ingest). The WI-4510 HOLD's concerns (634 lost_blocks + fidelity_mismatches) are fully resolved. Proceed with the governed WI-4510 cutover (make the TAFE shadow authoritative; bridge/INDEX.md becomes a generated view via WI-4507)?"
+  options:
+    - "Proceed: file WI-4510 cutover proposal"
+    - "Hold: not yet"
+    - "Proceed but quiesce swarm first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8965b1340bb6601b
+  resolved_at: 2026-06-14T23:13:27.283955Z
+  answer: "Your questions have been answered: \"TAFE shadow-vs-INDEX reconciliation is complete: cutover-evidence is substantively clean (lost_blocks=0, extra_blocks=0, parity=True), with only a 2-thread transient shadow-currency lag (cleared by the standard pre-cutover re-ingest). The WI-4510 HOLD's concerns (634 lost_blocks + fidelity_mismatches) are fully resolved. Proceed with the governed WI-4510 cutover (make the TAFE shadow authoritative; bridge/INDEX.md becomes a generated view via WI-4507)?\"=\"Proceed: file WI-4510 cutover proposal\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1263
+  asked_at: 2026-06-14T23:13:27.283955Z
+  question: "TAFE reconciliation is COMPLETE and gate-1 (proceed to the cutover proposal) is approved + recorded. But the WI-4510 cutover is an unimplemented fundamental-architecture migration (reverses the bridge data-flow; amends GOV-FILE-BRIDGE-AUTHORITY-001; needs its own ADR + phased plan + rollback). A complete handoff is ready. How should the WI-4510 cutover proposal be approached?"
+  options:
+    - "Fresh dedicated session"
+    - "Continue here in the loop"
+    - "Pause cutover; you'll direct later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d46745bbd6bbde82
+  resolved_at: 2026-06-14T23:13:27.283955Z
+  answer: "Your questions have been answered: \"TAFE reconciliation is COMPLETE and gate-1 (proceed to the cutover proposal) is approved + recorded. But the WI-4510 cutover is an unimplemented fundamental-architecture migration (reverses the bridge data-flow; amends GOV-FILE-BRIDGE-AUTHORITY-001; needs its own ADR + phased plan + rollback). A complete handoff is ready. How should the WI-4510 cutover proposal be approached?\"=\"Fresh dedicated session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1265
+  asked_at: 2026-06-14T23:36:48.400981Z
+  question: "Push + merge to main are done, the doc surfaces are professional, the description is refined, and the deploy-FQDN fix (WI-4572) is filed with both preflights green — it'll be reviewed and implemented asynchronously by the swarm. How would you like to proceed from here?"
+  options:
+    - "Stand down + clear stale decisions (Rec.)"
+    - "More repo polish"
+    - "Deep restructure (option C)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0670f1d09519de29
+  resolved_at: 2026-06-14T23:36:48.400981Z
+  answer: "Your questions have been answered: \"Push + merge to main are done, the doc surfaces are professional, the description is refined, and the deploy-FQDN fix (WI-4572) is filed with both preflights green — it'll be reviewed and implemented asynchronously by the swarm. How would you like to proceed from here?\"=\"dismiss the stale decisions, then /kb-session-wrap\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1266
+  asked_at: 2026-06-15T03:21:14.983648Z
+  question: "WI-4510 Phases 0-2 are implemented (by co-driving session 39c8c5) and I've independently verified them GREEN: 15/15 tests pass, ruff clean, Phase-0 cutover-evidence ok=True, regen-verify CLI wired. But 39c8c5 holds a go_implementation claim that MISSED its implementation deadline (02:23:39Z, no extension) and is in grace until 02:33:39Z (~7 min). The thread is one impl report (-007) from Codex VERIFIED. Protocol bars me from forcing an active claim without your call. How should I proceed?"
+  options:
+    - "Wait for lapse, then file"
+    - "Force-take-over now"
+    - "Stand down; let swarm file"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: af65cecb01df134f
+  resolved_at: 2026-06-15T03:21:14.983648Z
+  answer: "Your questions have been answered: \"WI-4510 Phases 0-2 are implemented (by co-driving session 39c8c5) and I've independently verified them GREEN: 15/15 tests pass, ruff clean, Phase-0 cutover-evidence ok=True, regen-verify CLI wired. But 39c8c5 holds a go_implementation claim that MISSED its implementation deadline (02:23:39Z, no extension) and is in grace until 02:33:39Z (~7 min). The thread is one impl report (-007) from Codex VERIFIED. Protocol bars me from forcing an active claim without your call. How should I proceed?\"=\"Wait for lapse, then file\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
@@ -8023,16 +7954,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S364
   answer: "Dismiss as unrecoverable false-positive prose flag (owner AskUserQuestion, 2026-05-27). The short prose pattern fired the detector with no recoverable referent; no real owner decision was missed."
   notes: "Tracker false-positive: short prose pattern in this session's startup window with no recoverable referent. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md (same root cause as DECISION-0624: detector re-fires when Pending Owner Decisions surface relays question text back into LLM context). Underlying detector fix tracked by bridge thread gtkb-owner-decision-tracker-startup-relay-known-match-suppression."
-- id: DECISION-0624
-  asked_at: 2026-05-15T21:09:56.911097Z
-  question: ""
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: fe6837e7b66ed715
-  resolved_at: 2026-05-15T22:30:00.000000Z
-  resolved_in_session: S354
-  answer: "Stand by for re-review (owner AskUserQuestion, 2026-05-15). Hold for the pending Codex re-review to land before taking new work."
-  notes: "Tracker false-positive: the Pending entry question text was relayed verbatim inside the cached startup disclosure (Pending Owner Decisions section) on the disclosure-relay turn, re-tripping the Stop-mode prose detector. Formalized as AskUserQuestion and resolved. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Underlying detector fix is tracked by bridge thread gtkb-owner-decision-tracker-startup-relay-known-match-suppression (NO-GO at -002; awaiting Prime REVISED -003)."
 - id: DECISION-0596
   asked_at: 2026-05-15T06:01:05.897121Z
   question: "Want me to fold those into a follow-up commit, or leave them for the next checkpoint? (Stale prose-ask from a prior 2026-05-15 early session. Referent of 'those' not recoverable from the record or session context. Resolved per owner AUQ 2026-05-15 S353: 'Dismiss as unrecoverable' — cleared with no action.)"

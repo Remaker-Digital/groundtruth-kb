@@ -501,3 +501,95 @@ def insert_index_status(
         _trim(project_root, current_thread=document_name)
     except Exception:  # noqa: BLE001 - archival must never fail a bridge write
         pass
+
+
+def _phantom_backing_files(document_name: str, project_root: Path) -> list[str]:
+    """Return the versioned bridge file names that back ``document_name``.
+
+    Only ``bridge/<document_name>-NNN.md`` files (digits immediately after the
+    slug) count as backing files. This deliberately excludes longer-named
+    siblings that merely share a prefix (e.g. ``foo-bar-001.md`` is not a
+    backing file for ``foo``), matching the version-pattern discipline used by
+    ``next_file_number``.
+    """
+    backing: list[str] = []
+    for path in _bridge_dir(project_root).glob(f"{document_name}-*.md"):
+        if re.match(rf"^{re.escape(document_name)}-\d{{3,}}\.md$", path.name):
+            backing.append(path.name)
+    return sorted(backing)
+
+
+def remove_document(document_name: str, project_root: Path) -> None:
+    """Remove a phantom ``Document: <name>`` block from bridge/INDEX.md.
+
+    A *phantom* block is an INDEX document entry with NO backing
+    ``bridge/<name>-NNN.md`` file on disk. Removal is restricted to phantoms
+    to preserve the never-delete-a-real-thread audit invariant: a thread that
+    still has versioned files on disk can never be removed from the INDEX by
+    this primitive.
+
+    The whole operation runs through the same serialized-writer lock and
+    atomic read-modify-write path as ``insert_index_status`` so concurrent
+    INDEX mutations can never interleave. The phantom-only guardrail and the
+    block removal are evaluated together inside the lock against live disk and
+    INDEX state.
+
+    Raises:
+        BridgeConflictError: if any ``bridge/<name>-NNN.md`` backing file
+            exists (phantom-only guardrail), or if ``document_name`` is absent
+            from INDEX.md (explicit not-found; consistent with
+            ``insert_index_status``'s block-not-found discipline).
+    """
+    index_path = _index_path(project_root)
+
+    def mutate(raw_current: str) -> str:
+        backing = _phantom_backing_files(document_name, project_root)
+        if backing:
+            raise BridgeConflictError(
+                f"refusing to remove {document_name!r}: backing bridge file(s) exist "
+                f"({', '.join(backing)}); only phantom (no-backing-file) entries are removable"
+            )
+        if get_block(parse_index(raw_current), document_name) is None:
+            raise BridgeConflictError(f"Document: {document_name} block not found in INDEX.md; nothing to remove")
+        lines = raw_current.splitlines(keepends=True)
+        out: list[str] = []
+        removed = False
+        i = 0
+        n = len(lines)
+        while i < n:
+            stripped = lines[i].rstrip("\r\n").strip()
+            doc_match = _DOCUMENT_LINE_RE.match(stripped)
+            if not removed and doc_match and doc_match.group("name") == document_name:
+                i += 1
+                # Drop the block's contiguous status/comment lines.
+                while i < n:
+                    nxt = lines[i].rstrip("\r\n").strip()
+                    if _STATUS_LINE_RE.match(nxt) or nxt.startswith("<!--"):
+                        i += 1
+                    else:
+                        break
+                # Drop a single trailing blank separator so blocks do not
+                # accumulate double blank lines after removal.
+                if i < n and lines[i].strip() == "":
+                    i += 1
+                removed = True
+                continue
+            out.append(lines[i])
+            i += 1
+        if not removed:
+            raise BridgeConflictError(f"Document: {document_name} block not found in INDEX.md; nothing to remove")
+        return "".join(out)
+
+    new_content = atomic_index_update(
+        index_path,
+        mutate,
+        state_dir=project_root / ".gtkb-state" / "bridge-index-writer",
+    )
+    verified = index_path.read_text(encoding="utf-8")
+    if verified != new_content:
+        raise BridgeConflictError("post-write verification failed for INDEX.md")
+    _, blocks = read_index(project_root)
+    if get_block(blocks, document_name) is not None:
+        raise BridgeConflictError(
+            f"post-write live-state verification failed: {document_name} still present in INDEX.md"
+        )

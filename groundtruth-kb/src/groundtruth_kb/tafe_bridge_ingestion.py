@@ -187,6 +187,27 @@ def _version_suffix(path: str) -> str:
     return base.rsplit("-", 1)[-1]
 
 
+def _file_slug_from_path(path: str) -> str | None:
+    """Derive the ``<slug>`` from a ``bridge/<slug>-NNN.md`` version-line path.
+
+    Strips the directory prefix, the ``.md`` extension, and the trailing
+    ``-NNN`` version token, returning the remaining slug. Returns ``None`` when
+    the path has no determinable ``-NNN.md`` version suffix so the ingestion
+    phantom-guard (WI-4574) **fails open** on an unparseable path: only a clear,
+    determinable mismatch may skip a thread. The Slice A version-line regex
+    guarantees the ``-NNN.md`` shape for any parsed version line, so this
+    ``None`` branch is a defensive guarantee rather than a normal parser path.
+    """
+    stem = path.rsplit("/", 1)[-1]
+    if not stem.endswith(".md"):
+        return None
+    base = stem[:-3]  # drop the ".md" extension
+    head, separator, suffix = base.rpartition("-")
+    if not separator or not suffix.isdigit():
+        return None
+    return head or None
+
+
 def _latest_version_line(block: DocumentBlock) -> IndexVersionLine | None:
     """Return the highest-version version line (the thread's latest), or None."""
     if not block.version_lines:
@@ -268,6 +289,16 @@ def _plan_thread(block: DocumentBlock, service: TypedArtifactFlowService) -> Thr
         return None
 
     slug = block.name
+    # WI-4574 ingestion phantom-guard: a ``Document:`` block whose name does not
+    # match the slug derived from its latest version-line ``artifact_ref`` would
+    # create a mismatched-``subject_id`` orphan flow_instance (the historical
+    # ``sp1`` phantom). Skip only a clear, determinable mismatch; an unparseable
+    # path (``_file_slug_from_path`` returns ``None``) fails open so legitimate
+    # threads are never dropped. Enforces the ``ADR-TAFE-SLICE-C-INGESTION-001``
+    # D2 identity contract (``subject_id`` consistent with the thread's files).
+    file_slug = _file_slug_from_path(latest.path)
+    if file_slug is not None and file_slug != slug:
+        return None
     has_prior_go = _has_prior_go(block, latest)
     flow_status = derive_flow_status(latest.status, has_prior_go=has_prior_go)
     bridge_kind = derive_bridge_kind(latest.status, has_prior_go=has_prior_go)

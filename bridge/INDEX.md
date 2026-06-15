@@ -1,4 +1,20 @@
+Document: gtkb-wi4510-tafe-authoritative-cutover
+VERIFIED: bridge/gtkb-wi4510-tafe-authoritative-cutover-008.md
+NEW: bridge/gtkb-wi4510-tafe-authoritative-cutover-007.md
+GO: bridge/gtkb-wi4510-tafe-authoritative-cutover-006.md
+REVISED: bridge/gtkb-wi4510-tafe-authoritative-cutover-005.md
+NO-GO: bridge/gtkb-wi4510-tafe-authoritative-cutover-004.md
+REVISED: bridge/gtkb-wi4510-tafe-authoritative-cutover-003.md
+NO-GO: bridge/gtkb-wi4510-tafe-authoritative-cutover-002.md
+NEW: bridge/gtkb-wi4510-tafe-authoritative-cutover-001.md
+
+Document: gtkb-wi4510-governed-cutover
+WITHDRAWN: bridge/gtkb-wi4510-governed-cutover-002.md
+NEW: bridge/gtkb-wi4510-governed-cutover-001.md
+
 Document: gtkb-bridge-index-remove-document
+VERIFIED: bridge/gtkb-bridge-index-remove-document-004.md
+NEW: bridge/gtkb-bridge-index-remove-document-003.md
 GO: bridge/gtkb-bridge-index-remove-document-002.md
 NEW: bridge/gtkb-bridge-index-remove-document-001.md
 
@@ -848,11 +864,11 @@ REVISED: bridge/gtkb-architecture-governance-hygiene-investigation-003.md
 NO-GO: bridge/gtkb-architecture-governance-hygiene-investigation-002.md
 NEW: bridge/gtkb-architecture-governance-hygiene-investigation-001.md
 
-Document: ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings 
-ADVISORY: bridge/ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings-001.md 
- 
-Document: gtkb-sp1-dispatch-reliability-prime-handoff 
-ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md 
+Document: ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings
+ADVISORY: bridge/ARCHITECTURE-ADVISORY-REPORT-2026-06-09-19-03-arch-audit-findings-001.md
+
+Document: gtkb-sp1-dispatch-reliability-prime-handoff
+ADVISORY: bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md
 
 Document: gtkb-bridge-advisory-message-type-implementation
 WITHDRAWN: bridge/gtkb-bridge-advisory-message-type-implementation-003.md

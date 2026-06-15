@@ -32,8 +32,8 @@ import pathlib
 import subprocess
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 
 logger = logging.getLogger("deploy_ui")
 
@@ -41,6 +41,13 @@ logger = logging.getLogger("deploy_ui")
 # Project root (repo root, one level above scripts/)
 # ---------------------------------------------------------------------------
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+# SPEC-1882: deploy_config is the single source of truth for environment FQDNs.
+# Read the FQDN from the SoT instead of hardcoding it here (WI-4572). Aliased
+# to keep the read separate from this module's own ENVIRONMENTS dict.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.deploy_config import get_environment as _dc_get_environment  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Component registry
@@ -84,13 +91,13 @@ ENVIRONMENTS: dict[str, dict] = {
         "container_app": "agent-red-staging",
         "resource_group": "Agent-Red",
         "registry": "acragentredeastus.azurecr.io",
-        "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "fqdn": _dc_get_environment("staging")["fqdn"],
     },
     "production": {
         "container_app": "agent-red-api-gateway",
         "resource_group": "Agent-Red",
         "registry": "acragentredeastus.azurecr.io",
-        "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "fqdn": _dc_get_environment("production")["fqdn"],
     },
 }
 

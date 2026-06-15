@@ -295,3 +295,7 @@ reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legiti
 [[acknowledged]]
 slug = "test-artifact-integrity-investigation"
 reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
+
+[[acknowledged]]
+slug = "sp1-dispatch-reliability-prime-handoff"
+reason = "WI-4574: isolated phantom-duplicate shadow row. A historical malformed INDEX block (Document name 'sp1-dispatch-reliability-prime-handoff', no 'gtkb-' prefix) pointed at bridge/gtkb-sp1-dispatch-reliability-prime-handoff-001.md -- the SAME artifact_ref as the correctly-slugged 'gtkb-sp1-...' instance (zero content loss). The append-only shadow retains the orphan after the INDEX phantom was trimmed; acknowledged as legitimately archived to unblock regen-verify. Reversible: removing this entry re-surfaces the slug. Owner decision: DELIB-WI4574-RECONCILE-AND-GUARD-AUTHORIZE-20260615 (the ingestion phantom-guard prevents recurrence)."
