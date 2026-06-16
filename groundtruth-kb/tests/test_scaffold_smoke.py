@@ -102,11 +102,11 @@ def test_smoke_local_only_doctor_not_fail(tmp_path: Path) -> None:
 
 
 def test_smoke_dual_agent_scaffold(tmp_path: Path) -> None:
-    """dual-agent scaffold creates bridge/INDEX.md and all bridge rule files."""
+    """dual-agent scaffold does not create bridge/INDEX.md and creates all bridge rule files."""
     options = _make_options("dual-agent", tmp_path)
     scaffold_project(options)
     target = tmp_path / "project"
-    assert (target / "bridge" / "INDEX.md").exists()
+    assert not (target / "bridge" / "INDEX.md").exists()
     rules_dir = target / ".claude" / "rules"
     for rule_file in _BRIDGE_RULE_FILES:
         assert (rules_dir / rule_file).exists(), f"Missing: {rule_file}"
@@ -142,11 +142,11 @@ def test_smoke_dual_agent_doctor_not_fail(tmp_path: Path) -> None:
 
 
 def test_smoke_dual_agent_webapp_scaffold(tmp_path: Path) -> None:
-    """dual-agent-webapp scaffold creates bridge and Docker files."""
+    """dual-agent-webapp scaffold does not create bridge/INDEX.md and creates Docker files."""
     options = _make_options("dual-agent-webapp", tmp_path, cloud_provider="azure")
     scaffold_project(options)
     target = tmp_path / "project"
-    assert (target / "bridge" / "INDEX.md").exists()
+    assert not (target / "bridge" / "INDEX.md").exists()
     rules_dir = target / ".claude" / "rules"
     for rule_file in _BRIDGE_RULE_FILES:
         assert (rules_dir / rule_file).exists(), f"Missing: {rule_file}"

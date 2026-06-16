@@ -270,6 +270,9 @@ def _rewrite_registry_text(text: str, adapters: list[SkillAdapter]) -> str:
 
         if skipping_codex_block and stripped.startswith("["):
             skipping_codex_block = False
+            while output and output[-1].strip() == "":
+                output.pop()
+            output.append("")
             continue
         if skipping_codex_block:
             index += 1
@@ -281,6 +284,9 @@ def _rewrite_registry_text(text: str, adapters: list[SkillAdapter]) -> str:
             current_source = stripped.split("=", 1)[1].strip().strip('"')
 
         if stripped == "[capabilities.codex]" and current_source in adapters_by_source:
+            while output and output[-1].strip() == "":
+                output.pop()
+            output.append("")
             output.append(line)
             output.extend(_registry_adapter_block(adapters_by_source[current_source]))
             skipping_codex_block = True

@@ -90,12 +90,12 @@ Existing requirements are sufficient. Once the Loyal Opposition approves this re
 
 ## Spec-Derived Verification Plan
 
-### Automated Tests
+**Automated Tests**
 - `python scripts/check_harness_parity.py --all`
 - `python -m pytest platform_tests/scripts/test_harness_quality_manifest.py`
 - `python -m pytest groundtruth-kb/tests/test_scaffold_smoke.py`
 
-### Manual Verification
+**Manual Verification**
 - Verify that both generators pass checker verification without formatting drift.
 - Verify `bridge/INDEX.md` is absent in generated project structures.
 
