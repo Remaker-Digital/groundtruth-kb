@@ -26,7 +26,9 @@ Dirty state at wrap: <clean|summary of remaining uncommitted paths>
 - MemBase: <work items/specs/projects/session_prompts updated, skipped, or blocked>
 - Deliberation Archive: <captures/harvest counts or blocker>
 - memory/MEMORY.md: <updated/no-op reason>
-- Bridge state: <latest statuses from bridge/INDEX.md that matter next>
+- Bridge state: <latest statuses from TAFE-backed bridge state / dispatcher
+  status that matter next; mention only current dispatcher/TAFE evidence unless
+  a historical audit record is directly relevant>
 - Reports/procedures: <paths to implementation reports, reviews, or procedure updates>
 - Ignored local evidence: <.groundtruth/.gtkb-state/report paths to inspect, or none>
 

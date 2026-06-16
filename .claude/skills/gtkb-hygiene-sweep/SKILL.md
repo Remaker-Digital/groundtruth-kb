@@ -32,7 +32,10 @@ This skill is NOT a replacement for owner-directed work prioritization. It surfa
 
 Before invoking the CLI:
 
-1. **Read live `bridge/INDEX.md`** — per `GOV-FILE-BRIDGE-AUTHORITY-001`, the index is canonical and never cached. Confirm no parallel session is already driving a hygiene-sweep-related thread.
+1. **Read TAFE/dispatcher bridge state** — use the bridge dispatcher
+   status/health CLI and TAFE-backed bridge-state surfaces to confirm no
+   parallel session is already driving a hygiene-sweep-related thread. Do not
+   consult or recreate the retired bridge-index artifact as bridge authority.
 2. **Confirm impl-authorization scope** — this skill files only the child-bridges it surfaces through owner AUQ; it does not invent new mutation scope.
 3. **Verify role assignment** — per `harness-state/role-assignments.json`, confirm the active harness's role includes `prime-builder` (this skill is `required_for_roles = ["prime-builder"]` in the registry).
 

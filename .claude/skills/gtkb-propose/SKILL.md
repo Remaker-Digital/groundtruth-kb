@@ -5,8 +5,13 @@ description: Scaffold a structurally compliant bridge proposal body (status toke
 
 This skill is the **composer** front-end to the `gtkb-bridge-propose`
 **writer**. It produces a gate-compliant draft; `gtkb-bridge-propose` performs
-the credential-scanned write + `bridge/INDEX.md` insert. This skill never writes
-to `bridge/` or MemBase itself.
+the credential-scanned no-index bridge write and dispatcher/TAFE state
+publication. This skill never writes to `bridge/` or MemBase itself.
+
+After the 2026-06-15 TAFE/dispatcher cutover, the retired bridge-index file
+must not exist in current GT-KB operation. The bridge writer must publish
+versioned bridge files and dispatcher/TAFE state without creating or requiring
+that retired file.
 
 # /gtkb-propose
 
@@ -44,7 +49,7 @@ versions of an existing thread, verdict files, or advisory entries.
        [--target-path <glob> --target-path <glob> ...]
    ```
 
-   The helper validates the slug (kebab-case + no `bridge/INDEX.md` collision),
+   The helper validates the slug (kebab-case and safe bridge-file name),
    validates the work-item/project/authorization triple read-only against
    MemBase, seeds `## Prior Deliberations` from a Deliberation Archive search,
    pre-lists the always-applicable governing specs in `## Specification Links`,
@@ -64,8 +69,8 @@ versions of an existing thread, verdict files, or advisory entries.
 
 4. **Hand off to the writer.** When the checklist is green, file the completed
    body via the `gtkb-bridge-propose` skill, which credential-scans the body,
-   writes `bridge/<slug>-001.md`, and inserts the `Document:` + `NEW:` entry at
-   the top of `bridge/INDEX.md`. Do **not** write `bridge/` from this skill.
+   writes `bridge/<slug>-001.md`, and publishes the bridge state through the
+   no-index dispatcher/TAFE path. Do **not** write `bridge/` from this skill.
 
 ## Boundaries
 

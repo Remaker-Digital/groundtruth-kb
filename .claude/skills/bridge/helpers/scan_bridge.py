@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Bridge INDEX scanner: role-filtered actionable list.
+"""Bridge scanner: role-filtered actionable list.
 
-Reads ``bridge/INDEX.md`` and emits a structured summary of which threads need
-attention from the calling harness based on its durable operating role.
+Reads status-bearing versioned bridge files and emits a structured summary of
+which threads need attention from the calling harness based on its durable
+operating role.
 
 Filter rules (per ``.claude/rules/file-bridge-protocol.md``):
 
@@ -53,7 +54,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-DEFAULT_INDEX_PATH = PROJECT_ROOT / "bridge" / "INDEX.md"
+DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 
 Role = Literal["prime-builder", "loyal-opposition"]
 
@@ -93,6 +94,11 @@ _STATUS_LINE_RE = re.compile(
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 _BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.MULTILINE)
+_VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3})\.md$")
+_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -174,6 +180,47 @@ def _parse_index(index_text: str) -> list[ThreadEntry]:
     return threads
 
 
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _render_state_from_version_files(project_root: Path) -> str:
+    bridge_dir = project_root / "bridge"
+    grouped: dict[str, list[tuple[int, str, str]]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = _VERSION_FILE_RE.match(path.name)
+        if not match:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        slug = match.group(1)
+        version = int(match.group(2))
+        try:
+            rel_path = path.resolve().relative_to(project_root.resolve()).as_posix()
+        except ValueError:
+            rel_path = path.as_posix()
+        grouped.setdefault(slug, []).append((version, status, rel_path))
+
+    lines: list[str] = []
+    for slug in sorted(grouped):
+        lines.append(f"Document: {slug}")
+        for _version, status, rel_path in sorted(grouped[slug], key=lambda row: row[0], reverse=True):
+            lines.append(f"{status}: {rel_path}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _operative_prime_path(thread: ThreadEntry) -> str | None:
     """Return the path of the operative Prime proposal (latest NEW/REVISED).
 
@@ -253,12 +300,13 @@ def scan(
     *,
     index_text: str | None = None,
 ) -> dict[str, Any]:
-    """Scan bridge/INDEX.md and return role-filtered actionable list.
+    """Scan versioned bridge state and return role-filtered actionable list.
 
     Args:
         role: ``"prime-builder"`` or ``"loyal-opposition"``.
-        index_path: Path to INDEX.md. Defaults to ``<project-root>/bridge/INDEX.md``.
-        index_text: Inline INDEX text (overrides ``index_path``). Useful for tests.
+        index_path: Optional compatibility-text locator used only to infer a
+            project root for old test fixtures; live scans do not read it.
+        index_text: Inline compatibility-shaped text. Useful for tests.
 
     Returns:
         Dict with keys:
@@ -269,9 +317,8 @@ def scan(
           - ``generated_at``: ISO-8601 UTC timestamp.
     """
     if index_text is None:
-        path = index_path if index_path is not None else DEFAULT_INDEX_PATH
-        index_text = path.read_text(encoding="utf-8")
-        project_root = path.resolve().parent.parent
+        project_root = index_path.resolve().parent.parent if index_path is not None else PROJECT_ROOT
+        index_text = _render_state_from_version_files(project_root)
     elif index_path is not None:
         # Inline text but an explicit index path: resolve operative bridge files
         # relative to that path's project root (used by terminal-kind tests).
@@ -329,7 +376,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", required=True, choices=["prime-builder", "loyal-opposition"])
     parser.add_argument(
-        "--index-path", default=None, help="Path to bridge/INDEX.md (defaults to project bridge/INDEX.md)"
+        "--index-path", default=None, help="Optional compatibility-state locator used to infer project root"
     )
     parser.add_argument("--format", default="json", choices=["json", "markdown"], help="Output format (default: json)")
     args = parser.parse_args(argv)

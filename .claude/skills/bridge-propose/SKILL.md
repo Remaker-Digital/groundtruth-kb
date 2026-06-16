@@ -1,6 +1,6 @@
 ---
 name: gtkb-bridge-propose
-description: Write a bridge proposal to ``bridge/<topic>-001.md`` and insert its entry into ``bridge/INDEX.md`` under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).
+description: Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).
 ---
 
 This skill implements the helper-mediated bridge-write path. It is the
@@ -8,15 +8,21 @@ safe alternative to persisting proposal bodies through non-Write code
 paths (``file.write_bytes``, ``shutil.copy2``, etc.) that are outside
 the ``scanner-safe-writer`` hook's Write-tool trigger scope.
 
+Authority note: after the 2026-06-15 TAFE/dispatcher cutover,
+the retired bridge-index file must not exist in current GT-KB operation. This
+skill publishes versioned bridge files and dispatcher/TAFE state; agents must
+use dispatcher/TAFE bridge state and `bridge-config` for current authority,
+topology, dispatch health, and target-selection claims.
+
 # /gtkb-bridge-propose
 
 ## What this skill does
 
-Takes a topic slug and a proposal body, scans the body against the
-canonical credential catalog (``CREDENTIAL_PATTERNS + BASH_EXTRAS``,
-PII excluded), writes ``bridge/<topic>-001.md``, and inserts a
-``Document: <topic>`` + ``NEW: bridge/<topic>-001.md`` entry at the
-top of ``bridge/INDEX.md``.
+Takes a topic slug and a proposal body, scans the body against the canonical
+credential catalog (``CREDENTIAL_PATTERNS + BASH_EXTRAS``, PII excluded),
+writes ``bridge/<topic>-001.md``, and records the bridge thread in
+dispatcher/TAFE state without creating or requiring the retired bridge-index
+file.
 
 **Project-linkage metadata (per ``DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001``)**:
 the proposal body for an implementation-targeting NEW/REVISED proposal MUST
@@ -33,7 +39,7 @@ verdict files (GO/NO-GO/VERIFIED/WITHDRAWN) are exempt by status.
 
 Two options are offered on a credential hit:
 
-- **Abort** — no file is written, no INDEX entry is added.
+- **Abort** — no bridge file or dispatcher/TAFE state is written.
 - **Redact** — credential-shaped spans are replaced with
   ``[REDACTED:<label>]`` markers. Redacted content is re-scanned. If
   the second scan still finds hits, the skill aborts with an
@@ -61,8 +67,8 @@ Use this skill when:
 Do NOT use for:
 
 - Editing an existing bridge file (Edit tool is the correct path)
-- Writing non-bridge files (``bridge/INDEX.md`` is managed by the
-  skill; other files are out of scope)
+- Writing non-bridge files (only the target versioned bridge file and
+  dispatcher/TAFE bridge state are in scope)
 - Persisting credential-shaped content (redaction is the only
   legitimate path; force-write is not available)
 
@@ -72,8 +78,8 @@ Do NOT use for:
 
 The bridge-propose helper has two governed authoring paths:
 
-- **Claude path:** helper composer functions may return proposal and INDEX
-  content for the harness to persist through Claude ``Write`` / ``Edit`` tool
+- **Claude path:** helper composer functions may return proposal content for
+  the harness to persist through Claude ``Write`` / ``Edit`` tool
   calls. Those calls flow through the live Claude PreToolUse governance hooks.
 - **Codex path:** Codex must use the helper-mediated path that runs
   ``.claude/hooks/bridge-compliance-gate.py --audit-only`` against the composed
@@ -81,11 +87,11 @@ The bridge-propose helper has two governed authoring paths:
   ``apply_patch`` as equivalent to Claude ``Write`` / ``Edit`` for bridge
   compliance unless a future hook-parity change explicitly adds that coverage.
 
-The pure composer functions are ``compose_proposal(...)`` and
-``compose_index_update(...)``. They perform no file I/O. The Codex writer entry
+The pure composer functions are ``compose_proposal(...)`` and state-publication
+helpers. They perform no file I/O. The Codex writer entry
 point is ``propose_bridge_codex_non_bypass(...)``; it preserves credential
 scanning, author metadata insertion, bridge-compliance validation, file-first
-write ordering, and atomic ``bridge/INDEX.md`` update behavior.
+write ordering, and no-index dispatcher/TAFE publication behavior.
 
 ### Optional deterministic draft scaffold
 
@@ -99,11 +105,13 @@ gt bridge propose --kind <implementation|defect-fix|scoping|advisory-disposition
 The command writes a NON-DISPATCHABLE draft under
 ``.gtkb-state/bridge-propose-drafts/<topic-slug>-001.md``. That draft is
 runtime state only; it is not a filed bridge proposal and does not mutate
-``bridge/`` or ``bridge/INDEX.md``. Review and fill the AI-judgment
+``bridge/`` or dispatcher/TAFE bridge state. Review and fill the AI-judgment
 placeholders, then use the helper-mediated write path below to file the final
 proposal. The helper remains the canonical bridge write path because it performs
-credential scanning, file-existence checks, and atomic ``bridge/INDEX.md``
-insertion.
+credential scanning, file-existence checks, and no-index dispatcher/TAFE
+publication. Here "canonical write path" means the current governed helper path
+for bridge file and state publication; it does not create or depend on
+the retired bridge-index file.
 
 Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
 caller-supplied ``topic_slug``, ``body``, and optional metadata.
@@ -194,17 +202,14 @@ already exists (for example, from a prior partial attempt with the
 same slug), ``BridgeFileAlreadyExistsError`` is raised before any
 INDEX touch. The skill never silently overwrites.
 
-### Phase 4 — INDEX insertion with retry
+### Phase 4 — No-index dispatcher/TAFE publication
 
 The ``Document: <topic_slug>`` + ``NEW: bridge/<topic_slug>-001.md``
-entry is inserted at the top of ``bridge/INDEX.md`` (after leading
-comment lines). The write uses a temp-file + atomic ``os.replace``
-pattern. If INDEX.md changes between the read and the rename, or if
-another writer already inserted an entry for the same topic, the
-write is retried once. Total budget: **2 attempts** (1 initial + 1
-retry). On second failure, ``BridgeIndexConflictError`` surfaces
-with an actionable message (the bridge file is already on disk;
-manually add an INDEX entry or retry the skill).
+state is published through dispatcher/TAFE bridge state without touching
+the retired bridge-index file. If another writer has already published the same
+topic or state publication fails after the bridge file write, the helper
+surfaces an actionable conflict/error so the caller can retry or repair through
+the governed bridge path.
 
 ## Errors
 
@@ -213,9 +218,10 @@ manually add an INDEX entry or retry the skill).
   finds hits. Indicates a catalog/redactor bug, not a user state.
 - ``BridgeFileAlreadyExistsError`` — target file already on disk;
   skill refuses to overwrite.
-- ``BridgeIndexConflictError`` — INDEX.md changed during the write,
-  or another writer inserted an entry for the same topic. Retry
-  budget exhausted after 2 total attempts.
+- ``BridgeIndexConflictError`` — retained historical exception name for
+  publication conflicts. In current no-index operation, treat this as a
+  dispatcher/TAFE state-publication conflict; do not recreate
+  the retired bridge-index file.
 - The Phase 0 pre-population stage is non-fatal; failures during
   glossary read, semantic search, or audit-log write are swallowed
   (graceful degradation). The proposal proceeds without pre-populated

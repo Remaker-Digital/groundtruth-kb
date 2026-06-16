@@ -164,8 +164,10 @@ until the follow-on thread lands with the producer contract cited.
 1. **Resolve role from the canonical registry** — read the active harness role via
    `groundtruth_kb.harness_projection.read_roles` (canonical `harness-state/harness-registry.json`); do not
    read any retired role-assignments mirror. This skill is `required_for_roles = ["prime-builder"]`.
-2. **Read live `bridge/INDEX.md`** — `GOV-FILE-BRIDGE-AUTHORITY-001`: the index is canonical and never cached.
-   Confirm no parallel session is already driving a hygiene-investigation thread.
+2. **Read TAFE/dispatcher bridge state** — use the bridge dispatcher
+   status/health CLI and TAFE-backed bridge-state surfaces to confirm no
+   parallel session is already driving a hygiene-investigation thread. Do not
+   consult or recreate the retired bridge-index artifact as bridge authority.
 3. **No mutation scope is invented** — this skill produces findings, a rendered report, and routable
    work-item forms; any source/config remediation a finding implies is a separate, GO-gated bridge.
 

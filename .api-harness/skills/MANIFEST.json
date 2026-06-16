@@ -29,17 +29,17 @@
       "adapter_relative_path": ".api-harness/skills/bridge/SKILL.md",
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
-      "description": "Operate the full bridge protocol \u2014 file proposals, scan INDEX for actionable items, write GO/NO-GO/VERIFIED verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.",
+      "description": "Operate the bridge protocol \u2014 file proposals, route actionable bridge work, write GO/NO-GO/VERIFIED verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "c99097647444bc3206949e6794d76c78eddbfdc56e0fe57eb8c1eab2bf195632"
+      "source_sha256": "205a065c04f7a7ae67abd47377b913e65a77ec98ca607f4dda6bc79e9c523789"
     },
     {
       "adapter_relative_path": ".api-harness/skills/bridge-propose/SKILL.md",
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
-      "description": "Write a bridge proposal to ``bridge/<topic>-001.md`` and insert its entry into ``bridge/INDEX.md`` under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).",
+      "description": "Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
-      "source_sha256": "5189b0b9b27922ed104e74e87ecc7f745bae629a5d659d5d67b6acb74a5e876b"
+      "source_sha256": "cb6046fae5c3a7bf213949ce107473ffa64b5b4a92c8141e412f4faed13d22c2"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-propose/SKILL.md",
@@ -47,7 +47,7 @@
       "capability_id": "skill.gtkb-propose",
       "description": "Scaffold a structurally compliant bridge proposal body (status token, project-linkage metadata, inline-JSON target_paths, seeded Prior Deliberations, spec-derived verification heading, required sections) and run a self-review checklist BEFORE filing, then hand off to gtkb-bridge-propose for the write. Use when starting a NEW bridge implementation proposal and you want it to clear the bridge-compliance gates on the first review instead of in a revise loop.",
       "source_relative_path": ".claude/skills/gtkb-propose/SKILL.md",
-      "source_sha256": "087724fc1d5476119c12ec1af2fd5e425677e5e07385feb1906063e88e8c1d87"
+      "source_sha256": "232c63d2e46920548916f83128141a4da7c539c30625441582cbf3531adf27a6"
     },
     {
       "adapter_relative_path": ".api-harness/skills/check-deliberations/SKILL.md",
@@ -143,7 +143,7 @@
       "capability_id": "skill.kb-session-wrap",
       "description": "Execute the GT-KB knowledge-first session wrap-up procedure. Collects durable session knowledge, updates governed memory surfaces, records blockers, syncs the current branch, and generates the next-session handoff prompt.",
       "source_relative_path": ".claude/skills/kb-session-wrap/SKILL.md",
-      "source_sha256": "a3d8198b16396f380fb16169c061f7e6d8a743206a294c88386d6c44d6992792"
+      "source_sha256": "1d2e1c036f55192598d1cb9398ec41cf9db5b6ea26de8db272a1f2fbe3728de5"
     },
     {
       "adapter_relative_path": ".api-harness/skills/kb-session-wrap-scan/SKILL.md",
@@ -175,7 +175,7 @@
       "capability_id": "skill.projects",
       "description": "Use GT-KB MemBase-backed project lifecycle commands to create, inspect, update, reorder, retire, and bridge-link first-class project records without creating a second backlog authority.",
       "source_relative_path": ".claude/skills/projects/SKILL.md",
-      "source_sha256": "d1b717e8b996e192c6c451c923a333cc460c14bda3925dd221e4f2e26883342d"
+      "source_sha256": "298b3106476065f3fb494c964f1c0fedca9e31ba03d3d986912c995e5185d139"
     },
     {
       "adapter_relative_path": ".api-harness/skills/proposal-review/SKILL.md",
@@ -199,7 +199,7 @@
       "capability_id": "skill.send-review",
       "description": "Create an implementation proposal through the governed bridge-propose helper for Loyal Opposition review.",
       "source_relative_path": ".claude/skills/send-review/SKILL.md",
-      "source_sha256": "301d7214a49a078ce5b587542085993a5f1df602d904707cec470f9f814c634b"
+      "source_sha256": "aabc50277cdd5a39dab45dda2ef3c30f1826364f23ac1e50ced37276031814c6"
     },
     {
       "adapter_relative_path": ".api-harness/skills/spec-intake/SKILL.md",
@@ -239,7 +239,7 @@
       "capability_id": "skill.gtkb-hygiene-investigation",
       "description": "Run a repeatable, full-coverage GT-KB architecture/hygiene investigation using the proven 4-round probe method (parallel focus-area probes -> gap probe -> completeness critic -> adversarial skeptic) with loop-until-dry and explicit decay disclosure. Emits findings against a structured schema, renders a chunked report via the deterministic report generator, and uses the frozen HYG-001..068 baseline registry for lookup and reporting; baseline diff/delta mode is deferred to a follow-on bridge. Use when the owner asks for a hygiene/architecture investigation, a drift/debt census, or a repeat of the GT-KB self-investigation that produced HYG-001..068.",
       "source_relative_path": ".claude/skills/gtkb-hygiene-investigation/SKILL.md",
-      "source_sha256": "d2631ccefbe6309594c3bc6190712115e36c1a8f71b868072f589076e5c612d0"
+      "source_sha256": "3db7a0a246f6df7c58f2044f11063b1b49a1053063ba6cbe3543281f3698533e"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-hygiene-sweep/SKILL.md",
@@ -247,7 +247,7 @@
       "capability_id": "skill.gtkb-hygiene-sweep",
       "description": "Orchestrate the deterministic `gt hygiene sweep` CLI; classify findings by class AND by artifact lifecycle trigger category per DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001; guide owner-gated remediation child-bridge filing. Use when investigating config-drift class observations, after seeing repeated similar config-defect bridges in a session, or proactively when the session-start hook surfaces a class-observation threshold. The companion CLI `gt hygiene sweep` (WI-3420 VERIFIED) provides the deterministic discovery; this skill provides the operator-facing classification + owner-AUQ workflow.",
       "source_relative_path": ".claude/skills/gtkb-hygiene-sweep/SKILL.md",
-      "source_sha256": "ab44d51daee2a80b3bc210af77391d98da9c095b964e7e7d32eee8aa0f21c9c7"
+      "source_sha256": "fc9bbf252340102c9b30baaad5d08cf7aebb87359d153613dc4569bbbd956d54"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-sweep-commit/SKILL.md",
@@ -263,7 +263,7 @@
       "capability_id": "skill.loyal-opposition-hygiene-assessment",
       "description": "Use when Loyal Opposition should assess GT-KB project hygiene, classify drift, and prepare a Prime Builder action plan without mutating project files.",
       "source_relative_path": ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md",
-      "source_sha256": "89a542d5ae7fe16b82547b313005c479cfff63cdead56485bbdd6576592855f2"
+      "source_sha256": "d3b8ae0fc1c463166806c7303c3aeb54c5d1c37fc825b802fce7be37fae6fbcf"
     },
     {
       "adapter_relative_path": ".api-harness/skills/verify/SKILL.md",
@@ -271,7 +271,7 @@
       "capability_id": "skill.verify",
       "description": "Author a Loyal Opposition post-implementation VERIFIED or NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate. Use when a post-implementation report enters the Loyal Opposition actionable queue, when asked to verify a post-implementation report, when authoring a VERIFIED/NO-GO verdict, or when reviewing an implementation report for spec-derived testing.",
       "source_relative_path": ".claude/skills/verify/SKILL.md",
-      "source_sha256": "461b2e8eb3605e0481efa79537a660866ecdb8618d30e03b2f196afd3c226e83"
+      "source_sha256": "1e9c8a341e636ed9e83d078adf87f515a86194a1a9a9a74f2a63595fe0fa14de"
     }
   ],
   "generated_by": "scripts/generate_api_skill_adapters.py",

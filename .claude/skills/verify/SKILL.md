@@ -30,16 +30,16 @@ bridge protocol. Specifically:
 - It does **NOT** itself execute the applicability preflight, the clause
   preflight, or the spec-derived tests. The reviewer runs those commands and
   pastes the real output into the verdict file.
-- It does **NOT** write or mutate `bridge/INDEX.md`. The reviewer (or the
-  existing helper-mediated bridge-write path) updates `bridge/INDEX.md`
-  separately after the verdict file is written.
+- It does **NOT** write or mutate canonical dispatcher/TAFE bridge state. The
+  retired bridge-index artifact must not be created, updated, or treated as a
+  live queue mirror after the verdict file is written.
 - It does **NOT** short-circuit Loyal Opposition's verdict. `VERIFIED` versus
   `NO-GO` is the reviewer's evidence-based decision; this skill only documents
   the file shape that decision is recorded in.
 
-`bridge/INDEX.md` remains the canonical bridge workflow state per
-`GOV-FILE-BRIDGE-AUTHORITY-001`. The verdict file produced with this skill
-flows through the normal bridge write channel like any other bridge file.
+After the 2026-06-15 TAFE/dispatcher cutover, verdict files flow through the
+normal dispatcher-backed bridge write channel like any other bridge file. Do not
+route verification through the retired bridge-index artifact.
 
 ## When to invoke
 
@@ -58,7 +58,8 @@ Do NOT use this skill for:
   `gtkb-proposal-review`, which produces a `GO`/`NO-GO` verdict on a proposal).
 - Authoring a Prime Builder implementation proposal or implementation report
   (that is `gtkb-bridge` / `gtkb-bridge-propose`).
-- Writing `bridge/INDEX.md` entries directly.
+- Writing retired bridge-index entries directly; that artifact is not live
+  bridge authority and must not exist in current GT-KB operation.
 
 ## Mandatory pre-write steps
 

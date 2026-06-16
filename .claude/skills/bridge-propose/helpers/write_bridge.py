@@ -1,9 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Helper for the /gtkb-bridge-propose skill.
 
-Writes a bridge proposal file ``bridge/<topic>-001.md`` and inserts
-its ``Document:`` / ``NEW:`` entry at the top of ``bridge/INDEX.md``
-under governance-safe credential-scan and concurrency controls.
+Writes a bridge proposal file ``bridge/<topic>-001.md`` through the no-index
+bridge path under governance-safe credential-scan and work-intent controls.
 
 Design contract:
 
@@ -16,14 +15,10 @@ Design contract:
   order, and re-scans the result. A non-empty second scan raises
   :class:`RedactionResidualError` (this is a bug, not a recoverable
   user state). **No Force option.**
-- File-first write: the bridge file is persisted before the INDEX
-  update. If the target file already exists,
-  :class:`BridgeFileAlreadyExistsError` is raised before any INDEX
-  touch.
-- INDEX update is serialized through the bridge index lock and retry-safe. Total
-  retry budget is **2 total attempts** (1 initial + 1 retry). On
-  the second failure, :class:`BridgeIndexConflictError` surfaces
-  with an actionable message.
+- File-first write: the bridge file is persisted only after credential,
+  author-metadata, compliance, and work-intent checks pass. If the target file
+  already exists, :class:`BridgeFileAlreadyExistsError` is raised before any
+  mutation.
 - Idempotency detection uses an **exact-line match** against the
   stripped ``Document: <topic>`` line — substring matching would
   false-positive on slug prefixes.
@@ -62,7 +57,6 @@ _credential_patterns = importlib.import_module("groundtruth_kb.governance.creden
 BASH_EXTRAS = _credential_patterns.BASH_EXTRAS
 CREDENTIAL_PATTERNS = _credential_patterns.CREDENTIAL_PATTERNS
 ensure_author_metadata = importlib.import_module("scripts.bridge_author_metadata").ensure_author_metadata
-atomic_index_update = importlib.import_module("scripts.bridge_index_writer").atomic_index_update
 
 
 class BridgeFileAlreadyExistsError(RuntimeError):
@@ -74,19 +68,7 @@ class BridgeFileAlreadyExistsError(RuntimeError):
 
 
 class BridgeIndexConflictError(RuntimeError):
-    """Raised when INDEX.md cannot be updated safely.
-
-    Two conditions trigger this error:
-
-    - Another writer inserted a ``Document: <topic>`` line between
-      the skill's read and its rename step.
-    - The INDEX content changed between the read and the rename
-      (non-topic concurrent modification), and the retry budget is
-      exhausted.
-
-    In both cases the bridge file is still on disk; the caller must
-    either manually add an INDEX entry or retry the skill.
-    """
+    """Retained historical exception name for no-index publication conflicts."""
 
 
 class RedactionResidualError(RuntimeError):
@@ -688,56 +670,11 @@ def handle_hits_abort_or_redact(
     raise ValueError(f"Unknown mode {mode!r}; expected 'abort' or 'redact'.")
 
 
-def _compute_new_index_content(existing_lines: list[str], new_entry: str) -> str:
-    """Insert ``new_entry`` at the top of the INDEX body, after header comments.
-
-    Header comment region is the contiguous prefix of lines that are
-    blank, markdown headers (``#``), or HTML comments
-    (``<!--``). Everything after that region is considered body.
-
-    Args:
-        existing_lines: Lines of the current INDEX.md (as returned by
-            ``splitlines(keepends=True)``).
-        new_entry: The full entry string to insert. Should end with a
-            trailing newline.
-
-    Returns:
-        The new INDEX content as a single string.
-    """
-    # Find the boundary between the header/comment prefix and the body.
-    insert_idx = 0
-    in_comment = False
-    for idx, line in enumerate(existing_lines):
-        stripped = line.strip()
-        # Track a multi-line HTML comment block.
-        if in_comment:
-            if "-->" in stripped:
-                in_comment = False
-            insert_idx = idx + 1
-            continue
-        if stripped.startswith("<!--"):
-            # Single-line or start of a multi-line HTML comment.
-            if "-->" not in stripped[4:]:
-                in_comment = True
-            insert_idx = idx + 1
-            continue
-        if not stripped or stripped.startswith("#") or stripped.startswith("|"):
-            # Blank line, markdown header, or markdown table row (status legend) —
-            # treat as header region.
-            insert_idx = idx + 1
-            continue
-        # First real content line — stop. ``insert_idx`` points at it.
-        break
-    # Ensure the new_entry ends with a newline.
-    entry = new_entry if new_entry.endswith("\n") else new_entry + "\n"
-    # Ensure separation between the inserted entry and the existing line that follows.
-    if insert_idx < len(existing_lines):
-        following = existing_lines[insert_idx]
-        if not entry.endswith("\n\n") and following.strip():
-            entry = entry + "\n"
-    head = "".join(existing_lines[:insert_idx])
-    tail = "".join(existing_lines[insert_idx:])
-    return head + entry + tail
+def _disabled_legacy_state_update(*_args: Any, **_kwargs: Any) -> str:
+    """Fail closed for removed compatibility-state publication helpers."""
+    raise BridgeIndexConflictError(
+        "retired bridge-index publication is disabled; use versioned bridge files plus dispatcher/TAFE state"
+    )
 
 
 def compose_proposal(
@@ -752,35 +689,9 @@ def compose_proposal(
     return bridge_root / f"{slug}-{version:03d}.md", content
 
 
-def compose_index_update(
-    slug: str,
-    version: int,
-    status: str,
-    current_index_text: str,
-) -> str:
-    """Return full ``bridge/INDEX.md`` text with the status line inserted.
-
-    This is a pure string transformation. It creates a new ``Document`` block
-    for new slugs and prepends a status line to an existing exact ``Document``
-    entry when the slug is already present.
-    """
-    status_token = status.strip().upper()
-    status_line = f"{status_token}: bridge/{slug}-{version:03d}.md"
-    lines = current_index_text.splitlines(keepends=True)
-
-    for line in lines:
-        if line.strip() == status_line:
-            raise BridgeIndexConflictError(f"INDEX.md already contains status line {status_line!r}")
-
-    document_line = f"Document: {slug}"
-    for index, line in enumerate(lines):
-        if line.strip() != document_line:
-            continue
-        insertion = status_line + "\n"
-        return "".join(lines[: index + 1] + [insertion] + lines[index + 1 :])
-
-    new_entry = f"{document_line}\n{status_line}\n"
-    return _compute_new_index_content(lines, new_entry)
+def compose_index_update(*args: Any, **kwargs: Any) -> str:
+    """Historical API stub retained only to fail closed for stale callers."""
+    return _disabled_legacy_state_update(*args, **kwargs)
 
 
 def _relative_to_project(path: Path, project_root: Path) -> str:
@@ -836,92 +747,14 @@ def _run_bridge_compliance_audit(
     return audit
 
 
-def _index_writer_state_dir(index_path: Path) -> Path:
-    return index_path.parent.parent / ".gtkb-state" / "bridge-index-writer"
+def _update_bridge_index(*args: Any, **kwargs: Any) -> None:
+    """Historical API stub retained only to fail closed for stale callers."""
+    _disabled_legacy_state_update(*args, **kwargs)
 
 
-def _latest_document_entry(index_text: str, topic_slug: str) -> tuple[str | None, str | None]:
-    in_target = False
-    for raw_line in index_text.splitlines():
-        stripped = raw_line.strip()
-        if stripped.startswith("Document:"):
-            if in_target:
-                return (None, None)
-            in_target = stripped == f"Document: {topic_slug}"
-            continue
-        if not in_target or not stripped or ":" not in stripped:
-            continue
-        status, path = stripped.split(":", 1)
-        return (status.strip(), path.strip())
-    return (None, None)
-
-
-def _update_bridge_index_with_composed_content(
-    index_path: Path,
-    *,
-    topic_slug: str,
-    version: int,
-    status: str,
-    expected_index_text: str | None = None,
-) -> None:
-    """Serialize an INDEX update using ``compose_index_update``."""
-
-    def mutate(current_text: str) -> str:
-        if expected_index_text is not None and _latest_document_entry(
-            current_text, topic_slug
-        ) != _latest_document_entry(expected_index_text, topic_slug):
-            raise BridgeIndexConflictError(
-                "INDEX.md target document changed during update - concurrent same-document modification detected."
-            )
-        return compose_index_update(topic_slug, version, status, current_text)
-
-    atomic_index_update(index_path, mutate, state_dir=_index_writer_state_dir(index_path))
-
-
-def _update_bridge_index(
-    index_path: Path,
-    new_entry: str,
-    *,
-    topic_slug: str,
-) -> None:
-    """Insert ``new_entry`` at the top of ``index_path`` through the serialized writer.
-
-    Steps:
-
-    1. Acquire the bridge-index writer lock.
-    2. Read the current text inside the lock.
-    3. Idempotency check using **exact line match**: if any line,
-       once stripped, equals ``"Document: <topic_slug>"`` exactly
-       (NOT substring match), raise :class:`BridgeIndexConflictError`
-       with a concurrent-same-topic message.
-    4. Compute the new content via
-       :func:`_compute_new_index_content`.
-    5. Atomically replace the index through
-       :func:`scripts.bridge_index_writer.atomic_index_update`.
-
-    Args:
-        index_path: Path to ``bridge/INDEX.md``.
-        new_entry: The entry block to insert at the top.
-        topic_slug: The topic slug (for idempotency detection).
-
-    Raises:
-        BridgeIndexConflictError: On concurrent same-topic insertion.
-    """
-
-    def mutate(current_text: str) -> str:
-        lines = current_text.splitlines(keepends=True)
-        expected = f"Document: {topic_slug}"
-        for line in lines:
-            if line.strip() == expected:
-                raise BridgeIndexConflictError(
-                    f"INDEX.md already has an entry for {expected!r}. "
-                    f"Another writer inserted it concurrently. The bridge file "
-                    f"at bridge/{topic_slug}-001.md is on disk; inspect and "
-                    f"reconcile manually."
-                )
-        return _compute_new_index_content(lines, new_entry)
-
-    atomic_index_update(index_path, mutate, state_dir=_index_writer_state_dir(index_path))
+def _update_bridge_index_with_composed_content(*args: Any, **kwargs: Any) -> None:
+    """Historical API stub retained only to fail closed for stale callers."""
+    _disabled_legacy_state_update(*args, **kwargs)
 
 
 def propose_bridge(
@@ -935,7 +768,7 @@ def propose_bridge(
     glossary_path: Path | None = None,
     pre_populate_log_path: Path | bool | None = None,
 ) -> Path:
-    """Create ``bridge/<topic_slug>-001.md`` and insert an INDEX entry.
+    """Create ``bridge/<topic_slug>-001.md`` through the no-index bridge path.
 
     Phase 0 — Prior Deliberations pre-population (default-on; Phase 2 of
     GTKB-DA-READ-SURFACE-CORRECTION): when
@@ -952,21 +785,13 @@ def propose_bridge(
     BASH_EXTRAS`` over ``body``. If hits are found, resolve per
     ``mode`` via :func:`handle_hits_abort_or_redact`.
 
-    Phase 2 — File-first write: write ``bridge/<topic_slug>-001.md``
-    atomically. If the file already exists,
-    :class:`BridgeFileAlreadyExistsError` is raised before any INDEX
-    touch.
-
-    Phase 3 — INDEX insertion with retry: call
-    :func:`_update_bridge_index`. On
-    :class:`BridgeIndexConflictError`, retry once. **Total attempts:
-    2 total** (1 initial + 1 retry). On the second failure, re-raise
-    with an actionable message that mentions the bridge file on disk.
+    Phase 2 — File-first write: write ``bridge/<topic_slug>-001.md`` after all
+    checks pass. If the file already exists,
+    :class:`BridgeFileAlreadyExistsError` is raised before any mutation.
 
     Args:
         topic_slug: Kebab-case slug for the bridge document. The
-            file becomes ``bridge/<topic_slug>-001.md`` and the
-            INDEX entry begins with ``Document: <topic_slug>``.
+            file becomes ``bridge/<topic_slug>-001.md``.
         body: Proposal body text.
         mode: ``"abort"`` (default) or ``"redact"``. Controls the
             hit-resolution policy.
@@ -992,13 +817,12 @@ def propose_bridge(
         CredentialHitsFoundError: ``mode='abort'`` and hits found.
         RedactionResidualError: Redaction failed the re-scan gate.
         BridgeFileAlreadyExistsError: Target file already on disk.
-        BridgeIndexConflictError: INDEX could not be updated after
-            2 total attempts.
+        BridgeIndexConflictError: retained for historical stale-callers only;
+            normal no-index writes do not raise it.
     """
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
     project_root = bridge_root.parent.resolve()
     bridge_file = bridge_root / f"{topic_slug}-001.md"
-    index_path = bridge_root / "INDEX.md"
 
     # Phase 0: Prior Deliberations pre-population (default-on).
     if pre_populate_prior_deliberations:
@@ -1025,43 +849,8 @@ def propose_bridge(
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
     bridge_file.parent.mkdir(parents=True, exist_ok=True)
     bridge_file.write_bytes(body_to_write.encode("utf-8"))
-
-    # Phase 3: INDEX insertion with retry.
-    # Retry budget: 2 total attempts (1 initial + 1 retry). Both the comment,
-    # the final exception message, and the test coverage use the "2 total"
-    # phrasing — keep them in sync.
-    new_entry = f"Document: {topic_slug}\nNEW: bridge/{topic_slug}-001.md\n"
-    last_error: BridgeIndexConflictError | None = None
-    max_attempts = 2  # 2 total attempts — 1 initial + 1 retry.
-    for attempt in range(1, max_attempts + 1):
-        try:
-            _update_bridge_index(index_path, new_entry, topic_slug=topic_slug)
-            # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
-            try:
-                import sys as _sys
-
-                _trim_scripts = str(bridge_root.parent / "scripts")
-                if _trim_scripts not in _sys.path:
-                    _sys.path.insert(0, _trim_scripts)
-                from bridge_index_archival import maybe_archive_and_prune_index as _trim
-
-                _trim(bridge_root.parent, current_thread=topic_slug)
-            except Exception:  # noqa: BLE001 - archival must never fail a bridge write
-                pass
-            _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-            return bridge_file
-        except BridgeIndexConflictError as exc:
-            last_error = exc
-            if attempt >= max_attempts:
-                break
-            # else: loop and retry the INDEX-layer update only.
-    # Exhausted 2 total attempts — re-raise with an actionable message.
-    raise BridgeIndexConflictError(
-        f"Bridge file {bridge_file} was written but INDEX.md could not be "
-        f"updated after 2 total attempts. The file exists on disk; manually "
-        f"add an entry to bridge/INDEX.md or retry the skill. "
-        f"Last error: {last_error}"
-    )
+    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
+    return bridge_file
 
 
 def propose_bridge_codex_non_bypass(
@@ -1083,13 +872,11 @@ def propose_bridge_codex_non_bypass(
     This path is for Codex harnesses where ``apply_patch`` is not covered by
     the bridge-compliance PreToolUse hook. It composes the proposal body,
     ensures author metadata, runs ``bridge-compliance-gate.py --audit-only`` on
-    the in-memory proposal content, and only then writes the proposal file and
-    atomically updates ``bridge/INDEX.md``.
+    the in-memory proposal content, and only then writes the proposal file.
     """
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
     project_root = bridge_root.parent.resolve()
     bridge_file, _ = compose_proposal(topic_slug, version, body, bridge_dir=bridge_root)
-    index_path = bridge_root / "INDEX.md"
 
     if pre_populate_prior_deliberations:
         body = globals()["pre_populate_prior_deliberations"](
@@ -1127,31 +914,9 @@ def propose_bridge_codex_non_bypass(
     session_id = resolve_work_intent_session_id()
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
     bridge_file.parent.mkdir(parents=True, exist_ok=True)
-    original_index = index_path.read_text(encoding="utf-8")
     bridge_file.write_bytes(body_to_write.encode("utf-8"))
-
-    last_error: BridgeIndexConflictError | None = None
-    max_attempts = 2
-    for attempt in range(1, max_attempts + 1):
-        try:
-            _update_bridge_index_with_composed_content(
-                index_path,
-                topic_slug=topic_slug,
-                version=version,
-                status=status,
-                expected_index_text=original_index,
-            )
-            _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-            return bridge_file
-        except BridgeIndexConflictError as exc:
-            last_error = exc
-            if attempt >= max_attempts:
-                break
-    raise BridgeIndexConflictError(
-        f"Bridge file {bridge_file} was written but INDEX.md could not be "
-        f"updated after 2 total attempts. The file exists on disk; manually "
-        f"add an entry to bridge/INDEX.md or retry the skill. Last error: {last_error}"
-    )
+    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
+    return bridge_file
 
 
 __all__ = [

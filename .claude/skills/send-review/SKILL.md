@@ -16,7 +16,7 @@ metadata:
 
 Compatibility alias for filing a Prime Builder proposal through the governed
 `gtkb-bridge-propose` helper path. Do not write proposal files or edit the
-bridge index from this skill directly.
+deprecated generated bridge-index compatibility view from this skill directly.
 
 **Arguments:** `$ARGUMENTS` = descriptive kebab-case name for the proposal (e.g., `widget-refactor`).
 
@@ -35,7 +35,7 @@ bridge index from this skill directly.
    described in `.claude/skills/bridge-propose/SKILL.md`. The helper performs
    credential scanning, bridge-compliance validation for Codex paths, proposal
    file creation, author metadata insertion, and governed bridge-index
-   registration via `gtkb-bridge-propose`.
+   compatibility-view registration via `gtkb-bridge-propose`.
 
 4. **Report** the helper result: created proposal path, bridge document slug,
    status line, and any helper error that blocked filing.
