@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Detect the bridge+source staged-index contamination signature (WI-4464).
 
-Background governance hooks auto-stage bridge-queue files
-(``bridge/INDEX.md``, ``bridge/<name>.md``) into the git index between tool
-calls. A plain ``git commit`` *without* an explicit ``-- <pathspec>`` then
-commits whatever the index holds rather than the intended files. On
+Background governance hooks can stage bridge audit files into the git index
+between tool calls. A plain ``git commit`` *without* an explicit ``-- <pathspec>``
+then commits whatever the index holds rather than the intended files. On
 2026-06-11 this produced mislabeled commit ``772a186b`` — a FAB-20 commit
 message carrying unrelated backlog-triage + prefix-split contents while the
 intended FAB-20 files stayed uncommitted. Full forensics:
@@ -33,13 +32,12 @@ import subprocess
 import sys
 
 # Bridge-queue match rule (documented module constant so the deferred wiring
-# slice and any future tuning are explicit). The canonical bridge queue surface
-# is ``bridge/INDEX.md`` plus top-level ``bridge/<name>.md`` files. The matcher
-# is deliberately conservative: a single ``bridge/`` segment ending in ``.md``.
-# Nested paths (``bridge/sub/foo.md``) and non-``.md`` paths (``bridge/foo.txt``)
-# are classified as ``other`` so the detector never over-claims the queue
-# surface and never hides genuine source contamination.
-BRIDGE_QUEUE_PATTERN = re.compile(r"^bridge/[^/]+\.md$")
+# slice and any future tuning are explicit). The canonical bridge queue evidence
+# surface is top-level status-bearing numbered markdown files. The matcher is
+# deliberately conservative: nested paths, non-markdown paths, and unversioned
+# bridge markdown are classified as ``other`` so the detector never accepts a
+# resurrected retired aggregate as valid review evidence.
+BRIDGE_QUEUE_PATTERN = re.compile(r"^bridge/[^/]+-\d{3}\.md$")
 
 # Distinct non-zero exit code for --strict contamination (kept stable so future
 # wiring / CI can branch on it without colliding with argparse's exit 2).

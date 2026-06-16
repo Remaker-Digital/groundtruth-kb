@@ -51,16 +51,16 @@ def test_detects_fenced_python_block() -> None:
     assert any(f.finding_type == "fenced_python" for f in findings)
 
 
-def test_detects_direct_index_write_instruction() -> None:
-    text = "Then insert a NEW line at the top of bridge/INDEX.md manually.\n"
+def test_detects_direct_bridge_write_instruction() -> None:
+    text = "Then edit bridge/gtkb-some-topic-001.md manually.\n"
     findings = chk.scan_text(text, "x")
-    assert any(f.finding_type == "index_write" for f in findings)
+    assert any(f.finding_type == "bridge_direct_write" for f in findings)
 
 
-def test_index_write_suppressed_by_governed_helper() -> None:
-    text = "File the entry via bridge-propose, which updates bridge/INDEX.md for you.\n"
+def test_bridge_write_suppressed_by_governed_helper() -> None:
+    text = "File the entry via bridge-propose, which updates bridge/gtkb-some-topic-001.md for you.\n"
     findings = chk.scan_text(text, "x")
-    assert not any(f.finding_type == "index_write" for f in findings)
+    assert not any(f.finding_type == "bridge_direct_write" for f in findings)
 
 
 def test_clean_skill_passes() -> None:

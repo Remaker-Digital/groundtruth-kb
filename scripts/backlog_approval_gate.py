@@ -34,7 +34,7 @@ def main() -> int:
         current_state=item.get("approval_state"),
         target_state=args.target_state,
         pending_owner_decisions_path=root / "memory" / "pending-owner-decisions.md",
-        bridge_index_path=root / "bridge" / "INDEX.md",
+        bridge_state_path=root / "bridge",
         project_root=root,
     )
     payload = {"allowed": ok, "reason": reason, "work_item_id": args.work_item_id}

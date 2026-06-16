@@ -12,13 +12,17 @@ import argparse
 import json
 import re
 import sqlite3
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "groundtruth.db"
-DEFAULT_BRIDGE_INDEX = PROJECT_ROOT / "bridge" / "INDEX.md"
+DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
+SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 TERMINAL_SPEC_STATUSES = {"implemented", "verified"}
 BRIDGE_TERMINAL_STATUSES = {"GO", "VERIFIED"}
@@ -244,36 +248,34 @@ def _has_markdown_section(content: str, heading: str) -> bool:
     return re.search(SECTION_RE_TEMPLATE.format(heading=re.escape(heading)), content) is not None
 
 
-def _extract_bridge_entries(index_text: str) -> list[tuple[str, str, str]]:
+def _extract_bridge_entries(project_root: Path) -> list[tuple[str, str, str]]:
+    """Return status-bearing numbered bridge files as ``(slug, status, rel_path)``."""
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
+
     entries: list[tuple[str, str, str]] = []
-    current_document: str | None = None
-    for line in index_text.splitlines():
-        doc_match = re.match(r"^Document:\s*(.+?)\s*$", line)
-        if doc_match:
-            current_document = doc_match.group(1)
-            continue
-        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s*(.+?)\s*$", line)
-        if current_document and status_match:
-            entries.append((current_document, status_match.group(1), status_match.group(2)))
+    for document in scan_expected_documents(project_root).values():
+        for rel_path in document.files:
+            status = status_from_bridge_file(project_root / rel_path)
+            if status:
+                entries.append((document.slug, status, rel_path))
     return entries
 
 
-def audit_bridge_spec_links(bridge_index: Path, project_root: Path) -> list[Gap]:
+def audit_bridge_spec_links(bridge_dir: Path, project_root: Path) -> list[Gap]:
     """Audit historical GO/VERIFIED bridge files for explicit spec linkage."""
-    if not bridge_index.exists():
+    if not bridge_dir.is_dir():
         return [
             Gap(
-                kind="bridge_index_missing",
+                kind="bridge_state_missing",
                 severity="critical",
-                artifact_id="bridge/INDEX.md",
-                artifact_path=str(bridge_index),
-                detail="Bridge index is missing; cannot audit approved/verified implementation history.",
+                artifact_id="bridge",
+                artifact_path=str(bridge_dir),
+                detail="Bridge directory is missing; cannot audit approved/verified implementation history.",
             )
         ]
 
     gaps: list[Gap] = []
-    index_text = bridge_index.read_text(encoding="utf-8", errors="replace")
-    for document, status, rel_path in _extract_bridge_entries(index_text):
+    for document, status, rel_path in _extract_bridge_entries(project_root):
         if status not in BRIDGE_TERMINAL_STATUSES:
             continue
         bridge_file = project_root / rel_path
@@ -312,10 +314,10 @@ def audit_bridge_spec_links(bridge_index: Path, project_root: Path) -> list[Gap]
     return gaps
 
 
-def run_audit(db_path: Path, bridge_index: Path, project_root: Path) -> dict[str, Any]:
+def run_audit(db_path: Path, bridge_dir: Path, project_root: Path) -> dict[str, Any]:
     gaps = [
         *audit_spec_triad(db_path),
-        *audit_bridge_spec_links(bridge_index, project_root),
+        *audit_bridge_spec_links(bridge_dir, project_root),
     ]
     by_kind: dict[str, int] = {}
     by_severity: dict[str, int] = {}
@@ -325,7 +327,7 @@ def run_audit(db_path: Path, bridge_index: Path, project_root: Path) -> dict[str
 
     return {
         "db_path": str(db_path),
-        "bridge_index": str(bridge_index),
+        "bridge_state": str(bridge_dir),
         "gap_count": len(gaps),
         "by_kind": dict(sorted(by_kind.items())),
         "by_severity": dict(sorted(by_severity.items())),
@@ -336,20 +338,20 @@ def run_audit(db_path: Path, bridge_index: Path, project_root: Path) -> dict[str
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
-    parser.add_argument("--bridge-index", type=Path, default=DEFAULT_BRIDGE_INDEX)
+    parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     parser.add_argument("--fail-on-gaps", action="store_true", help="Exit nonzero when gaps exist.")
     args = parser.parse_args()
 
-    report = run_audit(args.db, args.bridge_index, args.project_root)
+    report = run_audit(args.db, args.bridge_dir, args.project_root)
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         print("GT-KB triad completeness audit")
         print(f"DB: {report['db_path']}")
-        print(f"Bridge index: {report['bridge_index']}")
+        print(f"Bridge state: {report['bridge_state']}")
         print(f"Gaps: {report['gap_count']}")
         print(f"By severity: {report['by_severity']}")
         print(f"By kind: {report['by_kind']}")

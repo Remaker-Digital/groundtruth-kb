@@ -13,7 +13,7 @@ The command is read-only:
 
 * No MemBase writes. Opens ``KnowledgeDB`` for reads only and closes it
   before returning.
-* No ``bridge/INDEX.md`` mutation.
+* No bridge artifact mutation.
 * No schema migration.
 
 Per the GO'd proposal, the base output (no flags) deliberately reports raw

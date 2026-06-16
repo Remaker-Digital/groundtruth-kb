@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -400,25 +401,21 @@ def _bridge_latest_statuses(project_root: Path, bridge_ids: Iterable[str]) -> di
     statuses: dict[str, dict[str, str | None]] = {
         bridge_id: {"status": None, "file": None} for bridge_id in sorted(wanted)
     }
-    index_path = project_root / "bridge" / "INDEX.md"
-    try:
-        lines = index_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return statuses
+    gt_src = project_root / "groundtruth-kb" / "src"
+    if gt_src.is_dir() and str(gt_src) not in sys.path:
+        sys.path.insert(0, str(gt_src))
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
 
-    current: str | None = None
-    for raw_line in lines:
-        line = raw_line.strip()
-        if line.startswith("Document: "):
-            current = line.removeprefix("Document: ").strip()
+    documents = scan_expected_documents(project_root)
+    for bridge_id in wanted:
+        document = documents.get(bridge_id)
+        if document is None:
             continue
-        if current not in wanted or statuses[current]["status"] is not None:
-            continue
-        if ":" not in line:
-            continue
-        status, path = line.split(":", 1)
-        if path.strip().startswith("bridge/"):
-            statuses[current] = {"status": status.strip(), "file": path.strip()}
+        latest_file = document.files[-1]
+        statuses[bridge_id] = {
+            "status": status_from_bridge_file(project_root / latest_file),
+            "file": latest_file,
+        }
     return statuses
 
 
@@ -426,8 +423,8 @@ def ollama_role_promotion_prerequisites(project_root: Path) -> dict[str, Any]:
     """Return the bridge-evidence gate for Ollama role promotion.
 
     Harness D may only be promoted after the routing, adapter, and dispatch
-    child threads independently reach VERIFIED. This helper reads the live
-    bridge index and returns a report-friendly structure without mutating
+    child threads independently reach VERIFIED. This helper reads the numbered
+    bridge file chain and returns a report-friendly structure without mutating
     state.
     """
 

@@ -53,6 +53,7 @@ SPEC_ID_PATTERN = re.compile(r"\b(?:SPEC|GOV|DCL|ADR|PB|REQ)-[A-Z0-9][A-Z0-9-]*\
 
 DEFAULT_DB_PATH = "groundtruth.db"
 DEFAULT_BRIDGE_DIR = "bridge"
+VERSIONED_BRIDGE_FILE_PATTERN = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
 
 
 @dataclass
@@ -77,17 +78,6 @@ class SpecEntry:
     latest_assertion_run: AssertionRunEntry | None = None
 
 
-def _resolve_index_path(path_token: str, bridge_dir: Path) -> Path:
-    """Resolve a bridge/INDEX.md path token against the selected bridge dir."""
-    raw_path = Path(path_token)
-    if raw_path.is_absolute():
-        return raw_path
-    parts = raw_path.parts
-    if parts and parts[0] == bridge_dir.name:
-        return bridge_dir.joinpath(*parts[1:])
-    return bridge_dir.parent / raw_path
-
-
 def _bridge_kind(content: str) -> str | None:
     for line in content.splitlines():
         if line.startswith("bridge_kind:"):
@@ -95,38 +85,40 @@ def _bridge_kind(content: str) -> str | None:
     return None
 
 
+def _ensure_bridge_helpers_importable(bridge_dir: Path) -> None:
+    project_root = bridge_dir.resolve().parent
+    gt_src = project_root / "groundtruth-kb" / "src"
+    if gt_src.exists():
+        src_text = str(gt_src)
+        if src_text not in sys.path:
+            sys.path.insert(0, src_text)
+
+
+def _matching_bridge_files(bridge_id: str, bridge_dir: Path) -> list[Path]:
+    matches: list[tuple[int, Path]] = []
+    for path in bridge_dir.glob("*.md"):
+        match = VERSIONED_BRIDGE_FILE_PATTERN.match(path.name)
+        if not match or match.group("slug") != bridge_id:
+            continue
+        matches.append((int(match.group("version")), path))
+    return [path for _, path in sorted(matches, reverse=True)]
+
+
 def extract_spec_ids_from_bridge(bridge_id: str, bridge_dir: Path) -> tuple[list[str], Path]:
-    """Find the latest INDEX-listed proposal/report file and extract spec IDs.
+    """Find the latest actionable proposal/report file and extract spec IDs.
 
     Returns ``(spec_ids, source_file_path)``. Raises ``FileNotFoundError`` when
-    ``bridge/INDEX.md`` has no matching thread, no status-filtered proposal or
-    report, or the referenced bridge file is missing.
+    no matching thread has a status-filtered proposal or report file.
     """
-    index_path = bridge_dir / "INDEX.md"
-    if not index_path.exists():
-        raise FileNotFoundError(f"Bridge index not found at {index_path}")
+    _ensure_bridge_helpers_importable(bridge_dir)
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
-    in_thread = False
     saw_thread = False
-    status_pattern = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s*(\S+)")
-    document_header = f"Document: {bridge_id}"
-
-    for line in index_path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("Document: "):
-            in_thread = line.strip() == document_header
-            saw_thread = saw_thread or in_thread
-            continue
-        if not in_thread:
-            continue
-        status_match = status_pattern.match(line.strip())
-        if not status_match:
-            continue
-        status, path_token = status_match.groups()
+    for source_path in _matching_bridge_files(bridge_id, bridge_dir):
+        saw_thread = True
+        status = status_from_bridge_file(source_path)
         if status not in {"NEW", "REVISED"}:
             continue
-        source_path = _resolve_index_path(path_token, bridge_dir)
-        if not source_path.exists():
-            raise FileNotFoundError(f"Bridge index references missing file {path_token}")
         content = source_path.read_text(encoding="utf-8")
         if _bridge_kind(content) not in {"implementation_proposal", "implementation_report"}:
             continue
@@ -137,7 +129,7 @@ def extract_spec_ids_from_bridge(bridge_id: str, bridge_dir: Path) -> tuple[list
         raise FileNotFoundError(
             f"No latest NEW/REVISED implementation proposal or report found for bridge thread {bridge_id}"
         )
-    raise FileNotFoundError(f"No bridge index entry found for {bridge_id}")
+    raise FileNotFoundError(f"No numbered bridge files found for {bridge_id}")
 
 
 def query_tests_for_spec(conn: sqlite3.Connection, spec_id: str) -> list[TestEntry]:

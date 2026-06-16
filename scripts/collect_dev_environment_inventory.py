@@ -78,6 +78,7 @@ SENSITIVE_VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 ABSOLUTE_PATH_RE = re.compile(r"([A-Za-z]:\\|/Users/|/home/|/root/)")
+BRIDGE_NUMBERED_FILE_RE = re.compile(r"^[^/\\]+-\d{3}\.md$")
 
 
 def _now_iso() -> str:
@@ -463,7 +464,10 @@ def _capability(status: str, evidence: str) -> dict[str, str]:
 def _compatibility_matrix(
     project_root: Path, harnesses: dict[str, Any], surfaces: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    bridge_present = (project_root / "bridge" / "INDEX.md").is_file()
+    bridge_dir = project_root / "bridge"
+    bridge_present = bridge_dir.is_dir() and any(
+        path.is_file() and BRIDGE_NUMBERED_FILE_RE.match(path.name) for path in bridge_dir.glob("*.md")
+    )
     canonical_terms = (project_root / ".claude" / "rules" / "canonical-terminology.md").is_file()
     formal_gate = (project_root / ".claude" / "hooks" / "formal-artifact-approval-gate.py").is_file()
     credential_gate = (project_root / ".claude" / "hooks" / "credential-scan.py").is_file()
@@ -498,7 +502,7 @@ def _compatibility_matrix(
                         "harness-state/harness-registry.json",
                     ),
                     "file_bridge_read_write": _capability(
-                        "verified" if bridge_present else "unknown", "bridge/INDEX.md"
+                        "verified" if bridge_present else "unknown", "bridge/*-NNN.md"
                     ),
                     "formal_artifact_mutation_gates": _capability(
                         "configured" if formal_gate else "unknown",

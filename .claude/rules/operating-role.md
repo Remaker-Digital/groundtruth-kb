@@ -71,6 +71,11 @@ change.
   and at least one active Loyal Opposition, the command fails closed and no audit
   or registry write is made. Multiple active harnesses may hold the same operating
   role concurrently.
+- **Dispatchability is separate from role:** holding an operating role does not
+  imply receiving headless bridge dispatch. Dispatch eligibility and final
+  target ranking are configured in `config/dispatcher/rules.toml` and projected
+  through `can_receive_dispatch`, `can_fire_events`, cost, quality,
+  availability, and precedence fields.
 - If startup finds no harness recorded as Prime Builder (no role set contains
   `prime-builder`), the starting harness assumes Prime Builder and updates
   the registry (via `gt mode set-role`) with the appropriate role set for the

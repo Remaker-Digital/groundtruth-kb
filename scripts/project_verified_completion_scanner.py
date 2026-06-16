@@ -6,15 +6,14 @@ IP-1 of WI-3316 (bridge thread ``gtkb-project-verified-completion-auq-trigger``)
 For every ``status='active'`` project authorization, this scanner determines
 whether every work item linked to the authorization's project via an active
 project-to-work-item membership link is covered by a bridge thread whose
-latest ``bridge/INDEX.md`` status is ``VERIFIED`` (the
+latest status-bearing numbered bridge file is ``VERIFIED`` (the
 ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2 "explicitly linked"
 gating definition). An authorization is *completion-ready* iff its project has
 at least one active membership-linked work item and all of them are
 VERIFIED-covered.
 
 The scanner is strictly read-only: it issues no DB writes and no bridge-file
-writes. It uses the canonical bridge index parser in ``groundtruth_kb.bridge``
-rather than ad-hoc regex for INDEX parsing.
+writes.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -152,36 +151,39 @@ def _completion_guards_by_project(project_root: Path) -> dict[str, list[dict[str
 def _verified_thread_work_items(project_root: Path) -> dict[str, set[str]]:
     """Return ``{bridge_thread_slug: {work_item_id}}`` for VERIFIED-topped threads.
 
-    Scans ALL versions of each thread whose latest ``bridge/INDEX.md`` status is
+    Scans ALL versions of each thread whose latest numbered-file status is
     ``VERIFIED`` for ``Work Item:`` metadata lines (D3 corrected scope: per-thread,
     all versions — the top version is the Codex verdict, which carries no
     ``Work Item:`` metadata; the metadata lives in the Prime implementation
-    report one or more versions below). Uses the canonical
-    ``groundtruth_kb.bridge.detector.parse_index`` parser.
+    report one or more versions below).
     """
     _ensure_groundtruth_importable(project_root)
-    from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.is_file():
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
         return {}
-    result = parse_index(index_path.read_text(encoding="utf-8"), project_root=project_root)
-
+    grouped: dict[str, list[tuple[int, Path]]] = {}
+    bridge_file_re = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+    for path in bridge_dir.glob("*.md"):
+        match = bridge_file_re.match(path.name)
+        if match is None:
+            continue
+        grouped.setdefault(match.group("slug"), []).append((int(match.group("version")), path))
     by_thread: dict[str, set[str]] = {}
-    for document in result.documents:
-        top = document.current_top
-        if top is None or top.status != BridgeStatus.VERIFIED:
+    for slug, versioned_files in grouped.items():
+        latest_path = max(versioned_files, key=lambda item: item[0])[1]
+        if status_from_bridge_file(latest_path) != "VERIFIED":
             continue
         wis: set[str] = set()
-        for version in document.versions:
-            file_path = project_root / version.file_path
+        for _version, file_path in sorted(versioned_files):
             if not file_path.is_file():
                 continue
             text = file_path.read_text(encoding="utf-8", errors="replace")
             for match in _WORK_ITEM_LINE_RE.finditer(text):
                 wis.add(match.group(1).strip())
         if wis:
-            by_thread[document.name] = wis
+            by_thread[slug] = wis
     return by_thread
 
 

@@ -5,8 +5,8 @@ Implements the three Area-5 pre-flight checks scoped in
 ``bridge/gtkb-upgrade-pre-flight-checks-001.md`` and GO'd at ``-002`` / the
 implementation bridge at ``-implementation-002``:
 
-- **5.2 — Bridge in-flight awareness.** Scans ``bridge/INDEX.md`` for
-  ``Document:`` entries whose latest (top) status line is non-terminal
+- **5.2 — Bridge in-flight awareness.** Scans status-bearing numbered bridge
+  files whose latest status is non-terminal
   (``NEW``, ``REVISED``, or ``GO``). Emits one ``warning`` action per
   affected document. Silent when the latest status is ``VERIFIED`` or
   ``NO-GO``, regardless of what older lines say further down the entry
@@ -52,9 +52,10 @@ from groundtruth_kb.project.upgrade import UpgradeAction
 # 5.2 — Bridge in-flight awareness
 # ---------------------------------------------------------------------------
 
-_DOCUMENT_HEADER_RE = re.compile(r"^Document:\s+(\S+)\s*$")
-_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s*bridge/"
+_VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+_STATUS_TOKEN_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
 )
 
 # Non-terminal statuses: a document whose top line is one of these is still
@@ -64,16 +65,11 @@ _NON_TERMINAL_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "ADV
 
 
 def _check_bridge_inflight(target: Path, *, ignore: bool = False) -> list[UpgradeAction]:
-    """Scan ``bridge/INDEX.md`` for un-terminated ``Document:`` entries.
-
-    Parses by ``Document:`` block and inspects **only** the first status
-    line after each block header. HTML comments (``<!-- ... -->``), blank
-    lines, and narrative text between ``Document:`` blocks are skipped;
-    they neither set nor clear the "waiting for first status" state.
+    """Scan numbered bridge files for un-terminated bridge threads.
 
     Silent when ``ignore=True`` (adopter opted out via
-    ``--ignore-inflight-bridges``) or when ``bridge/INDEX.md`` does not
-    exist (non-bridge projects).
+    ``--ignore-inflight-bridges``) or when no bridge directory exists
+    (non-bridge projects).
 
     Per bridge ``gtkb-upgrade-pre-flight-checks-implementation-002.md`` C3.
 
@@ -92,44 +88,37 @@ def _check_bridge_inflight(target: Path, *, ignore: bool = False) -> list[Upgrad
     if ignore:
         return []
 
-    index_path = target / "bridge" / "INDEX.md"
-    if not index_path.exists():
+    bridge_dir = target / "bridge"
+    if not bridge_dir.is_dir():
         return []
 
-    try:
-        content = index_path.read_text(encoding="utf-8")
-    except OSError:
-        return []
+    latest: dict[str, tuple[int, str]] = {}
+    for path in bridge_dir.glob("*.md"):
+        name_match = _VERSIONED_BRIDGE_FILE_RE.match(path.name)
+        if name_match is None:
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        status: str | None = None
+        for raw in lines:
+            stripped = raw.strip()
+            if not stripped:
+                continue
+            status_match = _STATUS_TOKEN_RE.match(stripped)
+            status = status_match.group(1).upper() if status_match else None
+            break
+        if status is None:
+            continue
+        slug = name_match.group("slug")
+        version = int(name_match.group("version"))
+        prior = latest.get(slug)
+        if prior is None or version > prior[0]:
+            latest[slug] = (version, status)
 
     warnings: list[UpgradeAction] = []
-    current_doc: str | None = None
-
-    for raw_line in content.splitlines():
-        line = raw_line.rstrip()
-
-        doc_match = _DOCUMENT_HEADER_RE.match(line)
-        if doc_match is not None:
-            # A new ``Document:`` header resets our search regardless of
-            # whether the previous block ever produced a status line.
-            current_doc = doc_match.group(1)
-            continue
-
-        if current_doc is None:
-            continue
-
-        # HTML comments and blank lines are transparent — they neither
-        # produce a status nor close the current document's search.
-        stripped = line.strip()
-        if not stripped or stripped.startswith("<!--"):
-            continue
-
-        status_match = _STATUS_LINE_RE.match(line)
-        if status_match is None:
-            # Some other non-status content (table row, header text);
-            # keep scanning for the real status line within this block.
-            continue
-
-        status = status_match.group(1)
+    for current_doc, (_version, status) in latest.items():
         if status in _NON_TERMINAL_STATUSES:
             warnings.append(
                 UpgradeAction(
@@ -141,9 +130,6 @@ def _check_bridge_inflight(target: Path, *, ignore: bool = False) -> list[Upgrad
                     ),
                 )
             )
-        # Latest status seen — stop scanning this document (older status
-        # lines below must not produce additional warnings; per C3).
-        current_doc = None
 
     warnings.sort(key=lambda a: a.file)
     return warnings

@@ -104,7 +104,7 @@ class ThreadInfo:
 
 
 def scan_all_threads(project_root: Path) -> dict[str, ThreadInfo]:
-    """Return ``{slug: ThreadInfo}`` for every document in ``bridge/INDEX.md``.
+    """Return ``{slug: ThreadInfo}`` for every numbered bridge document.
 
     Unlike the v4 scanner (which only reads VERIFIED-topped threads), the
     backfill needs candidates of ANY status: an addressing thread may still be
@@ -112,24 +112,17 @@ def scan_all_threads(project_root: Path) -> dict[str, ThreadInfo]:
     simply stay paused for that project until the thread reaches VERIFIED.
     """
     _ensure_groundtruth_importable(project_root)
-    from groundtruth_kb.bridge.detector import parse_index
-
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.is_file():
-        return {}
-    result = parse_index(index_path.read_text(encoding="utf-8"), project_root=project_root)
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
 
     threads: dict[str, ThreadInfo] = {}
-    for document in result.documents:
-        top = document.current_top
+    for document in scan_expected_documents(project_root).values():
+        latest_path = project_root / document.files[-1]
         info = ThreadInfo(
-            slug=document.name,
-            top_status=(
-                top.status.value if top is not None and hasattr(top.status, "value") else str(top.status) if top else ""
-            ),
+            slug=document.slug,
+            top_status=status_from_bridge_file(latest_path) or "",
         )
-        for version in document.versions:
-            file_path = project_root / version.file_path
+        for rel_path in document.files:
+            file_path = project_root / rel_path
             if not file_path.is_file():
                 continue
             text = file_path.read_text(encoding="utf-8", errors="replace")
@@ -137,12 +130,12 @@ def scan_all_threads(project_root: Path) -> dict[str, ThreadInfo]:
                 info.work_items.add(match.group(1).strip())
             for line in _SUPERSEDE_LINE_RE.findall(text):
                 for ref in _BRIDGE_SLUG_REF_RE.findall(line):
-                    if ref != document.name:
+                    if ref != document.slug:
                         info.supersedes.add(ref)
                 bare = _SUPERSEDE_BARE_SLUG_RE.search(line)
-                if bare and bare.group(1) != document.name:
+                if bare and bare.group(1) != document.slug:
                     info.supersedes.add(bare.group(1))
-        threads[document.name] = info
+        threads[document.slug] = info
     return threads
 
 

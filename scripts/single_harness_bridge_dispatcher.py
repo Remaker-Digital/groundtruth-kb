@@ -434,7 +434,7 @@ def _build_prompt(target_mode: str, items: list[Any], max_items: int, trigger) -
             "Read your durable role from harness-state/harness-registry.json (canonical role registry per Slice 1 retirement). Multi-element "
             "role sets accept BOTH `pb` and `lo` keyword modes; this dispatch carries "
             f"mode `{target_mode}` for this work item.",
-            "Read current TAFE/dispatcher bridge state and status-bearing versioned bridge files before acting; do not require or recreate bridge/INDEX.md.",
+            "Read current TAFE/dispatcher bridge state and status-bearing numbered bridge files before acting; do not require or recreate retired aggregate queue state.",
             "Keep work scoped to the selected bridge entries and preserve the bridge protocol audit trail.",
             "",
             f"Selected entries, oldest-first, capped at {max_items}:",

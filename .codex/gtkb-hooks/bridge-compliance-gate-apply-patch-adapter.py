@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 SKIPPED_DIAGNOSTIC = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "last-bridge-audit-apply-patch-skipped.json"
 BRIDGE_VERSIONED_FILE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
-BRIDGE_INDEX_FILE = "bridge/INDEX.md"
+_RETIRED_BRIDGE_AGGREGATE_FILE = ("bridge", "INDEX.md")
 
 
 @dataclass(frozen=True)
@@ -112,7 +112,9 @@ def _normalize_rel_path(path_text: str, root: Path) -> str | None:
 
 def _is_bridge_target(path_text: str) -> bool:
     normalized = path_text.replace("\\", "/").lstrip("./")
-    return normalized == BRIDGE_INDEX_FILE or bool(BRIDGE_VERSIONED_FILE_RE.match(normalized))
+    parts = tuple(Path(normalized).parts)
+    retired_aggregate = len(parts) >= 2 and parts[-2:] == _RETIRED_BRIDGE_AGGREGATE_FILE
+    return retired_aggregate or bool(BRIDGE_VERSIONED_FILE_RE.match(normalized))
 
 
 def _is_patch_file_header(line: str) -> bool:
@@ -169,7 +171,7 @@ def _apply_patch_hunks(existing: str, hunk_lines: list[str]) -> str:
 
 
 def extract_bridge_writes(patch_text: str, *, root: Path = PROJECT_ROOT) -> list[BridgeWrite]:
-    """Return post-patch bridge contents for versioned files and bridge/INDEX.md."""
+    """Return post-patch bridge contents for versioned files and retired aggregate attempts."""
     if "*** Begin Patch" not in patch_text:
         return []
     lines = patch_text.splitlines()

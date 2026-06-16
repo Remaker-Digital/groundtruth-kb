@@ -21,7 +21,7 @@ CLI (per -003 F2 fix — fail-closed by default):
 Exit codes:
 - ``0``  success — every linked spec has at least one derived test and all
          derived tests passed; no waiver validation failures.
-- non-0  any of: missing INDEX entry, coverage gap, test failure, waiver
+- non-0  any of: missing bridge thread, coverage gap, test failure, waiver
          validation failure. stderr identifies which.
 
 Read-only against versioned bridge files and ``groundtruth.db``. Per F4
@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Final
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
-INDEX_PATH: Final[Path] = PROJECT_ROOT / "bridge" / "INDEX.md"
+BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 APPROVALS_DIR: Final[Path] = PROJECT_ROOT / ".groundtruth" / "formal-artifact-approvals"
 
@@ -80,11 +80,6 @@ WAIVERS_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     re.IGNORECASE,
 )
 
-# Index parsing — mirrors bridge protocol §"Index File" format.
-INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/(\S+\.md)\s*$"
-)
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
     r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
     re.IGNORECASE,
@@ -121,34 +116,8 @@ class SpecMatrixEntry:
 
 
 def _parse_index_for_document(bridge_id: str) -> list[BridgeVersion]:
-    """Return all versions for the named document, ordered most-recent-first.
-
-    Falls back to status-bearing versioned files when the retired INDEX view is
-    absent or lacks the document.
-    """
-    if not INDEX_PATH.is_file():
-        return _parse_versioned_files_for_document(bridge_id)
-    versions: list[BridgeVersion] = []
-    in_target = False
-    for line in INDEX_PATH.read_text(encoding="utf-8").splitlines():
-        doc_match = INDEX_DOC_RE.match(line)
-        if doc_match:
-            in_target = doc_match.group(1) == bridge_id
-            continue
-        if not in_target:
-            continue
-        status_match = INDEX_STATUS_RE.match(line)
-        if status_match:
-            status = status_match.group(1)
-            rel = status_match.group(2)
-            file_path = PROJECT_ROOT / "bridge" / rel
-            # Extract trailing version number from filename: foo-NNN.md → NNN.
-            version_match = re.search(r"-(\d+)\.md$", rel)
-            version_number = int(version_match.group(1)) if version_match else 0
-            versions.append(BridgeVersion(status, file_path, version_number))
-        elif line.strip() == "":
-            in_target = False  # Blank line ends the document entry.
-    return versions or _parse_versioned_files_for_document(bridge_id)
+    """Return all versions for the named document, ordered most-recent-first."""
+    return _parse_versioned_files_for_document(bridge_id)
 
 
 def _status_from_bridge_file(path: Path) -> str | None:
@@ -166,9 +135,8 @@ def _status_from_bridge_file(path: Path) -> str | None:
 
 
 def _parse_versioned_files_for_document(bridge_id: str) -> list[BridgeVersion]:
-    bridge_dir = PROJECT_ROOT / "bridge"
     versions: list[BridgeVersion] = []
-    for path in bridge_dir.glob(f"{bridge_id}-*.md"):
+    for path in BRIDGE_DIR.glob(f"{bridge_id}-*.md"):
         match = re.match(rf"^{re.escape(bridge_id)}-(\d+)\.md$", path.name)
         if not match:
             continue
@@ -534,7 +502,7 @@ def run(
     dry_run: bool = False,
 ) -> int:
     """Execute the full procedure. Returns exit code per CLI contract."""
-    # Step 1-2: Parse INDEX + enumerate ALL versions.
+    # Step 1-2: enumerate ALL numbered bridge-file versions.
     versions = _parse_index_for_document(bridge_id)
     if not versions:
         msg = (

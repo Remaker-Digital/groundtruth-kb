@@ -10,7 +10,8 @@ than in a revise loop. The composer counterpart to the gtkb-bridge-propose
 MemBase read-only and writes only a draft under
 ``.gtkb-state/propose-drafts/``. The author fills the ``TODO:`` placeholders,
 runs the printed self-review checklist, then hands the body to
-``gtkb-bridge-propose`` for the credential-scanned write + INDEX insert.
+``gtkb-bridge-propose`` for the credential-scanned write and dispatcher
+publication.
 
 GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
 Authorization: PAUTH-PROJECT-GTKB-GOV-PROPOSAL-STANDARDS-SLICES-1-4.
@@ -32,7 +33,6 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-BRIDGE_INDEX = PROJECT_ROOT / "bridge" / "INDEX.md"
 DRAFTS_DIR = PROJECT_ROOT / ".gtkb-state" / "propose-drafts"
 GROUNDTRUTH_DB = PROJECT_ROOT / "groundtruth.db"
 
@@ -57,7 +57,7 @@ REQUIRED_SECTIONS = (
     "## Requirement Sufficiency",
     "## Spec-Derived Verification Plan",
     "## Risk / Rollback",
-    "## Bridge Filing (INDEX-Canonical)",
+    "## Bridge Filing",
     "## Recommended Commit Type",
 )
 
@@ -86,21 +86,11 @@ def validate_slug(slug: str) -> str | None:
     return None
 
 
-def _index_document_slugs(index_text: str) -> set[str]:
-    """Return the set of ``Document:`` slugs present in a bridge INDEX text."""
-    return {m.group(1).strip() for m in re.finditer(r"^Document:\s*(\S+)\s*$", index_text, re.MULTILINE)}
-
-
-def slug_collision(slug: str, index_path: Path | None = None) -> str | None:
-    """Return an error string when ``slug`` already names a Document entry in the
-    bridge INDEX, else None. Missing INDEX degrades to no-collision."""
-    path = index_path or BRIDGE_INDEX
-    try:
-        text = path.read_text(encoding="utf-8-sig")
-    except OSError:
-        return None
-    if slug in _index_document_slugs(text):
-        return f"slug {slug!r} already has a Document entry in {path}; choose a distinct slug"
+def slug_collision(slug: str, bridge_dir: Path | None = None) -> str | None:
+    """Return an error string when ``slug`` already has numbered bridge files."""
+    path = bridge_dir or PROJECT_ROOT / "bridge"
+    if path.is_dir() and any(path.glob(f"{slug}-[0-9][0-9][0-9].md")):
+        return f"slug {slug!r} already has numbered bridge files in {path}; choose a distinct slug"
     return None
 
 
@@ -235,12 +225,12 @@ groundtruth-kb/.venv/Scripts/python.exe -m pytest <path> -q --no-header -p no:ca
 
 TODO: risk surface + single-commit rollback note.
 
-## Bridge Filing (INDEX-Canonical)
+## Bridge Filing
 
-This proposal is filed under `bridge/` with a `NEW` entry inserted at the top of
-the `{slug}` document list in `bridge/INDEX.md`; no prior version is deleted or
-rewritten (append-only). `bridge/INDEX.md` remains the canonical workflow state
-per `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-INDEX-IS-CANONICAL`.
+This proposal is filed under `bridge/` as the next status-bearing numbered
+bridge file for `{slug}`; no prior version is deleted or rewritten
+(append-only). Dispatcher/TAFE state plus the numbered file chain are the live
+workflow state per `GOV-FILE-BRIDGE-AUTHORITY-001`.
 
 ## Recommended Commit Type
 
@@ -271,7 +261,8 @@ def self_review_checklist(slug: str) -> str:
 7. Replace every remaining `TODO:` placeholder with real content.
 
 When green, hand the filled draft body to the gtkb-bridge-propose skill for the
-credential-scanned write + INDEX insert (do NOT write bridge/ from this helper).
+credential-scanned write and dispatcher publication (do NOT write bridge/ from
+this helper).
 """
 
 

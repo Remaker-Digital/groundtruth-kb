@@ -337,10 +337,7 @@ _BRIDGE_FILE_STATUS = re.compile(
 
 
 def _read_bridge_state_bytes(project_root: Path) -> bytes:
-    """Read retired INDEX when present, otherwise render versioned bridge state."""
-    bridge_index_path = project_root / "bridge" / "INDEX.md"
-    if bridge_index_path.exists():
-        return bridge_index_path.read_bytes()
+    """Render current bridge state from status-bearing numbered files."""
     rendered = _render_versioned_bridge_state(project_root)
     if not rendered:
         raise HandoffError(f"No readable bridge state under {project_root / 'bridge'}")
@@ -367,8 +364,6 @@ def _render_versioned_bridge_state(project_root: Path) -> str:
         return ""
     rows: dict[str, list[tuple[int, str, str]]] = {}
     for path in bridge_dir.glob("*.md"):
-        if path.name == "INDEX.md":
-            continue
         match = _VERSIONED_BRIDGE_FILE.match(path.name)
         if not match:
             continue
@@ -378,11 +373,7 @@ def _render_versioned_bridge_state(project_root: Path) -> str:
         slug = match.group("slug")
         version = int(match.group("version"))
         rows.setdefault(slug, []).append((version, status, f"bridge/{path.name}"))
-    lines = [
-        "<!-- GENERATED IN MEMORY: bridge state rendered from versioned files; "
-        "bridge/INDEX.md is deprecated/removed. -->",
-        "",
-    ]
+    lines = ["<!-- GENERATED IN MEMORY: bridge state rendered from numbered bridge files. -->", ""]
     for slug in sorted(rows):
         lines.append(f"Document: {slug}")
         for _version, status, rel_path in sorted(rows[slug], reverse=True):

@@ -36,8 +36,6 @@ def _status_from_bridge_file(path: Path) -> str | None:
 def _read_active_bridge_docs_from_files(bridge_dir: Path) -> list[str]:
     latest: dict[str, tuple[int, str]] = {}
     for path in bridge_dir.glob("*.md"):
-        if path.name == "INDEX.md":
-            continue
         match = re.match(r"^(.+)-(\d+)\.md$", path.name)
         if not match:
             continue
@@ -60,39 +58,7 @@ def _read_active_bridge_docs(cwd: str) -> list[str]:
     (i.e., not yet GO or VERIFIED — work is still in flight).
     """
     bridge_dir = Path(cwd) / "bridge"
-    index_path = bridge_dir / "INDEX.md"
-    if not index_path.exists():
-        return _read_active_bridge_docs_from_files(bridge_dir)
-
-    try:
-        text = index_path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-
-    active: list[str] = []
-    current_doc: str | None = None
-    latest_status: str | None = None
-
-    for line in text.splitlines():
-        line = line.strip()
-        doc_match = re.match(r"^Document:\s*(.+)$", line, re.IGNORECASE)
-        if doc_match:
-            # Save prior document if active
-            if current_doc and latest_status in ("NEW", "REVISED", "NO-GO", "ADVISORY"):
-                active.append(current_doc)
-            current_doc = doc_match.group(1).strip()
-            latest_status = None
-            continue
-
-        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):", line, re.IGNORECASE)
-        if status_match and latest_status is None:
-            latest_status = status_match.group(1).upper()
-
-    # Handle last document
-    if current_doc and latest_status in ("NEW", "REVISED", "NO-GO", "ADVISORY"):
-        active.append(current_doc)
-
-    return sorted(active)
+    return _read_active_bridge_docs_from_files(bridge_dir)
 
 
 def compute_context_key(cwd: str) -> str:

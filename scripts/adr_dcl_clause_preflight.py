@@ -53,7 +53,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CLAUSES_CONFIG = PROJECT_ROOT / "config" / "governance" / "adr-dcl-clauses.toml"
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
-DEFAULT_INDEX_PATH = DEFAULT_BRIDGE_DIR / "INDEX.md"
 IN_ROOT_DISCLOSURE_BLOCK_RE = re.compile(
     r"<!--\s*in-root-disclosure\s*-->.*?<!--\s*/in-root-disclosure\s*-->",
     re.IGNORECASE | re.DOTALL,
@@ -117,30 +116,13 @@ def load_clauses(path: Path) -> list[Clause]:
     return clauses
 
 
-def find_operative_file(bridge_id: str, index_path: Path, bridge_dir: Path) -> Path | None:
+def find_operative_file(bridge_id: str, bridge_dir: Path) -> Path | None:
     """Locate the operative bridge file (top-of-stack version) for a bridge id.
 
     Mirrors the resolution logic used by bridge_applicability_preflight.py:
-    parse INDEX.md for the matching `Document:` block and pick the first
-    versioned line. Falls back to glob if INDEX has no entry yet.
+    scan numbered bridge files for the matching slug and choose the latest
+    version.
     """
-    if index_path.is_file():
-        text = index_path.read_text(encoding="utf-8")
-        in_block = False
-        for line in text.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("Document:"):
-                doc_name = stripped[len("Document:") :].strip()
-                in_block = doc_name == bridge_id
-                continue
-            if in_block and stripped:
-                m = re.match(r"^[A-Z\-]+:\s*(?P<path>bridge/.+\.md)\s*$", stripped)
-                if m:
-                    candidate = PROJECT_ROOT / m.group("path")
-                    if candidate.is_file():
-                        return candidate
-            if in_block and not stripped:
-                in_block = False
     matches = sorted(bridge_dir.glob(f"{bridge_id}-[0-9][0-9][0-9].md"))
     return matches[-1] if matches else None
 
@@ -400,11 +382,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bridge-id", required=True, help="bridge thread id (without -NNN.md suffix)")
     parser.add_argument("--clauses-config", type=Path, default=DEFAULT_CLAUSES_CONFIG)
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
-    parser.add_argument("--index", type=Path, default=DEFAULT_INDEX_PATH)
     parser.add_argument(
         "--content-file",
         type=Path,
-        help="Evaluate candidate Markdown content from this file instead of resolving the operative INDEX entry.",
+        help="Evaluate candidate Markdown content from this file instead of resolving the operative bridge file.",
     )
     parser.add_argument("--out", type=Path, help="optional: write report to this path instead of stdout")
     parser.add_argument(
@@ -428,9 +409,7 @@ def main(argv: list[str] | None = None) -> int:
 
     clauses = load_clauses(args.clauses_config)
     operative_file = (
-        args.content_file
-        if args.content_file is not None
-        else find_operative_file(args.bridge_id, args.index, args.bridge_dir)
+        args.content_file if args.content_file is not None else find_operative_file(args.bridge_id, args.bridge_dir)
     )
     content = ""
     blocking_gaps_count = 0
@@ -445,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
         report = (
             f"{prefix}{title}\n\n"
             f"- Bridge id: `{args.bridge_id}`\n"
-            f"- Operative file: (not found — no INDEX entry and no matching `bridge/{args.bridge_id}-NNN.md`)\n"
+            f"- Operative file: (not found - no matching numbered bridge file for `{args.bridge_id}`)\n"
             f"- Mode: cannot evaluate without an operative file; gate fails closed with exit {EXIT_CANNOT_EVALUATE}.\n"
         )
     else:

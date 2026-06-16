@@ -1,6 +1,6 @@
 ---
 name: gtkb-hygiene-sweep
-description: Orchestrate the deterministic `gt hygiene sweep` CLI; classify findings by class AND by artifact lifecycle trigger category per DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001; guide owner-gated remediation child-bridge filing. Use when investigating config-drift class observations, after seeing repeated similar config-defect bridges in a session, or proactively when the session-start hook surfaces a class-observation threshold. The companion CLI `gt hygiene sweep` (WI-3420 VERIFIED) provides the deterministic discovery; this skill provides the operator-facing classification + owner-AUQ workflow.
+description: Orchestrate the deterministic `gt hygiene sweep` CLI and route deterministic inventory-backed string scans to `gt admin inventory refresh` plus `gt admin inventory scan-strings` instead of ad hoc grep loops. Use when investigating config-drift class observations, inventory-wide string checks, repeated config defects, or session-start hygiene thresholds; classify findings by artifact lifecycle trigger category per DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001 and guide owner-gated remediation child-bridge filing.
 ---
 
 # /gtkb-hygiene-sweep
@@ -35,7 +35,7 @@ Before invoking the CLI:
 1. **Read TAFE/dispatcher bridge state** — use the bridge dispatcher
    status/health CLI and TAFE-backed bridge-state surfaces to confirm no
    parallel session is already driving a hygiene-sweep-related thread. Do not
-   consult or recreate the retired bridge-index artifact as bridge authority.
+   consult or recreate aggregate queue artifacts as bridge authority.
 2. **Confirm impl-authorization scope** — this skill files only the child-bridges it surfaces through owner AUQ; it does not invent new mutation scope.
 3. **Verify role assignment** — per `harness-state/role-assignments.json`, confirm the active harness's role includes `prime-builder` (this skill is `required_for_roles = ["prime-builder"]` in the registry).
 
@@ -56,6 +56,33 @@ Before invoking the CLI:
    - Includes the standard `Specification Links`, `Owner Decisions / Input`, spec-derived verification plan, and acceptance criteria sections per `.claude/rules/file-bridge-protocol.md`.
 
 **Per `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`, this skill never silently transitions artifact lifecycle states. Every state transition (e.g., `unresolved-new -> deferred`) flows through an explicit owner-decision capture via AskUserQuestion.**
+
+## Inventory String Scans
+
+When the owner, a bridge proposal, or a verification plan requires an
+inventory-wide string search across declared GT-KB artifacts, use the
+deterministic inventory CLI rather than `rg`, grep, or hand-rolled file loops as
+authoritative evidence. Ad hoc search is acceptable for local exploration, but
+it must not be cited as the inventory-wide scan result when this deterministic
+process is required.
+
+1. Run `gt admin inventory refresh --json` first. If `gt` is unavailable, use
+   `python -m groundtruth_kb.cli admin inventory refresh --json` from the
+   project venv. Treat missing artifacts or inventory expansion errors as the
+   finding to report before scanning strings.
+2. Run `gt admin inventory scan-strings --match <literal> --report-only --json`
+   for one-off literal checks, or
+   `gt admin inventory scan-strings --match-file <path> --report-only --json`
+   for a deterministic set of strings. Use `--critical-class`,
+   `--warn-class`, `--critical-path`, and `--warn-path` when the evidence needs
+   critical vs. warning classification.
+3. Preserve the command, JSON summary, and any markdown ledger path in the
+   bridge proposal, implementation report, verification, or hygiene report that
+   depends on the scan. Critical hits are investigation/remediation inputs with
+   `remediation_status: untriaged`; the scanner itself does not remediate.
+4. For no-hit sentinels, use a fresh unique literal for each verification run.
+   Do not reuse a sentinel after writing that literal into a bridge report or
+   other scanned artifact, because the report itself can become the hit.
 
 ## Output
 
@@ -94,6 +121,13 @@ The companion CLI is `gt hygiene sweep`, landed under WI-3420 (VERIFIED via `bri
 - Read-only operation — the CLI does not mutate any source.
 
 Refer to `bridge/gtkb-hygiene-sweep-cli-004.md` and the CLI's `--help` output for invocation details.
+
+The inventory string-scan companion CLI is `gt admin inventory refresh` plus
+`gt admin inventory scan-strings`, introduced by
+`bridge/gtkb-inventory-string-scan-admin-cli-003.md` and verified through the
+same bridge thread. It provides deterministic artifact-inventory expansion,
+literal string matching, critical/warn classification, JSON output, and
+read-only markdown ledger evidence for follow-on remediation work.
 
 ## Cross-harness implementation notes
 

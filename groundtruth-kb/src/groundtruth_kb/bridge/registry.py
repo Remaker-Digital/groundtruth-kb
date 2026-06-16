@@ -5,8 +5,8 @@ RETIRED (2026-05-09): The smart-poller runtime that was the primary consumer
 of this registry has been archived to ``archive/smart-poller-2026-05-09/``.
 The cross-harness event-driven trigger
 (``scripts/cross_harness_bridge_trigger.py``) does not require static harness
-registration; it reads recipient signatures from ``bridge/INDEX.md`` directly
-on each fire. This module is retained for compatibility with adopters that
+registration; it reads current bridge dispatch state and numbered bridge-file
+status on each fire. This module is retained for compatibility with adopters that
 still consume the ``register`` CLI subcommand from a SessionStart hook.
 
 Per ``bridge/gtkb-bridge-poller-p2-registry-005.md`` (REVISED-2, GO at -006)

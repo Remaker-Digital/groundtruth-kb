@@ -9,8 +9,11 @@ deterministic plumbing belongs in services, not in session markdown):
 2. ``db_mutation``    — inline DB-mutation snippets a skill instructs the agent
    to run directly (``db.insert_*(`` / ``db.update_*(`` / ``KnowledgeDB(`` /
    ``INSERT INTO`` / ``UPDATE … SET`` / ``DELETE FROM``).
-3. ``index_write``    — direct ``bridge/INDEX.md`` write/edit instructions that
-   are NOT routed through a governed helper (``bridge-propose`` / ``write_bridge.py``).
+3. ``bridge_direct_write`` — direct numbered bridge-file write/edit
+   instructions that are NOT routed through a governed helper
+   (``bridge-propose`` / ``write_bridge.py``).
+4. ``index_write`` — direct ``bridge/INDEX.md`` mutation/restoration
+   instructions that are NOT routed through governed helper language.
 
 The checker is strictly read-only: it never mutates skill files and never opens
 the MemBase database. It emits a JSON report plus a markdown summary under
@@ -53,20 +56,27 @@ _DB_MUTATION_RES: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bDELETE\s+FROM\b", re.IGNORECASE),
 )
 
-# Direct bridge/INDEX.md write/edit instruction (either verb→path or path→verb).
-_INDEX_WRITE_RE = re.compile(
-    r"(?:insert|edit|add|append|write|update|modify)\b[^\n]{0,60}bridge/INDEX\.md"
-    r"|bridge/INDEX\.md[^\n]{0,60}(?:insert|edit|add|append|write|update|modify)\b",
+# Direct numbered bridge-file write/edit instruction (either verb→path or path→verb).
+_BRIDGE_DIRECT_WRITE_RE = re.compile(
+    r"(?:insert|edit|add|append|write|update|modify)\b[^\n]{0,60}bridge/[A-Za-z0-9._-]+-\d{3}\.md"
+    r"|bridge/[A-Za-z0-9._-]+-\d{3}\.md[^\n]{0,60}(?:insert|edit|add|append|write|update|modify)\b",
     re.IGNORECASE,
 )
 
-# Governed-helper references that legitimize INDEX manipulation (suppress FP).
+# Direct retired aggregate-index mutation instruction (either verb→path or path→verb).
+_INDEX_WRITE_RE = re.compile(
+    r"(?:insert|edit|add|append|write|update|modify|create|restore)\b[^\n]{0,80}bridge[/\\]INDEX\.md"
+    r"|bridge[/\\]INDEX\.md[^\n]{0,80}(?:insert|edit|add|append|write|update|modify|create|restore)\b",
+    re.IGNORECASE,
+)
+
+# Governed-helper references that legitimize bridge/index manipulation (suppress FP).
 _GOVERNED_HELPER_RE = re.compile(
     r"bridge-propose|write_bridge\.py|helpers/write_bridge|gtkb-bridge|\bgt\s+bridge\b",
     re.IGNORECASE,
 )
 
-FINDING_TYPES = ("fenced_python", "db_mutation", "index_write")
+FINDING_TYPES = ("fenced_python", "db_mutation", "bridge_direct_write", "index_write")
 
 
 @dataclass(frozen=True)
@@ -119,6 +129,9 @@ def scan_text(text: str, skill_path: str) -> list[Finding]:
             if pattern.search(line):
                 findings.append(Finding(skill_path, "db_mutation", index, snippet))
                 break
+
+        if _BRIDGE_DIRECT_WRITE_RE.search(line) and not _GOVERNED_HELPER_RE.search(line):
+            findings.append(Finding(skill_path, "bridge_direct_write", index, snippet))
 
         if _INDEX_WRITE_RE.search(line) and not _GOVERNED_HELPER_RE.search(line):
             findings.append(Finding(skill_path, "index_write", index, snippet))

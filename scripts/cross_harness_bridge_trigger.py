@@ -15,9 +15,8 @@ signature changed.
 Design contract:
 
 - TAFE/dispatcher bridge state plus the versioned bridge file chain are the
-  live authority after the 2026-06-15 cutover. The deprecated
-  ``bridge/INDEX.md`` compatibility view is read only when it already exists;
-  it is never required or recreated by this trigger.
+  live authority after the 2026-06-15 cutover. This trigger reads numbered
+  bridge files and never requires or recreates retired aggregate queue state.
 - Signature normalization: ``[{document_name, top_status, top_file}]`` per
   recipient, JSON sorted, SHA-256 hex. Byte-identical to
   ``groundtruth-kb/scripts/bridge_poller_runner.py::_pending_signature`` so
@@ -176,6 +175,11 @@ IMPLEMENTATION_AUTH_ENV_VARS = (
 )
 FATAL_WORKER_OUTPUT_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
+    ("Ollama chat request failed", "provider_failure"),
+    ("Ollama model inventory request failed", "provider_failure"),
+    ("OpenRouter completions request failed", "provider_failure"),
+    ("OpenRouter API returned error", "provider_failure"),
+    ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
     ("guard denied Write", "guard_denied_write"),
     ("guard denied", "guard_denial"),
 )
@@ -617,6 +621,25 @@ def _read_recent_text(path: Path, *, byte_limit: int = PRIOR_LAUNCH_LOG_READ_LIM
     return raw[-byte_limit:].decode("utf-8", errors="replace")
 
 
+def _matched_worker_output_markers(launch: dict[str, Any]) -> tuple[list[dict[str, str]], dict[str, str]]:
+    matched: list[dict[str, str]] = []
+    inspected_paths: dict[str, str] = {}
+    for field in ("stdout_path", "stderr_path"):
+        raw_path = launch.get(field)
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        path = Path(raw_path)
+        inspected_paths[field] = str(path)
+        text = _read_recent_text(path)
+        if not text:
+            continue
+        lowered = text.lower()
+        for marker, label in FATAL_WORKER_OUTPUT_MARKERS:
+            if marker.lower() in lowered:
+                matched.append({"field": field, "marker": marker, "label": label})
+    return matched, inspected_paths
+
+
 def _detect_previous_launch_failure(
     prior: dict[str, Any],
     *,
@@ -627,6 +650,22 @@ def _detect_previous_launch_failure(
     launch = prior.get("last_launch")
     if not isinstance(launch, dict):
         return None
+
+    matched, inspected_paths = _matched_worker_output_markers(launch)
+    if matched:
+        return {
+            "ts": _now_iso(),
+            "dispatch_id": _now_iso() + "-previous-launch-failed",
+            "recipient": recipient,
+            "launched": False,
+            "reason": "previous_launch_failed",
+            "error_type": "fatal_worker_output_marker",
+            "prior_dispatch_id": launch.get("dispatch_id"),
+            "prior_launched_at": launch.get("launched_at"),
+            "signature": signature,
+            "matched_markers": matched,
+            **inspected_paths,
+        }
 
     exit_code = launch.get("exit_code")
     if isinstance(exit_code, int) and exit_code != 0:
@@ -645,38 +684,22 @@ def _detect_previous_launch_failure(
             "matched_markers": [{"field": "exit_code", "marker": str(exit_code), "label": error_type}],
         }
 
-    matched: list[dict[str, str]] = []
-    inspected_paths: dict[str, str] = {}
-    for field in ("stdout_path", "stderr_path"):
-        raw_path = launch.get(field)
-        if not isinstance(raw_path, str) or not raw_path.strip():
-            continue
-        path = Path(raw_path)
-        inspected_paths[field] = str(path)
-        text = _read_recent_text(path)
-        if not text:
-            continue
-        lowered = text.lower()
-        for marker, label in FATAL_WORKER_OUTPUT_MARKERS:
-            if marker.lower() in lowered:
-                matched.append({"field": field, "marker": marker, "label": label})
+    if launch.get("exit_failure_reason"):
+        label = str(launch.get("exit_failure_reason"))
+        return {
+            "ts": _now_iso(),
+            "dispatch_id": _now_iso() + "-previous-launch-failed",
+            "recipient": recipient,
+            "launched": False,
+            "reason": "previous_launch_failed",
+            "error_type": label,
+            "prior_dispatch_id": launch.get("dispatch_id"),
+            "prior_launched_at": launch.get("launched_at"),
+            "signature": signature,
+            "matched_markers": [{"field": "exit_failure_reason", "marker": label, "label": label}],
+        }
 
-    if not matched:
-        return None
-
-    return {
-        "ts": _now_iso(),
-        "dispatch_id": _now_iso() + "-previous-launch-failed",
-        "recipient": recipient,
-        "launched": False,
-        "reason": "previous_launch_failed",
-        "error_type": "fatal_worker_output_marker",
-        "prior_dispatch_id": launch.get("dispatch_id"),
-        "prior_launched_at": launch.get("launched_at"),
-        "signature": signature,
-        "matched_markers": matched,
-        **inspected_paths,
-    }
+    return None
 
 
 def _new_dispatch_id(recipient_key: str) -> str:
@@ -1390,39 +1413,54 @@ def _poll_dispatch_verdict(
     poll_interval: float = 5.0,
 ) -> tuple[str | None, float | None]:
     """Poll for a verdict file created after dispatch_ts. Returns (path, latency)."""
-    import fnmatch
     import time
 
     start_time = time.monotonic()
+    while (time.monotonic() - start_time) < timeout:
+        verdict = _find_dispatch_verdict(dispatch_ts=dispatch_ts, bridge_id=bridge_id, project_root=project_root)
+        if verdict != (None, None):
+            return verdict
+
+        time.sleep(poll_interval)
+
+    return None, None
+
+
+def _find_dispatch_verdict(
+    *,
+    dispatch_ts: float,
+    bridge_id: str,
+    project_root: Path,
+) -> tuple[str | None, float | None]:
+    """Return a verdict file created after dispatch_ts, without polling."""
+    import fnmatch
+
+    if not bridge_id:
+        return None, None
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
         return None, None
 
     pattern1 = f"gtkb-{bridge_id}-*.md"
     pattern2 = f"{bridge_id}-*.md"
+    candidate_files = []
+    for file in bridge_dir.glob("*.md"):
+        name = file.name
+        if fnmatch.fnmatch(name, pattern1) or fnmatch.fnmatch(name, pattern2):
+            try:
+                mtime = file.stat().st_mtime
+                if mtime >= dispatch_ts:
+                    candidate_files.append((file, mtime))
+            except OSError:
+                continue
 
-    while (time.monotonic() - start_time) < timeout:
-        candidate_files = []
-        for file in bridge_dir.glob("*.md"):
-            name = file.name
-            if fnmatch.fnmatch(name, pattern1) or fnmatch.fnmatch(name, pattern2):
-                try:
-                    mtime = file.stat().st_mtime
-                    if mtime >= dispatch_ts:
-                        candidate_files.append((file, mtime))
-                except OSError:
-                    continue
-
-        if candidate_files:
-            candidate_files.sort(key=lambda x: x[1])
-            chosen_file, chosen_mtime = candidate_files[0]
-            rel_path = f"bridge/{chosen_file.name}"
-            latency = max(0.0, chosen_mtime - dispatch_ts)
-            return rel_path, latency
-
-        time.sleep(poll_interval)
-
-    return None, None
+    if not candidate_files:
+        return None, None
+    candidate_files.sort(key=lambda x: x[1])
+    chosen_file, chosen_mtime = candidate_files[0]
+    rel_path = f"bridge/{chosen_file.name}"
+    latency = max(0.0, chosen_mtime - dispatch_ts)
+    return rel_path, latency
 
 
 def _poll_and_log_verdict(
@@ -1545,12 +1583,12 @@ def _status_from_bridge_file(path: Path) -> str | None:
     return None
 
 
-def _render_bridge_state_compatibility_text(project_root: Path) -> str:
-    """Render INDEX-shaped text from versioned bridge files without writing it."""
+def _render_bridge_state_text(project_root: Path) -> str:
+    """Render parser input from status-bearing numbered bridge files."""
     try:
-        from groundtruth_kb.tafe_index_completeness import (
-            _candidate_is_archived,
-            _load_acknowledged_slugs,
+        from groundtruth_kb.bridge.versioned_files import (
+            candidate_is_archived,
+            load_acknowledged_archived_slugs,
             scan_expected_documents,
         )
     except Exception:
@@ -1560,13 +1598,10 @@ def _render_bridge_state_compatibility_text(project_root: Path) -> str:
         expected_docs = scan_expected_documents(project_root)
     except Exception:
         return ""
-    acknowledged = _load_acknowledged_slugs(project_root)
-    lines = [
-        "<!-- GENERATED IN MEMORY: dispatcher compatibility view from TAFE/versioned bridge state; bridge/INDEX.md is deprecated/removed. -->",
-        "",
-    ]
+    acknowledged = load_acknowledged_archived_slugs(project_root)
+    lines: list[str] = []
     for slug in sorted(expected_docs):
-        if _candidate_is_archived(slug, expected_docs, acknowledged, project_root):
+        if candidate_is_archived(slug, expected_docs, acknowledged, project_root):
             continue
         rows: list[tuple[str, str]] = []
         for rel_path in reversed(expected_docs[slug].files):
@@ -1582,12 +1617,9 @@ def _render_bridge_state_compatibility_text(project_root: Path) -> str:
     return "\n".join(lines)
 
 
-def _read_index_live(project_root: Path) -> str:
-    """Read live bridge state as INDEX-shaped text for legacy parser callers."""
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.is_file():
-        return _render_bridge_state_compatibility_text(project_root)
-    return index_path.read_text(encoding="utf-8")
+def _read_bridge_state_live(project_root: Path) -> str:
+    """Read live bridge state rendered for the shared parser."""
+    return _render_bridge_state_text(project_root)
 
 
 def _compute_actionable(
@@ -1684,7 +1716,7 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
             role_line,
             worker_context_line,
             loyal_opposition_preflight_line,
-            "Read current TAFE/dispatcher bridge state and status-bearing versioned bridge files before acting; do not require or recreate bridge/INDEX.md.",
+            "Read current TAFE/dispatcher bridge state and status-bearing versioned bridge files before acting; do not require or recreate retired aggregate queue state.",
             "If any listed entry is no longer actionable for your role, do not act on that stale entry.",
             "Keep work scoped to the selected bridge entries and preserve the bridge protocol audit trail.",
             "",
@@ -2659,6 +2691,8 @@ def _spawn_harness(
         "signature": sig,
         "needed_role_label": target.needed_role_label,
         "status_file_path": str(status_file_path),
+        "selected_documents": [it.document_name for it in selected],
+        "primary_bridge_id": selected[0].document_name if selected else "",
     }
     try:
         try:
@@ -2864,7 +2898,29 @@ def _cleanup_stale_tmp_files(state_dir: Path) -> None:
             pass
 
 
-def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Path) -> None:
+def _launch_ts(launch: dict[str, Any]) -> float | None:
+    raw = launch.get("launched_at")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        return dt.datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _primary_bridge_id_for_launch(launch: dict[str, Any]) -> str:
+    raw_primary = launch.get("primary_bridge_id")
+    if isinstance(raw_primary, str) and raw_primary.strip():
+        return raw_primary.strip()
+    selected = launch.get("selected_documents")
+    if isinstance(selected, list):
+        for item in selected:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+    return ""
+
+
+def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Path, project_root: Path) -> None:
     """Check prior launch status files and update signature state."""
     for recipient, recipient_state in list(recipients_state.items()):
         if not isinstance(recipient_state, dict):
@@ -2904,7 +2960,32 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
 
         max_retries = _dispatch_max_retries()
 
-        if exit_code == 0:
+        matched_markers, inspected_paths = _matched_worker_output_markers(last_launch)
+        failure_reason: str | None = None
+        failure_error_type: str | None = None
+        failure_extra: dict[str, Any] = {}
+        if matched_markers:
+            failure_reason = matched_markers[0]["label"]
+            failure_error_type = "fatal_worker_output_marker"
+            failure_extra.update(inspected_paths)
+            failure_extra["matched_markers"] = matched_markers
+        elif exit_code == 0 and last_launch.get("needed_role_label") == "loyal-opposition":
+            dispatch_ts = _launch_ts(last_launch)
+            bridge_id = _primary_bridge_id_for_launch(last_launch)
+            verdict_path, verdict_latency = (
+                _find_dispatch_verdict(dispatch_ts=dispatch_ts, bridge_id=bridge_id, project_root=project_root)
+                if dispatch_ts is not None
+                else (None, None)
+            )
+            if verdict_path:
+                last_launch["verdict_path"] = verdict_path
+                last_launch["verdict_latency_seconds"] = verdict_latency
+            else:
+                failure_reason = "no_verdict_produced"
+                failure_error_type = "missing_bridge_verdict"
+                failure_extra["bridge_id"] = bridge_id
+
+        if exit_code == 0 and failure_reason is None:
             # Success: keep signature state aligned for every recipient role.
             if launch_signature:
                 recipient_state["last_dispatched_signature"] = launch_signature
@@ -2916,6 +2997,7 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             recipient_state["circuit_breaker_tripped"] = False
             recipient_state.pop("circuit_breaker_tripped_at", None)
             recipient_state.pop("circuit_breaker_half_open", None)
+            recipient_state.pop("last_failure_reason", None)
         else:
             # Failure!
             failure_count = recipient_state.get("failure_count", 0) + 1
@@ -2923,6 +3005,9 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             if failure_count >= max_retries:
                 recipient_state["circuit_breaker_tripped"] = True
                 recipient_state["circuit_breaker_tripped_at"] = _now_iso()
+            reason = failure_reason or "subprocess_execution_failed"
+            last_launch["exit_failure_reason"] = reason
+            recipient_state["last_failure_reason"] = reason
 
             # Since it failed, write to dispatch failures log as well
             _record_dispatch_failure(
@@ -2932,12 +3017,133 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                     "dispatch_id": dispatch_id,
                     "recipient": recipient,
                     "launched": True,
-                    "reason": "subprocess_execution_failed",
+                    "reason": reason,
+                    "error_type": failure_error_type or "subprocess_execution_failed",
                     "exit_code": exit_code,
                     "failure_count": failure_count,
                     "circuit_breaker_tripped": recipient_state.get("circuit_breaker_tripped", False),
+                    **failure_extra,
                 },
             )
+
+
+def _prior_dispatched_signature(prior: dict[str, Any]) -> Any:
+    return (
+        prior.get("last_dispatched_signature")
+        if prior.get("last_dispatched_signature") is not None
+        else prior.get("signature")
+    )
+
+
+def _prior_state_for_target(
+    recipients_state: dict[str, Any],
+    target: DispatchTarget,
+) -> dict[str, Any]:
+    direct = recipients_state.get(target.dispatch_state_key)
+    if isinstance(direct, dict):
+        return direct
+    role_state = recipients_state.get(target.needed_role_label)
+    if isinstance(role_state, dict):
+        selected_candidate = role_state.get("selected_candidate")
+        if not isinstance(selected_candidate, dict) or selected_candidate.get("harness_id") == target.harness_id:
+            return role_state
+    return {}
+
+
+def _target_selected_signature(target: DispatchTarget, items: list[Any], max_items: int) -> tuple[list[Any], str]:
+    target_max_items = _effective_max_items_for_target(target, max_items)
+    filtered = [it for it in items if getattr(it, "dispatchable", True)]
+    selected = _selected_oldest_first(filtered, target_max_items)
+    return selected, _signature(selected)
+
+
+def _failure_class_from_previous(previous_failure: dict[str, Any]) -> str:
+    markers = previous_failure.get("matched_markers")
+    if isinstance(markers, list):
+        for marker in markers:
+            if isinstance(marker, dict) and marker.get("label"):
+                return str(marker["label"])
+    error_type = previous_failure.get("error_type")
+    return str(error_type or "provider_failure")
+
+
+def _retry_delay_active_for_prior(prior: dict[str, Any], retry_delay_seconds: int) -> bool:
+    prior_last_launch = prior.get("last_launch")
+    prior_launched_at = prior_last_launch.get("launched_at") if isinstance(prior_last_launch, dict) else None
+    if not prior_launched_at:
+        return False
+    try:
+        launched_time = dt.datetime.fromisoformat(str(prior_launched_at).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return (dt.datetime.now(dt.UTC) - launched_time).total_seconds() < retry_delay_seconds
+
+
+def _provider_failure_backoff_skip(
+    *,
+    prior: dict[str, Any],
+    recipient: str,
+    signature: str,
+    state_dir: Path,
+) -> dict[str, Any] | None:
+    """Return skip evidence when a target has failed this same selected batch."""
+    if not prior:
+        return None
+    if _prior_dispatched_signature(prior) != signature:
+        return None
+
+    previous_failure = _detect_previous_launch_failure(prior, recipient=recipient, signature=signature)
+    if previous_failure is not None:
+        _record_dispatch_failure(state_dir, previous_failure)
+        failure_class = _failure_class_from_previous(previous_failure)
+        return {
+            "reason": "provider_failure_backoff_active",
+            "failure_class": failure_class,
+            "previous_launch_failed": previous_failure,
+        }
+
+    failure_count = prior.get("failure_count", 0)
+    try:
+        failure_count_int = int(failure_count)
+    except (TypeError, ValueError):
+        failure_count_int = 0
+    if failure_count_int <= 0:
+        return None
+
+    retry_delay_seconds = _dispatch_retry_delay_seconds()
+    if prior.get("circuit_breaker_tripped"):
+        if not _circuit_breaker_half_open_allowed(prior, retry_delay_seconds):
+            return {
+                "reason": "provider_failure_backoff_active",
+                "failure_class": str(prior.get("last_failure_reason") or "circuit_breaker_active"),
+                "backoff_source": "circuit_breaker_active",
+            }
+        return None
+
+    if _retry_delay_active_for_prior(prior, retry_delay_seconds):
+        return {
+            "reason": "provider_failure_backoff_active",
+            "failure_class": str(prior.get("last_failure_reason") or "retry_delay_enforced"),
+            "backoff_source": "retry_delay_enforced",
+        }
+    return None
+
+
+def _seed_provider_failure_skip_state(
+    recipients_state: dict[str, Any],
+    target: DispatchTarget,
+    skip: dict[str, Any],
+) -> None:
+    prior = _prior_state_for_target(recipients_state, target)
+    seeded = dict(prior)
+    seeded["last_result"] = skip["reason"]
+    seeded["updated_at"] = _now_iso()
+    seeded["failure_class"] = skip.get("failure_class")
+    if "previous_launch_failed" in skip:
+        seeded["previous_launch_failed"] = skip["previous_launch_failed"]
+    if "backoff_source" in skip:
+        seeded["backoff_source"] = skip["backoff_source"]
+    recipients_state[target.dispatch_state_key] = seeded
 
 
 def run_trigger(
@@ -3007,7 +3213,7 @@ def run_trigger(
     _diag_index_mtime = _path_mtime_iso(project_root / "bridge")
     _diag_dispatch_state_mtime_pre = _path_mtime_iso(state_dir / DISPATCH_STATE_FILENAME)
 
-    index_text = _read_index_live(project_root)
+    index_text = _read_bridge_state_live(project_root)
     _diag_index_signature_pre = hashlib.sha256(index_text.encode("utf-8")).hexdigest()
     actionable_for_prime, actionable_for_codex = _compute_actionable(index_text, project_root)
 
@@ -3055,7 +3261,7 @@ def run_trigger(
     if not isinstance(recipients_state, dict):
         recipients_state = {}
     recipients_state = _migrate_recipients_state_keys(recipients_state, project_root)
-    _process_pending_exit_codes(recipients_state, state_dir)
+    _process_pending_exit_codes(recipients_state, state_dir, project_root)
 
     # IP-3b: resolve dispatch targets from the durable role record. The
     # mapping from actionable-classification to needed-role is fixed:
@@ -3100,7 +3306,7 @@ def run_trigger(
 
         skipped_candidates: list[dict[str, Any]] = []
         selected_target: DispatchTarget | None = None
-        for target in targets:
+        for target_index, target in enumerate(targets):
             h_info = harnesses.get(target.harness_id) or {}
             harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
             if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
@@ -3109,6 +3315,24 @@ def run_trigger(
                 skip["reason"] = reason
                 skipped_candidates.append(skip)
                 pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
+                continue
+            provider_backoff_skip = None
+            if target_index < len(targets) - 1:
+                _target_selected, target_signature = _target_selected_signature(target, items, max_items)
+                provider_backoff_skip = _provider_failure_backoff_skip(
+                    prior=_prior_state_for_target(recipients_state, target),
+                    recipient=target.dispatch_state_key,
+                    signature=target_signature,
+                    state_dir=state_dir,
+                )
+            if provider_backoff_skip is not None:
+                skip = _dispatch_target_evidence(target)
+                skip.update(
+                    {key: value for key, value in provider_backoff_skip.items() if key != "previous_launch_failed"}
+                )
+                skipped_candidates.append(skip)
+                _seed_provider_failure_skip_state(recipients_state, target, provider_backoff_skip)
+                pending_by_target.append((target, items, target.dispatch_state_key, skip["reason"], None))
                 continue
             selected_target = target
             break
@@ -3554,7 +3778,7 @@ def run_trigger(
         "hook_event_name": _hook_context_value(hook_context, "hook_event_name"),
         "index_mtime": _diag_index_mtime,
         "index_signature_pre": _diag_index_signature_pre,
-        "index_signature_post": hashlib.sha256(_read_index_live(project_root).encode("utf-8")).hexdigest(),
+        "index_signature_post": hashlib.sha256(_read_bridge_state_live(project_root).encode("utf-8")).hexdigest(),
         "dispatch_state_mtime_pre": _diag_dispatch_state_mtime_pre,
         "dispatch_state_mtime_post": _path_mtime_iso(state_dir / DISPATCH_STATE_FILENAME),
         "elapsed_ms": int((time.monotonic() - _diag_start) * 1000),

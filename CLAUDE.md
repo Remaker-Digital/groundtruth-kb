@@ -45,9 +45,11 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 
 **Owner role:** Provides direction (actions to take) and decisions (specifications to create, approve, or modify). The owner supplies the *what* and *why*.
 
-**Prime Builder role (Claude Code / Opus):** Creates, manages, maintains and frequently references implementation artifacts. Proposes specifications, implements approved changes, runs tests, and keeps the system internally consistent. Prime Builder is responsible for the *how* during implementation work.
+**Prime Builder role:** Creates, manages, maintains and frequently references implementation artifacts. Proposes specifications, implements approved changes, runs tests, and keeps the system internally consistent. Prime Builder is responsible for the *how* during implementation work. Any registered harness may hold this role by owner assignment.
 
-**Loyal Opposition role (Codex):** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work.
+**Loyal Opposition role:** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work. Any registered harness may hold this role by owner assignment.
+
+**Dispatchability:** Role assignment is independent from headless dispatch eligibility. Dispatch targets are controlled by `config/dispatcher/rules.toml` and the projected `can_receive_dispatch` axis; event sources are controlled by `can_fire_events`. Multiple active harnesses may hold the same operating role while only some of them receive dispatched bridge work. For dispatcher topology, dispatchability, selected targets, rule eligibility, or dispatch health, use the `bridge-config` skill or `gt bridge dispatch config|status|health`. Current queue authority is dispatcher/TAFE state plus status-bearing numbered bridge files.
 
 **GroundTruth KB vision filter:** For GroundTruth-related work, prefer choices that reduce the owner's role to adding or refining specifications, answering clarification questions, and making explicit trade-off decisions. Flag approaches that leave routine implementation, deployment plumbing, traceability reconciliation, generated-artifact inspection, or cross-agent process state with the owner.
 
@@ -55,18 +57,18 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
-**Operating procedure.** File-based bridge protocol. See `.claude/rules/file-bridge-protocol.md` and `.claude/rules/bridge-essential.md` §"Operational Mode".
+**Operating procedure.** Dispatcher-backed bridge protocol. See `.claude/rules/file-bridge-protocol.md` and `.claude/rules/bridge-essential.md` only for legacy helper behavior and historical audit interpretation.
 
 - **DO NOT implement anything without first preparing an implementation proposal and having it reviewed by Codex.**
 - **All implementation proposals MUST be reviewed by Codex before any code is written.**
 - **All post-implementation reports MUST be reviewed by Codex before committing.**
-- **Propose:** Save proposal to `bridge/{name}-001.md`, add NEW entry to `bridge/INDEX.md`.
-- **Review:** Codex scans INDEX for NEW/REVISED entries, reviews, adds GO or NO-GO version.
+- **Propose:** Save proposal to `bridge/{name}-001.md` through the governed dispatcher-backed bridge path.
+- **Review:** an eligible Loyal Opposition target receives dispatcher-routed NEW/REVISED work, reviews, adds GO or NO-GO version.
 - **Execute:** After Codex GO, implement code, tests, and verify.
-- **Report:** Save post-implementation report as new version, add NEW entry for verification.
-- **Verify:** Codex reviews report and adds VERIFIED or NO-GO version.
-- **Dispatch:** Bridge dispatch automation is the **cross-harness event-driven trigger** at `scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger fires on tool-use and Stop events. It dispatches Codex on latest `NEW` or `REVISED` (Loyal-Opposition-actionable) and Prime on latest `GO` or `NO-GO` (Prime-Builder-actionable). `VERIFIED` is terminal and not dispatched. The retired OS pollers and the retired smart poller are archived; do not re-enable without owner approval per `.claude/rules/bridge-essential.md` §"Re-Enabling Pollers".
-- **Manual scan is fallback** when the trigger is unhealthy or intentionally stopped: the owner triggers a bridge scan with a brief prompt such as `Bridge` or `Bridge scan`; agents then read `bridge/INDEX.md` and act on role-appropriate actionable entries.
+- **Report:** Save post-implementation report as new version, publish it through the dispatcher-backed bridge path for verification.
+- **Verify:** an eligible Loyal Opposition target reviews report and adds VERIFIED or NO-GO version.
+- **Dispatch:** Bridge dispatch automation is the **cross-harness event-driven trigger** at `scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger fires on tool-use and Stop events. It dispatches latest `NEW` or `REVISED` items to eligible Loyal Opposition targets and latest `GO` or `NO-GO` items to eligible Prime Builder targets. `VERIFIED` is terminal and not dispatched. Candidate eligibility and ranking come from `config/dispatcher/rules.toml`; inspect with the `bridge-config` skill or `gt bridge dispatch status`. The retired OS pollers and the retired smart poller are archived; do not re-enable without owner approval per `.claude/rules/bridge-essential.md` §"Re-Enabling Pollers".
+- **Retired bridge aggregate:** Do not recreate aggregate queue artifacts. Any helper that requires them is defective and must be repaired.
 
 ---
 
@@ -120,7 +122,7 @@ All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
 | GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001 | All cross-cutting technical requirements MUST be mechanically enforced for all implementation proposals, via two-layer defense in depth (write-time + review-time) |
 | GOV-DOCUMENT-AUTHOR-PROVENANCE-001 | Document Artifact Author Provenance Contract |
 | GOV-ENV-LOCAL-AUTHORITY-001 | env source-of-truth artifacts are authoritative per scope; single SoT per scope at a fixed relative path |
-| GOV-FILE-BRIDGE-AUTHORITY-001 | Live bridge index authority and permanent bridge repair authority |
+| GOV-FILE-BRIDGE-AUTHORITY-001 | Legacy file-bridge compatibility authority and permanent bridge repair authority |
 | GOV-GLOSSARY-AS-DA-READ-SURFACE-001 | Canonical glossary is the Deliberation Archive's primary read surface |
 | GOV-GTKB-ADOPTION-ENFORCEMENT-001 | A GroundTruth-KB adopter application must adopt and enforce available GT-KB governance capabilities |
 | GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001 | GT-KB installs must prepare capable harnesses for Prime Builder and Loyal Opposition roles |
@@ -203,7 +205,7 @@ Next: [describe task].
 
 ### Session Start (Mandatory)
 
-Scan live `bridge/INDEX.md` (role-filtered — Prime Builder acts on latest `GO`/`NO-GO`; Loyal Opposition on latest `NEW`/`REVISED`), then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The cross-harness event-driven trigger (PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval. **Antigravity startup optimization**: For the Antigravity harness (ID C), skip loading non-essential rules/logs (exempt from Phase B steps 9-18a) and run startup services with `--fast-hook` and `--skip-bridge-maintenance` to omit non-local checks.
+Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatcher topology, dispatchability, selected targets, and health evidence. Use TAFE-backed bridge-state surfaces and status-bearing numbered bridge files for canonical bridge queue/actionability claims. Then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The cross-harness event-driven trigger (PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval. **Antigravity startup optimization**: For the Antigravity harness (ID C), skip loading non-essential rules/logs (exempt from Phase B steps 9-18a) and run startup services with `--fast-hook` and `--skip-bridge-maintenance` to omit non-local checks.
 
 ### Protected Behaviors & Removal Rule
 

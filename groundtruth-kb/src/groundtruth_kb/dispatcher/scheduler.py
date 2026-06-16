@@ -42,8 +42,6 @@ def _bridge_actionable_count_from_files(project_root: Path) -> int:
     latest: dict[str, tuple[int, str]] = {}
     bridge_dir = project_root / "bridge"
     for path in bridge_dir.glob("*.md"):
-        if path.name == "INDEX.md":
-            continue
         match = re.match(r"^(.+)-(\d+)\.md$", path.name)
         if not match:
             continue
@@ -58,12 +56,7 @@ def _bridge_actionable_count_from_files(project_root: Path) -> int:
 
 
 def _bridge_actionable_count(project_root: Path) -> int:
-    index = project_root / "bridge" / "INDEX.md"
-    try:
-        text = index.read_text(encoding="utf-8")
-    except OSError:
-        return _bridge_actionable_count_from_files(project_root)
-    return sum(1 for line in text.splitlines() if line.startswith(("NEW:", "REVISED:")))
+    return _bridge_actionable_count_from_files(project_root)
 
 
 def _working_tree_dirty(project_root: Path) -> bool:

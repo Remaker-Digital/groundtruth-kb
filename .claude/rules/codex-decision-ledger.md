@@ -46,13 +46,13 @@ Purpose: persistent record of owner decisions and standing operating choices tha
   Owner directive in session on 2026-05-03.
 - decision:
   When Codex provides a status update, including in response to a bare `?`,
-  Codex must first load and examine the live `bridge/INDEX.md` and examine the
-  state of all active sub-agents.
+  Codex must first examine TAFE/dispatcher bridge state and examine the state
+  of all active sub-agents.
 - impact:
-  Status updates should report current bridge state from the authoritative
-  index, not cached summaries or earlier reads. If no sub-agents are active,
-  say so. If sub-agents are active, include their current state and whether
-  their work affects the next step.
+  Status updates should report current bridge state from TAFE/dispatcher bridge
+  state, not cached summaries, earlier reads, or derived artifacts. If no
+  sub-agents are active, say so. If sub-agents are active, include
+  their current state and whether their work affects the next step.
 - status:
   Active
 
@@ -65,10 +65,9 @@ Purpose: persistent record of owner decisions and standing operating choices tha
   should proceed directly without asking for owner input.
 - impact:
   Latest `NEW` or `REVISED` bridge entries are sufficient authorization for
-  Loyal Opposition review/verification work. Codex should read the live
-  `bridge/INDEX.md`, process the actionable item under the file bridge
-  protocol, and only stop for owner input when a necessary owner decision
-  blocks the review itself.
+  Loyal Opposition review/verification work. Codex should use TAFE/dispatcher
+  bridge state, process the actionable item under the bridge protocol, and only
+  stop for owner input when a necessary owner decision blocks the review itself.
 - status:
   Active
 

@@ -7,7 +7,7 @@ import re
 _PROTECTED_BRIDGE_PATH_PATTERN = (
     r"(?:[A-Za-z]:)?"
     r"(?:[\\/]|[\w .-]+[\\/])*"
-    r"bridge[\\/](?:INDEX\.md|[A-Za-z0-9_.-]+\.md)"
+    r"bridge[\\/][A-Za-z0-9_.-]+-\d{3}\.md"
 )
 
 _PROTECTED_BRIDGE_PATH_RE = re.compile(_PROTECTED_BRIDGE_PATH_PATTERN, re.IGNORECASE)
@@ -64,5 +64,5 @@ def bridge_bash_mutation_reason(command: str) -> str | None:
     return (
         f"Bash bridge artifact mutation denied for {listed}. "
         "Use guarded Write/Edit dispatch or the scripts/gtkb_bridge_writer.py helper path "
-        "for bridge/*.md and bridge/INDEX.md."
+        "for numbered bridge files."
     )

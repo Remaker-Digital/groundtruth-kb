@@ -47,11 +47,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-index-write-serializer.py\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/lo-file-safety-gate.py\"",
             "timeout": 5
           },

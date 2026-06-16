@@ -31,10 +31,11 @@ STANDING_BACKLOG_STALE_NO_GO_DAYS = 14
 IMPLEMENTATION_ACTIVE_APPROVAL_STATES = frozenset({"implementation_authorized"})
 IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = frozenset({"in_progress"})
 IMPLEMENTATION_ACTIVE_STAGES = frozenset({"implementing"})
-_BRIDGE_LATEST_STATUS_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s+(bridge/\S+\.md)\s*$"
+_BRIDGE_VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
+_BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
 )
-_BRIDGE_INDEX_STATUS_LIKE_RE = re.compile(r"^[A-Z][A-Z-]*:")
 _BRIDGE_DATE_RE = re.compile(r"^Date:\s*(\d{4}-\d{2}-\d{2})(?:\s+UTC)?\s*$", re.IGNORECASE)
 _LEGACY_ROOT_MARKERS = (
     "E:\\Claude-Playground",
@@ -1879,14 +1880,13 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
         )
 
     bridge_dir = target / "bridge"
-    index_path = bridge_dir / "INDEX.md"
-    if not index_path.exists():
+    if not bridge_dir.exists():
         return ToolCheck(
             name="Uncited owner-input bridges",
             required=False,
             found=False,
             status="warning",
-            message="bridge/INDEX.md not found",
+            message="bridge directory not found",
         )
 
     gate_path = target / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -1911,29 +1911,25 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
     sys.modules["bridge_gate_doctor"] = module
     spec.loader.exec_module(module)
 
-    # Per bridge protocol: a Document entry is a thread of versioned files,
-    # newest at top. The `VERIFIED:` status line points to Codex's verdict
-    # file; the actual Prime proposal/report carrying the Owner Decisions
-    # obligation is on `NEW:` or `REVISED:` lines in the same entry. The
-    # check must inspect the non-verdict files in each VERIFIED thread, not
-    # only the verdict file. Per Codex -004 F1.
+    # Per bridge protocol: each thread is a chain of numbered bridge files,
+    # newest version first. A latest VERIFIED file is the verdict; the Prime
+    # proposal/report carrying the Owner Decisions obligation is on NEW/REVISED
+    # versions in the same chain. The check inspects non-verdict files in each
+    # VERIFIED thread, not only the verdict file. Per Codex -004 F1.
     threads: list[tuple[str, list[tuple[str, Path]]]] = []
-    current_doc: str | None = None
-    current_files: list[tuple[str, Path]] = []
-    line_re = _re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN):\s*(bridge/\S+\.md)\s*$")
-    for line in index_path.read_text(encoding="utf-8").splitlines():
-        s = line.strip()
-        if s.startswith("Document:"):
-            if current_doc and current_files:
-                threads.append((current_doc, current_files))
-            current_doc = s[len("Document:") :].strip()
-            current_files = []
+    grouped_files: dict[str, list[tuple[int, str, Path]]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = _BRIDGE_VERSION_FILE_RE.match(path.name)
+        if match is None:
             continue
-        m = line_re.match(s)
-        if m and current_doc:
-            current_files.append((m.group(1), target / m.group(2)))
-    if current_doc and current_files:
-        threads.append((current_doc, current_files))
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        grouped_files.setdefault(match.group(1), []).append((int(match.group(2)), status, path))
+    for doc_name, versions in sorted(grouped_files.items()):
+        files = [(status, path) for _version, status, path in sorted(versions, key=lambda item: item[0], reverse=True)]
+        if files:
+            threads.append((doc_name, files))
 
     # Known historical offenders: bridge files filed before Sub-slice C's
     # bridge-compliance-gate began enforcing the Owner Decisions / Input
@@ -3366,37 +3362,18 @@ def _check_canonical_terms_registry(target: Path) -> ToolCheck:
 
 
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
-    """Check file bridge configuration for dual-agent projects.
-
-    Returns WARN when:
-    - BRIDGE-INVENTORY.md or bridge-os-poller-setup-prompt.md are missing
-    - bridge/INDEX.md is absent
-    - Any of the 3 required bridge rule files are absent from .claude/rules/
-
-    Returns pass only when bridge/INDEX.md exists AND all 3 required rule
-    files are present.
-    """
-    inventory = target / "BRIDGE-INVENTORY.md"
-    setup_prompt = target / "bridge-os-poller-setup-prompt.md"
-    index = target / "bridge" / "INDEX.md"
-
-    missing_setup = [path.name for path in (inventory, setup_prompt) if not path.exists()]
-    if missing_setup:
+    """Check file bridge configuration for dual-agent projects."""
+    bridge_dir = target / "bridge"
+    if not bridge_dir.is_dir():
         return ToolCheck(
             name="File Bridge Config",
             required=True,
             found=False,
             status="warning",
-            message=f"Missing file bridge setup artifact(s): {', '.join(missing_setup)}",
-        )
-
-    if not index.exists():
-        return ToolCheck(
-            name="File Bridge Config",
-            required=True,
-            found=True,
-            status="warning",
-            message="bridge/INDEX.md not found — create it to enable the bridge workflow",
+            message=(
+                "Bridge directory not found; create bridge/ and file numbered "
+                "bridge documents through dispatcher-backed flows."
+            ),
         )
 
     rules_dir = target / ".claude" / "rules"
@@ -3419,94 +3396,53 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
         required=True,
         found=True,
         status="pass",
-        message="File bridge inventory, setup prompt, bridge/INDEX.md, and bridge rules present",
+        message="File bridge directory and bridge rules present",
     )
 
 
-def _bridge_index_well_formedness_error(index_text: str) -> str | None:
-    if "\\n" in index_text:
-        return "contains literal escaped newline text (\\n); write real newline characters instead"
-
-    seen_documents: set[str] = set()
-    current_doc: str | None = None
-    current_doc_status_seen = False
-    for lineno, raw_line in enumerate(index_text.splitlines(), start=1):
-        line = raw_line.strip()
-        if line.startswith("Document:"):
-            if current_doc is not None and not current_doc_status_seen:
-                return f"Document {current_doc!r} has no status line before line {lineno}"
-            document = line.removeprefix("Document:").strip()
-            if not document:
-                return f"line {lineno}: Document line is missing a bridge document id"
-            if document in seen_documents:
-                return f"line {lineno}: duplicate Document entry {document!r}"
-            seen_documents.add(document)
-            current_doc = document
-            current_doc_status_seen = False
-            continue
-
-        if current_doc is None:
-            continue
-
-        if not line:
-            if not current_doc_status_seen:
-                return f"Document {current_doc!r} has a blank line before its first status line"
-            current_doc = None
-            current_doc_status_seen = False
-            continue
-
-        if _BRIDGE_LATEST_STATUS_RE.match(line):
-            current_doc_status_seen = True
-            continue
-
-        if _BRIDGE_INDEX_STATUS_LIKE_RE.match(line):
-            return f"line {lineno}: malformed bridge status line {line!r}"
-        return f"line {lineno}: unexpected non-status content inside Document {current_doc!r}: {line!r}"
-
-    if current_doc is not None and not current_doc_status_seen:
-        return f"Document {current_doc!r} has no status line"
-    return None
-
-
-def _check_file_bridge_index_parse(target: Path) -> ToolCheck:
-    index = target / "bridge" / "INDEX.md"
-    if not index.exists():
+def _check_file_bridge_state_parse(target: Path) -> ToolCheck:
+    bridge_dir = target / "bridge"
+    if not bridge_dir.exists():
         return ToolCheck(
-            name="File Bridge Index",
+            name="File Bridge State",
             required=True,
             found=False,
             status="fail",
-            message="bridge/INDEX.md not found; cannot parse canonical bridge workflow state",
+            message="bridge directory not found; cannot parse bridge workflow state",
         )
 
     try:
-        index_text = index.read_text(encoding="utf-8")
-    except OSError as exc:
+        from groundtruth_kb.bridge.status_driver import collect_bridge_status
+
+        snapshot = collect_bridge_status(target)
+    except Exception as exc:  # intentional-catch: doctor health check
         return ToolCheck(
-            name="File Bridge Index",
+            name="File Bridge State",
             required=True,
             found=True,
             status="fail",
-            message=f"bridge/INDEX.md unreadable: {exc}",
+            message=f"Versioned bridge state unreadable: {exc}",
         )
 
-    error = _bridge_index_well_formedness_error(index_text)
-    if error:
+    if snapshot.queue.parse_error_count:
+        first_error = snapshot.queue.parse_errors[0] if snapshot.queue.parse_errors else {}
         return ToolCheck(
-            name="File Bridge Index",
+            name="File Bridge State",
             required=True,
             found=True,
             status="fail",
-            message=f"bridge/INDEX.md malformed: {error}",
+            message=f"Versioned bridge state malformed: {first_error}",
         )
 
-    entry_count = len(_latest_bridge_status_entries(index_text))
     return ToolCheck(
-        name="File Bridge Index",
+        name="File Bridge State",
         required=True,
         found=True,
         status="pass",
-        message=f"bridge/INDEX.md parseable ({entry_count} document entr{'y' if entry_count == 1 else 'ies'})",
+        message=(
+            f"Versioned bridge state parseable ({snapshot.queue.threads} "
+            f"thread{'s' if snapshot.queue.threads != 1 else ''})"
+        ),
     )
 
 
@@ -4748,20 +4684,20 @@ def _check_da_harvest_coverage(target: Path) -> ToolCheck:
     - coverage_pct ``>=`` ``ERROR_THRESHOLD`` (80.0) → warning
     - coverage_pct ``<``  ``ERROR_THRESHOLD``        → fail
 
-    Missing DB or missing INDEX is treated as a skipped (warning) check
+    Missing DB or missing bridge directory is treated as a skipped warning
     rather than a hard fail — this keeps fresh scaffolds green until the
     consumer project wires its bridge.
     """
-    index_path = target / "bridge" / "INDEX.md"
+    bridge_dir = target / "bridge"
     db_path = target / "groundtruth.db"
 
-    if not index_path.exists() or not db_path.exists():
+    if not bridge_dir.exists() or not db_path.exists():
         return ToolCheck(
             name="DA harvest coverage",
             required=False,
             found=False,
             status="warning",
-            message="DA harvest coverage: skipped (bridge/INDEX.md or groundtruth.db missing)",
+            message="DA harvest coverage: skipped (bridge directory or groundtruth.db missing)",
         )
 
     db = None
@@ -4772,7 +4708,7 @@ def _check_da_harvest_coverage(target: Path) -> ToolCheck:
         )
 
         db = KnowledgeDB(str(db_path))
-        metrics = compute_active_bridge_thread_coverage(index_path, db)
+        metrics = compute_active_bridge_thread_coverage(bridge_dir, db)
     except Exception as exc:  # intentional-catch: validation tool, error -> fail status
         return ToolCheck(
             name="DA harvest coverage",
@@ -4830,29 +4766,44 @@ def _check_da_harvest_coverage(target: Path) -> ToolCheck:
 # ── Main entry point ──────────────────────────────────────────────────
 
 
-def _latest_bridge_status_entries(index_text: str) -> list[dict[str, str]]:
-    """Return the top status row for each bridge document in INDEX order."""
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = _BRIDGE_FILE_STATUS_RE.match(stripped)
+            return match.group(1).upper() if match else None
+    except OSError:
+        return None
+    return None
+
+
+def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
+    """Return the latest status row for each numbered bridge thread."""
+
+    bridge_dir = target / "bridge"
+    grouped: dict[str, list[tuple[int, str, str]]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = _BRIDGE_VERSION_FILE_RE.match(path.name)
+        if match is None:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        grouped.setdefault(match.group(1), []).append((int(match.group(2)), status, f"bridge/{path.name}"))
 
     entries: list[dict[str, str]] = []
-    current_document: str | None = None
-    for raw_line in index_text.splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document: "):
-            current_document = line.removeprefix("Document: ").strip()
-            continue
-        if current_document is None:
-            continue
-        match = _BRIDGE_LATEST_STATUS_RE.match(line)
-        if not match:
-            continue
+    for document, versions in sorted(grouped.items()):
+        latest_version, status, rel_path = max(versions, key=lambda item: item[0])
         entries.append(
             {
-                "document": current_document,
-                "status": match.group(1),
-                "path": match.group(2),
+                "document": document,
+                "status": status,
+                "path": rel_path,
+                "version": str(latest_version),
             }
         )
-        current_document = None
     return entries
 
 
@@ -4962,19 +4913,19 @@ def check_standing_backlog_health(
         finally:
             db.close()
 
-    index_path = target / "bridge" / "INDEX.md"
-    if not index_path.is_file():
+    bridge_dir = target / "bridge"
+    if not bridge_dir.is_dir():
         findings.append(
             {
                 "kind": "missing-evidence",
                 "severity": "FAIL",
-                "message": "bridge/INDEX.md is missing; cannot evaluate stale NO-GO bridge entries.",
-                "path": "bridge/INDEX.md",
+                "message": "bridge directory is missing; cannot evaluate stale NO-GO bridge entries.",
+                "path": "bridge/",
             }
         )
     else:
         try:
-            entries = _latest_bridge_status_entries(index_path.read_text(encoding="utf-8"))
+            entries = _latest_bridge_status_entries(target)
             for entry in entries:
                 if entry["status"] != "NO-GO":
                     continue
@@ -5013,7 +4964,7 @@ def check_standing_backlog_health(
                     "kind": "missing-evidence",
                     "severity": "FAIL",
                     "message": f"Could not evaluate bridge stale NO-GO state: {exc}",
-                    "path": "bridge/INDEX.md",
+                    "path": "bridge/",
                 }
             )
 
@@ -5254,7 +5205,7 @@ def run_doctor(
 
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
-        checks.append(_check_file_bridge_index_parse(target))
+        checks.append(_check_file_bridge_state_parse(target))
         checks.append(_check_settings_classifiers(target))
         checks.append(_check_active_legacy_root_references(target))
         checks.append(_check_spec_classifier_canonical_path(target))

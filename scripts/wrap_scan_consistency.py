@@ -1,10 +1,9 @@
 """W2 of GTKB-WRAPUP-ENHANCEMENTS Slice 1: S2 cross-artifact consistency scanner.
 
 Per bridge/gtkb-wrapup-enhancements-slice1-005.md (REVISED-2, GO at -006).
-Detects the phantom-INDEX-citation class and adjacent reference-integrity failures:
+Detects bridge-file structural drift and adjacent reference-integrity failures:
 
-    index_cites_missing_bridge_file       (S308 phantom-INDEX recurrences)
-    bridge_file_orphaned_from_index       (overlap with W1; reported with thread context)
+    bridge_numbered_file_missing_status   (status-bearing file without status)
     (retired: legacy standing-backlog cross-ref check removed at Slice 7-prime)
     memory_md_cites_missing_topic_file    (latent class)
     claude_md_cites_missing_rule          (latent class)
@@ -35,15 +34,7 @@ SEVERITY_ERROR = "error"
 EXIT_OK = 0
 EXIT_ERROR = 2
 
-# Per WRAPUP -011 §2: allowlist for known-acceptable historical phantom-INDEX
-# entries. Stage 1 ships an empty production list; Stage 2 (separate follow-up
-# bridge) populates with reviewed entries. Absent or empty allowlist preserves
-# current behavior (all phantom citations at error-severity).
-ALLOWLIST_PATH_RELATIVE = ".groundtruth/wrap-scan/historical-phantoms.toml"
-
-INDEX_LINE_PATTERN = re.compile(
-    r"^\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/[A-Za-z0-9_-]+-\d{3}\.md)\s*$"
-)
+BRIDGE_NUMBERED_FILE_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+-\d{3}\.md$")
 MEMORY_INDEX_REF_PATTERN = re.compile(r"\[[^\]]+\]\(([A-Za-z0-9_./-]+\.md)\)")
 RULE_REF_PATTERN = re.compile(r"`(\.claude/rules/[A-Za-z0-9_./-]+\.md)`")
 
@@ -56,118 +47,32 @@ def _finding(check: str, severity: str, message: str, **details: Any) -> dict:
     return {"check": check, "severity": severity, "message": message, **details}
 
 
-def _load_allowlist(project_root: Path) -> dict[str, dict]:
-    """Load historical-phantom allowlist; fail loudly on malformed.
-
-    Per WRAPUP -012 GO conditions: malformed allowlist must fail loudly
-    (raise), not silently default. Absent/empty allowlist returns empty
-    dict and preserves current behavior (all findings at error-severity).
-    """
-    allowlist_path = project_root / ALLOWLIST_PATH_RELATIVE
-    if not allowlist_path.exists():
-        return {}
-    try:
-        try:
-            import tomllib
-        except ImportError:
-            import tomli as tomllib  # type: ignore[no-redef,import-not-found]
-        data = tomllib.loads(allowlist_path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise RuntimeError(
-            f"Allowlist at {ALLOWLIST_PATH_RELATIVE} is malformed; refusing "
-            f"to silently default. Fix or delete the file. Underlying error: {exc}"
-        ) from exc
-
-    if not isinstance(data, dict):
-        raise RuntimeError(f"Allowlist at {ALLOWLIST_PATH_RELATIVE} must be a TOML mapping at the top level.")
-
-    schema_version = data.get("schema_version")
-    if schema_version != 1:
-        raise RuntimeError(
-            f"Allowlist schema_version={schema_version!r}; expected 1. Update the allowlist file or this scanner."
-        )
-
-    phantoms = data.get("phantoms", [])
-    if not isinstance(phantoms, list):
-        raise RuntimeError(f"Allowlist 'phantoms' field must be a list; got {type(phantoms).__name__}.")
-
-    by_pattern: dict[str, dict] = {}
-    for entry in phantoms:
-        if not isinstance(entry, dict):
-            raise RuntimeError(f"Allowlist phantom entry must be a mapping; got {type(entry).__name__}: {entry!r}")
-        pattern = entry.get("index_line_pattern")
-        if not isinstance(pattern, str) or not pattern.strip():
-            raise RuntimeError(f"Allowlist phantom entry missing/invalid 'index_line_pattern': {entry!r}")
-        by_pattern[pattern.strip()] = entry
-    return by_pattern
+def _ensure_bridge_helpers_importable(project_root: Path) -> None:
+    gt_src = project_root / "groundtruth-kb" / "src"
+    if gt_src.exists():
+        src_text = str(gt_src)
+        if src_text not in sys.path:
+            sys.path.insert(0, src_text)
 
 
-def check_index_cites_missing_bridge_file(project_root: Path) -> list[dict]:
-    """Detect INDEX lines citing missing bridge files.
-
-    Per WRAPUP -012: matches against the allowlist (loaded via _load_allowlist
-    above). Allowlisted lines emit info-severity finding with reason; un-
-    allowlisted missing files remain error-severity (canonical S308 class).
-    """
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.exists():
-        return []
-    allowlist = _load_allowlist(project_root)
-    findings: list[dict] = []
-    for line_no, line in enumerate(index_path.read_text(encoding="utf-8").splitlines(), 1):
-        match = INDEX_LINE_PATTERN.match(line)
-        if not match:
-            continue
-        status, ref = match.groups()
-        cited_path = project_root / ref
-        if cited_path.exists():
-            continue
-        normalized = line.strip()
-        allowlist_entry = allowlist.get(normalized)
-        if allowlist_entry is not None:
-            findings.append(
-                _finding(
-                    "index_cites_missing_bridge_file",
-                    SEVERITY_INFO,
-                    f"INDEX.md line {line_no} cites missing file (allowlisted historical phantom): {ref} ({status})",
-                    line_number=line_no,
-                    status=status,
-                    cited_path=ref,
-                    allowlist_reason=allowlist_entry.get("reason", "(no reason field)"),
-                    codex_review_bridge=allowlist_entry.get("codex_review_bridge"),
-                )
-            )
-        else:
-            findings.append(
-                _finding(
-                    "index_cites_missing_bridge_file",
-                    SEVERITY_ERROR,
-                    f"INDEX.md line {line_no} cites missing file: {ref} ({status})",
-                    line_number=line_no,
-                    status=status,
-                    cited_path=ref,
-                )
-            )
-    return findings
-
-
-def check_bridge_file_orphaned_from_index(project_root: Path) -> list[dict]:
+def check_bridge_numbered_files_have_status(project_root: Path) -> list[dict]:
     bridge_dir = project_root / "bridge"
-    index_path = bridge_dir / "INDEX.md"
-    if not index_path.exists() or not bridge_dir.is_dir():
+    if not bridge_dir.is_dir():
         return []
-    index_text = index_path.read_text(encoding="utf-8")
+    _ensure_bridge_helpers_importable(project_root)
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
+
     findings: list[dict] = []
     for entry in bridge_dir.iterdir():
-        if not entry.is_file() or entry.name == "INDEX.md" or entry.suffix != ".md":
+        if not entry.is_file() or not BRIDGE_NUMBERED_FILE_PATTERN.match(entry.name):
             continue
         ref = f"bridge/{entry.name}"
-        if ref not in index_text:
+        if status_from_bridge_file(entry) is None:
             findings.append(
                 _finding(
-                    "bridge_file_orphaned_from_index",
-                    SEVERITY_WARN,
-                    f"Bridge file present on disk but not referenced by any INDEX line: {ref}",
+                    "bridge_numbered_file_missing_status",
+                    SEVERITY_ERROR,
+                    f"Numbered bridge file is missing a lifecycle status token: {ref}",
                     path=ref,
                 )
             )
@@ -273,8 +178,7 @@ def check_da_cites_missing_bridge_file(project_root: Path) -> list[dict]:
 
 
 CHECKS = (
-    check_index_cites_missing_bridge_file,
-    check_bridge_file_orphaned_from_index,
+    check_bridge_numbered_files_have_status,
     check_memory_md_cites_missing_topic_file,
     check_claude_md_cites_missing_rule,
     check_da_cites_missing_bridge_file,

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Generate the bridge state swimlane JSON for the GT-KB dashboard.
 
-Reads ``bridge/INDEX.md`` (parsed via :mod:`scripts.gtkb_bridge_writer`),
-attaches per-thread timestamps from ``git log`` (with mtime fallback), and
-classifies each thread as terminal, awaiting Prime Builder, or awaiting
-Loyal Opposition.
+Reads status-bearing numbered bridge files, attaches per-thread timestamps
+from ``git log`` (with mtime fallback), and classifies each thread as
+terminal, awaiting Prime Builder, or awaiting Loyal Opposition.
 
 Output shape: see :func:`generate_swimlane`.
 
@@ -29,11 +28,11 @@ _THIS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _THIS_DIR.parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
+_GTKB_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
+if str(_GTKB_SRC) not in sys.path:
+    sys.path.insert(0, str(_GTKB_SRC))
 
-from scripts.gtkb_bridge_writer import (  # noqa: E402  (sys.path bootstrap)
-    DocumentBlock,
-    parse_index,
-)
+from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file  # noqa: E402
 
 TERMINAL_STATUSES = frozenset({"VERIFIED"})
 AWAITING_PRIME_STATUSES = frozenset({"NO-GO", "GO"})
@@ -45,23 +44,13 @@ def _now_utc() -> datetime:
     return datetime.now(UTC)
 
 
-def _index_path(project_root: Path) -> Path:
-    return project_root / "bridge" / "INDEX.md"
-
-
 def _bridge_dir(project_root: Path) -> Path:
     return project_root / "bridge"
 
 
-def _read_index_text(project_root: Path) -> str:
-    try:
-        return _index_path(project_root).read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return ""
-
-
-def _index_sha256(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+def _state_sha256(rows: list[dict[str, Any]]) -> str:
+    payload = json.dumps(rows, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _git_committer_iso(path: Path, project_root: Path, *, reverse: bool = False) -> str | None:
@@ -147,25 +136,34 @@ def _classify(status: str) -> tuple[bool, bool, bool, bool]:
     )
 
 
-def _thread_record(block: DocumentBlock, project_root: Path, now: datetime) -> dict[str, Any] | None:
-    if not block.entries:
+def _thread_record(
+    slug: str,
+    files: tuple[str, ...],
+    latest_version: int,
+    project_root: Path,
+    now: datetime,
+) -> dict[str, Any] | None:
+    if not files:
         return None
-    latest = block.entries[0]
-    latest_filename = latest.filename
-    bridge_path = _bridge_dir(project_root) / latest_filename
-    first_filename = f"{block.name}-001.md"
+    latest_rel = files[-1]
+    latest_filename = Path(latest_rel).name
+    bridge_path = project_root / latest_rel
+    status = status_from_bridge_file(bridge_path)
+    if status is None:
+        return None
+    first_filename = f"{slug}-001.md"
     first_path = _bridge_dir(project_root) / first_filename
 
     last_updated_at = _resolve_timestamp(bridge_path, project_root, reverse=False)
     first_seen_at = _resolve_timestamp(first_path, project_root, reverse=True)
-    is_terminal, awaiting_prime, awaiting_lo, awaiting_prime_dialogue = _classify(latest.status)
+    is_terminal, awaiting_prime, awaiting_lo, awaiting_prime_dialogue = _classify(status)
 
     return {
-        "document": block.name,
-        "latest_status": latest.status,
+        "document": slug,
+        "latest_status": status,
         "latest_filename": latest_filename,
-        "latest_version": latest.version,
-        "version_count": len(block.entries),
+        "latest_version": latest_version,
+        "version_count": len(files),
         "first_seen_at": first_seen_at,
         "last_updated_at": last_updated_at,
         "age_in_state_minutes": _age_in_state_minutes(last_updated_at, now),
@@ -195,23 +193,28 @@ def _summarize(threads: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def generate_swimlane(project_root: Path) -> dict[str, Any]:
-    """Read ``bridge/INDEX.md`` fresh and return the swimlane snapshot dict."""
+    """Read numbered bridge files fresh and return the swimlane snapshot dict."""
     project_root = project_root.resolve()
-    raw = _read_index_text(project_root)
-    try:
-        blocks = parse_index(raw)
-    except Exception:
-        logger.warning("parse_index failed; returning empty swimlane", exc_info=True)
-        blocks = ()
+    documents = scan_expected_documents(project_root)
     now = _now_utc()
     threads: list[dict[str, Any]] = []
-    for block in blocks:
-        record = _thread_record(block, project_root, now)
+    state_rows: list[dict[str, Any]] = []
+    for slug, doc in sorted(documents.items()):
+        record = _thread_record(slug, doc.files, doc.latest_version, project_root, now)
         if record is not None:
             threads.append(record)
+            state_rows.append(
+                {
+                    "document": slug,
+                    "latest_status": record["latest_status"],
+                    "latest_file": record["latest_filename"],
+                    "latest_version": record["latest_version"],
+                    "version_count": record["version_count"],
+                }
+            )
     return {
         "generated_at": now.isoformat(),
-        "source_index_sha": _index_sha256(raw),
+        "source_state_sha": _state_sha256(state_rows),
         "threads": threads,
         "summary": _summarize(threads),
     }

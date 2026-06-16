@@ -6,7 +6,7 @@ SPEC-2098 Phase C3: Session-wrap harvest script.
 
 Scans for deliberation sources created or finalized since the last harvest:
   - New Loyal Opposition reports (INSIGHTS-*.md)
-  - Completed bridge threads (VERIFIED status in bridge/INDEX.md)
+  - Completed bridge threads (VERIFIED status in the numbered bridge file chain)
   - GO-reviewed bridge proposals
   - Compressed bridge threads (flag-gated via --thread-level, SPEC-DA-THREAD-COMPRESSION)
 
@@ -46,7 +46,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
 import json
 import re
 import sys
@@ -61,7 +60,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSIGHT_DIR = REPO_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
 BRIDGE_DIR = REPO_ROOT / "bridge"
-BRIDGE_INDEX = BRIDGE_DIR / "INDEX.md"
 KB_PATH = REPO_ROOT / "groundtruth.db"
 
 # ---------------------------------------------------------------------------
@@ -73,12 +71,6 @@ WI_RE = re.compile(r"\bWI-\d+\b")
 SESSION_RE = re.compile(r"\b(S\d{3,})\b")
 _AR_KEY_SURVIVOR_RE = re.compile(r"(ar_live|ar_user|ar_spa_plat|pk_live|arsk)_[A-Za-z0-9_-]{10,}")
 
-# Bridge INDEX.md parsing
-_DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
-_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+bridge/(.+\.md)$"
-)
-
 # Verdict extraction for bridge files
 _VERDICT_FIELD_RE = re.compile(
     r"(?:^|\n)[^\S\r\n]*(?:\*{1,2})?[Vv]erdict(?:\*{1,2})?[^\S\r\n]*[:=][^\S\r\n]*(.+)?",
@@ -86,16 +78,16 @@ _VERDICT_FIELD_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
-# Bridge INDEX parser
+# Bridge file-chain reader
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class BridgeDocument:
-    """A document entry from bridge/INDEX.md."""
+    """A bridge document entry discovered from numbered files."""
 
     name: str
-    entries: list[tuple[str, str]]  # [(status, filename), ...] newest first
+    entries: list[tuple[str, str]]  # [(status, relative path), ...] newest first
 
     @property
     def latest_status(self) -> str:
@@ -109,36 +101,23 @@ class BridgeDocument:
         return [f for s, f in self.entries if s == status]
 
 
-def parse_bridge_index(index_path: Path) -> list[BridgeDocument]:
-    """Parse bridge/INDEX.md into structured document entries."""
-    if not index_path.exists():
-        return []
+def collect_bridge_documents() -> list[BridgeDocument]:
+    """Scan numbered bridge files into structured document entries."""
+    gt_src = REPO_ROOT / "groundtruth-kb" / "src"
+    if str(gt_src) not in sys.path:
+        sys.path.insert(0, str(gt_src))
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
 
     docs: list[BridgeDocument] = []
-    current_name: str | None = None
-    current_entries: list[tuple[str, str]] = []
-
-    for line in index_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("<!--") or line.startswith("#"):
-            continue
-
-        doc_match = _DOC_LINE_RE.match(line)
-        if doc_match:
-            if current_name is not None:
-                docs.append(BridgeDocument(name=current_name, entries=current_entries))
-            current_name = doc_match.group(1).strip()
-            current_entries = []
-            continue
-
-        status_match = _STATUS_LINE_RE.match(line)
-        if status_match and current_name is not None:
-            current_entries.append((status_match.group(1), status_match.group(2)))
-
-    if current_name is not None:
-        docs.append(BridgeDocument(name=current_name, entries=current_entries))
-
-    return docs
+    for document in scan_expected_documents(REPO_ROOT).values():
+        entries: list[tuple[str, str]] = []
+        for rel_path in reversed(document.files):
+            status = status_from_bridge_file(REPO_ROOT / rel_path)
+            if status:
+                entries.append((status, rel_path))
+        if entries:
+            docs.append(BridgeDocument(name=document.slug, entries=entries))
+    return sorted(docs, key=lambda doc: doc.name)
 
 
 # ---------------------------------------------------------------------------
@@ -275,64 +254,41 @@ def collect_bridge_threads() -> list[tuple[str, Path, str]]:
 
     Returns (source_ref, path, outcome) tuples.
     """
-    docs = parse_bridge_index(BRIDGE_INDEX)
+    docs = collect_bridge_documents()
     results = []
     seen_files: set[str] = set()
 
     for doc in docs:
         # Collect VERIFIED files
-        for fname in doc.files_with_status("VERIFIED"):
-            if fname not in seen_files:
-                fpath = BRIDGE_DIR / fname
+        for rel_path in doc.files_with_status("VERIFIED"):
+            if rel_path not in seen_files:
+                fpath = REPO_ROOT / rel_path
                 if fpath.exists() and fpath.stat().st_size >= 100:
-                    results.append((f"bridge/{fname}", fpath, "go"))
-                    seen_files.add(fname)
+                    results.append((rel_path, fpath, "go"))
+                    seen_files.add(rel_path)
 
         # Collect GO files (approval decisions)
-        for fname in doc.files_with_status("GO"):
-            if fname not in seen_files:
-                fpath = BRIDGE_DIR / fname
+        for rel_path in doc.files_with_status("GO"):
+            if rel_path not in seen_files:
+                fpath = REPO_ROOT / rel_path
                 if fpath.exists() and fpath.stat().st_size >= 100:
-                    results.append((f"bridge/{fname}", fpath, "go"))
-                    seen_files.add(fname)
+                    results.append((rel_path, fpath, "go"))
+                    seen_files.add(rel_path)
 
         # Collect NO-GO files (rejected approach records)
-        for fname in doc.files_with_status("NO-GO"):
-            if fname not in seen_files:
-                fpath = BRIDGE_DIR / fname
+        for rel_path in doc.files_with_status("NO-GO"):
+            if rel_path not in seen_files:
+                fpath = REPO_ROOT / rel_path
                 if fpath.exists() and fpath.stat().st_size >= 100:
-                    results.append((f"bridge/{fname}", fpath, "no_go"))
-                    seen_files.add(fname)
+                    results.append((rel_path, fpath, "no_go"))
+                    seen_files.add(rel_path)
 
     return results
 
 
 # ---------------------------------------------------------------------------
-# Compressed thread-level collector (flag-gated, shares logic with retroactive)
+# Compressed thread-level collector (flag-gated)
 # ---------------------------------------------------------------------------
-
-
-def _load_retroactive_module():
-    """Load retroactive_harvest_bridge_threads for shared thread-grouping logic.
-
-    Reuses ``parse_active_index``, ``collect_compressed_bridge_threads``, and
-    ``build_thread_summary`` to guarantee the ongoing harvest produces byte-
-    identical content for the same inputs (content-hash idempotence).
-
-    The module is registered in sys.modules BEFORE exec_module so that
-    dataclass(__module__) lookups succeed during class construction.
-    """
-    module_name = "retroactive_harvest_bridge_threads"
-    if module_name in sys.modules:
-        return sys.modules[module_name]
-    script_path = REPO_ROOT / "scripts" / "retroactive_harvest_bridge_threads.py"
-    spec = importlib.util.spec_from_file_location(module_name, script_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot load retroactive script at {script_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module  # register BEFORE exec so @dataclass can find it
-    spec.loader.exec_module(module)
-    return module
 
 
 def collect_compressed_bridge_threads() -> list[tuple[str, str, str, str, str]]:
@@ -342,25 +298,26 @@ def collect_compressed_bridge_threads() -> list[tuple[str, str, str, str, str]]:
         (source_ref, title, summary, content, outcome)
 
     The source_ref is always ``bridge/{thread-name}-*.md`` (canonical wildcard).
-    Outcome is ``'go'`` when the thread's latest INDEX status is VERIFIED,
-    otherwise ``'informational'``. Orphan threads (not in active INDEX) are
-    also included with outcome ``'informational'``.
-
-    Content synthesis reuses the retroactive sweep's ``build_thread_summary``
-    so content hashes are identical across the two code paths — a thread
-    harvested retroactively and then re-harvested via this collector produces
-    zero new rows (content_hash idempotence guaranteed).
+    Outcome is ``'go'`` when the thread's latest status is VERIFIED, otherwise
+    ``'informational'``.
     """
-    rhbt = _load_retroactive_module()
-    records = rhbt.collect_compressed_bridge_threads(BRIDGE_INDEX, BRIDGE_DIR)
-
     out: list[tuple[str, str, str, str, str]] = []
-    for rec in records:
-        if not rec.versions:
+    for doc in collect_bridge_documents():
+        title = f"Bridge thread: {doc.name}"
+        summary = f"Latest status {doc.latest_status}; {len(doc.entries)} status-bearing version file(s)."
+        sections: list[str] = []
+        for status, rel_path in reversed(doc.entries):
+            path = REPO_ROOT / rel_path
+            try:
+                body = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            sections.append(f"## {status}: {rel_path}\n\n{body}")
+        if not sections:
             continue
-        title, summary, content = rhbt.build_thread_summary(rec)
-        outcome = "go" if rec.latest_status == "VERIFIED" else "informational"
-        out.append((rec.source_ref, title, summary, content, outcome))
+        content = "\n\n---\n\n".join(sections)
+        outcome = "go" if doc.latest_status == "VERIFIED" else "informational"
+        out.append((f"bridge/{doc.name}-*.md", title, summary, content, outcome))
     return out
 
 

@@ -65,7 +65,7 @@ def build_envelope(
         The tool-specific result body. May be any JSON-serializable structure.
     source_ref:
         A canonical, in-root reference identifying where the payload came from
-        (e.g., ``"bridge/INDEX.md"``, ``"groundtruth.db#work_items"``). Used by
+        (e.g., ``"bridge/<thread>-001.md"``, ``"groundtruth.db#work_items"``). Used by
         consumers to chase provenance.
     generated_at:
         Timestamp the envelope was constructed. Defaults to the current UTC

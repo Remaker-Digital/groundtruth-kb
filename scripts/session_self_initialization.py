@@ -675,40 +675,6 @@ WRAPUP_TRIGGER_COMMANDS = (
 )
 
 
-def _run_verified_bridge_startup_maintenance(project_root: Path) -> dict[str, Any]:
-    """Run legacy VERIFIED bridge maintenance only when the compatibility view exists."""
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.exists():
-        return {
-            "verified_threads_seen": 0,
-            "already_archived": 0,
-            "inserted": 0,
-            "pruned_from_index": 0,
-            "failed_count": 0,
-            "failed": [],
-            "kept_unarchived": 0,
-            "skipped": "bridge/INDEX.md deprecated/absent",
-        }
-    try:
-        from retroactive_harvest_bridge_threads import archive_verified_threads_and_prune_index
-
-        return archive_verified_threads_and_prune_index(
-            index_path=index_path,
-            bridge_dir=project_root / "bridge",
-            kb_path=str(project_root / "groundtruth.db"),
-        )
-    except Exception as exc:  # noqa: BLE001 - startup report should still render
-        return {
-            "verified_threads_seen": 0,
-            "already_archived": 0,
-            "inserted": 0,
-            "pruned_from_index": 0,
-            "failed_count": 1,
-            "failed": [str(exc)],
-            "kept_unarchived": 0,
-        }
-
-
 def _file_size_profile(project_root: Path, relative_path: str) -> dict[str, Any] | None:
     path = project_root / relative_path
     if not path.is_file():
@@ -1282,24 +1248,8 @@ def _work_item_id_to_bridge_document(wi_id: str) -> str:
     return wi_id.lower()
 
 
-def _bridge_index_latest_status(project_root: Path) -> dict[str, str]:
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.exists():
-        return {}
-    text = _read_text(index_path)
-    result: dict[str, str] = {}
-    current: str | None = None
-    for line in text.splitlines():
-        if line.startswith("Document: "):
-            current = line.split(": ", 1)[1].strip()
-            continue
-        if not current:
-            continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/", line)
-        if match:
-            result[current] = match.group(1)
-            current = None
-    return result
+def _bridge_latest_status(project_root: Path) -> dict[str, str]:
+    return {entry["document"]: entry["status"] for entry in _bridge_entries_from_version_files(project_root)}
 
 
 def _residual_override_present(body: str) -> bool:
@@ -1336,7 +1286,7 @@ def _is_implementation_active_backlog_item(item: dict[str, Any]) -> bool:
 
 def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     items = _backlog_items_from_membase(project_root)
-    bridge_status = _bridge_index_latest_status(project_root)
+    bridge_status = _bridge_latest_status(project_root)
     classified = []
     for item in items:
         row = {"id": item["id"], "title": item["title"], "description": item.get("body", "")}
@@ -1430,30 +1380,8 @@ def _bridge_entries_from_version_files(project_root: Path) -> list[dict[str, str
     ]
 
 
-def _bridge_entries_from_compatibility_index(project_root: Path) -> list[dict[str, str]]:
-    index_path = project_root / "bridge" / "INDEX.md"
-    index_text = _read_text(index_path)
-    entries: list[dict[str, str]] = []
-    current_document: str | None = None
-    for line in index_text.splitlines():
-        if line.startswith("Document: "):
-            current_document = line.split(": ", 1)[1].strip()
-            continue
-        if not current_document:
-            continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+(bridge/[^\s]+)", line)
-        if not match:
-            continue
-        entries.append({"document": current_document, "status": match.group(1), "path": match.group(2)})
-        current_document = None
-    return entries
-
-
 def _bridge_metrics(project_root: Path) -> dict[str, Any]:
     entries = _bridge_entries_from_version_files(project_root)
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not entries and index_path.exists():
-        entries = _bridge_entries_from_compatibility_index(project_root)
 
     classified = []
     for entry in entries:
@@ -1492,9 +1420,9 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         "scope_confidence": "gtkb_current_heuristic",
         "source": "bridge/*.md",
         "source_read_mode": "versioned_bridge_file_chain",
-        "source_authority": "TAFE/dispatcher bridge state plus versioned bridge files are authoritative; bridge/INDEX.md is deprecated/removed",
+        "source_authority": "TAFE/dispatcher bridge state plus status-bearing numbered bridge files are authoritative.",
         "derived_artifacts_authoritative": False,
-        "live_index_available": index_path.is_file(),
+        "live_bridge_directory_available": (project_root / "bridge").is_dir(),
     }
 
 
@@ -7359,8 +7287,6 @@ def main(argv: list[str] | None = None) -> int:
         else project_root / "memory" / "gtkb-dashboard-history.json"
     )
     bridge_maintenance = None
-    if startup_emit_requested and not args.skip_bridge_maintenance and not args.fast_hook:
-        bridge_maintenance = _run_verified_bridge_startup_maintenance(project_root)
     startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if startup_emit_requested else None
 
     # Per bridge/generator-hardening-001-003.md Â§4.6: derive output paths

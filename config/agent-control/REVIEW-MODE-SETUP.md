@@ -34,9 +34,12 @@ When the local hooks support review mode, the active mode should:
 ## Session Start (Two-Phase)
 
 **Phase A — File bridge scan (first priority):**
-1. Read `bridge/INDEX.md`.
-2. Process document entries whose latest status is `NEW` or `REVISED`.
-3. Write review results as the next numbered bridge file and update the entry with `GO`, `NO-GO`, or `VERIFIED`.
+1. Read current TAFE/dispatcher bridge state and the status-bearing numbered
+   files under `bridge/`.
+2. Process bridge threads whose latest status is `NEW` or `REVISED`.
+3. Write review results as the next numbered bridge file and publish the
+   resulting `GO`, `NO-GO`, or `VERIFIED` status through the governed bridge
+   path.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 4. `AGENTS.md`

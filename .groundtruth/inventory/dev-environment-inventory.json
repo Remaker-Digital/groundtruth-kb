@@ -2,10 +2,10 @@
   "collector": {
     "name": "GT-KB development environment inventory collector",
     "script": "scripts/collect_dev_environment_inventory.py",
-    "script_hash": "sha256:61d23cb8e64e6a66d45eb02faf81eac9ebba575138a86c907369e89dfb6dbc12",
+    "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-16T12:17:01Z",
+  "generated_at": "2026-06-16T19:24:40Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -140,14 +140,13 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 33,
+      "count": 32,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-axis-2-surface.py",
         ".claude/hooks/bridge-compliance-gate.py",
-        ".claude/hooks/bridge-index-write-serializer.py",
         ".claude/hooks/bridge-proposal-wi-id-collision-gate.py",
         ".claude/hooks/code-quality-baseline-proposal-check.py",
         ".claude/hooks/credential-scan.py",
@@ -362,8 +361,8 @@
           "status": "configured"
         },
         "file_bridge_read_write": {
-          "evidence": "bridge/INDEX.md",
-          "status": "unknown"
+          "evidence": "bridge/*-NNN.md",
+          "status": "verified"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -439,8 +438,8 @@
           "status": "configured"
         },
         "file_bridge_read_write": {
-          "evidence": "bridge/INDEX.md",
-          "status": "unknown"
+          "evidence": "bridge/*-NNN.md",
+          "status": "verified"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -516,8 +515,8 @@
           "status": "configured"
         },
         "file_bridge_read_write": {
-          "evidence": "bridge/INDEX.md",
-          "status": "unknown"
+          "evidence": "bridge/*-NNN.md",
+          "status": "verified"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -593,8 +592,8 @@
           "status": "configured"
         },
         "file_bridge_read_write": {
-          "evidence": "bridge/INDEX.md",
-          "status": "unknown"
+          "evidence": "bridge/*-NNN.md",
+          "status": "verified"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -690,11 +689,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "verified",
-      "version": "26.1.2"
+      "status": "unknown",
+      "version": "unknown"
     },
     "playwright": {
       "classification": "unsupported",
@@ -708,7 +707,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -722,7 +721,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.12"
     }
   },
   "verification": {

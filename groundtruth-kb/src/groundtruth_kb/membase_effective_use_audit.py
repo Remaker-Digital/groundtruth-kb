@@ -15,8 +15,11 @@ from pathlib import Path
 from typing import Any
 
 SPEC_ID_RE = re.compile(r"\b(?:ADR|DCL|GOV|PB|SPEC)-[A-Z0-9][A-Z0-9_-]*\d+\b")
-STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+?\.md)\s*$")
-DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
+VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    re.IGNORECASE,
+)
 SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 DELIB_DRAFT_RE = re.compile(r"(?im)^\s*(?:draft\s+delib|delib\s+draft|source_type\s*=\s*owner_conversation)\b")
 
@@ -120,44 +123,49 @@ class AuditResult:
         return "\n".join(lines)
 
 
-def parse_bridge_index(index_path: Path) -> list[BridgeEntry]:
-    """Parse ``bridge/INDEX.md`` into latest-state entries."""
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
 
-    if not index_path.is_file():
+
+def parse_bridge_files(project_root: Path) -> list[BridgeEntry]:
+    """Parse numbered bridge files into latest-state entries."""
+
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
         return []
+    grouped: dict[str, list[tuple[int, str, str]]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = VERSIONED_BRIDGE_FILE_RE.match(path.name)
+        if match is None:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        grouped.setdefault(match.group("slug"), []).append(
+            (int(match.group("version")), status, path.relative_to(project_root).as_posix())
+        )
     entries: list[BridgeEntry] = []
-    current_document: str | None = None
-    current_statuses: list[tuple[str, str]] = []
-
-    def flush() -> None:
-        nonlocal current_document, current_statuses
-        if current_document and current_statuses:
-            latest_status, latest_path = current_statuses[0]
-            entries.append(
-                BridgeEntry(
-                    document=current_document,
-                    latest_status=latest_status,
-                    latest_path=latest_path,
-                    version_paths=tuple(path for _, path in current_statuses),
-                )
+    for slug, rows in sorted(grouped.items()):
+        ordered = sorted(rows, key=lambda row: row[0], reverse=True)
+        _latest_version, latest_status, latest_path = ordered[0]
+        entries.append(
+            BridgeEntry(
+                document=slug,
+                latest_status=latest_status,
+                latest_path=latest_path,
+                version_paths=tuple(path for _version, _status, path in ordered),
             )
-        current_document = None
-        current_statuses = []
-
-    for raw_line in index_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        doc_match = DOCUMENT_LINE_RE.match(line)
-        if doc_match:
-            flush()
-            current_document = doc_match.group(1)
-            continue
-        if not line:
-            flush()
-            continue
-        status_match = STATUS_LINE_RE.match(line)
-        if current_document and status_match:
-            current_statuses.append((status_match.group(1), status_match.group(2)))
-    flush()
+        )
     return entries
 
 
@@ -176,7 +184,7 @@ def run_audit(
     specs = _current_specs(active_db)
     filtered_specs = _filter_specs_by_age(specs, age_threshold_days=age_threshold_days, now=now)
     spec_by_id = {str(spec.get("id")): spec for spec in filtered_specs if spec.get("id")}
-    bridge_entries = parse_bridge_index(root / "bridge" / "INDEX.md")
+    bridge_entries = parse_bridge_files(root)
     memory_files = sorted((root / "memory").glob("*.md")) if (root / "memory").is_dir() else []
 
     findings: list[AuditFinding] = []

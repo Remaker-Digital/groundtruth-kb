@@ -73,20 +73,22 @@ def count_candidate_sources() -> dict[str, int]:
     if INSIGHT_DIR.exists():
         lo_count = len([f for f in INSIGHT_DIR.glob("INSIGHTS-*.md") if f.stat().st_size >= 100])
 
+    gt_src = REPO_ROOT / "groundtruth-kb" / "src"
+    if str(gt_src) not in sys.path:
+        sys.path.insert(0, str(gt_src))
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
+
     bridge_count = 0
-    index_path = BRIDGE_DIR / "INDEX.md"
-    if index_path.exists():
-        # Count files with VERIFIED, GO, or NO-GO status
-        seen: set[str] = set()
-        for line in index_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            m = re.match(r"^(VERIFIED|GO|NO-GO):\s+bridge/(.+\.md)$", line)
-            if m:
-                fname = m.group(2)
-                fpath = BRIDGE_DIR / fname
-                if fname not in seen and fpath.exists() and fpath.stat().st_size >= 100:
-                    seen.add(fname)
-                    bridge_count += 1
+    seen: set[str] = set()
+    for document in scan_expected_documents(REPO_ROOT).values():
+        for rel_path in document.files:
+            if rel_path in seen:
+                continue
+            fpath = REPO_ROOT / rel_path
+            status = status_from_bridge_file(fpath)
+            if status in {"VERIFIED", "GO", "NO-GO"} and fpath.exists() and fpath.stat().st_size >= 100:
+                seen.add(rel_path)
+                bridge_count += 1
 
     return {"lo_reports": lo_count, "bridge_threads": bridge_count, "total": lo_count + bridge_count}
 
@@ -134,15 +136,12 @@ def check_health(kb_path: str | None = None) -> dict:
     # --- Metric 3: Conflict quarantine ---
     # Conflicts = deliberations with 'informational' outcome that might have been misclassified
     # (those sourced from reports with conflicting verdict signals)
-    informational_count = source_types.get("lo_review", 0)  # approximate
     conflict_count = conn.execute(
         "SELECT COUNT(*) FROM current_deliberations WHERE outcome = 'informational'"
     ).fetchone()[0]
     quarantine_rate = conflict_count / total_delibs if total_delibs > 0 else 0.0
     # Lower is better for conflicts — invert threshold logic
-    if quarantine_rate == 0:
-        quarantine_status = "PASS"
-    elif quarantine_rate <= CONFLICT_WARN:
+    if quarantine_rate == 0 or quarantine_rate <= CONFLICT_WARN:
         quarantine_status = "PASS"
     else:
         quarantine_status = "WARN"
@@ -238,7 +237,7 @@ def print_report(metrics: dict) -> None:
 
     st = metrics["source_types"]
     if st:
-        print(f"\nSource type distribution:")
+        print("\nSource type distribution:")
         for k, v in sorted(st.items()):
             print(f"   {k}: {v}")
 

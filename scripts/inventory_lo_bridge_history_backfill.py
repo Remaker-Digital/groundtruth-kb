@@ -86,7 +86,7 @@ class InventoryRecord:
     classification_reason: str
     current_da_row_id: str | None
     current_da_content_hash: str | None
-    index_status: str | None
+    bridge_status: str | None
 
 
 @dataclass
@@ -160,7 +160,7 @@ def iter_lo_reports(repo_root: Path) -> list[tuple[str, Path]]:
 
 
 def iter_bridge_files(repo_root: Path) -> list[tuple[str, Path]]:
-    """Class B: ``bridge/*.md`` excluding ``INDEX.md`` and ``README.md``.
+    """Class B: status-bearing numbered bridge markdown files.
 
     Returns (source_ref, path) tuples in deterministic sorted order.
     """
@@ -169,29 +169,29 @@ def iter_bridge_files(repo_root: Path) -> list[tuple[str, Path]]:
         return []
     out: list[tuple[str, Path]] = []
     for f in sorted(bridge_dir.glob("*.md")):
-        if f.name in ("INDEX.md", "README.md"):
+        if not _VERSION_SUFFIX_RE.search(f.name):
             continue
         out.append((f"bridge/{f.name}", f))
     return out
 
 
 # ---------------------------------------------------------------------------
-# Bridge INDEX status lookup
+# Bridge file status lookup
 # ---------------------------------------------------------------------------
 
-_INDEX_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN):\s+bridge/(.+\.md)$")
 
+def load_bridge_file_status(repo_root: Path) -> dict[str, str]:
+    """Map ``bridge/<file>.md`` -> the file's first canonical status token."""
+    gt_src = repo_root / "groundtruth-kb" / "src"
+    if str(gt_src) not in sys.path:
+        sys.path.insert(0, str(gt_src))
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
-def load_index_status(repo_root: Path) -> dict[str, str]:
-    """Map ``bridge/<file>.md`` -> its status label in live ``bridge/INDEX.md``."""
-    index_path = repo_root / "bridge" / "INDEX.md"
-    if not index_path.exists():
-        return {}
     status_by_file: dict[str, str] = {}
-    for line in index_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        m = _INDEX_STATUS_RE.match(line.strip())
-        if m:
-            status_by_file[f"bridge/{m.group(2)}"] = m.group(1)
+    for source_ref, path in iter_bridge_files(repo_root):
+        status = status_from_bridge_file(path)
+        if status:
+            status_by_file[source_ref] = status
     return status_by_file
 
 
@@ -256,7 +256,7 @@ def classify_file(
     path: Path,
     file_class: str,
     snap: DASnapshot,
-    index_status: dict[str, str],
+    bridge_status: dict[str, str],
 ) -> InventoryRecord:
     """Classify exactly one file into one of the three classifications.
 
@@ -277,7 +277,7 @@ def classify_file(
     content = path.read_text(encoding="utf-8", errors="ignore")
     file_sha = hashlib.sha256(content.encode("utf-8")).hexdigest()
     thread_stem = _thread_stem_for_bridge(path.name) if file_class == "bridge" else path.stem
-    idx_status = index_status.get(source_ref)
+    status = bridge_status.get(source_ref)
 
     current_da_row_id = snap.exact_ref_row_id.get(source_ref)
     stored_hashes = snap.exact_ref_hashes.get(source_ref)
@@ -313,7 +313,7 @@ def classify_file(
         classification_reason=reason,
         current_da_row_id=current_da_row_id,
         current_da_content_hash=current_da_content_hash,
-        index_status=idx_status,
+        bridge_status=status,
     )
 
 
@@ -325,12 +325,12 @@ def classify_file(
 def build_inventory(repo_root: Path, db_path: Path) -> tuple[list[InventoryRecord], DASnapshot]:
     """Build the full inventory record list (read-only)."""
     snap = load_da_snapshot(db_path)
-    index_status = load_index_status(repo_root)
+    bridge_status = load_bridge_file_status(repo_root)
     records: list[InventoryRecord] = []
     for source_ref, path in iter_lo_reports(repo_root):
-        records.append(classify_file(source_ref, path, "lo_report", snap, index_status))
+        records.append(classify_file(source_ref, path, "lo_report", snap, bridge_status))
     for source_ref, path in iter_bridge_files(repo_root):
-        records.append(classify_file(source_ref, path, "bridge", snap, index_status))
+        records.append(classify_file(source_ref, path, "bridge", snap, bridge_status))
     # Deterministic ordering: by path.
     records.sort(key=lambda r: r.path)
     return records, snap
@@ -380,7 +380,7 @@ def build_summary(repo_root: Path, records: list[InventoryRecord], snap: DASnaps
     by_class = Counter(r.classification for r in records)
     by_reason = Counter(r.classification_reason for r in records)
     eligible = [r for r in records if r.classification == ELIGIBLE_FOR_HARVEST]
-    orphan_stems = sorted({r.thread_stem for r in records if r.file_class == "bridge" and r.index_status is None})
+    unstatused_stems = sorted({r.thread_stem for r in records if r.file_class == "bridge" and r.bridge_status is None})
 
     lines: list[str] = []
     lines.append("# LO / Bridge History Backfill — Slice 1 Inventory Summary")
@@ -416,10 +416,10 @@ def build_summary(repo_root: Path, records: list[InventoryRecord], snap: DASnaps
     else:
         lines.append("- (none)")
     lines.append("")
-    lines.append(f"## Orphan bridge threads (not in live INDEX.md) ({len(orphan_stems)})")
+    lines.append(f"## Bridge threads without status token ({len(unstatused_stems)})")
     lines.append("")
-    if orphan_stems:
-        for stem in orphan_stems:
+    if unstatused_stems:
+        for stem in unstatused_stems:
             lines.append(f"- `{stem}`")
     else:
         lines.append("- (none)")

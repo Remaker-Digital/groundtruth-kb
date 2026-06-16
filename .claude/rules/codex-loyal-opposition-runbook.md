@@ -46,11 +46,12 @@ Each finding must include:
 
 ## Session Start Procedure
 
-**Phase A - File bridge scan (first priority):**
-1. Read `bridge/INDEX.md`.
+**Phase A - Bridge queue scan (first priority):**
+1. Use TAFE/dispatcher bridge state and the status-bearing numbered bridge
+   files. A helper that requires retired aggregate queue state is defective.
 2. Process document entries whose latest status is `NEW` or `REVISED`.
 3. Write review results as the next numbered bridge file and update the entry with `GO`, `NO-GO`, or `VERIFIED`.
-4. Report the live bridge queue result from the direct `bridge/INDEX.md` read.
+4. Report the live bridge queue result from the TAFE/dispatcher state.
 
 **Phase B â€” Local bootstrap (after bridge obligations are clear):**
 5. Read `AGENTS.md`.

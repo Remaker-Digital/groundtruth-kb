@@ -12,8 +12,8 @@ Two operational modes:
   Bash denial, formal-artifact mutation denial, out-of-root rejection, and
   hard denial for Bash-based bridge artifact mutations.
 
-The script never modifies production ``bridge/INDEX.md``; all bridge filing
-proof uses a disposable fixture workspace under ``tempfile.mkdtemp``.
+The script never modifies production bridge state; all bridge filing proof uses
+a disposable fixture workspace under ``tempfile.mkdtemp``.
 
 Exit codes: 0 = all checks passed; 1 = one or more checks failed.
 """
@@ -478,9 +478,8 @@ def _check_bridge_filing_via_dispatch(
 ) -> bool:
     """L3: exercise the full bridge filing semantic per
     GOV-FILE-BRIDGE-AUTHORITY-001 — write a fixture bridge file via
-    ``dispatch_tool_call("Write", ...)`` AND insert a fixture
-    ``Document:``/``NEW:`` entry into the fixture INDEX. A bridge file
-    without an INDEX entry is not a filed bridge document.
+    ``dispatch_tool_call("Write", ...)`` and verify that the resulting numbered
+    file carries a lifecycle status token.
 
     The optional ``fixture_root`` parameter lets callers (notably tests)
     inspect the resulting fixture state after the call. When omitted, the
@@ -493,11 +492,9 @@ def _check_bridge_filing_via_dispatch(
         fixture_root = Path(fixture_root)
         fixture_root.mkdir(parents=True, exist_ok=True)
     try:
-        # Set up fixture workspace with bridge/ dir and minimal INDEX
+        # Set up fixture workspace with bridge/ dir.
         bridge_dir = fixture_root / "bridge"
         bridge_dir.mkdir(parents=True, exist_ok=True)
-        index_path = bridge_dir / "INDEX.md"
-        index_path.write_text("# Bridge Index (fixture)\n", encoding="utf-8")
 
         # Copy groundtruth.toml so resolve_project_root finds the fixture
         gt_toml = project_root / "groundtruth.toml"
@@ -560,35 +557,11 @@ def _check_bridge_filing_via_dispatch(
         else:
             first_line_ok = False
 
-        # Insert fixture Document:/NEW: entry into the fixture INDEX. Under
-        # GOV-FILE-BRIDGE-AUTHORITY-001 a bridge file without an INDEX entry
-        # is not a filed bridge document, so the GO@-006 bridge filing proof
-        # requires both write actions: the bridge file and the INDEX entry.
-        if file_exists and first_line_ok:
-            existing_index = index_path.read_text(encoding="utf-8")
-            entry_block = f"\nDocument: gtkb-ollama-e2e-fixture\nNEW: bridge/{fixture_bridge_file.name}\n"
-            existing_lines = existing_index.splitlines(keepends=True)
-            if existing_lines and existing_lines[0].lstrip().startswith("#"):
-                new_index = existing_lines[0] + entry_block + "".join(existing_lines[1:])
-            else:
-                new_index = entry_block.lstrip("\n") + existing_index
-            index_path.write_text(new_index, encoding="utf-8")
-            verify_index = index_path.read_text(encoding="utf-8")
-            index_entry_ok = (
-                "Document: gtkb-ollama-e2e-fixture" in verify_index
-                and f"NEW: bridge/{fixture_bridge_file.name}" in verify_index
-            )
-        else:
-            index_entry_ok = False
-
-        passed = file_exists and first_line_ok and index_entry_ok
+        passed = file_exists and first_line_ok
         _print_result(
             "L3 bridge filing via Write dispatch",
             passed,
-            (
-                f"file_created={file_exists}, first_line_is_NEW={first_line_ok}, "
-                f"index_entry_inserted={index_entry_ok}, result={result!r}"
-            ),
+            (f"file_created={file_exists}, first_line_is_NEW={first_line_ok}, result={result!r}"),
         )
         return passed
     except Exception as exc:
@@ -692,15 +665,12 @@ def _check_guard_out_of_root(project_root: Path, model_route: ModelRoute, endpoi
 
 
 def _check_guard_bridge_bash_denial(project_root: Path, model_route: ModelRoute, endpoint: str) -> bool:
-    """G4: Bash must not mutate bridge/*.md or bridge/INDEX.md."""
+    """G4: Bash must not mutate numbered bridge files."""
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
     fixture_root = Path(tempfile.mkdtemp(prefix="gtkb-ollama-bridge-bash-", dir=str(project_root)))
     bridge_dir = fixture_root / "bridge"
     bridge_dir.mkdir(parents=True, exist_ok=True)
     (fixture_root / "groundtruth.toml").write_text('[project]\nname = "fixture"\n', encoding="utf-8")
-    index_path = bridge_dir / "INDEX.md"
-    original_index = "# Bridge Index\n"
-    index_path.write_text(original_index, encoding="utf-8")
     fixture_bridge_file = bridge_dir / "gtkb-ollama-e2e-fixture-001.md"
     records: list[str] = []
     command_called = False
@@ -715,7 +685,6 @@ def _check_guard_bridge_bash_denial(project_root: Path, model_route: ModelRoute,
         nonlocal command_called
         command_called = True
         fixture_bridge_file.write_text("GO\n", encoding="utf-8")
-        index_path.write_text("mutated\n", encoding="utf-8")
         return subprocess.CompletedProcess(args=command, returncode=0, stdout="mutated", stderr="")
 
     try:
@@ -735,15 +704,13 @@ def _check_guard_bridge_bash_denial(project_root: Path, model_route: ModelRoute,
             and not records
             and not command_called
             and not fixture_bridge_file.exists()
-            and index_path.read_text(encoding="utf-8") == original_index
         )
         _print_result(
             "G4 bridge Bash mutation denial",
             passed,
             (
                 f"denial={exc}, guards_invoked={len(records)}, command_called={command_called}, "
-                f"file_exists={fixture_bridge_file.exists()}, index_unchanged="
-                f"{index_path.read_text(encoding='utf-8') == original_index}"
+                f"file_exists={fixture_bridge_file.exists()}"
             ),
         )
         return passed

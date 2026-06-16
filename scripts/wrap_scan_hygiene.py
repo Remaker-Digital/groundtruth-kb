@@ -5,7 +5,7 @@ Detects drift classes that have recurred across S294, S304, S307, S308:
 
     git_uncommitted_paths            (S304 layered drift)
     git_untracked_in_tracked_dirs    (S294 blanket-ignore class)
-    bridge_files_not_in_index        (S308 dangling -016/-017 class)
+    bridge_files_without_status      (status-bearing bridge file drift)
     pyc_without_source               (S308 stale parallel-checkout artifacts)
     tmp_artifacts_in_repo            (S305 .tmp.driveupload precedent)
     hardcoded_old_project_root       (S307 feedback_no_hardcoded_paths)
@@ -152,23 +152,35 @@ def check_git_untracked_in_tracked_dirs(project_root: Path) -> list[dict]:
     return findings
 
 
-def check_bridge_files_not_in_index(project_root: Path) -> list[dict]:
+BRIDGE_NUMBERED_FILE_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+-\d{3}\.md$")
+
+
+def _ensure_bridge_helpers_importable(project_root: Path) -> None:
+    gt_src = project_root / "groundtruth-kb" / "src"
+    if gt_src.exists():
+        src_text = str(gt_src)
+        if src_text not in sys.path:
+            sys.path.insert(0, src_text)
+
+
+def check_bridge_files_without_status(project_root: Path) -> list[dict]:
     bridge_dir = project_root / "bridge"
-    index_path = bridge_dir / "INDEX.md"
-    if not index_path.exists() or not bridge_dir.is_dir():
+    if not bridge_dir.is_dir():
         return []
-    index_text = index_path.read_text(encoding="utf-8")
+    _ensure_bridge_helpers_importable(project_root)
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
+
     findings: list[dict] = []
     for entry in bridge_dir.iterdir():
-        if not entry.is_file() or entry.name == "INDEX.md" or entry.suffix != ".md":
+        if not entry.is_file() or not BRIDGE_NUMBERED_FILE_PATTERN.match(entry.name):
             continue
         ref = f"bridge/{entry.name}"
-        if ref not in index_text:
+        if status_from_bridge_file(entry) is None:
             findings.append(
                 _finding(
-                    "bridge_files_not_in_index",
+                    "bridge_files_without_status",
                     SEVERITY_WARN,
-                    f"Bridge file not referenced by INDEX.md: {ref}",
+                    f"Numbered bridge file has no lifecycle status token: {ref}",
                     path=ref,
                 )
             )
@@ -310,7 +322,7 @@ def check_snapshots_non_manifest(project_root: Path) -> list[dict]:
 CHECKS = (
     check_git_uncommitted,
     check_git_untracked_in_tracked_dirs,
-    check_bridge_files_not_in_index,
+    check_bridge_files_without_status,
     check_pyc_without_source,
     check_tmp_artifacts_in_repo,
     check_hardcoded_old_project_root,

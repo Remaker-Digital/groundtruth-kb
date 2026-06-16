@@ -7,18 +7,23 @@ This rule auto-loads via `.claude/rules/` convention and is TRACKED in git
 
 **Bridge integrity is the top-priority task. Always.**
 
+> **2026-06-15 cutover note:** After the WI-4510 Phase-3 cutover,
+> TAFE-backed dispatcher state plus status-bearing versioned files under
+> `bridge/` are canonical. Aggregate queue artifacts are not live bridge state.
+
 The Prime Builder / Loyal Opposition bridge is how GroundTruth-KB coordinates
 implementation proposals, reviews, and verification. GroundTruth-KB is
-non-functional when the bridge stops working. Therefore: keeping the bridge
-canonical state correct and accurately reflected in `bridge/INDEX.md` is the
-first duty of every Prime Builder session, ahead of feature work, backlog
-progress, test runs, deployments, and documentation updates.
+non-functional when the bridge stops working. Therefore: keeping the
+TAFE-backed bridge state correct, dispatcher-visible, and consistent with the
+versioned bridge file chain is the first duty of every Prime Builder session,
+ahead of feature work, backlog progress, test runs, deployments, and
+documentation updates.
 
 The bridge as a protocol (proposal -> review -> revise -> GO/NO-GO -> implement
 -> post-impl -> VERIFIED, all recorded in versioned files under `bridge/`) is
 permanently in force. Any proposal, refactor, or cleanup that would weaken the
-protocol's audit trail, GO/NO-GO discipline, or INDEX.md as canonical state must
-be rejected.
+protocol's audit trail, GO/NO-GO discipline, or TAFE/dispatcher bridge-state
+authority must be rejected.
 
 ## Operational Mode (current as of 2026-05-09)
 
@@ -49,27 +54,26 @@ Bridge dispatch automation is provided by the cross-harness event-driven
 trigger at `scripts/cross_harness_bridge_trigger.py`, registered as
 PostToolUse and Stop hooks in `.claude/settings.json` and
 `.codex/hooks.json`. The trigger fires on tool-use and Stop events rather
-than on a fixed interval. When `bridge/INDEX.md` is modified by a tool
-call or the agent ends a turn, the trigger inspects the indexed state and
-dispatches the appropriate counterpart harness if a recipient's actionable
-queue signature has changed (Codex on latest NEW or REVISED; Prime on
-latest GO or NO-GO). ADVISORY entries are surfaced in the Prime actionable
+than on a fixed interval. When TAFE-backed bridge state changes, or the agent
+ends a turn, the trigger inspects dispatcher/TAFE state and dispatches the appropriate counterpart
+harness if a recipient's actionable queue signature has changed (Codex on
+latest NEW or REVISED; Prime on latest GO or NO-GO). ADVISORY entries are surfaced in the Prime actionable
 list by `compute_actionable_pending` for interactive sessions, but the
 `_derive_dispatchable` invariant in `groundtruth_kb.bridge.notify` returns
 False for ADVISORY, so every headless dispatch surface filters them out
 before the signature is computed and they never spawn a Prime worker.
 VERIFIED is terminal, and DEFERRED and WITHDRAWN are non-actionable for
 dispatch. The trigger
-is monitoring and dispatch infrastructure only; `bridge/INDEX.md` remains
-the canonical workflow state. Per-recipient dispatch state is recorded at
+is monitoring and dispatch infrastructure only; TAFE-backed bridge state is the
+canonical workflow state. Per-recipient dispatch state is recorded at
 `.gtkb-state/bridge-poller/dispatch-state.json` (path retained for
 compatibility with the smart-poller substrate).
 
 Manual fallback remains available when the trigger is unhealthy (per the
 doctor predicate above) or intentionally stopped: the owner triggers a
 Prime bridge scan with a brief prompt such as `Bridge` or `Bridge scan`,
-Prime then reads `bridge/INDEX.md` and acts on actionable entries. Codex
-bridge scans are similarly owner-triggered in the Codex harness.
+Prime then reads TAFE/dispatcher bridge state and acts on actionable entries.
+Codex bridge scans are similarly owner-triggered in the Codex harness.
 
 The 2026-04-25 OS-poller halt was made after the former OS Claude poller
 (activated ~2026-04-23) was found to fire on a fixed interval regardless
@@ -173,8 +177,8 @@ is the canonical mechanism for **dispatchable work** — work that can be
 completed by a freshly-spawned counterpart harness session without further
 owner input. Registered as PostToolUse and Stop hooks in
 `.claude/settings.json` and `.codex/hooks.json`. Fires on tool-use and Stop.
-Spawns counterpart harness sessions when actionable INDEX changes are
-detected.
+Spawns counterpart harness sessions when actionable dispatcher/TAFE bridge-state
+changes are detected.
 
 Examples of dispatchable work:
 - Loyal Opposition reviews of NEW or REVISED proposals.
@@ -185,7 +189,7 @@ Examples of dispatchable work:
 ### Axis 2: Non-dispatchable work — thread automation pattern
 
 A thread automation pattern wakes the interactive chat session
-periodically. Its role is to scan `bridge/INDEX.md` and surface work that
+periodically. Its role is to scan TAFE/dispatcher bridge state and surface work that
 **cannot be dispatched to a sub-agent** — work requiring interactive owner
 input mid-stream, accumulating context across turns, or coordination across
 threads.
@@ -249,8 +253,9 @@ in this slice.
 These remain in force regardless of whether bridge scans are manual or handled
 by the cross-harness event-driven trigger:
 
-- `bridge/INDEX.md` is the canonical workflow state. Both agents must trust
-  INDEX over any other signal.
+- TAFE-backed bridge state plus status-bearing versioned files under `bridge/`
+  are the canonical workflow state. Do not recreate aggregate queue artifacts
+  to satisfy stale helpers.
 - Bridge files are append-only. Never delete a bridge file; it forms the audit
   trail.
 - Per-thread versioning is monotonic. Statuses are NEW, REVISED, GO, NO-GO,
@@ -262,7 +267,7 @@ by the cross-harness event-driven trigger:
 
 Do NOT, without explicit owner approval:
 
-- Remove or rename `bridge/INDEX.md`
+- Recreate aggregate queue artifacts as live bridge state or treat them as authoritative
 - Delete bridge files (any version)
 - Skip the GO/NO-GO discipline for any code change beyond the explicit
   exemptions in `.claude/rules/codex-review-gate.md`
@@ -292,8 +297,9 @@ Do NOT, without explicit owner approval:
   information because the poller fired on a fixed interval regardless of
   bridge activity. Owner directive halted the retired pollers and removed the
   freshness hook, restoring manual-trigger operation until smart-poller
-  automation is available. The protocol itself was unaffected; INDEX.md
-  remains canonical. Lesson: blind, activity-independent automation — work
+  automation is available. The protocol itself was unaffected; after the
+  2026-06-15 cutover, TAFE-backed bridge state is canonical. Lesson: blind,
+  activity-independent automation — work
   repeated whether or not there is anything to do — is the defect; automation
   must be activity-driven and deterministic. The waste was work without
   information, not token volume.

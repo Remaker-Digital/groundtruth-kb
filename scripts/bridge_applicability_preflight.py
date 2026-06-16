@@ -28,14 +28,10 @@ except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import PATH_TOKEN_RE
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
-DEFAULT_INDEX_PATH: Final[Path] = PROJECT_ROOT / "bridge" / "INDEX.md"
+DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 
-INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
-)
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
     r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
     re.IGNORECASE,
@@ -114,34 +110,8 @@ def _strip_code_fences(lines: list[str]) -> list[str]:
     return out
 
 
-def parse_index_for_document(index_path: Path, bridge_id: str) -> list[BridgeVersion]:
-    if not index_path.is_file():
-        return parse_versioned_files_for_document(index_path.parent, bridge_id)
-    versions: list[BridgeVersion] = []
-    in_target = False
-    root = index_path.parent.parent
-    for line in index_path.read_text(encoding="utf-8").splitlines():
-        doc_match = INDEX_DOC_RE.match(line.strip())
-        if doc_match:
-            in_target = doc_match.group(1) == bridge_id
-            continue
-        if not in_target:
-            continue
-        status_match = INDEX_STATUS_RE.match(line.strip())
-        if status_match:
-            rel_path = status_match.group(2)
-            version_match = re.search(r"-(\d+)\.md$", rel_path)
-            versions.append(
-                BridgeVersion(
-                    status=status_match.group(1),
-                    rel_path=rel_path,
-                    abs_path=root / rel_path,
-                    version_number=int(version_match.group(1)) if version_match else 0,
-                )
-            )
-        elif line.strip() == "":
-            break
-    return versions or parse_versioned_files_for_document(index_path.parent, bridge_id)
+def parse_index_for_document(bridge_dir: Path, bridge_id: str) -> list[BridgeVersion]:
+    return parse_versioned_files_for_document(bridge_dir, bridge_id)
 
 
 def _status_from_bridge_file(path: Path) -> str | None:
@@ -406,17 +376,16 @@ def enrich_from_membase(applicable: dict[str, ApplicableSpec], db_path: Path) ->
 def build_packet(
     *,
     bridge_id: str,
-    index_path: Path = DEFAULT_INDEX_PATH,
+    bridge_dir: Path = DEFAULT_BRIDGE_DIR,
     config_path: Path = DEFAULT_CONFIG_PATH,
     db_path: Path = DEFAULT_DB_PATH,
     content_file: Path | None = None,
 ) -> dict[str, Any]:
-    versions = parse_index_for_document(index_path, bridge_id)
+    versions = parse_index_for_document(bridge_dir, bridge_id)
     operative = choose_operative_version(versions)
     if operative is None and content_file is None:
         raise SystemExit(
-            f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} "
-            f"under {index_path.parent}"
+            f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} under {bridge_dir}"
         )
     if operative is not None and not operative.abs_path.is_file():
         raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {operative.rel_path}")
@@ -429,18 +398,17 @@ def build_packet(
     elif operative is not None:
         content = operative.abs_path.read_text(encoding="utf-8")
         content_source = {
-            "mode": "indexed_operative",
+            "mode": "bridge_file_operative",
             "path": operative.rel_path,
         }
     else:
         raise SystemExit(
-            f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} "
-            f"under {index_path.parent}"
+            f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} under {bridge_dir}"
         )
     cited_specs = extract_spec_links(content)
     target_paths = extract_target_paths(content)
     cited_implementation_paths = collect_cited_implementation_paths(content)
-    project_root = index_path.parent.parent
+    project_root = bridge_dir.parent
     work_items = sorted(set(WORK_ITEM_RE.findall(content)))
     applicable = compute_applicable_specs(
         bridge_id=bridge_id,
@@ -536,7 +504,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--content-file", type=Path, default=None, help="Evaluate pending Markdown content from a file."
     )
-    parser.add_argument("--index", type=Path, default=DEFAULT_INDEX_PATH)
+    parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown.")
@@ -547,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
     packet = build_packet(
         bridge_id=args.bridge_id,
-        index_path=args.index,
+        bridge_dir=args.bridge_dir,
         config_path=args.config,
         db_path=args.db,
         content_file=args.content_file,

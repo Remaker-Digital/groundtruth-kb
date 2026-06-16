@@ -173,11 +173,15 @@ def test_verdict_template_includes_clause_applicability_section() -> None:
 
 
 def test_skill_documents_no_index_mutation() -> None:
-    """Test #7 — body explicitly states the skill does NOT mutate bridge/INDEX.md."""
+    """Test #7 — body contains no active bridge/INDEX.md mutation instruction."""
     body = _CLAUDE_SKILL.read_text(encoding="utf-8")
-    assert "bridge/INDEX.md" in body, "skill must reference bridge/INDEX.md"
-    pattern = re.compile(r"(does\s+\*?\*?NOT\*?\*?|not).{0,80}bridge/INDEX\.md", re.IGNORECASE | re.DOTALL)
-    assert pattern.search(body), "skill body must state it does NOT mutate bridge/INDEX.md"
+    forbidden = re.compile(
+        r"(?:insert|edit|add|append|write|update|modify|create|restore)\b[^\n]{0,80}bridge/INDEX\.md"
+        r"|bridge/INDEX\.md[^\n]{0,80}(?:insert|edit|add|append|write|update|modify|create|restore)\b",
+        re.IGNORECASE,
+    )
+    assert not forbidden.search(body), "skill body must not instruct agents to mutate bridge/INDEX.md"
+    assert "dispatcher/TAFE bridge state" in body, "skill must point at current bridge-state authority"
 
 
 def test_skill_documents_preflight_invocations() -> None:

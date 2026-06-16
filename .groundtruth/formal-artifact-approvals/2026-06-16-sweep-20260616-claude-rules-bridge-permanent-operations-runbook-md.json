@@ -1,0 +1,17 @@
+{
+  "action": "update",
+  "approval_mode": "auto",
+  "artifact_id": "sweep-20260616-claude-rules-bridge-permanent-operations-runbook-md",
+  "artifact_type": "narrative_artifact",
+  "auto_approval_activated_by": "owner",
+  "auto_approval_scope": "source_ref:owner request 2026-06-16: sweep all outstanding work into a commit and push latest to repo",
+  "change_reason": "Sweep commit consolidation of no-index bridge, dispatcher, harness-quality, and related instruction-surface changes.",
+  "changed_by": "codex/A",
+  "explicit_change_request": "Owner requested committing all outstanding non-ignored GT-KB worktree changes and pushing the latest repository state.",
+  "full_content": "# DEPRECATED \u2014 Bridge Permanent Operations Runbook (Retired 2026-06-11, FAB-05 / HYG-018)\n\n> \u26a0\ufe0f **DEPRECATED / RETIRED.** This runbook formerly mandated 3-minute OS bridge\n> pollers plus repair/verification commands. That mechanism is **retired and\n> must not be re-enabled.** The authoritative do-not-re-enable rule is\n> [`bridge-essential.md`](bridge-essential.md) \u00a7 \"Operational Mode\". The retired\n> poller scripts are archived at `archive/os-poller-2026-04-25/`.\n\n## Why Retired\n\nThe OS-poller stack (Windows scheduled tasks `AgentRedFileBridgeIndexScan-*`,\n`AgentRedPollerLivenessWatcher`, the foreground watchdog, and the liveness\nwatchers) polled blindly on a fixed interval regardless of bridge activity and\nwas halted by owner directive on 2026-04-25. Bridge dispatch is now event-driven\nvia the cross-harness event-driven trigger\n(`scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse + Stop\nhooks); manual dispatcher/TAFE bridge-state scans remain the fallback. See\n[`bridge-essential.md`](bridge-essential.md) for the canonical operating mode and\nthe two-axis bridge-automation model.\n\n## The Only Sanctioned Path Back\n\nThere is no accepted state that re-enables the retired OS pollers as the active\nautomation path. A *governed* scheduled-poller restoration, if ever pursued, is\ntracked as **WI-4404** and would require a fresh owner directive plus a bridge\nproposal; the orchestrator direction in\n`DELIB-BRIDGE-ORCHESTRATOR-VISION-20260610` may supersede WI-4404.\n\n## Historical Content\n\nThe archived poller scripts and the prior runbook procedures are preserved under\n`archive/os-poller-2026-04-25/` for historical reference only. They are not live\ndependencies and must not be invoked.\n\n## Copyright\n\n(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.\n",
+  "full_content_sha256": "367843ac1b8cb81f4719e0dcbcee9a39123bdb8dfaee88851af6d55aeffbd399",
+  "presented_to_user": true,
+  "source_ref": "owner request 2026-06-16: sweep all outstanding work into a commit and push latest to repo",
+  "target_path": ".claude/rules/bridge-permanent-operations-runbook.md",
+  "transcript_captured": true
+}

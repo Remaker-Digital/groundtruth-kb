@@ -23,8 +23,8 @@ Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authorit
 - If functioning, scan current TAFE/dispatcher bridge state and the versioned
   bridge file chain, then **process actionable `NEW`/`REVISED` entries
   oldest-to-newest by default — without asking** (per
-  `ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001`). `bridge/INDEX.md`
-  is deprecated/removed and must not be used as startup authority.
+  `ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001`). The retired
+  aggregate queue artifact must not be used as startup authority.
 - **Advisory mode** (opened with `init gtkb advisory`) is the opt-in that
   reports the scan and asks before processing; only advisory mode asks.
 - Respond by writing the next numbered bridge file with `GO`, `NO-GO`, or

@@ -34,9 +34,8 @@ def _load_helper() -> ModuleType:
     return module
 
 
-def _write_fresh_index(bridge_dir: Path) -> None:
+def _ensure_bridge_dir(bridge_dir: Path) -> None:
     bridge_dir.mkdir(parents=True, exist_ok=True)
-    (bridge_dir / "INDEX.md").write_text("# Bridge Index\n\n<!-- entries -->\n\n", encoding="utf-8")
 
 
 def _proposal_body(text: str = "Clean bridge body.") -> str:
@@ -106,7 +105,7 @@ def test_propose_bridge_acquires_with_ttl_300_and_releases_after_success(
 ) -> None:
     helper = _load_helper()
     bridge_dir = tmp_path / "bridge"
-    _write_fresh_index(bridge_dir)
+    _ensure_bridge_dir(bridge_dir)
 
     class _RecordingRegistry:
         def __init__(self) -> None:
@@ -148,8 +147,7 @@ def test_propose_bridge_blocks_when_thread_held_by_other_session(
 ) -> None:
     helper = _load_helper()
     bridge_dir = tmp_path / "bridge"
-    _write_fresh_index(bridge_dir)
-    original_index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
+    _ensure_bridge_dir(bridge_dir)
 
     assert registry.acquire("held-topic", "session-a", ttl_seconds=300, project_root=tmp_path)
     monkeypatch.setenv("CLAUDE_SESSION_ID", "session-b")
@@ -166,33 +164,36 @@ def test_propose_bridge_blocks_when_thread_held_by_other_session(
     assert "held-topic" in message
     assert "session-a" in message
     assert not (bridge_dir / "held-topic-001.md").exists()
-    assert (bridge_dir / "INDEX.md").read_text(encoding="utf-8") == original_index
+    assert not (bridge_dir / "INDEX.md").exists()
     assert registry.current_holder("held-topic", project_root=tmp_path)["session_id"] == "session-a"
 
 
-def test_propose_bridge_does_not_release_when_index_update_fails(
+def test_propose_bridge_does_not_release_when_file_write_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     helper = _load_helper()
     bridge_dir = tmp_path / "bridge"
-    _write_fresh_index(bridge_dir)
+    _ensure_bridge_dir(bridge_dir)
     monkeypatch.setenv("CLAUDE_SESSION_ID", "session-c")
+    original_write_bytes = Path.write_bytes
 
-    def _always_conflicts(index_path: Path, new_entry: str, *, topic_slug: str) -> None:  # noqa: ARG001
-        raise helper.BridgeIndexConflictError("simulated INDEX conflict")
+    def _fail_target_write(path: Path, data: bytes) -> int:
+        if path.name == "conflict-topic-001.md":
+            raise OSError("simulated bridge file write failure")
+        return original_write_bytes(path, data)
 
-    monkeypatch.setattr(helper, "_update_bridge_index", _always_conflicts)
+    monkeypatch.setattr(Path, "write_bytes", _fail_target_write)
 
-    with pytest.raises(helper.BridgeIndexConflictError, match="2 total attempts"):
+    with pytest.raises(OSError, match="simulated bridge file write failure"):
         helper.propose_bridge(
             "conflict-topic",
-            _proposal_body("File write succeeds, INDEX update fails."),
+            _proposal_body("File write fails after work-intent acquisition."),
             bridge_dir=bridge_dir,
             pre_populate_prior_deliberations=False,
         )
 
-    assert (bridge_dir / "conflict-topic-001.md").exists()
+    assert not (bridge_dir / "conflict-topic-001.md").exists()
     holder = registry.current_holder("conflict-topic", project_root=tmp_path)
     assert holder is not None
     assert holder["session_id"] == "session-c"

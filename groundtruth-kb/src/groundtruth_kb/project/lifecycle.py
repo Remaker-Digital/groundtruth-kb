@@ -544,33 +544,35 @@ class ProjectLifecycleService:
         """Return ``{bridge_thread_slug: {work_item_id}}`` for VERIFIED-topped threads.
 
         Scans ALL versions of each VERIFIED-topped thread for ``Work Item:``
-        metadata (D3 corrected scope). Uses the canonical
-        ``groundtruth_kb.bridge.detector.parse_index`` parser directly; a
-        cross-layer import of the ``scripts/`` scanner from package code was
-        rejected as fragile, so both layers delegate to the same parser.
+        metadata (D3 corrected scope).
         """
-        from groundtruth_kb.bridge.detector import BridgeStatus, parse_index
+        from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
         root = Path(project_root)
-        index_path = root / "bridge" / "INDEX.md"
-        if not index_path.is_file():
+        bridge_dir = root / "bridge"
+        if not bridge_dir.is_dir():
             return {}
-        result = parse_index(index_path.read_text(encoding="utf-8"), project_root=root)
+        grouped: dict[str, list[tuple[int, Path]]] = {}
+        bridge_file_re = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+        for path in bridge_dir.glob("*.md"):
+            match = bridge_file_re.match(path.name)
+            if match is None:
+                continue
+            grouped.setdefault(match.group("slug"), []).append((int(match.group("version")), path))
         by_thread: dict[str, set[str]] = {}
-        for document in result.documents:
-            top = document.current_top
-            if top is None or top.status != BridgeStatus.VERIFIED:
+        for slug, versioned_files in grouped.items():
+            latest_path = max(versioned_files, key=lambda item: item[0])[1]
+            if status_from_bridge_file(latest_path) != "VERIFIED":
                 continue
             wis: set[str] = set()
-            for version in document.versions:
-                file_path = root / version.file_path
+            for _version, file_path in sorted(versioned_files):
                 if not file_path.is_file():
                     continue
                 text = file_path.read_text(encoding="utf-8", errors="replace")
                 for match in _WORK_ITEM_LINE_RE.finditer(text):
                     wis.add(match.group(1).strip())
             if wis:
-                by_thread[document.name] = wis
+                by_thread[slug] = wis
         return by_thread
 
     def _verified_work_items_by_project(self, project_root: Path) -> dict[str, set[str]]:

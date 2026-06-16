@@ -7,7 +7,7 @@ Covers:
 - lifecycle-axis invariants (``managed ⊆ initial``, ``doctor_required ⊆ initial``)
 - lifecycle-matrix tests (scaffold × profile, upgrade × profile)
 - doctor-axis parity per profile
-- settings-registration parity (exact 11-row event-to-hook matrix)
+- settings-registration parity (exact 14-row event-to-hook matrix)
 - Condition 2 composite-ID trio (Codex GO at
   ``bridge/gtkb-managed-artifact-registry-008.md``).
 
@@ -54,11 +54,11 @@ def _registry_records() -> list[ManagedArtifact]:
 
 
 def test_registry_total_matches_current_manifest() -> None:
-    """67 total = 21 hooks + 11 rules + 11 skills + 4 files + 16 settings + 4 gitignore.
+    """63 total = 19 hooks + 11 rules + 11 skills + 4 files + 14 settings + 4 gitignore.
 
     Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
-    bridge -006 GO): hook count 19→20 (+spec-event-surfacer.py), settings
-    count 15→16 (+settings.hook.spec-event-surfacer.posttooluse).
+    bridge -006 GO): spec-event-surfacer.py is an active hook with a paired
+    PostToolUse settings registration.
 
     Pre-spec-event-surfacer rationale (carried forward):
     54 total = 19 hooks + 10 rules + 6 skills + 15 settings + 4 gitignore.
@@ -67,13 +67,10 @@ def test_registry_total_matches_current_manifest() -> None:
     with 3 new adopter-critical patterns (groundtruth.db, .groundtruth/,
     .claude/settings.local.json) promoted to upgrade-managed.
 
-    Post-governance-completeness (v0.6.x): hook count rose from 14 to 19 with
-    the addition of 5 new governance hooks (_delib_common, turn-marker,
-    delib-preflight-gate, owner-decision-capture, gov09-capture) per
-    gtkb-da-governance-completeness-implementation-016. Settings count rose
-    from 11 to 15 with 4 new settings-hook-registrations for the new event
-    hooks (turn-marker + delib-preflight-gate + gov09-capture on
-    UserPromptSubmit, owner-decision-capture on PostToolUse).
+    Current governance-completeness contract: active governance hooks are
+    _delib_common, owner-decision-capture, gov09-capture, and related policy
+    hooks. Retired dead-stub hooks are absent from hook and settings
+    registration records.
 
     ``ownership-glob`` rows from ``templates/scaffold-ownership.toml`` are
     excluded via ``_registry_records()`` helper — this test scope is
@@ -87,7 +84,7 @@ def test_registry_total_matches_current_manifest() -> None:
     # GTKB-ISOLATION-017 Slice 4 (S328): 1 new file-class record
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
     # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
-    # Deprecated turn-marker and delib-preflight-gate removed: -2 hooks, -2 settings registrations. Total: 67 - 4 = 63.
+    # Retired dead-stub hook cleanup removed two hooks and two settings registrations.
     assert len(records) == 63, f"expected 63 total registry records; got {len(records)}"
 
 
@@ -279,9 +276,9 @@ def test_scaffold_dual_agent_copies_everything() -> None:
     (3 adopter-critical patterns added: groundtruth.db, .groundtruth/,
     .claude/settings.local.json).
 
-    Post-governance-completeness: hook count 14→19 (5 new governance hooks),
-    settings-hook-registration count 11→15 (4 new event registrations).
-    Deprecated turn-marker and delib-preflight-gate hooks and registrations removed.
+    Current governance-completeness contract keeps only active hook and
+    settings-registration records; retired dead-stub hooks and registrations
+    remain absent.
     """
     scaffolded = artifacts_for_scaffold("dual-agent")
     by_class: dict[str, int] = {}
@@ -424,14 +421,14 @@ def test_doctor_rules_local_only_is_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_settings_parity_exact_sixteen_row_matrix() -> None:
-    """Registry produces the exact 16-row event-to-hook matrix enforced by scaffold.
+def test_settings_parity_exact_fourteen_row_matrix() -> None:
+    """Registry produces the exact 14-row event-to-hook matrix enforced by scaffold.
 
-    Post-governance-completeness: 15 = 11 original + 4 governance hook
-    registrations (turn-marker, delib-preflight-gate, gov09-capture on
-    UserPromptSubmit + owner-decision-capture on PostToolUse).
+    Current governance-completeness registrations add gov09-capture on
+    UserPromptSubmit and owner-decision-capture on PostToolUse; retired
+    dead-stub hook registrations remain absent.
     Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
-    bridge -006 GO): 16 = 15 + spec-event-surfacer.py on PostToolUse.
+    bridge -006 GO) adds spec-event-surfacer.py on PostToolUse.
     """
     registrations = artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
     assert len(registrations) == 14, (

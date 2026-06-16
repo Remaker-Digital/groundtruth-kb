@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import implementation_authorization as auth  # noqa: E402
 from scripts import implementation_start_gate as gate  # noqa: E402
+from scripts.gtkb_session_id import per_session_role_marker_path  # noqa: E402
 
 
 def _proposal(
@@ -66,9 +67,15 @@ def _write_thread(
     bridge.mkdir()
     proposal_name = f"{bridge_id}-001.md"
     go_name = f"{bridge_id}-002.md"
-    (bridge / proposal_name).write_text(proposal or _proposal(bridge_id=bridge_id), encoding="utf-8")
-    (bridge / go_name).write_text("GO\n\n# Review\n", encoding="utf-8")
+    proposal_body = proposal or _proposal(bridge_id=bridge_id)
+    if latest_status != "GO":
+        proposal_lines = proposal_body.splitlines()
+        if proposal_lines:
+            proposal_lines[0] = latest_status
+            proposal_body = "\n".join(proposal_lines) + "\n"
+    (bridge / proposal_name).write_text(proposal_body, encoding="utf-8")
     if latest_status == "GO":
+        (bridge / go_name).write_text("GO\n\n# Review\n", encoding="utf-8")
         lines = [
             f"Document: {bridge_id}",
             f"GO: bridge/{go_name}",
@@ -165,8 +172,25 @@ def _seed_owner_sufficiency_deliberation(root: Path) -> str:
     return deliberation_id
 
 
+def _write_prime_marker(root: Path, session_id: str) -> None:
+    marker_path = per_session_role_marker_path(root, session_id)
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    marker_path.write_text(
+        json.dumps(
+            {
+                "role": "prime-builder",
+                "session_id": session_id,
+                "session_id_source": "test-fixture",
+                "source": "test-fixture",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _claim_bridge(root: Path, bridge_id: str = "sample-implementation", session_id: str | None = None) -> None:
     holder = session_id or auth.resolve_work_intent_session_id() or "session-1"
+    _write_prime_marker(root, holder)
     assert auth.bridge_work_intent_registry.acquire(bridge_id, holder, project_root=root)
 
 
@@ -929,6 +953,50 @@ def test_gate_blocks_python_sqlite_literal_insert() -> None:
 def test_gate_blocks_python_sqlite_commit_after_select() -> None:
     cmd = "python -c \"import sqlite3; c=sqlite3.connect('a.db'); c.execute('SELECT * FROM t'); c.commit()\""
     assert gate._is_mutating_command(cmd) is True
+
+
+# WI-3358: quoted-argument Python mutation text is data, not shell intent.
+
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "python -c 'msg = \"sqlite3.connect(a.db).execute(INSERT INTO t VALUES (1))\"; print(msg)'",
+        "python -c 'msg = \"Path(x).write_text(y)\"; print(msg)'",
+        'python -c \'msg = """open(x, "w")"""; print(msg)\'',
+    ],
+)
+def test_gate_allows_quoted_python_mutation_literals(cmd: str, tmp_path: Path) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": cmd}}
+
+    assert gate._is_mutating_command(cmd) is False
+    assert gate.gate_decision(payload) == {}
+
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "python -c \"from pathlib import Path; Path('scripts/foo.py').write_text('x')\"",
+        "python -c \"open('scripts/foo.py', 'w').write('x')\"",
+        "python -c \"import sqlite3; sqlite3.connect('a.db').execute('INSERT INTO t VALUES (1)')\"",
+        "python -c \"db.insert_work_item('WI-1')\"",
+    ],
+)
+def test_gate_preserves_python_mutation_true_positives(cmd: str, tmp_path: Path) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": cmd}}
+
+    assert gate._is_mutating_command(cmd) is True
+    result = gate.gate_decision(payload)
+    assert result["decision"] == "block"
+    assert "authorization packet" in result["reason"]
+
+
+def test_gate_allows_bridge_write_with_quoted_protected_path_mention(tmp_path: Path) -> None:
+    cmd = 'Set-Content -Path bridge/note.md -Value "reminder: update scripts/secret.py"'
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": cmd}}
+
+    assert gate.changed_paths(payload) == (["bridge/note.md"], True)
+    assert gate.gate_decision(payload) == {}
 
 
 # WI-3353 IP-3: worktree-aware canonical-root resolution closes Bug 2 (the

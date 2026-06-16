@@ -442,16 +442,17 @@ live data + interaction); non-interactive README-style views.
 **Canonical full term:** file bridge (the protocol surface).
 
 **Definition:** The Prime Builder ↔ Loyal Opposition coordination
-protocol implemented via versioned markdown files under `bridge/` and
-the canonical `bridge/INDEX.md` workflow state. Statuses: NEW, REVISED,
-GO, NO-GO, VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. Both agents read and write the index;
-implementation never proceeds without GO.
+protocol implemented through dispatcher-backed bridge state and versioned
+markdown audit files under `bridge/`. Statuses: NEW, REVISED, GO, NO-GO,
+VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. After the 2026-06-15
+TAFE/dispatcher cutover, aggregate queue artifacts are not canonical dispatcher
+or bridge-state authority. Implementation never proceeds without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
 "file bridge" in canonical text); cross-system message bridges.
 
-**Source:** `.claude/rules/file-bridge-protocol.md`;
-`bridge/INDEX.md`; `AGENTS.md` (Codex-side rule).
+**Source:** dispatcher/TAFE bridge-state surfaces; `.claude/rules/file-bridge-protocol.md`
+for legacy helper behavior; `AGENTS.md` (Codex-side rule).
 
 ---
 
@@ -583,12 +584,17 @@ multi-harness mode, multi-element lists for single-harness mode). Switching
 an ACTIVE harness to Prime Builder updates that harness's role set; other
 active harnesses holding operating roles are preserved. The single-active-per-role
 invariant is obsolete: multiple active harnesses may hold the same operating
-role concurrently (e.g., coexisting Loyal Opposition harnesses). Inactive
-harnesses (registered or suspended) retain their
-existing role sets unchanged: role and status are orthogonal axes per the
-role/status orthogonality model in
-`DELIB-S378-ROLE-STATUS-ORTHOGONALITY-DISPATCH` and
-`ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3.
+role concurrently (e.g., coexisting Prime Builder or Loyal Opposition
+harnesses). Inactive harnesses (registered or suspended) retain their existing
+role sets unchanged: role, lifecycle status, event-firing capability, and
+headless dispatchability are orthogonal axes per the role/status/dispatchability
+model in `DELIB-S378-ROLE-STATUS-ORTHOGONALITY-DISPATCH`,
+`DELIB-20263438`, and `ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3.
+
+**Not to be confused with:** dispatchability. A harness may hold an operating
+role without being eligible to receive headless bridge dispatch for that role.
+Dispatch eligibility and final target ranking are controlled by
+`config/dispatcher/rules.toml`.
 
 **Canonical alias:** operating role.
 
@@ -600,7 +606,7 @@ role/status orthogonality model in
 and Loyal Opposition on a single topic. A bridge thread is identified by a
 kebab-case slug and consists of an ordered sequence of versioned files
 (`bridge/<slug>-001.md`, `-002.md`, …) plus a single entry in
-`bridge/INDEX.md`. The thread terminates at `VERIFIED` or owner-directed
+the dispatcher-backed bridge state. The thread terminates at `VERIFIED` or owner-directed
 retirement. `DEFERRED` parks a thread in owner-directed non-actionable state
 until its recorded clear/resume condition is met.
 
@@ -788,11 +794,12 @@ resume.
 ### smart poller
 
 **Definition:** The (now-retired) bridge-poller automation that scanned
-`bridge/INDEX.md` periodically and dispatched the appropriate harness when
-a recipient's actionable queue signature changed. The smart poller was
-monitoring/dispatch infrastructure only; `bridge/INDEX.md` remained the
-canonical workflow state. Bridge dispatch is now governed by the
-`cross-harness event-driven trigger` (see entry below).
+the legacy bridge index periodically and dispatched the appropriate harness
+when a recipient's actionable queue signature changed. The smart poller was
+monitoring/dispatch infrastructure only. Historical references saying
+aggregate queue artifacts were canonical describe pre-cutover behavior. Bridge
+dispatch is now governed by the `cross-harness event-driven trigger` and the dispatcher
+configuration/status/health CLI (see entry below).
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#smart-poller).*
 
@@ -804,13 +811,10 @@ canonical workflow state. Bridge dispatch is now governed by the
 the retired smart poller. Implemented as
 `scripts/cross_harness_bridge_trigger.py` and registered as PostToolUse +
 Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger
-fires on tool-use and Stop events: when `bridge/INDEX.md` is modified by
-a tool call or the agent ends a turn, the trigger inspects the indexed
-state and dispatches the appropriate counterpart harness if a recipient's
-actionable queue signature has changed. The trigger reuses the smart
-poller's actionable-signature scheme byte-identically per
-`platform_tests/scripts/test_cross_harness_bridge_trigger.py` so the audit-trail
-invariants are preserved.
+fires on tool-use and Stop events and inspects dispatcher/TAFE bridge state to
+dispatch the appropriate counterpart harness when actionable work changes.
+Aggregate queue artifacts must not be cited as canonical dispatcher topology,
+dispatch health, target-selection, or bridge-state authority.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#cross-harness-event-driven-trigger).*
 
@@ -852,9 +856,9 @@ topology context).
 **Definition:** The bridge dispatch substrate that operates in single-harness
 operating mode. A host-platform scheduled task (Windows Task Scheduler /
 launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
-the dispatcher routine on a fixed interval. The dispatcher reads live
-``bridge/INDEX.md``, computes a per-role actionable signature using the same
-kind-aware-routing path as the cross-harness event-driven trigger, and
+the dispatcher routine on a fixed interval. The dispatcher reads
+dispatcher/TAFE bridge state, computes a per-role actionable signature using
+the same kind-aware-routing path as the cross-harness event-driven trigger, and
 spawns subprocess workers for each role whose actionable signature has
 changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
 as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and

@@ -16,9 +16,9 @@ from pathlib import Path
 from typing import Final
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
-INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN):\s+(bridge/\S+\.md)\s*$"
+BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN)\b",
+    re.IGNORECASE,
 )
 SUMMARY_TOKEN_RE: Final[re.Pattern[str]] = re.compile(
     r"\b(?P<count>\d+)\s+(?P<kind>passed|failed|errors?|skipped|xfailed|xpassed)\b",
@@ -95,37 +95,40 @@ class ClaimResult:
     observed_counts: dict[str, int]
 
 
-def parse_index_for_document(index_path: Path, bridge_id: str) -> list[BridgeVersion]:
-    if not index_path.is_file():
-        raise VerifierError(f"bridge/INDEX.md not found: {index_path}")
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    except OSError:
+        return None
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def parse_index_for_document(bridge_dir: Path, bridge_id: str) -> list[BridgeVersion]:
     versions: list[BridgeVersion] = []
-    in_target = False
-    root = index_path.parent.parent
-    for raw_line in index_path.read_text(encoding="utf-8-sig").splitlines():
-        line = raw_line.strip()
-        doc_match = INDEX_DOC_RE.match(line)
-        if doc_match:
-            in_target = doc_match.group(1) == bridge_id
+    for path in bridge_dir.glob(f"{bridge_id}-*.md"):
+        version_match = re.match(rf"^{re.escape(bridge_id)}-(\d+)\.md$", path.name)
+        if not version_match:
             continue
-        if not in_target:
+        status = _status_from_bridge_file(path)
+        if status is None:
             continue
-        status_match = INDEX_STATUS_RE.match(line)
-        if status_match:
-            rel_path = status_match.group(2)
-            version_match = re.search(r"-(\d+)\.md$", rel_path)
-            versions.append(
-                BridgeVersion(
-                    status=status_match.group(1),
-                    rel_path=rel_path,
-                    abs_path=root / rel_path,
-                    version_number=int(version_match.group(1)) if version_match else 1,
-                )
+        versions.append(
+            BridgeVersion(
+                status=status,
+                rel_path=f"bridge/{path.name}",
+                abs_path=path,
+                version_number=int(version_match.group(1)),
             )
-        elif line == "":
-            break
+        )
     if not versions:
-        raise VerifierError(f"Document {bridge_id!r} not found in bridge/INDEX.md")
-    return versions
+        raise VerifierError(f"Bridge thread {bridge_id!r} has no readable numbered files")
+    return sorted(versions, key=lambda version: version.version_number, reverse=True)
 
 
 def resolve_report_path(project_root: Path, bridge_id: str, report_version: int | None) -> Path:
@@ -135,7 +138,7 @@ def resolve_report_path(project_root: Path, bridge_id: str, report_version: int 
             raise VerifierError(f"Report version not found: {path}")
         return path
 
-    versions = parse_index_for_document(project_root / "bridge" / "INDEX.md", bridge_id)
+    versions = parse_index_for_document(project_root / "bridge", bridge_id)
     for version in versions:
         if not version.abs_path.is_file():
             continue
@@ -592,7 +595,7 @@ def format_markdown(packet: dict[str, object]) -> str:
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bridge-id", required=True, help="Bridge Document id from bridge/INDEX.md.")
+    parser.add_argument("--bridge-id", required=True, help="Bridge document name / versioned bridge-thread slug.")
     parser.add_argument("--report-version", type=int, default=None, help="Specific report version number to inspect.")
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT, help=argparse.SUPPRESS)
     parser.add_argument("--timeout-seconds", type=int, default=30, help="Per-claim pytest timeout.")

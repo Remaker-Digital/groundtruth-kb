@@ -14,11 +14,10 @@ from typing import Any, Final
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
-DEFAULT_INDEX_PATH: Final[Path] = DEFAULT_BRIDGE_DIR / "INDEX.md"
 
-INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+?-(\d+)\.md)\s*$"
+BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    re.IGNORECASE,
 )
 BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\bbridge/(?P<slug>[A-Za-z0-9_.-]+)-(?P<version>\d{3})\.md\b")
 STATUS_AT_VERSION_RE: Final[re.Pattern[str]] = re.compile(
@@ -28,7 +27,7 @@ STATUS_AT_VERSION_RE: Final[re.Pattern[str]] = re.compile(
 
 
 @dataclass(frozen=True)
-class IndexVersion:
+class BridgeFileVersion:
     status: str
     rel_path: str
     version: int
@@ -42,46 +41,52 @@ class Citation:
     text: str
 
 
-def parse_index(index_path: Path) -> dict[str, list[IndexVersion]]:
-    if not index_path.is_file():
-        return {}
-    documents: dict[str, list[IndexVersion]] = {}
-    current_doc: str | None = None
-    for raw_line in index_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        doc_match = INDEX_DOC_RE.match(line)
-        if doc_match:
-            current_doc = doc_match.group(1)
-            documents.setdefault(current_doc, [])
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
             continue
-        if current_doc is None:
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def parse_bridge_files(bridge_dir: Path) -> dict[str, list[BridgeFileVersion]]:
+    documents: dict[str, list[BridgeFileVersion]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = re.match(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$", path.name)
+        if match is None:
             continue
-        if not line:
-            current_doc = None
+        status = _status_from_bridge_file(path)
+        if status is None:
             continue
-        status_match = INDEX_STATUS_RE.match(line)
-        if not status_match:
-            continue
-        documents[current_doc].append(
-            IndexVersion(
-                status=status_match.group(1),
-                rel_path=status_match.group(2),
-                version=int(status_match.group(3)),
+        documents.setdefault(match.group("slug"), []).append(
+            BridgeFileVersion(
+                status=status,
+                rel_path=f"bridge/{path.name}",
+                version=int(match.group("version")),
             )
         )
-    return documents
+    return {
+        slug: sorted(versions, key=lambda version: version.version, reverse=True)
+        for slug, versions in documents.items()
+    }
 
 
-def latest_versions(index_documents: dict[str, list[IndexVersion]]) -> dict[str, IndexVersion]:
-    latest: dict[str, IndexVersion] = {}
+def latest_versions(index_documents: dict[str, list[BridgeFileVersion]]) -> dict[str, BridgeFileVersion]:
+    latest: dict[str, BridgeFileVersion] = {}
     for slug, versions in index_documents.items():
         if versions:
             latest[slug] = versions[0]
     return latest
 
 
-def find_operative_file(bridge_id: str, *, index_path: Path, bridge_dir: Path) -> Path | None:
-    versions = parse_index(index_path).get(bridge_id, [])
+def find_operative_file(bridge_id: str, *, bridge_dir: Path) -> Path | None:
+    versions = parse_bridge_files(bridge_dir).get(bridge_id, [])
     if versions:
         return bridge_dir.parent / versions[0].rel_path
     candidates = sorted(bridge_dir.glob(f"{bridge_id}-*.md"))
@@ -140,7 +145,7 @@ def _version_path(slug: str, version: int) -> str:
     return f"bridge/{slug}-{version:03d}.md"
 
 
-def _warning_for(citation: Citation, latest: IndexVersion) -> dict[str, Any]:
+def _warning_for(citation: Citation, latest: BridgeFileVersion) -> dict[str, Any]:
     latest_path = latest.rel_path
     cited_path = _version_path(citation.cited_slug, citation.cited_version)
     return {
@@ -168,7 +173,7 @@ def _missing_for(citation: Citation) -> dict[str, Any]:
         "severity": "warn",
         "source": citation.source,
         "cleanup_hint": (
-            f"Citation of {cited_path} references a bridge thread not found in bridge/INDEX.md. "
+            f"Citation of {cited_path} references a bridge thread not found in numbered bridge files. "
             "Check the slug or document why the citation cannot be resolved."
         ),
     }
@@ -215,13 +220,12 @@ def render_markdown(packet: dict[str, Any]) -> str:
 def build_packet(
     *,
     bridge_id: str,
-    index_path: Path = DEFAULT_INDEX_PATH,
     bridge_dir: Path = DEFAULT_BRIDGE_DIR,
     content_file: Path | None = None,
 ) -> dict[str, Any]:
-    index_documents = parse_index(index_path)
+    index_documents = parse_bridge_files(bridge_dir)
     latest = latest_versions(index_documents)
-    operative = content_file or find_operative_file(bridge_id, index_path=index_path, bridge_dir=bridge_dir)
+    operative = content_file or find_operative_file(bridge_id, bridge_dir=bridge_dir)
     content = operative.read_text(encoding="utf-8") if operative and operative.is_file() else ""
     citations = extract_citations(content, known_slugs=set(latest), bridge_id=bridge_id)
 
@@ -238,7 +242,7 @@ def build_packet(
     packet: dict[str, Any] = {
         "bridge_id": bridge_id,
         "content_file": str(operative) if operative else None,
-        "index_path": str(index_path),
+        "bridge_state": str(bridge_dir),
         "citations": [asdict(citation) for citation in citations],
         "warnings": warnings,
         "missing_citations": missing,
@@ -252,7 +256,6 @@ def build_packet(
 def _build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bridge-id", required=True, help="Bridge document id / slug to inspect.")
-    parser.add_argument("--index-path", type=Path, default=DEFAULT_INDEX_PATH)
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--content-file", type=Path, default=None)
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
@@ -264,7 +267,6 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_argparser().parse_args(argv)
     packet = build_packet(
         bridge_id=args.bridge_id,
-        index_path=args.index_path,
         bridge_dir=args.bridge_dir,
         content_file=args.content_file,
     )

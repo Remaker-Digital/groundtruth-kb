@@ -93,8 +93,6 @@ def _current_go_verdict_files_from_versioned_bridge(project_root: Path) -> list[
     latest: dict[str, tuple[int, str, Path]] = {}
     bridge_dir = project_root / "bridge"
     for path in bridge_dir.glob("*.md"):
-        if path.name == "INDEX.md":
-            continue
         match = re.match(r"^(.+)-(\d+)\.md$", path.name)
         if not match:
             continue
@@ -108,23 +106,13 @@ def _current_go_verdict_files_from_versioned_bridge(project_root: Path) -> list[
     return [path for _version, status, path in latest.values() if status == "GO"]
 
 
-def has_go_verdict(work_item_id: str, bridge_index_path: Path, project_root: Path) -> bool:
+def has_go_verdict(work_item_id: str, bridge_state_path: Path, project_root: Path) -> bool:
     """Return whether a current GO bridge chain cites this work item."""
-
-    if not bridge_index_path.exists():
-        return any(
-            work_item_id in verdict_path.read_text(encoding="utf-8", errors="replace")
-            for verdict_path in _current_go_verdict_files_from_versioned_bridge(project_root)
-        )
-    for line in bridge_index_path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("GO: bridge/"):
-            continue
-        rel_path = stripped.split(":", 1)[1].strip()
-        verdict_path = project_root / rel_path
-        if verdict_path.exists() and work_item_id in verdict_path.read_text(encoding="utf-8"):
-            return True
-    return False
+    _ = bridge_state_path
+    return any(
+        work_item_id in verdict_path.read_text(encoding="utf-8", errors="replace")
+        for verdict_path in _current_go_verdict_files_from_versioned_bridge(project_root)
+    )
 
 
 def validate_transition(
@@ -133,7 +121,7 @@ def validate_transition(
     current_state: str | None,
     target_state: str,
     pending_owner_decisions_path: Path,
-    bridge_index_path: Path,
+    bridge_state_path: Path,
     project_root: Path,
 ) -> tuple[bool, str]:
     """Validate a requested approval-state transition."""
@@ -143,7 +131,7 @@ def validate_transition(
     if target != ApprovalState.IMPLEMENTATION_AUTHORIZED.value:
         return True, f"transition {source} -> {target} allowed"
     if source == ApprovalState.BRIDGE_AUTHORIZED.value and has_go_verdict(
-        work_item_id, bridge_index_path, project_root
+        work_item_id, bridge_state_path, project_root
     ):
         return True, "bridge GO verdict evidence found"
     if source == ApprovalState.AUQ_RESOLVED.value and has_auq_evidence(work_item_id, pending_owner_decisions_path):

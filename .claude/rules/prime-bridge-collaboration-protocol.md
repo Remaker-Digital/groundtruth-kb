@@ -3,13 +3,16 @@
 This rule defines mandatory collaboration behavior between Prime Builder and
 Loyal Opposition agents over the file bridge.
 
+> **2026-06-15 bridge cutover note:** This file preserves status and role
+> semantics for historical audit interpretation. After WI-4510 Phase-3,
+> TAFE-backed bridge state and status-bearing numbered bridge files are
+> canonical.
+
 ## Operating Model
 
-- The active bridge is file-based.
-- `bridge/INDEX.md` is the authoritative queue.
+- The active bridge is TAFE-backed and dispatcher-driven.
 - Bridge documents under `bridge/` are the auditable exchange artifacts.
-- Entries in the index are newest-first.
-- Only the latest status for each document entry is actionable.
+- Only the latest status for each document is actionable.
 - The archived SQLite/MCP bridge runtime is legacy compatibility code and must
   not be used as the active coordination channel for new projects.
 
@@ -84,13 +87,14 @@ Routine collaboration must not depend on manual owner prompting.
 - The cross-harness event-driven trigger
   (`scripts/cross_harness_bridge_trigger.py`) is registered as PostToolUse
   and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
-- The trigger fires on tool-use and Stop events: when an INDEX-modifying
-  tool call lands or the agent ends a turn, the trigger inspects
-  `bridge/INDEX.md` and dispatches the appropriate counterpart harness
-  when its actionable queue signature has changed.
-- Manual `bridge/INDEX.md` scans remain available as a fallback when the
-  trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
-  prompt such as `Bridge` or `Bridge scan`.
+- The trigger fires on tool-use and Stop events: when TAFE-backed bridge state
+  changes, or the agent ends a turn, the trigger inspects dispatcher/TAFE state
+  and dispatches the
+  appropriate counterpart harness when its actionable queue signature has
+  changed.
+- Manual bridge-state scans remain available as a fallback when the trigger is
+  unhealthy. The owner triggers a Prime bridge scan with a brief prompt such as
+  `Bridge` or `Bridge scan`.
 
 ## Escalation Boundary
 

@@ -57,13 +57,11 @@ def _stage_thread(tmp_path: Path, *, latest_status: str = "NO-GO", slug: str = "
         "### F2 - P2 - Missing gate ordering\n",
         encoding="utf-8",
     )
-    lines = [
-        "# Bridge Index\n\n",
-        f"Document: {slug}\n",
-        f"{latest_status}: bridge/{slug}-002.md\n",
-        f"NEW: bridge/{slug}-001.md\n",
-    ]
-    (bridge_dir / "INDEX.md").write_text("".join(lines), encoding="utf-8")
+    if latest_status != "NO-GO":
+        (bridge_dir / f"{slug}-002.md").write_text(
+            f"{latest_status}\n\n# Loyal Opposition Review\n\nVerdict: {latest_status}\n",
+            encoding="utf-8",
+        )
     return bridge_dir
 
 
@@ -72,7 +70,7 @@ def _completed_revision() -> str:
         "REVISED\n\n"
         "# Test Revision\n\n"
         "## Revision Claim\n\n"
-        "This completed revision addresses the findings while preserving bridge/INDEX.md as canonical.\n\n"
+        "This completed revision addresses the findings while preserving versioned bridge files as canonical.\n\n"
         "## Specification Links\n\n"
         "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
         "- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001\n"
@@ -87,7 +85,7 @@ def _completed_revision() -> str:
         "### F2 - P2 - Missing gate ordering\n\n"
         "Completed gate ordering is documented here.\n\n"
         "## Pre-Filing Preflight Subsection\n\n"
-        "The helper inserts the REVISED line at the top of the existing INDEX entry after gates pass.\n\n"
+        "The helper writes the REVISED bridge file through the governed bridge writer after gates pass.\n\n"
         "## Check Plan\n\n"
         "Run `python -m pytest platform_tests/skills/test_bridge_revise_helper.py` after filing.\n\n"
         "## Risk And Rollback\n\n"
@@ -114,13 +112,12 @@ def test_scaffold_mode_creates_non_dispatchable_draft(helper, tmp_path):
 
     draft = helper.scaffold_revision("test-revision", bridge_dir=bridge_dir, draft_dir=draft_dir)
 
-    index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
     assert draft == draft_dir / "test-revision-003.md"
     assert draft.exists()
     assert "draft_only: true" in draft.read_text(encoding="utf-8")
     assert "Owner Decisions / Input" in draft.read_text(encoding="utf-8")
-    assert "REVISED: bridge/test-revision-003.md" not in index
     assert not (bridge_dir / "test-revision-003.md").exists()
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
 def test_file_mode_creates_live_revised_after_gates(helper, tmp_path, monkeypatch):
@@ -137,13 +134,8 @@ def test_file_mode_creates_live_revised_after_gates(helper, tmp_path, monkeypatc
     assert live == bridge_dir / "test-revision-003.md"
     assert live.exists()
     assert calls and calls[0][0] == "test-revision"
-    index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
-    assert (
-        "Document: test-revision\n"
-        "REVISED: bridge/test-revision-003.md\n"
-        "NO-GO: bridge/test-revision-002.md\n"
-        "NEW: bridge/test-revision-001.md\n"
-    ) in index
+    assert live.read_text(encoding="utf-8").lstrip().startswith("REVISED")
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
 def test_existing_target_file_causes_no_overwrite_error(helper, tmp_path, monkeypatch):
@@ -179,7 +171,7 @@ def test_credential_content_aborts_before_live_mutation(helper, tmp_path, monkey
         helper.file_revision("test-revision", content=content, bridge_dir=bridge_dir)
 
     assert not (bridge_dir / "test-revision-003.md").exists()
-    assert "REVISED: bridge/test-revision-003.md" not in (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
 def test_incomplete_placeholders_cannot_become_live_revised_row(helper, tmp_path):
@@ -204,57 +196,29 @@ def test_preflight_failure_aborts_before_index_mutation(helper, tmp_path, monkey
         helper.file_revision("test-revision", content=_completed_revision(), bridge_dir=bridge_dir)
 
     assert not (bridge_dir / "test-revision-003.md").exists()
-    assert "REVISED: bridge/test-revision-003.md" not in (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
-def test_unrelated_index_change_during_write_is_merged(helper, tmp_path, monkeypatch):
+def test_unrelated_bridge_file_does_not_block_versioned_write(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
-    original_insert = helper.insert_index_status
-
-    def mutate_index_then_insert(slug, version, status, project_root, *, expected_index_raw=None):
-        (bridge_dir / "INDEX.md").write_text(
-            (expected_index_raw or "") + "\nDocument: other\nNEW: bridge/other-001.md\n", encoding="utf-8"
-        )
-        return original_insert(
-            slug,
-            version,
-            status,
-            project_root,
-            expected_index_raw=expected_index_raw,
-        )
+    (bridge_dir / "other-001.md").write_text("NEW\n\n# Other thread\n", encoding="utf-8")
 
     monkeypatch.setattr(helper, "_run_candidate_preflights", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(helper, "insert_index_status", mutate_index_then_insert)
 
     helper.file_revision("test-revision", content=_completed_revision(), bridge_dir=bridge_dir)
 
-    index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
-    assert "REVISED: bridge/test-revision-003.md" in index
-    assert "Document: other\nNEW: bridge/other-001.md" in index
+    assert (bridge_dir / "test-revision-003.md").exists()
+    assert (bridge_dir / "other-001.md").exists()
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
-def test_same_document_index_change_during_write_is_detected(helper, tmp_path, monkeypatch):
+def test_latest_status_change_before_write_is_detected(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
-    original_insert = helper.insert_index_status
-
-    def mutate_index_then_insert(slug, version, status, project_root, *, expected_index_raw=None):
-        changed = (expected_index_raw or "").replace(
-            "Document: test-revision\nNO-GO: bridge/test-revision-002.md\n",
-            "Document: test-revision\nGO: bridge/test-revision-009.md\nNO-GO: bridge/test-revision-002.md\n",
-        )
-        (bridge_dir / "INDEX.md").write_text(changed, encoding="utf-8")
-        return original_insert(
-            slug,
-            version,
-            status,
-            project_root,
-            expected_index_raw=expected_index_raw,
-        )
+    (bridge_dir / "test-revision-003.md").write_text("GO\n\n# Later review\n", encoding="utf-8")
 
     monkeypatch.setattr(helper, "_run_candidate_preflights", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(helper, "insert_index_status", mutate_index_then_insert)
 
-    with pytest.raises(helper.BridgeIndexConflictError):
+    with pytest.raises(helper.BridgeLatestStatusError):
         helper.file_revision("test-revision", content=_completed_revision(), bridge_dir=bridge_dir)
 
 
@@ -262,29 +226,19 @@ def test_file_mode_uses_validated_bridge_writer(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
     calls: list[tuple[str, object]] = []
 
-    def fake_validate(slug, status, role_slot, project_root):
-        calls.append(("validate", (slug, status, role_slot, project_root)))
-
     def fake_write(slug, version, content, project_root, *, require_author_metadata=True):
         calls.append(("write", (slug, version, require_author_metadata, content.startswith("REVISED"), project_root)))
         return project_root / "bridge" / f"{slug}-{version:03d}.md"
 
-    def fake_insert(slug, version, status, project_root, *, expected_index_raw=None):
-        calls.append(("insert", (slug, version, status, expected_index_raw is not None, project_root)))
-
     monkeypatch.setattr(helper, "_run_candidate_preflights", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(helper, "validate_transition", fake_validate)
     monkeypatch.setattr(helper, "write_bridge_file", fake_write)
-    monkeypatch.setattr(helper, "insert_index_status", fake_insert)
 
     helper.file_revision("test-revision", content=_completed_revision(), bridge_dir=bridge_dir)
 
-    assert [call[0] for call in calls] == ["validate", "write", "insert"]
-    assert calls[0][1][1] == "REVISED"
-    assert calls[0][1][2] == helper.PRIME_ROLE_SLOT
-    assert calls[1][1][2] is False
-    assert calls[2][1][2] == "REVISED"
-    assert calls[2][1][3] is True
+    assert [call[0] for call in calls] == ["write"]
+    assert calls[0][1][1] == 3
+    assert calls[0][1][2] is False
+    assert calls[0][1][3] is True
 
 
 def test_real_candidate_content_preflights_pass(helper, tmp_path):

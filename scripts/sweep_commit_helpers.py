@@ -3,8 +3,8 @@
 WI-4528 (P3, ``tooling``, origin=improvement). The inventory-drift gate
 (``scripts/check_dev_environment_inventory_drift.py``, run by
 ``.githooks/pre-commit --staged --allow-review-evidence``) accepts a protected
-hook-config change such as ``.codex/hooks.json`` only when a ``bridge/*.md`` or
-``bridge/INDEX.md`` is CO-STAGED in the same commit (``review_evidence_present``).
+hook-config change such as ``.codex/hooks.json`` only when a numbered bridge
+evidence file is CO-STAGED in the same commit (``review_evidence_present``).
 The protected entries in ``config/governance/protected-artifact-inventory-drift.toml``
 that carry ``accept_with_inventory_baseline_update = false`` are the ones that
 require this co-staged bridge evidence.
@@ -53,7 +53,7 @@ INVENTORY_DRIFT_TOML_RELATIVE_PATH = Path("config/governance/protected-artifact-
 # Bridge review-evidence patterns, byte-identical to BRIDGE_REVIEW_EVIDENCE_PATTERNS
 # in scripts/check_dev_environment_inventory_drift.py. A staged path matching any
 # of these satisfies the gate's review_evidence_present condition.
-BRIDGE_EVIDENCE_PATTERNS = ("bridge/INDEX.md", "bridge/*.md")
+BRIDGE_EVIDENCE_PATTERNS = ("bridge/*-[0-9][0-9][0-9].md",)
 
 
 @dataclass(frozen=True)
@@ -147,10 +147,9 @@ def is_bridge_evidence_path(path: str) -> bool:
 def partition_staged(paths: list[str], protected_globs: list[str]) -> dict[str, list[str]]:
     """Split staged paths into ``protected`` / ``bridge`` / ``other`` buckets.
 
-    Pure, no I/O. ``bridge`` includes ``bridge/INDEX.md`` and any ``bridge/*.md``
-    (the candidate review-evidence files). A path that is both bridge-shaped and
-    protected (none exist in the current registry, but defensively) is classified
-    as ``protected`` first.
+    Pure, no I/O. ``bridge`` includes candidate numbered review-evidence files.
+    A path that is both bridge-shaped and protected (none exist in the current
+    registry, but defensively) is classified as ``protected`` first.
     """
     protected: list[str] = []
     bridge: list[str] = []
@@ -175,20 +174,15 @@ def bridge_files_citing(
 
     For each protected path, returns the list of staged bridge files whose body
     cites the protected path (path-token match or filename mention).
-    ``bridge/INDEX.md``, when staged, is included as evidence for EVERY protected
-    path: it is the universal gate-satisfier (the gate accepts any
-    ``bridge/INDEX.md`` co-stage as review evidence regardless of content).
 
     Bridge files that cannot be read are skipped (fail-soft); a protected path
     with no citing bridge file maps to an empty list (the missing-evidence case).
     """
     root = Path(project_root)
-    index_staged = [bf for bf in staged_bridge_files if _posix(bf) == "bridge/INDEX.md"]
-    content_bridge_files = [bf for bf in staged_bridge_files if _posix(bf) != "bridge/INDEX.md"]
 
     # Pre-read bridge file bodies once.
     bodies: dict[str, str] = {}
-    for bridge_file in content_bridge_files:
+    for bridge_file in staged_bridge_files:
         try:
             bodies[bridge_file] = (root / bridge_file).read_text(encoding="utf-8", errors="replace")
         except (FileNotFoundError, OSError):
@@ -202,9 +196,6 @@ def bridge_files_citing(
         for bridge_file, body in bodies.items():
             if norm_protected in body or protected_basename in body:
                 matches.append(bridge_file)
-        # bridge/INDEX.md is universal evidence; append last so content-specific
-        # citations are listed first.
-        matches.extend(index_staged)
         citing[norm_protected] = matches
     return citing
 
@@ -283,7 +274,7 @@ def plan_commit_batches(staged: list[str], project_root: Path | str) -> list[Com
                     rationale=(
                         f"Protected path {protected!r} has NO bridge evidence co-staged; "
                         "commit will be blocked by the inventory-drift gate. Stage a "
-                        "bridge/*.md citing it, or bridge/INDEX.md, before committing."
+                        "numbered bridge evidence file citing it before committing."
                     ),
                 )
             )

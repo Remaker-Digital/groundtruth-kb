@@ -167,7 +167,7 @@ until the follow-on thread lands with the producer contract cited.
 2. **Read TAFE/dispatcher bridge state** — use the bridge dispatcher
    status/health CLI and TAFE-backed bridge-state surfaces to confirm no
    parallel session is already driving a hygiene-investigation thread. Do not
-   consult or recreate the retired bridge-index artifact as bridge authority.
+   consult or recreate aggregate queue artifacts as bridge authority.
 3. **No mutation scope is invented** — this skill produces findings, a rendered report, and routable
    work-item forms; any source/config remediation a finding implies is a separate, GO-gated bridge.
 

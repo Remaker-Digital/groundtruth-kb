@@ -20,10 +20,9 @@ Authority:
   :148-154 specific-approval requirement).
 
 Behavior:
-1. Read live bridge/INDEX.md and .gtkb-state/bridge-poller/dispatch-state.json.
-2. Compute Prime-actionable signature using groundtruth_kb.bridge canonical
-   parse_index + compute_actionable_pending (byte-identical to
-   scripts/cross_harness_bridge_trigger.py:_signature).
+1. Read current dispatcher/TAFE bridge state and status-bearing versioned
+   bridge files.
+2. Compute the role-actionable signature using the no-index bridge scanner.
 3. Read session-scoped surface cache at
    .gtkb-state/bridge-poller/axis-2-surface/<session-id>.json.
 4. If current_signature != last_surfaced_signature AND selected_count > 0:
@@ -47,11 +46,13 @@ Exit:   Always 0.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 ENV_DISABLE = "GTKB_NO_AXIS_2_SURFACE"
@@ -75,7 +76,6 @@ _ROLE_HEADING = {
 }
 
 STATE_DIR_REL = ".gtkb-state/bridge-poller/axis-2-surface"
-DISPATCH_STATE_REL = ".gtkb-state/bridge-poller/dispatch-state.json"
 ERRORS_LOG_REL = ".gtkb-state/bridge-poller/axis-2-surface/errors.jsonl"
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
 # (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
@@ -118,57 +118,45 @@ def _log_error(payload: dict[str, Any]) -> None:
         pass
 
 
+def _load_scan_bridge_helper() -> Any:
+    helper_path = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+    spec = importlib.util.spec_from_file_location("_gtkb_axis2_scan_bridge", helper_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"scan helper could not be loaded from {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _compute_actionable_for_role(role_profile: str) -> tuple[str, list[Any]]:
     """Return (signature, actionable_items) for the resolved session role.
 
-    Per Slice 4 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: the AXIS 2
-    surface follows the session-stated role. ``compute_actionable_pending``
-    returns ``(actionable_for_prime, actionable_for_codex)`` (element 0 = Prime
-    GO/NO-GO work; element 1 = Loyal Opposition NEW/REVISED work). This selects
-    the element matching ``role_profile`` and computes the signature over the
-    SELECTED items, so suppression/dismissal keys off the correct role's
-    signature.
+    Per Slice 4 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE, the AXIS 2
+    surface follows the session-stated role. The no-index scanner returns only
+    the selected role-actionable items, so suppression/dismissal keys off the
+    correct role's signature.
 
-    Byte-identical signature scheme to
-    scripts/cross_harness_bridge_trigger.py:_signature for the selected list.
-    Falls back to ("", []) if the bridge index is missing or the canonical
-    parser is unavailable — hook silently no-ops in those degraded states.
+    Signature scheme mirrors scripts/cross_harness_bridge_trigger.py:_signature
+    for the selected list. Falls back to ("", []) if the scanner is unavailable
+    or returns no selected items.
     """
-    index_path = PROJECT_ROOT / "bridge" / "INDEX.md"
-    if not index_path.is_file():
-        return "", []
-    index_text = index_path.read_text(encoding="utf-8")
-
-    # Lazy-import canonical detector/notify so a missing module degrades to
-    # silent no-op rather than crashing the agent.
     try:
-        # Make sure groundtruth_kb is importable in the harness environment.
-        gt_src = PROJECT_ROOT / "groundtruth-kb" / "src"
-        if gt_src.is_dir() and str(gt_src) not in sys.path:
-            sys.path.insert(0, str(gt_src))
-        from groundtruth_kb.bridge.detector import parse_index  # type: ignore
-        from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
+        scanner = _load_scan_bridge_helper()
+        result = scanner.scan(role=role_profile, index_path=PROJECT_ROOT / "bridge" / "versioned-state.md")
     except Exception as exc:
-        _log_error({"event": "canonical_parser_unavailable", "error": str(exc)})
+        _log_error({"event": "no_index_scan_failed", "error": str(exc)})
         return "", []
 
-    try:
-        parse_result = parse_index(index_text, project_root=PROJECT_ROOT)
-        actionable_prime, actionable_codex = compute_actionable_pending(parse_result, project_root=PROJECT_ROOT)
-    except Exception as exc:
-        _log_error({"event": "parse_or_compute_failed", "error": str(exc)})
-        return "", []
-
-    # Slice 4: select the element matching the resolved session role. Element 0
-    # is Prime-actionable (GO/NO-GO); element 1 is Loyal-Opposition-actionable
-    # (NEW/REVISED), per compute_actionable_pending's (prime, codex) contract.
-    items = actionable_prime if role_profile == ROLE_PRIME else actionable_codex
-    # WI-4278 / gtkb-axis-2-dispatchable-filter-004 GO: centrally-computed
-    # `dispatchable=False` suppresses terminal-kind GO entries from this
-    # in-session surface. WI-4548 keeps ADVISORY visible because it is
-    # intentionally non-dispatchable Axis-2 work for interactive Prime review.
+    # Convert scanner dict entries into the tiny attribute shape already used by
+    # the renderer and work-intent claim lookup.
     items = [
-        item for item in items if getattr(item, "dispatchable", True) or getattr(item, "top_status", "") == "ADVISORY"
+        SimpleNamespace(
+            document_name=thread["document"],
+            top_status=thread["latest_status"],
+            top_file=thread["latest_path"],
+            dispatchable=True,
+        )
+        for thread in result.get("actionable", [])
     ]
 
     import hashlib
@@ -276,7 +264,7 @@ def _render_surface(
     for item in items[:10]:  # cap to 10 to keep prompt context bounded
         lines.append(f"| {item.top_status} | {item.document_name} | {item.top_file} |")
     if len(items) > 10:
-        lines.append(f"| … | ({len(items) - 10} more not shown) | (see `bridge/INDEX.md`) |")
+        lines.append(f"| … | ({len(items) - 10} more not shown) | (run bridge scan helper) |")
     if role_profile == ROLE_PRIME:
         available_go_items = [item for item in items if getattr(item, "top_status", "") == "GO"]
         if available_go_items:

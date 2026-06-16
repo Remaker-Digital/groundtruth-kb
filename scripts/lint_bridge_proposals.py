@@ -16,7 +16,7 @@ for _parent in Path(__file__).resolve().parents:
             sys.path.insert(0, str(_gt_src))
         break
 
-from groundtruth_kb.bridge.taxonomy import BridgeKind
+from groundtruth_kb.bridge.taxonomy import BridgeKind  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -69,7 +69,7 @@ def resolve_bridge_file_paths(bridge_id: str | None = None, file_path: Path | No
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--bridge-id", help="Bridge document id from bridge/INDEX.md.")
+    group.add_argument("--bridge-id", help="Bridge document slug from numbered bridge files.")
     group.add_argument("--file", type=Path, help="Explicit bridge file to lint.")
     parser.add_argument("--strict", action="store_true", help="Exit non-zero when any finding is detected.")
     args = parser.parse_args(argv)

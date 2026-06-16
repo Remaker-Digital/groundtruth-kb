@@ -3,7 +3,7 @@
 
 Scans Loyal Opposition advisories under
 ``independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md`` and
-bridge ``ADVISORY`` entries listed in ``bridge/INDEX.md``, and STAGES one
+bridge threads whose latest numbered file is ``ADVISORY``, and STAGES one
 candidate per unhandled advisory on an append-only candidate surface
 (``.gtkb-state/advisory-candidates/candidates.jsonl``) under
 ``GOV-STANDING-BACKLOG-001`` authority.
@@ -39,7 +39,6 @@ import json
 import re
 import sys
 import tomllib
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -54,7 +53,6 @@ RESOLUTION_STATUS = "open"
 DROPBOX_RELATIVE = Path("independent-progress-assessments/CODEX-INSIGHT-DROPBOX")
 INSIGHTS_GLOB = "INSIGHTS-*.md"
 LAST_SCAN_RELATIVE = Path(".gtkb-state/advisory-router/last-scan.json")
-BRIDGE_INDEX_RELATIVE = Path("bridge/INDEX.md")
 RETENTION_CONFIG_RELATIVE = Path("config/governance/advisory-routing-retention.toml")
 
 # Stage 3 (WI-4469, DELIB-20261667 D5): the router no longer auto-promotes
@@ -317,37 +315,49 @@ def collect_dropbox_advisories(project_root: Path, *, since: date | None) -> lis
     return advisories
 
 
-def _iter_bridge_documents(text: str) -> Iterable[tuple[str, list[tuple[str, str]]]]:
-    """Yield (doc_id, [(status, path), ...]) for every Document block in INDEX text."""
-    status_re = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/.+\.md)$")
-    current_id: str | None = None
-    current_versions: list[tuple[str, str]] = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document: "):
-            if current_id is not None:
-                yield current_id, current_versions
-            current_id = line.removeprefix("Document: ").strip()
-            current_versions = []
+VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+BRIDGE_FILE_STATUS_RE = re.compile(r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN|DEFERRED)\b")
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    except OSError:
+        return None
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
             continue
-        match = status_re.match(line)
-        if current_id and match:
-            current_versions.append((match.group(1), match.group(2)))
-    if current_id is not None:
-        yield current_id, current_versions
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _latest_bridge_threads(project_root: Path) -> dict[str, tuple[int, str, str]]:
+    latest: dict[str, tuple[int, str, str]] = {}
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return latest
+    for path in bridge_dir.glob("*.md"):
+        match = VERSIONED_BRIDGE_FILE_RE.match(path.name)
+        if match is None:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        slug = match.group("slug")
+        version = int(match.group("version"))
+        rel_path = path.relative_to(project_root).as_posix()
+        prior = latest.get(slug)
+        if prior is None or version > prior[0]:
+            latest[slug] = (version, status, rel_path)
+    return latest
 
 
 def collect_bridge_advisories(project_root: Path, *, since: date | None) -> list[Advisory]:
-    """Scan bridge/INDEX.md for Document blocks whose latest status is ADVISORY."""
+    """Scan numbered bridge files for threads whose latest status is ADVISORY."""
     advisories: list[Advisory] = []
-    index_path = project_root / BRIDGE_INDEX_RELATIVE
-    if not index_path.is_file():
-        return advisories
-    text = index_path.read_text(encoding="utf-8-sig", errors="replace")
-    for doc_id, versions in _iter_bridge_documents(text):
-        if not versions:
-            continue
-        latest_status, latest_path = versions[0]
+    for doc_id, (_version, latest_status, latest_path) in sorted(_latest_bridge_threads(project_root).items()):
         if latest_status != "ADVISORY":
             continue
         file_path = project_root / latest_path

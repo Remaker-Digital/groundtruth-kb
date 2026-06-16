@@ -11,15 +11,14 @@ from __future__ import annotations
 import argparse
 import re
 import subprocess
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-BRIDGE_INDEX = PROJECT_ROOT / "bridge" / "INDEX.md"
 
 PROPOSAL_STATUSES = {"NEW", "REVISED"}
-STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
 CODEX_VERIFIED_PENDING_RE = re.compile(r"\bCodex\s+VERIFIED\s*\(\s*pending\s*\)", re.IGNORECASE)
 PYTEST_COMMAND_RE = re.compile(r"(?i)(?:^|[`$>]|(?:run|cmd|command):\s*)\s*pytest(?:\s|$)")
 RULE_DOCUMENTATION_RE = re.compile(
@@ -257,33 +256,18 @@ def lint_text(text: str, *, active_hooks_path: object = _RESOLVE_HOOKS_PATH) -> 
     return findings
 
 
-def _parse_index_versions(index_text: str, bridge_id: str) -> list[tuple[str, str]]:
-    versions: list[tuple[str, str]] = []
-    in_doc = False
-    for raw_line in index_text.splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document:"):
-            if in_doc:
-                break
-            in_doc = line.removeprefix("Document:").strip() == bridge_id
-            continue
-        if not in_doc:
-            continue
-        if not line:
-            break
-        match = STATUS_LINE_RE.match(line)
-        if match:
-            versions.append((match.group(1), match.group(2)))
-    return versions
-
-
 def resolve_bridge_proposal_path(bridge_id: str, *, project_root: Path = PROJECT_ROOT) -> Path:
-    index_path = project_root / "bridge" / "INDEX.md"
-    index_text = index_path.read_text(encoding="utf-8")
-    versions = _parse_index_versions(index_text, bridge_id)
-    for status, rel_path in versions:
-        if status in PROPOSAL_STATUSES:
-            return project_root / rel_path
+    gt_src = project_root / "groundtruth-kb" / "src"
+    if gt_src.is_dir() and str(gt_src) not in sys.path:
+        sys.path.insert(0, str(gt_src))
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
+
+    document = scan_expected_documents(project_root).get(bridge_id)
+    if document is not None:
+        for rel_path in reversed(document.files):
+            status = status_from_bridge_file(project_root / rel_path)
+            if status in PROPOSAL_STATUSES:
+                return project_root / rel_path
     fallback = project_root / "bridge" / f"{bridge_id}.md"
     if fallback.is_file():
         return fallback
@@ -307,7 +291,7 @@ def render_report(findings: Iterable[Finding], *, source: Path) -> str:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--bridge-id", help="Bridge document id from bridge/INDEX.md.")
+    source.add_argument("--bridge-id", help="Bridge document slug from numbered bridge files.")
     source.add_argument("--file", type=Path, help="Draft or bridge proposal file to lint.")
     parser.add_argument("--strict", action="store_true", help="Exit non-zero when any finding is detected.")
     return parser

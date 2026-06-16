@@ -85,7 +85,7 @@ class LaneClassificationInput:
     thread. This module does not parse bridge files; it consumes the context.
 
     Fields:
-        latest_status: latest bridge/INDEX status (NEW / REVISED / GO / NO-GO /
+        latest_status: latest bridge lifecycle status (NEW / REVISED / GO / NO-GO /
             VERIFIED), or None if unknown.
         current_bridge_kind: bridge_kind header of the entry's current top
             file, or None.

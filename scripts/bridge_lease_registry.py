@@ -4,7 +4,7 @@
 Slice 2 of the bridge scheduler program (WI-3373; GO at
 ``bridge/gtkb-bridge-scheduler-lanes-leases-slice-2-002.md``). Provides an
 atomic, file-backed, per-document lease so that no two bridge workers process
-or write a verdict for the same ``bridge/INDEX.md`` document concurrently.
+or write a verdict for the same bridge document concurrently.
 
 A lease is a small JSON file at ``<state_dir>/leases/<doc-slug>.lock``.
 Acquisition is atomic via ``os.open`` with ``O_CREAT | O_EXCL``: exactly one
@@ -28,7 +28,7 @@ import re
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 LEASE_SCHEMA_VERSION = 1
@@ -92,7 +92,7 @@ def _lease_path(state_dir: Path | str, doc_slug: str) -> Path:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _read_lease(path: Path) -> dict | None:
@@ -123,7 +123,7 @@ def _is_stale(record: dict, *, now: datetime) -> bool:
     except ValueError:
         return True
     if heartbeat.tzinfo is None:
-        heartbeat = heartbeat.replace(tzinfo=timezone.utc)
+        heartbeat = heartbeat.replace(tzinfo=UTC)
     ttl_raw = record.get("ttl_seconds", DEFAULT_LEASE_TTL_SECONDS)
     try:
         ttl = float(ttl_raw)

@@ -8,9 +8,9 @@ enforcement turns scope mistakes into NO-GO churn.
 
 Per the GO at bridge/gtkb-impl-start-target-paths-preflight-005.md (WI-3380):
 
-- Resolves the latest GO file for ``--bridge-id`` from live ``bridge/INDEX.md``
-  via the canonical ``parse_bridge_index`` / ``bridge_entry`` / ``approved_files_for_go``
-  helpers in ``scripts.implementation_authorization``.
+- Resolves the latest GO file for ``--bridge-id`` from dispatcher-backed bridge
+  state plus numbered bridge files via ``bridge_entry`` /
+  ``approved_files_for_go`` helpers in ``scripts.implementation_authorization``.
 - Reuses ``extract_target_paths()`` from the same module to parse the canonical
   ``target_paths`` JSON metadata line on the approved proposal.
 - Builds the candidate set from explicit ``--candidate-paths``, ``--git-diff``

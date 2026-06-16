@@ -46,7 +46,7 @@ python scripts/wrap_scan_consistency.py --report-format markdown --write-report 
 
 Also inspect:
 
-- TAFE-backed bridge state and dispatcher status/health for latest bridge statuses and any GO/NO-GO/NEW/VERIFIED changes created this session. Do not consult or recreate the retired bridge-index artifact as a live queue source.
+- TAFE-backed bridge state and dispatcher status/health for latest bridge statuses and any GO/NO-GO/NEW/VERIFIED changes created this session. Do not consult or recreate aggregate queue artifacts as live queue sources.
 - `groundtruth.db` through the current `groundtruth_kb` CLI or `KnowledgeDB` helpers for current work item, spec, assertion, and `session_prompts` state.
 - `memory/MEMORY.md` for current status, recent sessions, and quick references.
 - `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` for reports produced this session.
@@ -60,7 +60,7 @@ Use this matrix before editing anything. Every row must be updated, explicitly d
 | --- | --- | --- |
 | Owner decisions, requirements, approvals, rejections | Deliberation Archive, spec intake records, formal-artifact approval packets | Confirm the DA/spec/approval evidence exists or record a blocker. Do not rely on chat recall. |
 | Completed implementation work | MemBase work items/spec status, bridge implementation report, tests/assertions | Reconcile work item/spec state, list changed artifacts, and cite verification evidence. |
-| Bridge state | TAFE-backed bridge state, dispatcher status/health, and versioned bridge files | Ensure proposals, reports, GO/NO-GO, and VERIFIED entries are current and latest-status accurate. Do not consult or recreate the retired bridge-index artifact. |
+| Bridge state | TAFE-backed bridge state, dispatcher status/health, and versioned bridge files | Ensure proposals, reports, GO/NO-GO, and VERIFIED entries are current and latest-status accurate. Do not consult or recreate aggregate queue artifacts. |
 | Future work, unresolved blockers, drift risks | MemBase backlog/current work items or explicit deferred/blocker section | Create or link backlog candidates when authorized; otherwise preserve the candidate and reason. |
 | Session operating state | `memory/MEMORY.md` and wrap summary/report | Update current status, recent session notes, quick references, and known caveats. |
 | Cross-session continuity | `session_prompts` plus the handoff prompt | Insert a self-contained handoff prompt or record why insertion is blocked. |

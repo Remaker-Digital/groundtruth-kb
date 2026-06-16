@@ -3,6 +3,9 @@
 Purpose: one short startup file that makes session behavior deterministic after
 restart.
 
+> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
+> state and status-bearing numbered bridge files are canonical.
+
 ## What To Expect On Restart
 
 These changes take effect automatically when the active AI harness starts in
@@ -40,10 +43,10 @@ this workspace and reads `AGENTS.md`:
   within `E:\GT-KB`; all GT-KB application files must remain within
   `E:\GT-KB\applications\`; Agent Red files must remain within
   `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
-- The file bridge is always available through `bridge/INDEX.md` and must be
-  checked at startup in both Prime Builder and Loyal Opposition roles.
-- The live contents of `bridge/INDEX.md` are the sole authoritative source for
-  bridge queue state. Startup reports, dashboard fields, cached scan counts,
+- The bridge dispatcher and TAFE-backed bridge state must be checked at startup
+  in both Prime Builder and Loyal Opposition roles.
+- TAFE-backed bridge state is the authoritative source for bridge queue state;
+  startup reports, dashboard fields, cached scan counts,
   copied excerpts, summaries, and other derived artifacts are context only and
   must not determine current bridge state.
 - Loyal Opposition has permanent owner authority to diagnose and repair correct
@@ -95,10 +98,12 @@ Optional local environment overrides remain available:
 
 ## Recommended Review-Session Startup
 
-**Phase A - File bridge verification (first priority):**
-1. Read `bridge/INDEX.md`.
-2. Treat the live read as authoritative; do not use cached or generated bridge
-   scan values to determine current state.
+**Phase A - Bridge dispatcher verification (first priority):**
+1. Read TAFE-backed bridge state and run dispatcher status/health when topology,
+   target eligibility, or dispatch health is in question.
+2. Treat TAFE/dispatcher bridge state as authoritative; do not use
+   cached startup reports or generated bridge scan values to
+   determine current state.
 3. Verify the bridge is functioning before ordinary Prime Builder or Loyal
    Opposition work.
 4. If the bridge is not functioning, diagnose and repair bridge files,
@@ -139,7 +144,7 @@ Optional local environment overrides remain available:
 12. In Loyal Opposition mode, include the standard project-state startup
     report after bridge verification:
     - direct `git status --short --branch`
-    - direct `bridge/INDEX.md` latest-status counts and latest `NEW`/`REVISED`
+    - TAFE/dispatcher latest-status counts and latest `NEW`/`REVISED`
       actionability
     - Prime-actionable latest `GO`/`NO-GO` bridge responses for owner context
     - MemBase `current_work_items` status counts
@@ -172,8 +177,9 @@ backlog items, and that executing a consideration item requires owner
 presentation plus AskUserQuestion approval before implementation proposal work.
 Apply only the
 permissions and restrictions for the assigned operating role. Use
-bridge/INDEX.md as the file bridge. Prime Builder acts only on latest `GO` or
-`NO-GO` entries; Loyal Opposition processes latest `NEW` or `REVISED` entries.
+TAFE-backed bridge state and dispatcher status/health for bridge work. Prime
+Builder acts only on latest `GO` or `NO-GO` entries; Loyal Opposition processes
+latest `NEW` or `REVISED` entries.
 ```
 
 ## Read-Only Review Mode Behavior

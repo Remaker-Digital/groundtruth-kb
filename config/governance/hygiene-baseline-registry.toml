@@ -485,7 +485,7 @@ fab_cluster = "FAB-05"
 
 [[findings]]
 id = "HYG-039"
-title = "bridge/INDEX.md has no enforced write path; a gate-bypassing writer corrupted it on 2026-06-10"
+title = "Retired aggregate bridge queue artifact lacked an enforced write path; a gate-bypassing writer corrupted it on 2026-06-10"
 finding_class = "defect"
 impact = "High"
 effort = "Medium"

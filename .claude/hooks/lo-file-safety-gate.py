@@ -15,7 +15,6 @@ Exit: always 0.
 
 from __future__ import annotations
 
-import difflib
 import fnmatch
 import hashlib
 import json
@@ -61,12 +60,6 @@ CONFIG_RELATIVE_PATH = Path("config") / "governance" / "lo-file-safety.toml"
 APPROVAL_ENV_VAR = "GTKB_LO_FILE_SAFETY_APPROVAL_PACKET"
 APPROVAL_PACKET_TYPE = "lo_file_safety_authorization"
 LO_STATUS_TOKENS = frozenset({"NO-GO", "GO", "VERIFIED", "ADVISORY"})
-BRIDGE_INDEX_STATUS_TOKENS = frozenset(
-    {"NEW", "REVISED", "NO-GO", "GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"}
-)
-BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^(?P<status>NO-GO|GO|VERIFIED|ADVISORY):\s+bridge/(?P<slug>.+)-(?P<version>\d{3})\.md\s*$"
-)
 VERSIONED_BRIDGE_PATH_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
 NULL_SINKS = {"nul", "null", "$null", "/dev/null", "2>nul", "2>$null", "2>/dev/null"}
 WRITEISH_COMMAND_RE = re.compile(
@@ -459,48 +452,19 @@ def _packet_allows(tool_input: dict[str, Any], root: Path, rel_path: str, candid
     return _validate_packet(packet, rel_path, candidate_content)
 
 
-def _bridge_index_insert_is_allowed(old_content: str, candidate_content: str) -> tuple[bool, str]:
-    old_lines = old_content.splitlines()
-    new_lines = candidate_content.splitlines()
-    inserted: list[tuple[int, str]] = []
-    matcher = difflib.SequenceMatcher(a=old_lines, b=new_lines, autojunk=False)
-    for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
-        if tag == "equal":
-            continue
-        if tag != "insert":
-            return False, "bridge/INDEX.md edit must only insert one LO status line"
-        inserted.extend((idx, new_lines[idx]) for idx in range(j1, j2))
-    if len(inserted) != 1:
-        return False, "bridge/INDEX.md edit must insert exactly one LO status line"
-    insert_index, line = inserted[0]
-    match = BRIDGE_STATUS_LINE_RE.match(line.strip())
-    if not match:
-        return False, "bridge/INDEX.md insertion must be GO, NO-GO, VERIFIED, or ADVISORY"
-    slug = match.group("slug")
-    document_line = f"Document: {slug}"
-    prior_line = new_lines[insert_index - 1].strip() if insert_index > 0 else ""
-    if prior_line == document_line:
-        return True, ""
-    # Allow insertion below already-present newer LO status only when still inside
-    # the same document block is intentionally rejected; the top line is the queue state.
-    return False, "bridge/INDEX.md LO status line must be inserted at the top of the matching document entry"
+_RETIRED_BRIDGE_AGGREGATE_NAME = "INDEX.md"
+
+
+def _is_retired_bridge_aggregate_path(rel_path: str) -> bool:
+    path = Path(rel_path.replace("\\", "/"))
+    parts = tuple(path.parts)
+    return len(parts) >= 2 and parts[-2].lower() == "bridge" and parts[-1] == _RETIRED_BRIDGE_AGGREGATE_NAME
 
 
 def _bridge_file_decision(change: Change, root: Path, tool_input: dict[str, Any]) -> dict[str, Any]:
     rel = change.rel_path
-    if rel == "bridge/INDEX.md":
-        if change.operation == "Write":
-            return _block("BLOCKED (GTKB-LO-FILE-SAFETY): Loyal Opposition may not full-write bridge/INDEX.md.")
-        if change.candidate_content is None:
-            return _block("BLOCKED (GTKB-LO-FILE-SAFETY): bridge/INDEX.md edit could not be reconstructed.")
-        try:
-            old_content = _read_text(change.abs_path)
-        except OSError:
-            old_content = ""
-        ok, detail = _bridge_index_insert_is_allowed(old_content, change.candidate_content)
-        if ok:
-            return {}
-        return _block(f"BLOCKED (GTKB-LO-FILE-SAFETY): {detail}.")
+    if _is_retired_bridge_aggregate_path(rel):
+        return _block("BLOCKED (GTKB-LO-FILE-SAFETY): retired bridge aggregate files are not live bridge artifacts.")
     if rel.startswith("bridge/") and rel.endswith(".md"):
         if change.operation == "Write" and not change.abs_path.exists() and change.candidate_content is not None:
             first_line = _first_nonblank_line(change.candidate_content)
@@ -525,7 +489,7 @@ def _change_decision(change: Change, root: Path, config: dict[str, Any], tool_in
         )
     if change.operation == "Delete":
         return _block(f"BLOCKED (GTKB-LO-FILE-SAFETY): Loyal Opposition may not delete {rel!r}.")
-    if rel == "bridge/INDEX.md" or (rel.startswith("bridge/") and rel.endswith(".md")):
+    if _is_retired_bridge_aggregate_path(rel) or (rel.startswith("bridge/") and rel.endswith(".md")):
         return _bridge_file_decision(change, root, tool_input)
     if _is_allowlisted(config, rel):
         return {}

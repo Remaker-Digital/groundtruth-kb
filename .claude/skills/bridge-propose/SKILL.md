@@ -8,10 +8,9 @@ safe alternative to persisting proposal bodies through non-Write code
 paths (``file.write_bytes``, ``shutil.copy2``, etc.) that are outside
 the ``scanner-safe-writer`` hook's Write-tool trigger scope.
 
-Authority note: after the 2026-06-15 TAFE/dispatcher cutover,
-the retired bridge-index file must not exist in current GT-KB operation. This
-skill publishes versioned bridge files and dispatcher/TAFE state; agents must
-use dispatcher/TAFE bridge state and `bridge-config` for current authority,
+Authority note: after the 2026-06-15 TAFE/dispatcher cutover, this skill
+publishes versioned bridge files and dispatcher/TAFE state; agents must use
+dispatcher/TAFE bridge state and `bridge-config` for current authority,
 topology, dispatch health, and target-selection claims.
 
 # /gtkb-bridge-propose
@@ -21,8 +20,7 @@ topology, dispatch health, and target-selection claims.
 Takes a topic slug and a proposal body, scans the body against the canonical
 credential catalog (``CREDENTIAL_PATTERNS + BASH_EXTRAS``, PII excluded),
 writes ``bridge/<topic>-001.md``, and records the bridge thread in
-dispatcher/TAFE state without creating or requiring the retired bridge-index
-file.
+dispatcher/TAFE state without creating or requiring aggregate queue artifacts.
 
 **Project-linkage metadata (per ``DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001``)**:
 the proposal body for an implementation-targeting NEW/REVISED proposal MUST
@@ -111,7 +109,7 @@ proposal. The helper remains the canonical bridge write path because it performs
 credential scanning, file-existence checks, and no-index dispatcher/TAFE
 publication. Here "canonical write path" means the current governed helper path
 for bridge file and state publication; it does not create or depend on
-the retired bridge-index file.
+aggregate queue artifacts.
 
 Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
 caller-supplied ``topic_slug``, ``body``, and optional metadata.
@@ -200,13 +198,13 @@ If hits are non-empty, the caller must pass ``mode="abort"`` or
 ``bridge/<topic_slug>-001.md`` is written atomically. If the file
 already exists (for example, from a prior partial attempt with the
 same slug), ``BridgeFileAlreadyExistsError`` is raised before any
-INDEX touch. The skill never silently overwrites.
+state publication. The skill never silently overwrites.
 
 ### Phase 4 — No-index dispatcher/TAFE publication
 
 The ``Document: <topic_slug>`` + ``NEW: bridge/<topic_slug>-001.md``
 state is published through dispatcher/TAFE bridge state without touching
-the retired bridge-index file. If another writer has already published the same
+aggregate queue artifacts. If another writer has already published the same
 topic or state publication fails after the bridge file write, the helper
 surfaces an actionable conflict/error so the caller can retry or repair through
 the governed bridge path.
@@ -220,8 +218,7 @@ the governed bridge path.
   skill refuses to overwrite.
 - ``BridgeIndexConflictError`` — retained historical exception name for
   publication conflicts. In current no-index operation, treat this as a
-  dispatcher/TAFE state-publication conflict; do not recreate
-  the retired bridge-index file.
+  dispatcher/TAFE state-publication conflict.
 - The Phase 0 pre-population stage is non-fatal; failures during
   glossary read, semantic search, or audit-log write are swallowed
   (graceful degradation). The proposal proceeds without pre-populated

@@ -26,7 +26,7 @@ DB_ENV_VAR = "GTKB_WI_COLLISION_DB_PATH"
 WORK_ITEM_RE = re.compile(r"(?im)^Work Item:\s*`?(?P<work_item>[^`\n]+?)`?\s*$")
 ID_RE = re.compile(r"\b(?:GTKB-[A-Z]+-\d+|WI-\d+)\b")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
-INDEX_STATUS_RE = re.compile(r"^(?:NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)$")
+PROPOSAL_STATUSES = {"NEW", "REVISED"}
 
 
 @dataclass(frozen=True)
@@ -115,6 +115,12 @@ def _lookup_work_item(conn: sqlite3.Connection, item_id: str) -> sqlite3.Row | N
     ).fetchone()
 
 
+def _ensure_groundtruth_importable(project_root: Path) -> None:
+    gt_src = project_root / "groundtruth-kb" / "src"
+    if gt_src.is_dir() and str(gt_src) not in sys.path:
+        sys.path.insert(0, str(gt_src))
+
+
 def check_content(
     text: str,
     declared_wi: str | None = None,
@@ -163,23 +169,18 @@ def format_markdown(result: CollisionResult) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _read_index_target(bridge_id: str, *, project_root: Path = PROJECT_ROOT) -> Path:
-    index_path = project_root / "bridge" / "INDEX.md"
-    text = index_path.read_text(encoding="utf-8")
-    in_doc = False
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document:"):
-            in_doc = line.removeprefix("Document:").strip() == bridge_id
-            continue
-        if not in_doc:
-            continue
-        if not line:
-            break
-        match = INDEX_STATUS_RE.match(line)
-        if match:
-            return project_root / match.group(1)
-    raise FileNotFoundError(f"No bridge document found in INDEX for {bridge_id!r}")
+def _read_bridge_target(bridge_id: str, *, project_root: Path = PROJECT_ROOT) -> Path:
+    _ensure_groundtruth_importable(project_root)
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
+
+    document = scan_expected_documents(project_root).get(bridge_id)
+    if document is None:
+        raise FileNotFoundError(f"No numbered bridge document found for {bridge_id!r}")
+    for rel_path in reversed(document.files):
+        status = status_from_bridge_file(project_root / rel_path)
+        if status in PROPOSAL_STATUSES:
+            return project_root / rel_path
+    return project_root / document.files[-1]
 
 
 def _content_from_args(args: argparse.Namespace) -> str:
@@ -188,13 +189,13 @@ def _content_from_args(args: argparse.Namespace) -> str:
     if args.content_file:
         return Path(args.content_file).read_text(encoding="utf-8")
     if args.bridge_id:
-        return _read_index_target(args.bridge_id).read_text(encoding="utf-8")
+        return _read_bridge_target(args.bridge_id).read_text(encoding="utf-8")
     raise SystemExit("One of --bridge-id, --content-file, or --stdin is required.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bridge-id", help="Bridge document name from bridge/INDEX.md.")
+    parser.add_argument("--bridge-id", help="Bridge document slug from numbered bridge files.")
     parser.add_argument("--content-file", type=Path, help="Path to proposal content to scan.")
     parser.add_argument("--stdin", action="store_true", help="Read proposal content from stdin.")
     parser.add_argument("--declared-wi", help="Override the declared Work Item metadata.")

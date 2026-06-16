@@ -1,7 +1,10 @@
 # File Bridge Protocol
 
-The bridge between Prime Builder and Loyal Opposition uses a shared directory
-of versioned markdown files governed by a single index file.
+The bridge between Prime Builder and Loyal Opposition uses dispatcher/TAFE
+bridge state plus a shared directory of versioned markdown audit files.
+
+> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
+> state and status-bearing numbered bridge files are canonical.
 
 ## Directory
 
@@ -66,7 +69,7 @@ python scripts/implementation_authorization.py begin --bridge-id <document-name>
 ```
 
 The resulting packet is session-local implementation-scope evidence. It must be
-derived from live `bridge/INDEX.md`, the approved proposal file, and the GO
+derived from TAFE-backed bridge state, the approved proposal file, and the GO
 verdict file. It expires, fails closed on bridge status drift, and cannot
 replace formal-artifact approval packets.
 
@@ -84,7 +87,7 @@ Before writing or revising any bridge proposal at
    always-blocking cross-cutting bridge-governance set).
 3. Cite every triggered required + advisory spec in the proposal's
    `Specification Links` section.
-4. After drafting (and before filing or after editing the INDEX entry), run:
+4. After drafting and before filing, run:
 
    ```
    python scripts/bridge_applicability_preflight.py --bridge-id <intended-bridge-id>
@@ -93,7 +96,7 @@ Before writing or revising any bridge proposal at
    The expected result is `preflight_passed: true`,
    `missing_required_specs: []`, `missing_advisory_specs: []`. Any non-empty
    `missing_*_specs` list is a self-detected defect; revise the proposal before
-   INDEX update or before re-saving the file.
+   filing or before re-saving the file.
 
 5. Record the resulting `packet_hash` from the preflight output in the proposal
    as evidence of self-check (optional but recommended for auditability).
@@ -102,10 +105,9 @@ Loyal Opposition (Codex) MUST issue NO-GO on any bridge proposal whose
 preflight on its own operative file does not pass. Codex's NO-GO message must
 include the offending `missing_*_specs` list.
 
-The catch-22 case (preflight requires INDEX entry to know the operative file):
-if the INDEX entry doesn't yet exist, manually grep the draft text against the
-`applies_when_*` patterns in `config/governance/spec-applicability.toml`. After
-filing the INDEX entry, run the preflight once and revise if it fails.
+If the preflight cannot resolve the intended operative file from dispatcher/TAFE
+state and the numbered bridge file chain, treat that as a tooling defect and
+repair the resolver before relying on the result.
 
 This subsection operationalizes
 `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` (proposal must cite all
@@ -232,22 +234,12 @@ Examples:
 - `widget-refactor-002.md` (Loyal Opposition review with GO or NO-GO)
 - `widget-refactor-003.md` (Prime's revision after NO-GO)
 
-## Index File
+## Bridge State Publication
 
-`bridge/INDEX.md` is the single coordination file. Both agents read and write
-it. Format:
-
-```
-Document: {descriptive-name}
-{STATUS}: bridge/{descriptive-name}-{NNN}.md
-{STATUS}: bridge/{descriptive-name}-{NNN}.md
-...
-```
-
-Each document entry starts with a `Document:` line followed by one or more
-versioned file lines. The latest version is always at the top of the version
-list within each entry. New document entries are inserted at the top of the
-index file (after the header comments).
+After the WI-4510 Phase-3 cutover, TAFE-backed bridge state is the canonical
+coordination state. New bridge writes must go through the governed bridge
+writer path, which publishes dispatcher/TAFE state and writes the status-bearing
+numbered bridge file.
 
 ## Statuses
 
@@ -267,7 +259,7 @@ Versioned bridge files (`bridge/<slug>-NNN.md`) MUST begin with a canonical
 status token on the first non-blank line: one of `NEW`, `REVISED`, `GO`,
 `NO-GO`, `VERIFIED`, `ADVISORY`, `DEFERRED`, or `WITHDRAWN`. Headings and prose
 follow the token. This keeps each bridge file self-describing and makes the
-first line a reliable routing signal independent of `bridge/INDEX.md`.
+first line a reliable routing signal.
 
 The rule is mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`
 (activated byte-for-byte from
@@ -276,10 +268,9 @@ versioned bridge file whose first non-blank line is not a recognized status
 token is hard-blocked. The rule fires only on the `Write` tool (full file
 content); `Edit` operations are not subject to it. Files that already exist on
 disk with a non-canonical first line are grandfathered, so the rule never
-retroactively breaks historical bridge files on overwrite. `bridge/INDEX.md`
-and non-versioned bridge markdown are exempt. `WITHDRAWN` remains an accepted
-canonical token because it is used throughout `bridge/INDEX.md` as a terminal
-status.
+retroactively breaks historical bridge files on overwrite. Non-versioned bridge
+markdown is outside the dispatchable numbered-file chain. `WITHDRAWN` remains
+an accepted canonical token where it appears as a terminal status.
 
 Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 (`DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`; GO at
@@ -305,7 +296,7 @@ drafts.
 
 A `DEFERRED` entry MUST be recorded as both:
 
-1. an indexed status line, `DEFERRED: bridge/<slug>-NNN.md`; and
+1. dispatcher/TAFE lifecycle state for the thread; and
 2. a versioned bridge file whose first non-blank line is exactly `DEFERRED`.
 
 The `DEFERRED` file MUST include:
@@ -322,62 +313,49 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 ## Prime Workflow
 
-1. Write the proposal as `bridge/{name}-001.md`
-2. Open `bridge/INDEX.md` and insert a new entry at the top:
-   ```
-   Document: {name}
-   NEW: bridge/{name}-001.md
-   ```
+1. Write the proposal as `bridge/{name}-001.md` through the governed bridge
+   writer path
+2. Let the governed writer publish TAFE-backed bridge state.
 3. Continue working on other tasks
-4. Periodically scan the index for GO, NO-GO, or ADVISORY responses; GO and NO-GO are dispatchable implementation/revision work, ADVISORY is interactive-only disposition work (non-dispatchable). Skip DEFERRED, WITHDRAWN, and VERIFIED as non-actionable.
+4. Periodically scan TAFE/dispatcher bridge state for GO, NO-GO, or ADVISORY
+   responses; GO and NO-GO are dispatchable implementation/revision work,
+   ADVISORY is interactive-only disposition work (non-dispatchable). Skip
+   DEFERRED, WITHDRAWN, and VERIFIED as non-actionable.
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
-   incremented version, and insert a REVISED line at the top of that entry:
-   ```
-   Document: {name}
-   REVISED: bridge/{name}-003.md
-   NO-GO: bridge/{name}-002.md
-   NEW: bridge/{name}-001.md
-   ```
+   incremented version, and use the governed writer to publish a REVISED state.
 
 ## Loyal Opposition Workflow
 
-1. Periodically scan the index for NEW or REVISED entries; skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal Opposition review work.
-2. Process entries starting from the oldest (bottom of the index)
+1. Periodically scan TAFE/dispatcher bridge state for NEW or REVISED entries;
+   skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal
+   Opposition review work.
+2. Process entries starting from the oldest actionable item.
 3. Read the indicated file and perform the review
 4. Save review findings as a new version with incremented number
-5. Insert the verdict line at the top of that entry's version list:
-   ```
-   GO: bridge/{name}-002.md
-   NEW: bridge/{name}-001.md
-   ```
-   or:
-   ```
-   NO-GO: bridge/{name}-002.md
-   NEW: bridge/{name}-001.md
-   ```
+5. Use the governed writer to publish the verdict state for that thread.
 
 ## Post-Implementation Verification
 
 After Prime implements a GO'd proposal:
 1. Prime saves a post-implementation report as a new version with incremented number
-2. Prime inserts a NEW line at the top of that entry
+2. Prime uses the governed writer to publish a NEW verification-request entry
 3. Loyal Opposition reviews and responds with VERIFIED or NO-GO
 
-## Index Maintenance
+## Bridge State Maintenance
 
-When `INDEX.md` exceeds ~200 lines, the agent inserting a new entry may remove
-the oldest entries from the bottom of the file. Archived entries and their
-corresponding bridge files remain on disk for historical reference.
+Dispatcher/TAFE state is maintained by the governed bridge writer/reconcile
+path. Archived entries and their corresponding bridge files remain on disk for
+historical reference.
 
 ## Guardrails
 
 - Both agents must read the full entry (all versions) before acting on any
   single version
 - Never delete bridge files — they form the audit trail
-- If both agents write to INDEX.md simultaneously, the second writer must
-  re-read and merge (simple append conflict resolution)
-- The index is the source of truth for workflow state — not the files themselves
+- Use the governed bridge writer/reconcile path for state repair rather than
+  hand-merging coordination data.
+- TAFE-backed bridge state is the source of truth for workflow state.
 
 ## Mandatory Owner Decisions / Input Section Gate
 
@@ -408,11 +386,11 @@ The discipline does not mandate any specific type; it requires the choice to be 
 
 Per `bridge/gtkb-governance-hygiene-bundle-001.md` (Change D; rationale: S333 audit FINDING-P4-001 — `bridge/gtkb-isolation-018-slice-c-docs-cluster-001.md` was committed at `cd8f27ce` without an INDEX entry, which the bridge applicability preflight tool legitimately surfaces as `ERR_NO_INDEX_ENTRY`):
 
-A bridge file MAY be committed without an INDEX entry when the commit message tags it as a parked draft (e.g., `... 18.C draft parked`). The applicability preflight tool returns `ERR_NO_INDEX_ENTRY` for such files; that is expected behavior and not a defect.
+A bridge file MAY be committed without becoming dispatcher-actionable when the commit message tags it as a parked draft (e.g., `... 18.C draft parked`). The applicability preflight tool should report such files as non-actionable drafts rather than live queue work.
 
 Parked drafts are deliberate work-in-progress artifacts that must NOT trigger Loyal Opposition review until they are promoted by:
 
-1. Adding an INDEX entry with status `NEW` or `REVISED`.
+1. Publishing dispatcher/TAFE state with status `NEW` or `REVISED`.
 2. The promotion commit message explicitly states `<bridge-id>: parked draft promoted to <status>`.
 
 Audits SHOULD identify parked drafts in their inventory phase but MUST NOT flag them as orphans without checking the originating commit message for the `parked` tag.

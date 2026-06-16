@@ -77,7 +77,7 @@ def resolve_safe_path(path: str | os.PathLike[str], *, root: Path | None = None)
     """Resolve a (possibly relative) path against the GT-KB root and bound-check it.
 
     Relative paths are joined to the resolved root before resolution, so a
-    callsite that says ``resolve_safe_path("bridge/INDEX.md")`` always lands
+    callsite that says ``resolve_safe_path("bridge/<thread>-001.md")`` always lands
     inside the root regardless of the current working directory.
     """
 

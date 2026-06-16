@@ -4,13 +4,8 @@ Per ``SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001`` acceptance criterion #2:
 "The component validates the requested switch against the authoritative
 role, bridge, and session-state artifacts before writing durable state."
 
-The bridge-artifact validator mirrors the canonical bridge parser's status
-vocabulary from ``scripts/bridge_applicability_preflight.py:32`` —
-``{NEW, REVISED, GO, NO-GO, VERIFIED, WITHDRAWN, ADVISORY, DEFERRED}`` — and does NOT
-require referenced-file existence on disk (historical INDEX entries may
-legitimately reference moved or removed files; that is bridge hygiene, not
-mode-switch safety, per Codex NO-GO at bridge ``-007`` F1 closed by
-REVISED-3 at ``-008``).
+The bridge-artifact validator mirrors the canonical bridge status vocabulary
+and checks status-bearing numbered files directly.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights
 reserved.
@@ -27,11 +22,8 @@ BRIDGE_STATUS_TOKENS = frozenset(
     {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY", "DEFERRED", "ACCEPTED", "BLOCKED"}
 )
 
-_BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s+(bridge/\S+\.md)\s*$"
-)
-_BRIDGE_STATUS_SHAPED_LINE_RE = re.compile(r"^([A-Z][A-Z\-]+):\s+bridge/\S+\.md\s*$")
-_DOCUMENT_LINE_RE = re.compile(r"^Document:\s+\S")
+_BRIDGE_FILE_RE = re.compile(r"^.+-\d{3}\.md$")
+_BRIDGE_STATUS_TOKEN_RE = re.compile(r"^[#>*\-\s`]*([A-Z][A-Z\-]*)\b")
 
 
 @dataclass(frozen=True)
@@ -107,53 +99,47 @@ def validate_role_artifact(project_root: Path) -> ValidationResult:
 
 
 def validate_bridge_artifact(project_root: Path) -> ValidationResult:
-    """Validate ``bridge/INDEX.md``.
-
-    Parse-clean rule:
-    1. ``bridge/INDEX.md`` exists and is readable.
-    2. The file contains at least one ``Document: <name>`` entry (signal that
-       the bridge protocol is alive).
-    3. Every status line that matches the bridge-status pattern uses a token
-       from ``BRIDGE_STATUS_TOKENS``.
-    4. Lines that do NOT match the bridge-status shape are ignored (commentary,
-       HTML comments, blank lines, headings). Same forgiveness pattern as the
-       canonical preflight script.
-
-    Does NOT validate file-existence of referenced bridge files; historical
-    INDEX entries may reference relocated or removed files, and that is a
-    separate hygiene concern out of scope for mode-switch safety.
-    """
+    """Validate the status-bearing numbered bridge-file chain."""
     axis = "bridge"
-    path = project_root / "bridge" / "INDEX.md"
-    if not path.exists():
-        return _fail(axis, f"bridge artifact missing: {path}")
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        return _fail(axis, f"bridge artifact unreadable: {exc}")
-    has_document_entry = False
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return _fail(axis, f"bridge directory missing: {bridge_dir}")
+    checked_files = 0
     bad_status_tokens: list[str] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
+    unreadable: list[str] = []
+    missing_status: list[str] = []
+    for path in sorted(bridge_dir.glob("*.md")):
+        if not _BRIDGE_FILE_RE.match(path.name):
             continue
-        if _DOCUMENT_LINE_RE.match(stripped):
-            has_document_entry = True
+        checked_files += 1
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            unreadable.append(f"{path.name}: {exc}")
             continue
-        if _BRIDGE_STATUS_LINE_RE.match(stripped):
-            continue
-        shaped = _BRIDGE_STATUS_SHAPED_LINE_RE.match(stripped)
-        if shaped:
-            token = shaped.group(1)
-            if token not in BRIDGE_STATUS_TOKENS:
-                bad_status_tokens.append(token)
-    if not has_document_entry:
-        return _fail(axis, "bridge artifact contains no 'Document:' entry")
+        token: str | None = None
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = _BRIDGE_STATUS_TOKEN_RE.match(stripped)
+            token = match.group(1) if match else None
+            break
+        if token is None:
+            missing_status.append(path.name)
+        elif token not in BRIDGE_STATUS_TOKENS:
+            bad_status_tokens.append(token)
+    if checked_files == 0:
+        return _fail(axis, "bridge directory contains no numbered bridge files")
+    if unreadable:
+        return _fail(axis, f"bridge files unreadable: {sorted(unreadable)}")
+    if missing_status:
+        return _fail(axis, f"bridge files missing status tokens: {sorted(missing_status)}")
     if bad_status_tokens:
         unique_bad = sorted(set(bad_status_tokens))
         return _fail(
             axis,
-            f"bridge artifact contains unknown status tokens: {unique_bad}",
+            f"bridge files contain unknown status tokens: {unique_bad}",
         )
     return _ok(axis)
 

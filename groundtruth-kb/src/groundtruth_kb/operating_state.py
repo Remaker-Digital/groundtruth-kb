@@ -228,9 +228,9 @@ def _probe_chroma(root: Path, config: GTConfig) -> tuple[str, str, str, dict[str
 
 
 def _probe_bridge(root: Path) -> tuple[str, str, str, dict[str, Any]]:
-    index = root / "bridge" / "INDEX.md"
-    if not index.exists():
-        return "UNKNOWN", "bridge/INDEX.md not found", str(index), {}
+    bridge_dir = root / "bridge"
+    if not bridge_dir.exists():
+        return "UNKNOWN", "bridge directory not found", str(bridge_dir), {}
     snapshot = collect_bridge_status(root)
     queue = snapshot.queue
     status = "WARN" if queue.parse_error_count else "PASS"
@@ -240,7 +240,7 @@ def _probe_bridge(root: Path) -> tuple[str, str, str, dict[str, Any]]:
             f"{queue.threads} bridge thread(s); Prime actionable={len(queue.prime_actionable)}; "
             f"Loyal Opposition actionable={len(queue.loyal_opposition_actionable)}"
         ),
-        str(index),
+        str(bridge_dir),
         queue.to_json_dict(top_n=10),
     )
 
@@ -390,7 +390,7 @@ def _probe_system_interface_map(root: Path) -> tuple[str, str, str, dict[str, An
         else ""
     )
     backlog_ok = backlog is not None and all(
-        token in backlog_text for token in ("current_work_items", "work_items", "bridge/INDEX.md")
+        token in backlog_text for token in ("current_work_items", "work_items", "versioned bridge")
     )
     status = "PASS" if companion.exists() and backlog_ok else "WARN"
     companion_state = "present" if companion.exists() else "missing"

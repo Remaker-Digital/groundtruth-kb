@@ -56,6 +56,7 @@ SPEC_ID_RE = re.compile(r"\b(?:ADR|APP|DCL|DOC|GOV|OM|PB|SPEC)-[A-Z0-9][A-Z0-9_.
 DELIB_ID_RE = re.compile(r"\bDELIB-[A-Z0-9][A-Z0-9_.-]*\b")
 SESSION_RE = re.compile(r"^Session:\s*(?P<session>\S+)", re.MULTILINE)
 TARGET_PATHS_RE = re.compile(r"target_paths:\s*(?P<paths>\[[^\n]+\])")
+BRIDGE_NUMBERED_FILE_RE = re.compile(r"^[A-Za-z0-9_.-]+-\d{3}\.md$")
 
 
 def _project_root() -> Path:
@@ -204,7 +205,7 @@ def _session_bridge_target_paths(project_root: Path, session_id: str | None) -> 
     target_paths: list[str] = []
     documents: list[str] = []
     for path in bridge_dir.glob("*.md"):
-        if path.name == "INDEX.md":
+        if not BRIDGE_NUMBERED_FILE_RE.match(path.name):
             continue
         try:
             text = path.read_text(encoding="utf-8")

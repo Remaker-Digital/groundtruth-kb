@@ -476,7 +476,7 @@ def test_derive_paired_hook_id_strips_prefix_and_event_suffix() -> None:
     )
 
 
-def test_settings_hook_registration_turn_marker_file_missing_is_fail(tmp_path: Path) -> None:
+def test_settings_hook_registration_gov09_file_missing_is_fail(tmp_path: Path) -> None:
     """§B.4 case 1: bridge profile, hook file missing → ``fail``."""
     reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
     result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
@@ -486,7 +486,7 @@ def test_settings_hook_registration_turn_marker_file_missing_is_fail(tmp_path: P
     assert "gov09-capture.py" in result.message
 
 
-def test_settings_hook_registration_turn_marker_file_present_empty_event_is_warning(
+def test_settings_hook_registration_gov09_file_present_empty_event_is_warning(
     tmp_path: Path,
 ) -> None:
     """§B.4 case 2: hook file present, ``hooks['UserPromptSubmit']`` empty → ``warning``."""
@@ -512,7 +512,7 @@ def test_settings_hook_registration_owner_decision_present_and_registered_is_pas
 
 
 def test_settings_hook_registration_wrong_event_location_is_warning(tmp_path: Path) -> None:
-    """§B.4 case 4: turn-marker entry appears in ``PreToolUse`` instead of ``UserPromptSubmit``
+    """§B.4 case 4: gov09-capture entry appears in ``PreToolUse`` instead of ``UserPromptSubmit``
     → ``warning`` (the event-correct location is what's checked)."""
     reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
     _touch_hook_file(tmp_path, reg.hook_filename)

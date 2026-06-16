@@ -55,17 +55,13 @@ def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "tes
         "GO\n\n# Loyal Opposition Review\n\nVerdict: GO\n",
         encoding="utf-8",
     )
-    lines = [
-        "# Bridge Index\n\n",
-        f"Document: {slug}\n",
-        f"{latest_status}: bridge/{slug}-002.md\n",
-        f"NEW: bridge/{slug}-001.md\n",
-        "\n",
-        "Document: test-impl-report-extra\n",
-        "GO: bridge/test-impl-report-extra-002.md\n",
-        "NEW: bridge/test-impl-report-extra-001.md\n",
-    ]
-    (bridge_dir / "INDEX.md").write_text("".join(lines), encoding="utf-8")
+    if latest_status != "GO":
+        (bridge_dir / f"{slug}-002.md").write_text(
+            f"{latest_status}\n\n# Loyal Opposition Review\n\nVerdict: {latest_status}\n",
+            encoding="utf-8",
+        )
+    (bridge_dir / "test-impl-report-extra-001.md").write_text("NEW\n\n# Extra Proposal\n", encoding="utf-8")
+    (bridge_dir / "test-impl-report-extra-002.md").write_text("GO\n\n# Extra Review\n", encoding="utf-8")
     return bridge_dir
 
 
@@ -122,20 +118,15 @@ def test_latest_go_thread_produces_dry_run_plan(helper, tmp_path):
     assert "GOV-FILE-BRIDGE-AUTHORITY-001" in plan.linked_specs
 
 
-def test_write_mode_creates_report_and_inserts_new_line(helper, tmp_path):
+def test_write_mode_creates_report_without_index_mutation(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
 
     live = helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
     assert live == bridge_dir / "test-impl-report-003.md"
     assert live.exists()
-    index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
-    assert (
-        "Document: test-impl-report\n"
-        "NEW: bridge/test-impl-report-003.md\n"
-        "GO: bridge/test-impl-report-002.md\n"
-        "NEW: bridge/test-impl-report-001.md\n"
-    ) in index
+    assert live.read_text(encoding="utf-8").lstrip().startswith("NEW")
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
 def test_missing_bridge_kind_refuses_report(helper, tmp_path):
@@ -215,55 +206,25 @@ def test_credential_content_aborts_before_live_mutation(helper, tmp_path):
         helper.file_report("test-impl-report", content=content, bridge_dir=bridge_dir)
 
     assert not (bridge_dir / "test-impl-report-003.md").exists()
-    assert "NEW: bridge/test-impl-report-003.md" not in (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
-def test_unrelated_index_change_during_write_is_merged(helper, tmp_path, monkeypatch):
+def test_unrelated_bridge_file_does_not_block_versioned_write(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
-    original_insert = helper.insert_index_status
-
-    def mutate_index_then_insert(slug, version, status, project_root, *, expected_index_raw=None):
-        (bridge_dir / "INDEX.md").write_text(
-            (expected_index_raw or "") + "\nDocument: other\nNEW: bridge/other-001.md\n", encoding="utf-8"
-        )
-        return original_insert(
-            slug,
-            version,
-            status,
-            project_root,
-            expected_index_raw=expected_index_raw,
-        )
-
-    monkeypatch.setattr(helper, "insert_index_status", mutate_index_then_insert)
+    (bridge_dir / "other-001.md").write_text("NEW\n\n# Other thread\n", encoding="utf-8")
 
     helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
-    index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
-    assert "NEW: bridge/test-impl-report-003.md" in index
-    assert "Document: other\nNEW: bridge/other-001.md" in index
+    assert (bridge_dir / "test-impl-report-003.md").exists()
+    assert (bridge_dir / "other-001.md").exists()
+    assert not (bridge_dir / "INDEX.md").exists()
 
 
-def test_same_document_index_change_during_write_is_detected(helper, tmp_path, monkeypatch):
+def test_latest_status_change_before_write_is_detected(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
-    original_insert = helper.insert_index_status
+    (bridge_dir / "test-impl-report-003.md").write_text("NO-GO\n\n# Later review\n", encoding="utf-8")
 
-    def mutate_index_then_insert(slug, version, status, project_root, *, expected_index_raw=None):
-        changed = (expected_index_raw or "").replace(
-            "Document: test-impl-report\nGO: bridge/test-impl-report-002.md\n",
-            "Document: test-impl-report\nNO-GO: bridge/test-impl-report-009.md\nGO: bridge/test-impl-report-002.md\n",
-        )
-        (bridge_dir / "INDEX.md").write_text(changed, encoding="utf-8")
-        return original_insert(
-            slug,
-            version,
-            status,
-            project_root,
-            expected_index_raw=expected_index_raw,
-        )
-
-    monkeypatch.setattr(helper, "insert_index_status", mutate_index_then_insert)
-
-    with pytest.raises(helper.BridgeIndexConflictError):
+    with pytest.raises(helper.BridgeLatestStatusError):
         helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
 
@@ -271,28 +232,18 @@ def test_file_mode_uses_validated_bridge_writer(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
     calls: list[tuple[str, object]] = []
 
-    def fake_validate(slug, status, role_slot, project_root):
-        calls.append(("validate", (slug, status, role_slot, project_root)))
-
     def fake_write(slug, version, content, project_root, *, require_author_metadata=True):
         calls.append(("write", (slug, version, require_author_metadata, content.startswith("NEW"), project_root)))
         return project_root / "bridge" / f"{slug}-{version:03d}.md"
 
-    def fake_insert(slug, version, status, project_root, *, expected_index_raw=None):
-        calls.append(("insert", (slug, version, status, expected_index_raw is not None, project_root)))
-
-    monkeypatch.setattr(helper, "validate_transition", fake_validate)
     monkeypatch.setattr(helper, "write_bridge_file", fake_write)
-    monkeypatch.setattr(helper, "insert_index_status", fake_insert)
 
     helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
-    assert [call[0] for call in calls] == ["validate", "write", "insert"]
-    assert calls[0][1][1] == "NEW"
-    assert calls[0][1][2] == helper.PRIME_ROLE_SLOT
-    assert calls[1][1][2] is False
-    assert calls[2][1][2] == "NEW"
-    assert calls[2][1][3] is True
+    assert [call[0] for call in calls] == ["write"]
+    assert calls[0][1][1] == 3
+    assert calls[0][1][2] is False
+    assert calls[0][1][3] is True
 
 
 def test_file_report_preserves_content_file_mtime(helper, tmp_path):

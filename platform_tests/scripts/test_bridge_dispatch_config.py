@@ -9,12 +9,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
-from groundtruth_kb.bridge_dispatch_config import (
+from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     collect_bridge_dispatch_status,
     load_bridge_dispatch_config,
     select_dispatch_candidates,
 )
-from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text
+from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

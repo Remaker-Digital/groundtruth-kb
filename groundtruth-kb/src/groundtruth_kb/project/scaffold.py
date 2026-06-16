@@ -320,7 +320,7 @@ def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none
                 "AGENTS.md",
                 ".claude/settings.local.json",
                 ".claude/settings.json",
-                "bridge/INDEX.md",
+                "bridge/.gitkeep",
             }
         )
         # Codex bootstrap files copied from the GT-KB templates dir. These
@@ -597,48 +597,6 @@ def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: st
     (approvals_dir / ".gitkeep").write_text("", encoding="utf-8")
 
 
-def _generate_bridge_index(project_name: str) -> str:
-    """Generate the initial bridge/INDEX.md content.
-
-    Args:
-        project_name: Human-readable project name used in the header.
-
-    Returns:
-        UTF-8 string content for ``bridge/INDEX.md``.
-    """
-    return """\
-# {{PROJECT_NAME}} — File Bridge Index
-
-<!-- This file is the single coordination artifact for the Prime Builder ↔
-     Loyal Opposition file bridge. Both agents read and write this file.
-     Newest entries are at the top. -->
-
-## Statuses
-
-| Status | Set by | Meaning |
-|--------|--------|---------|
-| NEW | Prime | Fresh proposal awaiting review |
-| REVISED | Prime | Updated proposal after a NO-GO |
-| GO | Codex | Proposal approved for implementation |
-| NO-GO | Codex | Proposal requires changes before approval |
-| VERIFIED | Codex | Post-implementation verification passed |
-
-## Prime Workflow
-
-1. Write proposal as `bridge/{{name}}-001.md`
-2. Insert `NEW: bridge/{{name}}-001.md` at the top of this file
-3. On GO: implement; on NO-GO: revise and insert REVISED entry
-
-## Codex Workflow
-
-1. Scan this file for NEW or REVISED entries
-2. Review the indicated file, write response as next incremented version
-3. Insert GO or NO-GO verdict line at the top of that document entry
-
-<!-- Add new document entries below this line -->
-"""
-
-
 def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
     """Copy dual-agent templates: AGENTS.md, bridge rules, Codex bootstrap."""
     templates = get_templates_dir()
@@ -733,13 +691,11 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
         gi.write_text(content + addition, encoding="utf-8")
         content = gi.read_text(encoding="utf-8")
 
-    # bridge/INDEX.md — the coordination file for the file bridge workflow
+    # Bridge audit directory. Queue state is dispatcher/TAFE plus numbered
+    # status-bearing bridge files; fresh scaffolds do not create a queue file.
     bridge_dir = target / "bridge"
     bridge_dir.mkdir(parents=True, exist_ok=True)
-    (bridge_dir / "INDEX.md").write_text(
-        _generate_bridge_index(project_name),
-        encoding="utf-8",
-    )
+    (bridge_dir / ".gitkeep").write_text("", encoding="utf-8")
 
     # .claude/skills/ — dual-agent-only Phase A skills (decision-capture).
     _copy_skill_templates(target)
@@ -923,7 +879,7 @@ def _render_all_templates(
         "{{REVIEWER}}": ("codex (Loyal Opposition)" if profile.includes_bridge else "owner"),
         "{{NOTES}}": "Replace with your actual collaboration topology.",
         "{{PATH_TO_ENTRYPOINT}}": (
-            "bridge/INDEX.md + cross-harness event-driven trigger" if profile.includes_bridge else "TBD"
+            "gt bridge dispatch + status-bearing bridge files" if profile.includes_bridge else "TBD"
         ),
         "{{WHAT_IT_DOES}}": (
             "File bridge queue for Prime Builder and Loyal Opposition review handoffs"
@@ -943,16 +899,14 @@ def _render_all_templates(
         "{{SCHEDULE}}": "Event-driven on tool-use; manual fallback via 'Bridge' prompt",
         "{{EXECUTOR}}": "claude -p / codex exec invoked by the cross-harness event-driven trigger",
         "{{SOURCE}}": ("Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json"),
-        "{{FAILURE_SIGNAL}}": "No dispatch-state updates after INDEX changes",
-        "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (
-            "File-based latest-status queue in bridge/INDEX.md. Entries are newest-first."
-        ),
+        "{{FAILURE_SIGNAL}}": "No dispatch-state updates after new bridge versions",
+        "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": ("Dispatcher-backed latest-status queue over numbered bridge files."),
         "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": (
             "Latest NEW/REVISED entries require Loyal Opposition verdicts; latest GO/NO-GO entries "
             "require Prime responses."
         ),
         "{{WHEN_TO_RETRY}}": "Scheduled re-scan after the next interval; lock files prevent overlapping runs.",
-        "{{STARTUP_OR_LIVENESS_CHECK}}": ("Read bridge/INDEX.md, scheduler state, and recent scan logs."),
+        "{{STARTUP_OR_LIVENESS_CHECK}}": ("Run bridge dispatch health and scan versioned bridge files."),
         "{{WHEN_RESTARTS_ARE_ALLOWED_OR_AVOIDED}}": (
             "No long-running bridge process is required; update scheduled tasks after scanner or prompt changes."
         ),
@@ -1041,7 +995,7 @@ approval from the owner.
 - **Output:** evidence-based reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
 
 ## Startup Checklist
-1. Run file bridge sweep: check bridge/INDEX.md for latest NEW or REVISED entries
+1. Run file bridge sweep: scan versioned bridge files for latest NEW or REVISED entries
 2. Read project CLAUDE.md and MEMORY.md
 3. Report operating state to Prime Builder
 

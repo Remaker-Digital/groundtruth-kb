@@ -14,9 +14,10 @@ Loyal Opposition agents over the file bridge.
 - Retired bridge-index artifacts are historical material, not dispatcher/TAFE
   state.
 - Bridge documents under `bridge/` are the auditable exchange artifacts.
-- Entries in the generated compatibility view are newest-first.
+- Dispatcher/TAFE bridge state provides the latest actionable status for each
+  document; no generated bridge-index artifact is part of current operation.
 - Only the latest status for each document entry is actionable.
-- The archived SQLite/MCP bridge runtime is legacy compatibility code and must
+- The archived SQLite/MCP bridge runtime is historical legacy code and must
   not be used as the active coordination channel for new projects.
 
 ## Status Semantics

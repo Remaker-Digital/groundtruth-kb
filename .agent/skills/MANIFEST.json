@@ -26,21 +26,28 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "05e9437146154003ad1ded365c5bdd26de236b4f8eca0c0423e568cb66ebcffe"
+      "source_sha256": "dc785dfda73bd4899cec3a827e5e96c76b3f2fa1a4e2bebb419cea4e91a74fdd"
+    },
+    {
+      "adapter_relative_path": ".agent/skills/bridge-config/SKILL.md",
+      "canonical_name": "bridge-config",
+      "capability_id": "skill.bridge-config",
+      "source_relative_path": ".claude/skills/bridge-config/SKILL.md",
+      "source_sha256": "9c674fade46e95b76bf877f059253ddac687aba75d54eb3c054399b6f83d58a3"
     },
     {
       "adapter_relative_path": ".agent/skills/bridge-propose/SKILL.md",
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
-      "source_sha256": "cb6046fae5c3a7bf213949ce107473ffa64b5b4a92c8141e412f4faed13d22c2"
+      "source_sha256": "cdfe7bb7020fe0b55209bd684c5390ee0b86decd792743cfb2c63498136edf8e"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-propose/SKILL.md",
       "canonical_name": "gtkb-propose",
       "capability_id": "skill.gtkb-propose",
       "source_relative_path": ".claude/skills/gtkb-propose/SKILL.md",
-      "source_sha256": "232c63d2e46920548916f83128141a4da7c539c30625441582cbf3531adf27a6"
+      "source_sha256": "7eb0ff541b66aad979a2a21db5dd7307f148fd9146bcf38f38f094c0e21a8b56"
     },
     {
       "adapter_relative_path": ".agent/skills/check-deliberations/SKILL.md",
@@ -124,7 +131,7 @@
       "canonical_name": "kb-session-wrap",
       "capability_id": "skill.kb-session-wrap",
       "source_relative_path": ".claude/skills/kb-session-wrap/SKILL.md",
-      "source_sha256": "1d2e1c036f55192598d1cb9398ec41cf9db5b6ea26de8db272a1f2fbe3728de5"
+      "source_sha256": "923283300faa3f1d42b6096cf1455e3393a1dadf03e7831e20fd8817a5dddfff"
     },
     {
       "adapter_relative_path": ".agent/skills/kb-session-wrap-scan/SKILL.md",
@@ -152,7 +159,7 @@
       "canonical_name": "projects",
       "capability_id": "skill.projects",
       "source_relative_path": ".claude/skills/projects/SKILL.md",
-      "source_sha256": "298b3106476065f3fb494c964f1c0fedca9e31ba03d3d986912c995e5185d139"
+      "source_sha256": "0ca28e18fbb6331cb19c0c04a3c69b0b1ce3045d1afaa92a5dcbc91a6c95f155"
     },
     {
       "adapter_relative_path": ".agent/skills/proposal-review/SKILL.md",
@@ -173,7 +180,7 @@
       "canonical_name": "send-review",
       "capability_id": "skill.send-review",
       "source_relative_path": ".claude/skills/send-review/SKILL.md",
-      "source_sha256": "aabc50277cdd5a39dab45dda2ef3c30f1826364f23ac1e50ced37276031814c6"
+      "source_sha256": "ff37ea3c5c0b56a4c9608de0016c1af564764a3b64324833714b7e97d680975e"
     },
     {
       "adapter_relative_path": ".agent/skills/spec-intake/SKILL.md",
@@ -208,14 +215,14 @@
       "canonical_name": "gtkb-hygiene-investigation",
       "capability_id": "skill.gtkb-hygiene-investigation",
       "source_relative_path": ".claude/skills/gtkb-hygiene-investigation/SKILL.md",
-      "source_sha256": "3db7a0a246f6df7c58f2044f11063b1b49a1053063ba6cbe3543281f3698533e"
+      "source_sha256": "58a49132e0384ae2d277ce7e3f88cd27a21a4cb324a84bbf580b1a888aac8a86"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-hygiene-sweep/SKILL.md",
       "canonical_name": "gtkb-hygiene-sweep",
       "capability_id": "skill.gtkb-hygiene-sweep",
       "source_relative_path": ".claude/skills/gtkb-hygiene-sweep/SKILL.md",
-      "source_sha256": "329f8572a5ce6bfde46bd8092804d4307709803c34d710a56a7c63c93b671145"
+      "source_sha256": "d65ec1a4203431a380235dd8fdfb2b62a8152f676d4838964074d6f09bae4e97"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-sweep-commit/SKILL.md",
@@ -229,14 +236,14 @@
       "canonical_name": "loyal-opposition-hygiene-assessment",
       "capability_id": "skill.loyal-opposition-hygiene-assessment",
       "source_relative_path": ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md",
-      "source_sha256": "d3b8ae0fc1c463166806c7303c3aeb54c5d1c37fc825b802fce7be37fae6fbcf"
+      "source_sha256": "c817927d765d25f1ba58c4bc6e8d3779c7c15177ae8d87ae13e0abcf1138a705"
     },
     {
       "adapter_relative_path": ".agent/skills/verify/SKILL.md",
       "canonical_name": "gtkb-verify",
       "capability_id": "skill.verify",
       "source_relative_path": ".claude/skills/verify/SKILL.md",
-      "source_sha256": "79e049e16bba42fbda373b7ee52be9f42b5d3b580445be39ea8edfcfb8abe400"
+      "source_sha256": "c913ade9a666389eb4b53a717567046173aa89499da83153312aa855baea8d8f"
     }
   ],
   "generated_by": "scripts/generate_antigravity_skill_adapters.py",

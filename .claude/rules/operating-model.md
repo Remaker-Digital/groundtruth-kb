@@ -93,7 +93,7 @@ The terms below have canonical meanings in GT-KB. Allowed synonyms appear in par
 This artifact describes the operating model the platform is designed to embody. Some described capabilities are fully implemented; others are intended-but-incomplete. This section maps current capability state. Per `OM-DELTA-0030` discipline: claims about platform capabilities must distinguish implemented surfaces from intended surfaces.
 
 **Fully implemented (as of 2026-04-30):**
-- Bridge protocol (NEW / REVISED / GO / NO-GO / VERIFIED plus ADVISORY / DEFERRED / WITHDRAWN non-actionable states with `bridge/INDEX.md`).
+- Bridge protocol (NEW / REVISED / GO / NO-GO / VERIFIED plus ADVISORY / DEFERRED / WITHDRAWN non-actionable states with dispatcher/TAFE state and numbered bridge files).
 - MemBase (`groundtruth.db`) with append-only/versioned governed records.
 - Deliberation Archive (table + ChromaDB semantic index).
 - Smart-poller with kind-aware routing and single-instance lock (per `gtkb-bridge-poller-001` umbrella).

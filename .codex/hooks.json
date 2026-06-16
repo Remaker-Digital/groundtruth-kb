@@ -11,15 +11,15 @@
           },
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --project-root E:\\GT-KB --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --max-items 999",
-            "statusMessage": "Ensuring single-harness bridge automation",
-            "timeout": 15
-          },
-          {
-            "type": "command",
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\session_start_dispatch.py",
             "statusMessage": "Preparing GT-KB startup orientation",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --project-root E:\\GT-KB",
+            "statusMessage": "Reconciling single-harness bridge automation",
+            "timeout": 10
           }
         ]
       }
@@ -269,28 +269,6 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python E:\\GT-KB\\.claude\\hooks\\bridge-index-write-serializer.py",
-            "statusMessage": "Guarding bridge/INDEX.md atomic writes (WI-4481)",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "apply_patch",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python E:\\GT-KB\\.claude\\hooks\\bridge-index-write-serializer.py",
-            "statusMessage": "Guarding bridge/INDEX.md atomic writes (WI-4481)",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -321,14 +299,14 @@
           },
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-            "statusMessage": "Cross-harness bridge trigger",
-            "timeout": 5
+            "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
+            "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
+            "timeout": 10
           },
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
-            "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
+            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Checking cross-harness bridge dispatch",
             "timeout": 10
           }
         ]
@@ -344,14 +322,14 @@
           },
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-            "statusMessage": "Cross-harness bridge trigger",
-            "timeout": 5
+            "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
+            "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
+            "timeout": 10
           },
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
-            "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
+            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Checking cross-harness bridge dispatch",
             "timeout": 10
           }
         ]
@@ -375,20 +353,20 @@
           {
             "type": "command",
             "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
-            "statusMessage": "Cross-harness bridge Stop reconciliation",
-            "timeout": 5
+            "statusMessage": "Checking cross-harness bridge dispatch",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --dispatch-now --max-items 999 --project-root E:\\GT-KB",
+            "statusMessage": "Reconciling single-harness bridge automation",
+            "timeout": 10
           },
           {
             "type": "command",
             "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
             "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --dispatch-now --project-root E:\\GT-KB --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --max-items 999",
-            "statusMessage": "Single-harness bridge dispatch",
-            "timeout": 15
           },
           {
             "type": "command",

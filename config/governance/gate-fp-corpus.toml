@@ -19,8 +19,8 @@ command = 'python scripts/implementation_authorization.py begin --bridge-id gtkb
 note = 'relative scripts/... mis-read as out-of-root /implementation_authorization.py (this session)'
 
 [[bash_parser_pass]]
-command = 'wc -l bridge/INDEX.md'
-note = 'relative bridge/INDEX.md (this session)'
+command = 'wc -l bridge/gtkb-example-001.md'
+note = 'relative numbered bridge file (this session)'
 
 [[bash_parser_pass]]
 command = 'python -m pytest platform_tests/scripts/'
@@ -57,11 +57,11 @@ note = 'MSYS /c/ translated to C:\Users\... -> out of root'
 # --- Cross-harness directive surfaces (FAB-14 re-scope) ---
 
 [[powershell_parser_pass]]
-command = 'Get-Content bridge/INDEX.md'
+command = 'Get-Content bridge/gtkb-example-001.md'
 note = 'Claude PowerShell matcher routes command text through the same root-boundary parser without false-blocking in-root relative paths'
 
 [[codex_apply_patch_pass]]
-path = 'bridge/INDEX.md'
+path = 'bridge/gtkb-example-001.md'
 note = 'Codex apply_patch adapter treats in-root patch targets as allowed'
 
 [[codex_apply_patch_block]]

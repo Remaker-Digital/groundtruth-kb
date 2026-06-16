@@ -169,6 +169,12 @@ def _write_index(root: Path, body: str) -> None:
 def _write_bridge_file(root: Path, name: str, body: str = "# placeholder\n") -> None:
     """Create a referenced bridge file so ``compute_actionable_pending`` keeps it."""
     stripped = body.lstrip()
+    if stripped and not stripped.startswith(("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "WITHDRAWN")):
+        if name.endswith("-001.md"):
+            body = "NEW\n\n" + body
+        elif name.endswith("-002.md"):
+            body = "GO\n\n" + body
+        stripped = body.lstrip()
     if "author_session_context_id:" not in body and not stripped.startswith(("GO", "NO-GO", "VERIFIED")):
         body = body.rstrip() + "\nauthor_session_context_id: fixture-author-session\n"
     (root / "bridge" / name).write_text(body, encoding="utf-8")
@@ -2619,6 +2625,191 @@ def test_ollama_loyal_opposition_dispatch_caps_selected_batch_to_one(
     rec = state["recipients"]["loyal-opposition"]
     assert rec["pending_count"] == 3
     assert rec["selected_count"] == 1
+
+
+def test_lo_provider_failure_backoff_falls_back_after_max_turn_marker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4556: a same-signature Ollama max-turn failure backs off D and selects F."""
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"], "max_items": 1}},
+                reviewer_precedence=10,
+            ),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=20,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "D"
+
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    stderr_path = runs_dir / "prior-ollama.stderr.log"
+    stderr_path.write_text("ollama_harness: max-turn exhaustion before final assistant text\n", encoding="utf-8")
+    stdout_path = runs_dir / "prior-ollama.stdout.log"
+    stdout_path.write_text("", encoding="utf-8")
+
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    d_state = state["recipients"]["loyal-opposition:D"]
+    signature = d_state["last_dispatched_signature"]
+    launch = {
+        "dispatch_id": "prior-ollama",
+        "recipient": "loyal-opposition:D",
+        "launched": True,
+        "launched_at": (datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        "stdout_path": str(stdout_path),
+        "stderr_path": str(stderr_path),
+        "signature": signature,
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["example-thread"],
+        "primary_bridge_id": "example-thread",
+        "exit_code": 1,
+        "exit_code_processed": True,
+    }
+    for key in ("loyal-opposition:D", "loyal-opposition"):
+        state["recipients"][key]["failure_count"] = 1
+        state["recipients"][key]["last_result"] = "launched"
+        state["recipients"][key]["last_launch"] = dict(launch)
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+    fallback = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = fallback["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "F"
+    assert result["fallback_skipped_candidates"] == [
+        {
+            "recipient": "loyal-opposition:D",
+            "needed_role_label": "loyal-opposition",
+            "harness_id": "D",
+            "command_handle": "ollama",
+            "reviewer_precedence": 10,
+            "reason": "provider_failure_backoff_active",
+            "failure_class": "max_turn_exhaustion",
+        }
+    ]
+    assert fallback["dispatch_state"]["recipients"]["loyal-opposition:D"]["last_result"] == (
+        "provider_failure_backoff_active"
+    )
+    failures = _failure_records(state_dir)
+    assert any(
+        record.get("reason") == "previous_launch_failed"
+        and record.get("matched_markers", [{}])[0].get("label") == "max_turn_exhaustion"
+        for record in failures
+    )
+
+
+def test_lo_exit_zero_without_verdict_backs_off_and_falls_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4556: exit-0 worker completion without a bridge verdict is a failure."""
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"], "max_items": 1}},
+                reviewer_precedence=10,
+            ),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=20,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "D"
+
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    dispatch_id = "prior-no-verdict"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stdout_path.write_text("final prose without bridge verdict\n", encoding="utf-8")
+    stderr_path.write_text("", encoding="utf-8")
+
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    d_state = state["recipients"]["loyal-opposition:D"]
+    signature = d_state["last_dispatched_signature"]
+    launch = {
+        "dispatch_id": dispatch_id,
+        "recipient": "loyal-opposition:D",
+        "launched": True,
+        "pid": 12345,
+        "launched_at": (datetime.now(UTC) + timedelta(seconds=5)).isoformat(),
+        "stdout_path": str(stdout_path),
+        "stderr_path": str(stderr_path),
+        "signature": signature,
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["example-thread"],
+        "primary_bridge_id": "example-thread",
+    }
+    for key in ("loyal-opposition:D", "loyal-opposition"):
+        state["recipients"][key]["last_result"] = "launched"
+        state["recipients"][key]["last_launch"] = dict(launch)
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+    fallback = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = fallback["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "F"
+    assert result["fallback_skipped_candidates"] == [
+        {
+            "recipient": "loyal-opposition:D",
+            "needed_role_label": "loyal-opposition",
+            "harness_id": "D",
+            "command_handle": "ollama",
+            "reviewer_precedence": 10,
+            "reason": "provider_failure_backoff_active",
+            "failure_class": "no_verdict_produced",
+        }
+    ]
+    failures = _failure_records(state_dir)
+    assert any(record.get("reason") == "no_verdict_produced" for record in failures)
 
 
 def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(

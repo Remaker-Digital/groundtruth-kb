@@ -344,9 +344,9 @@ def _start_wrapper_errors(wrapper_path: Path) -> list[str]:
             )
     if "--role-profile" in text:
         errors.append("Codex SessionStart hook dispatcher must discover the role profile instead of forcing one")
-    if "Startup First-Response Directive" in text or "_live_bridge_index_context" in text:
+    if "Startup First-Response Directive" in text or ("_live_bridge" in text and "_context" in text):
         errors.append("Codex SessionStart hook dispatcher must not assemble startup content in the adapter")
-    if "SHA-256" in text or "Mandatory Direct Live Bridge Index Read" in text:
+    if "SHA-256" in text or "Mandatory Direct Live Bridge" in text:
         errors.append("Codex SessionStart hook dispatcher must not embed bridge excerpts or hashes")
     return errors
 

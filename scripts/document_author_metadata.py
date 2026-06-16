@@ -61,7 +61,7 @@ DEFAULT_GOVERNED_SURFACES: tuple[str, ...] = (
     "docs/**/*.md",
 )
 DEFAULT_EXCLUSIONS: tuple[str, ...] = (
-    "bridge/INDEX.md",
+    "bridge/README.md",
     ".claude/worktrees/**",
     ".gtkb-state/**",
     "archive/**",

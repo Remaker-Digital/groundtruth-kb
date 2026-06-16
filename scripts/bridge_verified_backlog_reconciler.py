@@ -23,7 +23,7 @@ from groundtruth_kb.db import (  # noqa: E402
     WORK_ITEM_TERMINAL_RESOLUTION_STATUSES,
 )
 
-BRIDGE_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN):\s+(bridge/\S+)")
+BRIDGE_FILE_STATUS_RE = re.compile(r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN)\b")
 BRIDGE_PATH_RE = re.compile(r"(?:^|\b)bridge/([A-Za-z0-9_.-]+?)-\d{3}\.md(?:\b|$)")
 VERSIONED_MD_RE = re.compile(r"^([A-Za-z0-9_.-]+?)-\d{3}\.md$")
 TOKEN_SPLIT_RE = re.compile(r"[,;\r\n]+")
@@ -45,26 +45,44 @@ REPAIR_CHANGE_REASON = (
 )
 
 
-def parse_latest_bridge_statuses(index_text: str) -> dict[str, dict[str, str]]:
-    """Return the latest status row for each document in bridge/INDEX.md."""
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
 
-    latest: dict[str, dict[str, str]] = {}
-    current_document: str | None = None
-    for raw_line in index_text.splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document: "):
-            current_document = line.split(": ", 1)[1].strip()
+
+def collect_latest_bridge_statuses(project_root: Path) -> dict[str, dict[str, str]]:
+    """Return the latest status row for each numbered bridge-file thread."""
+
+    latest: dict[str, tuple[int, str, str]] = {}
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return {}
+    for path in bridge_dir.glob("*.md"):
+        match = VERSIONED_MD_RE.match(path.name)
+        if match is None:
             continue
-        if current_document is None or current_document in latest:
+        slug = match.group(1)
+        version_match = re.search(r"-(\d{3})\.md$", path.name)
+        if version_match is None:
             continue
-        match = BRIDGE_STATUS_RE.match(line)
-        if match:
-            latest[current_document] = {
-                "status": match.group(1),
-                "path": match.group(2),
-            }
-            current_document = None
-    return latest
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        rel_path = path.relative_to(project_root).as_posix()
+        version = int(version_match.group(1))
+        prior = latest.get(slug)
+        if prior is None or version > prior[0]:
+            latest[slug] = (version, status, rel_path)
+    return {slug: {"status": status, "path": rel_path} for slug, (_version, status, rel_path) in sorted(latest.items())}
 
 
 def _flatten_related_value(value: Any) -> list[str]:
@@ -135,7 +153,7 @@ def _bridge_thread_files(project_root: Path, slug: str) -> list[Path]:
     return sorted((project_root / "bridge").glob(f"{slug}-*.md"))
 
 
-def build_work_item_bridge_index(
+def build_work_item_bridge_links(
     project_root: Path,
     bridge_statuses: dict[str, dict[str, str]],
 ) -> dict[str, list[str]]:
@@ -331,16 +349,14 @@ def reconcile(
     *,
     project_root: Path = PROJECT_ROOT,
     db_path: Path | None = None,
-    bridge_index: Path | None = None,
     apply: bool = False,
     repair_overbroad: bool = False,
 ) -> dict[str, Any]:
     root = project_root.resolve()
-    index_path = bridge_index or root / "bridge" / "INDEX.md"
     database_path = db_path or root / "groundtruth.db"
 
-    bridge_statuses = parse_latest_bridge_statuses(index_path.read_text(encoding="utf-8"))
-    derived_links = build_work_item_bridge_index(root, bridge_statuses)
+    bridge_statuses = collect_latest_bridge_statuses(root)
+    derived_links = build_work_item_bridge_links(root, bridge_statuses)
     db = KnowledgeDB(database_path)
     resolved_ids: list[str] = []
     reopened_ids: list[str] = []
@@ -414,7 +430,7 @@ def reconcile(
     return {
         "project_root": str(root),
         "db_path": str(database_path),
-        "bridge_index": str(index_path),
+        "bridge_state": str(root / "bridge"),
         "mode": mode,
         "bridge_document_count": len(bridge_statuses),
         "candidate_count": len(inventory),
@@ -471,13 +487,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--db-path", type=Path)
-    parser.add_argument("--bridge-index", type=Path)
     args = parser.parse_args(argv)
 
     summary = reconcile(
         project_root=args.project_root,
         db_path=args.db_path,
-        bridge_index=args.bridge_index,
         apply=args.apply,
         repair_overbroad=args.repair_overbroad,
     )

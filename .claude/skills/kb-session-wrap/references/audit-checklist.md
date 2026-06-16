@@ -19,7 +19,7 @@ Every 5th session is an audit session. Add these checks to the standard knowledg
 ## 3. Bridge Closure
 
 - Read TAFE-backed bridge state and dispatcher status/health. Do not consult or
-  recreate the retired bridge-index artifact as a live bridge source.
+  recreate aggregate queue artifacts as live bridge sources.
 - Identify latest `NEW`, `REVISED`, `GO`, `NO-GO`, and unverified post-implementation entries relevant to this session.
 - Confirm implementation reports and VERIFIED entries exist for completed bridge-backed work.
 - Create a blocker entry when bridge closure cannot be completed during wrap.

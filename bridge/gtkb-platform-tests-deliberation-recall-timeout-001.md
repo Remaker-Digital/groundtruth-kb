@@ -1,0 +1,194 @@
+NEW
+
+# GT-KB Bridge Implementation Proposal - platform_tests deliberation recall timeout
+
+bridge_kind: prime_proposal
+Document: gtkb-platform-tests-deliberation-recall-timeout
+Version: 001 (NEW; implementation proposal)
+Author: Prime Builder (Codex, harness A)
+Date: 2026-06-16 UTC
+
+author_identity: prime-builder/codex
+author_harness_id: A
+author_session_context_id: codex-platform-tests-deliberation-recall-timeout-20260616
+author_model: gpt-5-codex
+author_model_version: 5
+author_model_configuration: Codex desktop interactive session; Prime Builder
+
+Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING
+Project: PROJECT-GTKB-RELIABILITY-FIXES
+Work Item: WI-4595
+
+target_paths: ["platform_tests/scripts/test_benchmark_deliberation_recall.py", "scripts/benchmarks/deliberation_recall.py"]
+
+implementation_scope: source
+requires_review: true
+requires_verification: true
+kb_mutation_in_scope: false
+Recommended commit type: fix:
+
+---
+
+## Summary
+
+The June 15 hygiene assessment identified the `platform_tests` timeout path in
+`platform_tests/scripts/test_benchmark_deliberation_recall.py`: the test calls
+`scripts/benchmarks/deliberation_recall.py::run(...)` against the live GT-KB
+workstation MemBase, and that benchmark calls `KnowledgeDB.search_deliberations`
+for each sampled owner conversation. On this workstation that path can enter
+slow or hanging ChromaDB/ONNX semantic embedding work, so a nominal platform
+unit test becomes dependent on a large live derived index and is not bounded.
+
+This proposal makes the benchmark test path deterministic and bounded while
+preserving the public benchmark entry point
+`run(window_start, window_end, project_root)`. The intended fix is to stop
+`platform_tests` from invoking live semantic search implicitly and make the
+benchmark's default read-only search path deterministic over SQLite MemBase
+rows, with any live semantic/Chroma mode left as explicit exploratory behavior
+outside the platform unit-test lane.
+
+## Proposed Change
+
+- Update `scripts/benchmarks/deliberation_recall.py` so the default `run(...)`
+  path uses bounded SQLite queries against `groundtruth.db` only:
+  - sample rows with `ORDER BY changed_at DESC, id DESC LIMIT SAMPLE_SIZE`;
+  - resolve recall candidates with a deterministic LIKE/text-match helper over
+    authoritative deliberation fields, capped by `TOP_K`;
+  - compute the same `BenchmarkResult` fields and dimension keys already used
+    by callers: `sample_size`, `hits_at_3`, and `search_failure_rate`;
+  - keep the current function signature valid for existing callers.
+- If live semantic search is retained, make it opt-in through an explicit
+  keyword argument or environment switch so normal platform tests and benchmark
+  smoke tests never invoke ChromaDB/ONNX by accident.
+- Update `platform_tests/scripts/test_benchmark_deliberation_recall.py` to use
+  a temporary, minimal SQLite fixture instead of the live repository root for
+  the core assertions. The fixture should contain enough deliberation rows to
+  exercise hit, miss, empty-window, idempotency, and output-writing behavior.
+- Add a regression assertion that the platform test path does not call
+  `KnowledgeDB.search_deliberations` / live semantic embedding.
+
+Out of scope:
+
+- Repairing ChromaDB index corruption, stale HNSW segments, or general semantic
+  search fallback behavior. Those remain covered by related deliberation-search
+  work items such as WI-4568.
+- Schema migrations, production deploys, hook registration changes, or broad
+  benchmark-suite rewrites.
+- Mutating MemBase records during implementation. `groundtruth.db` was touched
+  only before this proposal to capture `WI-4595`, `TEST-11162`, and the active
+  project membership needed by the bridge metadata gate.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001` - protected platform test/source edits require
+  a live bridge GO, implementation-start packet, and append-only proposal
+  history.
+- `GOV-RELIABILITY-FAST-LANE-001` - the change is a small reliability defect
+  fix for a failing/unbounded local test path, with source/test mutation only.
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` - the owner-requested hygiene finding
+  has been preserved as `WI-4595` with linked test `TEST-11162`.
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` - this proposal
+  links the governing requirements before requesting implementation.
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` - this proposal cites the
+  active project, active work item, and active project authorization that bound
+  the requested implementation.
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` - verification must execute
+  the focused benchmark test slice and report exact commands/results before
+  Loyal Opposition can mark the work VERIFIED.
+
+## Prior Deliberations
+
+- `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-15-16-12-LO-HYGIENE-ASSESSMENT-overview.md`
+  - identifies the exact `platform_tests` timeout path and recommends making
+  deliberation recall deterministic/bounded rather than exercising live
+  ChromaDB/ONNX embedding in the platform lane.
+- `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-15-16-18-LO-HYGIENE-ASSESSMENT-advisory.md`
+  - repeats the same timeout-path finding as a Prime-facing hygiene action.
+- `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-14-21-20-antigravity-infrastructure-verification-advisory.md`
+  - earlier advisory evidence that the individual deliberation recall benchmark
+  can be slow because it searches a large live `groundtruth.db` through
+  ChromaDB/ONNX.
+- `WI-4453`, `WI-4561`, `WI-4568`, and `WI-4519` - related deliberation-search
+  reliability history. This proposal is narrower: it bounds the platform
+  benchmark test path and does not attempt general semantic-index repair.
+
+## Owner Decisions / Input
+
+Mike's current-thread directive on 2026-06-16 was: "Start bridge proposal for
+the platform_tests deliberation recall timeout path." That directive is enough
+to file this proposal and capture the supporting reliability work item. It does
+not authorize source edits by itself; source edits still require Loyal
+Opposition GO plus a matching implementation-start packet.
+
+No additional owner decision is required before Loyal Opposition review because
+the requested scope is bounded to two source/test files, uses the standing
+reliability fast-lane project authorization, and excludes schema/deployment and
+credential lifecycle work.
+
+## Requirement Sufficiency
+
+Existing requirements sufficient - the combination of
+`GOV-RELIABILITY-FAST-LANE-001`, `GOV-FILE-BRIDGE-AUTHORITY-001`,
+`DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`, and
+`DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` is enough to implement and
+verify this bounded reliability fix. No new requirement is needed before
+implementation.
+
+## Spec-Derived Verification Plan
+
+| Spec / governing surface | Verification command or evidence required |
+| --- | --- |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Before protected edits, run `python scripts/bridge_claim_cli.py claim gtkb-platform-tests-deliberation-recall-timeout` and `python scripts/implementation_authorization.py begin --bridge-id gtkb-platform-tests-deliberation-recall-timeout`; report the live claim and packet hash. |
+| `GOV-RELIABILITY-FAST-LANE-001` | Confirm the final diff is limited to `platform_tests/scripts/test_benchmark_deliberation_recall.py` and `scripts/benchmarks/deliberation_recall.py`, with no schema, deploy, hook-registration, or credential lifecycle changes. |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | Report that `WI-4595`, `TEST-11162`, and `PWM-PROJECT-GTKB-RELIABILITY-FIXES-WI-4595` remain present and active/current after implementation. |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` / `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | `python scripts/bridge_applicability_preflight.py --bridge-id gtkb-platform-tests-deliberation-recall-timeout` and `python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-platform-tests-deliberation-recall-timeout` must remain clean for the filed bridge thread. |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Execute the focused test and benchmark slice commands below and record exact observed results in the implementation report. |
+
+Required focused commands after implementation:
+
+```text
+groundtruth-kb\.venv\Scripts\python.exe -m pytest -o addopts='' --basetemp .gtkb-state\pytest-deliberation-recall platform_tests\scripts\test_benchmark_deliberation_recall.py -q --tb=short
+```
+
+Expected result: all tests in
+`platform_tests/scripts/test_benchmark_deliberation_recall.py` pass quickly on
+this workstation without invoking live ChromaDB/ONNX search.
+
+```text
+groundtruth-kb\.venv\Scripts\python.exe -m pytest -o addopts='' --basetemp .gtkb-state\pytest-benchmark-slice platform_tests\scripts\test_benchmark_versions_per_landed_change.py platform_tests\scripts\test_benchmark_tool_identification.py platform_tests\scripts\test_benchmark_recall_coverage.py platform_tests\scripts\test_benchmark_linkage_heatmap.py platform_tests\scripts\test_benchmark_deliberation_recall.py platform_tests\scripts\test_benchmark_assertion_signal_noise.py platform_tests\scripts\test_benchmark_advisory_latency.py -q --tb=short
+```
+
+Expected result: the benchmark-platform slice passes, proving the deliberation
+recall fix did not regress the sibling benchmark tests.
+
+```text
+groundtruth-kb\.venv\Scripts\python.exe -m ruff check platform_tests\scripts\test_benchmark_deliberation_recall.py scripts\benchmarks\deliberation_recall.py
+groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check platform_tests\scripts\test_benchmark_deliberation_recall.py scripts\benchmarks\deliberation_recall.py
+```
+
+Expected result: lint and format checks pass for the touched files, or any
+pre-existing environment/tooling limitation is disclosed with exact output.
+
+## Risk / Rollback
+
+Risk is limited to benchmark semantics: replacing implicit semantic search with
+a deterministic SQLite default could change the measured recall value. That is
+acceptable for the platform test lane because the canonical benchmark
+definition requires deterministic read-only measurement. If live semantic
+measurement is retained, it must be explicit and outside the unit-test path.
+
+Rollback is a normal revert of the two target files and this bridge thread's
+implementation report. Do not delete the captured `WI-4595` / `TEST-11162`
+history; if the proposal is rejected, close or supersede the work item through
+normal MemBase workflow instead of rewriting history.
+
+## Bridge Filing
+
+This proposal is filed under `bridge/` as the first status-bearing numbered
+bridge file for `gtkb-platform-tests-deliberation-recall-timeout`; no prior
+version is deleted or rewritten. Dispatcher/TAFE state plus the numbered file
+chain are the live workflow state per `GOV-FILE-BRIDGE-AUTHORITY-001`.
+
+---
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

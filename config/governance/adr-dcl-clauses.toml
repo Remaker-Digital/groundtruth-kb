@@ -64,17 +64,17 @@ waiver_policy = "explicit_owner_waiver_required_in_bridge"
 enforcement_mode = "blocking"
 
 [[clauses]]
-clause_id = "GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-INDEX-IS-CANONICAL"
+clause_id = "GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL"
 spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
-description = "bridge/INDEX.md is the canonical workflow state; both agents must trust INDEX over any other signal; bridge files are append-only audit trail."
+description = "Dispatcher/TAFE state plus status-bearing numbered bridge files are canonical workflow state; numbered bridge files are the append-only audit trail."
 applies_when_path = ["bridge/**"]
 applies_when_doc_name = []
 applies_when_content = [
-    "(?i)\\b(?:bridge/INDEX\\.md|INDEX entry|INDEX update|append[- ]only)\\b",
+    "(?i)\\b(?:dispatcher|TAFE|numbered bridge files?|versioned bridge files?|append[- ]only)\\b",
 ]
-evidence_required = "Bridge artifact filed under bridge/ with INDEX.md entry of correct status; no deletion or rewrite of prior versions."
-evidence_pattern = "(?i)(?:bridge/INDEX\\.md|INDEX update|insert.+top of.+(?:INDEX|entry))"
-failure_condition = "Implementation deletes a prior bridge file, mutates an existing INDEX entry's prior versions, or claims VERIFIED without an INDEX entry."
+evidence_required = "Bridge artifact filed as the next numbered file under bridge/ with correct status; no deletion or rewrite of prior versions."
+evidence_pattern = "(?i)(?:bridge/.+-\\d{3}\\.md|numbered bridge files?|versioned bridge files?|append[- ]only)"
+failure_condition = "Implementation deletes a prior bridge file, mutates an existing version's prior content, or claims VERIFIED without a status-bearing numbered bridge file."
 severity = "blocking"
 waiver_policy = "explicit_owner_waiver_required_in_bridge"
 enforcement_mode = "blocking"

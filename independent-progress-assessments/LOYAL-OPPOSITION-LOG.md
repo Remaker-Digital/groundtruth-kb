@@ -535,3 +535,13 @@ Loyal Opposition (Antigravity/lo role) completed a regression audit on the full 
 |------|---------|-------------------|------------------|--------|
 | Technical | The full test suite reports 25 failures out of 4,480 tests on `develop` due to schema drift from TAFE tables, canonical rules narrative packet mismatch (resolved 2026-06-15), and host harness-role conflicts in mock paths. | platform_tests/unit/test_knowledge_db_artifacts.py (missing TAFE tables/views); platform_tests/scripts/test_ollama_governance_artifacts.py (narrative packet mismatch resolved by updating `.groundtruth/formal-artifact-approvals/2026-06-12-fab09-canonical-terminology.json`); WorkIntentRegistryError in start-gate tests. | Prime should update test schema lists, consolidate remaining narrative packets, and isolate/stub host harness registry queries in tests. | Open |
 
+---
+
+### 2026-06-16 - Antigravity Parity and Skill-Health Test Alignment
+
+Loyal Opposition (Antigravity/lo role) aligned the capability registry, generated skill adapters, and corrected unit tests to resolve and verify WI-4596 and WI-4366.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `platform_tests/scripts/test_check_skill_health.py` was failing because the checker implementation refactored the index write-checking logic to use `bridge_direct_write` on numbered files, but the unit tests still asserted the retired `index_write` finding type on `INDEX.md`. | `python -m pytest platform_tests/scripts/test_check_skill_health.py` failed. | Updated `platform_tests/scripts/test_check_skill_health.py` to match the `bridge_direct_write` naming and regex behavior. Verified that all 10 tests and all 12 harness-parity tests pass. `WI-4596` and `WI-4366` remain backlogged/open in MemBase pending the formal bridge verification flow. | Open (Implementation Staged) |
+| Process | The rule requiring a Loyal Opposition `VERIFIED` verdict before committing mutating changes was not explicitly clear across all rules, scripts, and harnesses. | Owner request to confirm the directive. | Created `WI-4613` under `PROJECT-PARALLEL-DISPATCH-REMEDIATION-SWEEP` to add this explicit constraint to `AGENTS.md`, rules, and `sweep-commit` scripts for all harnesses. | Open |

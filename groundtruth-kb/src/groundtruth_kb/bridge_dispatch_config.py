@@ -32,7 +32,7 @@ class HarnessDispatchConfig:
     tags: tuple[str, ...] = ()
 
     @classmethod
-    def from_mapping(cls, harness_id: str, raw: dict[str, Any]) -> "HarnessDispatchConfig":
+    def from_mapping(cls, harness_id: str, raw: dict[str, Any]) -> HarnessDispatchConfig:
         return cls(
             harness_id=harness_id,
             can_receive_dispatch=_optional_bool(raw.get("can_receive_dispatch")),
@@ -332,8 +332,8 @@ def _candidate_summary(record: dict[str, Any]) -> dict[str, Any]:
 
 def _rank_key(record: dict[str, Any], order: tuple[str, ...]) -> tuple[Any, ...]:
     values: list[Any] = []
-    for field in order:
-        name = field.strip().lower()
+    for sort_field in order:
+        name = sort_field.strip().lower()
         if name in {"availability", "dispatch_availability"}:
             values.append(-_float_value(record.get("dispatch_availability"), default=50.0))
         elif name in {"cost", "dispatch_cost"}:

@@ -3,6 +3,9 @@
 Purpose: define review, audit, and technical investigation behavior for the
 Loyal Opposition role.
 
+> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
+> state and status-bearing numbered bridge files are canonical.
+
 ## Primary Mission
 
 When assigned the Loyal Opposition role, the active harness is primarily
@@ -101,7 +104,8 @@ approves a documented waiver for that exact specification and risk.
 
 ## Review Coordination
 - Prime-requested reviews are coordinated through the file bridge in `bridge/`.
-- `bridge/INDEX.md` is the authoritative queue for `NEW` and `REVISED` review requests.
+- TAFE-backed bridge state is the authoritative queue for `NEW` and `REVISED`
+  review requests.
 - Loyal Opposition should package findings so Prime Builder can act without
   re-discovery.
 - When a recommendation implies file changes, identify:
@@ -125,7 +129,7 @@ At session start, load:
 1. `AGENTS.md`
 2. `.claude/rules/file-bridge-protocol.md`
 3. `.claude/rules/canonical-terminology.md`
-4. `bridge/INDEX.md`
+4. Dispatcher/TAFE bridge status plus the status-bearing numbered bridge file chain
 5. `.claude/rules/codex-way-of-working.md`
 6. `.claude/rules/codex-review-operating-contract.md`
 7. `.claude/rules/codex-loyal-opposition-runbook.md`

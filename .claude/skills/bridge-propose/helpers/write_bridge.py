@@ -67,10 +67,6 @@ class BridgeFileAlreadyExistsError(RuntimeError):
     """
 
 
-class BridgeIndexConflictError(RuntimeError):
-    """Retained historical exception name for no-index publication conflicts."""
-
-
 class RedactionResidualError(RuntimeError):
     """Raised when the post-redaction re-scan still finds hits.
 
@@ -670,13 +666,6 @@ def handle_hits_abort_or_redact(
     raise ValueError(f"Unknown mode {mode!r}; expected 'abort' or 'redact'.")
 
 
-def _disabled_legacy_state_update(*_args: Any, **_kwargs: Any) -> str:
-    """Fail closed for removed compatibility-state publication helpers."""
-    raise BridgeIndexConflictError(
-        "retired bridge-index publication is disabled; use versioned bridge files plus dispatcher/TAFE state"
-    )
-
-
 def compose_proposal(
     slug: str,
     version: int,
@@ -687,11 +676,6 @@ def compose_proposal(
     """Return the proposal target path and content without writing files."""
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
     return bridge_root / f"{slug}-{version:03d}.md", content
-
-
-def compose_index_update(*args: Any, **kwargs: Any) -> str:
-    """Historical API stub retained only to fail closed for stale callers."""
-    return _disabled_legacy_state_update(*args, **kwargs)
 
 
 def _relative_to_project(path: Path, project_root: Path) -> str:
@@ -745,16 +729,6 @@ def _run_bridge_compliance_audit(
         reason = audit.get("reason") or "bridge-compliance audit denied the composed proposal"
         raise BridgeComplianceError(str(reason))
     return audit
-
-
-def _update_bridge_index(*args: Any, **kwargs: Any) -> None:
-    """Historical API stub retained only to fail closed for stale callers."""
-    _disabled_legacy_state_update(*args, **kwargs)
-
-
-def _update_bridge_index_with_composed_content(*args: Any, **kwargs: Any) -> None:
-    """Historical API stub retained only to fail closed for stale callers."""
-    _disabled_legacy_state_update(*args, **kwargs)
 
 
 def propose_bridge(
@@ -817,8 +791,6 @@ def propose_bridge(
         CredentialHitsFoundError: ``mode='abort'`` and hits found.
         RedactionResidualError: Redaction failed the re-scan gate.
         BridgeFileAlreadyExistsError: Target file already on disk.
-        BridgeIndexConflictError: retained for historical stale-callers only;
-            normal no-index writes do not raise it.
     """
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
     project_root = bridge_root.parent.resolve()
@@ -922,7 +894,6 @@ def propose_bridge_codex_non_bypass(
 __all__ = [
     "BridgeFileAlreadyExistsError",
     "BridgeComplianceError",
-    "BridgeIndexConflictError",
     "BridgeWorkIntentError",
     "CredentialHitsFoundError",
     "DEFAULT_GLOSSARY_PATH",
@@ -931,7 +902,6 @@ __all__ = [
     "RedactionResidualError",
     "WORK_INTENT_SESSION_ENV_VARS",
     "WORK_INTENT_TTL_SECONDS",
-    "compose_index_update",
     "compose_proposal",
     "handle_hits_abort_or_redact",
     "pre_populate_prior_deliberations",

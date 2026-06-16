@@ -14,7 +14,7 @@ watchers) polled blindly on a fixed interval regardless of bridge activity and
 was halted by owner directive on 2026-04-25. Bridge dispatch is now event-driven
 via the cross-harness event-driven trigger
 (`scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse + Stop
-hooks); manual `bridge/INDEX.md` scans remain the fallback. See
+hooks); manual dispatcher/TAFE bridge-state scans remain the fallback. See
 [`bridge-essential.md`](bridge-essential.md) for the canonical operating mode and
 the two-axis bridge-automation model.
 

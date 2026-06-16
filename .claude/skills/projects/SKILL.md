@@ -56,7 +56,7 @@ Use `--json` when another tool or agent needs machine-readable output.
 - Do not write directly to `groundtruth.db` for routine project lifecycle work.
 - Do not create new project or backlog authority tables.
 - Do not use `gt projects link-bridge` to edit or recreate the retired
-  bridge-index artifact. This command records a project artifact link with
+  aggregate queue artifact. This command records a project artifact link with
   `artifact_type="bridge_thread"` only.
 - Keep `add-item` to one explicit work item at a time.
 - Keep `reorder` scoped to one selected project. It must name the active

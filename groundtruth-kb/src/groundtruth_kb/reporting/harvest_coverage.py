@@ -17,9 +17,10 @@ import re
 from pathlib import Path
 from typing import Protocol
 
-_DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
-_STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+bridge/(.+\.md)$"
+_BRIDGE_VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
+_BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
 )
 
 
@@ -39,59 +40,60 @@ class _DeliberationLister(Protocol):
     ) -> list[dict[str, object]]: ...
 
 
-def _active_verified_threads(index_path: Path) -> list[str]:
-    """Parse bridge INDEX and return active thread names whose latest status is VERIFIED.
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = _BRIDGE_FILE_STATUS_RE.match(stripped)
+            return match.group(1).upper() if match else None
+    except OSError:
+        return None
+    return None
 
-    The INDEX format per `.claude/rules/file-bridge-protocol.md`:
 
-        Document: <thread-name>
-        <STATUS>: bridge/<thread-name>-NNN.md   (newest first within the entry)
-        <STATUS>: bridge/<thread-name>-NNN.md
-        ...
-    """
-    if not index_path.exists():
+def _resolve_bridge_dir(path: Path) -> Path:
+    if path.is_dir():
+        return path
+    if path.name.endswith(".md"):
+        return path.parent
+    return path / "bridge"
+
+
+def _active_verified_threads(bridge_state_path: Path) -> list[str]:
+    """Return thread names whose latest numbered bridge file is VERIFIED."""
+    bridge_dir = _resolve_bridge_dir(bridge_state_path)
+    if not bridge_dir.exists():
         return []
 
+    grouped: dict[str, list[tuple[int, str]]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = _BRIDGE_VERSION_FILE_RE.match(path.name)
+        if match is None:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        grouped.setdefault(match.group(1), []).append((int(match.group(2)), status))
+
     active_verified: list[str] = []
-    current_name: str | None = None
-    first_status: str | None = None
-
-    def _flush() -> None:
-        nonlocal current_name, first_status
-        if current_name is not None and first_status == "VERIFIED":
-            active_verified.append(current_name)
-        current_name = None
-        first_status = None
-
-    for raw_line in index_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("<!--") or line.startswith("#"):
-            continue
-
-        doc_match = _DOC_LINE_RE.match(line)
-        if doc_match:
-            _flush()
-            current_name = doc_match.group(1).strip()
-            first_status = None
-            continue
-
-        status_match = _STATUS_LINE_RE.match(line)
-        if status_match and current_name is not None and first_status is None:
-            # First status line within an entry = latest status (newest-first ordering)
-            first_status = status_match.group(1)
-
-    _flush()
-    return active_verified
+    for name, versions in grouped.items():
+        _version, latest_status = max(versions, key=lambda item: item[0])
+        if latest_status == "VERIFIED":
+            active_verified.append(name)
+    return sorted(active_verified)
 
 
 def compute_active_bridge_thread_coverage(
-    index_path: Path,
+    bridge_state_path: Path,
     db: _DeliberationLister,
 ) -> dict[str, object]:
     """Return DA harvest coverage metrics for active VERIFIED bridge threads.
 
     Args:
-        index_path: Path to ``bridge/INDEX.md`` in the consumer project.
+        bridge_state_path: Project root, bridge directory, or status-bearing
+            bridge-file directory locator.
         db: Knowledge DB handle exposing ``list_deliberations``.
 
     Returns:
@@ -99,11 +101,11 @@ def compute_active_bridge_thread_coverage(
         ``coverage_pct`` (float, 2 decimal places), ``uncovered_thread_names``
         (sorted list[str]), and ``covered_thread_names`` (sorted list[str]).
 
-        Empty index returns 100.0% coverage with denominator 0 — there are no
-        threads whose coverage can be missed. This matches the convention used
-        by the Agent Red retroactive sweep script.
+        Empty bridge state returns 100.0% coverage with denominator 0 — there
+        are no threads whose coverage can be missed. This matches the convention
+        used by the Agent Red retroactive sweep script.
     """
-    active_verified = set(_active_verified_threads(index_path))
+    active_verified = set(_active_verified_threads(bridge_state_path))
 
     all_bridge = db.list_deliberations(source_type="bridge_thread")
     covered: set[str] = set()

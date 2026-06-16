@@ -2,7 +2,7 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 67 records = 21 hooks + 11 rules + 11 skills + 4 files + 16 settings-hook-registrations + 4 gitignore-patterns.
+# 63 records = 19 hooks + 11 rules + 11 skills + 4 files + 14 settings-hook-registrations + 4 gitignore-patterns.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -20,8 +20,8 @@
 #   none    = []
 
 # =========================================================================
-# HOOKS (21 records — 14 original + governance and follow-on policy hooks per
-# gtkb-da-governance-completeness-implementation-016)
+# HOOKS (19 records: 14 original plus active governance and follow-on policy
+# hooks after retired dead-stub hooks were removed)
 # =========================================================================
 
 [[artifacts]]
@@ -584,8 +584,8 @@ adopter_divergence_policy = "warn"
 notes = "bridge show-thread helper; product-managed because bridge thread status inspection is framework-defined."
 
 # =========================================================================
-# SETTINGS-HOOK-REGISTRATION (16 records — 11 original + governance and recovery hook
-# registrations per gtkb-da-governance-completeness-implementation-016)
+# SETTINGS-HOOK-REGISTRATION (14 records: 11 original plus active governance
+# and recovery hook registrations after retired dead-stub hooks were removed)
 # =========================================================================
 
 [[artifacts]]

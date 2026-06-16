@@ -205,12 +205,12 @@ notes = "Bridge statuses, gates, claim/preflight contract."
 # =========================================================================
 
 [[artifacts]]
-id = "bridge-index"
+id = "bridge-versioned-files"
 domain = "bridge_protocol"
 lifecycle = "active"
-storage_path = "bridge/INDEX.md"
+storage_path = "bridge/*-[0-9][0-9][0-9].md"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
-mutation_api = "Direct Write gated by bridge-compliance-gate.py + bridge_claim_cli.py claim"
+mutation_api = "Governed bridge helper/CLI path gated by bridge-compliance-gate.py + bridge_claim_cli.py claim"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
 health_check_function = "_check_file_bridge_setup"

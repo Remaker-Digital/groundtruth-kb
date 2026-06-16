@@ -1,5 +1,5 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Smart-poller bridge INDEX.md parser, detector, and shape model.
+"""Bridge state parser, detector, and shape model.
 
 Per ``bridge/gtkb-bridge-poller-p1-detector-003.md`` (REVISED-1, GO at -004) and
 ``bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-007.md``
@@ -59,7 +59,7 @@ class BridgeVersion:
 
     status: BridgeStatus
     file_path: str  # relative path, e.g. "bridge/foo-001.md"
-    line_number: int  # 1-indexed line in INDEX.md
+    line_number: int  # 1-indexed line in rendered bridge-state text
 
 
 @dataclass(frozen=True)
@@ -106,10 +106,10 @@ def _is_blank(line: str) -> bool:
 
 
 def parse_index(index_text: str, *, project_root: Path | None = None) -> ParseResult:
-    """Parse the bridge INDEX.md content into a ``ParseResult``.
+    """Parse rendered bridge-state content into a ``ParseResult``.
 
     Args:
-        index_text: full text of ``bridge/INDEX.md``.
+        index_text: rendered bridge-state text containing ``Document:`` blocks.
         project_root: optional path used to validate ``referenced_file_missing``
             warnings. When ``None``, no file-existence checks are performed.
 

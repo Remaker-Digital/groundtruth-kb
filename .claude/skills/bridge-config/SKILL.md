@@ -15,10 +15,10 @@ metadata:
 Use this skill when you need to inspect or diagnose the bridge dispatch topology without mutating project state.
 Trigger this skill for questions about bridge dispatcher configuration, dispatchability, selected harnesses, event-firing capability, rule eligibility, dispatch health, or whether configured harnesses are receiving work.
 
-Do not answer those questions by summarizing `bridge/INDEX.md`. After the
-2026-06-15 TAFE/dispatcher cutover, `bridge/INDEX.md` is a deprecated generated
-compatibility view for legacy readers. It is not canonical dispatcher topology,
-dispatch health, target-selection, or bridge-state authority.
+Answer those questions from dispatcher/TAFE state, status-bearing numbered
+bridge files, and the CLI surfaces below. Aggregate queue artifacts are not
+dispatcher topology, dispatch health, target-selection evidence, or current
+bridge-state authority.
 
 ## Commands
 

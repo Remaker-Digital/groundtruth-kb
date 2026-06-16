@@ -8,10 +8,9 @@ This skill is the **composer** front-end to the `gtkb-bridge-propose`
 the credential-scanned no-index bridge write and dispatcher/TAFE state
 publication. This skill never writes to `bridge/` or MemBase itself.
 
-After the 2026-06-15 TAFE/dispatcher cutover, the retired bridge-index file
-must not exist in current GT-KB operation. The bridge writer must publish
+After the 2026-06-15 TAFE/dispatcher cutover, the bridge writer must publish
 versioned bridge files and dispatcher/TAFE state without creating or requiring
-that retired file.
+aggregate queue artifacts.
 
 # /gtkb-propose
 

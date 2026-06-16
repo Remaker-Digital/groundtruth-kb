@@ -18,7 +18,7 @@ DEFAULT_REGISTRY_RELATIVE_PATH = Path("config/governance/protected-artifact-inve
 DEFAULT_INVENTORY_RELATIVE_PATH = Path(".groundtruth/inventory/dev-environment-inventory.json")
 DEFAULT_VOLATILE_PATHS = ("generated_at",)
 PASSING_OUTCOMES = {"clean", "accepted_baseline_update", "local_only_notice", "review_evidence_present"}
-BRIDGE_REVIEW_EVIDENCE_PATTERNS = ("bridge/INDEX.md", "bridge/*.md")
+BRIDGE_REVIEW_EVIDENCE_PATTERNS = ("bridge/*-[0-9][0-9][0-9].md",)
 
 
 class DriftCheckError(RuntimeError):

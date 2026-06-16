@@ -1,7 +1,7 @@
 """Operating-mode transaction component: ``apply_role_switch``.
 
 Per ``SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001``. Validators run FIRST
-(role artifact, bridge artifact, session-state artifact); on any validation
+(role artifact, bridge state, session-state artifact); on any validation
 failure ``TransactionValidationError`` is raised and no state mutation
 occurs. On all-pass, the role-map is updated atomically, the derived
 topology is written to the session-state artifact, and an audit-trail
@@ -236,7 +236,7 @@ def apply_role_switch(
     Order of operations (fail-closed before any state mutation):
 
     1. Validate role artifact (the harness registry projection).
-    2. Validate bridge artifact (``bridge/INDEX.md``).
+    2. Validate bridge state (status-bearing numbered bridge files).
     3. Validate session-state artifact (``.claude/session/work-subject.json``).
     4. Validate role token against ``VALID_ROLES_FOR_WRITE`` (SET-rejects
        ``acting-prime-builder``).

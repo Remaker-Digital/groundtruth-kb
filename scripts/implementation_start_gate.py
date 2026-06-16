@@ -782,11 +782,67 @@ def _shell_redirect_present(command: str) -> bool:
         return False
 
 
+def _python_call_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _constant_string(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _open_call_uses_write_mode(node: ast.Call) -> bool:
+    mode: str | None = None
+    if len(node.args) >= 2:
+        mode = _constant_string(node.args[1])
+    for keyword in node.keywords:
+        if keyword.arg == "mode":
+            mode = _constant_string(keyword.value)
+            break
+    return mode is not None and "w" in mode
+
+
+def _has_python_mutating_signal(command: str) -> bool:
+    source = _python_c_source(command)
+    if source is None:
+        return False
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+
+    sqlite_classification = _classify_python_sqlite_read_ast(command)
+    if sqlite_classification is False:
+        return True
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        call_name = _python_call_name(node.func)
+        if call_name == "write_text":
+            return True
+        if call_name == "open" and _open_call_uses_write_mode(node):
+            return True
+        if call_name and call_name.startswith(("insert_", "update_", "delete_")):
+            return True
+    return False
+
+
 def _has_mutating_signal(command: str) -> bool:
     """True when the command carries a mutating signal: a named mutating
     command (MUTATING_COMMAND_RE) or a standalone shell redirect operator
     token (_shell_redirect_present)."""
-    return MUTATING_COMMAND_RE.search(command) is not None or _shell_redirect_present(command)
+    shell_view = _mask_quoted_spans(command, mask_double=True)
+    return (
+        MUTATING_COMMAND_RE.search(shell_view) is not None
+        or _has_python_mutating_signal(command)
+        or _shell_redirect_present(command)
+    )
 
 
 def _all_mutating_signal_is_null_sink_redirect(command: str) -> bool:

@@ -47,8 +47,8 @@ records `GO`, and the implementation-start packet is created from that GO.
 
 The hook `scripts/implementation_start_gate.py` must deny protected source,
 test, script, hook, configuration, deployment, repository-state, and KB-mutation
-work when the packet is missing, corrupt, expired, stale relative to live
-`bridge/INDEX.md`, or outside the GO'd proposal's `target_paths`.
+work when the packet is missing, corrupt, expired, stale relative to
+TAFE/dispatcher bridge state, or outside the GO'd proposal's `target_paths`.
 
 Implementation proposals filed after this gate lands must include a
 `Requirement Sufficiency` subsection. It must state either that existing
@@ -79,7 +79,7 @@ path, not source/config/test implementation.
 If Prime Builder catches itself about to implement without a GO:
 1. STOP immediately
 2. Draft a bridge proposal describing the intended change
-3. Submit to bridge/INDEX.md as NEW
+3. Submit through the governed bridge writer/dispatcher path as NEW
 4. Wait for Loyal Opposition GO before proceeding
 5. Run `python scripts/implementation_authorization.py begin --bridge-id <document-name>`
    before protected implementation edits

@@ -2,7 +2,7 @@
 
 Slice 1 registers exactly one tool, ``gt_status_summary``, which returns a
 boundary-safe, authority-labelled snapshot of GT-KB workflow state (bridge
-INDEX status counts, MemBase row counts, project root, working-tree-clean
+versioned-file status counts, MemBase row counts, project root, working-tree-clean
 flag, and current harness role).
 
 The server is not registered with any harness in this slice; that lands in
@@ -12,43 +12,26 @@ Slice 3 along with the ``.mcp.json`` / Codex config wiring.
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 import subprocess
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from mcp import types
 from mcp.server.lowlevel import Server
 
+from groundtruth_kb.bridge.status_driver import collect_bridge_status
 from groundtruth_kb.mcp_surface.authority import AuthorityLabel, build_envelope
 from groundtruth_kb.mcp_surface.boundary import resolve_safe_path
 from groundtruth_kb.mcp_surface.roles import current_role
 
 SERVER_NAME = "gt-kb-mcp"
 
-_BRIDGE_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN):\s+")
-
 
 def _bridge_status_counts(project_root: Path) -> dict[str, int]:
-    """Return latest-status-per-thread counts from ``bridge/INDEX.md``."""
+    """Return latest-status-per-thread counts from versioned bridge files."""
 
-    index_path = resolve_safe_path("bridge/INDEX.md", root=project_root)
-    text = index_path.read_text(encoding="utf-8")
-    latest_status_per_thread: dict[str, str] = {}
-    current_doc: str | None = None
-    for line in text.splitlines():
-        if line.startswith("Document: "):
-            current_doc = line.split(": ", 1)[1].strip()
-            continue
-        if not current_doc:
-            continue
-        match = _BRIDGE_STATUS_RE.match(line)
-        if match and current_doc not in latest_status_per_thread:
-            latest_status_per_thread[current_doc] = match.group(1)
-            current_doc = None
-    return dict(Counter(latest_status_per_thread.values()))
+    return collect_bridge_status(project_root).queue.status_counts
 
 
 def _membase_row_counts(project_root: Path) -> dict[str, int | None]:
@@ -117,7 +100,7 @@ def build_status_summary_envelope(project_root: Path) -> dict[str, Any]:
     return build_envelope(
         authority=AuthorityLabel.GENERATED_SUMMARY,
         payload=payload,
-        source_ref="bridge/INDEX.md+groundtruth.db",
+        source_ref="bridge/versioned-files+groundtruth.db",
     )
 
 
@@ -132,7 +115,7 @@ def build_server() -> Server:
             types.Tool(
                 name="gt_status_summary",
                 description=(
-                    "Read-only summary of GT-KB workflow state: bridge INDEX "
+                    "Read-only summary of GT-KB workflow state: versioned bridge "
                     "status counts, MemBase row counts, project root, "
                     "working-tree-clean flag, and current harness role. Returns "
                     "a generated-summary envelope; not authoritative."

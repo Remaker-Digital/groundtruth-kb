@@ -5,13 +5,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sqlite3
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
 NON_TERMINAL_WORK_ITEM_STATUSES = {
     "blocked",
@@ -25,33 +28,28 @@ NON_TERMINAL_WORK_ITEM_STATUSES = {
 }
 
 
-def parse_latest_bridge_entries(index_text: str) -> list[dict[str, str]]:
-    """Return one latest status row per bridge document in INDEX order."""
+def latest_bridge_entries(project_root: Path) -> list[dict[str, str]]:
+    """Return one latest status row per numbered bridge document."""
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
 
     entries: list[dict[str, str]] = []
-    current_document: str | None = None
-    for line in index_text.splitlines():
-        if line.startswith("Document: "):
-            current_document = line.split(": ", 1)[1].strip()
-            continue
-        if not current_document:
-            continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN):\s+(bridge/[^\s]+)", line)
-        if not match:
+    for document in scan_expected_documents(project_root).values():
+        rel_path = document.files[-1]
+        status = status_from_bridge_file(project_root / rel_path)
+        if not status:
             continue
         entries.append(
             {
-                "document": current_document,
-                "status": match.group(1),
-                "path": match.group(2),
+                "document": document.slug,
+                "status": status,
+                "path": rel_path,
             }
         )
-        current_document = None
-    return entries
+    return sorted(entries, key=lambda entry: entry["path"])
 
 
 def bridge_summary(project_root: Path) -> dict[str, Any]:
-    entries = parse_latest_bridge_entries((project_root / "bridge" / "INDEX.md").read_text(encoding="utf-8"))
+    entries = latest_bridge_entries(project_root)
     status_counts = Counter(entry["status"] for entry in entries)
     actionable = [entry for entry in entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES]
     return {

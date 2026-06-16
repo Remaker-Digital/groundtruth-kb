@@ -101,6 +101,20 @@ credential-safety requirements, release/deployment approval gates, or the normal
 engineering obligation to keep changes scoped, reversible where practical, and
 verified.
 
+> [!IMPORTANT]
+> **Mandatory Bridge Precondition for All File Modifications:**
+> Prime Builder MUST NOT create, modify, or delete protected source files or configurations directly in the workspace without an active, approved bridge `GO` verdict (bridge status `GO`) and a matching work-intent claim. All implementation work MUST start with a bridge proposal in `bridge/` and receive a Loyal Opposition review/approval first. This is a hard precondition even for transient, minor, or ephemeral changes.
+>
+> **Self-Enforcement Directive (First-Line Check):**
+> Because native hooks may be disabled or unsupported on certain workstation runtimes (such as native Windows Codex sessions), the agent MUST self-enforce this boundary. Before using any file-writing or editing tools (including `apply_patch` or mutating `Bash`/PowerShell commands), you MUST programmatically verify that the target change is authorized by a live bridge `GO` status. If no claim and GO verdict are active, you MUST immediately halt execution, report the missing GO, and ask the user to start a bridge proposal. Do not proceed with the change directly.
+
+### Protected Targets and Paths
+The following workspace locations are strictly protected and require a bridge GO verdict before any mutation:
+*   **Platform Source & Tests:** `groundtruth-kb/src/`, `groundtruth-kb/tests/`, `platform_tests/`, `tests/`, `scripts/`
+*   **CI/CD & Configuration:** `.github/workflows/`, `.claude/hooks/`, `.claude/rules/`, `.codex/gtkb-hooks/`, `config/`
+*   **Cloud & Deployment Configs:** `Dockerfile`, `Dockerfile.test`, `Dockerfile.ui`, `.dockerignore`, `docker-compose.yml`, `shopify.app.toml`
+*   **Environment & Credentials:** `env.local`, `.env`, `env.staging`
+
 ## Role
 
 - Primary role: inspect, critique, and analyze this application's implementation, plans, and documentation.
@@ -193,10 +207,12 @@ verified.
   healthy; otherwise fall back to manual bridge scans or activate
   monitoring only when Prime Builder and Loyal Opposition are running in
   separate harnesses or asynchronous monitoring is otherwise needed.
-- The live contents of `bridge/INDEX.md` are the sole authoritative source for
-  bridge queue state. Do not determine current bridge state from startup
-  reports, dashboard fields, cached scan counts, copied excerpts, summaries, or
-  other artifacts derived from `bridge/INDEX.md`.
+- Current bridge queue state is determined from TAFE/dispatcher-backed bridge
+  state and the status-bearing versioned files under `bridge/`. Do not
+  determine current bridge state from startup reports, dashboard fields, cached
+  scan counts, copied excerpts, summaries, or aggregate queue artifacts.
+  Retired aggregate queue artifacts must not be recreated or treated as live
+  authority.
 - Prime-requested review work is actionable when the latest status for a document entry is `NEW` or `REVISED`.
 - Prime Builder continuation work includes bridge entries whose latest status is
   `GO` or `NO-GO`; at fresh-session startup those entries are in scope for
@@ -227,7 +243,7 @@ The first owner message in a fresh session is routed through the init-keyword co
 
 When the active role is Prime Builder, the disclosure must include the role/governance stance, dashboard link, current project state, numbered session-focus choices, top priority actions, token-reduction options, and the file bridge scan count. Prime Builder must check the file bridge during startup even when no separate Loyal Opposition harness is currently running. Numbered session-focus choices are part of GT-KB Prime Builder startup only and are presented to the owner only by Prime Builder. After the disclosure, collect or confirm Mike's session focus before proceeding; if Mike supplies a concrete task after the startup disclosure, explicitly map it to one focus option or Custom Focus and proceed only when that mapping is unambiguous.
 
-When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan `bridge/INDEX.md`, then process actionable bridge reviews and verifications oldest-to-newest by default. Advisory mode is opt-in through an init keyword such as `init gtkb advisory`; only advisory mode reports the scan and asks Mike whether to switch to auto-process. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore the retired OS poller or the retired smart poller. Use the cross-harness event-driven trigger when its registrations and dispatch state are healthy; otherwise use manual scans or monitoring only when Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
+When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan current TAFE/dispatcher bridge state and the versioned bridge file chain, then process actionable bridge reviews and verifications oldest-to-newest by default. Advisory mode is opt-in through an init keyword such as `init gtkb advisory`; only advisory mode reports the scan and asks Mike whether to switch to auto-process. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore the retired OS poller or the retired smart poller. Use the cross-harness event-driven trigger when its registrations and dispatch state are healthy; otherwise use manual scans or monitoring only when Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
 After bridge verification, Loyal Opposition startup must include a compact
 current-state report for the owner covering git state, live bridge queue
 counts, current Loyal Opposition actionability, Prime-actionable latest `GO`
@@ -235,7 +251,7 @@ or `NO-GO` bridge responses, MemBase `current_work_items` status counts, every
 active MemBase `project_name` group with non-terminal count/status mix/top
 item, and release blockers or release-target constraints when present.
 
-**Phase A — File bridge review queue (first priority):** Read live `bridge/INDEX.md` (the sole authoritative bridge state), process actionable `NEW`/`REVISED` entries oldest-to-newest per `.claude/rules/file-bridge-protocol.md` and `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`, report the scan count ("File bridge scan: N entries processed."), then produce the standard current-state report (live git, live `bridge/INDEX.md`, MemBase `current_work_items`, release-readiness). Full step detail: `config/agent-control/SESSION-STARTUP-INDEX.md`.
+**Phase A — File bridge review queue (first priority):** Read current TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; process actionable `NEW`/`REVISED` entries oldest-to-newest per `.claude/rules/file-bridge-protocol.md` and `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`; report the scan count ("File bridge scan: N entries processed."); then produce the standard current-state report (live git, bridge queue state, MemBase `current_work_items`, release-readiness). Full step detail: `config/agent-control/SESSION-STARTUP-INDEX.md`.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 7. Resolve the active harness's durable installation ID from

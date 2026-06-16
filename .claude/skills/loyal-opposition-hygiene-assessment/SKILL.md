@@ -49,7 +49,7 @@ Read the smallest relevant set:
 - `config/agent-control/system-interface-map.toml`
 - Bridge dispatcher status/health CLI and TAFE-backed bridge-state surfaces
   (when bridge hygiene or bridge actionability is in scope). Do not consult or
-  recreate the retired bridge-index artifact as a live bridge source.
+  recreate aggregate queue artifacts as live bridge sources.
 - `python -m groundtruth_kb backlog list` (only when backlog/work-item hygiene is in scope; reads MemBase work_items, the canonical backlog authority per ADR-STANDING-BACKLOG-DB-AUTHORITY-001 v2)
 - Relevant docs, scripts, generated artifacts, tests, and archive paths for the selected hygiene phase
 
@@ -59,7 +59,7 @@ Read the smallest relevant set:
 |---|---|---|
 | 1. DA harvest | identify missing or candidate Deliberation Archive capture and coverage risks | harvest / capture through the governed `scripts/harvest_session_deliberations.py` path |
 | 2. Branch cleanup | identify stale branches / worktree noise; require dry-run evidence before any cleanup | perform branch cleanup only with safe scope, never `git push --force` to main/master |
-| 3. Bridge double-version | audit `bridge/` parser behavior, retired bridge-index assumptions, and version ambiguity before any fix | repair only if verified defect exists; never edit a filed bridge file in place |
+| 3. Bridge double-version | audit `bridge/` parser behavior, aggregate-queue assumptions, and version ambiguity before any fix | repair only if verified defect exists; never edit a filed bridge file in place |
 | 4. `REPOSITORY-STRUCTURE.md` | identify current structure / source-of-truth gaps | draft or update documentation |
 | 5. Terminology drift | map drift against `.claude/rules/canonical-terminology.md` | update docs / schema / API / tests as needed |
 | 6. Duplicate specs | identify candidate duplicate specifications and authority conflicts | merge / retire only through the governed spec process (formal-artifact approval) |
@@ -124,7 +124,7 @@ This skill is **read-only advisory**. The following actions are **explicitly OUT
 - Broad rename / naming-consistency rewrites.
 - Role-assignment or bridge-status mutation, except existing bridge-function repair authority that already lives elsewhere.
 - Any write to `groundtruth.db` or `.groundtruth/formal-artifact-approvals/`.
-- Any write to retired bridge-index artifacts or `bridge/*.md` outside the standard Loyal Opposition bridge-review surface (which is NOT this skill). The retired bridge-index artifact is not canonical bridge-state authority and must not be recreated.
+- Any write to aggregate queue artifacts or `bridge/*.md` outside the standard Loyal Opposition bridge-review surface (which is NOT this skill). Aggregate queue artifacts are not canonical bridge-state authority and must not be recreated.
 
 If the assessment finds a defect that requires mutation, the report MUST list it as a `prime-action` or `peer-prime-candidate` and stop there. Mutation is filed through standard Prime channels (bridge proposal -> Codex GO -> implementation -> post-impl -> VERIFIED), not through this skill.
 

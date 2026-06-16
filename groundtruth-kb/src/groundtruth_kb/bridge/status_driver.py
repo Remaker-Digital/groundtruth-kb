@@ -1,14 +1,16 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Read-only bridge queue and automation status driver.
 
-This module is intentionally side-effect free. It reads the live bridge index,
-local hook configuration, and local dispatch state, then returns a deterministic
-snapshot suitable for ``gt status`` and startup summaries.
+This module is intentionally side-effect free. It reads status-bearing
+versioned bridge files, local hook configuration, and local dispatch state, then
+returns a deterministic snapshot suitable for ``gt status`` and startup
+summaries.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import time
 import tomllib
 from dataclasses import dataclass
@@ -63,7 +65,7 @@ class BridgeQueueItem:
 
 @dataclass(frozen=True)
 class BridgeQueueSnapshot:
-    """Live bridge queue classification derived from bridge/INDEX.md."""
+    """Live bridge queue classification derived from versioned bridge files."""
 
     index_path: Path
     threads: int
@@ -141,8 +143,8 @@ def collect_bridge_status(project_root: Path, *, top_n: int | None = 10) -> Brid
 
 
 def _collect_queue_snapshot(root: Path) -> BridgeQueueSnapshot:
-    index_path = root / "bridge" / "INDEX.md"
-    parse_result = _parse_live_index(index_path, root)
+    state_path = root / "bridge"
+    parse_result = _parse_live_bridge_state(root)
     prime_pending, loyal_pending = compute_actionable_pending(parse_result, project_root=root)
 
     status_counts: dict[str, int] = {}
@@ -175,7 +177,7 @@ def _collect_queue_snapshot(root: Path) -> BridgeQueueSnapshot:
         dispatchable_counts[key] += 1
 
     return BridgeQueueSnapshot(
-        index_path=index_path,
+        index_path=state_path,
         threads=len(parse_result.documents),
         status_counts=dict(sorted(status_counts.items())),
         prime_actionable=prime_items,
@@ -202,10 +204,49 @@ def _collect_queue_snapshot(root: Path) -> BridgeQueueSnapshot:
     )
 
 
-def _parse_live_index(index_path: Path, root: Path) -> ParseResult:
-    if not index_path.exists():
+def _render_state_from_versioned_files(root: Path) -> str:
+    bridge_dir = root / "bridge"
+    grouped: dict[str, list[tuple[int, str, str]]] = {}
+    status_re = re.compile(
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+        re.IGNORECASE,
+    )
+    file_re = re.compile(r"^(.+)-(\d{3,})\.md$")
+    for path in bridge_dir.glob("*.md"):
+        match = file_re.match(path.name)
+        if not match:
+            continue
+        status: str | None = None
+        try:
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                status_match = status_re.match(stripped)
+                status = status_match.group(1).upper() if status_match else None
+                break
+        except OSError:
+            continue
+        if status is None:
+            continue
+        try:
+            rel_path = path.resolve().relative_to(root.resolve()).as_posix()
+        except (OSError, ValueError):
+            rel_path = path.as_posix()
+        grouped.setdefault(match.group(1), []).append((int(match.group(2)), status, rel_path))
+    lines: list[str] = []
+    for slug in sorted(grouped):
+        lines.append(f"Document: {slug}")
+        for _version, status, rel_path in sorted(grouped[slug], key=lambda row: row[0], reverse=True):
+            lines.append(f"{status}: {rel_path}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _parse_live_bridge_state(root: Path) -> ParseResult:
+    if not (root / "bridge").exists():
         return ParseResult(documents=())
-    return parse_index(index_path.read_text(encoding="utf-8"), project_root=root)
+    return parse_index(_render_state_from_versioned_files(root), project_root=root)
 
 
 def _collect_automation_snapshot(root: Path) -> BridgeAutomationSnapshot:

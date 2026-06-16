@@ -9,7 +9,6 @@ governed_surfaces = [
 ]
 
 exclusions = [
-  "bridge/INDEX.md",
   ".claude/worktrees/**",
   ".gtkb-state/**",
   "archive/**",

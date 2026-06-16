@@ -30,16 +30,11 @@ except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import PATH_TOKEN_RE
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
-DEFAULT_INDEX_PATH: Final[Path] = PROJECT_ROOT / "bridge" / "INDEX.md"
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 DEFAULT_CLAUSES_CONFIG: Final[Path] = PROJECT_ROOT / "config" / "governance" / "adr-dcl-clauses.toml"
 DEFAULT_THRESHOLD: Final[int] = 30
 
-INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
-)
 TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\b")
 TOKEN_RE: Final[re.Pattern[str]] = re.compile(r"[a-z0-9][a-z0-9_/-]*")
@@ -215,24 +210,8 @@ class DiscoveryResult:
     reasons: list[str] = field(default_factory=list)
 
 
-def parse_index_for_document(index_path: Path, bridge_id: str, bridge_dir: Path) -> Path | None:
-    """Return the top-of-stack bridge file for ``bridge_id`` from INDEX."""
-    if index_path.is_file():
-        root = index_path.parent.parent
-        in_target = False
-        for line in index_path.read_text(encoding="utf-8").splitlines():
-            doc_match = INDEX_DOC_RE.match(line.strip())
-            if doc_match:
-                in_target = doc_match.group(1) == bridge_id
-                continue
-            if not in_target:
-                continue
-            status_match = INDEX_STATUS_RE.match(line.strip())
-            if status_match:
-                candidate = root / status_match.group(2)
-                return candidate if candidate.is_file() else None
-            if not line.strip():
-                break
+def parse_index_for_document(bridge_id: str, bridge_dir: Path) -> Path | None:
+    """Return the latest numbered bridge file for ``bridge_id``."""
     matches = sorted(bridge_dir.glob(f"{bridge_id}-[0-9][0-9][0-9].md"))
     return matches[-1] if matches else None
 
@@ -274,10 +253,9 @@ def load_bridge_content(
     *,
     bridge_id: str,
     content_file: Path | None = None,
-    index_path: Path = DEFAULT_INDEX_PATH,
     bridge_dir: Path = DEFAULT_BRIDGE_DIR,
 ) -> BridgeContent | None:
-    operative = content_file or parse_index_for_document(index_path, bridge_id, bridge_dir)
+    operative = content_file or parse_index_for_document(bridge_id, bridge_dir)
     if operative is None or not operative.is_file():
         return None
     content = operative.read_text(encoding="utf-8")
@@ -504,7 +482,6 @@ def build_payload(
     *,
     bridge_id: str,
     content_file: Path | None = None,
-    index_path: Path = DEFAULT_INDEX_PATH,
     bridge_dir: Path = DEFAULT_BRIDGE_DIR,
     db_path: Path = DEFAULT_DB_PATH,
     clauses_config: Path = DEFAULT_CLAUSES_CONFIG,
@@ -513,7 +490,6 @@ def build_payload(
     bridge = load_bridge_content(
         bridge_id=bridge_id,
         content_file=content_file,
-        index_path=index_path,
         bridge_dir=bridge_dir,
     )
     specs = load_adr_dcl_specs(db_path)
@@ -538,9 +514,8 @@ def build_payload(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bridge-id", required=True, help="Document name from bridge/INDEX.md.")
+    parser.add_argument("--bridge-id", required=True, help="Bridge document name / versioned bridge-thread slug.")
     parser.add_argument("--content-file", type=Path, help="Evaluate pending markdown content from this file.")
-    parser.add_argument("--index", type=Path, default=DEFAULT_INDEX_PATH)
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--clauses-config", type=Path, default=DEFAULT_CLAUSES_CONFIG)
@@ -555,7 +530,6 @@ def main(argv: list[str] | None = None) -> int:
     payload = build_payload(
         bridge_id=args.bridge_id,
         content_file=args.content_file,
-        index_path=args.index,
         bridge_dir=args.bridge_dir,
         db_path=args.db,
         clauses_config=args.clauses_config,

@@ -168,22 +168,22 @@ def test_bridge_bash_file_write_is_denied_before_guards_or_subprocess(tmp_path: 
 def test_bridge_bash_index_write_is_denied_and_index_unchanged(tmp_path: Path):
     root = make_root(tmp_path)
     (root / "bridge").mkdir()
-    index = root / "bridge" / "INDEX.md"
-    index.write_text("Document: fixture\nNEW: bridge/fixture-001.md\n", encoding="utf-8")
-    before = index.read_text(encoding="utf-8")
+    bridge_file = root / "bridge" / "fixture-001.md"
+    bridge_file.write_text("NEW\n\nFixture proposal\n", encoding="utf-8")
+    before = bridge_file.read_text(encoding="utf-8")
     records: list[tuple[str, dict, dict]] = []
     command_called = False
 
     def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
         nonlocal command_called
         command_called = True
-        index.write_text("bad\n", encoding="utf-8")
+        bridge_file.write_text("bad\n", encoding="utf-8")
         return subprocess.CompletedProcess(args=command, returncode=0, stdout="wrote", stderr="")
 
     with pytest.raises(orh.OpenRouterHarnessError, match="Bash bridge artifact mutation denied"):
         orh.dispatch_tool_call(
             "Bash",
-            {"command": "echo bad > bridge/INDEX.md"},
+            {"command": "echo bad > bridge/fixture-001.md"},
             metadata(),
             root,
             guard_runner=allow_runner(records),
@@ -192,7 +192,7 @@ def test_bridge_bash_index_write_is_denied_and_index_unchanged(tmp_path: Path):
 
     assert records == []
     assert command_called is False
-    assert index.read_text(encoding="utf-8") == before
+    assert bridge_file.read_text(encoding="utf-8") == before
 
 
 def test_bridge_bash_read_reference_still_uses_bash_guards(tmp_path: Path):

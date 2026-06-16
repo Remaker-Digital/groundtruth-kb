@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-16T17:53:59Z",
+  "envelope_schema_version": 1,
+  "harness_id": "A",
+  "harness_name": "codex",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-16T17:53:59Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "A-2026-06-16T17-53-59Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": "M  .agent/skills/send-review/SKILL.md\nM  .claude/hooks/bridge-axis-2-surface.py\nM  .claude/hooks/bridge-compliance-gate.py\nD  .claude/hooks/bridge-index-write-serializer.py\nM  .claude/hooks/lo-file-safety-gate.py\nM  .claude/rules/acting-prime-builder.md\nM  .claude/rules/bridge-essential.md\nM  .claude/rules/bridge-permanent-operations-runbook.md\nM  .claude/rules/canonical-terminology.md\nM  .claude/rules/codex-decision-ledger.md\nM  .claude/rules/codex-loyal-opposition-runbook.md\nM  .claude/rules/codex-review-gate.md\nM  .claude/rules/codex-review-operating-contract.md\nM  .claude/rules/codex-session-bootstrap.md\nM  .claude/rules/codex-standing-priorities.md\nM  .claude/rules/codex-way-of-working.md\nM  .claude/rules/file-bridge-protocol.md\nM  .claude/rules/operating-model.md\nM  .claude/rules/operating-role.md\nM  .claude/rules/prime-bridge-collaboration-protocol.md\nM  .claude/settings.json\nM  .claude/skills/bridge-config/SKILL.md\nM  .claude/skills/bridge-propose/SKILL.md\nM  .claude/skills/bridge-propose/helpers/write_bridge.py\nM  .claude/skills/bridge/SKILL.md\nM  .claude/skills/gtkb-hygiene-investigation/SKILL.md\nM  .claude/skills/gtkb-hygiene-sweep/SKILL.md\nM  .claude/skills/gtkb-propose/SKILL.md\nM  .claude/skills/kb-session-wrap/SKILL.md\nM  .claude/skills/kb-session-wrap/references/audit-checklist.md\nM  .claude/skills/loyal-opposition-hygiene-assessment/SKILL.md\nM  .claude/skills/projects/SKILL.md\nM  .claude/skills/send-review/SKILL.md\nM  .claude/skills/verify/SKILL.md\nM  .codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py\nM  .codex/hooks.json\nM  .codex/skills/MANIFEST.json\nM  .codex/skills/bridge-config/SKILL.md\nM  .codex/skills/send-review/SKILL.md\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-agents-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-acting-prime-builder-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-bridge-essential-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-bridge-permanent-operations-runbook-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-canonical-terminology-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-codex-decision-ledger-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-codex-loyal-opposition-runbook-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-codex-review-gate-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-codex-review-operating-contract-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-codex-session-bootstrap-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-codex-standing-priorities-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-codex-way-of-working-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-file-bridge-protocol-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-operating-model-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-operating-role-md.json\nA  .groundtruth/formal-artifact-approvals/2026-06-16-sweep-20260616-claude-rules-prime-bridge-collaboration-protocol-md.json\nM  .groundtruth/inventory/dev-environment-inventory.json\nM  .groundtruth/inventory/dev-environment-inventory.md\nM  AGENTS.md\nM  CLAUDE.md\nA  bridge/agent-disposition-protocol-enforcement-umbrella-001.md\nA  bridge/agent-disposition-protocol-enforcement-umbrella-002.md\nA  bridge/agent-disposition-protocol-enforcement-umbrella-004.md\nA  bridge/gtkb-bridge-index-retirement-cleanout-packet-correction-003.md\nA  bridge/gtkb-bridge-index-retirement-cleanout-packet-correction-004.md\nA  bridge/gtkb-harness-capability-registry-drift-disposition-001.md\nA  bridge/gtkb-harness-capability-registry-drift-disposition-002.md\nA  bridge/gtkb-harness-capability-registry-drift-disposition-004.md\nA  bridge/gtkb-impl-start-gate-quoted-arg-misclassification-005.md\nA  bridge/gtkb-impl-start-gate-quoted-arg-misclassification-006.md\nA  bridge/gtkb-inventory-string-scan-admin-cli-003.md\nA  bridge/gtkb-inventory-string-scan-admin-cli-004.md\nA  bridge/gtkb-inventory-string-scan-admin-cli-005.md\nA  bridge/gtkb-no-index-skill-template-doc-cleanout-005.md\nA  bridge/gtkb-no-index-skill-template-doc-cleanout-006.md\nA  bridge/gtkb-wi-4556-ollama-provider-fallback-backoff-003.md\nA  bridge/gtkb-wi-4556-ollama-provider-fallback-backoff-004.md\nA  bridge/gtkb-wi-4556-ollama-provider-fallback-backoff-006.md\nA  bridge/harness-testing-quality-benchmarking-manifest-rubric-001.md\nA  bridge/harness-testing-quality-benchmarking-manifest-rubric-002.md",
+        "short_line_count": 239,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

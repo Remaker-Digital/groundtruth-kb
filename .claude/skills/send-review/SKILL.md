@@ -15,8 +15,8 @@ metadata:
 # Send Review to Loyal Opposition
 
 Compatibility alias for filing a Prime Builder proposal through the governed
-`gtkb-bridge-propose` helper path. Do not write proposal files or edit the
-deprecated generated bridge-index compatibility view from this skill directly.
+`gtkb-bridge-propose` helper path. Do not write proposal files directly, and do
+not create or restore aggregate queue artifacts.
 
 **Arguments:** `$ARGUMENTS` = descriptive kebab-case name for the proposal (e.g., `widget-refactor`).
 
@@ -34,8 +34,8 @@ deprecated generated bridge-index compatibility view from this skill directly.
 3. **File through `gtkb-bridge-propose`.** Use the helper-mediated bridge writer
    described in `.claude/skills/bridge-propose/SKILL.md`. The helper performs
    credential scanning, bridge-compliance validation for Codex paths, proposal
-   file creation, author metadata insertion, and governed bridge-index
-   compatibility-view registration via `gtkb-bridge-propose`.
+   file creation, author metadata insertion, and dispatcher/TAFE bridge-state
+   publication via `gtkb-bridge-propose`.
 
 4. **Report** the helper result: created proposal path, bridge document slug,
    status line, and any helper error that blocked filing.

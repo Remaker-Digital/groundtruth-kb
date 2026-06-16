@@ -731,7 +731,7 @@ def render_startup_focus_lines(
         lines.extend(
             [
                 "- First owner message in a fresh session is routed through the init-keyword matcher: matches relay startup disclosure; non-matches pass through as ordinary task input.",
-                "- Live bridge authority: `bridge/INDEX.md` is the canonical handoff/review record; poller status, scan-freshness files, and startup snapshots are non-canonical.",
+                "- Live bridge authority: dispatcher/TAFE state plus status-bearing numbered bridge files; poller status, scan-freshness files, and startup snapshots are non-canonical.",
             ]
         )
     return "\n".join(lines)

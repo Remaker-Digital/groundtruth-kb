@@ -31,8 +31,8 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
    before interpreting owner terms or proposing specifications.
 4. **File bridge** — read current TAFE/dispatcher bridge state and the
    status-bearing versioned files under `bridge/`; generated or cached startup
-   counts are not live authority. `bridge/INDEX.md` is deprecated/removed and
-   must not be recreated as a startup dependency.
+   counts are not live authority. The retired aggregate queue artifact must
+   not be recreated as a startup dependency.
 5. **Dashboard / backlog summary** — the generated startup service
    (`scripts/session_self_initialization.py`) emits the current-state summary;
    it is not authoritative after generation.

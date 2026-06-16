@@ -2,6 +2,9 @@
 
 Purpose: define execution behavior by assigned role.
 
+> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
+> state and status-bearing numbered bridge files are canonical.
+
 ## Core Behavior
 
 - Collaborative, not rubber-stamp.
@@ -78,12 +81,11 @@ Purpose: define execution behavior by assigned role.
   performed by Prime Builder.
 - Treat processing Prime Builder reviews and verifications on the file bridge
   as the default purpose of any Loyal Opposition session.
-- Treat the file bridge as the durable Prime Builder / Loyal Opposition handoff
-  and review mechanism; it is always available through `bridge/INDEX.md`.
-- Treat the live contents of `bridge/INDEX.md` as the only authoritative source
-  for current bridge queue state. Startup reports, dashboard fields, cached scan
-  counts, copied excerpts, summaries, and other derived artifacts are context
-  only.
+- Treat TAFE-backed bridge state as the durable Prime Builder / Loyal Opposition
+  handoff and review mechanism.
+- Treat TAFE-backed bridge state as authoritative for current bridge queue
+  state. Startup reports, dashboard fields, cached scan counts, copied excerpts,
+  summaries, and other derived artifacts are context only.
 - Treat correct bridge function and correct bridge use as permanently
   owner-authorized Loyal Opposition work. Loyal Opposition may update the bridge
   and downstream bridge-dependent artifacts needed to sustain bridge function
@@ -172,11 +174,13 @@ Purpose: define execution behavior by assigned role.
 
 ## File Bridge Coordination
 
-- Use `bridge/INDEX.md` as the Prime Builder / Loyal Opposition review queue.
+- Use TAFE-backed bridge state as the Prime Builder / Loyal Opposition review
+  queue.
 - Check the file bridge at startup in both Prime Builder and Loyal Opposition
   roles.
-- Re-read live `bridge/INDEX.md` before deciding current bridge state; never
-  rely on a derived artifact for current bridge queue status.
+- Re-read TAFE/dispatcher bridge state before deciding current bridge state;
+  never rely on derived artifacts for current bridge
+  queue status.
 - Prime Builder may act only on entries whose latest status is `GO` or
   `NO-GO`.
 - Loyal Opposition may act only on entries whose latest status is `NEW` or

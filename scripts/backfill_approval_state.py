@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -17,21 +16,16 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from groundtruth_kb.backlog.approval_state import classify_initial_state  # noqa: E402
+from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
-STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+bridge/")
 
-
-def bridge_statuses(index_path: Path) -> dict[str, str]:
+def bridge_statuses(project_root: Path) -> dict[str, str]:
     statuses: dict[str, str] = {}
-    current: str | None = None
-    for line in index_path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("Document: "):
-            current = line.split(":", 1)[1].strip()
-            continue
-        if current and (match := STATUS_RE.match(line.strip())):
-            statuses.setdefault(current, match.group(1))
-            current = None
+    for document in scan_expected_documents(project_root).values():
+        status = status_from_bridge_file(project_root / document.files[-1])
+        if status:
+            statuses[document.slug] = status
     return statuses
 
 
@@ -53,7 +47,7 @@ def main() -> int:
     args = parser.parse_args()
     root = args.project_root.resolve()
     db = KnowledgeDB(root / "groundtruth.db")
-    statuses = bridge_statuses(root / "bridge" / "INDEX.md")
+    statuses = bridge_statuses(root)
     planned = []
     for row in rows_needing_backfill(db):
         state = classify_initial_state(row, bridge_statuses=statuses)

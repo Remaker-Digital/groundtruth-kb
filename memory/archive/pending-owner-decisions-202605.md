@@ -6644,3 +6644,90 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-16T16:05:13.402603Z
   answer: "User has answered your questions: \"WI-3337's proposal is GO'd by an independent dispatched Codex review. What should I do next?\"=\"Implement WI-3337 now\". You can now continue with the user's answers in mind."
   notes: ""
+
+- id: DECISION-0648
+  asked_at: 2026-05-16T19:10:55.164152Z
+  question: "WI-3339's lifecycle FSM implements REQ-HARNESS-REGISTRY-001 FR2 as the literal four-edge graph (registered→active, active⇄suspended, suspended→retired) with no direct active→retired edge. Before WI-3340 finalizes the `gt harness retire` verb, how should retiring an *active* harness behave?"
+  options:
+    - "Auto-suspend then retire (Recommended)"
+    - "Add direct active→retired edge"
+    - "Require explicit suspend first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c63da4f733905229
+  resolved_at: 2026-05-16T19:10:55.164152Z
+  answer: "User has answered your questions: \"WI-3339's lifecycle FSM implements REQ-HARNESS-REGISTRY-001 FR2 as the literal four-edge graph (registered→active, active⇄suspended, suspended→retired) with no direct active→retired edge. Before WI-3340 finalizes the `gt harness retire` verb, how should retiring an *active* harness behave?\"=\"Auto-suspend then retire (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0649
+  asked_at: 2026-05-16T19:23:08.879070Z
+  question: "Codex NO-GO'd WI-3340 (finding F1, P1-blocking): `gt harness set-role` cannot be made DB-coherent until the `harnesses` table is the authoritative role substrate — and that substrate isn't ready until WI-3342 seeds the table and migrates the readers. How should the WI-3340 revision handle the `set-role` verb?"
+  options:
+    - "Defer set-role to WI-3341 (Recommended)"
+    - "Dual-write set-role in WI-3340"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f0bd8ec4829b4782
+  resolved_at: 2026-05-16T19:23:08.879070Z
+  answer: "User has answered your questions: \"Codex NO-GO'd WI-3340 (finding F1, P1-blocking): `gt harness set-role` cannot be made DB-coherent until the `harnesses` table is the authoritative role substrate — and that substrate isn't ready until WI-3342 seeds the table and migrates the readers. How should the WI-3340 revision handle the `set-role` verb?\"=\"Defer set-role to WI-3341 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0650
+  asked_at: 2026-05-16T20:49:51.975690Z
+  question: "Codex NO-GO'd WI-3341 Slice A (F1, P1): FR9 specifies `gt harness set-role` over *active* harnesses, but 'active' is a `harnesses`-table lifecycle status — and that table stays empty until WI-3342 seeds it from the legacy harness-state JSON. WI-3342 is sequenced *after* WI-3341, so the dependency runs backwards. This same root cause NO-GO'd WI-3340's set-role too. How should I resolve it?"
+  options:
+    - "Seed the harnesses table first (Recommended)"
+    - "Transitional role-map-only set-role"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b64ed8d2e149c705
+  resolved_at: 2026-05-16T20:49:51.975690Z
+  answer: "User has answered your questions: \"Codex NO-GO'd WI-3341 Slice A (F1, P1): FR9 specifies `gt harness set-role` over *active* harnesses, but 'active' is a `harnesses`-table lifecycle status — and that table stays empty until WI-3342 seeds it from the legacy harness-state JSON. WI-3342 is sequenced *after* WI-3341, so the dependency runs backwards. This same root cause NO-GO'd WI-3340's set-role too. How should I resolve it?\"=\"Seed the harnesses table first (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0651
+  asked_at: 2026-05-17T02:03:22.357123Z
+  question: "The GO'd -003 proposal names `tests/scripts/test_cross_harness_bridge_trigger.py` in its target_paths, IP-7, and verification command — but that path does not exist. The real file is `platform_tests/scripts/test_cross_harness_bridge_trigger.py`. The live implementation-start gate will hard-block a write to the correct path, because the authorization packet (minted from -003) only authorizes the wrong one. The other 9 target_paths are correct. How should I proceed?"
+  options:
+    - "File REVISED -005, then implement"
+    - "Implement 9/10 now, defer trigger test"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8a57900ce41707f6
+  resolved_at: 2026-05-17T02:03:22.357123Z
+  answer: "User has answered your questions: \"The GO'd -003 proposal names `tests/scripts/test_cross_harness_bridge_trigger.py` in its target_paths, IP-7, and verification command — but that path does not exist. The real file is `platform_tests/scripts/test_cross_harness_bridge_trigger.py`. The live implementation-start gate will hard-block a write to the correct path, because the authorization packet (minted from -003) only authorizes the wrong one. The other 9 target_paths are correct. How should I proceed?\"=\"File REVISED -005, then implement\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0652
+  asked_at: 2026-05-17T04:06:14.694273Z
+  question: "How should the friction-hygiene thread close the 32-vs-19 IP-D test gap from Codex NO-GO -018?"
+  options:
+    - "Land the 13 missing tests"
+    - "REVISED proposal narrowing to 19"
+    - "Owner waiver for the reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e4c7f23a2fc20a1f
+  resolved_at: 2026-05-17T04:06:14.694273Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0653
+  asked_at: 2026-05-17T05:18:57.516709Z
+  question: "WI-3341 Slice A is VERIFIED. Commit the 6 implemented files now?"
+  options:
+    - "Commit now"
+    - "Hold off"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0bf9effd060bd7b2
+  resolved_at: 2026-05-17T05:18:57.516709Z
+  answer: "User has answered your questions: \"WI-3341 Slice A is VERIFIED. Commit the 6 implemented files now?\"=\"Commit now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0654
+  asked_at: 2026-05-17T05:18:57.516709Z
+  question: "Commit the WI-3341 bridge thread record now?"
+  options:
+    - "Commit bridge record"
+    - "Leave it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2dc268e90fd9559b
+  resolved_at: 2026-05-17T05:18:57.516709Z
+  answer: "User has answered your questions: \"Commit the WI-3341 bridge thread record now?\"=\"Commit bridge record\". You can now continue with the user's answers in mind."
+  notes: ""

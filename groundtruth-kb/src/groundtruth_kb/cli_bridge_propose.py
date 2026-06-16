@@ -11,7 +11,6 @@ from typing import Any
 
 import click
 
-from groundtruth_kb import bridge_revise
 from groundtruth_kb.bridge.proposal_autoload import (
     auto_owner_decisions,
     auto_prior_delibs,
@@ -284,78 +283,3 @@ def bridge_propose(
     click.echo(f"Wrote DRAFT: {output_path}")
     click.echo("This is a NON-DISPATCHABLE draft; it is not a filed bridge proposal.")
     click.echo("Fill the AI-judgment placeholders, then file through the bridge-propose helper.")
-
-
-@bridge_group.command("revise")
-@click.option("--thread", "slug", required=True, help="Bridge thread slug to revise.")
-@click.option("--reason", required=True, help="Why this REVISED is filed (e.g. fix-no-go-002-F1).")
-@click.option(
-    "--fix-class",
-    required=True,
-    type=click.Choice(bridge_revise.ALL_FIX_CLASSES),
-    help="Mechanical fix-class. Slice-1: content_carryforward_only, citation_add, target_paths_add.",
-)
-@click.option("--add-citation", "add_citations", multiple=True, help="Spec id to add (citation_add). Repeatable.")
-@click.option(
-    "--add-target-path", "add_target_paths", multiple=True, help="Path to add (target_paths_add). Repeatable."
-)
-@click.option("--dry-run", is_flag=True, help="Compute the REVISED + INDEX line without writing.")
-@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
-@click.pass_context
-def bridge_revise_cmd(
-    ctx: click.Context,
-    slug: str,
-    reason: str,
-    fix_class: str,
-    add_citations: tuple[str, ...],
-    add_target_paths: tuple[str, ...],
-    dry_run: bool,
-    json_output: bool,
-) -> None:
-    """Deterministically file a REVISED bridge version (WI-3429, Slice 1)."""
-    config = _resolve_config(ctx)
-    try:
-        result = bridge_revise.revise(
-            slug,
-            reason,
-            fix_class,
-            add_citations=add_citations,
-            add_target_paths=add_target_paths,
-            dry_run=dry_run,
-            project_root=Path(config.project_root),
-        )
-    except bridge_revise.BridgeReviseError as exc:
-        raise click.ClickException(str(exc)) from exc
-
-    if json_output:
-        click.echo(
-            json.dumps(
-                {
-                    "slug": result.slug,
-                    "fix_class": result.fix_class,
-                    "reason": result.reason,
-                    "source_path": result.source_path.as_posix(),
-                    "new_version": result.new_version,
-                    "new_path": result.new_path.as_posix(),
-                    "index_status_line": result.index_status_line,
-                    "dry_run": result.dry_run,
-                    "written": result.written,
-                    "preflight_summaries": result.preflight_summaries,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-        )
-        return
-
-    if result.dry_run:
-        click.echo(f"DRY-RUN: would write {result.new_path.as_posix()} (REVISED, v{result.new_version:03d})")
-        click.echo(f"  carry-forward source: {result.source_path.as_posix()}")
-        click.echo(f"  INDEX line: {result.index_status_line}")
-        click.echo("  (no file written, no INDEX change)")
-        return
-
-    click.echo(f"Filed REVISED: {result.new_path.as_posix()}")
-    click.echo(f"  INDEX line: {result.index_status_line}")
-    for name, summary in result.preflight_summaries.items():
-        click.echo(f"  preflight[{name}]: {summary}")

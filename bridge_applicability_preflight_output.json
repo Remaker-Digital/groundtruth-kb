@@ -1,0 +1,174 @@
+{
+  "applicable_specs": {
+    "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001": {
+      "exists_in_membase": true,
+      "matched_by": [
+        "content:artifact",
+        "content:deliberation",
+        "content:MemBase"
+      ],
+      "rationale": "Development changes should preserve traceability across artifacts, tests, reports, and decisions.",
+      "severity": "advisory",
+      "spec_id": "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001",
+      "status": "verified",
+      "title": "Model project memory as a durable artifact graph",
+      "type": "architecture_decision"
+    },
+    "ADR-ISOLATION-APPLICATION-PLACEMENT-001": {
+      "exists_in_membase": true,
+      "matched_by": [
+        "path:groundtruth-kb/src/groundtruth_kb/project/**",
+        "content:Agent Red"
+      ],
+      "rationale": "Application/root placement work must honor the GT-KB root and applications/ boundary.",
+      "severity": "blocking",
+      "spec_id": "ADR-ISOLATION-APPLICATION-PLACEMENT-001",
+      "status": "specified",
+      "title": "Adopter applications live at <gt-kb-root>/applications/<name>/",
+      "type": "architecture_decision"
+    },
+    "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001": {
+      "exists_in_membase": true,
+      "matched_by": [
+        "content:verified",
+        "content:retired"
+      ],
+      "rationale": "Artifact lifecycle transitions should expose candidate, active, deferred, blocked, superseded, verified, complete, rejected, and retired states.",
+      "severity": "advisory",
+      "spec_id": "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001",
+      "status": "verified",
+      "title": "Artifact lifecycle triggers require thresholds, states, and confirmation flows",
+      "type": "design_constraint"
+    },
+    "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001": {
+      "exists_in_membase": true,
+      "matched_by": [
+        "doc:*",
+        "content:Specification Links",
+        "content:implementation proposal",
+        "content:bridge proposal"
+      ],
+      "rationale": "Implementation proposals must cite every relevant governing specification.",
+      "severity": "blocking",
+      "spec_id": "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001",
+      "status": "specified",
+      "title": "Implementation proposals must be linked to all relevant specifications",
+      "type": "design_constraint"
+    },
+    "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001": {
+      "exists_in_membase": true,
+      "matched_by": [
+        "doc:*",
+        "content:VERIFIED",
+        "content:verification"
+      ],
+      "rationale": "Verification must be derived from linked specifications and executed against the implementation.",
+      "severity": "blocking",
+      "spec_id": "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001",
+      "status": "specified",
+      "title": "VERIFIED is conditional on test creation + execution derived from linked specs",
+      "type": "design_constraint"
+    },
+    "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001": {
+      "exists_in_membase": true,
+      "matched_by": [
+        "content:owner decision",
+        "content:requirement",
+        "content:specification",
+        "content:ADR",
+        "content:DCL",
+        "content:work item",
+        "content:backlog"
+      ],
+      "rationale": "Concrete requirements, decisions, risks, procedures, and future work should be preserved as durable artifacts.",
+      "severity": "advisory",
+      "spec_id": "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+      "status": "verified",
+      "title": "Artifact-oriented governance is the default project interpretation stance",
+      "type": "governance"
+    },
+    "GOV-FILE-BRIDGE-AUTHORITY-001": {
+      "exists_in_membase": true,
+      "matched_by": [
+        "doc:*",
+        "path:bridge/**"
+      ],
+      "rationale": "All bridge-mediated implementation and verification work must honor the file bridge authority model.",
+      "severity": "blocking",
+      "spec_id": "GOV-FILE-BRIDGE-AUTHORITY-001",
+      "status": "verified",
+      "title": "Live bridge index authority and permanent bridge repair authority",
+      "type": "governance"
+    }
+  },
+  "bridge_document_name": "gtkb-sessionstart-governance-hook-surface-repair",
+  "cited_specs": [
+    "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001",
+    "ADR-CODEX-HOOK-PARITY-FALLBACK-001",
+    "ADR-ISOLATION-APPLICATION-PLACEMENT-001",
+    "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001",
+    "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001",
+    "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001",
+    "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001",
+    "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+    "GOV-FILE-BRIDGE-AUTHORITY-001",
+    "GOV-GTKB-ADOPTION-ENFORCEMENT-001",
+    "GOV-RELEASE-READINESS-GOVERNED-TESTING-001",
+    "GOV-RELIABILITY-FAST-LANE-001",
+    "GOV-STANDING-BACKLOG-001"
+  ],
+  "content_source": {
+    "mode": "bridge_file_operative",
+    "path": "bridge/gtkb-sessionstart-governance-hook-surface-repair-001.md"
+  },
+  "missing_advisory_specs": [],
+  "missing_required_specs": [],
+  "operative_version": {
+    "path": "bridge/gtkb-sessionstart-governance-hook-surface-repair-001.md",
+    "status": "NEW",
+    "version_number": 1
+  },
+  "packet_hash": "sha256:11d4386be4a26eb39998eb624d5ba3aeb4cf8ea94d3f52ae785f84ac72a8b295",
+  "preflight_passed": true,
+  "target_paths": [
+    ".claude/hooks/`,",
+    ".claude/hooks/delib-preflight-gate.py",
+    ".claude/hooks/delib-preflight-gate.py`,",
+    ".claude/hooks/turn-marker.py",
+    ".claude/hooks/turn-marker.py`,",
+    ".claude/settings.json",
+    ".codex/gtkb-hooks/`,",
+    ".codex/gtkb-hooks/delib-preflight-gate.py",
+    ".codex/gtkb-hooks/turn-marker.py",
+    ".codex/hooks.json",
+    "bridge/`",
+    "bridge/gtkb-da-governance-completeness-implementation-017.md`",
+    "bridge/gtkb-hourly-quality-scout-advisory-001.md`",
+    "groundtruth-kb/src/groundtruth_kb/project/doctor.py",
+    "groundtruth-kb/templates/hooks/delib-preflight-gate.py",
+    "groundtruth-kb/templates/hooks/turn-marker.py",
+    "groundtruth-kb/templates/managed-artifacts.toml",
+    "groundtruth-kb/tests/test_doctor.py",
+    "groundtruth-kb/tests/test_doctor_adoption_drift.py",
+    "groundtruth-kb/tests/test_managed_registry.py",
+    "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-15-16-18-LO-HYGIENE-ASSESSMENT-advisory.md`",
+    "platform_tests/scripts/test_fab09_safety_gate_registration.py",
+    "scripts/bridge_applicability_preflight.py",
+    "scripts/implementation_authorization.py",
+    "scripts/session_start_dispatch_core.py`",
+    "tests/checker"
+  ],
+  "warnings": {
+    "missing_parent_dirs": [],
+    "spec_links_section": {
+      "candidate_heading": null,
+      "status": "harvested"
+    }
+  },
+  "work_items": [
+    "GTKB-ADOPTION-ENFORCEMENT-001",
+    "GTKB-RELIABILITY-FIXES",
+    "GTKB-RELIABILITY-FIXES-STANDING",
+    "WI-4575"
+  ]
+}
