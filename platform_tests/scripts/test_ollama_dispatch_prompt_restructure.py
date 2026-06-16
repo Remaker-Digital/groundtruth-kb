@@ -46,3 +46,20 @@ def test_build_system_prompt_retains_preflight_commands() -> None:
     assert prompt is not None
     assert "bridge_applicability_preflight.py" in prompt
     assert "adr_dcl_clause_preflight.py" in prompt
+
+
+def test_build_system_prompt_uses_no_index_bridge_instructions() -> None:
+    route = oh.ModelRoute(
+        key="fixture-route",
+        model_id="fixture-model:latest",
+        model_version="latest",
+        tool_calling_supported=True,
+        allowed_tools=("Read", "Write", "Edit", "Grep", "Glob", "Bash"),
+    )
+    prompt = oh.build_system_prompt("bridge-review", route)
+    assert prompt is not None
+    assert "bridge/INDEX.md" not in prompt
+    assert "full\nversioned bridge-file chain" in prompt
+    assert "gt bridge dispatch config" in prompt
+    assert "gt bridge dispatch status" in prompt
+    assert "gt bridge dispatch\nhealth" in prompt

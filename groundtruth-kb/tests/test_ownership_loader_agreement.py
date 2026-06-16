@@ -248,9 +248,9 @@ def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     # local-only post-Slice-1+3+4: 21 (14 hooks + 4 rules + 3 file-class)
     ids = {a.id for a in artifacts_for_scaffold("local-only")}
     assert len(ids) == 21
-    # dual-agent scaffold: 60 rows post-Slice-1+3+4.
+    # dual-agent scaffold: 62 rows post-Slice-1+3+4 after retired hook cleanup.
     ids_da = {a.id for a in artifacts_for_scaffold("dual-agent")}
-    assert len(ids_da) == 66
+    assert len(ids_da) == 62
     # None are ownership-glob.
     assert all("adopter-" not in i for i in ids_da), "ownership-glob leaked into scaffold"
 

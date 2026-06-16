@@ -2,9 +2,9 @@
 
 Spec-derived tests for the REQ-HARNESS-REGISTRY-001 FR9 role-partition
 postcondition: ``prime_builder_ids`` and ``verify_role_partition``. A valid
-FR9 active dispatch partition holds exactly one active prime-builder and
-exactly one active loyal-opposition. Non-active harness role metadata is
-retained but ignored by the active partition.
+FR9 active dispatch partition holds at least one active prime-builder and at
+least one active loyal-opposition. Non-active harness role metadata is retained
+but ignored by the active partition.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights reserved.
 """

@@ -37,6 +37,7 @@ import sqlite3
 import sys
 from pathlib import Path
 from types import ModuleType
+
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -176,6 +177,32 @@ def test_runner_fails_closed_when_document_not_in_index(tmp_path: Path, monkeypa
     (tmp_path / "bridge" / "INDEX.md").write_text("Document: other-thing\nNEW: bridge/foo-001.md\n", encoding="utf-8")
     rc = runner.run(bridge_id="missing-thing")
     assert rc == 2  # ERR_NO_INDEX_ENTRY exit code
+
+
+def test_runner_resolves_versioned_bridge_files_without_index(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """No-index bridge state: status-bearing version files replace INDEX lookup."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    bridge_id = "no-index-thread"
+    (tmp_path / "bridge").mkdir()
+    _seed_bridge_file(
+        tmp_path,
+        f"{bridge_id}-001.md",
+        spec_links=["SPEC-NOINDEX-001"],
+        status_header="NEW",
+    )
+    _seed_test_file(tmp_path, "noindex", ["SPEC-NOINDEX-001"])
+
+    rc = runner.run(bridge_id=bridge_id, dry_run=True)
+
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "Bridge: no-index-thread" in captured.out
+    assert "Overall verified: DRY-RUN" in captured.out
 
 
 # ---------------------------------------------------------------------------

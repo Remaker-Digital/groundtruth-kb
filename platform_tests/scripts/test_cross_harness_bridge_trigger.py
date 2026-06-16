@@ -168,6 +168,9 @@ def _write_index(root: Path, body: str) -> None:
 
 def _write_bridge_file(root: Path, name: str, body: str = "# placeholder\n") -> None:
     """Create a referenced bridge file so ``compute_actionable_pending`` keeps it."""
+    stripped = body.lstrip()
+    if "author_session_context_id:" not in body and not stripped.startswith(("GO", "NO-GO", "VERIFIED")):
+        body = body.rstrip() + "\nauthor_session_context_id: fixture-author-session\n"
     (root / "bridge" / name).write_text(body, encoding="utf-8")
 
 
@@ -176,6 +179,8 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | 
         target_paths = ["scripts/cross_harness_bridge_trigger.py"]
     proposal = "\n".join(
         [
+            "NEW",
+            "",
             f"# Fixture proposal {doc}",
             "",
             f"target_paths: {json.dumps(target_paths)}",
@@ -2497,8 +2502,7 @@ def test_resolve_dispatch_target_attaches_invocation_surfaces_from_projection(
 
 # ──────────────────────────────────────────────────────────────────────────
 # Slice 2: status-aware dispatch resolver + single-harness topology gate.
-# DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertions 1-7, 10, 11.
-# (Assertions 8-9 = Slice 6 doctor; the doctor half of assertion 6 = Slice 6.)
+# WI-4578 role/dispatchability orthogonality plus legacy status-gate coverage.
 # bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver (GO at -002).
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -2534,6 +2538,8 @@ def _rec(
     status=_NO_STATUS,
     surfaces=None,
     event_driven_hooks=True,
+    can_receive_dispatch=None,
+    can_fire_events=None,
     reviewer_precedence=None,
 ) -> dict:
     """Build one registry record. status=_NO_STATUS omits the status key
@@ -2550,6 +2556,10 @@ def _rec(
         record["status"] = status
     if event_driven_hooks is not _NO_EVENT_CAPABILITY:
         record["event_driven_hooks"] = event_driven_hooks
+    if can_receive_dispatch is not None:
+        record["can_receive_dispatch"] = can_receive_dispatch
+    if can_fire_events is not None:
+        record["can_fire_events"] = can_fire_events
     if reviewer_precedence is not None:
         record["reviewer_precedence"] = reviewer_precedence
     return record
@@ -2714,11 +2724,11 @@ def test_lo_ordered_fallback_skips_not_ready_preferred_target(
     assert "loyal-opposition:F" not in summary["results"]
 
 
-def test_lo_ordered_fallback_skips_same_harness_author_target(
+def test_lo_ordered_fallback_allows_same_harness_author_different_session(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Same-harness reviewer refusal falls through to the next ready LO candidate."""
+    """Same-harness authorship is not self-review when session context differs."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_registry(
@@ -2745,7 +2755,11 @@ def test_lo_ordered_fallback_skips_same_harness_author_target(
         ],
     )
     _write_index(root, _index_with_one_new(root))
-    _write_bridge_file(root, "example-thread-001.md", "NEW\n\nauthor_harness_id: A\n")
+    _write_bridge_file(
+        root,
+        "example-thread-001.md",
+        "NEW\n\nauthor_harness_id: A\nauthor_session_context_id: author-session\n",
+    )
     trigger = _load_trigger()
 
     def _readiness(kind: str, _project_root: Path) -> dict[str, object]:
@@ -2757,7 +2771,7 @@ def test_lo_ordered_fallback_skips_same_harness_author_target(
 
     result = summary["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
-    assert result["selected_candidate"]["harness_id"] == "F"
+    assert result["selected_candidate"]["harness_id"] == "A"
     assert result["fallback_skipped_candidates"] == [
         {
             "recipient": "loyal-opposition:D",
@@ -2767,18 +2781,9 @@ def test_lo_ordered_fallback_skips_same_harness_author_target(
             "reviewer_precedence": 10,
             "reason": "ollama_dispatch_not_ready",
         },
-        {
-            "recipient": "loyal-opposition:A",
-            "needed_role_label": "loyal-opposition",
-            "harness_id": "A",
-            "command_handle": "codex",
-            "reviewer_precedence": 20,
-            "reason": "author_meets_reviewer_refused",
-        },
     ]
     state = summary["dispatch_state"]["recipients"]
-    assert state["loyal-opposition"]["selected_candidate"]["harness_id"] == "F"
-    assert state["loyal-opposition:A"]["last_result"] == "author_meets_reviewer_refused"
+    assert state["loyal-opposition"]["selected_candidate"]["harness_id"] == "A"
     assert state["loyal-opposition:D"]["last_result"] == "ollama_dispatch_not_ready"
 
 
@@ -2823,27 +2828,46 @@ def test_lo_ordered_fallback_all_candidates_unavailable_records_no_ready(
     assert state["loyal-opposition:A"]["last_result"] == "codex_dispatch_not_ready"
 
 
-def test_prime_builder_multi_active_remains_configuration_failure(tmp_path: Path) -> None:
-    """WI-4484: ordered fallback is LO-only; Prime Builder dispatch remains single-target."""
+def test_prime_builder_multi_active_selects_dispatchable_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4578: multiple active PBs are valid; dispatchability selects the target."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_registry(
         root,
         [
-            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
-            _rec("C", "antigravity", ["prime-builder"], "active", {"headless": {"argv": ["ag", "{{PROMPT}}"]}}),
-            _rec("A", "codex", ["loyal-opposition"], "active", _CODEX_INVOCATION_SURFACES),
+            _rec(
+                "B",
+                "claude",
+                ["prime-builder"],
+                "active",
+                _CLAUDE_INVOCATION_SURFACES,
+                can_receive_dispatch=False,
+                can_fire_events=True,
+            ),
+            _rec(
+                "A",
+                "codex",
+                ["prime-builder", "loyal-opposition"],
+                "active",
+                _CODEX_INVOCATION_SURFACES,
+                can_receive_dispatch=True,
+                can_fire_events=True,
+            ),
         ],
     )
     _write_index(root, _index_with_one_go(root))
     trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
     summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
 
-    assert summary["results"]["prime-builder"]["reason"] == "dispatch_target_resolution_failed"
-    records = _failure_records(state_dir)
-    assert records[-1]["reason"] == "dispatch_target_resolution_failed"
-    assert "'B'" in records[-1]["error_message"] and "'C'" in records[-1]["error_message"]
+    result = summary["results"]["prime-builder"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "A"
+    assert _failure_records(state_dir) == []
 
 
 def test_resolve_exactly_one_active_dispatches(tmp_path: Path) -> None:
@@ -2880,22 +2904,22 @@ def test_resolve_filters_by_active_status(tmp_path: Path) -> None:
     assert pb is not None and pb.harness_id == "B", "inactive C must not be selected"
 
 
-def test_resolve_filters_by_event_driven_hooks(tmp_path: Path) -> None:
-    """WI-4213: an active same-role harness without bridge-event hooks is never selected."""
+def test_resolve_filters_by_dispatchability(tmp_path: Path) -> None:
+    """WI-4578: an active same-role harness that cannot receive dispatch is never selected."""
     trigger = _load_trigger()
     _write_registry(
         tmp_path,
         [
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
-            _rec("C", "antigravity", ["prime-builder"], "active", event_driven_hooks=False),
+            _rec("C", "antigravity", ["prime-builder"], "active", can_receive_dispatch=False),
         ],
     )
     pb = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
-    assert pb is not None and pb.harness_id == "B", "non-event-capable C must not be selected"
+    assert pb is not None and pb.harness_id == "B", "non-dispatchable C must not be selected"
 
 
-def test_resolve_missing_event_driven_hooks_treated_as_not_capable(tmp_path: Path) -> None:
-    """WI-4213: missing event-driven capability is fail-closed."""
+def test_resolve_missing_dispatchability_treated_as_not_capable(tmp_path: Path) -> None:
+    """WI-4213 compatibility: missing dispatchability alias is fail-closed."""
     trigger = _load_trigger()
     state_dir = tmp_path / "state"
     _write_registry(
@@ -2905,7 +2929,7 @@ def test_resolve_missing_event_driven_hooks_treated_as_not_capable(tmp_path: Pat
     assert trigger._resolve_dispatch_target("prime-builder", tmp_path, state_dir) is None
     records = _failure_records(state_dir)
     assert records[0]["reason"] == "no_active_target_for_role"
-    assert "none active and event-capable" in records[0]["error_message"]
+    assert "none active and receive-dispatch-capable" in records[0]["error_message"]
 
 
 def test_resolve_zero_active_returns_sentinel_and_audits(tmp_path: Path) -> None:
@@ -2933,21 +2957,20 @@ def test_resolve_zero_active_no_statedir_still_sentinels(tmp_path: Path) -> None
     assert trigger._resolve_dispatch_target("prime-builder", tmp_path) is None
 
 
-def test_resolve_multi_active_raises_naming_ids(tmp_path: Path) -> None:
-    """Assertion 3: 2+ ACTIVE -> ValueError naming all matching IDs."""
+def test_resolve_multi_active_returns_top_ranked_target(tmp_path: Path) -> None:
+    """WI-4578: 2+ ACTIVE role holders are valid; resolver returns the top-ranked target."""
     trigger = _load_trigger()
     _write_registry(
         tmp_path,
         [
-            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
-            _rec("C", "antigravity", ["prime-builder"], "active"),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES, reviewer_precedence=20),
+            _rec("C", "antigravity", ["prime-builder"], "active", reviewer_precedence=10),
         ],
     )
-    with pytest.raises(ValueError) as excinfo:
-        trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
-    msg = str(excinfo.value)
-    assert "multiple active" in msg
-    assert "'B'" in msg and "'C'" in msg
+    target = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
+
+    assert target is not None
+    assert target.harness_id == "C"
 
 
 def test_resolve_missing_status_treated_as_inactive(tmp_path: Path) -> None:

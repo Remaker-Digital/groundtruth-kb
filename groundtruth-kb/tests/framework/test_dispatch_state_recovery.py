@@ -24,7 +24,7 @@ from cross_harness_bridge_trigger import run_trigger  # noqa: E402
 
 
 @pytest.fixture()
-def test_env(tmp_path: Path) -> tuple[Path, Path]:
+def test_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
     # Setup mock groundtruth.toml
     toml = tmp_path / "groundtruth.toml"
     toml.write_text(
@@ -94,8 +94,8 @@ def test_env(tmp_path: Path) -> tuple[Path, Path]:
     state_dir.mkdir(parents=True, exist_ok=True)
 
     # Mock environment variable for test execution to avoid single harness skip
-    os.environ["GTKB_HARNESS_PROJECT_TEST_MODE"] = "1"
-    os.environ["GTKB_HARNESS_REGISTRY_PATH"] = str(registry_file)
+    monkeypatch.setenv("GTKB_HARNESS_PROJECT_TEST_MODE", "1")
+    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry_file))
 
     return tmp_path, state_dir
 
@@ -180,7 +180,7 @@ def test_circuit_breaker_active(test_env: tuple[Path, Path]) -> None:
     assert lo_state.get("reason") == "circuit_breaker_active"
 
 
-def test_retry_delay_enforcement(test_env: tuple[Path, Path]) -> None:
+def test_retry_delay_enforcement(test_env: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
     project_root, state_dir = test_env
 
     # Write a state with 1 failure (retry pending) updated just now
@@ -202,7 +202,7 @@ def test_retry_delay_enforcement(test_env: tuple[Path, Path]) -> None:
     state_file.write_text(json.dumps(state_data), encoding="utf-8")
 
     # Set delay to a high value so it enforces it
-    os.environ["OLLAMA_RETRY_DELAY_SECONDS"] = "300"
+    monkeypatch.setenv("OLLAMA_RETRY_DELAY_SECONDS", "300")
 
     summary = run_trigger(
         project_root=project_root,

@@ -76,7 +76,9 @@ All rights reserved.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -252,6 +254,26 @@ DENY_LOG_PATH = Path(".claude/hooks/scanner-safe-writer.log")
 SCHEMA_VERSION = 1
 
 
+def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": datetime.datetime.now(tz=datetime.UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "scanner-safe-writer",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 def _is_in_scope(file_path: str) -> bool:
     """Return True when ``file_path`` resolves to a direct ``bridge/*.md`` file.
 
@@ -356,9 +378,11 @@ def _self_test() -> None:
         sys.exit(1)
     _write_deny_record(SELF_TEST_FILE_PATH, hits, session_id="self-test")
     first_name = hits[0][0]
+    reason = f"Bridge write blocked by scanner-safe-writer: {first_name} detected."
+    _record_gate_denial(first_name, SELF_TEST_FILE_PATH, reason)
     emit_deny(
         "PreToolUse",
-        f"Bridge write blocked by scanner-safe-writer: {first_name} detected.",
+        reason,
     )
     sys.exit(0)
 
@@ -422,14 +446,16 @@ def main() -> None:
     session_id = payload.get("session_id")
     _write_deny_record(file_path, hits, session_id)
     first_name, first_description, _ = hits[0]
+    reason = (
+        f"Bridge write blocked by scanner-safe-writer: {first_name} "
+        f"({first_description}) detected in {file_path}. Redact credential "
+        "values before retrying. See .claude/hooks/scanner-safe-writer.log "
+        "for the full deny record."
+    )
+    _record_gate_denial(first_name, file_path, reason)
     emit_deny(
         "PreToolUse",
-        (
-            f"Bridge write blocked by scanner-safe-writer: {first_name} "
-            f"({first_description}) detected in {file_path}. Redact credential "
-            "values before retrying. See .claude/hooks/scanner-safe-writer.log "
-            "for the full deny record."
-        ),
+        reason,
     )
     sys.exit(0)
 

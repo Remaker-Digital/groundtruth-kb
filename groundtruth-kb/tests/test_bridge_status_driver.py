@@ -75,15 +75,16 @@ def test_bridge_status_driver_reports_role_actionability_without_verified(projec
         "impl-go",
         "scoping-go",
         "revise-me",
+        "advisory",
     ]
-    assert {item.top_status for item in queue.prime_actionable} == {"GO", "NO-GO"}
+    assert {item.top_status for item in queue.prime_actionable} == {"GO", "NO-GO", "ADVISORY"}
     assert "closed" not in {item.document_name for item in queue.prime_actionable}
     assert [item.document_name for item in queue.loyal_opposition_actionable] == [
         "review-new",
         "review-revised",
     ]
     assert queue.dispatchable_counts["prime_dispatchable"] == 2
-    assert queue.dispatchable_counts["prime_interactive"] == 1
+    assert queue.dispatchable_counts["prime_interactive"] == 2
     assert queue.dispatchable_counts["terminal_or_non_actionable"] == 3
 
 

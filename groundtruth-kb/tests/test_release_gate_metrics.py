@@ -67,7 +67,7 @@ def _add_non_auq_resolved_entry(target: Path, decision_id: str = "DECISION-9002"
         f"- id: {decision_id}\n"
         f"  asked_at: 2026-05-10T08:00:00Z\n"
         f'  question: ""\n'
-        f"  detected_via: prose:awaiting_input_q\n"
+        f"  detected_via: manual_input\n"
         f"  status: resolved\n"
         f"  question_hash: aaaa1111bbbb2222\n"
         f"  resolved_at: 2026-05-10T08:30:00Z\n"

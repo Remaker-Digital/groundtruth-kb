@@ -84,7 +84,7 @@ EVENTLESS_TOPOLOGY = [
         "role": ["prime-builder"],
         "can_fire_events": False,
         "can_receive_dispatch": True,
-        "event_driven_hooks": True,  # deprecated alias == can_receive_dispatch
+        "event_driven_hooks": False,  # deprecated alias == can_fire_events
     },
     {
         "id": "D",
@@ -94,7 +94,7 @@ EVENTLESS_TOPOLOGY = [
         "role": ["loyal-opposition"],
         "can_fire_events": False,
         "can_receive_dispatch": True,
-        "event_driven_hooks": True,
+        "event_driven_hooks": False,
     },
 ]
 
@@ -120,7 +120,7 @@ WITH_EVENT_SOURCE_TOPOLOGY = [
         "role": ["loyal-opposition"],
         "can_fire_events": False,
         "can_receive_dispatch": True,
-        "event_driven_hooks": True,
+        "event_driven_hooks": False,
     },
 ]
 
@@ -338,8 +338,32 @@ def test_capability_axes_split(harness_type: str, expected_fire: bool, expected_
     record = _project_harness_record({"id": "X", "harness_name": harness_type, "harness_type": harness_type})
     assert record["can_fire_events"] is expected_fire
     assert record["can_receive_dispatch"] is expected_receive
-    # Deprecated alias preserves the receive-axis value for legacy readers.
-    assert record["event_driven_hooks"] == record["can_receive_dispatch"]
+    # Deprecated alias preserves the event-firing-axis value for legacy topology readers.
+    assert record["event_driven_hooks"] == record["can_fire_events"]
+
+
+def test_capability_axes_honor_explicit_dispatch_metadata() -> None:
+    from groundtruth_kb.harness_projection import _project_harness_record
+
+    record = _project_harness_record(
+        {
+            "id": "B",
+            "harness_name": "claude",
+            "harness_type": "claude",
+            "invocation_surfaces": {
+                "headless": {"argv": ["claude", "-p", "{{PROMPT}}"]},
+                "dispatch": {
+                    "can_fire_events": True,
+                    "can_receive_dispatch": False,
+                    "event_driven_hooks": False,
+                },
+            },
+        }
+    )
+
+    assert record["can_fire_events"] is True
+    assert record["can_receive_dispatch"] is False
+    assert record["event_driven_hooks"] is False
 
 
 # ---------------------------------------------------------------------------

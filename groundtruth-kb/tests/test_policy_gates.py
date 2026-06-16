@@ -168,7 +168,7 @@ def test_application_scope_platform_path_is_denied() -> None:
     decision = check_policy(
         action="platform-write",
         scope="application",
-        paths=(Path("src/groundtruth_kb/cli.py"),),
+        paths=(Path(__file__).resolve().parent.parent / "src" / "groundtruth_kb" / "cli.py",),
         registry=registry,
     )
 

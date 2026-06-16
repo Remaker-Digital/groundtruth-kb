@@ -75,9 +75,11 @@ remembering cross-agent process state.
 
 Every Codex session MUST execute these steps before any other work:
 
-1. **File bridge sweep.** Read `bridge/INDEX.md` if it exists. Process entries
-   whose latest status is `NEW` or `REVISED` according to the project bridge
-   protocol. Report count: "File bridge scan: N entries processed."
+1. **Bridge sweep.** Read canonical TAFE/dispatcher bridge state. Treat
+   retired bridge-index artifacts as non-authoritative historical material.
+   Process entries whose latest status is `NEW` or `REVISED` according to the
+   project bridge protocol. Report count:
+   "File bridge scan: N entries processed."
 
 2. **Read governing documents.** Load and internalize:
    - `CLAUDE.md` (project rules and procedures)

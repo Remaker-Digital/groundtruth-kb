@@ -87,7 +87,8 @@ def test_registry_total_matches_current_manifest() -> None:
     # GTKB-ISOLATION-017 Slice 4 (S328): 1 new file-class record
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
     # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
-    assert len(records) == 67, f"expected 67 total registry records; got {len(records)}"
+    # Deprecated turn-marker and delib-preflight-gate removed: -2 hooks, -2 settings registrations. Total: 67 - 4 = 63.
+    assert len(records) == 63, f"expected 63 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
@@ -101,11 +102,11 @@ def test_registry_class_counts_match_proposal() -> None:
     for r in records:
         counts[r.class_] = counts.get(r.class_, 0) + 1
     assert counts == {
-        "hook": 21,
+        "hook": 19,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
         "skill": 11,
         "file": 4,  # GTKB-ISOLATION-017 Slice 3/4 records + WI-4225 template-only coverage record
-        "settings-hook-registration": 16,
+        "settings-hook-registration": 14,
         "gitignore-pattern": 4,
     }
 
@@ -280,17 +281,18 @@ def test_scaffold_dual_agent_copies_everything() -> None:
 
     Post-governance-completeness: hook count 14→19 (5 new governance hooks),
     settings-hook-registration count 11→15 (4 new event registrations).
+    Deprecated turn-marker and delib-preflight-gate hooks and registrations removed.
     """
     scaffolded = artifacts_for_scaffold("dual-agent")
     by_class: dict[str, int] = {}
     for r in scaffolded:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
-        "hook": 21,
+        "hook": 19,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
         "skill": 11,
         "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
-        "settings-hook-registration": 16,
+        "settings-hook-registration": 14,
         "gitignore-pattern": 4,
     }
 
@@ -390,8 +392,6 @@ def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
             "destructive-gate.py",
             "credential-scan.py",
             "_delib_common.py",
-            "turn-marker.py",
-            "delib-preflight-gate.py",
             "owner-decision-capture.py",
             "gov09-capture.py",
             "spec-event-surfacer.py",
@@ -434,8 +434,8 @@ def test_settings_parity_exact_sixteen_row_matrix() -> None:
     bridge -006 GO): 16 = 15 + spec-event-surfacer.py on PostToolUse.
     """
     registrations = artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
-    assert len(registrations) == 16, (
-        f"expected 16 settings-hook-registration records for dual-agent; got {len(registrations)}"
+    assert len(registrations) == 14, (
+        f"expected 14 settings-hook-registration records for dual-agent; got {len(registrations)}"
     )
     # Collect per-event sorted hook filenames
     by_event: dict[str, list[str]] = {}
@@ -451,8 +451,6 @@ def test_settings_parity_exact_sixteen_row_matrix() -> None:
             [
                 "delib-search-gate.py",
                 "intake-classifier.py",
-                "turn-marker.py",
-                "delib-preflight-gate.py",
                 "gov09-capture.py",
             ]
         ),
@@ -487,17 +485,15 @@ def test_settings_upgrade_managed_set_post_c4() -> None:
     0 scaffolded .claude/settings.json registrations remain unrepairable.
     """
     managed = artifacts_for_upgrade("dual-agent", class_="settings-hook-registration")
-    assert len(managed) == 16, (
-        f"expected 16 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
+    assert len(managed) == 14, (
+        f"expected 14 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
     )
     by_filename = {r.hook_filename: r.event for r in managed if isinstance(r, SettingsHookRegistration)}
     assert by_filename == {
         # SessionStart (promoted in C4)
         "session-start-governance.py": "SessionStart",
         "assertion-check.py": "SessionStart",
-        # UserPromptSubmit (3 governance + 2 promoted in C4)
-        "turn-marker.py": "UserPromptSubmit",
-        "delib-preflight-gate.py": "UserPromptSubmit",
+        # UserPromptSubmit (1 governance + 2 promoted in C4)
         "gov09-capture.py": "UserPromptSubmit",
         "delib-search-gate.py": "UserPromptSubmit",
         "intake-classifier.py": "UserPromptSubmit",
@@ -601,9 +597,9 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 66 records:
-    # 21 hooks + 11 rules + 11 skills + 3 files + 16 settings + 4 gitignore.
-    assert len(dual_agent) == 66
+    # dual-agent sees all 62 records:
+    # 19 hooks + 11 rules + 11 skills + 3 files + 14 settings + 4 gitignore.
+    assert len(dual_agent) == 62
 
     local_only = load_managed_artifacts("local-only")
     # local-only sees all 14 ORIGINAL hooks + rule.prime-builder + 2

@@ -257,10 +257,39 @@ def test_active_prime_builder_attribution_filters_inactive(tmp_path: Path, monke
     assert resolve_changed_by() == "prime-builder/claude"
 
 
-def test_two_active_prime_builders_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Two ACTIVE Prime Builders is a registry misconfiguration: priority-3
-    resolution returns None and the mutating resolver fails closed (RuntimeError).
-    """
+def test_multiple_active_prime_builders_selects_single_dispatchable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fallback attribution selects the only dispatchable active Prime Builder."""
+    registry = tmp_path / "harness-registry.json"
+    _write_attribution_registry(
+        registry,
+        [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["prime-builder"],
+                "can_receive_dispatch": True,
+            },
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder"],
+                "can_receive_dispatch": False,
+            },
+        ],
+    )
+    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry))
+    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
+    assert resolve_changed_by() == "prime-builder/codex"
+
+
+def test_two_dispatchable_prime_builders_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two dispatchable ACTIVE Prime Builders are ambiguous and fail closed."""
     registry = tmp_path / "harness-registry.json"
     _write_attribution_registry(
         registry,
@@ -271,6 +300,7 @@ def test_two_active_prime_builders_fail_closed(tmp_path: Path, monkeypatch: pyte
                 "harness_type": "claude",
                 "status": "active",
                 "role": ["prime-builder"],
+                "can_receive_dispatch": True,
             },
             {
                 "id": "C",
@@ -278,6 +308,7 @@ def test_two_active_prime_builders_fail_closed(tmp_path: Path, monkeypatch: pyte
                 "harness_type": "antigravity",
                 "status": "active",
                 "role": ["prime-builder"],
+                "can_receive_dispatch": True,
             },
         ],
     )

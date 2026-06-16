@@ -16,6 +16,8 @@ All rights reserved.
 
 from __future__ import annotations
 
+import datetime as _dt
+import hashlib
 import json
 import os
 import re
@@ -56,9 +58,25 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         return [field for field in REQUIRED_AUTHOR_METADATA_FIELDS if not values.get(field)]
 
 
-BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
+RETIRED_BRIDGE_INDEX_REL = "bridge/" + "INDEX" + ".md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
+BRIDGE_INDEX_STATUS_TOKENS = (
+    "NEW",
+    "REVISED",
+    "GO",
+    "NO-GO",
+    "VERIFIED",
+    "WITHDRAWN",
+    "ADVISORY",
+    "DEFERRED",
+    "ACCEPTED",
+    "BLOCKED",
+)
+BRIDGE_INDEX_STATUS_RE = re.compile(
+    r"^(?:" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r"):\s+bridge/[^\s]+\.md$"
+)
+BRIDGE_INDEX_STATUS_LIKE_RE = re.compile(r"^[A-Z][A-Z-]*:")
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
 # (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
 # unification-003 GO at -004). Import the canonical bridge work-intent order;
@@ -185,6 +203,46 @@ BRIDGE_KIND_METADATA_EXEMPT = frozenset(
 )
 PROJECT_METADATA_STATUSES = frozenset({"NEW", "REVISED"})
 
+# Requirement Sufficiency presence gate (WI-3439).
+# .claude/rules/file-bridge-protocol.md section "Mandatory Implementation-Start
+# Authorization Metadata" requires every implementation proposal that requests
+# source/test/script/hook/config/deploy/repo-state/KB-mutation work to carry a
+# "## Requirement Sufficiency" subsection with exactly one operative state. This
+# Write-time gate enforces presence + a bounded operative state BEFORE GO, so the
+# omission is caught here rather than post-GO at implementation-start. Scoped to
+# implementation-proposal bridge_kind tokens (canonical prime_proposal plus the
+# colloquial implementation_proposal used via the helper path), NOT
+# implementation_report (post-implementation reports correctly lack the
+# subsection). See the GO at
+# bridge/gtkb-wi3439-requirement-sufficiency-presence-check-002.md constraint 1.
+REQUIREMENT_SUFFICIENCY_HEADING_RE = re.compile(
+    r"^#{1,6}\s*requirement\s+sufficiency\s*$",
+    re.IGNORECASE,
+)
+REQUIREMENT_SUFFICIENCY_OPERATIVE_RE = re.compile(
+    r"existing\s+requirements?\s+(?:are\s+)?sufficient"
+    r"|new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
+    re.IGNORECASE,
+)
+# The two mutually exclusive operative states. The file-bridge-protocol requires
+# EXACTLY ONE; the gap helper counts distinct states present and rejects zero or
+# more than one (per WI-3439 verification NO-GO -008: the combined RE above only
+# proved presence-of-either, so a section asserting BOTH states was wrongly
+# accepted).
+REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE = re.compile(
+    r"existing\s+requirements?\s+(?:are\s+)?sufficient",
+    re.IGNORECASE,
+)
+REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE = re.compile(
+    r"new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
+    re.IGNORECASE,
+)
+REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES = (
+    REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE,
+    REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE,
+)
+BRIDGE_KIND_IMPLEMENTATION_PROPOSAL = frozenset({"prime_proposal", "implementation_proposal"})
+
 # WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
 # CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-
 # MANDATORY-001/CLAUSE-PROJECT-AUTH-LIVE-CHECK).
@@ -229,6 +287,27 @@ ADVISORY_REPORT_SECTIONS = (
     "Classification Slot",
 )
 AUDIT_OUTPUT_RELATIVE_PATH = Path(".codex") / "gtkb-hooks" / "last-bridge-audit.json"
+
+
+def _record_gate_denial(pattern_id: str, subject: str, reason: str, *, root: Path | None = None) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    base = root or Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
+    if not path.is_absolute():
+        path = base / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "bridge-compliance-gate",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
 
 
 def _ancestor_or_self(root: Path, cwd_path: Path) -> bool:
@@ -305,8 +384,8 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
 def _canonical_project_root(cwd_path: Path) -> Path:
     """Resolve the canonical GT-KB project root for project-state access.
 
-    Bridge governance state -- ``groundtruth.db``, the live ``bridge/INDEX.md``,
-    and the audit-output tree -- exists only at the canonical main-worktree
+    Bridge governance state -- ``groundtruth.db``, versioned bridge files, and
+    the audit-output tree -- exists only at the canonical main-worktree
     root. A session running inside a ``.claude/worktrees/*`` linked worktree has
     a cwd that is NOT that root; trusting it makes the gate read an empty
     scaffold database and falsely block a valid proposal.
@@ -337,31 +416,85 @@ def _canonical_project_root(cwd_path: Path) -> Path:
 
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
     """
-    Returns {document_name: latest_status}.
-    Only the first status line per document entry is considered (latest version).
+    Returns {document_name: latest_status} from versioned bridge files.
+    The argument is retained for older call sites and may be either the bridge
+    directory or any path inside it.
     """
-    result: dict[str, str] = {}
+    bridge_dir = index_path if index_path.is_dir() else index_path.parent
+    if not bridge_dir.is_dir():
+        return {}
+    latest: dict[str, tuple[int, str]] = {}
+    status_re = re.compile(
+        r"^[#>*\-\s`]*(" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r")\b",
+        re.IGNORECASE,
+    )
+    for path in bridge_dir.glob("*.md"):
+        match = re.match(r"(?P<doc>.+)-(?P<version>\d{3})\.md$", path.name)
+        if not match:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        status = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            status_match = status_re.match(stripped)
+            status = status_match.group(1).upper() if status_match else ""
+            break
+        version = int(match.group("version"))
+        doc = match.group("doc")
+        if status and version > latest.get(doc, (-1, ""))[0]:
+            latest[doc] = (version, status)
+    return {doc: status for doc, (_, status) in latest.items()}
+
+
+def _bridge_index_well_formedness_error(content: str) -> str | None:
+    """Return a hard-block reason for malformed retired bridge-state content."""
+    if "\\n" in content:
+        return "retired bridge-index content contains literal escaped newline text (\\n)."
+
+    seen_documents: set[str] = set()
     current_doc: str | None = None
-    current_doc_status_seen: bool = False
-
-    try:
-        lines = index_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return result
-
-    for line in lines:
-        line = line.strip()
+    current_doc_status_seen = False
+    for lineno, raw_line in enumerate(content.splitlines(), start=1):
+        line = raw_line.strip()
         if line.startswith("Document:"):
-            current_doc = line.removeprefix("Document:").strip()
+            if current_doc is not None and not current_doc_status_seen:
+                return f"Document {current_doc!r} has no status line before line {lineno}."
+            document = line.removeprefix("Document:").strip()
+            if not document:
+                return f"line {lineno}: Document line is missing a bridge document id."
+            if document in seen_documents:
+                return f"line {lineno}: duplicate Document entry {document!r}."
+            seen_documents.add(document)
+            current_doc = document
             current_doc_status_seen = False
-        elif current_doc and not current_doc_status_seen:
-            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "DEFERRED", "REVISED", "NEW"):
-                if line.startswith(status + ":"):
-                    result[current_doc] = status
-                    current_doc_status_seen = True
-                    break
+            continue
 
-    return result
+        if current_doc is None:
+            continue
+
+        if not line:
+            if not current_doc_status_seen:
+                return f"Document {current_doc!r} has a blank line before its first status line."
+            current_doc = None
+            current_doc_status_seen = False
+            continue
+
+        if BRIDGE_INDEX_STATUS_RE.match(line):
+            current_doc_status_seen = True
+            continue
+
+        if BRIDGE_INDEX_STATUS_LIKE_RE.match(line):
+            return f"line {lineno}: malformed bridge status line {line!r}."
+        return f"line {lineno}: unexpected non-status content inside Document {current_doc!r}: {line!r}."
+
+    if current_doc is not None and not current_doc_status_seen:
+        return f"Document {current_doc!r} has no status line."
+    return None
 
 
 def _first_nonblank_line(content: str) -> str:
@@ -376,7 +509,7 @@ def _is_bridge_markdown_file(file_path: str) -> bool:
     normalized = file_path.replace("\\", "/")
     if not normalized.endswith(".md"):
         return False
-    return "/bridge/" in f"/{normalized}" and not normalized.endswith("/bridge/INDEX.md")
+    return "/bridge/" in f"/{normalized}" and not normalized.endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
 
 
 def _extract_bridge_id_from_path(file_path: str) -> str | None:
@@ -460,7 +593,7 @@ def _first_line_is_recognized_status(first_line: str) -> bool:
     Mirrors the gate's existing first-line recognition union (the ADVISORY,
     GO/NO-GO/VERIFIED, and PENDING_PREFLIGHT_STATUSES {NEW, REVISED} checks in
     ``_deny_reason_for_content``) plus the non-actionable ``DEFERRED`` and
-    terminal ``WITHDRAWN`` statuses used throughout bridge/INDEX.md. Errs toward acceptance (``.startswith`` for
+    terminal ``WITHDRAWN`` statuses used throughout bridge state. Errs toward acceptance (``.startswith`` for
     verdicts) so the body-status-token rule never false-blocks a line the rest
     of the gate would recognize.
     """
@@ -499,7 +632,7 @@ def _body_status_token_violation(file_path: str, content: str) -> bool:
     New files (and overwrites of files that currently have a canonical first
     line) must keep a canonical first line. Files that already exist on disk
     with a non-canonical first line are grandfathered. Non-versioned bridge
-    markdown (no ``-NNN`` suffix, e.g. bridge/INDEX.md is already excluded by
+    markdown (no ``-NNN`` suffix, e.g. retired bridge-index artifacts are already excluded by
     ``_is_bridge_markdown_file``) is not subject to the rule.
     """
     if _extract_bridge_id_from_path(file_path) is None:
@@ -736,6 +869,71 @@ def _bridge_kind_is_metadata_exempt(content: str) -> bool:
     return match.group(1).strip().lower() in BRIDGE_KIND_METADATA_EXEMPT
 
 
+def _bridge_kind_is_implementation_proposal(content: str) -> bool:
+    """Return True when the proposal's bridge_kind denotes an implementation
+    proposal (canonical ``prime_proposal`` or the colloquial
+    ``implementation_proposal`` token used via the helper path).
+
+    Used by the WI-3439 Requirement Sufficiency gate so the check fires ONLY for
+    implementation proposals -- never for implementation reports, verdicts, or
+    advisories, which legitimately lack the subsection. This is a POSITIVE
+    predicate, deliberately NOT the negative ``_bridge_kind_is_metadata_exempt``
+    set: that set does not contain ``implementation_report`` and so would wrongly
+    gate post-implementation reports (GO constraint 1). A proposal that omits the
+    bridge_kind line returns False (conservative; the project-linkage gate still
+    catches missing metadata).
+    """
+    match = BRIDGE_KIND_LINE_RE.search(content)
+    if not match:
+        return False
+    return match.group(1).strip().lower() in BRIDGE_KIND_IMPLEMENTATION_PROPOSAL
+
+
+def _requirement_sufficiency_section_gap(content: str) -> str | None:
+    """Return a short gap descriptor when an implementation proposal's
+    ``## Requirement Sufficiency`` subsection is absent, placeholder-only, or
+    does not carry EXACTLY ONE bounded operative state; return None when it is
+    substantive with a single operative state.
+
+    Operative states per .claude/rules/file-bridge-protocol.md section "Mandatory
+    Implementation-Start Authorization Metadata": exactly one of "Existing
+    requirements sufficient" or "New or revised requirement required before
+    implementation". The two states are mutually exclusive, so a section that
+    asserts BOTH is a gap (WI-3439 verification NO-GO -008). Mirrors the existing
+    ``_has_concrete_spec_links`` / ``_has_concrete_owner_decisions_section``
+    section-presence machinery (heading scan + ``_collect_section_lines`` +
+    placeholder-line rejection).
+    """
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if REQUIREMENT_SUFFICIENCY_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return "section absent"
+    section = _collect_section_lines(lines, start)
+    nonblank = [stripped for stripped in (ln.strip() for ln in section) if stripped]
+    if not nonblank:
+        return "section empty"
+    if not any(not SPEC_PLACEHOLDER_LINE_RE.match(ln) for ln in nonblank):
+        return "section placeholder-only"
+    joined = "\n".join(section)
+    states_present = sum(1 for state_re in REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES if state_re.search(joined))
+    if states_present == 0:
+        return (
+            "no operative state ('Existing requirements sufficient' or "
+            "'New or revised requirement required before implementation')"
+        )
+    if states_present > 1:
+        return (
+            "multiple operative states (exactly one required: 'Existing "
+            "requirements sufficient' XOR 'New or revised requirement required "
+            "before implementation')"
+        )
+    return None
+
+
 def _project_metadata_gaps(content: str) -> list[str]:
     """Return the list of missing project-linkage metadata lines.
 
@@ -938,35 +1136,25 @@ def _run_pending_applicability_preflight(
     return True, ""
 
 
-def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
+def _read_proposal_target_paths(bridge_dir: Path, doc_name: str) -> list[str]:
     """Read target_paths from the latest proposal file's frontmatter."""
-    # Find the latest proposal file path from the index
-    try:
-        lines = index_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
-
-    in_doc = False
-    latest_file: str | None = None
-    for line in lines:
-        line = line.strip()
-        if line.startswith("Document:") and line.removeprefix("Document:").strip() == doc_name:
-            in_doc = True
+    latest_path: Path | None = None
+    latest_version = -1
+    pattern = re.compile(rf"^{re.escape(doc_name)}-(\d{{3}})\.md$")
+    for path in bridge_dir.glob(f"{doc_name}-*.md"):
+        match = pattern.match(path.name)
+        if not match:
             continue
-        if in_doc and line.startswith("Document:"):
-            break
-        if in_doc and latest_file is None:
-            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "DEFERRED", "REVISED", "NEW"):
-                if line.startswith(status + ":"):
-                    latest_file = line.split(":", 1)[1].strip()
-                    break
+        version = int(match.group(1))
+        if version > latest_version:
+            latest_path = path
+            latest_version = version
 
-    if not latest_file:
+    if latest_path is None:
         return []
 
-    proposal_path = index_path.parent.parent / latest_file
     try:
-        content = proposal_path.read_text(encoding="utf-8")
+        content = latest_path.read_text(encoding="utf-8")
     except OSError:
         return []
 
@@ -993,28 +1181,20 @@ def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
 
 
 def _is_bridge_index_file(file_path: str) -> bool:
-    """True when file_path points at the canonical bridge index.
-
-    Edits to bridge/INDEX.md are intrinsic bridge protocol (every proposal
-    filing, verdict, and status transition edits it) and are never the gated
-    "implementation" of a pending proposal - even when a proposal legitimately
-    lists bridge/INDEX.md in its target_paths.
-    """
+    """True when file_path points at the retired bridge-index artifact."""
     normalized = file_path.replace("\\", "/")
-    return f"/{normalized}".endswith("/bridge/INDEX.md")
+    return f"/{normalized}".endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
 
 
-def _pending_proposal_ask_reason(index_path: Path, file_path: str) -> str | None:
+def _pending_proposal_ask_reason(bridge_dir: Path, file_path: str) -> str | None:
     """Return an ask-checkpoint reason when file_path matches a pending
-    proposal's target_paths, or None. bridge/INDEX.md is always exempt."""
-    if _is_bridge_index_file(file_path):
-        return None
-    doc_statuses = _parse_bridge_index(index_path)
+    proposal's target_paths, or None."""
+    doc_statuses = _parse_bridge_index(bridge_dir)
     file_path_normalized = file_path.replace("\\", "/")
     for doc_name, status in doc_statuses.items():
         if status not in ("NEW", "REVISED", "NO-GO"):
             continue
-        for tp in _read_proposal_target_paths(index_path, doc_name):
+        for tp in _read_proposal_target_paths(bridge_dir, doc_name):
             tp_norm = tp.replace("\\", "/")
             if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
                 if status == "NO-GO":
@@ -1062,6 +1242,9 @@ def _deny_reason_for_content(
     content: str,
     run_pending_preflight: bool = True,
 ) -> str | None:
+    if _is_bridge_index_file(file_path) and content:
+        return "[Governance] Retired bridge-index artifacts must not be written or recreated."
+
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
             return (
@@ -1159,6 +1342,22 @@ def _deny_reason_for_content(
                     "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
                     "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
                     "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
+                )
+        if (
+            first_line in PROJECT_METADATA_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
+            and _target_paths_from_content(content)
+        ):
+            req_suff_gap = _requirement_sufficiency_section_gap(content)
+            if req_suff_gap:
+                return (
+                    "[Governance] Implementation proposals that request implementation work "
+                    "must include a substantive ## Requirement Sufficiency subsection with "
+                    "exactly one operative state ('Existing requirements sufficient' or "
+                    "'New or revised requirement required before implementation'). "
+                    f"Gap: {req_suff_gap}. "
+                    "(Hard-block per .claude/rules/file-bridge-protocol.md "
+                    "'Mandatory Implementation-Start Authorization Metadata'; WI-3439.)"
                 )
         if run_pending_preflight and first_line in PENDING_PREFLIGHT_STATUSES:
             bridge_id = _extract_bridge_id_from_path(file_path)
@@ -1341,6 +1540,7 @@ def main() -> None:
             print(json.dumps(out))
 
         def emit_deny(event: str, reason: str) -> None:  # type: ignore[misc]
+            _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
             out = {
                 "hookSpecificOutput": {
                     "hookEventName": event,
@@ -1386,6 +1586,7 @@ def main() -> None:
 
     work_intent_reason = _bridge_work_intent_deny_reason(cwd_path=cwd_path, file_path=file_path, payload=payload)
     if work_intent_reason:
+        _record_gate_denial("bridge-compliance", file_path, work_intent_reason, root=cwd_path)
         emit_deny("PreToolUse", work_intent_reason)
         sys.exit(0)
 
@@ -1397,6 +1598,7 @@ def main() -> None:
         run_pending_preflight=tool_name == "Write",
     )
     if reason:
+        _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
         emit_deny("PreToolUse", reason)
         sys.exit(0)
 
@@ -1405,12 +1607,12 @@ def main() -> None:
         emit_ask("PreToolUse", heading_ask_reason)
         sys.exit(0)
 
-    index_path = _canonical_project_root(cwd_path) / BRIDGE_INDEX_FILENAME
-    if not index_path.exists():
+    bridge_dir = _canonical_project_root(cwd_path) / "bridge"
+    if not bridge_dir.is_dir():
         emit_pass()
         sys.exit(0)
 
-    ask_reason = _pending_proposal_ask_reason(index_path, file_path)
+    ask_reason = _pending_proposal_ask_reason(bridge_dir, file_path)
     if ask_reason:
         emit_ask("PreToolUse", ask_reason)
         sys.exit(0)

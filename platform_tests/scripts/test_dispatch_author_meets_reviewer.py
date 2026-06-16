@@ -64,28 +64,34 @@ def _write_project(root: Path) -> Path:
     return root
 
 
-def test_should_refuse_self_review_returns_true_when_author_matches_dispatched_harness_id(tmp_path: Path) -> None:
+def test_should_refuse_self_review_returns_true_when_author_session_matches_reviewer_session(tmp_path: Path) -> None:
     root = _write_project(tmp_path)
     bridge_id = "test-doc"
-    (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text("author_harness_id: D\n# content\n", encoding="utf-8")
-    res = cht._should_refuse_self_review(bridge_id, "D", root)
+    (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text(
+        "author_harness_id: D\nauthor_session_context_id: session-D\n# content\n",
+        encoding="utf-8",
+    )
+    res = cht._should_refuse_self_review(bridge_id, "session-D", root)
     assert res is True
 
 
-def test_should_refuse_self_review_returns_false_when_author_differs(tmp_path: Path) -> None:
+def test_should_refuse_self_review_returns_false_when_same_harness_different_session(tmp_path: Path) -> None:
     root = _write_project(tmp_path)
     bridge_id = "test-doc"
-    (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text("author_harness_id: B\n# content\n", encoding="utf-8")
-    res = cht._should_refuse_self_review(bridge_id, "D", root)
+    (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text(
+        "author_harness_id: D\nauthor_session_context_id: author-session\n# content\n",
+        encoding="utf-8",
+    )
+    res = cht._should_refuse_self_review(bridge_id, "reviewer-session", root)
     assert res is False
 
 
-def test_should_refuse_self_review_handles_missing_author_metadata(tmp_path: Path) -> None:
+def test_should_refuse_self_review_fails_closed_when_author_session_metadata_missing(tmp_path: Path) -> None:
     root = _write_project(tmp_path)
     bridge_id = "test-doc"
     (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text("# content\n", encoding="utf-8")
-    res = cht._should_refuse_self_review(bridge_id, "D", root)
-    assert res is False
+    res = cht._should_refuse_self_review(bridge_id, "reviewer-session", root)
+    assert res is True
 
 
 def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refusal(
@@ -96,7 +102,10 @@ def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refus
     state_dir = tmp_path / "state"
 
     bridge_id = "test-self-review"
-    (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text("author_harness_id: D\n# content\n", encoding="utf-8")
+    (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text(
+        "author_harness_id: D\nauthor_session_context_id: dispatch-session-1\n# content\n",
+        encoding="utf-8",
+    )
     (root / "bridge" / "INDEX.md").write_text(
         f"Document: {bridge_id}\nNEW: bridge/gtkb-{bridge_id}-001.md\n", encoding="utf-8"
     )
@@ -104,6 +113,7 @@ def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refus
     monkeypatch.setattr(cht, "_is_cross_harness_trigger_active_substrate", lambda root: True)
     monkeypatch.setattr(cht, "_is_single_harness_topology", lambda root: False)
     monkeypatch.setattr(cht, "_evaluate_ollama_dispatch_readiness", lambda root: {"ready": True})
+    monkeypatch.setattr(cht, "_new_dispatch_id", lambda recipient_key: "dispatch-session-1")
 
     summary = cht.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
 
@@ -124,4 +134,39 @@ def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refus
     assert len(lo_diags) > 0
     lo_diag = lo_diags[-1]
     assert lo_diag["last_result"] == "author_meets_reviewer_refused"
+    assert lo_diag["classification"] == "author_meets_reviewer_refused"
+
+
+def test_dispatch_fails_closed_when_author_session_metadata_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+    root = _write_project(tmp_path)
+    state_dir = tmp_path / "state"
+
+    bridge_id = "test-missing-session"
+    (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text(
+        "author_harness_id: D\n# content\n",
+        encoding="utf-8",
+    )
+    (root / "bridge" / "INDEX.md").write_text(
+        f"Document: {bridge_id}\nNEW: bridge/gtkb-{bridge_id}-001.md\n", encoding="utf-8"
+    )
+
+    monkeypatch.setattr(cht, "_is_cross_harness_trigger_active_substrate", lambda root: True)
+    monkeypatch.setattr(cht, "_is_single_harness_topology", lambda root: False)
+    monkeypatch.setattr(cht, "_evaluate_ollama_dispatch_readiness", lambda root: {"ready": True})
+
+    summary = cht.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert summary["results"]["loyal-opposition"]["reason"] == "author_session_context_missing"
+
+    state_file = state_dir / "dispatch-state.json"
+    state_data = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state_data["recipients"]["loyal-opposition"]["last_result"] == "author_session_context_missing"
+
+    diag_file = state_dir / "trigger-diagnostic.jsonl"
+    lo_diags = [json.loads(line) for line in diag_file.read_text(encoding="utf-8").splitlines()]
+    lo_diag = [record for record in lo_diags if record.get("recipient") == "loyal-opposition"][-1]
+    assert lo_diag["last_result"] == "author_session_context_missing"
     assert lo_diag["classification"] == "author_meets_reviewer_refused"

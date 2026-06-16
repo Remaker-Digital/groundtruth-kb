@@ -23,11 +23,10 @@ per ADR).
 
 ## Bridge essentials
 
-`bridge/INDEX.md` is the canonical workflow state for proposals reviewed
-through the file bridge. The bridge protocol is described in
-`.claude/rules/bridge-essential.md`. Both the Prime Builder and Loyal
-Opposition harnesses scan this index; never delete bridge files (they form
-the audit trail).
+TAFE-backed bridge state is the canonical workflow state for proposals reviewed
+through the bridge. Retired bridge-index artifacts are not live bridge state.
+The bridge protocol is described in `.claude/rules/bridge-essential.md`; never
+delete bridge files (they form the audit trail).
 
 ## Adopter-owned vs product-managed
 

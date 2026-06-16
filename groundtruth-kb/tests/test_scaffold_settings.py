@@ -86,15 +86,12 @@ def test_settings_json_exact_event_placement(tmp_project):
     # SessionStart hooks (governance + assertion check)
     assert _hook_names_for_event("SessionStart") == ["assertion-check.py", "session-start-governance.py"]
 
-    # UserPromptSubmit hooks: delib-search-gate + intake-classifier + 3
-    # governance-completeness hooks (turn-marker, delib-preflight-gate,
-    # gov09-capture) per gtkb-da-governance-completeness-implementation-016.
+    # UserPromptSubmit hooks: delib-search-gate + intake-classifier + 1
+    # governance-completeness hook (gov09-capture) per gtkb-da-governance-completeness-implementation-016.
     assert _hook_names_for_event("UserPromptSubmit") == sorted(
         [
             "delib-search-gate.py",
             "intake-classifier.py",
-            "turn-marker.py",
-            "delib-preflight-gate.py",
             "gov09-capture.py",
         ]
     )

@@ -149,6 +149,8 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | 
         target_paths = ["scripts/single_harness_bridge_dispatcher.py"]
     proposal = "\n".join(
         [
+            "NEW",
+            "",
             f"# Fixture proposal {doc}",
             "",
             f"target_paths: {json.dumps(target_paths)}",

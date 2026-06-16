@@ -36,8 +36,6 @@ _bridge_writer = importlib.import_module("scripts.gtkb_bridge_writer")
 PRIME_ROLE_SLOT = _bridge_writer.PRIME_ROLE_SLOT
 WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
-insert_index_status = _bridge_writer.insert_index_status
-validate_transition = _bridge_writer.validate_transition
 write_bridge_file = _bridge_writer.write_bridge_file
 
 
@@ -46,7 +44,7 @@ class BridgeRevisionError(RuntimeError):
 
 
 class BridgeDocumentNotFoundError(BridgeRevisionError):
-    """Raised when ``bridge/INDEX.md`` lacks an exact ``Document: <slug>`` entry."""
+    """Raised when versioned bridge files lack an exact ``<slug>`` chain."""
 
 
 class BridgeLatestStatusError(BridgeRevisionError):
@@ -62,7 +60,7 @@ class BridgePreflightError(BridgeRevisionError):
 
 
 class BridgeIndexConflictError(BridgeRevisionError):
-    """Raised when ``bridge/INDEX.md`` changes during live filing."""
+    """Retained historical exception name for stale helper callers."""
 
 
 class BridgeFileAlreadyExistsError(BridgeRevisionError):
@@ -115,44 +113,43 @@ def _load_bridge_propose_helper():
     return module
 
 
-def _read_index(bridge_dir: Path) -> str:
-    index_path = bridge_dir / "INDEX.md"
-    if not index_path.is_file():
-        raise BridgeDocumentNotFoundError(f"Bridge index not found: {index_path}")
-    return index_path.read_text(encoding="utf-8")
-
-
 def _parse_versions(slug: str, bridge_dir: Path) -> list[BridgeVersion]:
-    text = _read_index(bridge_dir)
     versions: list[BridgeVersion] = []
-    in_doc = False
     root = bridge_dir.parent
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document:"):
-            if in_doc:
-                break
-            in_doc = line.removeprefix("Document:").strip() == slug
+    pattern = re.compile(rf"^{re.escape(slug)}-(\d{{3}})\.md$")
+    status_re = re.compile(
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+        re.IGNORECASE,
+    )
+    for path in bridge_dir.glob(f"{slug}-*.md"):
+        version_match = pattern.match(path.name)
+        if not version_match:
             continue
-        if not in_doc:
-            continue
-        if line == "":
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
             break
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)$", line)
-        if not match:
+        status = None
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = status_re.match(stripped)
+            status = match.group(1).upper() if match else None
+            break
+        if status is None:
             continue
-        rel_path = match.group(2)
-        version_match = re.search(r"-(\d{3})\.md$", rel_path)
         versions.append(
             BridgeVersion(
-                status=match.group(1),
-                rel_path=rel_path,
-                abs_path=root / rel_path,
-                version=int(version_match.group(1)) if version_match else 0,
+                status=status,
+                rel_path=f"bridge/{path.name}",
+                abs_path=root / "bridge" / path.name,
+                version=int(version_match.group(1)),
             )
         )
+    versions.sort(key=lambda item: item.version, reverse=True)
     if not versions:
-        raise BridgeDocumentNotFoundError(f"No exact bridge document entry found for {slug!r}")
+        raise BridgeDocumentNotFoundError(f"No versioned bridge files found for {slug!r}")
     return versions
 
 
@@ -341,7 +338,6 @@ def file_revision(
         raise BridgeLatestStatusError(f"file mode requires latest bridge status NO-GO; got {latest.status}")
     plan = plan_revision(slug, bridge_dir=bridge_root)
     live_path = bridge_root.parent / plan.live_path
-    index_path = bridge_root / "INDEX.md"
     if live_path.exists():
         raise BridgeFileAlreadyExistsError(f"Live bridge file already exists: {live_path}")
 
@@ -350,7 +346,6 @@ def file_revision(
     helper.handle_hits_abort_or_redact(content, hits, mode="abort")
     content = ensure_author_metadata(content, project_root=bridge_root.parent)
 
-    original_index = index_path.read_text(encoding="utf-8")
     candidate_dir = PROJECT_ROOT / ".tmp" / "bridge-revisions"
     candidate_dir.mkdir(parents=True, exist_ok=True)
     candidate_path = candidate_dir / f"{slug}-{plan.next_version:03d}.candidate.md"
@@ -358,18 +353,8 @@ def file_revision(
         candidate_path.write_text(content, encoding="utf-8", newline="\n")
         if run_preflights:
             _run_candidate_preflights(slug, candidate_path)
-        if index_path.read_text(encoding="utf-8") != original_index:
-            raise BridgeIndexConflictError("bridge/INDEX.md changed before live file write")
         try:
-            validate_transition(slug, "REVISED", PRIME_ROLE_SLOT, bridge_root.parent)
             write_bridge_file(slug, plan.next_version, content, bridge_root.parent, require_author_metadata=False)
-            insert_index_status(
-                slug,
-                plan.next_version,
-                "REVISED",
-                bridge_root.parent,
-                expected_index_raw=original_index,
-            )
         except WriterBridgeTransitionError as exc:
             raise BridgeLatestStatusError(str(exc)) from exc
         except WriterBridgeConflictError as exc:
@@ -378,18 +363,6 @@ def file_revision(
             raise BridgeIndexConflictError(str(exc)) from exc
     finally:
         candidate_path.unlink(missing_ok=True)
-    # WI-3364: best-effort event-driven bridge/INDEX.md archival trim.
-    try:
-        import sys as _sys
-
-        _trim_scripts = str(bridge_root.parent / "scripts")
-        if _trim_scripts not in _sys.path:
-            _sys.path.insert(0, _trim_scripts)
-        from bridge_index_archival import maybe_archive_and_prune_index as _trim
-
-        _trim(bridge_root.parent, current_thread=slug)
-    except Exception:  # noqa: BLE001 - archival must never fail a bridge write
-        pass
     return live_path
 
 

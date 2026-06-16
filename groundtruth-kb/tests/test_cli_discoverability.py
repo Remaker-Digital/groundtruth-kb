@@ -97,9 +97,10 @@ def test_doctor_json_flag_includes_all_checks(
     result = runner.invoke(main, ["project", "doctor", "--dir", str(tmp_path), "--profile", "local-only", "--json"])
 
     payload = json.loads(result.output)
-    assert len(payload["checks"]) == 1
+    assert len(payload["checks"]) == 2
     assert payload["checks"][0]["name"] == "sample"
     assert payload["checks"][0]["required"] is True
+    assert payload["checks"][1]["name"] == "isolation:application-registry"
 
 
 def test_doctor_json_exits_nonzero_when_overall_fail(

@@ -30,12 +30,13 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
-DEFAULT_INDEX_PATH = DEFAULT_BRIDGE_DIR / "INDEX.md"
 DEFAULT_PREVIEW_LINES = 200
 
 _VERSION_FILE_RE = re.compile(r"-(\d{3})\.md$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s*(bridge/.+\.md)\s*$")
-_DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
+_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -64,42 +65,6 @@ def _list_version_files(slug: str, bridge_dir: Path) -> list[tuple[int, Path]]:
     return results
 
 
-def _index_entry_for_slug(slug: str, index_path: Path) -> tuple[str, list[tuple[str, str]]]:
-    """Return (entry_block_text, [(status, path), ...]) for the slug's Document block.
-
-    Returns ("", []) if the slug is not present.
-    """
-    if not index_path.is_file():
-        return "", []
-    text = index_path.read_text(encoding="utf-8")
-    lines = text.splitlines()
-
-    block_lines: list[str] = []
-    status_entries: list[tuple[str, str]] = []
-    in_block = False
-
-    for raw_line in lines:
-        line = raw_line.rstrip()
-        if not line and in_block:
-            break
-        m_doc = _DOCUMENT_LINE_RE.match(line)
-        if m_doc:
-            if m_doc.group(1) == slug:
-                in_block = True
-                block_lines.append(line)
-                continue
-            if in_block:
-                break
-            continue
-        if in_block:
-            block_lines.append(line)
-            m_status = _STATUS_LINE_RE.match(line)
-            if m_status:
-                status_entries.append((m_status.group(1), m_status.group(2)))
-
-    return "\n".join(block_lines), status_entries
-
-
 def _content_preview(path: Path, max_lines: int) -> tuple[str, str]:
     """Return (first_line, preview_text) for the given file."""
     text = path.read_text(encoding="utf-8")
@@ -107,6 +72,20 @@ def _content_preview(path: Path, max_lines: int) -> tuple[str, str]:
     first_line = lines[0] if lines else ""
     preview_lines = lines[:max_lines]
     return first_line, "\n".join(preview_lines)
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
 
 
 def show(
@@ -121,30 +100,33 @@ def show(
     Args:
         slug: Bridge thread slug (e.g., ``"gtkb-bridge-convenience-verbs"``).
         bridge_dir: Path to the bridge directory. Defaults to ``<project>/bridge/``.
-        index_path: Path to INDEX.md. Defaults to ``<bridge_dir>/INDEX.md``.
+        index_path: Deprecated compatibility parameter; ignored for live state.
         preview_lines: Per-version content preview line cap (default 200).
 
     Returns:
         Dict with keys:
           - ``slug``: the requested slug.
-          - ``document_entry``: raw INDEX entry block text for the slug (or empty).
-          - ``index_status_chain``: list of (status, path) tuples from INDEX (latest at index 0).
+          - ``document_entry``: synthesized status block text for the slug.
+          - ``index_status_chain``: retained key containing synthesized status chain.
           - ``versions``: list of {version, path, verdict_line, content_preview} dicts,
             sorted by version ascending.
-          - ``drift``: list of strings describing INDEX-vs-disk discrepancies.
+          - ``drift``: list of version-file consistency diagnostics.
           - ``found``: True if any version files exist on disk.
           - ``preview_lines_cap``: the per-version line cap applied.
     """
     bridge_dir_path = bridge_dir if bridge_dir is not None else DEFAULT_BRIDGE_DIR
-    index_path_resolved = index_path if index_path is not None else bridge_dir_path / "INDEX.md"
+    _ = index_path
 
     version_files = _list_version_files(slug, bridge_dir_path)
-    document_entry, status_chain = _index_entry_for_slug(slug, index_path_resolved)
 
     versions: list[ThreadVersion] = []
+    status_chain: list[tuple[str, str]] = []
     for version_int, path in version_files:
         first_line, preview = _content_preview(path, preview_lines)
         rel_path = path.relative_to(PROJECT_ROOT).as_posix() if PROJECT_ROOT in path.parents else path.as_posix()
+        status = _status_from_bridge_file(path)
+        if status is not None:
+            status_chain.append((status, rel_path))
         versions.append(
             ThreadVersion(
                 version=version_int,
@@ -154,13 +136,16 @@ def show(
             )
         )
 
+    status_chain.sort(
+        key=lambda row: (
+            int(_VERSION_FILE_RE.search(Path(row[1]).name).group(1))  # type: ignore[union-attr]
+            if _VERSION_FILE_RE.search(Path(row[1]).name)
+            else 0
+        ),
+        reverse=True,
+    )
+    document_entry = "\n".join([f"Document: {slug}", *[f"{status}: {path}" for status, path in status_chain]])
     drift: list[str] = []
-    disk_paths = {f"bridge/{path.name}" for _, path in version_files}
-    index_paths = {p for _, p in status_chain}
-    for missing in index_paths - disk_paths:
-        drift.append(f"INDEX references {missing} but file does not exist on disk")
-    for orphan in disk_paths - index_paths:
-        drift.append(f"On-disk file {orphan} is not referenced by INDEX")
 
     return {
         "slug": slug,
@@ -180,17 +165,17 @@ def _format_markdown(result: dict[str, Any]) -> str:
     if not result["found"]:
         lines.append(f"_No version files found on disk for slug {result['slug']!r}._")
         return "\n".join(lines)
-    lines.append("## INDEX entry")
+    lines.append("## Versioned State")
     lines.append("")
     if result["document_entry"]:
         lines.append("```")
         lines.append(result["document_entry"])
         lines.append("```")
     else:
-        lines.append("_(not present in INDEX)_")
+        lines.append("_(no status-bearing version files found)_")
     lines.append("")
     if result["drift"]:
-        lines.append("## INDEX vs. disk drift")
+        lines.append("## Version-File Drift")
         lines.append("")
         for entry in result["drift"]:
             lines.append(f"- {entry}")
@@ -212,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("slug", help="Bridge thread slug (e.g., gtkb-bridge-convenience-verbs)")
     parser.add_argument("--bridge-dir", default=None, help="Path to bridge/ (defaults to project bridge/)")
-    parser.add_argument("--index-path", default=None, help="Path to INDEX.md (defaults to <bridge-dir>/INDEX.md)")
+    parser.add_argument("--index-path", default=None, help="Deprecated compatibility parameter; ignored for live state")
     parser.add_argument(
         "--preview-lines",
         type=int,

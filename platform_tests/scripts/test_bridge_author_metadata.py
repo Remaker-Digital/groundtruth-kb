@@ -42,8 +42,8 @@ _AUTHOR_ENV_VARS = tuple(
 )
 
 # A single ACTIVE Prime Builder (Claude / B) plus an active Loyal Opposition
-# (Codex / A), matching the live registry topology. ``_resolve_durable_identity_fields``
-# resolves the single active Prime Builder when ``GTKB_HARNESS_NAME`` is unset.
+# (Codex / A). ``_resolve_durable_identity_fields`` resolves the unambiguous
+# active Prime Builder fallback when ``GTKB_HARNESS_NAME`` is unset.
 _SINGLE_PB_REGISTRY = [
     {"id": "B", "harness_name": "claude", "role": ["prime-builder"], "status": "active"},
     {"id": "A", "harness_name": "codex", "role": ["loyal-opposition"], "status": "active"},
@@ -150,6 +150,33 @@ def test_durable_identity_fields_resolve_from_registry(tmp_path: Path) -> None:
         "author_model_configuration",
     ):
         assert runtime_field not in fields
+
+
+def test_durable_identity_fields_resolve_single_dispatchable_prime_builder(tmp_path: Path) -> None:
+    """Multiple active Prime Builders resolve only when one can receive dispatch."""
+    _write_registry_projection(
+        tmp_path,
+        [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "role": ["prime-builder"],
+                "status": "active",
+                "can_receive_dispatch": True,
+            },
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "role": ["prime-builder"],
+                "status": "active",
+                "can_receive_dispatch": False,
+            },
+        ],
+    )
+
+    fields = _resolve_durable_identity_fields(tmp_path)
+
+    assert fields == {"author_identity": "prime-builder/codex", "author_harness_id": "A"}
 
 
 def test_stale_current_json_is_not_read_as_baseline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

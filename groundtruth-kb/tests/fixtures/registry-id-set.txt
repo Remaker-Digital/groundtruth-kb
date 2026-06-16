@@ -24,7 +24,6 @@ hook.assertion-check
 hook.bridge-compliance-gate
 hook.code-quality-baseline-proposal-check
 hook.credential-scan
-hook.delib-preflight-gate
 hook.delib-search-gate
 hook.delib-search-tracker
 hook.destructive-gate
@@ -39,7 +38,6 @@ hook.session-start-governance
 hook.spec-before-code
 hook.spec-classifier
 hook.spec-event-surfacer
-hook.turn-marker
 rule.bridge-essential
 rule.bridge-poller-canonical
 rule.canonical-terminology
@@ -54,7 +52,6 @@ rule.report-depth
 settings.hook.assertion-check.sessionstart
 settings.hook.bridge-compliance-gate.pretooluse
 settings.hook.credential-scan.pretooluse
-settings.hook.delib-preflight-gate.userpromptsubmit
 settings.hook.delib-search-gate.userpromptsubmit
 settings.hook.delib-search-tracker.posttooluse
 settings.hook.destructive-gate.pretooluse
@@ -66,7 +63,6 @@ settings.hook.scanner-safe-writer.pretooluse
 settings.hook.session-start-governance.sessionstart
 settings.hook.spec-before-code.pretooluse
 settings.hook.spec-event-surfacer.posttooluse
-settings.hook.turn-marker.userpromptsubmit
 skill.bridge-propose.helper
 skill.bridge-propose.skill-md
 skill.bridge.impl-report-helper

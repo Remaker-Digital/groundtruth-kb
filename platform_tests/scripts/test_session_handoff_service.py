@@ -337,6 +337,21 @@ def test_handoff_prompt_uses_handoff_terminology_not_continuation(tmp_path: Path
     assert "continuation prompt" not in body
 
 
+def test_handoff_reads_versioned_bridge_files_when_index_is_absent(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-NOINDEX")
+    index_path = root / "bridge" / "INDEX.md"
+    index_path.unlink()
+    (root / "bridge" / "gtkb-test-thread-001-001.md").write_text("NEW\n\n# Proposal\n", encoding="utf-8")
+    (root / "bridge" / "gtkb-test-thread-001-002.md").write_text("GO\n\n# Verdict\n", encoding="utf-8")
+    db = _make_db(tmp_path)
+
+    result = generate(session_id="S-NOINDEX", project_root=root, db=db)
+
+    body = result["prompt_markdown"]
+    assert "GO: gtkb-test-thread-001 -> bridge/gtkb-test-thread-001-002.md" in body
+    assert "versioned bridge file chain" in body
+
+
 # ---------------------------------------------------------------------------
 # Regression: live identities schema must not select non-present harness
 # (NO-GO -007 FINDING-P1-002 — bridge/gtkb-handoff-prompt-deterministic-service-impl-007.md)

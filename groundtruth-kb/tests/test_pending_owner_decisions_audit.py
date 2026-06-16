@@ -52,8 +52,7 @@ def _make_fixture_pending_file(tmp_path: Path, body: str) -> Path:
 
 
 _VALID_FIXTURE_HEADER = (
-    "# Pending Owner Decisions\n\n"
-    "This file is owned by .claude/hooks/owner-decision-tracker.py.\n\n---\n\n"
+    "# Pending Owner Decisions\n\nThis file is owned by .claude/hooks/owner-decision-tracker.py.\n\n---\n\n"
 )
 
 
@@ -107,6 +106,9 @@ _KNOWN_LIVE_ORPHANS: set[str] = {
     # a textual reference; we document it here as expected so unexpected
     # NEW orphans surface as test failures.
     "DECISION-0192",
+    # DECISION-0624: textual reference in notes explaining a recursive re-trigger
+    # pattern. Triaged as expected textual orphan.
+    "DECISION-0624",
 }
 
 
@@ -142,14 +144,14 @@ def test_audit_orphans_fixture(audit_module, tmp_path):
         "## Resolved\n\n"
         "- id: DECISION-0001\n"
         "  asked_at: 2026-04-01T12:00:00Z\n"
-        "  question: \"Test question\"\n"
+        '  question: "Test question"\n'
         "  detected_via: ask_user_question\n"
         "  status: resolved\n"
         "  question_hash: deadbeefcafebabe\n"
         "  resolved_at: 2026-04-01T12:30:00Z\n"
         "  resolved_in_session: S001\n"
-        "  answer: \"Test answer\"\n"
-        "  notes: \"References DECISION-0099 which does not exist\"\n\n"
+        '  answer: "Test answer"\n'
+        '  notes: "References DECISION-0099 which does not exist"\n\n'
         "## History\n\n"
         "(none)\n"
     )
@@ -166,11 +168,11 @@ def test_cleanup_idempotency_fixture(audit_module, tmp_path):
         "## Pending\n\n"
         "- id: DECISION-0010\n"
         "  asked_at: 2026-04-15T08:00:00Z\n"
-        "  question: \"Pre-tightening prose ask\"\n"
+        '  question: "Pre-tightening prose ask"\n'
         "  detected_via: prose:offering_or_choice\n"
         "  status: pending\n"
         "  question_hash: aaaa1111bbbb2222\n"
-        "  notes: \"\"\n\n"
+        '  notes: ""\n\n'
         "## Resolved\n\n"
         "(none)\n\n"
         "## History\n\n"
@@ -205,11 +207,11 @@ def test_cleanup_auq_safety_fixture(audit_module, tmp_path):
         "## Pending\n\n"
         "- id: DECISION-0020\n"
         "  asked_at: 2026-04-15T08:00:00Z\n"
-        "  question: \"AUQ ask\"\n"
+        '  question: "AUQ ask"\n'
         "  detected_via: ask_user_question\n"
         "  status: pending\n"
         "  question_hash: cccc3333dddd4444\n"
-        "  notes: \"\"\n\n"
+        '  notes: ""\n\n'
         "## Resolved\n\n"
         "(none)\n\n"
         "## History\n\n"
@@ -227,9 +229,7 @@ def test_cleanup_auq_safety_fixture(audit_module, tmp_path):
 
     # Cleanup against AUQ-only pending: no-op (no qualifying candidates).
     result = audit_module.cleanup(fixture_path, log_path=log_path)
-    assert result["moved"] == 0, (
-        f"Cleanup should be no-op when only AUQ entry is in pending; got {result}"
-    )
+    assert result["moved"] == 0, f"Cleanup should be no-op when only AUQ entry is in pending; got {result}"
 
 
 def test_cleanup_auq_safety_failsafe_via_monkeypatch(audit_module, tmp_path, monkeypatch):
@@ -240,9 +240,7 @@ def test_cleanup_auq_safety_failsafe_via_monkeypatch(audit_module, tmp_path, mon
     abort, not just be unreachable code. Monkeypatch audit() to inject a
     synthetic AUQ candidate and assert RuntimeError is raised.
     """
-    body = _VALID_FIXTURE_HEADER + (
-        "## Pending\n\n(none)\n\n## Resolved\n\n(none)\n\n## History\n\n(none)\n"
-    )
+    body = _VALID_FIXTURE_HEADER + ("## Pending\n\n(none)\n\n## Resolved\n\n(none)\n\n## History\n\n(none)\n")
     fixture_path = _make_fixture_pending_file(tmp_path, body)
     log_path = tmp_path / "audit.log"
 
@@ -254,17 +252,22 @@ def test_cleanup_auq_safety_failsafe_via_monkeypatch(audit_module, tmp_path, mon
         "detected_via_distribution": {},
         "status_distribution": {},
         "schema_findings": {
-            "missing_required": [], "bad_id_format": [], "bad_asked_at": [],
-            "unrecognized_detected_via": [], "duplicate_ids": [],
+            "missing_required": [],
+            "bad_id_format": [],
+            "bad_asked_at": [],
+            "unrecognized_detected_via": [],
+            "duplicate_ids": [],
             "section_status_mismatch": [],
         },
         "orphan_id_references": [],
-        "historical_fp_candidates": [{
-            "id": "DECISION-9999",
-            "asked_at": "2026-04-15T08:00:00Z",
-            "detected_via": "ask_user_question",
-            "already_marked": False,
-        }],
+        "historical_fp_candidates": [
+            {
+                "id": "DECISION-9999",
+                "asked_at": "2026-04-15T08:00:00Z",
+                "detected_via": "ask_user_question",
+                "already_marked": False,
+            }
+        ],
     }
     monkeypatch.setattr(audit_module, "audit", lambda path: fake_audit_result)
 
@@ -283,9 +286,7 @@ def test_cleanup_aborts_on_any_schema_finding(audit_module, tmp_path, monkeypatc
     bad_asked_at, unrecognized_detected_via, duplicate_ids,
     section_status_mismatch. Verified by injecting each class via monkeypatch.
     """
-    body = _VALID_FIXTURE_HEADER + (
-        "## Pending\n\n(none)\n\n## Resolved\n\n(none)\n\n## History\n\n(none)\n"
-    )
+    body = _VALID_FIXTURE_HEADER + ("## Pending\n\n(none)\n\n## Resolved\n\n(none)\n\n## History\n\n(none)\n")
     fixture_path = _make_fixture_pending_file(tmp_path, body)
     log_path = tmp_path / "audit.log"
 
@@ -295,8 +296,11 @@ def test_cleanup_aborts_on_any_schema_finding(audit_module, tmp_path, monkeypatc
         "detected_via_distribution": {},
         "status_distribution": {},
         "schema_findings": {
-            "missing_required": [], "bad_id_format": [], "bad_asked_at": [],
-            "unrecognized_detected_via": [], "duplicate_ids": [],
+            "missing_required": [],
+            "bad_id_format": [],
+            "bad_asked_at": [],
+            "unrecognized_detected_via": [],
+            "duplicate_ids": [],
             "section_status_mismatch": [],
         },
         "orphan_id_references": [],
@@ -304,8 +308,12 @@ def test_cleanup_aborts_on_any_schema_finding(audit_module, tmp_path, monkeypatc
     }
 
     finding_classes = (
-        "missing_required", "bad_id_format", "bad_asked_at",
-        "unrecognized_detected_via", "duplicate_ids", "section_status_mismatch",
+        "missing_required",
+        "bad_id_format",
+        "bad_asked_at",
+        "unrecognized_detected_via",
+        "duplicate_ids",
+        "section_status_mismatch",
     )
 
     for cls in finding_classes:
@@ -329,11 +337,11 @@ def test_cleanup_atomic_write_fixture(audit_module, tmp_path):
         "## Pending\n\n"
         "- id: DECISION-0030\n"
         "  asked_at: 2026-04-15T08:00:00Z\n"
-        "  question: \"Pre-tightening prose ask\"\n"
+        '  question: "Pre-tightening prose ask"\n'
         "  detected_via: prose:awaiting_input_q\n"
         "  status: pending\n"
         "  question_hash: eeee5555ffff6666\n"
-        "  notes: \"\"\n\n"
+        '  notes: ""\n\n'
         "## Resolved\n\n"
         "(none)\n\n"
         "## History\n\n"
@@ -383,7 +391,7 @@ def test_audit_corruption_path_isolated(audit_module, tmp_path, monkeypatch):
         "  asked_at: 2026-04-15T08:00:00Z\n"
         "  detected_via: prose:offering_or_choice\n"
         "  status: pending\n"
-        "  notes: \"\"\n\n"
+        '  notes: ""\n\n'
         "## Resolved\n\n"
         "(none)\n\n"
         "## History\n\n"
@@ -409,11 +417,11 @@ def test_cleanup_log_appended_fixture(audit_module, tmp_path):
         "## Pending\n\n"
         "- id: DECISION-0040\n"
         "  asked_at: 2026-04-15T08:00:00Z\n"
-        "  question: \"Pre-tightening prose ask\"\n"
+        '  question: "Pre-tightening prose ask"\n'
         "  detected_via: prose:standing_by_for_q\n"
         "  status: pending\n"
         "  question_hash: 11112222aaaabbbb\n"
-        "  notes: \"\"\n\n"
+        '  notes: ""\n\n'
         "## Resolved\n\n"
         "(none)\n\n"
         "## History\n\n"

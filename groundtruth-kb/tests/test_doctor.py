@@ -467,7 +467,8 @@ def _get_registration(reg_id: str) -> SettingsHookRegistration:
 def test_derive_paired_hook_id_strips_prefix_and_event_suffix() -> None:
     """``_derive_paired_hook_id`` yields the paired ``hook.<short>`` id."""
     assert (
-        _derive_paired_hook_id("settings.hook.turn-marker.userpromptsubmit", "userpromptsubmit") == "hook.turn-marker"
+        _derive_paired_hook_id("settings.hook.gov09-capture.userpromptsubmit", "userpromptsubmit")
+        == "hook.gov09-capture"
     )
     assert (
         _derive_paired_hook_id("settings.hook.owner-decision-capture.posttooluse", "posttooluse")
@@ -477,19 +478,19 @@ def test_derive_paired_hook_id_strips_prefix_and_event_suffix() -> None:
 
 def test_settings_hook_registration_turn_marker_file_missing_is_fail(tmp_path: Path) -> None:
     """§B.4 case 1: bridge profile, hook file missing → ``fail``."""
-    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
     result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
     assert result.name == f"settings:{reg.id}"
     assert result.status == "fail"
     assert result.required is True
-    assert "turn-marker.py" in result.message
+    assert "gov09-capture.py" in result.message
 
 
 def test_settings_hook_registration_turn_marker_file_present_empty_event_is_warning(
     tmp_path: Path,
 ) -> None:
     """§B.4 case 2: hook file present, ``hooks['UserPromptSubmit']`` empty → ``warning``."""
-    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
     _touch_hook_file(tmp_path, reg.hook_filename)
     _write_settings_hooks(tmp_path, {"UserPromptSubmit": []})
     result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
@@ -513,7 +514,7 @@ def test_settings_hook_registration_owner_decision_present_and_registered_is_pas
 def test_settings_hook_registration_wrong_event_location_is_warning(tmp_path: Path) -> None:
     """§B.4 case 4: turn-marker entry appears in ``PreToolUse`` instead of ``UserPromptSubmit``
     → ``warning`` (the event-correct location is what's checked)."""
-    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
     _touch_hook_file(tmp_path, reg.hook_filename)
     _write_settings_hooks(tmp_path, {"PreToolUse": [_hook_entry(reg.hook_filename)]})
     result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
@@ -523,7 +524,7 @@ def test_settings_hook_registration_wrong_event_location_is_warning(tmp_path: Pa
 def test_settings_hook_registration_base_profile_is_pass_and_not_required(tmp_path: Path) -> None:
     """§B.4 case 5 (partial): on a non-bridge profile the check degrades to
     ``pass`` with ``required=False`` without inspecting the filesystem."""
-    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
     # No hook file, no settings.json — base profile should still pass.
     result = _check_settings_hook_registration_drift(tmp_path, "local-only", reg)
     assert result.status == "pass"

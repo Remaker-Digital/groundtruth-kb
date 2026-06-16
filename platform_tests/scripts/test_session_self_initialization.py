@@ -265,7 +265,10 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert (
         model["role"]["role_assignment"] == "active AI harness assigned by owner through the single role assignment map"
     )
-    assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
+    assert (
+        model["role"]["bridge"]
+        == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
+    )
     assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert "gtkb-bridge" in model["role"]["bridge_operation_instructions"]
@@ -668,13 +671,15 @@ def test_harness_role_assignment_map_is_startup_source_of_truth(tmp_path, capsys
             "codex",
             "--harness-id",
             "A",
+            "--role-assignment-path",
+            str(role_path),
         ]
     )
 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
-    assert "Role being assumed: Loyal Opposition" in context
+    assert "Role being assumed: Prime Builder" in context
     assert f"Role mapping source: {role_path}" in context
     assert "Harness self-identification: A" in context
     assert "Harness identity source: harness-state/harness-identities.json" in context
@@ -864,7 +869,10 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "## Compact Startup Routing Facts" in prime_context
     assert "hookSpecificOutput.startupDisclosure" in prime_context
     assert "role records may be list-valued role sets" in prime_context
-    assert "read `bridge/INDEX.md` directly before bridge queue claims" in prime_context
+    assert (
+        "read TAFE/dispatcher bridge state and status-bearing versioned files under `bridge/` before bridge queue claims"
+        in prime_context
+    )
     assert "routes the first owner message through the init-keyword matcher" in prime_context
     assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in prime_context
     assert "on no-match, process the prompt as normal task content" in prime_context
@@ -975,7 +983,10 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         model["role"]["role_assignment"]
         == "active AI harness assigned by owner through single role map entry for harness `B`"
     )
-    assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
+    assert (
+        model["role"]["bridge"]
+        == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
+    )
     assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert model["role"]["role_mapping_source"] == "harness-state/harness-registry.json"
@@ -1020,7 +1031,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert "Do not relay this section to Mike as user-visible startup content." in context
     assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." in context
     assert (
-        "Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly"
+        "Mandatory direct-read rule: before reporting the live bridge scan count, read current TAFE/dispatcher bridge state and versioned bridge files directly"
         in context
     )
     assert "Project-state startup rule: include a compact current-state report" in context
@@ -1125,8 +1136,8 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
     assert contention["raw_latest_status_counts"] == {"NEW": 1}
     assert contention["raw_review_queue_count"] == 1
     assert contention["raw_prime_response_queue_count"] == 0
-    assert contention["source"] == "bridge/INDEX.md"
-    assert contention["source_read_mode"] == "direct_file_read"
+    assert contention["source"] == "bridge/*.md"
+    assert contention["source_read_mode"] == "versioned_bridge_file_chain"
     assert contention["derived_artifacts_authoritative"] is False
     assert contention["live_index_available"] is True
     assert (
@@ -1169,7 +1180,7 @@ def test_bridge_metrics_ignore_cached_startup_report_counts(tmp_path) -> None:
     assert contention["raw_latest_status_counts"] == {"GO": 1}
     assert contention["raw_review_queue_count"] == 0
     assert contention["raw_prime_response_queue_count"] == 1
-    assert contention["source_read_mode"] == "direct_file_read"
+    assert contention["source_read_mode"] == "versioned_bridge_file_chain"
 
 
 def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None:
@@ -1275,7 +1286,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
         for target in panel.get("targets", [])
     )
     assert "Role being assumed: Prime Builder" in report_text
-    assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in report_text
+    assert (
+        "Bridge: always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
+        in report_text
+    )
     assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in report_text
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in report_text
     assert "DISPATCHABLE WORK" in report_text
@@ -1415,7 +1429,7 @@ def test_startup_pruning_scan_reports_large_inputs(tmp_path) -> None:
     assert scan["file_count"] >= 2
     assert scan["completed_count"] == 1
     assert scan["candidate_count"] >= 1
-    assert any(candidate["target"] == "bridge/INDEX.md" for candidate in scan["candidates"])
+    assert any(candidate["target"] == "bridge/*.md" for candidate in scan["candidates"])
     assert any(
         candidate["target"].endswith("INSIGHTS-test.md")
         for candidate in scan["candidates"]
@@ -1576,7 +1590,7 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert freshness["validation"]["startup_payload_fresh"] is True
     assert freshness["validation"]["status"] in {"fresh", "fresh_with_gaps"}
     assert freshness["required_local_sources"]
-    assert any(item["source"] == "bridge/INDEX.md" for item in freshness["required_local_sources"])
+    assert any(item["source"] == "bridge/*.md" for item in freshness["required_local_sources"])
     assert any(item["source"] == "GitHub Actions via gh" for item in freshness["live_probes"])
     assert freshness["repo"]["sha"]
 
@@ -1791,7 +1805,10 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
     assert f"Role being assumed: {module.ROLE_PROFILES[discovered_role]['assumed_role']}" in context
-    assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in context
+    assert (
+        "Bridge: always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
+        in context
+    )
     assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in context
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in context
     assert "DISPATCHABLE WORK" in context

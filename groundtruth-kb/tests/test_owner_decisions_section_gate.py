@@ -126,18 +126,15 @@ sufficient.
 
 
 def _write_claim(tmp_path: Path, thread_slug: str, session_id: str = "test-slice-c") -> None:
-    intent_dir = tmp_path / ".gtkb-state" / "work-intent"
-    intent_dir.mkdir(parents=True, exist_ok=True)
-    import datetime
+    import sys
+    from pathlib import Path
 
-    now = datetime.datetime.now(datetime.UTC)
-    expiry = now + datetime.timedelta(seconds=60)
-    record = {
-        "session_id": session_id,
-        "acquired_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "ttl_expires_at": expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-    (intent_dir / f"{thread_slug}.json").write_text(json.dumps(record), encoding="utf-8")
+    project_root = Path(__file__).resolve().parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    import scripts.bridge_work_intent_registry as registry
+
+    registry.acquire(thread_slug, session_id, project_root=tmp_path)
 
 
 def test_hook_blocks_proposal_claiming_approval_without_section(tmp_path):

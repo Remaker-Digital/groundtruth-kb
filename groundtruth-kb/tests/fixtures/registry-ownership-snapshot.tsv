@@ -8,6 +8,10 @@ adopter-memory-files	adopter-owned
 adopter-requirements-local-txt	legacy-exception
 adopter-requirements-test-txt	legacy-exception
 adopter-webapp	adopter-owned
+file.narrative-artifact-approval-gate-template	gt-kb-managed
+file.readme-quickstart	adopter-owned
+file.release-readiness-banner	adopter-owned
+file.upgrade-rehearsal-recipe	gt-kb-scaffolded
 gitignore.hook-logs	gt-kb-managed
 gitignore.kb-database	gt-kb-managed
 gitignore.kb-working-dir	gt-kb-managed
@@ -16,8 +20,8 @@ gt-kb-staging	gt-kb-managed
 hook._delib_common	gt-kb-managed
 hook.assertion-check	gt-kb-managed
 hook.bridge-compliance-gate	gt-kb-managed
+hook.code-quality-baseline-proposal-check	gt-kb-managed
 hook.credential-scan	gt-kb-managed
-hook.delib-preflight-gate	gt-kb-managed
 hook.delib-search-gate	gt-kb-managed
 hook.delib-search-tracker	gt-kb-managed
 hook.destructive-gate	gt-kb-managed
@@ -32,11 +36,11 @@ hook.session-start-governance	gt-kb-managed
 hook.spec-before-code	gt-kb-managed
 hook.spec-classifier	gt-kb-managed
 hook.spec-event-surfacer	gt-kb-managed
-hook.turn-marker	gt-kb-managed
 rule.bridge-essential	gt-kb-managed
 rule.bridge-poller-canonical	gt-kb-managed
 rule.canonical-terminology	gt-kb-managed
 rule.canonical-terminology-config	gt-kb-managed
+rule.canonical-terminology-policy	gt-kb-managed
 rule.deliberation-protocol	gt-kb-managed
 rule.file-bridge-protocol	gt-kb-managed
 rule.loyal-opposition	gt-kb-managed
@@ -46,7 +50,6 @@ rule.report-depth	gt-kb-managed
 settings.hook.assertion-check.sessionstart	gt-kb-managed
 settings.hook.bridge-compliance-gate.pretooluse	gt-kb-managed
 settings.hook.credential-scan.pretooluse	gt-kb-managed
-settings.hook.delib-preflight-gate.userpromptsubmit	gt-kb-managed
 settings.hook.delib-search-gate.userpromptsubmit	gt-kb-managed
 settings.hook.delib-search-tracker.posttooluse	gt-kb-managed
 settings.hook.destructive-gate.pretooluse	gt-kb-managed
@@ -58,9 +61,13 @@ settings.hook.scanner-safe-writer.pretooluse	gt-kb-managed
 settings.hook.session-start-governance.sessionstart	gt-kb-managed
 settings.hook.spec-before-code.pretooluse	gt-kb-managed
 settings.hook.spec-event-surfacer.posttooluse	gt-kb-managed
-settings.hook.turn-marker.userpromptsubmit	gt-kb-managed
 skill.bridge-propose.helper	gt-kb-managed
 skill.bridge-propose.skill-md	gt-kb-managed
+skill.bridge.impl-report-helper	gt-kb-managed
+skill.bridge.revise-helper	gt-kb-managed
+skill.bridge.scan-helper	gt-kb-managed
+skill.bridge.show-thread-helper	gt-kb-managed
+skill.bridge.skill-md	gt-kb-managed
 skill.decision-capture.helper	gt-kb-managed
 skill.decision-capture.skill-md	gt-kb-managed
 skill.spec-intake.helper	gt-kb-managed

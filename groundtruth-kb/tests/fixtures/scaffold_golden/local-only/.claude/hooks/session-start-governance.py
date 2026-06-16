@@ -3,7 +3,7 @@
 SessionStart hook: governance summary.
 
 Emits a session-start governance summary showing:
-- Bridge index status (pending entries, if any)
+- Bridge status (pending entries, if any)
 - Reminder of active governance hooks
 
 Hook type: SessionStart
@@ -15,38 +15,81 @@ All rights reserved.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
-BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
+BRIDGE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
+)
 
 
-def _parse_bridge_pending(index_path: Path) -> list[str]:
+def _parse_bridge_pending(cwd: Path) -> list[str]:
     """Return list of document names with NEW or REVISED latest status."""
-    pending: list[str] = []
-    if not index_path.exists():
-        return pending
+    bridge_dir = cwd / "bridge"
+    if not bridge_dir.is_dir():
+        return []
+    latest: dict[str, tuple[int, str]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = re.match(r"(?P<doc>.+)-(?P<version>\d{3})\.md$", path.name)
+        if not match:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        status = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            status_match = BRIDGE_STATUS_RE.match(stripped)
+            status = status_match.group(1).upper() if status_match else ""
+            break
+        version = int(match.group("version"))
+        doc = match.group("doc")
+        if status and version > latest.get(doc, (-1, ""))[0]:
+            latest[doc] = (version, status)
+    return [f"{doc} ({status})" for doc, (_, status) in sorted(latest.items()) if status in ("NEW", "REVISED")]
 
+
+def _refresh_core_spec_intake(cwd: str) -> None:
+    """Best-effort: re-emit the next missing core-spec question into MEMORY.md.
+
+    Cross-session prompt driver (SPEC-CORE-INTAKE-001 / SPEC-CORE-INTAKE-002):
+    on each adopter session start, reconcile MEMORY.md to the current intake
+    state for the enrolled project (re-emit the next missing slot, or clear the
+    block once complete). Fail-safe by construction: any resolution, import, or
+    I/O failure is a silent no-op so this hook never breaks a session start.
+    Respects the explicit opt-out (DCL-CORE-INTAKE-001).
+    """
     try:
-        lines = index_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return pending
+        root = Path(cwd)
+        db_path = root / "groundtruth.db"
+        memory_path = root / "MEMORY.md"
+        if not db_path.exists() or not memory_path.exists():
+            return
 
-    current_doc: str | None = None
-    seen_status: bool = False
-    for line in lines:
-        line = line.strip()
-        if line.startswith("Document:"):
-            current_doc = line.removeprefix("Document:").strip()
-            seen_status = False
-        elif current_doc and not seen_status:
-            for status in ("VERIFIED", "GO", "NO-GO", "REVISED", "NEW"):
-                if line.startswith(status + ":"):
-                    seen_status = True
-                    if status in ("NEW", "REVISED"):
-                        pending.append(f"{current_doc} ({status})")
-                    break
-    return pending
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.project.core_spec_intake import (
+            find_enrolled_project_id,
+            intake_enabled,
+            refresh_intake_prompt,
+        )
+
+        if not intake_enabled(root):
+            return
+        db = KnowledgeDB(db_path)
+        try:
+            project_id = find_enrolled_project_id(db)
+            if project_id is None:
+                return
+            refresh_intake_prompt(db, project_id, memory_path)
+        finally:
+            db.close()
+    except Exception:  # intentional-catch: hook must never break session start
+        return
 
 
 def main() -> None:
@@ -63,7 +106,7 @@ def main() -> None:
     if "--self-test" in sys.argv:
         emit_additional_context(
             "SessionStart",
-            "[Governance] Session governance hook active. Bridge index will be checked at session start.",
+            "[Governance] Session governance hook active. Canonical bridge state will be checked at session start.",
         )
         sys.exit(0)
 
@@ -73,19 +116,20 @@ def main() -> None:
         payload = {}
 
     cwd = payload.get("cwd", ".")
-    index_path = Path(cwd) / BRIDGE_INDEX_FILENAME
-    pending = _parse_bridge_pending(index_path)
+    _refresh_core_spec_intake(cwd)
+    cwd_path = Path(cwd)
+    pending = _parse_bridge_pending(cwd_path)
 
     if pending:
         entry_list = "\n  - ".join(pending)
         msg = (
             f"[Governance] Session start: {len(pending)} bridge entry/entries pending Codex review:\n"
             f"  - {entry_list}\n"
-            "Check bridge/INDEX.md and process oldest actionable entry first."
+            "Check canonical bridge state and process oldest actionable entry first."
         )
     else:
         msg = (
-            "[Governance] Session start: bridge index clear. "
+            "[Governance] Session start: bridge queue clear. "
             "All governance hooks active (deliberation gate, spec-before-code, bridge compliance, "
             "KB-not-markdown, destructive gate, credential scan)."
         )

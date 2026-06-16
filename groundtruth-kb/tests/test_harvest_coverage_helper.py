@@ -36,8 +36,19 @@ class _FakeDB:
         if source_type != "bridge_thread":
             return []
         if source_ref is None:
-            return [r for rows in self._rows.values() for r in rows]
-        return list(self._rows.get(source_ref, []))
+            results = []
+            for ref, rows in self._rows.items():
+                for r in rows:
+                    r_copy = dict(r)
+                    r_copy.setdefault("source_ref", ref)
+                    results.append(r_copy)
+            return results
+        results = []
+        for r in self._rows.get(source_ref, []):
+            r_copy = dict(r)
+            r_copy.setdefault("source_ref", source_ref)
+            results.append(r_copy)
+        return results
 
 
 def _write_index(path: Path, entries: list[tuple[str, list[tuple[str, str]]]]) -> None:

@@ -243,7 +243,7 @@ def test_spec_record_is_not_hook_matched_but_cli_still_blocks_missing_evidence(t
     root, config, content = _project(tmp_path)
     payload = {
         "tool_name": "Bash",
-        "tool_input": {"command": "python -m groundtruth_kb spec record --id GOV-TEST-001"},
+        "tool_input": {"command": "python -m groundtruth_kb.cli spec record --id GOV-TEST-001"},
     }
     hook = subprocess.run(
         [sys.executable, str(HOOK)],

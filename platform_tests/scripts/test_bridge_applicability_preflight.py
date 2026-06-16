@@ -113,6 +113,40 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["missing_advisory_specs"] == []
 
 
+def test_preflight_resolves_versioned_bridge_files_when_index_is_absent(tmp_path: Path) -> None:
+    bridge_id = "application-move"
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / f"{bridge_id}-001.md").write_text(
+        """
+NEW
+
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Specification Links
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001
+""",
+        encoding="utf-8",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        index_path=bridge / "INDEX.md",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+    )
+
+    assert packet["content_source"]["mode"] == "indexed_operative"
+    assert packet["operative_version"]["path"] == f"bridge/{bridge_id}-001.md"
+    assert packet["preflight_passed"] is True
+
+
 def test_preflight_content_file_uses_pending_content(tmp_path: Path) -> None:
     bridge_id = "application-move"
     _write_bridge(

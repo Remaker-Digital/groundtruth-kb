@@ -3,8 +3,7 @@
 Per ``bridge/gtkb-self-diagnostic-leak-closure-slice-4-implementation-gate-hygiene-003.md``
 (Codex GO at -004). Covers:
 
-- IP-1: filename-vs-document boundary-based parser hardening (per-bridge strict
-  check in ``bridge_entry``; ``parse_bridge_index`` silently skips misattributed).
+- IP-1: versioned bridge-file resolver hardening for implementation authorization.
 - IP-2: named-packet cache at ``by-bridge/<bridge-id>.json``, ``activate`` and
   ``list`` subcommands, plus unique named-packet fallback when ``current.json``
   points at the wrong bridge.
@@ -45,13 +44,12 @@ def auth_module():
     return module
 
 
-def _write_index(project_root: Path, blocks: list[str]) -> Path:
-    """Write a bridge/INDEX.md with header comments + the supplied per-document blocks."""
-    index_path = project_root / "bridge" / "INDEX.md"
-    index_path.parent.mkdir(parents=True, exist_ok=True)
-    header = "# Bridge Index\n\n<!-- header comment -->\n\n"
-    index_path.write_text(header + "\n\n".join(blocks) + "\n", encoding="utf-8")
-    return index_path
+def _ignore_retired_index_fixture(project_root: Path, blocks: list[str]) -> Path:
+    """Keep obsolete chain fixture arguments without writing retired index state."""
+    del blocks
+    bridge_dir = project_root / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    return bridge_dir / "retired-index-fixture-not-written.md"
 
 
 def _write_proposal(
@@ -59,6 +57,7 @@ def _write_proposal(
     slug: str,
     version: int = 1,
     *,
+    status: str = "NEW",
     target_paths: list[str] | None = None,
     verification_heading: str = "Verification Plan",
     verification_body: str = "Fixture verification plan: derived from the linked specs above.",
@@ -71,6 +70,7 @@ def _write_proposal(
     proposal_path.parent.mkdir(parents=True, exist_ok=True)
     target_paths_json = json.dumps(target_paths)
     body = (
+        f"{status}\n\n"
         f"# Fixture proposal {slug} v{version}\n\n"
         f"target_paths: {target_paths_json}\n\n"
         f"## Specification Links\n\n"
@@ -99,69 +99,55 @@ def _setup_simple_go_bridge(project_root: Path, slug: str = "fixture-bridge") ->
     proposal = _write_proposal(project_root, slug, version=1, target_paths=["scripts/dummy.py", ".gtkb-state/**"])
     verdict = _write_verdict(project_root, slug, version=2, verdict="GO")
     block = f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
-    _write_index(project_root, [block])
+    _ignore_retired_index_fixture(project_root, [block])
     return slug, proposal, verdict
 
 
 # ---------------------------------------------------------------------------
-# IP-1: parser hardening
+# IP-1: versioned bridge-file resolver hardening
 # ---------------------------------------------------------------------------
 
 
-def test_parse_bridge_index_skips_misattributed_status_line(auth_module, tmp_path):
-    """parse_bridge_index silently skips status lines whose filename does not
-    match the enclosing Document name; per-bridge enforcement is in bridge_entry.
-    """
-    _setup_simple_go_bridge(tmp_path, slug="real-bridge")
-    # Insert a bad block that mixes filenames
-    bad_block = (
-        "Document: doc-a\n"
-        "NEW: bridge/doc-b-001.md\n"  # misattributed: filename is for doc-b
-    )
-    good_block = "Document: real-bridge\nGO: bridge/real-bridge-002.md\nNEW: bridge/real-bridge.md\n"
-    _write_index(tmp_path, [bad_block, good_block])
+def test_bridge_entry_uses_versioned_files_when_index_is_absent(auth_module, tmp_path):
+    """bridge_entry reconstructs newest-first state from bridge/<slug>-NNN.md files."""
+    slug, _, _ = _setup_simple_go_bridge(tmp_path, slug="real-bridge")
 
-    entries = auth_module.parse_bridge_index(tmp_path)
-    # real-bridge present, doc-a has no valid versions so it's absent
-    assert "real-bridge" in entries
-    assert "doc-a" not in entries
+    entry = auth_module.bridge_entry(tmp_path, slug)
+
+    assert entry.bridge_id == slug
+    assert entry.versions == [
+        ("GO", "bridge/real-bridge-002.md"),
+        ("NEW", "bridge/real-bridge.md"),
+    ]
 
 
-def test_bridge_entry_raises_for_misattributed_status_under_queried_bridge(auth_module, tmp_path):
-    """bridge_entry enforces per-bridge consistency: querying a bridge whose
-    Document section has a misattributed status line raises.
-    """
+def test_bridge_entry_raises_for_duplicate_version_files(auth_module, tmp_path):
+    """bridge_entry fails closed when both v1 naming forms exist for one thread."""
     _write_proposal(tmp_path, "doc-a", version=1, target_paths=["scripts/foo.py"])
-    _write_verdict(tmp_path, "doc-a", version=2, verdict="GO")
-    bad_block = (
-        "Document: doc-a\n"
-        "GO: bridge/doc-a-002.md\n"
-        "NEW: bridge/some-other-doc-001.md\n"  # misattributed
-    )
-    _write_index(tmp_path, [bad_block])
+    duplicate = tmp_path / "bridge" / "doc-a-001.md"
+    duplicate.write_text("NEW\n\nDuplicate v1 fixture.\n", encoding="utf-8")
 
-    with pytest.raises(auth_module.AuthorizationError, match="does not match enclosing Document"):
+    with pytest.raises(auth_module.AuthorizationError, match="Duplicate bridge version 001"):
         auth_module.bridge_entry(tmp_path, "doc-a")
 
 
-def test_filename_matches_doc_accepts_v1_no_suffix_and_v2_plus_suffix(auth_module):
-    """The boundary-based matcher accepts both v1 (no suffix) and v2+ (-NNN.md)
-    forms, including for doc_ids that themselves end in -NNN.
-    """
-    matches = auth_module._filename_matches_doc
-    # v1, no suffix
-    assert matches("bridge/foo.md", "foo")
-    # v2+ with suffix
-    assert matches("bridge/foo-022.md", "foo")
-    # doc_id ending in -001 (real-world case)
-    assert matches("bridge/gtkb-single-harness-bridge-dispatcher-001.md", "gtkb-single-harness-bridge-dispatcher-001")
-    assert matches(
-        "bridge/gtkb-single-harness-bridge-dispatcher-001-022.md", "gtkb-single-harness-bridge-dispatcher-001"
+def test_bridge_version_from_rel_path_accepts_v1_no_suffix_and_v2_plus_suffix(auth_module):
+    """The resolver accepts both v1 (no suffix) and v2+ (-NNN.md) forms."""
+    version = auth_module._bridge_version_from_rel_path
+    assert version("bridge/foo.md", "foo") == 1
+    assert version("bridge/foo-022.md", "foo") == 22
+    assert (
+        version("bridge/gtkb-single-harness-bridge-dispatcher-001.md", "gtkb-single-harness-bridge-dispatcher-001") == 1
     )
-    # Mismatch: filename does not start with bridge/<doc_id>
-    assert not matches("bridge/bar-001.md", "foo")
-    # Mismatch: suffix not matching expected pattern
-    assert not matches("bridge/foo-abc.md", "foo")
+    assert (
+        version(
+            "bridge/gtkb-single-harness-bridge-dispatcher-001-022.md",
+            "gtkb-single-harness-bridge-dispatcher-001",
+        )
+        == 22
+    )
+    assert version("bridge/bar-001.md", "foo") is None
+    assert version("bridge/foo-abc.md", "foo") is None
 
 
 def test_bridge_entry_succeeds_for_well_formed_bridge(auth_module, tmp_path):
@@ -172,13 +158,13 @@ def test_bridge_entry_succeeds_for_well_formed_bridge(auth_module, tmp_path):
     assert entry.latest_status == "GO"
 
 
-def test_parse_bridge_index_records_deferred_status(auth_module, tmp_path):
-    """DEFERRED is an indexed lifecycle status, not a line to skip."""
+def test_bridge_entry_records_deferred_status(auth_module, tmp_path):
+    """DEFERRED is a versioned lifecycle status, not a line to skip."""
     slug = "deferred-bridge"
     _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
     _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
-    _write_index(
+    _ignore_retired_index_fixture(
         tmp_path,
         [f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
     )
@@ -189,18 +175,15 @@ def test_parse_bridge_index_records_deferred_status(auth_module, tmp_path):
     assert entry.versions[0] == ("DEFERRED", f"bridge/{slug}-003.md")
 
 
-def test_bridge_entry_raises_for_misattributed_deferred_status(auth_module, tmp_path):
-    """Per-bridge filename validation applies to DEFERRED rows too."""
+def test_bridge_entry_raises_for_malformed_deferred_file(auth_module, tmp_path):
+    """Per-file status validation applies to DEFERRED chains too."""
     slug = "deferred-bridge"
     _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_verdict(tmp_path, "other-bridge", version=3, verdict="DEFERRED")
-    _write_index(
-        tmp_path,
-        [f"Document: {slug}\nDEFERRED: bridge/other-bridge-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
-    )
+    bad = tmp_path / "bridge" / f"{slug}-003.md"
+    bad.write_text("# Missing status token\n", encoding="utf-8")
 
-    with pytest.raises(auth_module.AuthorizationError, match="does not match enclosing Document"):
+    with pytest.raises(auth_module.AuthorizationError, match="unrecognized status line"):
         auth_module.bridge_entry(tmp_path, slug)
 
 
@@ -210,7 +193,7 @@ def test_create_packet_fails_when_latest_status_is_deferred(auth_module, tmp_pat
     _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
     _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
-    _write_index(
+    _ignore_retired_index_fixture(
         tmp_path,
         [f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
     )
@@ -299,7 +282,17 @@ def _begin_packet(auth_module, tmp_path: Path, slug: str) -> dict[str, Any]:
     return packet
 
 
+def _write_prime_marker(tmp_path: Path, session_id: str) -> None:
+    marker_dir = tmp_path / ".claude" / "session"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    (marker_dir / f"role-{session_id}.json").write_text(
+        json.dumps({"role": "prime-builder", "session_id": session_id}),
+        encoding="utf-8",
+    )
+
+
 def _claim_bridge(auth_module, tmp_path: Path, slug: str, session_id: str = "session-1") -> None:
+    _write_prime_marker(tmp_path, session_id)
     assert auth_module.bridge_work_intent_registry.acquire(slug, session_id, project_root=tmp_path)
 
 
@@ -403,7 +396,7 @@ def test_activate_restores_named_packet_to_current_json(auth_module, tmp_path):
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
     block_b = "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b.md\n"
     block_a = f"Document: {slug_a}\nGO: bridge/{slug_a}-002.md\nNEW: bridge/{slug_a}.md\n"
-    _write_index(tmp_path, [block_b, block_a])
+    _ignore_retired_index_fixture(tmp_path, [block_b, block_a])
     # Overwrite current.json with bridge-b's packet
     _begin_packet(auth_module, tmp_path, "bridge-b")
     assert json.loads(auth_module.packet_path(tmp_path).read_text(encoding="utf-8"))["bridge_id"] == "bridge-b"
@@ -436,7 +429,7 @@ def test_activate_fails_when_bridge_status_drifted(auth_module, tmp_path):
     # Now drift the INDEX: add NEW: -003.md so latest_status is no longer GO
     _write_proposal(tmp_path, slug, version=3, target_paths=["scripts/dummy.py"])
     block = f"Document: {slug}\nNEW: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
 
     with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
         auth_module.activate_packet(tmp_path, slug)
@@ -449,7 +442,7 @@ def test_validate_packet_fails_with_pending_new_after_go(auth_module, tmp_path):
     _begin_packet(auth_module, tmp_path, slug)
     _write_proposal(tmp_path, slug, version=3, target_paths=["scripts/dummy.py"])
     block = f"Document: {slug}\nNEW: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
     with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
         auth_module.activate_packet(tmp_path, slug)
 
@@ -475,7 +468,7 @@ def test_validate_packet_fails_with_newer_go_after_pinned_go(auth_module, tmp_pa
         f"GO: bridge/{slug}-002.md\n"
         f"NEW: bridge/{slug}.md\n"
     )
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
     with pytest.raises(auth_module.AuthorizationError, match="Newer GO exists"):
         auth_module.activate_packet(tmp_path, slug)
 
@@ -494,7 +487,7 @@ def test_validate_packet_fails_with_verified_after_go(auth_module, tmp_path):
         f"GO: bridge/{slug}-002.md\n"
         f"NEW: bridge/{slug}.md\n"
     )
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
     with pytest.raises(auth_module.AuthorizationError, match="VERIFIED \\(terminal"):
         auth_module.activate_packet(tmp_path, slug)
 
@@ -506,7 +499,7 @@ def test_validate_packet_fails_with_deferred_after_go(auth_module, tmp_path):
     _begin_packet(auth_module, tmp_path, slug)
     _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
     block = f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
 
     with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
         auth_module.load_packet(tmp_path)
@@ -526,7 +519,7 @@ def test_validate_packet_succeeds_with_no_go_after_post_impl(auth_module, tmp_pa
         f"GO: bridge/{slug}-002.md\n"
         f"NEW: bridge/{slug}.md\n"
     )
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
     packet = auth_module.activate_packet(tmp_path, slug)
     assert packet["bridge_id"] == slug
 
@@ -538,7 +531,7 @@ def test_list_enumerates_named_packets(auth_module, tmp_path):
     _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
     _write_proposal(tmp_path, "bridge-b", version=1)
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
-    _write_index(
+    _ignore_retired_index_fixture(
         tmp_path,
         [
             "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
@@ -588,7 +581,7 @@ def test_validate_targets_falls_back_to_unique_named_packet_after_current_clobbe
     _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
     _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/b.py"])
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
-    _write_index(
+    _ignore_retired_index_fixture(
         tmp_path,
         [
             "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
@@ -625,7 +618,7 @@ def test_validate_targets_session_aware_prefers_claimed_bridge_packet(auth_modul
     _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
     _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/shared.py"])
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
-    _write_index(
+    _ignore_retired_index_fixture(
         tmp_path,
         [
             "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
@@ -733,7 +726,7 @@ def test_create_authorization_packet_accepts_test_plan_spec_to_test_heading(auth
         verification_body="Run `python -m pytest platform_tests/scripts/test_dummy.py -q`.",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(
+    _ignore_retired_index_fixture(
         tmp_path,
         [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"],
     )
@@ -798,7 +791,7 @@ def test_create_authorization_packet_accepts_requirement_sufficiency_are_suffici
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     packet = auth_module.create_authorization_packet(tmp_path, slug)
     assert packet["requirement_sufficiency"] == "sufficient"
 
@@ -815,7 +808,7 @@ def test_create_authorization_packet_accepts_owner_direction_work_item_sufficien
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     packet = auth_module.create_authorization_packet(tmp_path, slug)
     assert packet["requirement_sufficiency"] == "sufficient"
 
@@ -838,7 +831,7 @@ def test_owner_sufficiency_deliberation_allows_missing_proposal_phrase(auth_modu
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
 
     packet = auth_module.create_authorization_packet(
@@ -871,7 +864,7 @@ def test_owner_sufficiency_deliberation_can_match_work_item_relation(auth_module
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(
         tmp_path,
         work_item_id=None,
@@ -900,7 +893,7 @@ def test_missing_requirement_sufficiency_still_blocks_without_owner_evidence(aut
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
 
     with pytest.raises(auth_module.AuthorizationError, match="phrasing is unrecognized"):
         auth_module.create_authorization_packet(tmp_path, slug)
@@ -917,7 +910,7 @@ def test_owner_sufficiency_deliberation_rejects_non_owner_source(auth_module, tm
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(tmp_path, source_type="report")
 
     with pytest.raises(auth_module.AuthorizationError, match="not owner_conversation"):
@@ -939,7 +932,7 @@ def test_owner_sufficiency_deliberation_rejects_non_decision_outcome(auth_module
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(tmp_path, outcome="deferred")
 
     with pytest.raises(auth_module.AuthorizationError, match="not an owner_decision"):
@@ -962,7 +955,7 @@ def test_owner_sufficiency_deliberation_rejects_non_applicable_evidence(auth_mod
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(
         tmp_path,
         work_item_id="WI-OTHER",
@@ -988,7 +981,7 @@ def test_owner_sufficiency_deliberation_does_not_override_explicit_gap(auth_modu
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
 
     with pytest.raises(auth_module.AuthorizationError, match="new or revised requirements"):
@@ -1010,7 +1003,7 @@ def test_begin_cli_passes_owner_sufficiency_deliberation_id(auth_module, tmp_pat
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
     _claim_bridge(auth_module, tmp_path, slug, session_id="session-1")
 
@@ -1145,6 +1138,7 @@ def test_create_authorization_packet_accepts_target_paths_heading_proposal(auth_
     proposal = tmp_path / "bridge" / f"{slug}.md"
     proposal.parent.mkdir(parents=True, exist_ok=True)
     proposal.write_text(
+        "NEW\n\n"
         f"# Fixture proposal {slug}\n\n"
         "## target_paths\n\n"
         "- `scripts/dummy.py`\n"
@@ -1158,7 +1152,7 @@ def test_create_authorization_packet_accepts_target_paths_heading_proposal(auth_
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _write_index(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
     packet = auth_module.create_authorization_packet(tmp_path, slug)
     assert packet["bridge_id"] == slug
     assert packet["target_path_globs"] == ["scripts/dummy.py", ".gtkb-state/**"]
@@ -1282,7 +1276,7 @@ def test_validate_packet_accepts_post_go_no_go_after_revised_report(auth_module,
         f"GO: bridge/{slug}-002.md\n"
         f"NEW: bridge/{slug}.md\n"
     )
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
     packet = auth_module.activate_packet(tmp_path, slug)
     assert packet["bridge_id"] == slug
 
@@ -1303,7 +1297,7 @@ def test_validate_packet_raises_on_post_go_revised_report_awaiting_review(auth_m
         f"GO: bridge/{slug}-002.md\n"
         f"NEW: bridge/{slug}.md\n"
     )
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
     with pytest.raises(auth_module.AuthorizationError, match="awaiting Loyal Opposition review"):
         auth_module.activate_packet(tmp_path, slug)
 
@@ -1314,7 +1308,7 @@ def test_create_authorization_packet_raises_on_latest_deferred_above_go(auth_mod
     slug, _, _ = _setup_simple_go_bridge(tmp_path)
     _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
     block = f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
 
     with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
         auth_module.create_authorization_packet(tmp_path, slug)
@@ -1327,7 +1321,7 @@ def test_validate_packet_raises_when_bridge_becomes_latest_deferred(auth_module,
     _begin_packet(auth_module, tmp_path, slug)
     _write_verdict(tmp_path, slug, version=3, verdict="DEFERRED")
     block = f"Document: {slug}\nDEFERRED: bridge/{slug}-003.md\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
-    _write_index(tmp_path, [block])
+    _ignore_retired_index_fixture(tmp_path, [block])
 
     with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
         auth_module.activate_packet(tmp_path, slug)
@@ -1342,7 +1336,7 @@ def test_begin_creates_packet_for_post_go_no_go_thread(auth_module, tmp_path):
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
     _write_verdict(tmp_path, slug, version=3, verdict="NEW")
     _write_verdict(tmp_path, slug, version=4, verdict="NO-GO")
-    _write_index(
+    _ignore_retired_index_fixture(
         tmp_path,
         [
             f"Document: {slug}\n"

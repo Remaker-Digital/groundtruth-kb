@@ -390,6 +390,7 @@ class TestM17:
             spec_id="S1",
             test_type="unit",
             expected_outcome="pass",
+            test_file="tests/test_foo.py",
             last_result="pass",
             last_executed_at="2026-04-10T00:00:00+00:00",
             changed_by="t",
@@ -406,6 +407,7 @@ class TestM17:
             spec_id="S1",
             test_type="unit",
             expected_outcome="pass",
+            test_file="tests/test_foo.py",
             last_result="pass",
             last_executed_at="2026-01-01T00:00:00+00:00",
             changed_by="t",
@@ -423,6 +425,7 @@ class TestM17:
             spec_id="S1",
             test_type="unit",
             expected_outcome="pass",
+            test_file="tests/test_foo.py",
             changed_by="t",
             change_reason="t",
         )
@@ -455,6 +458,7 @@ class TestM18:
             spec_id="S1",
             test_type="unit",
             expected_outcome="pass",
+            test_file="tests/test_foo.py",
             changed_by="t",
             change_reason="t",
         )

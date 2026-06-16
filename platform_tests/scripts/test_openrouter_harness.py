@@ -72,6 +72,18 @@ def test_load_routing_config_parses_openrouter_model(tmp_path: Path):
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
+def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
+    root = make_root(tmp_path)
+    prompt = orh.build_system_prompt("bridge-review", route(root))
+
+    assert prompt is not None
+    assert "bridge/INDEX.md" not in prompt
+    assert "full\nversioned bridge-file chain" in prompt
+    assert "gt bridge dispatch config" in prompt
+    assert "gt bridge dispatch status" in prompt
+    assert "gt bridge dispatch\nhealth" in prompt
+
+
 def test_bridge_write_invokes_required_guard_sequence(tmp_path: Path):
     root = make_root(tmp_path)
     records: list[tuple[str, dict, dict]] = []

@@ -30,7 +30,7 @@ def _insert_open_work_item(root: Path, work_item_id: str = "WI-ORPHAN") -> None:
             f"Work item {work_item_id}",
             "hygiene",
             "backlog",
-            "open",
+            "in_progress",
             "test",
             "seed",
         )
@@ -64,7 +64,7 @@ def _insert_authorized_open_work_item(root: Path, work_item_id: str = "WI-COVERE
             f"Work item {work_item_id}",
             "hygiene",
             "backlog",
-            "open",
+            "in_progress",
             "test",
             "seed",
         )

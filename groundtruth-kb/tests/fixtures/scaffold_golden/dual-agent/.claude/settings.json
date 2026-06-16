@@ -39,22 +39,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/turn-marker.py"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python .claude/hooks/delib-preflight-gate.py"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "python .claude/hooks/gov09-capture.py"
           }
         ]

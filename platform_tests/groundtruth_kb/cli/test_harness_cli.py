@@ -398,7 +398,7 @@ def test_harness_set_role_unknown_harness_rejected(tmp_path: Path) -> None:
     assert "ZZ" in result.output
 
 
-def test_harness_set_role_emits_single_prime_builder(tmp_path: Path) -> None:
+def test_harness_set_role_emits_role_holder_sets(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
     _register_active(config, "A", "codex-cli", role=["loyal-opposition"])
     _register_active(config, "B", "claude-code", role=["loyal-opposition"])
@@ -408,7 +408,9 @@ def test_harness_set_role_emits_single_prime_builder(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["verified_prime_builder"] == "B"
+    assert payload["verified_prime_builders"] == ["B"]
     assert payload["verified_loyal_opposition"] == "A"
+    assert payload["verified_loyal_oppositions"] == ["A"]
     assert payload["new_role_set"] == ["prime-builder"]
 
 

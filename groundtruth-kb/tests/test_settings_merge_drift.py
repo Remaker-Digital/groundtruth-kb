@@ -82,8 +82,6 @@ def _setup_git_for_upgrade(target: Path) -> None:
 _FULL_SETTINGS_BY_EVENT: dict[str, list[str]] = {
     "SessionStart": ["session-start-governance.py", "assertion-check.py"],
     "UserPromptSubmit": [
-        "turn-marker.py",
-        "delib-preflight-gate.py",
         "gov09-capture.py",
         "delib-search-gate.py",
         "intake-classifier.py",
