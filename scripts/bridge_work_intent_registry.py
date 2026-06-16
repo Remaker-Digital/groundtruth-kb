@@ -14,9 +14,8 @@ from typing import Any, Final
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 SLUG_RE: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s+(bridge/\S+\.md)\s*$"
+BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)$"
 )
 
 DEFAULT_DRAFT_TTL_SECONDS: Final[int] = int(os.environ.get("GTKB_WORK_INTENT_TTL_SECONDS") or "600")
@@ -168,28 +167,52 @@ def _is_lapsed_go_implementation(record: dict[str, Any], *, now: datetime | None
     return bool(grace_expires_at and grace_expires_at <= (now or now_utc()))
 
 
-def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str | None:
-    root = _root(project_root)
-    index_path = root / "bridge" / "INDEX.md"
-    if not index_path.is_file():
-        return None
-    in_target = False
-    for raw_line in index_path.read_text(encoding="utf-8-sig").splitlines():
+def _version_from_path(rel_path: str, thread_slug: str) -> int | None:
+    if rel_path == f"bridge/{thread_slug}.md":
+        return 1
+    match = re.fullmatch(rf"bridge/{re.escape(thread_slug)}-(\d{{3,}})\.md", rel_path)
+    return int(match.group(1)) if match else None
+
+
+def _bridge_file_status(path: Path) -> str:
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError as exc:
+        raise WorkIntentRegistryError(f"Bridge file is unreadable: {path}") from exc
+    for raw_line in lines:
         line = raw_line.strip()
-        doc_match = INDEX_DOC_RE.match(line)
-        if doc_match:
-            if in_target:
-                break
-            in_target = doc_match.group(1) == thread_slug
-            continue
-        if not in_target:
-            continue
         if not line:
-            break
-        status_match = INDEX_STATUS_RE.match(line)
-        if status_match:
-            return status_match.group(1)
-    return None
+            continue
+        if BRIDGE_FILE_STATUS_RE.fullmatch(line):
+            return line
+        raise WorkIntentRegistryError(f"Bridge file has unrecognized status line: {path}: {line!r}")
+    raise WorkIntentRegistryError(f"Bridge file is empty: {path}")
+
+
+def _thread_version_entries(thread_slug: str, *, project_root: Path | None = None) -> list[tuple[int, str, str]]:
+    root = _root(project_root)
+    bridge_dir = root / "bridge"
+    if not bridge_dir.is_dir():
+        return []
+    by_version: dict[int, tuple[str, str]] = {}
+    for path in sorted(bridge_dir.glob(f"{thread_slug}*.md")):
+        rel_path = path.relative_to(root).as_posix()
+        version = _version_from_path(rel_path, thread_slug)
+        if version is None:
+            continue
+        status = _bridge_file_status(path)
+        if version in by_version:
+            prior = by_version[version][1]
+            raise WorkIntentRegistryError(
+                f"Duplicate bridge version {version:03d} for {thread_slug}: {prior}, {rel_path}"
+            )
+        by_version[version] = (status, rel_path)
+    return [(version, status, rel_path) for version, (status, rel_path) in sorted(by_version.items(), reverse=True)]
+
+
+def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str | None:
+    entries = _thread_version_entries(thread_slug, project_root=project_root)
+    return entries[0][1] if entries else None
 
 
 def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
@@ -660,45 +683,13 @@ def lapsed_go_implementation_claims(*, project_root: Path | None = None) -> list
         conn.close()
 
 
-def _version_from_path(rel_path: str, thread_slug: str) -> int | None:
-    if rel_path == f"bridge/{thread_slug}.md":
-        return 1
-    match = re.fullmatch(rf"bridge/{re.escape(thread_slug)}-(\d{{3,}})\.md", rel_path)
-    return int(match.group(1)) if match else None
-
-
-def _iter_thread_versions(index_path: Path, thread_slug: str) -> list[int]:
-    if not index_path.is_file():
-        raise WorkIntentRegistryError(f"bridge/INDEX.md not found: {index_path}")
-    versions: list[int] = []
-    in_target = False
-    for raw_line in index_path.read_text(encoding="utf-8-sig").splitlines():
-        line = raw_line.strip()
-        doc_match = INDEX_DOC_RE.match(line)
-        if doc_match:
-            if in_target:
-                break
-            in_target = doc_match.group(1) == thread_slug
-            continue
-        if not in_target:
-            continue
-        if not line:
-            break
-        status_match = INDEX_STATUS_RE.match(line)
-        if status_match:
-            version = _version_from_path(status_match.group(2), thread_slug)
-            if version is not None:
-                versions.append(version)
-    if not versions:
-        raise WorkIntentRegistryError(f"Document {thread_slug!r} not found in bridge/INDEX.md")
-    return versions
-
-
 def revalidate_thread_version(thread_slug: str, project_root: Path) -> dict[str, int | str | bool]:
     """Read live bridge state and report the next version target."""
     slug = _validate_slug(thread_slug)
     root = _root(project_root)
-    versions = _iter_thread_versions(root / "bridge" / "INDEX.md", slug)
+    versions = [version for version, _, _ in _thread_version_entries(slug, project_root=root)]
+    if not versions:
+        raise WorkIntentRegistryError(f"Document {slug!r} not found in versioned bridge files")
     latest_version = max(versions)
     next_version = latest_version + 1
     next_rel_path = f"bridge/{slug}-{next_version:03d}.md"

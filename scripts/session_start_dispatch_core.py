@@ -292,7 +292,7 @@ def _bridge_auto_dispatch_context() -> str | None:
             "Do not relay the normal fresh-session startup disclosure.",
             "Do not treat the initial prompt as a discarded owner session-start stimulus.",
             "Treat the initial prompt as the active bridge auto-dispatch task.",
-            "Read `bridge/INDEX.md` directly before acting.",
+            "Read current TAFE/dispatcher bridge state and status-bearing versioned bridge files before acting; do not require or recreate `bridge/INDEX.md`.",
             "Process only entries whose live latest status is actionable for the durable role.",
             "Preserve the bridge protocol audit trail.",
         ]

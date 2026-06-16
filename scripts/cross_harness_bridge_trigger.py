@@ -6,19 +6,18 @@ Per ``bridge/gtkb-bridge-poller-event-driven-replacement-003.md`` GO at
 ``-004`` (Slice 2):
 
 This script is the harness-agnostic detection + dispatch surface invoked by
-PostToolUse / Stop hooks on either Claude Code or Codex. It re-reads the
-**live** ``bridge/INDEX.md`` (working-tree state, NOT committed state) every
-time it fires, computes a per-recipient actionable signature mirroring the
-smart-poller's ``_pending_signature`` scheme, compares against the durable
-dispatch-state, and dispatches the recipient harness only when its signature
-changed.
+PostToolUse / Stop hooks on either Claude Code or Codex. It re-reads live
+bridge state every time it fires, computes a per-recipient actionable signature
+mirroring the smart-poller's ``_pending_signature`` scheme, compares against
+the durable dispatch-state, and dispatches the recipient harness only when its
+signature changed.
 
 Design contract:
 
-- INDEX-as-canonical-state per ``.claude/rules/file-bridge-protocol.md`` is
-  preserved. The trigger event is a tool-use hook; the dispatch predicate is
-  live-INDEX-signature-changed (NOT commit-history-based — addresses Codex
-  F1 finding on REVISED-1).
+- TAFE/dispatcher bridge state plus the versioned bridge file chain are the
+  live authority after the 2026-06-15 cutover. The deprecated
+  ``bridge/INDEX.md`` compatibility view is read only when it already exists;
+  it is never required or recreated by this trigger.
 - Signature normalization: ``[{document_name, top_status, top_file}]`` per
   recipient, JSON sorted, SHA-256 hex. Byte-identical to
   ``groundtruth-kb/scripts/bridge_poller_runner.py::_pending_signature`` so
@@ -51,6 +50,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -222,6 +222,8 @@ _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
     "unchanged": "no_change",
     "no_pending_after_filter": "selected_batch_skipped",
     "author_meets_reviewer_refused": "author_meets_reviewer_refused",
+    "author_session_context_missing": "author_meets_reviewer_refused",
+    "author_session_context_unreadable": "author_meets_reviewer_refused",
 }
 
 
@@ -1319,16 +1321,31 @@ def _classify_invocation_outcome(last_result: str) -> str:
 
 def _should_refuse_self_review(
     bridge_id: str,
-    dispatched_harness_id: str,
+    reviewer_session_context_id: str,
     project_root: Path,
 ) -> bool:
-    """Check if the latest version of the proposal for bridge_id was written by dispatched_harness_id."""
+    """Return whether the latest bridge artifact must be refused as self-review."""
+    return (
+        _self_review_refusal_reason(
+            bridge_id=bridge_id,
+            reviewer_session_context_id=reviewer_session_context_id,
+            project_root=project_root,
+        )
+        is not None
+    )
+
+
+def _self_review_refusal_reason(
+    bridge_id: str,
+    reviewer_session_context_id: str,
+    project_root: Path,
+) -> str | None:
+    """Refuse only same-session review; fail closed when session metadata is missing."""
     import fnmatch
-    import re
 
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
-        return False
+        return None
 
     pattern1 = f"gtkb-{bridge_id}-*.md"
     pattern2 = f"{bridge_id}-*.md"
@@ -1340,7 +1357,7 @@ def _should_refuse_self_review(
             candidate_files.append(file)
 
     if not candidate_files:
-        return False
+        return None
 
     # Sort to find the latest version
     candidate_files.sort(key=lambda f: f.name)
@@ -1348,19 +1365,21 @@ def _should_refuse_self_review(
 
     try:
         content = latest_file.read_text(encoding="utf-8")
-        # Parse first 30 lines for author_harness_id:
-        lines = content.splitlines()[:30]
+        # Parse the metadata header for author_session_context_id.
+        lines = content.splitlines()[:50]
         for line in lines:
-            match = re.match(r"^author_harness_id:\s*(\S+)", line.strip())
+            match = re.match(r"^author_session_context_id:\s*(\S+)", line.strip())
             if match:
-                author_id = match.group(1).strip().strip('"').strip("'")
-                if author_id == dispatched_harness_id:
-                    return True
-                break
+                author_session_context_id = match.group(1).strip().strip('"').strip("'")
+                if not author_session_context_id:
+                    return "author_session_context_missing"
+                if author_session_context_id == reviewer_session_context_id:
+                    return "author_meets_reviewer_refused"
+                return None
     except Exception:
-        pass
+        return "author_session_context_unreadable"
 
-    return False
+    return "author_session_context_missing"
 
 
 def _poll_dispatch_verdict(
@@ -1507,15 +1526,67 @@ def _emit_trigger_diagnostic(state_dir: Path, record: dict[str, Any]) -> None:
         pass
 
 
-def _read_index_live(project_root: Path) -> str:
-    """Read the live (working-tree) bridge/INDEX.md content.
+_BRIDGE_STATUS_LINE_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED|ACCEPTED)\b",
+    re.IGNORECASE,
+)
 
-    Per Codex F1 on REVISED-1: dispatch predicate is live INDEX, not committed
-    INDEX. An uncommitted INDEX edit must be visible here.
-    """
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        match = _BRIDGE_STATUS_LINE_RE.match(line.strip())
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _render_bridge_state_compatibility_text(project_root: Path) -> str:
+    """Render INDEX-shaped text from versioned bridge files without writing it."""
+    try:
+        from groundtruth_kb.tafe_index_completeness import (
+            _candidate_is_archived,
+            _load_acknowledged_slugs,
+            scan_expected_documents,
+        )
+    except Exception:
+        return ""
+
+    try:
+        expected_docs = scan_expected_documents(project_root)
+    except Exception:
+        return ""
+    acknowledged = _load_acknowledged_slugs(project_root)
+    lines = [
+        "<!-- GENERATED IN MEMORY: dispatcher compatibility view from TAFE/versioned bridge state; bridge/INDEX.md is deprecated/removed. -->",
+        "",
+    ]
+    for slug in sorted(expected_docs):
+        if _candidate_is_archived(slug, expected_docs, acknowledged, project_root):
+            continue
+        rows: list[tuple[str, str]] = []
+        for rel_path in reversed(expected_docs[slug].files):
+            status = _status_from_bridge_file(project_root / rel_path)
+            if status is not None:
+                rows.append((status, rel_path))
+        if not rows:
+            continue
+        lines.append(f"Document: {slug}")
+        for status, rel_path in rows:
+            lines.append(f"{status}: {rel_path}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _read_index_live(project_root: Path) -> str:
+    """Read live bridge state as INDEX-shaped text for legacy parser callers."""
     index_path = project_root / "bridge" / "INDEX.md"
     if not index_path.is_file():
-        return ""
+        return _render_bridge_state_compatibility_text(project_root)
     return index_path.read_text(encoding="utf-8")
 
 
@@ -1523,10 +1594,10 @@ def _compute_actionable(
     index_text: str,
     project_root: Path,
 ) -> tuple[list[Any], list[Any]]:
-    """Parse INDEX and return (actionable_for_prime, actionable_for_codex).
+    """Parse INDEX-shaped bridge state and return role-actionable queues.
 
     Lazy-imports the canonical detector + notify modules. Tests exercise this
-    via synthetic in-root projects and a real on-disk INDEX.
+    via synthetic in-root projects and compatibility text.
     """
     from groundtruth_kb.bridge.detector import parse_index  # type: ignore
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
@@ -1536,7 +1607,7 @@ def _compute_actionable(
 
 
 def _selected_oldest_first(items: list[Any], max_items: int) -> list[Any]:
-    """INDEX is newest-first; bridge work is processed oldest-first."""
+    """Compatibility bridge state is newest-first; bridge work is processed oldest-first."""
     if max_items <= 0:
         return []
     return list(reversed(items))[:max_items]
@@ -1613,7 +1684,7 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
             role_line,
             worker_context_line,
             loyal_opposition_preflight_line,
-            "Read bridge/INDEX.md directly before acting. Treat the live latest status as authoritative.",
+            "Read current TAFE/dispatcher bridge state and status-bearing versioned bridge files before acting; do not require or recreate bridge/INDEX.md.",
             "If any listed entry is no longer actionable for your role, do not act on that stale entry.",
             "Keep work scoped to the selected bridge entries and preserve the bridge protocol audit trail.",
             "",
@@ -2130,6 +2201,24 @@ def _record_can_fire_events(h_info: dict[str, object]) -> bool:
     return h_info.get("event_driven_hooks") is True
 
 
+def _dispatch_context_for_items(needed_role_label: str, project_root: Path, items: list[Any] | None) -> Any:
+    """Build a config-rule context from the first bridge work item."""
+    from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text
+
+    if not items:
+        return DispatchContext(required_role=needed_role_label)
+    first = items[0]
+    status = str(getattr(first, "top_status", "") or "").strip().upper() or None
+    text = ""
+    top_file = str(getattr(first, "top_file", "") or "").strip()
+    if top_file:
+        try:
+            text = (project_root / top_file).read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+    return context_from_bridge_text(needed_role_label, text, status=status)
+
+
 def _is_dispatch_ready(
     h_id: str,
     h_info: dict[str, object],
@@ -2176,11 +2265,13 @@ def _resolve_dispatch_targets(
     needed_role_label: str,
     project_root: Path,
     state_dir: Path | None = None,
+    items: list[Any] | None = None,
 ) -> list[DispatchTarget]:
     """Resolve which harnesses should receive work needing the given durable role.
 
-    Allows multiple active harnesses per role concurrently. Returns a list of
-    resolved DispatchTarget objects.
+    Allows multiple active harnesses per role concurrently. Dispatchability,
+    status/activity rules, and final ranking are read from
+    ``config/dispatcher/rules.toml`` when available.
     """
     if needed_role_label not in _LABEL_TO_CANONICAL_MODE:
         raise ValueError(f"unknown role label: {needed_role_label!r}")
@@ -2218,7 +2309,27 @@ def _resolve_dispatch_targets(
     active_matching = [
         (h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info) and _record_can_receive_dispatch(h_info)
     ]
-    if needed_role_label == "loyal-opposition":
+    try:
+        from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config, select_dispatch_candidates
+
+        dispatch_config = load_bridge_dispatch_config(project_root)
+        context = _dispatch_context_for_items(needed_role_label, project_root, items)
+        records = []
+        for h_id, h_info in active_matching:
+            record = dict(h_info)
+            record["id"] = str(h_id)
+            records.append(record)
+        ranked = select_dispatch_candidates(records, dispatch_config, context)
+        ranked_ids = [str(record.get("id") or "") for record in ranked]
+        by_id = {str(h_id): (h_id, h_info) for h_id, h_info in active_matching}
+        if ranked_ids or dispatch_config.rules:
+            active_matching = [by_id[h_id] for h_id in ranked_ids if h_id in by_id]
+        else:
+            active_matching = sorted(
+                active_matching,
+                key=lambda item: (_reviewer_precedence_for_record(item[1]), str(item[0])),
+            )
+    except Exception:
         active_matching = sorted(
             active_matching,
             key=lambda item: (_reviewer_precedence_for_record(item[1]), str(item[0])),
@@ -2228,7 +2339,9 @@ def _resolve_dispatch_targets(
         if state_dir is not None:
             inactive_ids = sorted(h_id for h_id, _ in role_matching)
             note = (
-                f" (role-set members exist but none active and event-capable: {inactive_ids})" if inactive_ids else ""
+                f" (role-set members exist but none active and receive-dispatch-capable: {inactive_ids})"
+                if inactive_ids
+                else ""
             )
             _record_dispatch_failure(
                 state_dir,
@@ -2293,16 +2406,10 @@ def _resolve_dispatch_target(
     project_root: Path,
     state_dir: Path | None = None,
 ) -> DispatchTarget | None:
-    """Resolve a single dispatch target for backward compatibility in tests.
-
-    If multiple active targets exist, raises ValueError matching test assertions.
-    """
+    """Resolve the top-ranked dispatch target for backward compatibility."""
     targets = _resolve_dispatch_targets(needed_role_label, project_root, state_dir)
     if not targets:
         return None
-    if len(targets) > 1:
-        ids_str = ", ".join(f"'{t.harness_id}'" for t in targets)
-        raise ValueError(f"multiple active harnesses match role {needed_role_label!r}: {ids_str}")
     target = targets[0]
     role_map = _read_role_assignments(project_root)
     harnesses = role_map.get("harnesses", {})
@@ -2631,9 +2738,8 @@ def _record_substrate_mismatch_skip(state_dir: Path, active_substrate: str) -> N
 def _is_single_harness_topology(project_root: Path) -> bool:
     """Return True iff the role map records a single harness ID with both
     ``prime-builder`` AND ``loyal-opposition`` in its role-set AND that harness
-    carries ``status == "active"`` AND ``event_driven_hooks is True``
-    (DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 7 and v2 capability
-    gate: single-harness mode requires an active event-capable harness).
+    carries ``status == "active"`` AND event-firing capability. Single-harness
+    mode requires an active event-capable harness.
 
     Per IP-8 of ``bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md``
     (Codex GO at ``-006``): the cross-harness trigger goes inert in
@@ -2659,8 +2765,7 @@ def _is_single_harness_topology(project_root: Path) -> bool:
     if isinstance(raw_role, list):
         role_set = {str(r).strip().lower() for r in raw_role if isinstance(r, str)}
         has_both = "prime-builder" in role_set and "loyal-opposition" in role_set
-        # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 7 plus WI-4213:
-        # single-harness mode is applicable only when the single harness is
+        # WI-4578 + WI-4213: single-harness mode is applicable only when the single harness is
         # status==active and event-capable. Missing/unknown status or missing/
         # false event capability -> not single-harness (the trigger then
         # proceeds on its normal multi-harness path, where the resolver finds
@@ -2899,7 +3004,7 @@ def run_trigger(
     # locals never influence the dispatch decision. Per
     # bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md (Codex GO -004).
     _diag_start = time.monotonic()
-    _diag_index_mtime = _path_mtime_iso(project_root / "bridge" / "INDEX.md")
+    _diag_index_mtime = _path_mtime_iso(project_root / "bridge")
     _diag_dispatch_state_mtime_pre = _path_mtime_iso(state_dir / DISPATCH_STATE_FILENAME)
 
     index_text = _read_index_live(project_root)
@@ -2970,10 +3075,10 @@ def run_trigger(
         ("codex", "loyal-opposition", actionable_for_codex),
     ):
         try:
-            targets = _resolve_dispatch_targets(needed_role_label, project_root, state_dir)
+            targets = _resolve_dispatch_targets(needed_role_label, project_root, state_dir, items=items)
         except ValueError as exc:
-            # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 3: config errors (drift, unknown label, missing identity)
-            # raise; the caller records dispatch_target_resolution_failed.
+            # Config errors (drift, unknown label, missing identity) raise; the
+            # caller records dispatch_target_resolution_failed.
             _record_dispatch_failure(
                 state_dir,
                 {
@@ -2988,78 +3093,31 @@ def run_trigger(
             continue
 
         if not targets:
-            # DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001 assertion 2: zero-ACTIVE
-            # sentinel. _resolve_dispatch_targets already emitted the
+            # Zero eligible target sentinel. _resolve_dispatch_targets already emitted the
             # no_active_target_for_role audit record; do NOT double-record here.
             pending_by_target.append((None, items, needed_role_label, "no_active_target_for_role", None))
             continue
 
-        if needed_role_label == "loyal-opposition":
-            skipped_candidates: list[dict[str, Any]] = []
-            selected_target: DispatchTarget | None = None
-            for target in targets:
-                h_info = harnesses.get(target.harness_id) or {}
-                harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
-                if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
-                    reason = f"{harness_type}_dispatch_not_ready"
-                    skip = _dispatch_target_evidence(target)
-                    skip["reason"] = reason
-                    skipped_candidates.append(skip)
-                    pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
-                    continue
-                target_max_items = _effective_max_items_for_target(target, max_items)
-                selected_for_target = _selected_oldest_first(
-                    [item for item in items if getattr(item, "dispatchable", True)],
-                    target_max_items,
-                )
-                if selected_for_target and _should_refuse_self_review(
-                    bridge_id=selected_for_target[0].document_name,
-                    dispatched_harness_id=target.harness_id,
-                    project_root=project_root,
-                ):
-                    reason = "author_meets_reviewer_refused"
-                    skip = _dispatch_target_evidence(target)
-                    skip["reason"] = reason
-                    skipped_candidates.append(skip)
-                    pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
-                    continue
-                selected_target = target
-                break
-            if selected_target is None:
-                pending_by_target.append(
-                    (None, items, needed_role_label, "no_ready_target_for_role", skipped_candidates)
-                )
-            else:
-                pending_by_target.append(
-                    (selected_target, items, selected_target.dispatch_state_key, None, skipped_candidates)
-                )
-            continue
-
-        if len(targets) > 1:
-            ids_str = ", ".join(f"'{target.harness_id}'" for target in targets)
-            error_message = f"multiple active harnesses match role {needed_role_label!r}: {ids_str}"
-            _record_dispatch_failure(
-                state_dir,
-                {
-                    "dispatch_id": _now_iso() + "-resolve-fail",
-                    "recipient": needed_role_label,
-                    "launched": False,
-                    "reason": "dispatch_target_resolution_failed",
-                    "error_message": error_message,
-                },
-            )
-            pending_by_target.append((None, items, needed_role_label, "dispatch_target_resolution_failed", None))
-            continue
-
+        skipped_candidates: list[dict[str, Any]] = []
+        selected_target: DispatchTarget | None = None
         for target in targets:
             h_info = harnesses.get(target.harness_id) or {}
             harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
             if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
-                pending_by_target.append(
-                    (target, items, target.dispatch_state_key, f"{harness_type}_dispatch_not_ready", None)
-                )
-            else:
-                pending_by_target.append((target, items, target.dispatch_state_key, None, None))
+                reason = f"{harness_type}_dispatch_not_ready"
+                skip = _dispatch_target_evidence(target)
+                skip["reason"] = reason
+                skipped_candidates.append(skip)
+                pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
+                continue
+            selected_target = target
+            break
+        if selected_target is None:
+            pending_by_target.append((None, items, needed_role_label, "no_ready_target_for_role", skipped_candidates))
+        else:
+            pending_by_target.append(
+                (selected_target, items, selected_target.dispatch_state_key, None, skipped_candidates)
+            )
 
     results: dict[str, Any] = {}
     for target, items, recipient, failure_reason, fallback_skipped_candidates in pending_by_target:
@@ -3310,15 +3368,19 @@ def run_trigger(
 
                         if target.needed_role_label == "loyal-opposition" and dispatched_selected:
                             first_item = dispatched_selected[0]
-                            if _should_refuse_self_review(
+                            if dispatch_id is None:
+                                dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                            self_review_refusal_reason = _self_review_refusal_reason(
                                 bridge_id=first_item.document_name,
-                                dispatched_harness_id=target.harness_id,
+                                reviewer_session_context_id=dispatch_id,
                                 project_root=project_root,
-                            ):
-                                recipient_state["last_result"] = "author_meets_reviewer_refused"
+                            )
+                            if self_review_refusal_reason is not None:
+                                recipient_state["last_result"] = self_review_refusal_reason
                                 results[recipient] = {
                                     "launched": False,
-                                    "reason": "author_meets_reviewer_refused",
+                                    "reason": self_review_refusal_reason,
+                                    "dispatch_id": dispatch_id,
                                 }
                                 recipients_state[recipient] = recipient_state
                                 continue
@@ -3773,7 +3835,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Cross-harness bridge trigger — event-driven replacement for the "
-            "smart-poller. Reads live bridge/INDEX.md, computes per-recipient "
+            "smart-poller. Reads live TAFE/versioned bridge state, computes per-recipient "
             "actionable signature, dispatches recipient harness on signature change."
         )
     )

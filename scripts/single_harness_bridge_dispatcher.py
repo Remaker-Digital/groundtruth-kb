@@ -66,13 +66,12 @@ _PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src
 if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
+from bridge_lease_registry import is_lease_held  # noqa: E402
+from gtkb_session_id import SESSION_ID_ENV_VARS  # noqa: E402
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     issue_dispatch_authorization_packets,
 )
-from bridge_lease_registry import is_lease_held
-from gtkb_session_id import SESSION_ID_ENV_VARS
-
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -435,7 +434,7 @@ def _build_prompt(target_mode: str, items: list[Any], max_items: int, trigger) -
             "Read your durable role from harness-state/harness-registry.json (canonical role registry per Slice 1 retirement). Multi-element "
             "role sets accept BOTH `pb` and `lo` keyword modes; this dispatch carries "
             f"mode `{target_mode}` for this work item.",
-            "Read bridge/INDEX.md directly before acting. Treat the live latest status as authoritative.",
+            "Read current TAFE/dispatcher bridge state and status-bearing versioned bridge files before acting; do not require or recreate bridge/INDEX.md.",
             "Keep work scoped to the selected bridge entries and preserve the bridge protocol audit trail.",
             "",
             f"Selected entries, oldest-first, capped at {max_items}:",
@@ -485,11 +484,12 @@ def _issue_dispatch_authorization_for_selected(
 def _resolve_dispatcher_targets(
     needed_role_label: str,
     project_root: Path,
+    items: list[Any] | None = None,
 ) -> list[Any]:
     """Resolve active harnesses for the given role to be dispatched by the poller.
 
-    Orthogonal to event-driven hooks capability. Spawns workers for ALL active
-    harnesses registered for the role.
+    Orthogonal to event-driven hooks capability. Returns eligible targets in
+    dispatch-config ranking order.
     """
     trigger = _load_trigger_module()
     role_map = trigger._read_role_assignments(project_root)
@@ -518,7 +518,36 @@ def _resolve_dispatcher_targets(
         for h_id, h_info in harnesses.items()
         if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
     ]
-    active_matching = [(h_id, h_info) for h_id, h_info in role_matching if _is_active(h_info)]
+    active_matching = [
+        (h_id, h_info)
+        for h_id, h_info in role_matching
+        if _is_active(h_info) and trigger._record_can_receive_dispatch(h_info)
+    ]
+    try:
+        from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config, select_dispatch_candidates
+
+        dispatch_config = load_bridge_dispatch_config(project_root)
+        context = trigger._dispatch_context_for_items(needed_role_label, project_root, items)
+        records = []
+        for h_id, h_info in active_matching:
+            record = dict(h_info)
+            record["id"] = str(h_id)
+            records.append(record)
+        ranked = select_dispatch_candidates(records, dispatch_config, context)
+        ranked_ids = [str(record.get("id") or "") for record in ranked]
+        by_id = {str(h_id): (h_id, h_info) for h_id, h_info in active_matching}
+        if ranked_ids or dispatch_config.rules:
+            active_matching = [by_id[h_id] for h_id in ranked_ids if h_id in by_id]
+        else:
+            active_matching = sorted(
+                active_matching,
+                key=lambda item: (trigger._reviewer_precedence_for_record(item[1]), str(item[0])),
+            )
+    except Exception:
+        active_matching = sorted(
+            active_matching,
+            key=lambda item: (trigger._reviewer_precedence_for_record(item[1]), str(item[0])),
+        )
 
     targets = []
     identities = trigger._read_harness_identities(project_root)
@@ -730,11 +759,9 @@ def run_dispatcher(
         ]
         resolved_targets = []
         for needed_role_label, items in pending:
-            mode = _LABEL_TO_CANONICAL_MODE[needed_role_label]
-
             # Resolve targets
             try:
-                targets = _resolve_dispatcher_targets(needed_role_label, project_root)
+                targets = _resolve_dispatcher_targets(needed_role_label, project_root, items=items)
             except ValueError as exc:
                 trigger._record_dispatch_failure(
                     state_dir,
@@ -1029,7 +1056,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Single-harness bridge dispatcher - wakes from a Windows scheduled "
-            "task; reads bridge/INDEX.md; computes per-role actionable signatures; "
+            "task; reads TAFE/versioned bridge state; computes per-role actionable signatures; "
             "spawns subprocess workers in single-harness topology when work waits."
         )
     )

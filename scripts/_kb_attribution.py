@@ -13,13 +13,12 @@ Three-source priority order for resolution:
 2. Environment variable `GTKB_HARNESS_NAME` (set by harness wrappers at
    session start; current default for ad-hoc CLI use under a configured
    harness session).
-3. The single ACTIVE Prime Builder harness (only when EXACTLY ONE harness
-   currently holds `prime-builder` in its role-set AND registry
-   `status == "active"`; raises `RuntimeError` if zero or multiple active Prime
-   Builders exist). The active-status filter is applied upstream by
-   `load_role_assignments`, which returns only `status == "active"` harnesses
-   per ADR-ROLE-STATUS-ORTHOGONALITY-001 /
-   DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001.
+3. The active Prime Builder fallback harness. When multiple active harnesses
+   hold `prime-builder`, priority-3 fallback resolves only if exactly one is
+   dispatchable; otherwise the mutating resolver fails closed and the caller
+   must provide an explicit harness name. The active-status filter is applied
+   upstream by `load_role_assignments`, which returns only `status == "active"`
+   harnesses.
 
 The resolver does NOT attempt to "infer" the harness from a process ID,
 parent-shell name, or any other derived signal. The above three sources
@@ -37,6 +36,7 @@ where the mutating variant raises. Mutating callers MUST NOT use the
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -126,8 +126,20 @@ def _name_for_harness_id(harness_id: str) -> str | None:
     return None
 
 
+def _record_can_receive_dispatch(record: Mapping[str, object]) -> bool:
+    """Return whether an active role holder can receive headless dispatch.
+
+    Older registry projections exposed only ``event_driven_hooks`` for this
+    axis, so keep it as a compatibility fallback for attribution contexts that
+    read historical fixtures.
+    """
+    if "can_receive_dispatch" in record:
+        return record.get("can_receive_dispatch") is True
+    return record.get("event_driven_hooks") is True
+
+
 def _active_prime_builder_harness_name() -> str | None:
-    """Return the harness_name of the single ACTIVE Prime Builder, or None if 0 or >1.
+    """Return the fallback Prime Builder harness_name, or None if ambiguous.
 
     Per IP-8 of gtkb-single-harness-bridge-dispatcher-001: Prime membership is
     set-membership against the role-set wire form. Multi-element role sets
@@ -135,21 +147,26 @@ def _active_prime_builder_harness_name() -> str | None:
     ``prime-builder`` (or the compatibility/provenance value
     ``acting-prime-builder``).
 
-    Role/status orthogonality (ADR-ROLE-STATUS-ORTHOGONALITY-001 /
-    DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001): attribution resolves to the single
-    *active* Prime Builder. The active-status filter is applied upstream by
-    ``load_role_assignments``, which returns ONLY ``status == "active"``
-    harnesses (and does not surface the status field), so role membership at
-    this layer already implies active. Two active Prime Builders (a registry
-    misconfiguration) return ``None``, and the mutating caller fails closed.
+    Role/status/dispatchability orthogonality: the active-status filter is
+    applied upstream by ``load_role_assignments``. When there are multiple active
+    Prime Builders, fallback attribution resolves only if exactly one of them is
+    dispatchable; otherwise the mutating caller must pass an explicit harness.
     """
     from scripts.harness_roles import is_prime_builder  # local import: avoid cycle
 
     assignments = _load_role_assignments()
     prime_ids = [hid for hid, rec in assignments.items() if isinstance(rec, dict) and is_prime_builder(rec)]
-    if len(prime_ids) != 1:
+    if len(prime_ids) == 1:
+        return _name_for_harness_id(prime_ids[0])
+
+    dispatchable_prime_ids = [
+        hid
+        for hid in prime_ids
+        if isinstance(assignments.get(hid), dict) and _record_can_receive_dispatch(assignments[hid])
+    ]
+    if len(dispatchable_prime_ids) != 1:
         return None
-    return _name_for_harness_id(prime_ids[0])
+    return _name_for_harness_id(dispatchable_prime_ids[0])
 
 
 def _resolve_harness_name(harness_name: str | None) -> str | None:
@@ -216,21 +233,22 @@ def resolve_changed_by(*, harness_name: str | None = None) -> str:
     Priority:
         1. Explicit kwarg `harness_name`.
         2. `GTKB_HARNESS_NAME` env var.
-        3. The single ACTIVE Prime Builder harness (exactly one harness holding
-           `prime-builder` with registry `status == "active"`; the active-status
-           filter is applied upstream by `load_role_assignments`).
+        3. The active Prime Builder fallback harness. If multiple active Prime
+           Builders exist, fallback resolves only when exactly one is
+           dispatchable.
 
     Raises:
         RuntimeError: if no source resolves a harness, if the harness has
             no role assignment in the harness registry projection, or if priority-3
-            finds zero or multiple Prime Builders.
+            finds no unambiguous Prime Builder fallback.
     """
     resolved = _resolve_harness_name(harness_name)
     if not resolved:
         raise RuntimeError(
             "resolve_changed_by: no harness_name resolved. "
             f"Provide explicit kwarg, set ${ENV_VAR_HARNESS_NAME}, "
-            f"or ensure exactly one Prime Builder is assigned in {ROLE_ASSIGNMENTS_PATH.name}."
+            "or provide one unambiguous active dispatchable Prime Builder "
+            f"fallback in {ROLE_ASSIGNMENTS_PATH.name}."
         )
     harness_id = _harness_id_for_name(resolved)
     if not harness_id:

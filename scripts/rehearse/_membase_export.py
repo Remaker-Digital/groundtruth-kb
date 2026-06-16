@@ -104,6 +104,12 @@ _EXPECTED_VERSIONED_ARTIFACT_TABLES: frozenset[str] = frozenset(
         "sot_artifacts",
         "canonical_terms",
         "dispatch_events",
+        "agent_capability_snapshots",
+        "flow_definitions",
+        "flow_instances",
+        "stage_attempt_telemetry",
+        "stage_instances",
+        "stage_leases",
     }
 )
 
@@ -113,6 +119,8 @@ _RELATIONSHIP_TABLES: frozenset[str] = frozenset(
         "deliberation_specs",
         "deliberation_work_items",
         "specification_deliberation_sources",
+        "flow_artifacts",
+        "flow_events",
     }
 )
 
@@ -209,6 +217,11 @@ _TABLE_SPECIFIC_TYPE_COLUMNS: dict[str, tuple[str, ...]] = {
     # is populated for ~96% of rows (1,264 / 1,318 in the live schema)
     # and explicitly identifies the originating project.
     "deliberations": ("origin_project", "origin_repo"),
+    # TAFE tables query parent flow instance references or metadata columns.
+    "flow_instances": ("subject_id", "flow_type", "subject_type", "status", "metadata"),
+    "stage_instances": ("flow_instance_id",),
+    "stage_leases": ("stage_instance_id",),
+    "stage_attempt_telemetry": ("flow_instance_id",),
     # Explicitly empty (no override) for these tables; their type-columns
     # are functional categories, not adopter/framework discriminators:
     #   - operational_procedures.type: workflow type, not scope
@@ -382,23 +395,88 @@ def _classify_deliberation_origin(origin_project: str | None) -> tuple[str, str]
     return None
 
 
-def _classify_by_type_specific_signal(table_name: str, type_columns: dict[str, str | None]) -> tuple[str, str] | None:
+def _classify_tafe_row(
+    conn: sqlite3.Connection, table_name: str, row_id: str, type_columns: dict[str, str | None]
+) -> tuple[str, str] | None:
+    """Type-specific classifier for TAFE tables.
+
+    TAFE tables are part of the platform's Typed Artifact Flow Engine.
+    Their classification is derived dynamically from their parent flow instance.
+    """
+    if table_name == "flow_definitions":
+        return ("framework", "tafe_flow_definition_framework")
+    if table_name == "agent_capability_snapshots":
+        return ("framework", "tafe_agent_capability_snapshot_framework")
+
+    cur = conn.cursor()
+    flow_instance_id = None
+    if table_name == "flow_instances":
+        flow_instance_id = row_id
+    elif "flow_instance_id" in type_columns:
+        flow_instance_id = type_columns["flow_instance_id"]
+    elif "stage_instance_id" in type_columns:
+        stage_inst_id = type_columns["stage_instance_id"]
+        if stage_inst_id:
+            cur.execute("SELECT flow_instance_id FROM stage_instances WHERE id = ?", (stage_inst_id,))
+            res = cur.fetchone()
+            if res:
+                flow_instance_id = res[0]
+
+    if not flow_instance_id:
+        return None
+
+    cur.execute(
+        "SELECT subject_id, flow_type, subject_type, status, metadata FROM flow_instances WHERE id = ?",
+        (flow_instance_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return ("unclassified", f"tafe_parent_flow_instance_missing:{flow_instance_id}")
+
+    subject_id, flow_type, subject_type, status, metadata = row
+    content_text = f"{flow_type} {subject_type} {status} {metadata}"
+
+    sid = (subject_id or "").lower()
+    blob = content_text.lower()
+    adopter_hit = any(m in sid for m in _ADOPTER_CONTENT_MARKERS) or any(m in blob for m in _ADOPTER_CONTENT_MARKERS)
+    framework_hit = (
+        any(m in sid for m in _FRAMEWORK_CONTENT_MARKERS)
+        or "gtkb" in sid
+        or any(m in blob for m in _FRAMEWORK_CONTENT_MARKERS)
+        or "gtkb" in blob
+    )
+
+    if adopter_hit and not framework_hit:
+        return ("adopter", f"tafe_derived_from_flow_instance_adopter:{flow_instance_id}")
+    if framework_hit and not adopter_hit:
+        return ("framework", f"tafe_derived_from_flow_instance_framework:{flow_instance_id}")
+    if adopter_hit and framework_hit:
+        return ("unclassified", f"tafe_derived_from_flow_instance_mixed:{flow_instance_id}")
+    return ("unclassified", f"tafe_derived_from_flow_instance_no_signal:{flow_instance_id}")
+
+
+def _classify_by_type_specific_signal(
+    conn: sqlite3.Connection, table_name: str, row_id: str, type_columns: dict[str, str | None]
+) -> tuple[str, str] | None:
     """Dispatch to per-table type-specific classifier.
 
     Returns ``(classification, signal)`` if the table has a strong
     type-specific signal; ``None`` if no signal applies (caller falls
     through to ID-prefix + content scan).
-
-    Per Codex ``-008`` Finding 1: the originally promised type-specific
-    override layer. Implemented for ``tests`` (path-based) and
-    ``deliberations`` (origin_project-based). Explicitly absent for
-    other versioned tables — see module docstring "Type-Specific
-    Override Decisions".
     """
     if table_name == "tests":
         return _classify_test_path(type_columns.get("test_file"))
     if table_name == "deliberations":
         return _classify_deliberation_origin(type_columns.get("origin_project"))
+    if table_name in (
+        "flow_definitions",
+        "flow_instances",
+        "stage_instances",
+        "stage_leases",
+        "stage_attempt_telemetry",
+        "agent_capability_snapshots",
+    ):
+        return _classify_tafe_row(conn, table_name, row_id, type_columns)
     return None
 
 
@@ -456,7 +534,7 @@ def _enumerate_versioned_table(conn: sqlite3.Connection, table_name: str) -> lis
     entries: list[dict[str, Any]] = []
     for row_id, data in by_id.items():
         # Tier 1 — type-specific signal.
-        type_specific = _classify_by_type_specific_signal(table_name, data["type_columns"])
+        type_specific = _classify_by_type_specific_signal(conn, table_name, row_id, data["type_columns"])
         if type_specific is not None:
             classification, signal = type_specific
         else:
@@ -485,51 +563,59 @@ def _enumerate_relationship_table(
     """Enumerate relationship rows; trace classification from parent.
 
     Per Codex ``-006`` constraint 3: each row references a parent
-    deliberation via ``deliberation_id``; classification inherits from
-    that parent. Orphan rows (parent missing) surface as warnings and
-    classify as ``unclassified``.
+    deliberation via ``deliberation_id`` or a parent flow instance via
+    ``flow_instance_id``; classification inherits from that parent.
+    Orphan rows (parent missing) surface as warnings and classify as
+    ``unclassified``.
 
     Returns ``(entries, warnings)``.
     """
     cur = conn.cursor()
     cur.execute(f'PRAGMA table_info("{table_name}")')
     columns = [c[1] for c in cur.fetchall()]
-    if "deliberation_id" not in columns:
+
+    parent_col = None
+    if "deliberation_id" in columns:
+        parent_col = "deliberation_id"
+    elif "flow_instance_id" in columns:
+        parent_col = "flow_instance_id"
+
+    if parent_col is None:
         return [], [
-            f"relationship_table_shape_unexpected: {table_name!r} has no deliberation_id column (columns: {columns})"
+            f"relationship_table_shape_unexpected: {table_name!r} has neither deliberation_id nor flow_instance_id column (columns: {columns})"
         ]
 
-    other_cols = [c for c in columns if c != "deliberation_id"]
-    select_cols = ["deliberation_id", *other_cols]
+    other_cols = [c for c in columns if c != parent_col]
+    select_cols = [parent_col, *other_cols]
     cur.execute(f'SELECT {", ".join(select_cols)} FROM "{table_name}"')
     rows = cur.fetchall()
 
+    parent_name = parent_col.removesuffix("_id") if parent_col else ""
     entries: list[dict[str, Any]] = []
     warnings: list[str] = []
     for row in rows:
-        deliberation_id = row[0]
+        parent_id = row[0]
         other_values = dict(zip(other_cols, row[1:], strict=False))
-        parent = parent_classifications.get(deliberation_id)
+        parent = parent_classifications.get(parent_id)
         if parent is None:
             warnings.append(
-                f"orphan_relationship_row: {table_name}.deliberation_id="
-                f"{deliberation_id!r} (parent not in deliberations table)"
+                f"orphan_relationship_row: {table_name}.{parent_col}={parent_id!r} (parent not found in parent tables)"
             )
             classification = "unclassified"
-            classification_signal = "orphan_parent_deliberation_missing"
+            classification_signal = f"orphan_parent_{parent_name}_missing"
             parent_classification: str | None = None
         else:
             classification = parent["classification"]
-            classification_signal = "from_parent_deliberation"
+            classification_signal = f"from_parent_{parent_name}"
             parent_classification = parent["classification"]
         entries.append(
             {
                 "table_name": table_name,
-                "deliberation_id": deliberation_id,
+                parent_col: parent_id,
                 **other_values,
                 "classification": classification,
                 "classification_signal": classification_signal,
-                "classification_inheritance": "from_parent_deliberation",
+                "classification_inheritance": f"from_parent_{parent_name}",
                 "parent_classification": parent_classification,
             }
         )
@@ -795,30 +881,30 @@ def run(
 
         warnings: list[str] = []
 
-        # Pass 1 — versioned-artifact tables. Build deliberation
-        # classification map for relationship-row inheritance in pass 2.
+        # Pass 1 — versioned-artifact tables. Build deliberation and flow_instance
+        # classification maps for relationship-row inheritance in pass 2.
         versioned_records: list[dict[str, Any]] = []
-        deliberation_classifications: dict[str, dict[str, str]] = {}
+        parent_classifications: dict[str, dict[str, str]] = {}
         for table in discovered:
             name = table["table_name"]
             if name not in _EXPECTED_VERSIONED_ARTIFACT_TABLES:
                 continue
             entries = _enumerate_versioned_table(conn, name)
             versioned_records.extend(entries)
-            if name == "deliberations":
+            if name in ("deliberations", "flow_instances"):
                 for entry in entries:
-                    deliberation_classifications[entry["id"]] = {
+                    parent_classifications[entry["id"]] = {
                         "classification": entry["classification"],
                         "signal": entry["classification_signal"],
                     }
 
-        # Pass 2 — relationship tables (depend on deliberation map).
+        # Pass 2 — relationship tables (depend on parent map).
         relationship_records: list[dict[str, Any]] = []
         for table in discovered:
             name = table["table_name"]
             if name not in _RELATIONSHIP_TABLES:
                 continue
-            entries, rel_warnings = _enumerate_relationship_table(conn, name, deliberation_classifications)
+            entries, rel_warnings = _enumerate_relationship_table(conn, name, parent_classifications)
             relationship_records.extend(entries)
             warnings.extend(rel_warnings)
 

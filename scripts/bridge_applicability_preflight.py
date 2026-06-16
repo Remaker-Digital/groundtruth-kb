@@ -36,6 +36,10 @@ INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
 INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+(bridge/\S+\.md)\s*$"
 )
+BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    re.IGNORECASE,
+)
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     # Strict harvest heading. Tolerates a trailing qualifier ONLY when it is
     # introduced by a separator -- "(" (parenthetical), ":", en-dash, em-dash,
@@ -112,7 +116,7 @@ def _strip_code_fences(lines: list[str]) -> list[str]:
 
 def parse_index_for_document(index_path: Path, bridge_id: str) -> list[BridgeVersion]:
     if not index_path.is_file():
-        return []
+        return parse_versioned_files_for_document(index_path.parent, bridge_id)
     versions: list[BridgeVersion] = []
     in_target = False
     root = index_path.parent.parent
@@ -137,7 +141,42 @@ def parse_index_for_document(index_path: Path, bridge_id: str) -> list[BridgeVer
             )
         elif line.strip() == "":
             break
-    return versions
+    return versions or parse_versioned_files_for_document(index_path.parent, bridge_id)
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def parse_versioned_files_for_document(bridge_dir: Path, bridge_id: str) -> list[BridgeVersion]:
+    """Return versioned bridge files for ``bridge_id`` when INDEX is absent."""
+    versions: list[BridgeVersion] = []
+    for path in bridge_dir.glob(f"{bridge_id}-*.md"):
+        match = re.match(rf"^{re.escape(bridge_id)}-(\d+)\.md$", path.name)
+        if not match:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        versions.append(
+            BridgeVersion(
+                status=status,
+                rel_path=f"bridge/{path.name}",
+                abs_path=path,
+                version_number=int(match.group(1)),
+            )
+        )
+    return sorted(versions, key=lambda version: version.version_number, reverse=True)
 
 
 def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | None:
@@ -375,7 +414,10 @@ def build_packet(
     versions = parse_index_for_document(index_path, bridge_id)
     operative = choose_operative_version(versions)
     if operative is None and content_file is None:
-        raise SystemExit(f"ERR_NO_INDEX_ENTRY: no entry for bridge_id={bridge_id!r} in {index_path}")
+        raise SystemExit(
+            f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} "
+            f"under {index_path.parent}"
+        )
     if operative is not None and not operative.abs_path.is_file():
         raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {operative.rel_path}")
     if content_file is not None:
@@ -391,7 +433,10 @@ def build_packet(
             "path": operative.rel_path,
         }
     else:
-        raise SystemExit(f"ERR_NO_INDEX_ENTRY: no entry for bridge_id={bridge_id!r} in {index_path}")
+        raise SystemExit(
+            f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} "
+            f"under {index_path.parent}"
+        )
     cited_specs = extract_spec_links(content)
     target_paths = extract_target_paths(content)
     cited_implementation_paths = collect_cited_implementation_paths(content)
@@ -487,7 +532,7 @@ def format_markdown(packet: dict[str, Any]) -> str:
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bridge-id", required=True, help="Document name from bridge/INDEX.md.")
+    parser.add_argument("--bridge-id", required=True, help="Bridge document name / versioned bridge-thread slug.")
     parser.add_argument(
         "--content-file", type=Path, default=None, help="Evaluate pending Markdown content from a file."
     )

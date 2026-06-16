@@ -61,6 +61,7 @@ RECOGNIZED_DETECTED_VIA = frozenset(
         "prose:standing_by_for_q",
         "prose:standing_by_for_first_person",
         "prose:your_decision_q",
+        "prime_dispatched_worker_blocker",
     }
 )
 

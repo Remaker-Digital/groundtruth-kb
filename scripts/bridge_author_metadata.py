@@ -233,6 +233,13 @@ def _metadata_from_env(env: Mapping[str, str]) -> dict[str, str]:
     return values
 
 
+def _record_can_receive_dispatch(record: Mapping[str, object]) -> bool:
+    """Return dispatchability for a projected harness role record."""
+    if "can_receive_dispatch" in record:
+        return record.get("can_receive_dispatch") is True
+    return record.get("event_driven_hooks") is True
+
+
 def _resolve_durable_identity_fields(
     project_root: Path,
     *,
@@ -245,16 +252,18 @@ def _resolve_durable_identity_fields(
     using the same ``<role>/<harness_name>`` label form as
     ``scripts/_kb_attribution.resolve_changed_by``. The filing harness is
     resolved with a two-source priority — ``GTKB_HARNESS_NAME`` env, then the
-    single ACTIVE Prime Builder in the registry projection at ``project_root`` —
-    threading ``project_root`` through the projection-backed loaders so callers
-    (and tests) read the intended registry rather than a module-global root.
+    active Prime Builder fallback in the registry projection at
+    ``project_root``. If multiple active Prime Builders exist, fallback
+    metadata resolves only when exactly one is dispatchable. ``project_root`` is
+    threaded through the projection-backed loaders so callers (and tests) read
+    the intended registry rather than a module-global root.
 
     Returns ``{}`` (never ``None``) when the filing harness cannot be resolved
-    unambiguously — no ``GTKB_HARNESS_NAME`` and zero or multiple active Prime
-    Builders, no registry id for the resolved name, or no role assignment — so it
-    contributes nothing rather than a wrong value, and an incomplete merged set
-    fails closed in ``validate_author_metadata`` instead of inheriting another
-    harness's values.
+    unambiguously — no ``GTKB_HARNESS_NAME`` and no unambiguous active
+    Prime Builder fallback, no registry id for the resolved name, or no role
+    assignment — so it contributes nothing rather than a wrong value, and an
+    incomplete merged set fails closed in ``validate_author_metadata`` instead
+    of inheriting another harness's values.
 
     It NEVER returns the four per-session runtime fields
     (``author_session_context_id``, ``author_model``, ``author_model_version``,
@@ -281,6 +290,12 @@ def _resolve_durable_identity_fields(
         prime_ids = [
             hid for hid, record in assignments.items() if isinstance(record, dict) and is_prime_builder(record)
         ]
+        if len(prime_ids) > 1:
+            prime_ids = [
+                hid
+                for hid in prime_ids
+                if isinstance(assignments.get(hid), dict) and _record_can_receive_dispatch(assignments[hid])
+            ]
         if len(prime_ids) != 1:
             return {}
         harness_name = next(

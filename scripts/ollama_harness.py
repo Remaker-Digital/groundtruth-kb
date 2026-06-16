@@ -277,10 +277,13 @@ def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | Non
 
 Before you can write any bridge verdict, you MUST acquire the work-intent claim: python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command reports an existing holder, treat that JSON output as claim evidence — not as a harness crash. Do not proceed to Write until the claim command returns success.
 
-Use the GT-KB file bridge as the authoritative workflow surface. Read bridge/INDEX.md before
-acting, read the full version chain for the target document, and respond to latest NEW or
-REVISED bridge entries by writing the next numbered bridge verdict file and updating
-bridge/INDEX.md. Do not stop with prose when a bridge verdict is required.
+Use the GT-KB file bridge as the authoritative workflow surface. Read the full
+versioned bridge-file chain for the target document before acting, and use
+gt bridge dispatch config, gt bridge dispatch status, and gt bridge dispatch
+health for dispatcher topology and readiness. Respond to latest NEW or REVISED
+bridge entries by writing the next numbered bridge verdict file through the
+guarded bridge writer path. Do not stop with prose when a bridge verdict is
+required.
 Use harness-state/harness-registry.json through the canonical role reader as the role source
 of truth. Do not treat harness-local operating-role.md files as live role authority.
 
@@ -291,9 +294,11 @@ Run the preflight checks with Bash:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
 python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
 
-Do not use Bash to create, edit, overwrite, remove, or index bridge/*.md or
-bridge/INDEX.md. The harness hard-denies shell bridge mutations; use guarded
-Write/Edit dispatch or the deterministic bridge writer/helper path for bridge artifacts.
+Do not use Bash to create, edit, overwrite, remove, or index bridge/*.md files
+or the retired bridge index. The harness hard-denies shell bridge mutations;
+use guarded Write/Edit dispatch or the deterministic bridge writer/helper path
+for bridge artifacts. Treat any helper that requires the retired bridge index
+as defective and report that defect instead of following stale instructions.
 
 Bridge verdict author metadata to include:
 author_identity: Ollama Loyal Opposition
@@ -357,7 +362,7 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
         ),
         "Bash": _schema(
             "Bash",
-            "Run a bounded local shell command after guards allow it; bridge/*.md and bridge/INDEX.md mutations are denied.",
+            "Run a bounded local shell command after guards allow it; bridge artifact and retired-index mutations are denied.",
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),

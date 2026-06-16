@@ -164,8 +164,8 @@ HARNESS_LIFECYCLE_GUARDS = {
 BRIDGE_DISPATCH_ROLE_TEXT = (
     "cross-harness event-driven trigger registered as PostToolUse and Stop hooks "
     "(.claude/settings.json, .codex/hooks.json); fires on tool-use and Stop "
-    "rather than on a fixed interval; manual bridge/INDEX.md scans available "
-    "as fallback; retired smart poller and OS poller remain archived"
+    "rather than on a fixed interval; manual TAFE/dispatcher bridge scans "
+    "available as fallback; retired smart poller and OS poller remain archived"
 )
 BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "Bridge automation has two complementary axes. "
@@ -174,15 +174,16 @@ BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "self-contained work — reviews, verdicts, tests, work that a freshly-spawned "
     "counterpart harness can complete without further owner input. Registered as "
     "PostToolUse and Stop hooks. "
-    "AXIS 2 (NON-DISPATCHABLE WORK): a thread automation pattern wakes the "
-    "interactive chat session periodically to scan `bridge/INDEX.md` and surface "
-    "work that requires interactive owner input mid-stream — owner-AUQ-required "
+    "AXIS 2 (NON-DISPATCHABLE WORK): an owner-approved thread automation pattern "
+    "may wake the interactive chat session to inspect TAFE/dispatcher bridge "
+    "state and surface work that requires interactive owner input mid-stream — owner-AUQ-required "
     "decisions, multi-turn review with accumulating context, cross-thread "
     "coordination, AUQ-heavy implementation. "
     "Both axes are required; their roles do not overlap. "
     "Use the `gtkb-bridge` skill (`.claude/skills/bridge/SKILL.md`; Codex adapter "
     "`.codex/skills/bridge/SKILL.md`) for proposal/review/verification mechanics. "
-    "Manual `bridge/INDEX.md` scans remain available as fallback. "
+    "Manual bridge scans remain available as fallback, but they must use "
+    "TAFE/dispatcher bridge state and versioned bridge files. "
     "Do NOT create new bridge automations (Codex-app-side, Claude-side, or otherwise) "
     "without owner approval; any new automation must be classified by axis "
     "(dispatchable vs non-dispatchable) and inventoried in "
@@ -192,7 +193,7 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
-        "bridge": "always available through bridge/INDEX.md and checked at session startup",
+        "bridge": "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": "harness-state/harness-registry.json",
@@ -205,7 +206,7 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
             "acting-prime-builder before the two-role canonical set (prime-builder, loyal-opposition) "
             "was finalized. Compatibility/provenance label, NOT a new role-switch target."
         ),
-        "bridge": "always available through bridge/INDEX.md and checked at session startup",
+        "bridge": "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": ".claude/rules/acting-prime-builder.md",
@@ -213,7 +214,7 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
     "loyal-opposition": {
         "assumed_role": "Loyal Opposition",
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
-        "bridge": "always available through bridge/INDEX.md and checked at session startup",
+        "bridge": "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": "harness-state/harness-registry.json",
@@ -634,7 +635,6 @@ GTKB_PATH_PREFIXES = (
 STARTUP_PRUNING_RELATIVE_FILES = (
     "AGENTS.md",
     "CLAUDE.md",
-    "bridge/INDEX.md",
     "independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md",
     "independent-progress-assessments/CODEX-STANDING-PRIORITIES.md",
     "independent-progress-assessments/GROUNDTRUTH-KB-VISION.md",
@@ -676,12 +676,24 @@ WRAPUP_TRIGGER_COMMANDS = (
 
 
 def _run_verified_bridge_startup_maintenance(project_root: Path) -> dict[str, Any]:
-    """Archive VERIFIED bridge threads and prune them from the startup index."""
+    """Run legacy VERIFIED bridge maintenance only when the compatibility view exists."""
+    index_path = project_root / "bridge" / "INDEX.md"
+    if not index_path.exists():
+        return {
+            "verified_threads_seen": 0,
+            "already_archived": 0,
+            "inserted": 0,
+            "pruned_from_index": 0,
+            "failed_count": 0,
+            "failed": [],
+            "kept_unarchived": 0,
+            "skipped": "bridge/INDEX.md deprecated/absent",
+        }
     try:
         from retroactive_harvest_bridge_threads import archive_verified_threads_and_prune_index
 
         return archive_verified_threads_and_prune_index(
-            index_path=project_root / "bridge" / "INDEX.md",
+            index_path=index_path,
             bridge_dir=project_root / "bridge",
             kb_path=str(project_root / "groundtruth.db"),
         )
@@ -793,11 +805,8 @@ def _startup_pruning_scan(
         candidates.append(
             {
                 "type": "completed",
-                "target": "bridge/INDEX.md",
-                "action": (
-                    "Archived terminal bridge state and compacted oversized historical "
-                    "comment blocks from the active startup index."
-                ),
+                "target": "bridge/*.md",
+                "action": ("Archived terminal bridge state and compacted oversized historical comment blocks."),
                 "evidence": bridge_maintenance,
             }
         )
@@ -1391,7 +1400,37 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
     }, top_priority
 
 
-def _bridge_metrics(project_root: Path) -> dict[str, Any]:
+def _bridge_entries_from_version_files(project_root: Path) -> list[dict[str, str]]:
+    bridge_dir = project_root / "bridge"
+    latest_by_document: dict[str, tuple[int, str, str]] = {}
+    if not bridge_dir.is_dir():
+        return []
+    for path in bridge_dir.glob("*.md"):
+        match = re.match(r"^(?P<document>.+)-(?P<version>\d{3})\.md$", path.name)
+        if not match:
+            continue
+        document = match.group("document")
+        version = int(match.group("version"))
+        first_line = _read_text(path).splitlines()
+        if not first_line:
+            continue
+        status_match = re.match(
+            r"^#?\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED)\b",
+            first_line[0].strip(),
+            re.IGNORECASE,
+        )
+        if not status_match:
+            continue
+        prior = latest_by_document.get(document)
+        if prior is None or version > prior[0]:
+            latest_by_document[document] = (version, status_match.group(1).upper(), f"bridge/{path.name}")
+    return [
+        {"document": document, "status": status, "path": path}
+        for document, (_version, status, path) in sorted(latest_by_document.items())
+    ]
+
+
+def _bridge_entries_from_compatibility_index(project_root: Path) -> list[dict[str, str]]:
     index_path = project_root / "bridge" / "INDEX.md"
     index_text = _read_text(index_path)
     entries: list[dict[str, str]] = []
@@ -1407,6 +1446,14 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
             continue
         entries.append({"document": current_document, "status": match.group(1), "path": match.group(2)})
         current_document = None
+    return entries
+
+
+def _bridge_metrics(project_root: Path) -> dict[str, Any]:
+    entries = _bridge_entries_from_version_files(project_root)
+    index_path = project_root / "bridge" / "INDEX.md"
+    if not entries and index_path.exists():
+        entries = _bridge_entries_from_compatibility_index(project_root)
 
     classified = []
     for entry in entries:
@@ -1443,9 +1490,9 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         "raw_advisory_response_paths": ["proposal", "rebuttal", "defer", "candidate-artifact"],
         "scope_counts": dict(sorted(Counter(entry["scope"] for entry in classified).items())),
         "scope_confidence": "gtkb_current_heuristic",
-        "source": "bridge/INDEX.md",
-        "source_read_mode": "direct_file_read",
-        "source_authority": "live bridge/INDEX.md is the sole authoritative bridge queue source",
+        "source": "bridge/*.md",
+        "source_read_mode": "versioned_bridge_file_chain",
+        "source_authority": "TAFE/dispatcher bridge state plus versioned bridge files are authoritative; bridge/INDEX.md is deprecated/removed",
         "derived_artifacts_authoritative": False,
         "live_index_available": index_path.is_file(),
     }
@@ -3217,7 +3264,7 @@ def _dashboard_intelligence(
                 "action": "Disposition LO advisory bridge report",
                 "why": "Latest ADVISORY bridge thread(s): " + ", ".join(advisory_documents[:5]),
                 "remediation": "Respond through one permitted path: proposal, rebuttal, defer, or candidate-artifact.",
-                "shortcut": _shortcut("Open bridge index", "bridge/INDEX.md"),
+                "shortcut": _shortcut("Open bridge directory", "bridge"),
                 "source": "Bridge ADVISORY",
             }
         )
@@ -3346,7 +3393,7 @@ def _dashboard_intelligence(
             "sources": [
                 "groundtruth.db",
                 "memory/release-readiness.md",
-                "bridge/INDEX.md",
+                "bridge/*.md",
                 ".github/workflows",
                 "docs/release/dev-environment-inventory.json",
                 "GitHub Actions via gh when authenticated",
@@ -3357,7 +3404,7 @@ def _dashboard_intelligence(
             _shortcut("Open dashboard data", "docs/gtkb-dashboard/dashboard-data.json"),
             _shortcut("Open release readiness", "memory/release-readiness.md"),
             _shortcut("Query MemBase backlog", "gt backlog list", "command"),
-            _shortcut("Open bridge index", "bridge/INDEX.md"),
+            _shortcut("Open bridge directory", "bridge"),
             _shortcut("Open dev environment inventory", "docs/release/dev-environment-inventory.md"),
             _shortcut("Open GitHub Actions", actions_url, "web"),
             _shortcut("Open GT-KB upstream", "https://github.com/Remaker-Digital/groundtruth-kb", "web"),
@@ -4374,11 +4421,11 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.",
             "- Bridge/dispatch distinction: the file bridge is the durable role handoff and review mechanism; the cross-harness event-driven trigger is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
-            "- Live bridge authority: current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`; this generated report is not authoritative after generation.",
-            "- Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
+            "- Live bridge authority: current bridge state must be determined from TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; this generated report is not authoritative after generation.",
+            "- Mandatory direct-read rule: before reporting the live bridge scan count, read current TAFE/dispatcher bridge state and versioned bridge files directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
             "- Project-state startup rule: include a compact current-state report for every active MemBase project group using `current_work_items.project_name`; distinguish bridge queue state, git drift, release blockers, and Prime-actionable bridge responses.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
-            "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual bridge/INDEX.md scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
+            "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual TAFE/dispatcher bridge scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
@@ -6490,6 +6537,28 @@ def _source_file_observation(project_root: Path, relative_path: str, *, required
     }
 
 
+def _source_file_set_observation(
+    directory: Path, *, pattern: str, source: str, required: bool = True
+) -> dict[str, Any]:
+    try:
+        files = sorted(path for path in directory.glob(pattern) if path.is_file())
+    except OSError:
+        files = []
+    latest_modified_at = None
+    if files:
+        latest_mtime = max(path.stat().st_mtime for path in files)
+        latest_modified_at = datetime.fromtimestamp(latest_mtime, UTC).isoformat().replace("+00:00", "Z")
+    return {
+        "source": source.replace("\\", "/"),
+        "kind": "local_file_set",
+        "required": required,
+        "status": "present" if files else "missing",
+        "path": str(directory),
+        "file_count": len(files),
+        "latest_modified_at": latest_modified_at,
+    }
+
+
 def _source_file_signature(path: Path, *, source: str, required: bool = True) -> dict[str, Any]:
     if not path.is_file():
         return {
@@ -6519,6 +6588,48 @@ def _source_file_signature(path: Path, *, source: str, required: bool = True) ->
     }
 
 
+def _source_file_set_signature(directory: Path, *, pattern: str, source: str, required: bool = True) -> dict[str, Any]:
+    try:
+        files = sorted(path for path in directory.glob(pattern) if path.is_file())
+    except OSError:
+        files = []
+    if not files:
+        return {
+            "source": source.replace("\\", "/"),
+            "kind": "local_file_set",
+            "required": required,
+            "status": "missing",
+            "path": str(directory),
+            "file_count": 0,
+            "latest_modified_at": None,
+            "sha256": None,
+        }
+    hasher = hashlib.sha256()
+    latest_mtime = 0.0
+    latest_mtime_ns = 0
+    for path in files:
+        stat = path.stat()
+        latest_mtime = max(latest_mtime, stat.st_mtime)
+        latest_mtime_ns = max(latest_mtime_ns, stat.st_mtime_ns)
+        hasher.update(path.name.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(str(stat.st_mtime_ns).encode("ascii"))
+        hasher.update(b"\0")
+        hasher.update(str(stat.st_size).encode("ascii"))
+        hasher.update(b"\n")
+    return {
+        "source": source.replace("\\", "/"),
+        "kind": "local_file_set",
+        "required": required,
+        "status": "present",
+        "path": str(directory),
+        "file_count": len(files),
+        "latest_modified_at": datetime.fromtimestamp(latest_mtime, UTC).isoformat().replace("+00:00", "Z"),
+        "latest_modified_ns": latest_mtime_ns,
+        "sha256": hasher.hexdigest(),
+    }
+
+
 def _startup_freshness_input_signatures(project_root: Path) -> dict[str, Any]:
     role_path = operating_role_path(project_root, prefer_local=False)
     role_source = (
@@ -6528,7 +6639,9 @@ def _startup_freshness_input_signatures(project_root: Path) -> dict[str, Any]:
     )
     return {
         "role_assignments": _source_file_signature(role_path, source=role_source),
-        "bridge_index": _source_file_signature(project_root / "bridge" / "INDEX.md", source="bridge/INDEX.md"),
+        "bridge_version_chain": _source_file_set_signature(
+            project_root / "bridge", pattern="*.md", source="bridge/*.md"
+        ),
     }
 
 
@@ -6569,7 +6682,7 @@ def _startup_freshness_metadata(
     local_sources = [
         _source_file_observation(project_root, "groundtruth.db"),
         _source_file_observation(project_root, "memory/release-readiness.md"),
-        _source_file_observation(project_root, "bridge/INDEX.md"),
+        _source_file_set_observation(project_root / "bridge", pattern="*.md", source="bridge/*.md"),
         _workflow_inventory_observation(project_root),
     ]
     live_probes = [
@@ -6630,7 +6743,7 @@ def _startup_freshness_metadata(
         {
             "name": "required_local_sources_present",
             "passed": required_local_sources_ok,
-            "detail": "groundtruth.db, memory/release-readiness.md, bridge/INDEX.md, and .github/workflows must exist for a fresh startup payload.",
+            "detail": "groundtruth.db, memory/release-readiness.md, bridge/*.md, and .github/workflows must exist for a fresh startup payload.",
         },
         {
             "name": "payload_render_origin_is_in_memory",
@@ -6697,7 +6810,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         "",
         "- Resource authority: live project files under `E:\\GT-KB` are canonical; session overlays and generated startup/dashboard summaries are routing context only.",
         "- Role authority: resolve `harness-state/harness-identities.json` first, then `harness-state/harness-registry.json` (canonical role registry per Slice 1 retirement); role records may be list-valued role sets.",
-        "- Bridge authority: read `bridge/INDEX.md` directly before bridge queue claims; generated bridge counts are non-authoritative after startup generation.",
+        "- Bridge authority: read TAFE/dispatcher bridge state and status-bearing versioned files under `bridge/` before bridge queue claims; generated bridge counts are non-authoritative after startup generation.",
         "- Work subject authority: `.claude/session/work-subject.json`; GT-KB infrastructure is default unless owner direction names an application/adopter.",
         "- Knowledge surfaces: use `groundtruth.db` (MemBase), `memory/release-readiness.md`, `.claude/rules/`, `.codex/skills/`, and `docs/gtkb-dashboard/session-startup-report.md` as targeted context sources. Backlog is queried via `gt backlog list`.",
         "- Hook handling: Codex hook `systemMessage` and `additionalContext` are operational instructions; if a hook blocks, read the cited guard/state file and clear stale lifecycle state only through the governed hook path.",
@@ -7147,7 +7260,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--skip-bridge-maintenance",
         action="store_true",
-        help="Skip startup archival/pruning of VERIFIED bridge index entries.",
+        help="Skip startup archival/pruning of legacy VERIFIED bridge compatibility-view entries.",
     )
     args = parser.parse_args(argv)
     if not args.project_root.is_absolute():

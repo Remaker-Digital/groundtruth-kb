@@ -12,7 +12,7 @@ CLI (per -003 F2 fix — fail-closed by default):
 
     python scripts/run_spec_derived_tests.py --bridge-id <doc-name> [--json] [--advisory] [--strict]
 
-- ``--bridge-id``  required: kebab-case Document name from bridge/INDEX.md.
+- ``--bridge-id``  required: kebab-case bridge Document/thread name.
 - ``--json``       emit JSON output (canonical for review-skill consumption).
 - ``--advisory``   opt-in to non-blocking mode (exits 0 on coverage gap / fail).
 - ``--strict``     accepted as no-op for backward compatibility (fail-closed
@@ -24,7 +24,7 @@ Exit codes:
 - non-0  any of: missing INDEX entry, coverage gap, test failure, waiver
          validation failure. stderr identifies which.
 
-Read-only against ``bridge/INDEX.md`` and ``groundtruth.db``. Per F4
+Read-only against versioned bridge files and ``groundtruth.db``. Per F4
 classification: this is GT-KB platform governance tooling (not Agent Red
 application code).
 """
@@ -85,6 +85,10 @@ INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
 INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED):\s+bridge/(\S+\.md)\s*$"
 )
+BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    re.IGNORECASE,
+)
 
 # Waiver field parsing — supports `key: value` lines under bullet items.
 WAIVER_BULLET_RE: Final[re.Pattern[str]] = re.compile(r"^\s*-\s*spec_id:\s*(\S+)\s*$")
@@ -119,10 +123,11 @@ class SpecMatrixEntry:
 def _parse_index_for_document(bridge_id: str) -> list[BridgeVersion]:
     """Return all versions for the named document, ordered most-recent-first.
 
-    Returns [] when the document is not found in INDEX.md.
+    Falls back to status-bearing versioned files when the retired INDEX view is
+    absent or lacks the document.
     """
     if not INDEX_PATH.is_file():
-        return []
+        return _parse_versioned_files_for_document(bridge_id)
     versions: list[BridgeVersion] = []
     in_target = False
     for line in INDEX_PATH.read_text(encoding="utf-8").splitlines():
@@ -143,7 +148,35 @@ def _parse_index_for_document(bridge_id: str) -> list[BridgeVersion]:
             versions.append(BridgeVersion(status, file_path, version_number))
         elif line.strip() == "":
             in_target = False  # Blank line ends the document entry.
-    return versions
+    return versions or _parse_versioned_files_for_document(bridge_id)
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _parse_versioned_files_for_document(bridge_id: str) -> list[BridgeVersion]:
+    bridge_dir = PROJECT_ROOT / "bridge"
+    versions: list[BridgeVersion] = []
+    for path in bridge_dir.glob(f"{bridge_id}-*.md"):
+        match = re.match(rf"^{re.escape(bridge_id)}-(\d+)\.md$", path.name)
+        if not match:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        versions.append(BridgeVersion(status, path, int(match.group(1))))
+    return sorted(versions, key=lambda version: version.version_number, reverse=True)
 
 
 def _strip_code_fences(lines: list[str]) -> list[str]:
@@ -456,6 +489,8 @@ def _format_human(
     bridge_id: str,
     version_count: int,
     verified_overall: bool,
+    *,
+    dry_run: bool = False,
 ) -> str:
     lines = [
         f"Bridge: {bridge_id}",
@@ -466,28 +501,46 @@ def _format_human(
     ]
     for spec_id in sorted(matrix.keys()):
         entry = matrix[spec_id]
-        marker = "[PASS]" if entry.verified else "[FAIL]" if entry.tests_failed else "[GAP]"
-        detail = (
-            f"{len(entry.tests_found)} tests, all pass"
+        marker = (
+            "[DRY]"
+            if dry_run and entry.tests_found
+            else "[PASS]"
             if entry.verified
-            else f"{entry.tests_failed} failed"
+            else "[FAIL]"
             if entry.tests_failed
-            else "no derived tests found"
+            else "[GAP]"
         )
+        if dry_run and entry.tests_found:
+            detail = f"{len(entry.tests_found)} tests discovered, not executed"
+        elif dry_run:
+            detail = "no derived tests found"
+        elif entry.verified:
+            detail = f"{len(entry.tests_found)} tests, all pass"
+        elif entry.tests_failed:
+            detail = f"{entry.tests_failed} failed"
+        else:
+            detail = "no derived tests found"
         lines.append(f"  {spec_id:<55} {marker:<8}{detail}")
     lines.append("")
-    lines.append(f"Overall verified: {'YES' if verified_overall else 'NO'}")
+    lines.append(f"Overall verified: {'DRY-RUN' if dry_run else 'YES' if verified_overall else 'NO'}")
     return "\n".join(lines)
 
 
 def run(
-    bridge_id: str, json_output: bool = False, advisory: bool = False, pytest_timeout_s: int = DEFAULT_PYTEST_TIMEOUT_S
+    bridge_id: str,
+    json_output: bool = False,
+    advisory: bool = False,
+    pytest_timeout_s: int = DEFAULT_PYTEST_TIMEOUT_S,
+    dry_run: bool = False,
 ) -> int:
     """Execute the full procedure. Returns exit code per CLI contract."""
     # Step 1-2: Parse INDEX + enumerate ALL versions.
     versions = _parse_index_for_document(bridge_id)
     if not versions:
-        msg = f"ERR_NO_INDEX_ENTRY: no entry for bridge_id={bridge_id!r} in {INDEX_PATH}"
+        msg = (
+            f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for "
+            f"bridge_id={bridge_id!r} under {PROJECT_ROOT / 'bridge'}"
+        )
         sys.stderr.write(msg + "\n")
         return 0 if advisory else 2
 
@@ -593,6 +646,14 @@ def run(
             matrix[spec_id] = entry
             continue
         test_files = _discover_derived_tests(spec_id)
+        if dry_run:
+            matrix[spec_id] = SpecMatrixEntry(
+                spec_id=spec_id,
+                tests_found=test_files,
+                verified=bool(test_files),
+                reason="dry_run_tests_discovered" if test_files else "no_derived_tests",
+            )
+            continue
         if not test_files:
             entry = SpecMatrixEntry(
                 spec_id=spec_id,
@@ -619,6 +680,7 @@ def run(
         payload = {
             "bridge_document_name": bridge_id,
             "cited_specs_count": len(cited_specs),
+            "dry_run": dry_run,
             "matrix": {
                 spec_id: {
                     "tests_found": e.tests_found,
@@ -635,8 +697,12 @@ def run(
         }
         sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     else:
-        sys.stdout.write(_format_human(matrix, waivers, bridge_id, len(versions), verified_overall) + "\n")
+        sys.stdout.write(
+            _format_human(matrix, waivers, bridge_id, len(versions), verified_overall, dry_run=dry_run) + "\n"
+        )
 
+    if dry_run:
+        return 0
     if not verified_overall and not advisory:
         return 5
     return 0
@@ -647,8 +713,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         prog="run_spec_derived_tests.py",
         description="GT-KB platform VERIFIED runner: full-history bridge spec-derived test execution.",
     )
-    parser.add_argument("--bridge-id", required=True, help="Document name from bridge/INDEX.md.")
+    parser.add_argument("--bridge-id", required=True, help="Bridge document name / versioned bridge-thread slug.")
     parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Resolve bridge history and derived-test coverage without executing pytest.",
+    )
     parser.add_argument(
         "--advisory",
         action="store_true",
@@ -675,6 +746,7 @@ def main(argv: list[str] | None = None) -> int:
         json_output=args.json,
         advisory=args.advisory,
         pytest_timeout_s=args.pytest_timeout,
+        dry_run=args.dry_run,
     )
 
 

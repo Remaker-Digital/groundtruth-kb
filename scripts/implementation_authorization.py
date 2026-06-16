@@ -65,6 +65,7 @@ VERIFICATION_TEST_EVIDENCE_RE = re.compile(
     r"(?i)(?:\bpython -m pytest\b|\bpytest\b|\bruff\b|\bnpm test\b|\bpnpm test\b"
     r"|\buv run\b|\bmake test\b|\btest_[\w./-]+\.py\b|spec-to-test)"
 )
+BRIDGE_FILE_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|ACCEPTED|BLOCKED)$")
 REQUIREMENT_GAP_PHRASE = "New or revised requirement required before implementation"
 REQUIREMENT_SUFFICIENCY_PHRASES = (
     "Existing requirements sufficient",
@@ -175,8 +176,8 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
     return None
 
 
-def _nearest_index_project_root(cwd_path: Path) -> Path | None:
-    """Return the nearest ancestor with an explicit bridge index.
+def _nearest_bridge_project_root(cwd_path: Path) -> Path | None:
+    """Return the nearest ancestor with versioned bridge files.
 
     Unit tests often build synthetic bridge roots under the live checkout's
     temp directory. Prefer that explicit bridge marker over global resolver
@@ -187,7 +188,8 @@ def _nearest_index_project_root(cwd_path: Path) -> Path | None:
     except OSError:
         resolved = cwd_path
     for candidate in (resolved, *resolved.parents):
-        if (candidate / "bridge" / "INDEX.md").is_file():
+        bridge_dir = candidate / "bridge"
+        if bridge_dir.is_dir() and any(bridge_dir.glob("*.md")):
             return candidate
     return None
 
@@ -211,13 +213,13 @@ def canonical_project_root(cwd_path: Path, *, fallback: Path | None = None) -> P
     """Resolve the canonical GT-KB project root, independent of session cwd.
 
     A linked worktree under ``.claude/worktrees/*`` has a cwd that is not the
-    canonical root where ``bridge/INDEX.md`` and the implementation-authorization
+    canonical root where versioned bridge files and implementation-authorization
     packets live. Resolution is fail-soft; a candidate is accepted only when it
     is ``cwd_path`` itself or an ancestor of it (the canonical root always
     contains the session cwd):
 
       1. The containing canonical root for ``.claude/worktrees/*`` sessions.
-      2. The nearest ancestor of ``cwd_path`` with an explicit bridge index.
+      2. The nearest ancestor of ``cwd_path`` with versioned bridge files.
       3. ``git rev-parse --git-common-dir`` rooted at ``cwd_path``.
       4. ``groundtruth_kb.bridge.paths.resolve_project_root()`` when importable.
       5. ``fallback`` when supplied, else ``cwd_path``.
@@ -225,9 +227,9 @@ def canonical_project_root(cwd_path: Path, *, fallback: Path | None = None) -> P
     worktree_root = _containing_worktree_canonical_root(cwd_path)
     if worktree_root is not None:
         return worktree_root
-    index_root = _nearest_index_project_root(cwd_path)
-    if index_root is not None:
-        return index_root
+    bridge_root = _nearest_bridge_project_root(cwd_path)
+    if bridge_root is not None:
+        return bridge_root
     git_root = _git_common_dir_root(cwd_path)
     if git_root is not None and _ancestor_or_self(git_root, cwd_path):
         return git_root
@@ -275,85 +277,59 @@ def groundtruth_db_path(project_root: Path) -> Path:
     return project_root / "groundtruth.db"
 
 
-def _filename_matches_doc(path: str, doc_id: str) -> bool:
-    """Return True iff path is bridge/<doc_id>.md or bridge/<doc_id>-NNN.md.
-
-    Accepts both the v1 form (no version suffix; e.g. bridge/foo.md) and the
-    v2+ form (zero-padded version suffix; e.g. bridge/foo-022.md). Boundary
-    based matching avoids the disambiguation problem when a doc_id itself
-    ends in -NNN (e.g. gtkb-single-harness-bridge-dispatcher-001).
-    """
-    prefix = f"bridge/{doc_id}"
-    if not path.startswith(prefix):
-        return False
-    suffix = path[len(prefix) :]
-    return suffix == ".md" or re.match(r"^-\d{3,}\.md$", suffix) is not None
+def _bridge_version_from_rel_path(rel_path: str, bridge_id: str) -> int | None:
+    if rel_path == f"bridge/{bridge_id}.md":
+        return 1
+    match = re.fullmatch(rf"bridge/{re.escape(bridge_id)}-(\d{{3,}})\.md", rel_path)
+    return int(match.group(1)) if match else None
 
 
-def parse_bridge_index(project_root: Path) -> dict[str, BridgeEntry]:
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.is_file():
-        raise AuthorizationError("bridge/INDEX.md not found")
-    entries: dict[str, BridgeEntry] = {}
-    current_id: str | None = None
-    current_versions: list[tuple[str, str]] = []
-    for raw_line in index_path.read_text(encoding="utf-8-sig").splitlines():
+def _bridge_file_status(project_root: Path, rel_path: str) -> str:
+    path = project_root / rel_path
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError as exc:
+        raise AuthorizationError(f"Bridge file is unreadable: {rel_path}") from exc
+    for raw_line in lines:
         line = raw_line.strip()
-        if line.startswith("Document: "):
-            if current_id is not None and current_versions:
-                entries[current_id] = BridgeEntry(current_id, current_versions)
-            current_id = line.removeprefix("Document: ").strip()
-            current_versions = []
+        if not line:
             continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED):\s+(bridge/.+\.md)$", line)
-        if current_id and match:
-            status, path = match.group(1), match.group(2)
-            if not _filename_matches_doc(path, current_id):
-                # Misattributed status line: silently skip in parse_bridge_index.
-                # Strict per-bridge consistency is enforced by bridge_entry()
-                # for the specific queried bridge_id, so unrelated malformed
-                # entries elsewhere in the index do not globally block the gate.
-                continue
-            current_versions.append((status, path))
-    if current_id is not None and current_versions:
-        entries[current_id] = BridgeEntry(current_id, current_versions)
-    return entries
+        if BRIDGE_FILE_STATUS_RE.fullmatch(line):
+            return line
+        raise AuthorizationError(f"Bridge file has unrecognized status line: {rel_path}: {line!r}")
+    raise AuthorizationError(f"Bridge file is empty: {rel_path}")
 
 
-def _validate_bridge_index_for(project_root: Path, bridge_id: str) -> None:
-    """Strict per-bridge consistency check: raise if any status line under
-    bridge_id's Document section has a filename that does not match bridge_id
-    via _filename_matches_doc(). This is the gate's fail-closed enforcement
-    point for the specific queried bridge.
+def bridge_entry_from_versioned_files(project_root: Path, bridge_id: str) -> BridgeEntry:
+    """Resolve a bridge thread from its append-only version files.
+
+    The retired bridge index is historical only. Authorization derives current
+    state from the versioned audit files that remain in bridge/.
     """
-    index_path = project_root / "bridge" / "INDEX.md"
-    if not index_path.is_file():
-        raise AuthorizationError("bridge/INDEX.md not found")
-    in_target = False
-    for raw_line in index_path.read_text(encoding="utf-8-sig").splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document: "):
-            doc_id = line.removeprefix("Document: ").strip()
-            in_target = doc_id == bridge_id
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        raise AuthorizationError("bridge directory not found")
+
+    by_version: dict[int, tuple[str, str]] = {}
+    for path in sorted(bridge_dir.glob(f"{bridge_id}*.md")):
+        rel_path = path.relative_to(project_root).as_posix()
+        version = _bridge_version_from_rel_path(rel_path, bridge_id)
+        if version is None:
             continue
-        if in_target:
-            match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED):\s+(bridge/.+\.md)$", line)
-            if match:
-                path = match.group(2)
-                if not _filename_matches_doc(path, bridge_id):
-                    raise AuthorizationError(
-                        f"Bridge INDEX status line filename does not match enclosing Document: "
-                        f"{line!r} under Document: {bridge_id!r}; refusing to authorize"
-                    )
+        if version in by_version:
+            prior = by_version[version][1]
+            raise AuthorizationError(f"Duplicate bridge version {version:03d} for {bridge_id}: {prior}, {rel_path}")
+        status = _bridge_file_status(project_root, rel_path)
+        by_version[version] = (status, rel_path)
+
+    if not by_version:
+        raise AuthorizationError(f"Bridge document not found as versioned files: {bridge_id}")
+    versions = [entry for _, entry in sorted(by_version.items(), reverse=True)]
+    return BridgeEntry(bridge_id, versions)
 
 
 def bridge_entry(project_root: Path, bridge_id: str) -> BridgeEntry:
-    _validate_bridge_index_for(project_root, bridge_id)
-    entries = parse_bridge_index(project_root)
-    entry = entries.get(bridge_id)
-    if entry is None:
-        raise AuthorizationError(f"Bridge document not found in INDEX: {bridge_id}")
-    return entry
+    return bridge_entry_from_versioned_files(project_root, bridge_id)
 
 
 def _post_go_chain_state(statuses_after_go: list[str]) -> str:
@@ -1212,8 +1188,8 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
     """Enumerate all named-cache packets under
     `.gtkb-state/implementation-authorizations/by-bridge/`. Each row reports
     `(bridge_id, expires_at, target_path_globs, valid, error)`. A row is
-    `valid=True` iff the packet would pass `_validate_packet()` against live
-    INDEX state right now.
+    `valid=True` iff the packet would pass `_validate_packet()` against the
+    live versioned bridge-file chain right now.
     """
     by_bridge_dir = project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH
     if not by_bridge_dir.is_dir():
