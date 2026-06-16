@@ -294,7 +294,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "_purge_previous_diagnostics" in core_text
     assert "GTKB_STARTUP_REQUESTED_AT" in core_text
     assert "subprocess.run" in core_text
-    assert "STARTUP_SERVICE_TIMEOUT_SECONDS = 50.0" in core_text
+    assert "STARTUP_SERVICE_TIMEOUT_SECONDS = 150.0" in core_text
     assert "timeout=STARTUP_SERVICE_TIMEOUT_SECONDS" in core_text
     assert "Startup First-Response Directive" not in core_text
     assert "_live_bridge_index_context" not in core_text
