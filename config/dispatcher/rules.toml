@@ -1,7 +1,67 @@
-# Dispatch-envelope registry.
+# Bridge dispatch configuration.
 #
-# This is the declarative registry for dispatch-envelope rules. It starts empty
-# until a bridge-approved rule is added.
+# Role membership, dispatchability, and event-firing capability are independent
+# axes. Durable operating roles remain in harness-state/harness-registry.json;
+# this file controls whether a role holder can receive headless bridge dispatch
+# and how eligible candidates are ranked.
 
-rules = []
+schema_version = 1
+selection_order = ["availability", "cost", "quality", "reviewer_precedence", "harness_id"]
 
+[harnesses.A]
+description = "Codex: active Prime Builder and dispatchable PB target."
+can_receive_dispatch = true
+can_fire_events = true
+dispatch_cost = 35
+dispatch_quality = 88
+dispatch_availability = 90
+tags = ["prime-builder", "event-source"]
+
+[harnesses.B]
+description = "Claude Code: Prime Builder for interactive work; not a dispatched PB target."
+can_receive_dispatch = false
+can_fire_events = true
+dispatch_cost = 70
+dispatch_quality = 95
+dispatch_availability = 75
+tags = ["prime-builder", "interactive-only", "event-source"]
+
+[harnesses.C]
+description = "Antigravity: Loyal Opposition dispatch target."
+can_receive_dispatch = true
+can_fire_events = false
+dispatch_cost = 35
+dispatch_quality = 78
+dispatch_availability = 80
+tags = ["loyal-opposition"]
+
+[harnesses.D]
+description = "Ollama: cheapest Loyal Opposition dispatch target."
+can_receive_dispatch = true
+can_fire_events = false
+dispatch_cost = 5
+dispatch_quality = 62
+dispatch_availability = 95
+max_items = 1
+tags = ["loyal-opposition", "low-cost"]
+
+[harnesses.F]
+description = "OpenRouter: low-cost Loyal Opposition dispatch target."
+can_receive_dispatch = true
+can_fire_events = false
+dispatch_cost = 20
+dispatch_quality = 72
+dispatch_availability = 90
+tags = ["loyal-opposition", "low-cost"]
+
+[[rules]]
+id = "bridge-prime-builder-default"
+required_roles = ["prime-builder"]
+statuses = ["GO", "NO-GO"]
+prefer = ["availability", "quality", "cost", "reviewer_precedence", "harness_id"]
+
+[[rules]]
+id = "bridge-loyal-opposition-cheap-fast-default"
+required_roles = ["loyal-opposition"]
+statuses = ["NEW", "REVISED"]
+prefer = ["cost", "availability", "quality", "reviewer_precedence", "harness_id"]

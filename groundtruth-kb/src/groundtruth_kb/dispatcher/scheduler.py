@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -17,12 +18,51 @@ def _now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+_BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    re.IGNORECASE,
+)
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _bridge_actionable_count_from_files(project_root: Path) -> int:
+    latest: dict[str, tuple[int, str]] = {}
+    bridge_dir = project_root / "bridge"
+    for path in bridge_dir.glob("*.md"):
+        if path.name == "INDEX.md":
+            continue
+        match = re.match(r"^(.+)-(\d+)\.md$", path.name)
+        if not match:
+            continue
+        slug = match.group(1)
+        version = int(match.group(2))
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        if slug not in latest or version > latest[slug][0]:
+            latest[slug] = (version, status)
+    return sum(1 for _version, status in latest.values() if status in {"NEW", "REVISED"})
+
+
 def _bridge_actionable_count(project_root: Path) -> int:
     index = project_root / "bridge" / "INDEX.md"
     try:
         text = index.read_text(encoding="utf-8")
     except OSError:
-        return 0
+        return _bridge_actionable_count_from_files(project_root)
     return sum(1 for line in text.splitlines() if line.startswith(("NEW:", "REVISED:")))
 
 

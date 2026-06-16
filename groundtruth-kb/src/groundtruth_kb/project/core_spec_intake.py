@@ -295,7 +295,7 @@ def _project_intake_enabled(project: dict[str, object] | None) -> bool:
     if not project:
         return False
     notes = project.get("notes")
-    if not notes:
+    if not isinstance(notes, str):
         return False
     try:
         payload = json.loads(notes)

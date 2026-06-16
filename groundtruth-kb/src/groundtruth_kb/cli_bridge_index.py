@@ -31,9 +31,10 @@ def _load_scripts_writer(project_root: Path) -> ModuleType:
     scripts_dir = str(project_root / "scripts")
     if scripts_dir not in sys.path:
         sys.path.insert(0, scripts_dir)
-    import gtkb_bridge_writer  # noqa: PLC0415 - lazy, project-root-relative import
+    import gtkb_bridge_writer  # type: ignore[import-not-found]  # noqa: PLC0415 - lazy, project-root-relative import
+    from typing import cast
 
-    return gtkb_bridge_writer
+    return cast(ModuleType, gtkb_bridge_writer)
 
 
 @click.group("index")

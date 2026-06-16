@@ -27,7 +27,7 @@ import threading
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from groundtruth_kb.governance.credential_patterns import db_pattern_list
 
@@ -124,7 +124,7 @@ _CANONICAL_CHROMA_DIRNAME_DEFAULT = ".groundtruth-chroma"
 _CHROMA_READ_PATH_CONFIG_RELPATH = ("config", "governance", "chroma-read-path.toml")
 
 
-def _call_with_timeout(fn, timeout_seconds: float) -> Any:
+def _call_with_timeout(fn: Callable[[], Any], timeout_seconds: float) -> Any:
     """Run ``fn()`` in a daemon thread, raising ``TimeoutError`` past ``timeout_seconds``.
 
     The worker is a daemon so a genuinely hung ChromaDB C call cannot block
@@ -1212,8 +1212,30 @@ def get_depth(spec_id: str) -> int:
 
 # --- F1: Schema Enrichment sentinels and validators ---
 
-_UNSET = object()  # Sentinel: caller did not provide this argument
-_CARRY_FORWARD = object()  # Sentinel: carry forward from previous version (update only)
+
+class _UnsetSentinel:
+    def __repr__(self) -> str:
+        return "<UNSET>"
+
+
+class _CarryForwardSentinel:
+    def __repr__(self) -> str:
+        return "<CARRY_FORWARD>"
+
+
+_UNSET = _UnsetSentinel()  # Sentinel: caller did not provide this argument
+_CARRY_FORWARD = _CarryForwardSentinel()  # Sentinel: carry forward from previous version (update only)
+
+
+def _is_unset(val: Any) -> bool:
+    cls = getattr(val, "__class__", None)
+    return val is _UNSET or (cls is not None and cls.__name__ == "_UnsetSentinel")
+
+
+def _is_carry_forward(val: Any) -> bool:
+    cls = getattr(val, "__class__", None)
+    return val is _CARRY_FORWARD or (cls is not None and cls.__name__ == "_CarryForwardSentinel")
+
 
 _VALID_AUTHORITIES = frozenset({"stated", "inferred", "provisional", "inherited", "unknown"})
 _VALID_TESTABILITIES = frozenset({"automatable", "observable", "structural", "untestable"})
@@ -1227,12 +1249,12 @@ def _normalize_provisional(authority: Any, provisional_until: Any) -> tuple[Any,
     Returns (authority, provisional_until) after normalization.
     """
     if provisional_until is not None:
-        if authority is _UNSET or authority is None:
+        if _is_unset(authority) or authority is None:
             authority = "provisional"
         elif authority != "provisional":
             raise ValueError(f"provisional_until requires authority='provisional', got {authority!r}")
     else:
-        if authority is not None and authority is not _UNSET and authority == "provisional":
+        if authority is not None and not _is_unset(authority) and authority == "provisional":
             raise ValueError("authority='provisional' requires provisional_until to be set")
     return authority, provisional_until
 
@@ -2094,7 +2116,7 @@ class KnowledgeDB:
         # F1: Normalize provisional lifecycle FIRST (while _UNSET preserved)
         authority, provisional_until = _normalize_provisional(authority, provisional_until)
         # F1: Apply new-insert default AFTER normalization
-        if authority is _UNSET:
+        if _is_unset(authority):
             authority = "stated"
         # F1: Validate enriched fields
         if authority is not None:
@@ -2217,13 +2239,13 @@ class KnowledgeDB:
 
         # Tags and assertions: use module-level _UNSET to allow explicit [] or None
         raw_tags = fields.get("tags", _UNSET)
-        if raw_tags is not _UNSET:
+        if not _is_unset(raw_tags):
             tags_json = json.dumps(raw_tags) if raw_tags is not None else None
         else:
             tags_json = current["tags"]
 
         raw_assertions = fields.get("assertions", _UNSET)
-        if raw_assertions is not _UNSET:
+        if not _is_unset(raw_assertions):
             assertions_json = json.dumps(raw_assertions) if raw_assertions is not None else None
         else:
             assertions_json = current["assertions"]
@@ -2237,11 +2259,11 @@ class KnowledgeDB:
         testability = fields.get("testability", _UNSET)
 
         # Step 3: Resolve carry-forward BEFORE normalization
-        if authority is _UNSET:
+        if _is_unset(authority):
             authority = current.get("authority")
-        if provisional_until is _CARRY_FORWARD:
+        if _is_carry_forward(provisional_until):
             provisional_until = current.get("provisional_until")
-        if testability is _UNSET:
+        if _is_unset(testability):
             testability = current.get("testability")
 
         # Step 4: INV-4 — changing authority AWAY from provisional clears provisional_until
@@ -2253,7 +2275,7 @@ class KnowledgeDB:
         authority, provisional_until = _normalize_provisional(authority, provisional_until)
 
         # Step 6: Default — if still _UNSET after carry-forward, keep None (legacy rows)
-        if authority is _UNSET:
+        if _is_unset(authority):
             authority = None
 
         # Step 7: Validate all F1 fields
@@ -5950,13 +5972,16 @@ class KnowledgeDB:
         return [_row_to_dict(row) for row in rows]
 
     def _active_stage_lease_row(self, conn: sqlite3.Connection, stage_instance_id: str) -> sqlite3.Row | None:
-        return conn.execute(
-            """SELECT * FROM current_stage_leases
-               WHERE stage_instance_id = ? AND lease_status = 'active'
-               ORDER BY changed_at DESC, id
-               LIMIT 1""",
-            (stage_instance_id,),
-        ).fetchone()
+        return cast(
+            sqlite3.Row | None,
+            conn.execute(
+                """SELECT * FROM current_stage_leases
+                   WHERE stage_instance_id = ? AND lease_status = 'active'
+                   ORDER BY changed_at DESC, id
+                   LIMIT 1""",
+                (stage_instance_id,),
+            ).fetchone(),
+        )
 
     def _append_stage_claim_state(
         self,

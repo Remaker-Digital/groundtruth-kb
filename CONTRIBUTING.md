@@ -14,8 +14,9 @@ verifies every implementation against its linked specifications (`VERIFIED`).
 Nothing is "done" until specification-derived tests have actually run.
 
 The coordination surface is the **file bridge**: versioned markdown files under
-[`bridge/`](bridge/) with [`bridge/INDEX.md`](bridge/INDEX.md) as canonical
-state. See [`.claude/rules/file-bridge-protocol.md`](.claude/rules/file-bridge-protocol.md)
+[`bridge/`](bridge/); after WI-4510 Phase-3 cutover dispatcher/TAFE bridge
+state is canonical and retired bridge-index artifacts are not live queue
+authority. See [`.claude/rules/file-bridge-protocol.md`](.claude/rules/file-bridge-protocol.md)
 for the full protocol.
 
 ## Development setup

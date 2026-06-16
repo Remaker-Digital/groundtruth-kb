@@ -1,11 +1,11 @@
 """Role-map partition checks for the operating-mode subsystem.
 
 ``REQ-HARNESS-REGISTRY-001`` FR9-F12 require that active bridge dispatch leave
-the active harness set with exactly one ``prime-builder`` assignment and exactly
-one ``loyal-opposition`` assignment. When more than one harness is active, those
-roles must be assigned to different active harnesses. Non-active harnesses may
-retain operating roles for interactive or owner-directed work; they do not
-participate in active dispatch partitioning.
+the active harness set with at least one ``prime-builder`` assignment and at
+least one ``loyal-opposition`` assignment. When more than one harness is
+active, no active harness may carry both roles. Non-active harnesses may retain
+operating roles for interactive or owner-directed work; they do not participate
+in active dispatch partitioning.
 
 It reads the harness registry projection
 (``harness-state/harness-registry.json``) and computes over the role-set wire
@@ -13,7 +13,7 @@ form — a list of role tokens, or a legacy scalar string per
 ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``.
 
 Authority: ``REQ-HARNESS-REGISTRY-001`` FR9-F12;
-``DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001`` v2;
+``DELIB-20263438`` (role/dispatchability orthogonality);
 ``GOV-HARNESS-ROLE-PORTABILITY-001`` (Prime Builder and Loyal Opposition are
 portable harness-assigned roles).
 
@@ -30,9 +30,8 @@ from typing import Any
 
 # Role tokens that count as holding the prime-builder role. The legacy
 # ``acting-prime-builder`` provenance token is READ-accepted per
-# ``GOV-ACTING-PRIME-BUILDER-001``; it counts toward the single-prime-builder
-# invariant so a stale provenance value cannot mask a second prime-class
-# harness.
+# ``GOV-ACTING-PRIME-BUILDER-001``; it counts toward the active-prime-builder
+# invariant so stale provenance cannot mask a missing prime-class harness.
 _PRIME_BUILDER_TOKENS = frozenset({"prime-builder", "acting-prime-builder"})
 
 
@@ -169,9 +168,9 @@ def verify_active_role_partition(project_root: Path, *, role_path: Path | None =
 
     Loads the harness registry projection under ``project_root`` (or the
     explicit ``role_path`` override) and raises ``RolePartitionViolation``
-    unless exactly one active harness holds a prime-builder-class role and
-    exactly one active harness holds loyal-opposition. With multiple active
-    harnesses, the two role holders must be different. Registered, inactive,
+    unless at least one active harness holds a prime-builder-class role and
+    at least one active harness holds loyal-opposition. With multiple active
+    harnesses, no harness may hold both roles. Registered, inactive,
     suspended, and retired harnesses may retain roles but are ignored by the
     active partition.
 

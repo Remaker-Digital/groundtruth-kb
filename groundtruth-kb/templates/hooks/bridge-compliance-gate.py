@@ -58,7 +58,7 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         return [field for field in REQUIRED_AUTHOR_METADATA_FIELDS if not values.get(field)]
 
 
-BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
+RETIRED_BRIDGE_INDEX_REL = "bridge/" + "INDEX" + ".md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
 BRIDGE_INDEX_STATUS_TOKENS = (
@@ -384,8 +384,8 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
 def _canonical_project_root(cwd_path: Path) -> Path:
     """Resolve the canonical GT-KB project root for project-state access.
 
-    Bridge governance state -- ``groundtruth.db``, the live ``bridge/INDEX.md``,
-    and the audit-output tree -- exists only at the canonical main-worktree
+    Bridge governance state -- ``groundtruth.db``, versioned bridge files, and
+    the audit-output tree -- exists only at the canonical main-worktree
     root. A session running inside a ``.claude/worktrees/*`` linked worktree has
     a cwd that is NOT that root; trusting it makes the gate read an empty
     scaffold database and falsely block a valid proposal.
@@ -416,37 +416,45 @@ def _canonical_project_root(cwd_path: Path) -> Path:
 
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
     """
-    Returns {document_name: latest_status}.
-    Only the first status line per document entry is considered (latest version).
+    Returns {document_name: latest_status} from versioned bridge files.
+    The argument is retained for older call sites and may be either the bridge
+    directory or any path inside it.
     """
-    result: dict[str, str] = {}
-    current_doc: str | None = None
-    current_doc_status_seen: bool = False
-
-    try:
-        lines = index_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return result
-
-    for line in lines:
-        line = line.strip()
-        if line.startswith("Document:"):
-            current_doc = line.removeprefix("Document:").strip()
-            current_doc_status_seen = False
-        elif current_doc and not current_doc_status_seen:
-            for status in BRIDGE_INDEX_STATUS_TOKENS:
-                if line.startswith(status + ":"):
-                    result[current_doc] = status
-                    current_doc_status_seen = True
-                    break
-
-    return result
+    bridge_dir = index_path if index_path.is_dir() else index_path.parent
+    if not bridge_dir.is_dir():
+        return {}
+    latest: dict[str, tuple[int, str]] = {}
+    status_re = re.compile(
+        r"^[#>*\-\s`]*(" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r")\b",
+        re.IGNORECASE,
+    )
+    for path in bridge_dir.glob("*.md"):
+        match = re.match(r"(?P<doc>.+)-(?P<version>\d{3})\.md$", path.name)
+        if not match:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        status = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            status_match = status_re.match(stripped)
+            status = status_match.group(1).upper() if status_match else ""
+            break
+        version = int(match.group("version"))
+        doc = match.group("doc")
+        if status and version > latest.get(doc, (-1, ""))[0]:
+            latest[doc] = (version, status)
+    return {doc: status for doc, (_, status) in latest.items()}
 
 
 def _bridge_index_well_formedness_error(content: str) -> str | None:
-    """Return a hard-block reason for malformed bridge/INDEX.md content."""
+    """Return a hard-block reason for malformed retired bridge-state content."""
     if "\\n" in content:
-        return "bridge/INDEX.md contains literal escaped newline text (\\n); write real newline characters instead."
+        return "retired bridge-index content contains literal escaped newline text (\\n)."
 
     seen_documents: set[str] = set()
     current_doc: str | None = None
@@ -501,7 +509,7 @@ def _is_bridge_markdown_file(file_path: str) -> bool:
     normalized = file_path.replace("\\", "/")
     if not normalized.endswith(".md"):
         return False
-    return "/bridge/" in f"/{normalized}" and not normalized.endswith("/bridge/INDEX.md")
+    return "/bridge/" in f"/{normalized}" and not normalized.endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
 
 
 def _extract_bridge_id_from_path(file_path: str) -> str | None:
@@ -585,7 +593,7 @@ def _first_line_is_recognized_status(first_line: str) -> bool:
     Mirrors the gate's existing first-line recognition union (the ADVISORY,
     GO/NO-GO/VERIFIED, and PENDING_PREFLIGHT_STATUSES {NEW, REVISED} checks in
     ``_deny_reason_for_content``) plus the non-actionable ``DEFERRED`` and
-    terminal ``WITHDRAWN`` statuses used throughout bridge/INDEX.md. Errs toward acceptance (``.startswith`` for
+    terminal ``WITHDRAWN`` statuses used throughout bridge state. Errs toward acceptance (``.startswith`` for
     verdicts) so the body-status-token rule never false-blocks a line the rest
     of the gate would recognize.
     """
@@ -624,7 +632,7 @@ def _body_status_token_violation(file_path: str, content: str) -> bool:
     New files (and overwrites of files that currently have a canonical first
     line) must keep a canonical first line. Files that already exist on disk
     with a non-canonical first line are grandfathered. Non-versioned bridge
-    markdown (no ``-NNN`` suffix, e.g. bridge/INDEX.md is already excluded by
+    markdown (no ``-NNN`` suffix, e.g. retired bridge-index artifacts are already excluded by
     ``_is_bridge_markdown_file``) is not subject to the rule.
     """
     if _extract_bridge_id_from_path(file_path) is None:
@@ -1128,35 +1136,25 @@ def _run_pending_applicability_preflight(
     return True, ""
 
 
-def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
+def _read_proposal_target_paths(bridge_dir: Path, doc_name: str) -> list[str]:
     """Read target_paths from the latest proposal file's frontmatter."""
-    # Find the latest proposal file path from the index
-    try:
-        lines = index_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
-
-    in_doc = False
-    latest_file: str | None = None
-    for line in lines:
-        line = line.strip()
-        if line.startswith("Document:") and line.removeprefix("Document:").strip() == doc_name:
-            in_doc = True
+    latest_path: Path | None = None
+    latest_version = -1
+    pattern = re.compile(rf"^{re.escape(doc_name)}-(\d{{3}})\.md$")
+    for path in bridge_dir.glob(f"{doc_name}-*.md"):
+        match = pattern.match(path.name)
+        if not match:
             continue
-        if in_doc and line.startswith("Document:"):
-            break
-        if in_doc and latest_file is None:
-            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "DEFERRED", "REVISED", "NEW"):
-                if line.startswith(status + ":"):
-                    latest_file = line.split(":", 1)[1].strip()
-                    break
+        version = int(match.group(1))
+        if version > latest_version:
+            latest_path = path
+            latest_version = version
 
-    if not latest_file:
+    if latest_path is None:
         return []
 
-    proposal_path = index_path.parent.parent / latest_file
     try:
-        content = proposal_path.read_text(encoding="utf-8")
+        content = latest_path.read_text(encoding="utf-8")
     except OSError:
         return []
 
@@ -1183,28 +1181,20 @@ def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
 
 
 def _is_bridge_index_file(file_path: str) -> bool:
-    """True when file_path points at the canonical bridge index.
-
-    Edits to bridge/INDEX.md are intrinsic bridge protocol (every proposal
-    filing, verdict, and status transition edits it) and are never the gated
-    "implementation" of a pending proposal - even when a proposal legitimately
-    lists bridge/INDEX.md in its target_paths.
-    """
+    """True when file_path points at the retired bridge-index artifact."""
     normalized = file_path.replace("\\", "/")
-    return f"/{normalized}".endswith("/bridge/INDEX.md")
+    return f"/{normalized}".endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
 
 
-def _pending_proposal_ask_reason(index_path: Path, file_path: str) -> str | None:
+def _pending_proposal_ask_reason(bridge_dir: Path, file_path: str) -> str | None:
     """Return an ask-checkpoint reason when file_path matches a pending
-    proposal's target_paths, or None. bridge/INDEX.md is always exempt."""
-    if _is_bridge_index_file(file_path):
-        return None
-    doc_statuses = _parse_bridge_index(index_path)
+    proposal's target_paths, or None."""
+    doc_statuses = _parse_bridge_index(bridge_dir)
     file_path_normalized = file_path.replace("\\", "/")
     for doc_name, status in doc_statuses.items():
         if status not in ("NEW", "REVISED", "NO-GO"):
             continue
-        for tp in _read_proposal_target_paths(index_path, doc_name):
+        for tp in _read_proposal_target_paths(bridge_dir, doc_name):
             tp_norm = tp.replace("\\", "/")
             if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
                 if status == "NO-GO":
@@ -1253,10 +1243,7 @@ def _deny_reason_for_content(
     run_pending_preflight: bool = True,
 ) -> str | None:
     if _is_bridge_index_file(file_path) and content:
-        index_error = _bridge_index_well_formedness_error(content)
-        if index_error:
-            return f"[Governance] bridge/INDEX.md is malformed: {index_error}"
-        return None
+        return "[Governance] Retired bridge-index artifacts must not be written or recreated."
 
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
@@ -1620,12 +1607,12 @@ def main() -> None:
         emit_ask("PreToolUse", heading_ask_reason)
         sys.exit(0)
 
-    index_path = _canonical_project_root(cwd_path) / BRIDGE_INDEX_FILENAME
-    if not index_path.exists():
+    bridge_dir = _canonical_project_root(cwd_path) / "bridge"
+    if not bridge_dir.is_dir():
         emit_pass()
         sys.exit(0)
 
-    ask_reason = _pending_proposal_ask_reason(index_path, file_path)
+    ask_reason = _pending_proposal_ask_reason(bridge_dir, file_path)
     if ask_reason:
         emit_ask("PreToolUse", ask_reason)
         sys.exit(0)

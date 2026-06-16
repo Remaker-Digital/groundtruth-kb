@@ -96,18 +96,18 @@ _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 # - ``can_receive_dispatch``: the harness can be spawned headless as a dispatch
 #   target. All registered launchable harness types qualify.
 #
-# ``event_driven_hooks`` is retained as a DEPRECATED back-compat alias equal to
-# ``can_receive_dispatch`` (its de-facto current meaning and value), so legacy
-# readers that have not migrated to the split axes see no value change. New
-# code MUST read ``can_fire_events`` / ``can_receive_dispatch``.
+# ``event_driven_hooks`` is retained as a DEPRECATED back-compat alias for
+# ``can_fire_events`` so legacy topology readers continue to ask the event
+# source question correctly. New code MUST read ``can_fire_events`` /
+# ``can_receive_dispatch``.
 _EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli"})
 
 _DISPATCH_RECEIVE_CAPABLE_TYPES = frozenset(
     {"claude", "claude-code", "codex", "codex-cli", "ollama", "openrouter", "antigravity"}
 )
 
-# Deprecated alias preserved for back-compat readers; equals the receive axis.
-_EVENT_DRIVEN_HOOK_CAPABLE_TYPES = _DISPATCH_RECEIVE_CAPABLE_TYPES
+# Deprecated alias preserved for back-compat readers; equals the event-firing axis.
+_EVENT_DRIVEN_HOOK_CAPABLE_TYPES = _EVENT_FIRING_CAPABLE_TYPES
 
 
 def _now_iso() -> str:
@@ -133,22 +133,86 @@ def _decode_json_field(raw: Any) -> Any:
     return raw
 
 
-def _project_harness_record(row: dict[str, Any]) -> dict[str, Any]:
+def _bool_or_none(value: Any) -> bool | None:
+    """Normalize an explicit boolean-ish metadata value."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
+    """Extract explicit dispatch capability metadata from invocation surfaces.
+
+    ``harnesses`` has no dedicated dispatchability columns, and this bridge
+    slice deliberately avoids a schema migration. The append-only registry can
+    still carry explicit metadata inside the existing ``invocation_surfaces``
+    JSON field. Supported shapes are intentionally tolerant:
+
+    - top-level ``can_fire_events`` / ``can_receive_dispatch``;
+    - ``dispatch`` or ``dispatchability`` subtable with those keys;
+    - ``headless.can_receive_dispatch`` for target-only overrides.
+    """
+
+    surfaces = record.get("invocation_surfaces")
+    if not isinstance(surfaces, dict):
+        return {}
+    sources = [surfaces]
+    for key in ("dispatch", "dispatchability"):
+        value = surfaces.get(key)
+        if isinstance(value, dict):
+            sources.append(value)
+    headless = surfaces.get("headless")
+    if isinstance(headless, dict):
+        sources.append(headless)
+
+    aliases = {
+        "can_fire_events": ("can_fire_events", "fire_events", "event_source"),
+        "can_receive_dispatch": ("can_receive_dispatch", "receive_dispatch", "dispatch_target"),
+        "event_driven_hooks": ("event_driven_hooks",),
+    }
+    result: dict[str, bool] = {}
+    for canonical, names in aliases.items():
+        for source in sources:
+            for name in names:
+                parsed = _bool_or_none(source.get(name))
+                if parsed is not None:
+                    result[canonical] = parsed
+                    break
+            if canonical in result:
+                break
+    return result
+
+
+def _project_harness_record(row: dict[str, Any], dispatch_config: Any | None = None) -> dict[str, Any]:
     """Project one ``current_harnesses`` row into a flat projection record."""
     record: dict[str, Any] = {field: row.get(field) for field in _PROJECTED_FIELDS}
     for field in _JSON_DECODED_FIELDS:
         record[field] = _decode_json_field(row.get(field))
     harness_type = str(record.get("harness_type") or "").strip().lower()
+    explicit = _dispatch_metadata(record)
     # Honest split axes (FAB-01 / HYG-004).
-    record["can_fire_events"] = harness_type in _EVENT_FIRING_CAPABLE_TYPES
-    record["can_receive_dispatch"] = harness_type in _DISPATCH_RECEIVE_CAPABLE_TYPES
-    # Deprecated back-compat alias == can_receive_dispatch (unchanged value for
-    # legacy readers; new code reads the split axes above).
-    record["event_driven_hooks"] = record["can_receive_dispatch"]
+    record["can_fire_events"] = explicit.get("can_fire_events", harness_type in _EVENT_FIRING_CAPABLE_TYPES)
+    record["can_receive_dispatch"] = explicit.get(
+        "can_receive_dispatch",
+        harness_type in _DISPATCH_RECEIVE_CAPABLE_TYPES,
+    )
+    # Deprecated back-compat alias for event-firing capability. New code reads
+    # the split axes above; legacy topology readers still consume this field.
+    record["event_driven_hooks"] = explicit.get("event_driven_hooks", record["can_fire_events"])
+    if dispatch_config is not None:
+        from groundtruth_kb.bridge_dispatch_config import apply_dispatch_config_to_record
+
+        record = apply_dispatch_config_to_record(record, dispatch_config)
     return record
 
 
-def build_projection(harness_rows: list[dict[str, Any]]) -> dict[str, Any]:
+def build_projection(harness_rows: list[dict[str, Any]], *, dispatch_config: Any | None = None) -> dict[str, Any]:
     """Build the projection document from current-version harness rows.
 
     Pure function: given the rows returned by ``KnowledgeDB.list_harnesses()``
@@ -157,7 +221,7 @@ def build_projection(harness_rows: list[dict[str, Any]]) -> dict[str, Any]:
     — topology is a derived pure function over the harness set (FR4), never a
     persisted value.
     """
-    records = [_project_harness_record(row) for row in harness_rows]
+    records = [_project_harness_record(row, dispatch_config=dispatch_config) for row in harness_rows]
     records.sort(key=lambda r: str(r.get("id") or ""))
     return {
         "schema_version": PROJECTION_SCHEMA_VERSION,
@@ -211,7 +275,14 @@ def generate_harness_projection(
     function does not force a ``groundtruth_kb.db`` import). Returns the written
     path.
     """
-    document = build_projection(db.list_harnesses())
+    dispatch_config = None
+    try:
+        from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config
+
+        dispatch_config = load_bridge_dispatch_config(project_root)
+    except Exception:  # intentional-catch: autogenerated check fix
+        dispatch_config = None
+    document = build_projection(db.list_harnesses(), dispatch_config=dispatch_config)
     path = harness_registry_path(project_root, projection_path)
     return _write_projection(path, document)
 

@@ -349,7 +349,7 @@ def _classify_stage(
     metadata = _as_mapping(stage.get("metadata"))
     last_activity_dt, last_activity_at = _last_activity(stage, telemetry)
 
-    base = {
+    base: dict[str, Any] = {
         "flow_instance_id": flow_id,
         "stage_instance_id": stage_instance_id,
         "stage_id": str(stage.get("stage_id") or ""),
@@ -362,14 +362,14 @@ def _classify_stage(
     if active_lease is not None:
         expires_dt = _parse_iso(active_lease.get("expires_at"))
         if expires_dt is not None and now_dt >= expires_dt:
-            age = int((now_dt - expires_dt).total_seconds())
-            if age >= thresholds.lease_expiry_grace_seconds:
+            age_val = int((now_dt - expires_dt).total_seconds())
+            if age_val >= thresholds.lease_expiry_grace_seconds:
                 findings.append(
                     _finalize(
                         StuckFlowFinding(
                             **base,
                             reason=REASON_EXPIRED_LEASE,
-                            age_seconds=age,
+                            age_seconds=age_val,
                             lease_id=str(active_lease.get("id") or "") or None,
                             expires_at=str(active_lease.get("expires_at") or "") or None,
                         ),
@@ -378,14 +378,14 @@ def _classify_stage(
                 )
     else:
         owner_gate_blocked = _truthy(metadata.get("owner_gate_blocked"))
-        age = int((now_dt - last_activity_dt).total_seconds()) if last_activity_dt is not None else None
-        if owner_gate_blocked and age is not None and age >= thresholds.owner_gate_stalled_seconds:
+        age_opt = int((now_dt - last_activity_dt).total_seconds()) if last_activity_dt is not None else None
+        if owner_gate_blocked and age_opt is not None and age_opt >= thresholds.owner_gate_stalled_seconds:
             findings.append(
                 _finalize(
                     StuckFlowFinding(
                         **base,
                         reason=REASON_OWNER_GATE_STALLED,
-                        age_seconds=age,
+                        age_seconds=age_opt,
                         last_activity_at=last_activity_at,
                     ),
                     telemetry,
@@ -393,8 +393,8 @@ def _classify_stage(
             )
         elif (
             not owner_gate_blocked
-            and age is not None
-            and age >= thresholds.stalled_seconds
+            and age_opt is not None
+            and age_opt >= thresholds.stalled_seconds
             and _normalized(stage.get("claim_status")) == UNCLAIMED_CLAIM_STATUS
         ):
             findings.append(
@@ -402,7 +402,7 @@ def _classify_stage(
                     StuckFlowFinding(
                         **base,
                         reason=REASON_STALLED_PENDING,
-                        age_seconds=age,
+                        age_seconds=age_opt,
                         last_activity_at=last_activity_at,
                     ),
                     telemetry,
@@ -410,7 +410,7 @@ def _classify_stage(
             )
 
     # Telemetry facet (SPEC-TAFE-R6): orthogonal; can co-occur with a structural reason.
-    if _is_failed_unrecovered(latest):
+    if latest is not None and _is_failed_unrecovered(latest):
         findings.append(
             _finalize(
                 StuckFlowFinding(

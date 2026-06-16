@@ -29,8 +29,10 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
    `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`.
 3. **Canonical terminology** — load `.claude/rules/canonical-terminology.md`
    before interpreting owner terms or proposing specifications.
-4. **File bridge** — read live `bridge/INDEX.md` directly; it is the sole
-   authoritative bridge-queue state (no cached/derived counts).
+4. **File bridge** — read current TAFE/dispatcher bridge state and the
+   status-bearing versioned files under `bridge/`; generated or cached startup
+   counts are not live authority. `bridge/INDEX.md` is deprecated/removed and
+   must not be recreated as a startup dependency.
 5. **Dashboard / backlog summary** — the generated startup service
    (`scripts/session_self_initialization.py`) emits the current-state summary;
    it is not authoritative after generation.

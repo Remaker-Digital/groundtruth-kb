@@ -153,43 +153,61 @@ def _desired_role_assignments(
             for row in rows
         }
 
-    prime_id = (
-        preferred_prime_id
-        if preferred_prime_id in active_by_id
-        else _choose_existing_role_holder(active, ROLE_PRIME_BUILDER)
-    )
-    if prime_id is None:
-        prime_id = _choose_any_active(active)
-    if prime_id is None:
-        raise HarnessOperationError("cannot select an active prime-builder harness")
+    assignments: dict[str, list[str]] = {_record_id(row): list(_current_roles(row)) for row in rows}
 
-    lo_id = (
-        preferred_lo_id
-        if preferred_lo_id in active_by_id and preferred_lo_id != prime_id
-        else _choose_existing_role_holder(active, ROLE_LOYAL_OPPOSITION, exclude_id=prime_id)
-    )
-    if lo_id is None:
-        lo_id = _choose_any_active(active, exclude_id=prime_id)
-    if lo_id is None or lo_id == prime_id:
-        raise HarnessOperationError(
-            "cannot satisfy operating-role invariant: PB and LO require distinct "
-            "active harnesses when more than one active harness exists"
-        )
+    prime_ids = [_record_id(row) for row in active if ROLE_PRIME_BUILDER in _current_roles(row)]
+    lo_ids = [_record_id(row) for row in active if ROLE_LOYAL_OPPOSITION in _current_roles(row)]
 
-    assignments: dict[str, list[str]] = {}
+    if not prime_ids:
+        prime_id = preferred_prime_id if preferred_prime_id in active_by_id else _choose_any_active(active)
+        if prime_id is None:
+            raise HarnessOperationError("cannot select an active prime-builder harness")
+        assignments[prime_id] = sorted({*assignments.get(prime_id, []), ROLE_PRIME_BUILDER})
+        prime_ids = [prime_id]
+
+    # In multi-harness topology, a PB+LO overlap is normalized by moving LO to a
+    # different active harness. This preserves role/dispatchability
+    # orthogonality without reviving the retired single-active-per-role rule.
+    non_overlapping_los = [hid for hid in lo_ids if hid not in set(prime_ids)]
+    if not non_overlapping_los:
+        prime_set = set(prime_ids)
+        lo_id = None
+        if preferred_lo_id in active_by_id and preferred_lo_id not in prime_set:
+            lo_id = preferred_lo_id
+        if lo_id is None:
+            for candidate in _sort_harnesses(active):
+                candidate_id = _record_id(candidate)
+                if candidate_id not in prime_set:
+                    lo_id = candidate_id
+                    break
+        if lo_id is None:
+            for candidate in _sort_harnesses(active):
+                candidate_id = _record_id(candidate)
+                if candidate_id != prime_ids[0]:
+                    lo_id = candidate_id
+                    # All active harnesses are PBs; convert the chosen secondary
+                    # PB to LO-only so the active PB and LO sets stay distinct.
+                    assignments[lo_id] = [ROLE_LOYAL_OPPOSITION]
+                    break
+        if lo_id is None:
+            raise HarnessOperationError(
+                "cannot satisfy operating-role invariant: at least one active "
+                "loyal-opposition harness distinct from active prime-builder is required"
+            )
+        if assignments.get(lo_id) != [ROLE_LOYAL_OPPOSITION]:
+            assignments[lo_id] = sorted({*assignments.get(lo_id, []), ROLE_LOYAL_OPPOSITION})
+        non_overlapping_los = [lo_id]
+
     for row in rows:
         harness_id = _record_id(row)
         if harness_id not in active_by_id:
-            assignments[harness_id] = _current_roles(row)
             continue
-        roles: list[str] = []
-        if harness_id == prime_id:
-            roles.append(ROLE_PRIME_BUILDER)
-        elif harness_id == lo_id:
-            roles.append(ROLE_LOYAL_OPPOSITION)
-        else:
-            roles = [r for r in _current_roles(row) if r in {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION}]
-        assignments[harness_id] = roles
+        roles = set(assignments.get(harness_id, []))
+        if ROLE_PRIME_BUILDER in roles and ROLE_LOYAL_OPPOSITION in roles and len(active) > 1:
+            roles.discard(ROLE_LOYAL_OPPOSITION)
+        if not roles:
+            roles.add(ROLE_LOYAL_OPPOSITION)
+        assignments[harness_id] = sorted(roles)
     return assignments
 
 
@@ -272,8 +290,10 @@ def reconcile_role_assignments(
     - non-active harnesses may retain PB/LO role assignment for interactive or
       owner-directed work, but do not participate in active role partitioning;
     - with one active harness, that harness carries PB+LO;
-    - with multiple active harnesses, exactly one active harness carries PB and
-      exactly one different active harness carries LO.
+    - with multiple active harnesses, at least one active harness carries PB
+      and at least one different active harness carries LO. Multiple same-role
+      active harnesses are valid; dispatchability and precedence decide which
+      harness receives headless bridge work.
 
     The function appends only rows whose role set actually changes. Non-active
     rows carry their current role set forward unchanged.

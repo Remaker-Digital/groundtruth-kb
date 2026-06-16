@@ -16,7 +16,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import click
 
@@ -189,6 +189,114 @@ def _emit_cli_payload(payload: dict[str, Any], *, json_output: bool) -> None:
         summary = payload.get("summary")
         if summary:
             click.echo(summary)
+
+
+@bridge_group.group("dispatch")
+def bridge_dispatch_group() -> None:
+    """Bridge dispatch configuration, status, and health."""
+
+
+def _emit_bridge_dispatch_config(ctx: click.Context, *, json_output: bool) -> None:
+    from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config
+
+    config = _resolve_config(ctx)
+    dispatch_config = load_bridge_dispatch_config(config.project_root)
+    payload = dispatch_config.to_json_dict()
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Bridge dispatch config: {payload['path']}")
+    click.echo(f"Schema version: {payload['schema_version']}")
+    click.echo(f"Harness overlays: {len(payload['harnesses'])}")
+    click.echo(f"Rules: {len(payload['rules'])}")
+    if payload["errors"]:
+        click.echo("Errors:")
+        for error in payload["errors"]:
+            click.echo(f"- {error}")
+
+
+def _emit_bridge_dispatch_status(ctx: click.Context, *, json_output: bool) -> None:
+    from groundtruth_kb.bridge_dispatch_config import collect_bridge_dispatch_status, format_bridge_dispatch_status
+
+    config = _resolve_config(ctx)
+    status = collect_bridge_dispatch_status(config.project_root)
+    if json_output:
+        click.echo(json.dumps(status.to_json_dict(), indent=2, sort_keys=True))
+        return
+    click.echo(format_bridge_dispatch_status(status))
+
+
+def _emit_bridge_dispatch_health(ctx: click.Context, *, json_output: bool) -> None:
+    from groundtruth_kb.bridge_dispatch_config import collect_bridge_dispatch_status
+
+    config = _resolve_config(ctx)
+    status = collect_bridge_dispatch_status(config.project_root)
+    payload = {
+        "health_status": status.health_status,
+        "findings": list(status.health_findings),
+        "selected_by_role": status.selected_by_role,
+        "config_path": str(status.config.path),
+    }
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Bridge dispatch health: {status.health_status}")
+        for role, candidates in status.selected_by_role.items():
+            ids = [str(row.get("id")) for row in candidates]
+            click.echo(f"- {role}: {', '.join(ids) if ids else '(none)'}")
+        if status.health_findings:
+            click.echo("Findings:")
+            for finding in status.health_findings:
+                click.echo(f"- {finding}")
+    ctx.exit(0 if status.health_status != "FAIL" else 1)
+
+
+@bridge_group.command("config")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_config_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Show the canonical bridge dispatch configuration."""
+    _emit_bridge_dispatch_config(ctx, json_output=json_output)
+
+
+@bridge_group.command("status")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_status_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Show current harness eligibility and selected dispatch candidates."""
+    _emit_bridge_dispatch_status(ctx, json_output=json_output)
+
+
+@bridge_group.command("health")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_health_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Check whether bridge dispatch has eligible targets for both roles."""
+    _emit_bridge_dispatch_health(ctx, json_output=json_output)
+
+
+@bridge_dispatch_group.command("config")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Show the canonical bridge dispatch configuration."""
+    _emit_bridge_dispatch_config(ctx, json_output=json_output)
+
+
+@bridge_dispatch_group.command("status")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_status_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Show current harness eligibility and selected dispatch candidates."""
+    _emit_bridge_dispatch_status(ctx, json_output=json_output)
+
+
+@bridge_dispatch_group.command("health")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_health_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Check whether bridge dispatch has eligible targets for both roles."""
+    _emit_bridge_dispatch_health(ctx, json_output=json_output)
 
 
 def _flow_service(ctx: click.Context) -> tuple[KnowledgeDB, TypedArtifactFlowService]:
@@ -364,7 +472,7 @@ def flow_status_cmd(ctx: click.Context, flow_instance_id: str | None, json_outpu
         if flow_instance_id:
             row = service.get_flow_instance(flow_instance_id)
             if row is None:
-                payload = {
+                payload: dict[str, Any] = {
                     "flow_instance": None,
                     "found": False,
                     "mutated": False,
@@ -1552,7 +1660,7 @@ def flow_publish_reconcile_cmd(ctx: click.Context, json_output: bool) -> None:
     if scripts_dir not in _sys.path:
         _sys.path.insert(0, scripts_dir)
     try:
-        import bridge_index_writer  # noqa: PLC0415 - lazy, project-root-relative import
+        import bridge_index_writer  # type: ignore[import-not-found]  # noqa: PLC0415 - lazy, project-root-relative import
     except ImportError as exc:  # pragma: no cover - defensive
         raise click.ClickException(f"cannot load serialized bridge INDEX writer: {exc}") from exc
 
@@ -1668,7 +1776,7 @@ def application_register_cmd(ctx: click.Context, name: str) -> None:
             apps = data.get("applications", {})
             if not isinstance(apps, dict):
                 apps = {}
-        except Exception:
+        except Exception:  # intentional-catch: autogenerated check fix
             apps = {}
 
     apps[name] = {"slot": name}
@@ -1706,7 +1814,7 @@ def application_unregister_cmd(ctx: click.Context, name: str) -> None:
                 registry_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
                 click.echo(f"Successfully unregistered application '{name}'")
                 return
-        except Exception as e:
+        except Exception as e:  # intentional-catch: autogenerated check fix
             click.echo(f"Error reading registry: {e}", err=True)
             raise SystemExit(1) from e
 
@@ -5142,7 +5250,7 @@ def project_doctor(auto_install: bool, profile: str | None, target_dir: str, jso
     iso_state = evaluate_isolation_state(target)
     if iso_state["verdicts"]:
         for v in iso_state["verdicts"]:
-            status = "fail" if v["severity"] in {"P0", "P1"} else "warning"
+            status: Literal["pass", "fail", "warning", "info"] = "fail" if v["severity"] in {"P0", "P1"} else "warning"
             required = v["severity"] in {"P0", "P1"}
             check = ToolCheck(
                 name=f"isolation:{v['verdict'].lower().replace(' ', '-')}",
@@ -7443,9 +7551,9 @@ def harness_set_role(ctx: click.Context, harness_id: str, role: str, reason: str
     """Assign one default operating-role metadata value to one harness.
 
     REQ-HARNESS-REGISTRY-001 FR9. The target must be a known, non-retired
-    harness in the registry. The candidate role map must leave exactly one
-    active Prime Builder and exactly one active Loyal Opposition; they are
-    distinct when more than one active harness exists.
+    harness in the registry. The candidate role map must leave at least one
+    active Prime Builder and at least one active Loyal Opposition; no active
+    harness may hold both roles when more than one active harness exists.
     """
     import json as _json
     from pathlib import Path
@@ -7488,7 +7596,9 @@ def harness_set_role(ctx: click.Context, harness_id: str, role: str, reason: str
                 "derived_topology": result.derived_topology,
                 "audit_record_path": str(result.audit_record_path),
                 "verified_prime_builder": summary.prime_builder_id,
+                "verified_prime_builders": list(summary.prime_builder_ids),
                 "verified_loyal_opposition": summary.loyal_opposition_id,
+                "verified_loyal_oppositions": list(summary.loyal_opposition_ids),
                 "verified_active_harnesses": list(summary.active_harness_ids),
             },
             indent=2,

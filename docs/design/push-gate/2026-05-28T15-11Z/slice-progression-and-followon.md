@@ -95,7 +95,11 @@ The push gate's slice progression must preserve compatibility with existing GT-K
 - **`gt github security doctor`** (SPEC-SEC-GITHUB-POSTURE-001) — Slice 6 registers the push-gate workflow as a required check via this doctor's existing branch-protection invariants; no change to the doctor's other invariants.
 - **`release-candidate-gate` skill** (GOV-RELEASE-READINESS-GOVERNED-TESTING-001) — Slice 6 (Layer 7) wraps the existing skill; the skill itself is unchanged.
 - **`.githooks/pre-commit`** (SPEC-SEC-HOOK-PORTABILITY-001) — Slice 4 adds `.githooks/pre-push` under the same `core.hooksPath` invariant; existing `pre-commit` is unchanged.
-- **`bridge/INDEX.md`** (GOV-FILE-BRIDGE-AUTHORITY-001) — INDEX remains canonical workflow state across all slices; no change to bridge protocol itself.
+- **Historical pre-cutover bridge index note:** this 2026-05-28 push-gate design
+  predates the 2026-06-15 TAFE/dispatcher cutover. Its original
+  `bridge/INDEX.md` canonicality assumption is no longer current for the GT-KB
+  host; TAFE-backed bridge state is canonical and `bridge/INDEX.md` is a
+  deprecated generated compatibility view.
 
 ## Out-of-Scope Surfaces (Explicit Non-Coupling)
 

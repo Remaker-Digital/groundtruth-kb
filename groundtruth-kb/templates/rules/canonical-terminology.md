@@ -375,17 +375,18 @@ live data + interaction); non-interactive README-style views.
 
 **Canonical full term:** file bridge (the protocol surface).
 
-**Definition:** The Prime Builder ↔ Loyal Opposition coordination
-protocol implemented via versioned markdown files under `bridge/` and
-the canonical `bridge/INDEX.md` workflow state. Statuses: NEW, REVISED,
-GO, NO-GO, VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. Both agents read and write the index;
-implementation never proceeds without GO.
+**Definition:** The Prime Builder ↔ Loyal Opposition coordination protocol
+implemented via dispatcher/TAFE bridge state plus versioned markdown audit files
+under `bridge/`. In current GT-KB hosts, retired bridge-index artifacts are not
+canonical bridge-state or dispatcher authority. Statuses: NEW, REVISED, GO,
+NO-GO, VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. Implementation never proceeds
+without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
 "file bridge" in canonical text); cross-system message bridges.
 
 **Source:** `.claude/rules/file-bridge-protocol.md`;
-`bridge/INDEX.md`; `AGENTS.md` (Codex-side rule).
+dispatcher/TAFE bridge-state surfaces; `AGENTS.md` (Codex-side rule).
 
 ---
 

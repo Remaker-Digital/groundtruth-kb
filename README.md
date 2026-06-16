@@ -69,7 +69,7 @@ gt project doctor             # health checks across the platform
 |-----------|-----------|
 | **MemBase** | The canonical, append-only knowledge database for governed records — specifications, tests, work items, procedures, documents, environment config. Implemented as `groundtruth.db` (SQLite); every mutation is a new versioned row with `changed_by` / `changed_at` / `change_reason`. See [MEMBASE-4-CLAUDE.md](MEMBASE-4-CLAUDE.md). |
 | **Deliberation Archive** | The design-reasoning tier: a searchable archive of decisions, reviews, and rejected alternatives that answers *why*. Implemented as the `deliberations` table with semantic indexing. |
-| **File bridge protocol** | The dual-agent coordination surface (Prime Builder ↔ Loyal Opposition), versioned markdown under `bridge/` with [`bridge/INDEX.md`](bridge/INDEX.md) as canonical state. See [file-bridge-protocol.md](.claude/rules/file-bridge-protocol.md). |
+| **File bridge protocol** | The dual-agent coordination surface (Prime Builder ↔ Loyal Opposition), versioned markdown under `bridge/`. After WI-4510 Phase-3 cutover, dispatcher/TAFE bridge state is canonical; retired bridge-index artifacts are not live queue authority. See [file-bridge-protocol.md](.claude/rules/file-bridge-protocol.md). |
 | **`gt` CLI** | The platform command surface — `gt project init`, `gt summary`, `gt assert`, `gt backlog`, `gt deliberations`, `gt project doctor`, `gt project upgrade`. |
 | **Dashboard** | KPI surface for governance, release-readiness, drift, and bridge state. Optional Grafana integration; core surfaces are always available via the CLI. |
 

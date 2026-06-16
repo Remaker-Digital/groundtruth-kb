@@ -12,7 +12,7 @@ Inputs (per spec § Inputs):
 1. The latest archived session-envelope JSON at
    ``harness-state/<harness_name>/session-envelope-archive/<closed_at-ISO>-session-envelope.json``.
 2. Open bridge state filtered for the active role: the latest NEW / REVISED /
-   GO / NO-GO line per Document in ``bridge/INDEX.md``.
+   GO / NO-GO line per versioned bridge Document chain.
 
 Outputs (per spec § Output Surfaces):
 
@@ -78,7 +78,7 @@ def generate(
 
     Raises:
         HandoffError: When the archive directory or a usable envelope file is
-            missing, or when the bridge index cannot be read.
+            missing, or when bridge state cannot be read.
     """
     root = (project_root or _default_project_root()).resolve()
     harness_name = _resolve_active_harness_name(root)
@@ -104,10 +104,7 @@ def generate(
 
     resolved_session_id = session_id or _derive_session_id(envelope, envelope_path)
 
-    bridge_index_path = root / "bridge" / "INDEX.md"
-    if not bridge_index_path.exists():
-        raise HandoffError(f"Bridge INDEX missing: {bridge_index_path}")
-    bridge_bytes = bridge_index_path.read_bytes()
+    bridge_bytes = _read_bridge_state_bytes(root)
     role = _role_from_envelope(envelope)
     bridge_state = _parse_bridge_state_for_role(bridge_bytes.decode("utf-8"), role)
 
@@ -332,14 +329,74 @@ def _role_from_envelope(envelope: dict[str, Any]) -> str:
 
 _DOCUMENT_LINE = re.compile(r"^Document:\s*(?P<name>\S+)\s*$")
 _STATUS_LINE = re.compile(r"^(?P<status>[A-Z-]+):\s*(?P<path>\S+)\s*$")
+_VERSIONED_BRIDGE_FILE = re.compile(r"^(?P<slug>.+)-(?P<version>\d+)\.md$")
+_BRIDGE_FILE_STATUS = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    re.IGNORECASE,
+)
+
+
+def _read_bridge_state_bytes(project_root: Path) -> bytes:
+    """Read retired INDEX when present, otherwise render versioned bridge state."""
+    bridge_index_path = project_root / "bridge" / "INDEX.md"
+    if bridge_index_path.exists():
+        return bridge_index_path.read_bytes()
+    rendered = _render_versioned_bridge_state(project_root)
+    if not rendered:
+        raise HandoffError(f"No readable bridge state under {project_root / 'bridge'}")
+    return rendered.encode("utf-8")
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _BRIDGE_FILE_STATUS.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _render_versioned_bridge_state(project_root: Path) -> str:
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return ""
+    rows: dict[str, list[tuple[int, str, str]]] = {}
+    for path in bridge_dir.glob("*.md"):
+        if path.name == "INDEX.md":
+            continue
+        match = _VERSIONED_BRIDGE_FILE.match(path.name)
+        if not match:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        slug = match.group("slug")
+        version = int(match.group("version"))
+        rows.setdefault(slug, []).append((version, status, f"bridge/{path.name}"))
+    lines = [
+        "<!-- GENERATED IN MEMORY: bridge state rendered from versioned files; "
+        "bridge/INDEX.md is deprecated/removed. -->",
+        "",
+    ]
+    for slug in sorted(rows):
+        lines.append(f"Document: {slug}")
+        for _version, status, rel_path in sorted(rows[slug], reverse=True):
+            lines.append(f"{status}: {rel_path}")
+        lines.append("")
+    return "\n".join(lines)
 
 
 def _parse_bridge_state_for_role(index_text: str, role: str) -> list[dict[str, str]]:
-    """Parse ``bridge/INDEX.md`` into role-filtered latest-status entries.
+    """Parse INDEX-shaped bridge state into role-filtered latest-status entries.
 
     Returns a list of ``{document, status, path}`` dicts whose ``status`` is
-    actionable for ``role``. Entries are ordered by their first appearance in
-    the index (newest-first, per the protocol).
+    actionable for ``role``. Entries are ordered by first appearance in the
+    rendered state (newest version first within each document).
     """
     actionable = _ROLE_ACTIONABLE_STATUSES.get(role, _ROLE_ACTIONABLE_STATUSES["prime-builder"])
     entries: list[dict[str, str]] = []
@@ -414,7 +471,7 @@ def _assemble_prompt(
     lines.append(
         "Generated deterministically per "
         "SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001 from the archived "
-        "session envelope plus the live bridge index.",
+        "session envelope plus live versioned bridge state.",
     )
     lines.append("")
     lines.append("## Closed Session Envelope")
@@ -456,9 +513,9 @@ def _assemble_prompt(
     lines.append("## Next-Session Direction")
     lines.append("")
     lines.append(
-        "Read this handoff prompt before reading bridge/INDEX.md. Then read "
-        "the live bridge state directly and act on the role-actionable "
-        "entries above in oldest-first order.",
+        "Read this handoff prompt, then read live dispatcher/TAFE state and "
+        "the versioned bridge file chain. Act on the role-actionable entries "
+        "above in oldest-first order.",
     )
     lines.append("")
     return "\n".join(lines)

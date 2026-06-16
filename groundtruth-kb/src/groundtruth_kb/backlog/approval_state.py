@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -68,11 +69,53 @@ def has_auq_evidence(work_item_id: str, pending_owner_decisions_path: Path) -> b
     return work_item_id in text and "ask_user_question" in text
 
 
+_BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    re.IGNORECASE,
+)
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _current_go_verdict_files_from_versioned_bridge(project_root: Path) -> list[Path]:
+    latest: dict[str, tuple[int, str, Path]] = {}
+    bridge_dir = project_root / "bridge"
+    for path in bridge_dir.glob("*.md"):
+        if path.name == "INDEX.md":
+            continue
+        match = re.match(r"^(.+)-(\d+)\.md$", path.name)
+        if not match:
+            continue
+        slug = match.group(1)
+        version = int(match.group(2))
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        if slug not in latest or version > latest[slug][0]:
+            latest[slug] = (version, status, path)
+    return [path for _version, status, path in latest.values() if status == "GO"]
+
+
 def has_go_verdict(work_item_id: str, bridge_index_path: Path, project_root: Path) -> bool:
     """Return whether a current GO bridge chain cites this work item."""
 
     if not bridge_index_path.exists():
-        return False
+        return any(
+            work_item_id in verdict_path.read_text(encoding="utf-8", errors="replace")
+            for verdict_path in _current_go_verdict_files_from_versioned_bridge(project_root)
+        )
     for line in bridge_index_path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if not stripped.startswith("GO: bridge/"):

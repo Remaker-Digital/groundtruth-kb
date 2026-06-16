@@ -13,16 +13,56 @@ import hashlib
 import re
 from pathlib import Path
 
+_BRIDGE_FILE_STATUS = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    re.IGNORECASE,
+)
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _BRIDGE_FILE_STATUS.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _read_active_bridge_docs_from_files(bridge_dir: Path) -> list[str]:
+    latest: dict[str, tuple[int, str]] = {}
+    for path in bridge_dir.glob("*.md"):
+        if path.name == "INDEX.md":
+            continue
+        match = re.match(r"^(.+)-(\d+)\.md$", path.name)
+        if not match:
+            continue
+        slug = match.group(1)
+        version = int(match.group(2))
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        if slug not in latest or version > latest[slug][0]:
+            latest[slug] = (version, status)
+    return sorted(
+        slug for slug, (_version, status) in latest.items() if status in ("NEW", "REVISED", "NO-GO", "ADVISORY")
+    )
+
 
 def _read_active_bridge_docs(cwd: str) -> list[str]:
-    """Extract active (non-terminal) bridge document names from INDEX.md.
+    """Extract active (non-terminal) bridge document names from bridge state.
 
     Active means the latest status for a document is NEW, REVISED, NO-GO, or ADVISORY
     (i.e., not yet GO or VERIFIED — work is still in flight).
     """
-    index_path = Path(cwd) / "bridge" / "INDEX.md"
+    bridge_dir = Path(cwd) / "bridge"
+    index_path = bridge_dir / "INDEX.md"
     if not index_path.exists():
-        return []
+        return _read_active_bridge_docs_from_files(bridge_dir)
 
     try:
         text = index_path.read_text(encoding="utf-8")

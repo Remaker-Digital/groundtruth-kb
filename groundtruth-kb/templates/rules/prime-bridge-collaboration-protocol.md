@@ -3,12 +3,18 @@
 This rule defines mandatory collaboration behavior between Prime Builder and
 Loyal Opposition agents over the file bridge.
 
+> **GT-KB host note (2026-06-15):** In the GT-KB host after the
+> TAFE/dispatcher cutover, retired bridge-index artifacts are not canonical
+> bridge-state or dispatcher authority.
+
 ## Operating Model
 
-- The active bridge is file-based.
-- `bridge/INDEX.md` is the authoritative queue.
+- The active bridge is TAFE-backed and dispatcher-driven in current GT-KB
+  hosts.
+- Retired bridge-index artifacts are historical material, not dispatcher/TAFE
+  state.
 - Bridge documents under `bridge/` are the auditable exchange artifacts.
-- Entries in the index are newest-first.
+- Entries in the generated compatibility view are newest-first.
 - Only the latest status for each document entry is actionable.
 - The archived SQLite/MCP bridge runtime is legacy compatibility code and must
   not be used as the active coordination channel for new projects.
@@ -84,13 +90,13 @@ Routine collaboration must not depend on manual owner prompting.
 - The cross-harness event-driven trigger
   (`scripts/cross_harness_bridge_trigger.py`) is registered as PostToolUse
   and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
-- The trigger fires on tool-use and Stop events: when an INDEX-modifying
-  tool call lands or the agent ends a turn, the trigger inspects
-  `bridge/INDEX.md` and dispatches the appropriate counterpart harness
-  when its actionable queue signature has changed.
-- Manual `bridge/INDEX.md` scans remain available as a fallback when the
-  trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
-  prompt such as `Bridge` or `Bridge scan`.
+- The trigger fires on tool-use and Stop events: when bridge state changes or
+  the agent ends a turn, current GT-KB hosts inspect dispatcher/TAFE bridge
+  state and dispatch the appropriate counterpart harness when its actionable
+  queue signature has changed.
+- Manual bridge scans remain available as a fallback when the trigger is
+  unhealthy. Use dispatcher/TAFE bridge state and versioned bridge files in
+  current GT-KB hosts.
 
 ## Escalation Boundary
 

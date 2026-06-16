@@ -6,6 +6,7 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 # Common patterns for parsing commands
 REDIRECTION_RE = re.compile(r"(?:>|>>|<|\|)\s*([^\s|&;]+)")
@@ -56,6 +57,8 @@ def _classify_path_token(token: str) -> str | None:
     if token.startswith("\\\\") or token.startswith("//"):  # UNC (both slash forms)
         return token
     if token.startswith("/"):  # rooted-driveless -> project-root-relative
+        if token.lower().startswith(("/etc/", "/home/")):
+            return token
         return token.lstrip("/")
     return None  # relative path / flag / bare word — not a boundary risk
 
@@ -64,14 +67,18 @@ class DirectiveEnforcementError(ValueError):
     """Raised when a path or command violates directive enforcement rules."""
 
 
-def load_directives(project_root: Path) -> list[dict]:
+def load_directives(project_root: Path) -> list[dict[str, Any]]:
     registry_file = project_root / ".gtkb" / "directive-registry.json"
     if not registry_file.is_file():
         return []
     try:
         data = json.loads(registry_file.read_text(encoding="utf-8"))
-        return data.get("directives", [])
-    except Exception:
+        if isinstance(data, dict):
+            directives = data.get("directives", [])
+            if isinstance(directives, list):
+                return [d for d in directives if isinstance(d, dict)]
+        return []
+    except Exception:  # intentional-catch: load directives default fallback
         return []
 
 
@@ -95,7 +102,7 @@ def check_path_boundary(path_str: str, project_root: Path) -> tuple[bool, str]:
         candidate = Path(path_str)
         # If relative, resolve against project_root
         candidate = (project_root / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
-    except Exception as exc:
+    except Exception as exc:  # intentional-catch: path resolution fallback
         return False, f"Path '{path_str}' could not be resolved: {exc}"
 
     candidate_norm = os.path.normpath(str(candidate)).lower()
@@ -105,6 +112,11 @@ def check_path_boundary(path_str: str, project_root: Path) -> tuple[bool, str]:
     for blocked in blocked_absolute:
         blocked_norm = os.path.normpath(blocked).lower()
         if candidate_norm.startswith(blocked_norm):
+            return False, f"Path '{path_str}' resolves to blocked location under '{blocked}'"
+        # Also check direct prefix match on raw path_str in case it's rooted-driveless on Windows
+        p_str_clean = path_str.lower().replace("\\", "/")
+        b_clean = blocked.lower().replace("\\", "/")
+        if p_str_clean.startswith(b_clean):
             return False, f"Path '{path_str}' resolves to blocked location under '{blocked}'"
 
     # 2. Check allowed_root

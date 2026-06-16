@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
+from typing import Any
 
 from .allowlist import is_allowlisted_file
 from .registry_check import has_registry_entry
 from .strong_markers import has_strong_marker
 
 
-def detect_occupancy(project_root: Path, app_name: str) -> dict[str, any]:
+def detect_occupancy(project_root: Path, app_name: str) -> dict[str, Any]:
     """Detect occupancy status for the given application slot.
 
     Returns a dict with:

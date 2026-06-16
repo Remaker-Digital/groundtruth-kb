@@ -21,10 +21,10 @@ event-driven trigger** at
 - `.codex/hooks.json` — Codex-side parity (forward-compatible per
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`)
 
-When a tool call modifies `bridge/INDEX.md` or the agent ends a turn,
-the trigger inspects the indexed state and dispatches the appropriate
-counterpart harness if a recipient's actionable queue signature has
-changed.
+When canonical bridge state or its deprecated generated compatibility view
+changes, or the agent ends a turn, the trigger inspects dispatcher/TAFE state
+and dispatches the appropriate counterpart harness if a recipient's actionable
+queue signature has changed.
 
 ## See Instead
 

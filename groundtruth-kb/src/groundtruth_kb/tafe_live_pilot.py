@@ -42,6 +42,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from groundtruth_kb.tafe_index_preview import render_tafe_bridge_index_preview
 from groundtruth_kb.tafe_index_sync import parse_bridge_index
@@ -300,7 +301,7 @@ def evaluate_enforcement(
     )
 
 
-def _ensure_implementation_definition(service: TypedArtifactFlowService, *, changed_by: str) -> dict:
+def _ensure_implementation_definition(service: TypedArtifactFlowService, *, changed_by: str) -> dict[str, Any]:
     """Return the seeded ``implementation`` flow definition, seeding if absent."""
 
     definition = service.get_flow_definition(IMPLEMENTATION_FLOW_DEFINITION_ID)
@@ -320,7 +321,7 @@ def _get_or_create_flow_instance(
     *,
     slug: str,
     changed_by: str,
-) -> dict:
+) -> dict[str, Any]:
     """Find the pilot flow instance for ``slug`` or create a fresh one."""
 
     flow_instance_id = f"FLOWINST-PILOT-{slug}"

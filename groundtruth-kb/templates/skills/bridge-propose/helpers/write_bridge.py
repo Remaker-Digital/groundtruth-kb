@@ -1,9 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Helper for the /gtkb-bridge-propose skill.
 
-Writes a bridge proposal file ``bridge/<topic>-001.md`` and inserts
-its ``Document:`` / ``NEW:`` entry at the top of ``bridge/INDEX.md``
-under governance-safe credential-scan and concurrency controls.
+Writes a bridge proposal file ``bridge/<topic>-001.md`` through the no-index
+bridge path under governance-safe credential-scan and work-intent controls.
 
 Design contract:
 
@@ -16,14 +15,10 @@ Design contract:
   order, and re-scans the result. A non-empty second scan raises
   :class:`RedactionResidualError` (this is a bug, not a recoverable
   user state). **No Force option.**
-- File-first write: the bridge file is persisted before the INDEX
-  update. If the target file already exists,
-  :class:`BridgeFileAlreadyExistsError` is raised before any INDEX
-  touch.
-- INDEX update is serialized through the bridge index lock and retry-safe. Total
-  retry budget is **2 total attempts** (1 initial + 1 retry). On
-  the second failure, :class:`BridgeIndexConflictError` surfaces
-  with an actionable message.
+- File-first write: the bridge file is persisted only after credential,
+  author-metadata, compliance, and work-intent checks pass. If the target file
+  already exists, :class:`BridgeFileAlreadyExistsError` is raised before any
+  mutation.
 - Idempotency detection uses an **exact-line match** against the
   stripped ``Document: <topic>`` line — substring matching would
   false-positive on slug prefixes.
@@ -35,7 +30,9 @@ import importlib
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -60,7 +57,6 @@ _credential_patterns = importlib.import_module("groundtruth_kb.governance.creden
 BASH_EXTRAS = _credential_patterns.BASH_EXTRAS
 CREDENTIAL_PATTERNS = _credential_patterns.CREDENTIAL_PATTERNS
 ensure_author_metadata = importlib.import_module("scripts.bridge_author_metadata").ensure_author_metadata
-atomic_index_update = importlib.import_module("scripts.bridge_index_writer").atomic_index_update
 
 
 class BridgeFileAlreadyExistsError(RuntimeError):
@@ -72,19 +68,7 @@ class BridgeFileAlreadyExistsError(RuntimeError):
 
 
 class BridgeIndexConflictError(RuntimeError):
-    """Raised when INDEX.md cannot be updated safely.
-
-    Two conditions trigger this error:
-
-    - Another writer inserted a ``Document: <topic>`` line between
-      the skill's read and its rename step.
-    - The INDEX content changed between the read and the rename
-      (non-topic concurrent modification), and the retry budget is
-      exhausted.
-
-    In both cases the bridge file is still on disk; the caller must
-    either manually add an INDEX entry or retry the skill.
-    """
+    """Retained historical exception name for no-index publication conflicts."""
 
 
 class RedactionResidualError(RuntimeError):
@@ -105,8 +89,14 @@ class CredentialHitsFoundError(RuntimeError):
     """
 
 
-class SpecificationLinksMissingError(RuntimeError):
-    """Raised when a bridge proposal omits mandatory specification linkage."""
+class BridgeComplianceError(RuntimeError):
+    """Raised when the Codex helper path fails bridge-compliance validation.
+
+    Codex does not currently have a Write/Edit tool hook route equivalent to
+    Claude's bridge-compliance PreToolUse path. The Codex path therefore runs
+    the bridge-compliance gate in audit mode before any proposal file write and
+    raises this error on a deny decision.
+    """
 
 
 class BridgeWorkIntentError(RuntimeError):
@@ -218,11 +208,16 @@ def _release_bridge_work_intent(registry: Any, thread_slug: str, session_id: str
 #      `GOV-GLOSSARY-AS-DA-READ-SURFACE-001`. When the topic slug matches a
 #      `### <heading>` in the glossary, the helper reads that heading's
 #      `**Source:**` block and extracts DELIB/MemBase-spec IDs as seeds.
+#      This is the deterministic substitute for plain semantic search.
 #
 #   2. Semantic search (BROAD COVERAGE; OPTIONAL). When a KnowledgeDB
 #      instance is provided, the helper queries
 #      `search_deliberations(query, limit=...)` for additional candidates.
-#      Failures are swallowed (graceful degradation).
+#      Failures are swallowed (graceful degradation): no DB → seeds only.
+#
+# Results are combined, deduplicated (seeds first), and inserted as
+# `<!-- Pre-populated by helper; review and prune. -->` markers in the
+# proposal body's `## Prior Deliberations` section.
 # ---------------------------------------------------------------------------
 
 _GLOSSARY_HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
@@ -238,7 +233,12 @@ NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before f
 
 
 def _try_open_default_db() -> Any | None:
-    """Attempt to open the default ``KnowledgeDB`` for semantic search."""
+    """Attempt to open the default ``KnowledgeDB`` for semantic search.
+
+    Returns ``None`` on any failure (import error, missing DB file, etc.) —
+    semantic search is best-effort; glossary-source seeding does not depend
+    on a working DB. Failures are silent (graceful degradation).
+    """
     try:
         from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
 
@@ -251,7 +251,23 @@ def _glossary_seed_ids_for_topic(
     topic_slug: str,
     glossary_content: str,
 ) -> list[str]:
-    """Extract DELIB/spec IDs from the glossary entry matching the topic slug."""
+    """Extract DELIB/spec IDs from the glossary entry matching the topic slug.
+
+    Converts the kebab-case slug to a lowercase space-separated form and
+    locates a ``### <heading>`` whose text (case-insensitive, normalized
+    whitespace) matches. Within 30 lines of the heading, finds the
+    ``**Source:**`` line; collects the contiguous source-block lines (until
+    the next bold field or heading); extracts ID-shaped tokens.
+
+    Args:
+        topic_slug: Kebab-case slug (e.g., ``"isolation"``).
+        glossary_content: Full text of the canonical-terminology file.
+
+    Returns:
+        Ordered, de-duplicated list of ID-shaped tokens (DELIB-* and MemBase
+        spec IDs). Empty if the slug does not match a glossary heading or if
+        the source block contains no ID-shaped tokens.
+    """
     if not topic_slug or not glossary_content:
         return []
     candidate = topic_slug.replace("-", " ").strip().lower()
@@ -306,6 +322,17 @@ def _glossary_seed_ids_for_topic(
 
 
 def _find_prior_deliberations_section(body_lines: list[str]) -> tuple[int, int] | None:
+    """Locate the existing ``## Prior Deliberations`` section line range.
+
+    Args:
+        body_lines: Lines of the proposal body (without trailing newlines).
+
+    Returns:
+        ``(heading_idx, end_idx)`` where ``heading_idx`` is the heading
+        line and ``end_idx`` is the exclusive index past the section's last
+        content line (i.e., the next ``## `` heading line or
+        ``len(body_lines)``). ``None`` if the section is absent.
+    """
     section_start = None
     for i, line in enumerate(body_lines):
         if line.strip() == _PRIOR_DELIBS_HEADING:
@@ -327,6 +354,7 @@ def _format_helper_entry(
     source: str,
     db_record: dict[str, Any] | None = None,
 ) -> str:
+    """Format one Markdown bullet for a pre-populated DA candidate."""
     if db_record is not None:
         title = (db_record.get("title") or "").strip()
         source_type = db_record.get("source_type") or ""
@@ -337,7 +365,15 @@ def _format_helper_entry(
 
 
 def _insert_prior_deliberations_block(body: str, block_text: str) -> str:
-    """Insert ``block_text`` into the body's ``## Prior Deliberations`` section."""
+    """Insert ``block_text`` into the body's ``## Prior Deliberations`` section.
+
+    Three cases:
+
+    1. Section absent — append a new section at end.
+    2. Section present and empty — fill with the block.
+    3. Section present and non-empty — append the block under a
+       ``### Helper-suggested candidates`` subheading.
+    """
     body_lines = body.splitlines(keepends=True)
     stripped_lines = [ln.rstrip("\n") for ln in body_lines]
     range_ = _find_prior_deliberations_section(stripped_lines)
@@ -372,23 +408,44 @@ def pre_populate_prior_deliberations(
     """Pre-populate the ``## Prior Deliberations`` section of a proposal body.
 
     Two-stage retrieval — glossary-source seeding (deterministic) then
-    semantic search (broad coverage; default-on, auto-opens default
-    ``KnowledgeDB``).
+    semantic search (broad coverage; default-on). See module-level
+    comment above this function for the full design rationale.
+
+    The default authoring workflow performs both stages. If no candidates
+    are found from either stage (genuinely novel topic with no glossary
+    entry and no DA matches), the function inserts a
+    ``_No prior deliberations: <fill in reason before filing>._``
+    placeholder so the proposal does not fail the LO review-side check
+    that NO-GOs empty Prior Deliberations sections.
 
     Args:
+        topic_slug: Kebab-case topic slug. Used for both glossary lookup
+            (converted to space-separated noun phrase) and the DA query.
+        body: Full proposal body text.
         db: ``KnowledgeDB`` instance, ``None`` (default — auto-open the
             default ``KnowledgeDB("groundtruth.db")`` for semantic search;
             silent fallback to glossary-only if open fails), or ``False``
             (explicitly disable semantic search).
+        glossary_path: Path to the canonical-terminology glossary. Defaults
+            to ``.claude/rules/canonical-terminology.md``.
+        limit: Top-N for the semantic search call.
+        threshold: Similarity threshold (advisory; current
+            ``search_deliberations`` does not enforce a threshold parameter).
+        log_path: Audit-log destination. ``None`` (default) logs to
+            ``.gtkb-state/bridge-propose-helper/last-prepopulation.json``;
+            ``False`` disables logging; an explicit ``Path`` overrides the
+            default.
 
-    When neither stage produces candidates, an
-    ``_No prior deliberations: <fill in reason before filing>._``
-    placeholder is inserted so the proposal does not fail the LO
-    review-side check.
+    Returns:
+        The body with the pre-populated section. When candidates exist,
+        seeds + search results are inserted as Markdown bullets under the
+        ``## Prior Deliberations`` heading. When no candidates exist, the
+        section is filled with the empty-justification placeholder.
     """
     if glossary_path is None:
         glossary_path = DEFAULT_GLOSSARY_PATH
 
+    # Stage 1: glossary-source seeding (deterministic).
     glossary_content = ""
     if isinstance(glossary_path, Path) and glossary_path.exists():
         try:
@@ -397,6 +454,7 @@ def pre_populate_prior_deliberations(
             glossary_content = ""
     seed_ids = _glossary_seed_ids_for_topic(topic_slug, glossary_content)
 
+    # Stage 2: semantic search (default-on; ``False`` opts out).
     if db is False:
         active_db: Any | None = None
     elif db is None:
@@ -413,6 +471,7 @@ def pre_populate_prior_deliberations(
         except Exception:  # noqa: BLE001 - graceful degradation
             search_results = []
 
+    # Combine + dedupe (seeds first).
     seen: set[str] = set(seed_ids)
     search_records_to_add: list[dict[str, Any]] = []
     for r in search_results:
@@ -421,6 +480,7 @@ def pre_populate_prior_deliberations(
             search_records_to_add.append(r)
             seen.add(rid)
 
+    # Audit log.
     if log_path is None:
         log_path = DEFAULT_PREPOPULATION_LOG
     if log_path is not False and isinstance(log_path, Path):
@@ -447,14 +507,18 @@ def pre_populate_prior_deliberations(
                 encoding="utf-8",
             )
         except OSError:
+            # Log failure is non-fatal; proceed with population.
             pass
 
     if not seed_ids and not search_records_to_add:
-        # F2 fix: novel/no-match topics get the empty-justification placeholder
-        # so the proposal does not fail the LO review-side check.
+        # F2 fix: novel/no-match topics get the empty-justification
+        # placeholder so the proposal does not fail the LO review-side
+        # check (Prior Deliberations Section Requirement) that
+        # NO-GOs empty sections lacking ``_No prior deliberations:_``.
         placeholder_block = NO_PRIOR_DELIBS_PLACEHOLDER + "\n"
         return _insert_prior_deliberations_block(body, placeholder_block)
 
+    # Build the entry block.
     entries: list[str] = []
     for sid in seed_ids:
         entries.append(_format_helper_entry(sid, source="glossary"))
@@ -466,53 +530,6 @@ def pre_populate_prior_deliberations(
     block_text = marker + "\n" + "\n".join(entries) + "\n"
 
     return _insert_prior_deliberations_block(body, block_text)
-
-
-_SPEC_LINK_HEADING_RE = re.compile(
-    r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
-    re.IGNORECASE,
-)
-_SPEC_LINK_TOKEN_RE = re.compile(
-    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\b"
-    r"|(?:^|[`(\s])(?:\.claude/rules|groundtruth-kb/docs|docs|bridge)/[^\s`)]+",
-    re.IGNORECASE | re.MULTILINE,
-)
-_SPEC_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|none|n/a|not applicable|no relevant)\b", re.IGNORECASE)
-
-
-def _specification_links_section(body: str) -> str | None:
-    """Return the body of the mandatory specification-link section, if present."""
-    lines = body.splitlines()
-    start: int | None = None
-    for idx, line in enumerate(lines):
-        if _SPEC_LINK_HEADING_RE.match(line.strip()):
-            start = idx + 1
-            break
-    if start is None:
-        return None
-
-    section: list[str] = []
-    for line in lines[start:]:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            break
-        section.append(line)
-    return "\n".join(section).strip()
-
-
-def validate_specification_links(body: str) -> None:
-    """Require explicit links to the relevant governing specifications."""
-    section = _specification_links_section(body)
-    if section is None:
-        raise SpecificationLinksMissingError(
-            "Bridge implementation proposals must include a 'Specification Links' "
-            "section citing every relevant governing specification."
-        )
-    if _SPEC_PLACEHOLDER_RE.search(section) or not _SPEC_LINK_TOKEN_RE.search(section):
-        raise SpecificationLinksMissingError(
-            "The 'Specification Links' section must contain concrete spec IDs "
-            "or specification/rule file paths, not placeholders."
-        )
 
 
 def scan_credential_hits(content: str) -> list[dict[str, Any]]:
@@ -653,106 +670,91 @@ def handle_hits_abort_or_redact(
     raise ValueError(f"Unknown mode {mode!r}; expected 'abort' or 'redact'.")
 
 
-def _compute_new_index_content(existing_lines: list[str], new_entry: str) -> str:
-    """Insert ``new_entry`` at the top of the INDEX body, after header comments.
-
-    Header comment region is the contiguous prefix of lines that are
-    blank, markdown headers (``#``), or HTML comments
-    (``<!--``). Everything after that region is considered body.
-
-    Args:
-        existing_lines: Lines of the current INDEX.md (as returned by
-            ``splitlines(keepends=True)``).
-        new_entry: The full entry string to insert. Should end with a
-            trailing newline.
-
-    Returns:
-        The new INDEX content as a single string.
-    """
-    # Find the boundary between the header/comment prefix and the body.
-    insert_idx = 0
-    in_comment = False
-    for idx, line in enumerate(existing_lines):
-        stripped = line.strip()
-        # Track a multi-line HTML comment block.
-        if in_comment:
-            if "-->" in stripped:
-                in_comment = False
-            insert_idx = idx + 1
-            continue
-        if stripped.startswith("<!--"):
-            # Single-line or start of a multi-line HTML comment.
-            if "-->" not in stripped[4:]:
-                in_comment = True
-            insert_idx = idx + 1
-            continue
-        if not stripped or stripped.startswith("#") or stripped.startswith("|"):
-            # Blank line, markdown header, or markdown table row (status legend) —
-            # treat as header region.
-            insert_idx = idx + 1
-            continue
-        # First real content line — stop. ``insert_idx`` points at it.
-        break
-    # Ensure the new_entry ends with a newline.
-    entry = new_entry if new_entry.endswith("\n") else new_entry + "\n"
-    # Ensure separation between the inserted entry and the existing line that follows.
-    if insert_idx < len(existing_lines):
-        following = existing_lines[insert_idx]
-        if not entry.endswith("\n\n") and following.strip():
-            entry = entry + "\n"
-    head = "".join(existing_lines[:insert_idx])
-    tail = "".join(existing_lines[insert_idx:])
-    return head + entry + tail
+def _disabled_legacy_state_update(*_args: Any, **_kwargs: Any) -> str:
+    """Fail closed for removed compatibility-state publication helpers."""
+    raise BridgeIndexConflictError(
+        "retired bridge-index publication is disabled; use versioned bridge files plus dispatcher/TAFE state"
+    )
 
 
-def _index_writer_state_dir(index_path: Path) -> Path:
-    return index_path.parent.parent / ".gtkb-state" / "bridge-index-writer"
-
-
-def _update_bridge_index(
-    index_path: Path,
-    new_entry: str,
+def compose_proposal(
+    slug: str,
+    version: int,
+    content: str,
     *,
-    topic_slug: str,
-) -> None:
-    """Insert ``new_entry`` at the top of ``index_path`` through the serialized writer.
+    bridge_dir: Path | None = None,
+) -> tuple[Path, str]:
+    """Return the proposal target path and content without writing files."""
+    bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
+    return bridge_root / f"{slug}-{version:03d}.md", content
 
-    Steps:
 
-    1. Acquire the bridge-index writer lock.
-    2. Read the current text inside the lock.
-    3. Idempotency check using **exact line match**: if any line,
-       once stripped, equals ``"Document: <topic_slug>"`` exactly
-       (NOT substring match), raise :class:`BridgeIndexConflictError`
-       with a concurrent-same-topic message.
-    4. Compute the new content via
-       :func:`_compute_new_index_content`.
-    5. Atomically replace the index through
-       :func:`scripts.bridge_index_writer.atomic_index_update`.
+def compose_index_update(*args: Any, **kwargs: Any) -> str:
+    """Historical API stub retained only to fail closed for stale callers."""
+    return _disabled_legacy_state_update(*args, **kwargs)
 
-    Args:
-        index_path: Path to ``bridge/INDEX.md``.
-        new_entry: The entry block to insert at the top.
-        topic_slug: The topic slug (for idempotency detection).
 
-    Raises:
-        BridgeIndexConflictError: On concurrent same-topic insertion.
-    """
+def _relative_to_project(path: Path, project_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
-    def mutate(current_text: str) -> str:
-        lines = current_text.splitlines(keepends=True)
-        expected = f"Document: {topic_slug}"
-        for line in lines:
-            if line.strip() == expected:
-                raise BridgeIndexConflictError(
-                    f"INDEX.md already has an entry for {expected!r}. "
-                    f"Another writer inserted it concurrently. The bridge file "
-                    f"at bridge/{topic_slug}-001.md is on disk; inspect and "
-                    f"reconcile manually."
-                )
-        return _compute_new_index_content(lines, new_entry)
 
-    atomic_index_update(index_path, mutate, state_dir=_index_writer_state_dir(index_path))
+def _run_bridge_compliance_audit(
+    *,
+    file_path: Path,
+    content: str,
+    project_root: Path,
+) -> dict[str, Any]:
+    """Run bridge-compliance-gate.py in audit mode for in-memory content."""
+    gate_path = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
+    payload = {
+        "cwd": str(project_root.resolve()),
+        "tool_input": {
+            "file_path": _relative_to_project(file_path, project_root),
+            "content": content,
+        },
+    }
+    with tempfile.TemporaryDirectory(prefix="gtkb-bridge-compliance-") as tmp:
+        audit_output = Path(tmp) / "audit.json"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(gate_path),
+                "--audit-only",
+                "--audit-output",
+                str(audit_output),
+            ],
+            cwd=project_root,
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise BridgeComplianceError(
+                "bridge-compliance audit failed to execute: "
+                f"returncode={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}"
+            )
+        try:
+            audit = json.loads(audit_output.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise BridgeComplianceError("bridge-compliance audit did not produce readable JSON") from exc
+    if audit.get("decision") != "pass":
+        reason = audit.get("reason") or "bridge-compliance audit denied the composed proposal"
+        raise BridgeComplianceError(str(reason))
+    return audit
+
+
+def _update_bridge_index(*args: Any, **kwargs: Any) -> None:
+    """Historical API stub retained only to fail closed for stale callers."""
+    _disabled_legacy_state_update(*args, **kwargs)
+
+
+def _update_bridge_index_with_composed_content(*args: Any, **kwargs: Any) -> None:
+    """Historical API stub retained only to fail closed for stale callers."""
+    _disabled_legacy_state_update(*args, **kwargs)
 
 
 def propose_bridge(
@@ -766,9 +768,9 @@ def propose_bridge(
     glossary_path: Path | None = None,
     pre_populate_log_path: Path | bool | None = None,
 ) -> Path:
-    """Create ``bridge/<topic_slug>-001.md`` and insert an INDEX entry.
+    """Create ``bridge/<topic_slug>-001.md`` through the no-index bridge path.
 
-    Phase 0a — Prior Deliberations pre-population (default-on; Phase 2 of
+    Phase 0 — Prior Deliberations pre-population (default-on; Phase 2 of
     GTKB-DA-READ-SURFACE-CORRECTION): when
     ``pre_populate_prior_deliberations=True`` (default), call
     :func:`pre_populate_prior_deliberations` on ``body`` before scanning.
@@ -779,60 +781,50 @@ def propose_bridge(
     opt-out callers must include a justification in the section
     (``_No prior deliberations: <reason>._``).
 
-    Phase 0b - Specification linkage gate: require a ``Specification Links``
-    section with concrete spec/rule links before any bridge file or INDEX
-    mutation.
-
     Phase 1 — Pre-flight scan: iterate ``CREDENTIAL_PATTERNS +
     BASH_EXTRAS`` over ``body``. If hits are found, resolve per
     ``mode`` via :func:`handle_hits_abort_or_redact`.
 
-    Phase 2 — File-first write: write ``bridge/<topic_slug>-001.md``
-    atomically. If the file already exists,
-    :class:`BridgeFileAlreadyExistsError` is raised before any INDEX
-    touch.
-
-    Phase 3 — INDEX insertion with retry: call
-    :func:`_update_bridge_index`. On
-    :class:`BridgeIndexConflictError`, retry once. **Total attempts:
-    2 total** (1 initial + 1 retry). On the second failure, re-raise
-    with an actionable message that mentions the bridge file on disk.
+    Phase 2 — File-first write: write ``bridge/<topic_slug>-001.md`` after all
+    checks pass. If the file already exists,
+    :class:`BridgeFileAlreadyExistsError` is raised before any mutation.
 
     Args:
         topic_slug: Kebab-case slug for the bridge document. The
-            file becomes ``bridge/<topic_slug>-001.md`` and the
-            INDEX entry begins with ``Document: <topic_slug>``.
+            file becomes ``bridge/<topic_slug>-001.md``.
         body: Proposal body text.
         mode: ``"abort"`` (default) or ``"redact"``. Controls the
             hit-resolution policy.
         bridge_dir: Parent bridge directory. Defaults to
             ``Path("bridge")``.
-        pre_populate_prior_deliberations: Phase-0a pre-population flag
-            (default ``True``). Set ``False`` to opt out.
+        pre_populate_prior_deliberations: Phase-0 pre-population flag
+            (default ``True``). Set ``False`` to opt out; callers
+            opting out must include a ``_No prior deliberations:_``
+            justification line per the LO review-side check.
         db: Optional ``KnowledgeDB`` instance for the semantic-search
-            stage of pre-population.
+            stage of pre-population. ``None`` skips semantic search;
+            glossary-source seeding still runs.
         glossary_path: Override the glossary path used for seeding.
+            Defaults to ``.claude/rules/canonical-terminology.md``.
         pre_populate_log_path: Override the audit-log path. ``None``
-            (default) writes to the default location; ``False`` disables
-            logging.
+            (default) writes to ``.gtkb-state/bridge-propose-helper/
+            last-prepopulation.json``; ``False`` disables logging.
 
     Returns:
         Absolute path to the created bridge file.
 
     Raises:
-        SpecificationLinksMissingError: Mandatory specification linkage missing.
         CredentialHitsFoundError: ``mode='abort'`` and hits found.
         RedactionResidualError: Redaction failed the re-scan gate.
         BridgeFileAlreadyExistsError: Target file already on disk.
-        BridgeIndexConflictError: INDEX could not be updated after
-            2 total attempts.
+        BridgeIndexConflictError: retained for historical stale-callers only;
+            normal no-index writes do not raise it.
     """
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
     project_root = bridge_root.parent.resolve()
     bridge_file = bridge_root / f"{topic_slug}-001.md"
-    index_path = bridge_root / "INDEX.md"
 
-    # Phase 0a: Prior Deliberations pre-population (default-on).
+    # Phase 0: Prior Deliberations pre-population (default-on).
     if pre_populate_prior_deliberations:
         body = globals()["pre_populate_prior_deliberations"](
             topic_slug,
@@ -841,9 +833,6 @@ def propose_bridge(
             glossary_path=glossary_path,
             log_path=pre_populate_log_path,
         )
-
-    # Phase 0b: Implementation proposals must link relevant specifications.
-    validate_specification_links(body)
 
     # Phase 1: Pre-flight scan.
     hits = scan_credential_hits(body)
@@ -860,35 +849,79 @@ def propose_bridge(
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
     bridge_file.parent.mkdir(parents=True, exist_ok=True)
     bridge_file.write_bytes(body_to_write.encode("utf-8"))
+    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
+    return bridge_file
 
-    # Phase 3: INDEX insertion with retry.
-    # Retry budget: 2 total attempts (1 initial + 1 retry). Both the comment,
-    # the final exception message, and the test coverage use the "2 total"
-    # phrasing — keep them in sync.
-    new_entry = f"Document: {topic_slug}\nNEW: bridge/{topic_slug}-001.md\n"
-    last_error: BridgeIndexConflictError | None = None
-    max_attempts = 2  # 2 total attempts — 1 initial + 1 retry.
-    for attempt in range(1, max_attempts + 1):
-        try:
-            _update_bridge_index(index_path, new_entry, topic_slug=topic_slug)
-            _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-            return bridge_file
-        except BridgeIndexConflictError as exc:
-            last_error = exc
-            if attempt >= max_attempts:
-                break
-            # else: loop and retry the INDEX-layer update only.
-    # Exhausted 2 total attempts — re-raise with an actionable message.
-    raise BridgeIndexConflictError(
-        f"Bridge file {bridge_file} was written but INDEX.md could not be "
-        f"updated after 2 total attempts. The file exists on disk; manually "
-        f"add an entry to bridge/INDEX.md or retry the skill. "
-        f"Last error: {last_error}"
+
+def propose_bridge_codex_non_bypass(
+    topic_slug: str,
+    body: str,
+    *,
+    version: int = 1,
+    status: str = "NEW",
+    mode: Literal["abort", "redact"] = "abort",
+    bridge_dir: Path | None = None,
+    pre_populate_prior_deliberations: bool = True,
+    db: Any | None = None,
+    glossary_path: Path | None = None,
+    pre_populate_log_path: Path | bool | None = None,
+    author_metadata: dict[str, Any] | None = None,
+) -> Path:
+    """Create a bridge proposal through the Codex inline-compliance path.
+
+    This path is for Codex harnesses where ``apply_patch`` is not covered by
+    the bridge-compliance PreToolUse hook. It composes the proposal body,
+    ensures author metadata, runs ``bridge-compliance-gate.py --audit-only`` on
+    the in-memory proposal content, and only then writes the proposal file.
+    """
+    bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
+    project_root = bridge_root.parent.resolve()
+    bridge_file, _ = compose_proposal(topic_slug, version, body, bridge_dir=bridge_root)
+
+    if pre_populate_prior_deliberations:
+        body = globals()["pre_populate_prior_deliberations"](
+            topic_slug,
+            body,
+            db=db,
+            glossary_path=glossary_path,
+            log_path=pre_populate_log_path,
+        )
+
+    hits = scan_credential_hits(body)
+    body_to_write = handle_hits_abort_or_redact(body, hits, mode=mode)
+    body_to_write = ensure_author_metadata(
+        body_to_write,
+        project_root=project_root,
+        explicit=author_metadata,
     )
+    bridge_file, body_to_write = compose_proposal(
+        topic_slug,
+        version,
+        body_to_write,
+        bridge_dir=bridge_root,
+    )
+
+    _run_bridge_compliance_audit(
+        file_path=bridge_file,
+        content=body_to_write,
+        project_root=project_root,
+    )
+
+    if bridge_file.exists():
+        raise BridgeFileAlreadyExistsError(
+            f"{bridge_file} already exists - pick a fresh slug or version. The skill never silently overwrites."
+        )
+    session_id = resolve_work_intent_session_id()
+    work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
+    bridge_file.parent.mkdir(parents=True, exist_ok=True)
+    bridge_file.write_bytes(body_to_write.encode("utf-8"))
+    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
+    return bridge_file
 
 
 __all__ = [
     "BridgeFileAlreadyExistsError",
+    "BridgeComplianceError",
     "BridgeIndexConflictError",
     "BridgeWorkIntentError",
     "CredentialHitsFoundError",
@@ -896,14 +929,15 @@ __all__ = [
     "DEFAULT_PREPOPULATION_LOG",
     "DEFAULT_PRE_POPULATION_LIMIT",
     "RedactionResidualError",
-    "SpecificationLinksMissingError",
     "WORK_INTENT_SESSION_ENV_VARS",
     "WORK_INTENT_TTL_SECONDS",
+    "compose_index_update",
+    "compose_proposal",
     "handle_hits_abort_or_redact",
     "pre_populate_prior_deliberations",
     "propose_bridge",
+    "propose_bridge_codex_non_bypass",
     "redact_credential_hits",
     "resolve_work_intent_session_id",
     "scan_credential_hits",
-    "validate_specification_links",
 ]

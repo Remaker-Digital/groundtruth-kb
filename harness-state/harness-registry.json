@@ -1,11 +1,18 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-14T15:09:38Z",
+  "generated_at": "2026-06-15T18:50:23Z",
   "harnesses": [
     {
       "can_fire_events": true,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 35.0,
+      "dispatch_quality": 88.0,
+      "dispatch_tags": [
+        "prime-builder",
+        "event-source"
+      ],
       "event_driven_hooks": true,
       "harness_name": "codex",
       "harness_type": "codex",
@@ -25,15 +32,23 @@
       },
       "reviewer_precedence": 20,
       "role": [
-        "loyal-opposition"
+        "prime-builder"
       ],
       "status": "active",
-      "version": 37
+      "version": 38
     },
     {
       "can_fire_events": true,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
+      "dispatch_availability": 75.0,
+      "dispatch_cost": 70.0,
+      "dispatch_quality": 95.0,
+      "dispatch_tags": [
+        "prime-builder",
+        "interactive-only",
+        "event-source"
+      ],
       "event_driven_hooks": true,
       "harness_name": "claude",
       "harness_type": "claude",
@@ -55,14 +70,20 @@
       "role": [
         "prime-builder"
       ],
-      "status": "active",
-      "version": 30
+      "status": "suspended",
+      "version": 31
     },
     {
       "can_fire_events": false,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
-      "event_driven_hooks": true,
+      "dispatch_availability": 80.0,
+      "dispatch_cost": 35.0,
+      "dispatch_quality": 78.0,
+      "dispatch_tags": [
+        "loyal-opposition"
+      ],
+      "event_driven_hooks": false,
       "harness_name": "antigravity",
       "harness_type": "antigravity",
       "id": "C",
@@ -83,18 +104,26 @@
           "name": "Antigravity IDE"
         }
       },
-      "reviewer_precedence": 20,
+      "reviewer_precedence": 30,
       "role": [
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 20
+      "version": 21
     },
     {
       "can_fire_events": false,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
-      "event_driven_hooks": true,
+      "dispatch_availability": 95.0,
+      "dispatch_cost": 5.0,
+      "dispatch_max_items": 1,
+      "dispatch_quality": 62.0,
+      "dispatch_tags": [
+        "loyal-opposition",
+        "low-cost"
+      ],
+      "event_driven_hooks": false,
       "harness_name": "ollama",
       "harness_type": "ollama",
       "id": "D",
@@ -116,13 +145,20 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 12
+      "version": 13
     },
     {
       "can_fire_events": false,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
-      "event_driven_hooks": true,
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 20.0,
+      "dispatch_quality": 72.0,
+      "dispatch_tags": [
+        "loyal-opposition",
+        "low-cost"
+      ],
+      "event_driven_hooks": false,
       "harness_name": "openrouter",
       "harness_type": "openrouter",
       "id": "F",
@@ -138,12 +174,12 @@
           ]
         }
       },
-      "reviewer_precedence": 30,
+      "reviewer_precedence": 20,
       "role": [
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 8
+      "version": 9
     }
   ],
   "schema_version": 1,

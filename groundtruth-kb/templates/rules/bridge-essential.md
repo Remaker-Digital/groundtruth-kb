@@ -1,5 +1,9 @@
 # Bridge Is Essential
 
+> **GT-KB host note (2026-06-15):** In the GT-KB host after the
+> TAFE/dispatcher cutover, dispatcher/TAFE bridge state is canonical. Retired
+> bridge-index artifacts are not live bridge-state or dispatcher authority.
+
 ## The Mandate
 
 Bridge uptime is the top-priority task.
@@ -17,12 +21,12 @@ Configure your OS-level bridge scanner and run `gt project doctor` to verify bri
 ## Visibility Contract
 
 Every response from Prime Builder should include a bridge status note showing
-the bridge INDEX was checked and any actionable entries were processed.
+canonical bridge state was checked and any actionable entries were processed.
 
 ## Incident Response
 
 If the bridge becomes unresponsive:
-1. Check `bridge/INDEX.md` for stale NEW or REVISED entries
+1. Check canonical bridge state for stale NEW or REVISED entries
 2. Verify scanner logs for recent activity
 3. Run `gt project doctor` to confirm bridge file readiness
 4. Restart scanner if necessary — document the restart reason
@@ -33,4 +37,5 @@ If the bridge becomes unresponsive:
 - Use a lock file to prevent overlapping scanner runs
 - Never delete bridge files — they form the audit trail
 - Document scanner configuration in BRIDGE-INVENTORY.md
-- The index is the source of truth for workflow state
+- TAFE/dispatcher bridge state is the source of truth for workflow state in
+  current GT-KB hosts; retired bridge-index artifacts are historical only

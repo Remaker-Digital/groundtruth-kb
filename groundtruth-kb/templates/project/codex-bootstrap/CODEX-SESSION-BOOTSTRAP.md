@@ -5,22 +5,23 @@ Execute phases A through C in order before beginning any assigned work.
 
 ---
 
-## Phase A: File Bridge Sweep
+## Phase A: Bridge Sweep
 
-1. **Read the index.** Open `bridge/INDEX.md` if it exists.
+1. **Read canonical bridge state.** Use TAFE/dispatcher bridge state. Treat
+   retired bridge-index artifacts as non-authoritative historical material.
 2. **Identify actionable entries.** Process document entries whose latest
    status is `NEW` or `REVISED`. Entries are newest-first; historical status
    lines are evidence, not current work.
 3. **Review each entry.** Read the referenced bridge document and relevant
    artifacts.
-4. **Write the response.** Create the next numbered bridge document and add a
-   `GO`, `NO-GO`, or `VERIFIED` line at the top of the document entry in
-   `bridge/INDEX.md`.
+4. **Write the response.** Create the next numbered bridge document through the
+   governed bridge writer/helper path; that path must not recreate retired
+   bridge-index artifacts.
 5. **Report.** Log the result: "File bridge scan: N entries processed."
 
-If `bridge/INDEX.md` is missing, report that the file bridge is not initialized
-and continue with Phase B. Do not use the archived SQLite/MCP bridge runtime as
-the active queue for new projects.
+If canonical bridge state is missing, report that the bridge is not initialized
+and continue with Phase B. Do not use a retired bridge-index view or an
+archived SQLite/MCP bridge runtime as the active queue for new projects.
 
 ---
 
@@ -44,8 +45,8 @@ CLAUDE.md takes precedence (rules over state). Remember: MEMORY.md can coordinat
 
 ## Phase C: Check for Pending Review Requests
 
-1. Confirm whether any latest `NEW` or `REVISED` entries remain in
-   `bridge/INDEX.md`.
+1. Confirm whether any latest `NEW` or `REVISED` entries remain in canonical
+   bridge state.
 2. Check the insight dropbox for reports that reference unresolved items.
 3. Prioritize pending bridge review requests over exploratory analysis.
 

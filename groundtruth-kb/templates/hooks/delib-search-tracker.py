@@ -206,40 +206,40 @@ def _extract_result_evidence(tool_output: str, cmd_metadata: dict | None = None)
 # ---------------------------------------------------------------------------
 # Shared context key derivation (duplicated from governance.context for
 # template self-containment — both gate and tracker must produce identical
-# keys from the same bridge/INDEX.md state).
+# keys from the same versioned bridge-file state).
 # ---------------------------------------------------------------------------
 
 
 def _read_active_bridge_docs(cwd: str) -> list[str]:
-    """Extract active (non-terminal) bridge document names from INDEX.md."""
-    index_path = Path(cwd) / "bridge" / "INDEX.md"
-    if not index_path.exists():
+    """Extract active bridge document names from versioned bridge files."""
+    bridge_dir = Path(cwd) / "bridge"
+    if not bridge_dir.is_dir():
         return []
-    try:
-        text = index_path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-
-    active: list[str] = []
-    current_doc: str | None = None
-    latest_status: str | None = None
-
-    for line in text.splitlines():
-        line = line.strip()
-        doc_match = re.match(r"^Document:\s*(.+)$", line, re.IGNORECASE)
-        if doc_match:
-            if current_doc and latest_status in ("NEW", "REVISED", "NO-GO"):
-                active.append(current_doc)
-            current_doc = doc_match.group(1).strip()
-            latest_status = None
+    latest: dict[str, tuple[int, str]] = {}
+    status_re = re.compile(
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b", re.IGNORECASE
+    )
+    for path in bridge_dir.glob("*.md"):
+        match = re.match(r"(?P<doc>.+)-(?P<version>\d{3})\.md$", path.name)
+        if not match:
             continue
-        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):", line, re.IGNORECASE)
-        if status_match and latest_status is None:
-            latest_status = status_match.group(1).upper()
-
-    if current_doc and latest_status in ("NEW", "REVISED", "NO-GO"):
-        active.append(current_doc)
-    return sorted(active)
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        status = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            status_match = status_re.match(stripped)
+            status = status_match.group(1).upper() if status_match else ""
+            break
+        version = int(match.group("version"))
+        doc = match.group("doc")
+        if status and version > latest.get(doc, (-1, ""))[0]:
+            latest[doc] = (version, status)
+    return sorted(doc for doc, (_, status) in latest.items() if status in ("NEW", "REVISED", "NO-GO"))
 
 
 def _compute_context_key(cwd: str) -> str:

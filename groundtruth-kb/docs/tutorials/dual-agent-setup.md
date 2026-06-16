@@ -38,9 +38,11 @@ references; do not follow its instructions.
 
 ## Step 2: Confirm Bridge Dispatch Automation
 
-The file bridge uses `bridge/INDEX.md` as its authoritative queue. Bridge
-dispatch is automated by the **cross-harness event-driven trigger**, which
-fires on tool-use and Stop events rather than on a fixed interval. The
+In current GT-KB hosts after the 2026-06-15 TAFE/dispatcher cutover,
+TAFE-backed bridge state is authoritative and `bridge/INDEX.md` is a
+deprecated generated compatibility view for legacy helpers. Bridge dispatch is
+automated by the **cross-harness event-driven trigger**, which fires on
+tool-use and Stop events rather than on a fixed interval. The
 retired smart-poller and OS-scheduled-task implementations are no longer
 used; see `groundtruth-kb/docs/tutorials/bridge-smart-poller.md` and
 `bridge-os-scheduler.md` (both DEPRECATED stubs) for retirement context.
@@ -49,8 +51,8 @@ The trigger entrypoint, hook registrations, and dispatch-state path are
 scaffolded automatically. The relevant artifacts are:
 
 - `scripts/cross_harness_bridge_trigger.py` - the trigger script that
-  inspects `bridge/INDEX.md` and dispatches the appropriate counterpart
-  harness when a recipient's actionable queue signature has changed.
+  inspects bridge state and dispatches the appropriate counterpart harness when
+  a recipient's actionable queue signature has changed.
 - `.claude/settings.json` - registers the trigger as a `PostToolUse` and
   `Stop` hook on the Claude Code side.
 - `.codex/hooks.json` - registers the trigger as a `PostToolUse` and `Stop`

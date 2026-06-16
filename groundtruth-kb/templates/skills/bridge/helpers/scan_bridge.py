@@ -1,16 +1,34 @@
 #!/usr/bin/env python3
-"""Bridge INDEX scanner: role-filtered actionable list.
+"""Bridge scanner: role-filtered actionable list.
 
-Reads ``bridge/INDEX.md`` and emits a structured summary of which threads need
-attention from the calling harness based on its durable operating role.
+Reads status-bearing versioned bridge files and emits a structured summary of
+which threads need attention from the calling harness based on its durable
+operating role.
 
 Filter rules (per ``.claude/rules/file-bridge-protocol.md``):
 
 - ``prime-builder`` acts on latest ``NO-GO`` (revise) and latest ``GO``
-  (implement).
-- ``loyal-opposition`` acts on latest ``NEW`` and latest ``REVISED`` (review).
-- ``VERIFIED`` is terminal for both roles. VERIFIED threads are surfaced in
+  (implement) — EXCEPT a latest ``GO`` whose operative Prime proposal carries a
+  terminal-kind ``bridge_kind`` (``governance_review``, ``scoping``,
+  ``closure``, ...). Such a ``GO`` is the deliverable and has no Prime
+  implementation follow-up, so it is excluded from the Prime actionable list.
+  A latest ``NO-GO`` always stays Prime-actionable regardless of kind (Prime
+  must revise).
+- ``loyal-opposition`` acts on latest ``NEW`` and latest ``REVISED`` (review),
+  unaffected by terminal-kind classification.
+- ``ADVISORY`` is actionable for ``prime-builder`` only (advisory disposition
+  requires Prime owner-deliberation/UAQ work); it is non-actionable for
+  ``loyal-opposition`` and is non-dispatchable for headless dispatch (see the
+  ``_derive_dispatchable`` invariant in ``groundtruth_kb.bridge.notify``).
+- ``VERIFIED`` is terminal for both roles. ``DEFERRED`` and ``WITHDRAWN`` are
+  non-actionable for both roles. VERIFIED threads are surfaced in
   ``terminal_verified`` for context, not in ``actionable``.
+
+The terminal-kind classification mirrors the canonical dispatchability model in
+``groundtruth_kb.bridge.notify`` (``_KIND_TERMINAL_TOKENS`` +
+``_derive_dispatchable``: a ``GO`` is dispatchable only when its kind is not
+terminal). Parity with the canonical token set is asserted by
+``platform_tests/scripts/test_scan_bridge.py``.
 
 The helper performs no mutations and is idempotent. It implements the manual
 Scan procedure documented in ``.claude/skills/bridge/SKILL.md``.
@@ -36,18 +54,51 @@ from pathlib import Path
 from typing import Any, Literal
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-DEFAULT_INDEX_PATH = PROJECT_ROOT / "bridge" / "INDEX.md"
+DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 
 Role = Literal["prime-builder", "loyal-opposition"]
 
-PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO"})
+PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO", "ADVISORY"})
 LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED"})
 TERMINAL_STATUSES = frozenset({"VERIFIED"})
+
+# Prime-authored proposal statuses. ``bridge_kind`` metadata lives on the
+# operative Prime proposal (latest NEW/REVISED), NOT on the Codex GO verdict.
+_PRIME_VERSION_STATUSES = frozenset({"NEW", "REVISED"})
+
+# Terminal-kind ``bridge_kind`` substring tokens. MIRROR of
+# ``groundtruth_kb.bridge.notify._KIND_TERMINAL_TOKENS``. A latest-``GO`` whose
+# operative Prime proposal carries one of these tokens is dispatch-terminal: the
+# ``GO`` is the deliverable, with no Prime implementation follow-up, so it must
+# NOT appear in the Prime actionable list. Kept in sync with the canonical set
+# by a parity test in ``platform_tests/scripts/test_scan_bridge.py``.
+_KIND_TERMINAL_TOKENS = (
+    "scoping",
+    "closure",
+    "parking",
+    "index_reconciliation",
+    "thread_reconciliation",
+    "operational_state_change",
+    "candidate_spec_intake",
+    "governance_review",
+    "spec_intake",
+    "loyal_opposition_advisory",
+    "governance_advisory",
+)
+
+# Header read budget (bytes). ``bridge_kind`` is always in the header section.
+_HEADER_READ_BUDGET_BYTES = 4096
 
 _STATUS_LINE_RE = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
+_BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.MULTILINE)
+_VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3})\.md$")
+_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -129,8 +180,95 @@ def _parse_index(index_text: str) -> list[ThreadEntry]:
     return threads
 
 
-def _role_filter(threads: list[ThreadEntry], role: Role) -> tuple[list[ThreadEntry], list[ThreadEntry]]:
-    """Return (actionable, terminal_verified) for the given role."""
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
+def _render_state_from_version_files(project_root: Path) -> str:
+    bridge_dir = project_root / "bridge"
+    grouped: dict[str, list[tuple[int, str, str]]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = _VERSION_FILE_RE.match(path.name)
+        if not match:
+            continue
+        status = _status_from_bridge_file(path)
+        if status is None:
+            continue
+        slug = match.group(1)
+        version = int(match.group(2))
+        try:
+            rel_path = path.resolve().relative_to(project_root.resolve()).as_posix()
+        except ValueError:
+            rel_path = path.as_posix()
+        grouped.setdefault(slug, []).append((version, status, rel_path))
+
+    lines: list[str] = []
+    for slug in sorted(grouped):
+        lines.append(f"Document: {slug}")
+        for _version, status, rel_path in sorted(grouped[slug], key=lambda row: row[0], reverse=True):
+            lines.append(f"{status}: {rel_path}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _operative_prime_path(thread: ThreadEntry) -> str | None:
+    """Return the path of the operative Prime proposal (latest NEW/REVISED).
+
+    ``version_chain`` is ordered latest-first, so the first NEW/REVISED entry is
+    the operative Prime version that carries ``bridge_kind:`` metadata. Returns
+    None if the thread has no Prime-authored version (rare).
+    """
+    for version in thread.version_chain:
+        if version.status in _PRIME_VERSION_STATUSES:
+            return version.path
+    return None
+
+
+def _is_terminal_kind_go(thread: ThreadEntry, project_root: Path) -> bool:
+    """Return True if the thread's latest GO is dispatch-terminal.
+
+    Reads ``bridge_kind:`` from the operative Prime proposal version and matches
+    it against ``_KIND_TERMINAL_TOKENS``. Unreadable file, absent operative
+    version, or missing ``bridge_kind`` → False (fail-open: keep the GO
+    actionable), mirroring the canonical ``ambiguous -> dispatchable`` GO rule in
+    ``groundtruth_kb.bridge.notify._derive_dispatchable``.
+    """
+    rel_path = _operative_prime_path(thread)
+    if rel_path is None:
+        return False
+    full_path = project_root / rel_path
+    try:
+        with full_path.open("r", encoding="utf-8") as fh:
+            head = fh.read(_HEADER_READ_BUDGET_BYTES)
+    except (OSError, UnicodeDecodeError):
+        return False
+    match = _BRIDGE_KIND_RE.search(head)
+    if not match:
+        return False
+    bk_normalized = match.group(1).strip().lower().replace("-", "_")
+    return any(token in bk_normalized for token in _KIND_TERMINAL_TOKENS)
+
+
+def _role_filter(
+    threads: list[ThreadEntry], role: Role, project_root: Path
+) -> tuple[list[ThreadEntry], list[ThreadEntry]]:
+    """Return (actionable, terminal_verified) for the given role.
+
+    For ``prime-builder``, a latest ``GO`` whose operative Prime proposal carries
+    a terminal-kind ``bridge_kind`` is excluded — the GO is the deliverable with
+    no Prime implementation follow-up. A latest ``NO-GO`` is never excluded
+    (Prime must revise regardless of kind). ``loyal-opposition`` is unaffected.
+    """
     if role == "prime-builder":
         actionable_statuses = PRIME_ACTIONABLE_STATUSES
     elif role == "loyal-opposition":
@@ -138,7 +276,13 @@ def _role_filter(threads: list[ThreadEntry], role: Role) -> tuple[list[ThreadEnt
     else:
         raise ValueError(f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'")
 
-    actionable = [t for t in threads if t.latest_status in actionable_statuses]
+    actionable: list[ThreadEntry] = []
+    for t in threads:
+        if t.latest_status not in actionable_statuses:
+            continue
+        if role == "prime-builder" and t.latest_status == "GO" and _is_terminal_kind_go(t, project_root):
+            continue
+        actionable.append(t)
     terminal_verified = [t for t in threads if t.latest_status in TERMINAL_STATUSES]
     return actionable, terminal_verified
 
@@ -156,12 +300,13 @@ def scan(
     *,
     index_text: str | None = None,
 ) -> dict[str, Any]:
-    """Scan bridge/INDEX.md and return role-filtered actionable list.
+    """Scan versioned bridge state and return role-filtered actionable list.
 
     Args:
         role: ``"prime-builder"`` or ``"loyal-opposition"``.
-        index_path: Path to INDEX.md. Defaults to ``<project-root>/bridge/INDEX.md``.
-        index_text: Inline INDEX text (overrides ``index_path``). Useful for tests.
+        index_path: Optional compatibility-text locator used only to infer a
+            project root for old test fixtures; live scans do not read it.
+        index_text: Inline compatibility-shaped text. Useful for tests.
 
     Returns:
         Dict with keys:
@@ -172,11 +317,19 @@ def scan(
           - ``generated_at``: ISO-8601 UTC timestamp.
     """
     if index_text is None:
-        path = index_path if index_path is not None else DEFAULT_INDEX_PATH
-        index_text = path.read_text(encoding="utf-8")
+        project_root = index_path.resolve().parent.parent if index_path is not None else PROJECT_ROOT
+        index_text = _render_state_from_version_files(project_root)
+    elif index_path is not None:
+        # Inline text but an explicit index path: resolve operative bridge files
+        # relative to that path's project root (used by terminal-kind tests).
+        project_root = index_path.resolve().parent.parent
+    else:
+        # Inline text with no path: operative files (if any) resolve under the
+        # real project root; absent fixture files fail-open to actionable.
+        project_root = PROJECT_ROOT
 
     threads = _parse_index(index_text)
-    actionable, terminal_verified = _role_filter(threads, role)
+    actionable, terminal_verified = _role_filter(threads, role, project_root)
 
     return {
         "role": role,
@@ -223,7 +376,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", required=True, choices=["prime-builder", "loyal-opposition"])
     parser.add_argument(
-        "--index-path", default=None, help="Path to bridge/INDEX.md (defaults to project bridge/INDEX.md)"
+        "--index-path", default=None, help="Optional compatibility-state locator used to infer project root"
     )
     parser.add_argument("--format", default="json", choices=["json", "markdown"], help="Output format (default: json)")
     args = parser.parse_args(argv)

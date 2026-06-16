@@ -12,7 +12,8 @@ authoritative for that system.
 The current operational backlog authority is MemBase `current_work_items`.
 All work items are backlog items. Projects and sub-projects are grouping
 metadata over work items, not separate work authorities. `memory/work_list.md`
-is a compatibility/human-readable view. bridge/INDEX.md is bridge queue state, not the backlog.
+is a compatibility/human-readable view. Retired bridge-index artifacts are not
+the backlog and not dispatcher authority.
 Dashboard/startup surfaces are summaries only.
 
 ## Compact Map
@@ -26,8 +27,8 @@ Dashboard/startup surfaces are summaries only.
 | MEMORY.md | `memory/MEMORY.md` | Harness-memory operational notepad in this checkout. |
 | canonical glossary | `.claude/rules/canonical-terminology.md` | Term meanings, not concrete artifact lookup. |
 | operating model | `.claude/rules/operating-model.md` | Rule-cited soft authority. |
-| file bridge | `.claude/rules/file-bridge-protocol.md` | Protocol; live queue state is `bridge/INDEX.md`. |
-| bridge queue | `bridge/INDEX.md` | Live bridge status only. |
+| file bridge | TAFE-backed bridge state + bridge dispatcher CLI | `.claude/rules/file-bridge-protocol.md` describes legacy helper behavior and historical audit semantics. |
+| bridge queue | TAFE-backed bridge state | Retired bridge-index artifacts are not live queue authority. |
 | smart poller | `independent-progress-assessments/bridge-automation/` | Optional helper for bridge monitoring. |
 | retired OS poller | `.claude/rules/file-bridge-protocol.md` | Must not be restored. |
 | dashboard | `docs/gtkb-dashboard/session-startup-report.md` | Generated summary, not authority. |

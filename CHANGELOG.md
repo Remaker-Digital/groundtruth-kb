@@ -8,9 +8,9 @@ The version source of truth is [`groundtruth-kb/src/groundtruth_kb/__init__.py`]
 
 ## [Unreleased]
 
-Active development happens on the `develop` branch. See [`bridge/INDEX.md`](bridge/INDEX.md)
-for in-flight implementation proposals and reviews, and the standing backlog
-(`gt backlog list`) for planned work.
+Active development happens on the `develop` branch. Current bridge status is
+resolved through dispatcher/TAFE bridge state and versioned bridge files; the
+standing backlog (`gt backlog list`) tracks planned work.
 
 ## [0.7.0-rc1]
 
@@ -27,9 +27,9 @@ specification-driven, dual-agent operating model end to end.
   rejected alternatives, with semantic indexing, so future sessions inherit the
   project's reasoning.
 - **File-bridge protocol** — versioned Prime Builder ↔ Loyal Opposition
-  coordination under `bridge/` with `bridge/INDEX.md` as canonical workflow
-  state (`NEW` / `REVISED` / `GO` / `NO-GO` / `VERIFIED`, plus `ADVISORY` /
-  `DEFERRED` / `WITHDRAWN`).
+  coordination under `bridge/`; dispatcher/TAFE bridge state is canonical after
+  the authority cutover (`NEW` / `REVISED` / `GO` / `NO-GO` / `VERIFIED`, plus
+  `ADVISORY` / `DEFERRED` / `WITHDRAWN`).
 - **`gt` CLI** — `gt project init`, `gt summary`, `gt assert`, `gt backlog`,
   `gt deliberations`, `gt project doctor`, and `gt project upgrade`.
 

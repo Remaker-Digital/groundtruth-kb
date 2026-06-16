@@ -256,32 +256,6 @@ notes = "Shared helper module for deliberation hooks; product-managed because th
 
 [[artifacts]]
 class = "hook"
-id = "hook.turn-marker"
-template_path = "hooks/turn-marker.py"
-target_path = ".claude/hooks/turn-marker.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "UserPromptSubmit turn-marker recorder; product-managed framework session-state policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook.delib-preflight-gate"
-template_path = "hooks/delib-preflight-gate.py"
-target_path = ".claude/hooks/delib-preflight-gate.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "UserPromptSubmit gate enforcing pre-action deliberation search; product-managed framework policy."
-
-[[artifacts]]
-class = "hook"
 id = "hook.owner-decision-capture"
 template_path = "hooks/owner-decision-capture.py"
 target_path = ".claude/hooks/owner-decision-capture.py"
@@ -789,34 +763,6 @@ adopter_divergence_policy = "warn"
 # in to BOTH upgrade enforcement AND doctor enforcement. Registry order
 # below is the authoritative target order for the structured-merge.
 notes = "Registers scanner-safe-writer on PreToolUse; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.turn-marker.userpromptsubmit"
-event = "UserPromptSubmit"
-hook_filename = "turn-marker.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers turn-marker on UserPromptSubmit; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.delib-preflight-gate.userpromptsubmit"
-event = "UserPromptSubmit"
-hook_filename = "delib-preflight-gate.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers delib-preflight-gate on UserPromptSubmit; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"

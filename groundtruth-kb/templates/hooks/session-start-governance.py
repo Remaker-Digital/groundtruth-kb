@@ -3,7 +3,7 @@
 SessionStart hook: governance summary.
 
 Emits a session-start governance summary showing:
-- Bridge index status (pending entries, if any)
+- Bridge status (pending entries, if any)
 - Reminder of active governance hooks
 
 Hook type: SessionStart
@@ -15,38 +15,43 @@ All rights reserved.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
-BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
+BRIDGE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
+)
 
 
-def _parse_bridge_pending(index_path: Path) -> list[str]:
+def _parse_bridge_pending(cwd: Path) -> list[str]:
     """Return list of document names with NEW or REVISED latest status."""
-    pending: list[str] = []
-    if not index_path.exists():
-        return pending
-
-    try:
-        lines = index_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return pending
-
-    current_doc: str | None = None
-    seen_status: bool = False
-    for line in lines:
-        line = line.strip()
-        if line.startswith("Document:"):
-            current_doc = line.removeprefix("Document:").strip()
-            seen_status = False
-        elif current_doc and not seen_status:
-            for status in ("VERIFIED", "GO", "NO-GO", "REVISED", "NEW"):
-                if line.startswith(status + ":"):
-                    seen_status = True
-                    if status in ("NEW", "REVISED"):
-                        pending.append(f"{current_doc} ({status})")
-                    break
-    return pending
+    bridge_dir = cwd / "bridge"
+    if not bridge_dir.is_dir():
+        return []
+    latest: dict[str, tuple[int, str]] = {}
+    for path in bridge_dir.glob("*.md"):
+        match = re.match(r"(?P<doc>.+)-(?P<version>\d{3})\.md$", path.name)
+        if not match:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        status = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            status_match = BRIDGE_STATUS_RE.match(stripped)
+            status = status_match.group(1).upper() if status_match else ""
+            break
+        version = int(match.group("version"))
+        doc = match.group("doc")
+        if status and version > latest.get(doc, (-1, ""))[0]:
+            latest[doc] = (version, status)
+    return [f"{doc} ({status})" for doc, (_, status) in sorted(latest.items()) if status in ("NEW", "REVISED")]
 
 
 def _refresh_core_spec_intake(cwd: str) -> None:
@@ -101,7 +106,7 @@ def main() -> None:
     if "--self-test" in sys.argv:
         emit_additional_context(
             "SessionStart",
-            "[Governance] Session governance hook active. Bridge index will be checked at session start.",
+            "[Governance] Session governance hook active. Canonical bridge state will be checked at session start.",
         )
         sys.exit(0)
 
@@ -112,19 +117,19 @@ def main() -> None:
 
     cwd = payload.get("cwd", ".")
     _refresh_core_spec_intake(cwd)
-    index_path = Path(cwd) / BRIDGE_INDEX_FILENAME
-    pending = _parse_bridge_pending(index_path)
+    cwd_path = Path(cwd)
+    pending = _parse_bridge_pending(cwd_path)
 
     if pending:
         entry_list = "\n  - ".join(pending)
         msg = (
             f"[Governance] Session start: {len(pending)} bridge entry/entries pending Codex review:\n"
             f"  - {entry_list}\n"
-            "Check bridge/INDEX.md and process oldest actionable entry first."
+            "Check canonical bridge state and process oldest actionable entry first."
         )
     else:
         msg = (
-            "[Governance] Session start: bridge index clear. "
+            "[Governance] Session start: bridge queue clear. "
             "All governance hooks active (deliberation gate, spec-before-code, bridge compliance, "
             "KB-not-markdown, destructive gate, credential scan)."
         )
