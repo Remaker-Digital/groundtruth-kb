@@ -21,7 +21,7 @@ bridge behavior, and recurring automation.
 
 | Path | Purpose | Trigger / invocation | Owner |
 |------|---------|----------------------|-------|
-| bridge/INDEX.md + cross-harness event-driven trigger | File bridge queue for Prime Builder and Loyal Opposition review handoffs | PostToolUse + Stop hooks invoke scripts/cross_harness_bridge_trigger.py | GoldenFixtureOwner |
+| gt bridge dispatch + status-bearing bridge files | File bridge queue for Prime Builder and Loyal Opposition review handoffs | PostToolUse + Stop hooks invoke scripts/cross_harness_bridge_trigger.py | GoldenFixtureOwner |
 
 Include:
 - bridge entrypoints
@@ -90,7 +90,7 @@ file. Prompt text is operational configuration when it changes bridge behavior.
 
 | Name | Schedule / trigger | Executor | Defined in | Failure signal |
 |------|--------------------|----------|------------|----------------|
-| file-bridge-cross-harness-trigger | Event-driven on tool-use; manual fallback via 'Bridge' prompt | claude -p / codex exec invoked by the cross-harness event-driven trigger | Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json | No dispatch-state updates after INDEX changes |
+| file-bridge-cross-harness-trigger | Event-driven on tool-use; manual fallback via 'Bridge' prompt | claude -p / codex exec invoked by the cross-harness event-driven trigger | Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json | No dispatch-state updates after new bridge versions |
 
 Include recurring tasks from:
 - app-native automations
@@ -100,10 +100,10 @@ Include recurring tasks from:
 
 ## Protocol rules
 
-- **Message model:** File-based latest-status queue in bridge/INDEX.md. Entries are newest-first.
+- **Message model:** Dispatcher-backed latest-status queue over numbered bridge files.
 - **Reply rule:** Latest NEW/REVISED entries require Loyal Opposition verdicts; latest GO/NO-GO entries require Prime responses.
 - **Retry rule:** Scheduled re-scan after the next interval; lock files prevent overlapping runs.
-- **Health check:** Read bridge/INDEX.md, scheduler state, and recent scan logs.
+- **Health check:** Run bridge dispatch health and scan versioned bridge files.
 - **Restart policy:** No long-running bridge process is required; update scheduled tasks after scanner or prompt changes.
 
 Per ADR-0001: Three-Tier Memory Architecture, canonical project history lives in MemBase; this inventory is an operational control surface that must stay aligned with MemBase records.

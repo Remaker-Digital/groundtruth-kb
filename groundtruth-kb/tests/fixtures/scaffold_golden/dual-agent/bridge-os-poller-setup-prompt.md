@@ -21,8 +21,8 @@ event-driven trigger** at
 - `.codex/hooks.json` — Codex-side parity (forward-compatible per
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`)
 
-When canonical bridge state or its deprecated generated compatibility view
-changes, or the agent ends a turn, the trigger inspects dispatcher/TAFE state
+When canonical bridge state changes, or the agent ends a turn, the trigger
+inspects dispatcher/TAFE state
 and dispatches the appropriate counterpart harness if a recipient's actionable
 queue signature has changed.
 

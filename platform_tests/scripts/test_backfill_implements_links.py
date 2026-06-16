@@ -53,8 +53,8 @@ def _write_thread(bridge_dir: Path, slug: str, versions: list[tuple[str, str]]) 
     in version order (-001, -002, ...). Returns nothing; the caller appends the
     INDEX entry separately so multi-thread INDEX ordering is explicit."""
     bridge_dir.mkdir(parents=True, exist_ok=True)
-    for index, (_status, body) in enumerate(versions, start=1):
-        (bridge_dir / f"{slug}-{index:03d}.md").write_text(body, encoding="utf-8")
+    for index, (status, body) in enumerate(versions, start=1):
+        (bridge_dir / f"{slug}-{index:03d}.md").write_text(f"{status}\n\n{body}", encoding="utf-8")
 
 
 def _build_index(bridge_dir: Path, threads: list[tuple[str, list[str]]]) -> None:

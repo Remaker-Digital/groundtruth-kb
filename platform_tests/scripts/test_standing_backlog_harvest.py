@@ -154,20 +154,17 @@ def test_standing_backlog_contains_harvested_source_items() -> None:
     )
 
 
-def test_standing_backlog_audit_treats_withdrawn_as_terminal_not_actionable() -> None:
+def test_standing_backlog_audit_treats_withdrawn_as_terminal_not_actionable(tmp_path: Path) -> None:
     """WITHDRAWN at top of a document's version chain must be parsed as the
     latest status, and must NOT appear in actionable (parallel to VERIFIED's
     terminal treatment). Per WI-3276 / gtkb-audit-script-withdrawn-status-handling.
     """
-    fixture = (
-        "# Bridge Index\n"
-        "\n"
-        "Document: test-thread-withdrawn-fixture\n"
-        "WITHDRAWN: bridge/test-thread-withdrawn-fixture-002.md\n"
-        "NO-GO: bridge/test-thread-withdrawn-fixture-001.md\n"
-    )
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "test-thread-withdrawn-fixture-001.md").write_text("NO-GO\n", encoding="utf-8")
+    (bridge_dir / "test-thread-withdrawn-fixture-002.md").write_text("WITHDRAWN\n", encoding="utf-8")
     module = _load_module()
-    entries = module.parse_latest_bridge_entries(fixture)
+    entries = module.latest_bridge_entries(tmp_path)
     fixture_entry = next(
         (e for e in entries if e["document"] == "test-thread-withdrawn-fixture"),
         None,

@@ -165,16 +165,14 @@ def _insert_test(db_path: Path, spec_id: str, *, last_result: str | None = "pass
     conn.close()
 
 
-def _write_bridge(project_root: Path, index_text: str, files: dict[str, str]) -> Path:
+def _write_bridge(project_root: Path, _index_text: str, files: dict[str, str]) -> Path:
     bridge_dir = project_root / "bridge"
     bridge_dir.mkdir()
-    index = bridge_dir / "INDEX.md"
-    index.write_text(index_text, encoding="utf-8")
     for rel, content in files.items():
         path = project_root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-    return index
+    return bridge_dir
 
 
 def test_audit_flags_terminal_spec_without_test_or_implementation(tmp_path: Path) -> None:
@@ -182,9 +180,9 @@ def test_audit_flags_terminal_spec_without_test_or_implementation(tmp_path: Path
     db_path = tmp_path / "groundtruth.db"
     _init_db(db_path)
     _insert_spec(db_path, "SPEC-MISSING", status="verified")
-    index = _write_bridge(tmp_path, "", {})
+    bridge_dir = _write_bridge(tmp_path, "", {})
 
-    report = run_audit(db_path, index, tmp_path)
+    report = run_audit(db_path, bridge_dir, tmp_path)
 
     kinds = {gap["kind"] for gap in report["gaps"]}
     assert "terminal_spec_without_test_mapping" in kinds
@@ -203,9 +201,9 @@ def test_audit_accepts_terminal_spec_with_passing_test_and_source_path(tmp_path:
     )
     _insert_owner_deliberation(db_path, "DCL-COMPLETE-001")
     _insert_test(db_path, "DCL-COMPLETE-001", last_result="pass")
-    index = _write_bridge(tmp_path, "", {})
+    bridge_dir = _write_bridge(tmp_path, "", {})
 
-    report = run_audit(db_path, index, tmp_path)
+    report = run_audit(db_path, bridge_dir, tmp_path)
 
     assert report["gap_count"] == 0
 
@@ -214,13 +212,13 @@ def test_audit_flags_go_bridge_without_specification_links(tmp_path: Path) -> No
     """Verifies DCL-RETROACTIVE-TRIAD-COMPLETENESS-001.A2: historical GO bridges need explicit spec links."""
     db_path = tmp_path / "groundtruth.db"
     _init_db(db_path)
-    index = _write_bridge(
+    bridge_dir = _write_bridge(
         tmp_path,
-        "Document: missing-links\nGO: bridge/missing-links-002.md\nNEW: bridge/missing-links-001.md\n",
+        "",
         {"bridge/missing-links-002.md": "GO\n\n# Review\n\nNo links here.\n"},
     )
 
-    report = run_audit(db_path, index, tmp_path)
+    report = run_audit(db_path, bridge_dir, tmp_path)
 
     assert any(
         gap["kind"] == "bridge_terminal_without_specification_links_section" and gap["artifact_id"] == "missing-links"
@@ -240,9 +238,9 @@ def test_audit_flags_agent_red_specs_for_reclassification_review(tmp_path: Path)
         source_paths=["applications/Agent_Red/example.py"],
     )
     _insert_test(db_path, "SPEC-AGENT-RED-CANDIDATE", last_result="pass")
-    index = _write_bridge(tmp_path, "", {})
+    bridge_dir = _write_bridge(tmp_path, "", {})
 
-    report = run_audit(db_path, index, tmp_path)
+    report = run_audit(db_path, bridge_dir, tmp_path)
 
     assert any(gap["kind"] == "agent_red_scoped_spec_candidate_for_gtkb_reclassification" for gap in report["gaps"])
 
@@ -252,9 +250,9 @@ def test_audit_flags_spec_without_owner_deliberation_origin(tmp_path: Path) -> N
     db_path = tmp_path / "groundtruth.db"
     _init_db(db_path)
     _insert_spec(db_path, "SPEC-NO-DELIB", status="specified")
-    index = _write_bridge(tmp_path, "", {})
+    bridge_dir = _write_bridge(tmp_path, "", {})
 
-    report = run_audit(db_path, index, tmp_path)
+    report = run_audit(db_path, bridge_dir, tmp_path)
 
     assert any(
         gap["kind"] == "spec_without_owner_deliberation_origin"
@@ -270,9 +268,9 @@ def test_audit_accepts_owner_deliberation_origin(tmp_path: Path) -> None:
     _init_db(db_path)
     _insert_spec(db_path, "SPEC-WITH-DELIB", status="specified")
     _insert_owner_deliberation(db_path, "SPEC-WITH-DELIB")
-    index = _write_bridge(tmp_path, "", {})
+    bridge_dir = _write_bridge(tmp_path, "", {})
 
-    report = run_audit(db_path, index, tmp_path)
+    report = run_audit(db_path, bridge_dir, tmp_path)
 
     assert not any(
         gap["kind"] == "spec_without_owner_deliberation_origin" and gap["artifact_id"] == "SPEC-WITH-DELIB"

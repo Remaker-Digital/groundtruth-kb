@@ -199,7 +199,7 @@ def generate_cmd(
 ) -> None:
     """Generate the deterministic handoff prompt for a session.
 
-    Reads the latest archived session envelope plus the live bridge index,
+    Reads the latest archived session envelope plus live bridge state,
     writes a new ``session_prompts`` MemBase row (idempotent on identical
     canonical inputs), writes the prompt markdown to
     ``.claude/session/handoff-<session-id>.md``, and echoes the prompt body

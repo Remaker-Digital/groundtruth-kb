@@ -44,30 +44,28 @@ def _make_local_only_project(tmp_path: Path) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# bridge/INDEX.md absent → WARN
+# bridge/INDEX.md absent → OK
 # ---------------------------------------------------------------------------
 
 
-def test_doctor_warns_when_bridge_index_absent(tmp_path: Path) -> None:
-    """run_doctor() with dual-agent profile warns when bridge/INDEX.md is absent."""
+def test_doctor_accepts_absent_bridge_index(tmp_path: Path) -> None:
+    """run_doctor() with dual-agent profile does not warn when bridge/INDEX.md is absent."""
     target = _make_dual_agent_project(tmp_path)
-    (target / "bridge" / "INDEX.md").unlink()
 
     report = run_doctor(target, "dual-agent")
-    bridge_checks = [c for c in report.checks if "Bridge" in c.name or "bridge" in c.message.lower()]
-    warn_checks = [c for c in bridge_checks if c.status == "warning"]
-    assert warn_checks, "Expected a warning check about missing bridge/INDEX.md"
-    assert any("INDEX.md" in c.message for c in warn_checks)
+    bridge_checks = [c for c in report.checks if c.name in {"File Bridge Config", "File Bridge State"}]
+    assert len(bridge_checks) == 2
+    assert all("INDEX.md" not in c.message for c in bridge_checks)
+    assert all(c.status == "pass" for c in bridge_checks)
 
 
-def test_direct_check_warns_when_bridge_index_absent(tmp_path: Path) -> None:
-    """_check_file_bridge_setup() returns WARN when bridge/INDEX.md is absent."""
+def test_direct_check_accepts_absent_bridge_index(tmp_path: Path) -> None:
+    """_check_file_bridge_setup() returns PASS when bridge/INDEX.md is absent."""
     target = _make_dual_agent_project(tmp_path)
-    (target / "bridge" / "INDEX.md").unlink()
 
     result = _check_file_bridge_setup(target)
-    assert result.status == "warning"
-    assert "INDEX.md" in result.message
+    assert result.status == "pass"
+    assert "INDEX.md" not in result.message
 
 
 # ---------------------------------------------------------------------------
@@ -112,26 +110,27 @@ def test_local_only_doctor_no_bridge_index_warn(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Regression guard: doctor does NOT pass when INDEX.md absent
+# Regression guard: doctor does not depend on retired INDEX.md
 # ---------------------------------------------------------------------------
 
 
-def test_doctor_does_not_pass_when_index_absent(tmp_path: Path) -> None:
-    """Doctor overall is not 'pass' when bridge/INDEX.md is absent (regression guard)."""
+def test_doctor_file_bridge_checks_pass_when_index_absent(tmp_path: Path) -> None:
+    """File bridge checks pass without the retired index artifact."""
     target = _make_dual_agent_project(tmp_path)
-    (target / "bridge" / "INDEX.md").unlink()
 
     report = run_doctor(target, "dual-agent")
-    assert report.overall != "pass", "Doctor should not return 'pass' when bridge/INDEX.md is absent"
+    bridge_checks = [c for c in report.checks if c.name in {"File Bridge Config", "File Bridge State"}]
+    assert bridge_checks
+    assert all(c.status == "pass" for c in bridge_checks)
 
 
 # ---------------------------------------------------------------------------
-# Doctor passes when INDEX.md + all rule files present
+# Doctor passes when bridge directory + all rule files present
 # ---------------------------------------------------------------------------
 
 
 def test_doctor_bridge_check_passes_when_complete(tmp_path: Path) -> None:
-    """_check_file_bridge_setup() returns pass when bridge/INDEX.md and all rule files are present."""
+    """_check_file_bridge_setup() returns pass when bridge directory and all rule files are present."""
     target = _make_dual_agent_project(tmp_path)
     result = _check_file_bridge_setup(target)
     assert result.status == "pass"

@@ -2,7 +2,7 @@
 
 Covers the Codex GO conditions on bridge/gtkb-da-harvest-coverage-implementation-005.md:
     - Flag-gated thread-level harvest runs alongside existing file-level.
-    - Compressed rows content-hash-match retroactive sweep (no duplicates).
+    - Compressed rows are deterministic over numbered bridge-file chains.
     - Machine-readable JSON summary emitted per schema.
     - Default off until baseline established (v1 rollout).
 
@@ -11,7 +11,6 @@ Covers the Codex GO conditions on bridge/gtkb-da-harvest-coverage-implementation
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import sys
@@ -19,7 +18,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "harvest_session_deliberations.py"
-RETROACTIVE_SCRIPT_PATH = REPO_ROOT / "scripts" / "retroactive_harvest_bridge_threads.py"
 
 
 def _load_script(path: Path, alias: str):
@@ -31,9 +29,8 @@ def _load_script(path: Path, alias: str):
     return module
 
 
-# Load both modules once at import time
+# Load the harvest module once at import time.
 hsd = _load_script(SCRIPT_PATH, "harvest_session_deliberations")
-rhbt = _load_script(RETROACTIVE_SCRIPT_PATH, "retroactive_harvest_for_hsd_test")
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +60,7 @@ class TestCLIFlags:
 
 
 # ---------------------------------------------------------------------------
-# Compressed collector — integrity with retroactive sweep
+# Compressed collector — integrity over versioned bridge files
 # ---------------------------------------------------------------------------
 
 
@@ -72,61 +69,40 @@ class TestCompressedCollector:
         """collect_compressed_bridge_threads returns (source_ref, title, summary, content, outcome) tuples."""
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
-        (bridge_dir / "alpha-001.md").write_text("# Alpha\n\nInitial proposal.\n", encoding="utf-8")
-        (bridge_dir / "alpha-002.md").write_text("# Alpha\n\nVerification.\n", encoding="utf-8")
-        index = bridge_dir / "INDEX.md"
-        index.write_text(
-            "# Bridge Index\n\nDocument: alpha\nVERIFIED: bridge/alpha-002.md\nNEW: bridge/alpha-001.md\n",
-            encoding="utf-8",
-        )
+        (bridge_dir / "alpha-001.md").write_text("NEW\n\n# Alpha\n\nInitial proposal.\n", encoding="utf-8")
+        (bridge_dir / "alpha-002.md").write_text("VERIFIED\n\n# Alpha\n\nVerification.\n", encoding="utf-8")
 
+        monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "BRIDGE_INDEX", index)
 
         results = hsd.collect_compressed_bridge_threads()
         assert len(results) == 1
         source_ref, title, summary, content, outcome = results[0]
         assert source_ref == "bridge/alpha-*.md"
         assert "alpha" in title.lower()
-        assert "2 version" in title or "versions" in title
+        assert "2 status-bearing version" in summary
         assert outcome == "go"  # latest_status=VERIFIED
         assert len(content) > 0
 
-    def test_compressed_content_hash_matches_retroactive_sweep(
+    def test_compressed_content_orders_versions_oldest_first(
         self,
         tmp_path: Path,
         monkeypatch,
     ) -> None:
-        """Thread summary content (and hash) produced by harvest_session matches retroactive.
-
-        This is the idempotence guarantee: same inputs → same content_hash →
-        upsert_deliberation_source is a no-op on re-run.
-        """
+        """Thread summary content is deterministic over the numbered file chain."""
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
-        (bridge_dir / "beta-001.md").write_text("# Beta Proposal\n\nBody line.\n", encoding="utf-8")
-        (bridge_dir / "beta-002.md").write_text("# Beta GO\n\nApproved.\n", encoding="utf-8")
-        index = bridge_dir / "INDEX.md"
-        index.write_text(
-            "# Bridge Index\n\nDocument: beta\nGO: bridge/beta-002.md\nNEW: bridge/beta-001.md\n",
-            encoding="utf-8",
-        )
+        (bridge_dir / "beta-001.md").write_text("NEW\n\n# Beta Proposal\n\nBody line.\n", encoding="utf-8")
+        (bridge_dir / "beta-002.md").write_text("GO\n\n# Beta GO\n\nApproved.\n", encoding="utf-8")
 
-        # Retroactive content
-        records = rhbt.collect_compressed_bridge_threads(index, bridge_dir)
-        assert len(records) == 1
-        _, _, retro_content = rhbt.build_thread_summary(records[0])
-        retro_hash = hashlib.sha256(retro_content.encode()).hexdigest()
-
-        # harvest_session content
+        monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "BRIDGE_INDEX", index)
-        hsd_results = hsd.collect_compressed_bridge_threads()
-        assert len(hsd_results) == 1
-        _, _, _, hsd_content, _ = hsd_results[0]
-        hsd_hash = hashlib.sha256(hsd_content.encode()).hexdigest()
+        results = hsd.collect_compressed_bridge_threads()
 
-        assert hsd_hash == retro_hash, "Content hashes must match for idempotence"
+        assert len(results) == 1
+        _, _, _, content, outcome = results[0]
+        assert content.index("NEW: bridge/beta-001.md") < content.index("GO: bridge/beta-002.md")
+        assert outcome == "informational"
 
     def test_non_verified_active_thread_gets_informational_outcome(
         self,
@@ -136,15 +112,10 @@ class TestCompressedCollector:
         """Active non-VERIFIED thread → outcome 'informational'."""
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
-        (bridge_dir / "gamma-001.md").write_text("# Gamma\n\nIn flight.\n", encoding="utf-8")
-        index = bridge_dir / "INDEX.md"
-        index.write_text(
-            "# Bridge Index\n\nDocument: gamma\nNEW: bridge/gamma-001.md\n",
-            encoding="utf-8",
-        )
+        (bridge_dir / "gamma-001.md").write_text("NEW\n\n# Gamma\n\nIn flight.\n", encoding="utf-8")
 
+        monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "BRIDGE_INDEX", index)
 
         results = hsd.collect_compressed_bridge_threads()
         assert len(results) == 1
@@ -229,17 +200,12 @@ class TestFlagToggle:
         """Default thread_level=False means compressed threads are NOT included."""
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
-        (bridge_dir / "delta-001.md").write_text("# Delta\n\nBody.\n" + "x" * 200, encoding="utf-8")
-        index = bridge_dir / "INDEX.md"
-        index.write_text(
-            "# Bridge Index\n\nDocument: delta\nVERIFIED: bridge/delta-001.md\n",
-            encoding="utf-8",
-        )
+        (bridge_dir / "delta-001.md").write_text("VERIFIED\n\n# Delta\n\nBody.\n" + "x" * 200, encoding="utf-8")
         insight_dir = tmp_path / "ipa"
         insight_dir.mkdir()
 
+        monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "BRIDGE_INDEX", index)
         monkeypatch.setattr(hsd, "INSIGHT_DIR", insight_dir)
 
         # Dry run, thread_level=False (default)
@@ -257,19 +223,14 @@ class TestFlagToggle:
         bridge_dir.mkdir()
         # File-level harvest requires >= 100 bytes
         (bridge_dir / "epsilon-001.md").write_text(
-            "# Epsilon\n\n" + ("body line\n" * 20),
-            encoding="utf-8",
-        )
-        index = bridge_dir / "INDEX.md"
-        index.write_text(
-            "# Bridge Index\n\nDocument: epsilon\nVERIFIED: bridge/epsilon-001.md\n",
+            "GO\n\n# Epsilon\n\n" + ("body line\n" * 20),
             encoding="utf-8",
         )
         insight_dir = tmp_path / "ipa"
         insight_dir.mkdir()
 
+        monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "BRIDGE_INDEX", index)
         monkeypatch.setattr(hsd, "INSIGHT_DIR", insight_dir)
 
         results = hsd.harvest(apply=False, thread_level=True)
@@ -287,19 +248,14 @@ class TestFlagToggle:
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
         (bridge_dir / "zeta-001.md").write_text(
-            "# Zeta\n\n" + ("body line\n" * 20),
-            encoding="utf-8",
-        )
-        index = bridge_dir / "INDEX.md"
-        index.write_text(
-            "# Bridge Index\n\nDocument: zeta\nVERIFIED: bridge/zeta-001.md\n",
+            "GO\n\n# Zeta\n\n" + ("body line\n" * 20),
             encoding="utf-8",
         )
         insight_dir = tmp_path / "ipa"
         insight_dir.mkdir()
 
+        monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "BRIDGE_INDEX", index)
         monkeypatch.setattr(hsd, "INSIGHT_DIR", insight_dir)
 
         # Confirm file-level picks up zeta-001.md (dry-run, thread_level off)

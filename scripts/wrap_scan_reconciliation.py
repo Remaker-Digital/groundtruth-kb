@@ -2,12 +2,10 @@
 
 Per bridge/gtkb-bridge-reconciliation-wrap-scan-check-002.md (GO at -002, WI-4238).
 
-This scanner makes the VERIFIED bridge-reconciliation detector a *routine*
-session-wrap signal rather than an operator-demand-only check. It reuses the
-detector unchanged through its supported public surface
-(``scripts/bridge_reconciliation_audit.py::run_audit``) and emits one
-informational, report-only finding per non-zero deviation class plus a single
-roll-up finding. Zero deviations yield a single "clean" informational finding.
+This scanner makes bridge/backlog reconciliation state a routine session-wrap
+signal. The previous operator-demand detector has been retired; this scanner now
+reports lightweight bridge lifecycle counts from the status-bearing numbered
+file chain and leaves deeper reconciliation to the dispatcher/health CLI.
 
 It composes with — and does not replace — the other ``wrap_scan_*`` scanners
 (``wrap_scan_consistency``, ``wrap_scan_cross_artifact_drift``,
@@ -29,7 +27,6 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _wrap_io import _atomic_write_text  # noqa: E402
-from bridge_reconciliation_audit import run_audit  # noqa: E402
 
 SCANNER_ID = "wrap_scan_reconciliation"
 SEVERITY_INFORMATIONAL = "informational"
@@ -53,107 +50,64 @@ def _finding(check: str, message: str, **details: Any) -> dict[str, Any]:
     }
 
 
-def _counts_by_class(audit_result: dict[str, Any]) -> dict[str, int]:
-    """Derive per-class deviation counts from a ``run_audit`` result.
+def _ensure_bridge_helpers_importable(project_root: Path) -> None:
+    gt_src = project_root / "groundtruth-kb" / "src"
+    if gt_src.exists():
+        src_text = str(gt_src)
+        if src_text not in sys.path:
+            sys.path.insert(0, src_text)
 
-    Depends only on documented public keys. Prefers the canonical
-    ``counts_by_class`` key emitted by ``run_audit``; falls back to the
-    legacy ``counts`` key, then to deriving counts from the ``issues`` list
-    (keyed by each issue's ``class``). Non-positive entries are dropped so a
-    deviation class only appears when it actually occurred.
-    """
-    raw: dict[str, Any] = {}
-    for key in ("counts_by_class", "counts"):
-        value = audit_result.get(key)
-        if isinstance(value, dict):
-            raw = value
-            break
-    if not raw:
-        for issue in audit_result.get("issues", []) or []:
-            if isinstance(issue, dict):
-                deviation_class = issue.get("class")
-                if deviation_class:
-                    raw[str(deviation_class)] = raw.get(str(deviation_class), 0) + 1
+
+def _bridge_status_counts(project_root: Path, bridge_dir: Path | None = None) -> dict[str, int]:
+    _ensure_bridge_helpers_importable(project_root)
+    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
+
+    resolved_bridge_dir = bridge_dir or project_root / "bridge"
     counts: dict[str, int] = {}
-    for deviation_class, count in raw.items():
-        try:
-            numeric = int(count)
-        except (TypeError, ValueError):
-            continue
-        if numeric > 0:
-            counts[str(deviation_class)] = numeric
+    for doc in scan_expected_documents(project_root, resolved_bridge_dir).values():
+        latest_path = Path(doc.files[-1])
+        if not latest_path.is_absolute():
+            latest_path = project_root / latest_path
+        status = status_from_bridge_file(latest_path) or "UNKNOWN"
+        counts[status] = counts.get(status, 0) + 1
     return dict(sorted(counts.items()))
 
 
-def build_reconciliation_findings(audit_result: dict[str, Any]) -> list[dict[str, Any]]:
-    """Pure transform: ``run_audit`` result -> wrap-scan finding list.
-
-    Emits one informational finding per non-zero deviation class (sorted by
-    class name) plus a single roll-up finding carrying the total and the
-    per-class breakdown. When there are no deviations, returns a single
-    "clean" informational finding (never an error; report-only by design).
-    """
-    counts = _counts_by_class(audit_result)
-    if not counts:
-        return [
-            _finding(
-                "reconciliation_clean",
-                "No bridge/backlog reconciliation drift detected.",
-                deviation_total=0,
-                counts_by_class={},
-            )
-        ]
-    findings: list[dict[str, Any]] = []
-    for deviation_class, count in counts.items():
-        findings.append(
-            _finding(
-                "reconciliation_deviation_class",
-                f"{count} bridge/backlog reconciliation deviation(s) of class '{deviation_class}'.",
-                deviation_class=deviation_class,
-                count=count,
-            )
-        )
-    total = sum(counts.values())
-    findings.append(
+def build_reconciliation_findings(status_counts: dict[str, int]) -> list[dict[str, Any]]:
+    total = sum(status_counts.values())
+    return [
         _finding(
-            "reconciliation_rollup",
-            f"{total} bridge/backlog reconciliation deviation(s) across {len(counts)} class(es).",
-            deviation_total=total,
-            class_count=len(counts),
-            counts_by_class=dict(counts),
+            "bridge_status_rollup",
+            f"{total} status-bearing bridge document(s) visible to the wrap scanner.",
+            bridge_document_total=total,
+            bridge_status_counts=dict(status_counts),
         )
-    )
-    return findings
+    ]
 
 
 def scan(
     project_root: Path,
     *,
     db_path: Path | None = None,
-    bridge_index: Path | None = None,
+    bridge_dir: Path | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
-    """Run the VERIFIED reconciliation detector read-only and shape findings.
+    """Read bridge lifecycle status counts and shape report-only findings.
 
-    ``generated_at`` may be injected for deterministic tests; otherwise the
-    audit result's own ``generated_at`` is carried through.
+    ``generated_at`` may be injected for deterministic tests. ``db_path`` is
+    retained for CLI compatibility but is not read by this lightweight scanner.
     """
-    audit_result = run_audit(
-        project_root=project_root,
-        db_path=db_path,
-        bridge_index=bridge_index,
-    )
-    findings = build_reconciliation_findings(audit_result)
-    counts = _counts_by_class(audit_result)
-    resolved_generated_at = generated_at if generated_at is not None else audit_result.get("generated_at")
+    _ = db_path
+    counts = _bridge_status_counts(project_root, bridge_dir)
+    findings = build_reconciliation_findings(counts)
     return {
         "scanner_id": SCANNER_ID,
-        "generated_at": resolved_generated_at,
+        "generated_at": generated_at,
         "report_only": True,
         "severity_model": SEVERITY_INFORMATIONAL,
         "finding_count": len(findings),
         "findings": findings,
-        "counts_by_class": dict(counts),
+        "bridge_status_counts": dict(counts),
     }
 
 
@@ -169,8 +123,8 @@ def render_markdown(report: dict[str, Any]) -> str:
     if generated_at:
         lines.append(f"generated_at: `{generated_at}`")
     lines.append("")
-    counts = report.get("counts_by_class") or {}
-    lines.append("## Counts By Class")
+    counts = report.get("bridge_status_counts") or {}
+    lines.append("## Bridge Status Counts")
     if counts:
         lines.extend(f"- {key}: {value}" for key, value in counts.items())
     else:
@@ -188,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument("--project-root", type=Path, default=None)
     parser.add_argument("--db-path", type=Path, default=None)
-    parser.add_argument("--bridge-index", type=Path, default=None)
+    parser.add_argument("--bridge-dir", type=Path, default=None)
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -203,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     project_root = (args.project_root or _project_root()).resolve()
-    report = scan(project_root, db_path=args.db_path, bridge_index=args.bridge_index)
+    report = scan(project_root, db_path=args.db_path, bridge_dir=args.bridge_dir)
     payload = render_json(report)
 
     if args.stdout:

@@ -25,11 +25,7 @@ spec.loader.exec_module(preflight)
 def _write_bridge(root: Path, bridge_id: str, content: str) -> None:
     bridge = root / "bridge"
     bridge.mkdir()
-    (bridge / f"{bridge_id}-001.md").write_text(content, encoding="utf-8")
-    (bridge / "INDEX.md").write_text(
-        f"# Bridge Index\n\nDocument: {bridge_id}\nNEW: bridge/{bridge_id}-001.md\n",
-        encoding="utf-8",
-    )
+    (bridge / f"{bridge_id}-001.md").write_text(f"NEW\n\n{content}", encoding="utf-8")
 
 
 def _write_config(path: Path) -> None:
@@ -71,7 +67,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
 
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=tmp_path / "bridge" / "INDEX.md",
+        bridge_dir=tmp_path / "bridge",
         config_path=config,
         db_path=tmp_path / "missing.db",
     )
@@ -103,7 +99,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
 
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=tmp_path / "bridge" / "INDEX.md",
+        bridge_dir=tmp_path / "bridge",
         config_path=config,
         db_path=tmp_path / "missing.db",
     )
@@ -137,12 +133,12 @@ target_paths: ["applications/Agent_Red/src/app.py"]
 
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=bridge / "INDEX.md",
+        bridge_dir=bridge,
         config_path=config,
         db_path=tmp_path / "missing.db",
     )
 
-    assert packet["content_source"]["mode"] == "indexed_operative"
+    assert packet["content_source"]["mode"] == "bridge_file_operative"
     assert packet["operative_version"]["path"] == f"bridge/{bridge_id}-001.md"
     assert packet["preflight_passed"] is True
 
@@ -180,7 +176,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
 
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=tmp_path / "bridge" / "INDEX.md",
+        bridge_dir=tmp_path / "bridge",
         config_path=config,
         db_path=tmp_path / "missing.db",
         content_file=pending,
@@ -226,7 +222,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
 
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=tmp_path / "bridge" / "INDEX.md",
+        bridge_dir=tmp_path / "bridge",
         config_path=config,
         db_path=tmp_path / "missing.db",
         content_file=pending,
@@ -244,6 +240,8 @@ def test_withdrawn_status_is_parsed_as_terminal_operative_version(tmp_path: Path
     bridge.mkdir()
     (bridge / f"{bridge_id}-001.md").write_text(
         """
+NEW
+
 # Old Review
 
 ## Specification Links
@@ -254,6 +252,8 @@ def test_withdrawn_status_is_parsed_as_terminal_operative_version(tmp_path: Path
     )
     (bridge / f"{bridge_id}-002.md").write_text(
         """
+WITHDRAWN
+
 # Supersession Notice
 
 ## Specification Links
@@ -281,7 +281,7 @@ def test_withdrawn_status_is_parsed_as_terminal_operative_version(tmp_path: Path
 
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=bridge / "INDEX.md",
+        bridge_dir=bridge,
         config_path=config,
         db_path=tmp_path / "missing.db",
     )
@@ -311,7 +311,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
 
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=tmp_path / "bridge" / "INDEX.md",
+        bridge_dir=tmp_path / "bridge",
         config_path=config,
         db_path=tmp_path / "missing.db",
     )
@@ -458,7 +458,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     _write_config(config)
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=tmp_path / "bridge" / "INDEX.md",
+        bridge_dir=tmp_path / "bridge",
         config_path=config,
         db_path=tmp_path / "missing.db",
     )
@@ -491,7 +491,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     _write_config(config)
     packet = preflight.build_packet(
         bridge_id=bridge_id,
-        index_path=tmp_path / "bridge" / "INDEX.md",
+        bridge_dir=tmp_path / "bridge",
         config_path=config,
         db_path=tmp_path / "missing.db",
     )

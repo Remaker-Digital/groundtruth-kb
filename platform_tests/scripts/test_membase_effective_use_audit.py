@@ -5,7 +5,7 @@ from pathlib import Path
 
 from groundtruth_kb.membase_effective_use_audit import (
     AuditResult,
-    parse_bridge_index,
+    parse_bridge_files,
     run_audit,
     write_audit_report,
 )
@@ -30,21 +30,11 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def test_parse_bridge_index_captures_latest_status_and_versions(tmp_path: Path) -> None:
-    index = tmp_path / "bridge" / "INDEX.md"
-    _write(
-        index,
-        "\n".join(
-            [
-                "Document: gtkb-example",
-                "VERIFIED: bridge/gtkb-example-002.md",
-                "NEW: bridge/gtkb-example-001.md",
-                "",
-            ]
-        ),
-    )
+def test_parse_bridge_files_captures_latest_status_and_versions(tmp_path: Path) -> None:
+    _write(tmp_path / "bridge" / "gtkb-example-001.md", "NEW\n\nInitial proposal.\n")
+    _write(tmp_path / "bridge" / "gtkb-example-002.md", "VERIFIED\n\nVerification.\n")
 
-    entries = parse_bridge_index(index)
+    entries = parse_bridge_files(tmp_path)
 
     assert len(entries) == 1
     assert entries[0].document == "gtkb-example"
@@ -54,8 +44,7 @@ def test_parse_bridge_index_captures_latest_status_and_versions(tmp_path: Path) 
 
 
 def test_run_audit_flags_verified_bridge_citing_unverified_spec(tmp_path: Path) -> None:
-    _write(tmp_path / "bridge" / "INDEX.md", "Document: gtkb-example\nVERIFIED: bridge/gtkb-example-001.md\n")
-    _write(tmp_path / "bridge" / "gtkb-example-001.md", "Specification Links\n- SPEC-EXAMPLE-001\n")
+    _write(tmp_path / "bridge" / "gtkb-example-001.md", "VERIFIED\n\nSpecification Links\n- SPEC-EXAMPLE-001\n")
     db = FakeDB([{"id": "SPEC-EXAMPLE-001", "status": "specified", "changed_at": "2026-05-01T00:00:00+00:00"}])
 
     result = run_audit(tmp_path, db=db, now=datetime(2026, 6, 1, tzinfo=UTC))
@@ -67,8 +56,7 @@ def test_run_audit_flags_verified_bridge_citing_unverified_spec(tmp_path: Path) 
 
 
 def test_run_audit_ignores_verified_bridge_citing_verified_spec(tmp_path: Path) -> None:
-    _write(tmp_path / "bridge" / "INDEX.md", "Document: gtkb-example\nVERIFIED: bridge/gtkb-example-001.md\n")
-    _write(tmp_path / "bridge" / "gtkb-example-001.md", "Specification Links\n- SPEC-EXAMPLE-001\n")
+    _write(tmp_path / "bridge" / "gtkb-example-001.md", "VERIFIED\n\nSpecification Links\n- SPEC-EXAMPLE-001\n")
     db = FakeDB([{"id": "SPEC-EXAMPLE-001", "status": "verified", "changed_at": "2026-05-01T00:00:00+00:00"}])
 
     result = run_audit(tmp_path, db=db, now=datetime(2026, 6, 1, tzinfo=UTC))
@@ -77,7 +65,6 @@ def test_run_audit_ignores_verified_bridge_citing_verified_spec(tmp_path: Path) 
 
 
 def test_run_audit_flags_memory_duplication_of_three_spec_sentences(tmp_path: Path) -> None:
-    _write(tmp_path / "bridge" / "INDEX.md", "")
     _write(
         tmp_path / "memory" / "MEMORY.md",
         "First durable sentence. Second durable sentence. Third durable sentence.",
@@ -100,7 +87,6 @@ def test_run_audit_flags_memory_duplication_of_three_spec_sentences(tmp_path: Pa
 
 
 def test_run_audit_flags_deliberation_draft_candidates(tmp_path: Path) -> None:
-    _write(tmp_path / "bridge" / "INDEX.md", "")
     _write(tmp_path / "memory" / "MEMORY.md", "draft delib: owner said this should become durable.")
 
     result = run_audit(tmp_path, db=FakeDB([]), now=datetime(2026, 6, 1, tzinfo=UTC))
@@ -110,8 +96,7 @@ def test_run_audit_flags_deliberation_draft_candidates(tmp_path: Path) -> None:
 
 
 def test_run_audit_applies_age_filter_to_specs(tmp_path: Path) -> None:
-    _write(tmp_path / "bridge" / "INDEX.md", "Document: gtkb-example\nVERIFIED: bridge/gtkb-example-001.md\n")
-    _write(tmp_path / "bridge" / "gtkb-example-001.md", "Specification Links\n- SPEC-OLD-001\n")
+    _write(tmp_path / "bridge" / "gtkb-example-001.md", "VERIFIED\n\nSpecification Links\n- SPEC-OLD-001\n")
     old_timestamp = (datetime(2026, 6, 1, tzinfo=UTC) - timedelta(days=200)).isoformat()
     db = FakeDB([{"id": "SPEC-OLD-001", "status": "specified", "changed_at": old_timestamp}])
 
