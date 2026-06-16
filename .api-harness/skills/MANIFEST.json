@@ -255,7 +255,7 @@
       "capability_id": "skill.gtkb-hygiene-sweep",
       "description": "Orchestrate the deterministic `gt hygiene sweep` CLI and route deterministic inventory-backed string scans to `gt admin inventory refresh` plus `gt admin inventory scan-strings` instead of ad hoc grep loops. Use when investigating config-drift class observations, inventory-wide string checks, repeated config defects, or session-start hygiene thresholds; classify findings by artifact lifecycle trigger category per DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001 and guide owner-gated remediation child-bridge filing.",
       "source_relative_path": ".claude/skills/gtkb-hygiene-sweep/SKILL.md",
-      "source_sha256": "718cafaf2cd6ecb9efa2c29a31555c2b9a5b699da3eb138df724c14b28829b28"
+      "source_sha256": "4beb52830648c314210930434ff8ffa33ac3fe9adab98acf70cc5a16dd4d6cf7"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-sweep-commit/SKILL.md",

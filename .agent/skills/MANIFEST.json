@@ -222,7 +222,7 @@
       "canonical_name": "gtkb-hygiene-sweep",
       "capability_id": "skill.gtkb-hygiene-sweep",
       "source_relative_path": ".claude/skills/gtkb-hygiene-sweep/SKILL.md",
-      "source_sha256": "d65ec1a4203431a380235dd8fdfb2b62a8152f676d4838964074d6f09bae4e97"
+      "source_sha256": "a836a16b551bca526c1b7457433aa704383544abb4b3823b10e9c2222396179f"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-sweep-commit/SKILL.md",

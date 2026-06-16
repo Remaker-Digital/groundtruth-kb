@@ -124,10 +124,11 @@ Refer to `bridge/gtkb-hygiene-sweep-cli-004.md` and the CLI's `--help` output fo
 
 The inventory string-scan companion CLI is `gt admin inventory refresh` plus
 `gt admin inventory scan-strings`, introduced by
-`bridge/gtkb-inventory-string-scan-admin-cli-003.md` and verified through the
-same bridge thread. It provides deterministic artifact-inventory expansion,
-literal string matching, critical/warn classification, JSON output, and
-read-only markdown ledger evidence for follow-on remediation work.
+`bridge/gtkb-inventory-string-scan-admin-cli-003.md`; its implementation and
+verification record stays with that same bridge thread as the lifecycle
+advances. It provides deterministic artifact-inventory expansion, literal
+string matching, critical/warn classification, JSON output, and read-only
+markdown ledger evidence for follow-on remediation work.
 
 ## Cross-harness implementation notes
 
