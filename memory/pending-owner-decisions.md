@@ -6,7 +6,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-1272
+  asked_at: 2026-06-15T16:25:51.995224Z
+  question: "Want me to investigate the missing governance hooks (and the stray edit's source), or fix the trivial legacy-root ref..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 69b6fbf7d1112110
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1273
+  asked_at: 2026-06-15T16:34:49.110316Z
+  question: "Want me to (a) investigate + re-enable the storm watchdog, (b) take on WI-4577 so the generated INDEX self-trims, and..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 5bfa647bec89cbd4
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -7696,6 +7709,43 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 7499759d0d9f327e
   resolved_at: 2026-06-15T14:49:11.547069Z
   answer: "PreToolUse:AskUserQuestion hook error: [python .claude/hooks/bridge-compliance-gate.py]: C:\\Python314\\python.exe: can't open file 'E:\\\\GT-KB\\\\groundtruth-kb\\\\.claude\\\\hooks\\\\bridge-compliance-gate.py': [Errno 2] No such file or directory"
+  notes: ""
+- id: DECISION-1270
+  asked_at: 2026-06-15T16:25:51.995224Z
+  question: "The 3 leaked application slots (_test_8f5c7586, _test_golden_dual_agent, _test_golden_local_only) are unregistered, git-ignored test debris (transient test DB + scaffold output). The doctor's P0/P1 isolation FAILs only clear by deleting the directories; the destructive-gate blocked rm pending your approval. Delete them?"
+  options:
+    - "Delete the 3 dirs"
+    - "Leave them"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9e9040532a62f32d
+  resolved_at: 2026-06-15T16:25:51.995224Z
+  answer: "Your questions have been answered: \"The 3 leaked application slots (_test_8f5c7586, _test_golden_dual_agent, _test_golden_local_only) are unregistered, git-ignored test debris (transient test DB + scaffold output). The doctor's P0/P1 isolation FAILs only clear by deleting the directories; the destructive-gate blocked rm pending your approval. Delete them?\"=\"Delete the 3 dirs\", \"Re-enable the bridge dispatcher now (substrate -> cross_harness_trigger, multi-harness)? This resumes the swarm and the first dispatched tafe_canonical bridge write will apply the one-time INDEX reformat (re-adding the 3 terminal-archived threads). It also clears the 2 stale dispatch ALARMs. A stray background file edit just appeared, so resuming concurrency now carries some uncertainty.\"=\"Hold dispatcher (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1271
+  asked_at: 2026-06-15T16:25:51.995224Z
+  question: "Re-enable the bridge dispatcher now (substrate -> cross_harness_trigger, multi-harness)? This resumes the swarm and the first dispatched tafe_canonical bridge write will apply the one-time INDEX reformat (re-adding the 3 terminal-archived threads). It also clears the 2 stale dispatch ALARMs. A stray background file edit just appeared, so resuming concurrency now carries some uncertainty."
+  options:
+    - "Hold dispatcher (recommended)"
+    - "Re-enable now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 773f2e8523d2c184
+  resolved_at: 2026-06-15T16:25:51.995224Z
+  answer: "Your questions have been answered: \"The 3 leaked application slots (_test_8f5c7586, _test_golden_dual_agent, _test_golden_local_only) are unregistered, git-ignored test debris (transient test DB + scaffold output). The doctor's P0/P1 isolation FAILs only clear by deleting the directories; the destructive-gate blocked rm pending your approval. Delete them?\"=\"Delete the 3 dirs\", \"Re-enable the bridge dispatcher now (substrate -> cross_harness_trigger, multi-harness)? This resumes the swarm and the first dispatched tafe_canonical bridge write will apply the one-time INDEX reformat (re-adding the 3 terminal-archived threads). It also clears the 2 stale dispatch ALARMs. A stray background file edit just appeared, so resuming concurrency now carries some uncertainty.\"=\"Hold dispatcher (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1274
+  asked_at: 2026-06-15T16:39:49.847560Z
+  question: "The bridge + dispatcher are functional and verified now. Which remaining robustness item(s) should I pursue next? (None blocks current function; you can pick any combination.)"
+  options:
+    - "Re-enable storm watchdog"
+    - "WI-4577 archival fix"
+    - "Investigate missing hooks"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5e7656f025a00021
+  resolved_at: 2026-06-15T16:39:49.847560Z
+  answer: "Your questions have been answered: \"The bridge + dispatcher are functional and verified now. Which remaining robustness item(s) should I pursue next? (None blocks current function; you can pick any combination.)\"=\"Re-enable storm watchdog\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
