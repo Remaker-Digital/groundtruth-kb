@@ -5,7 +5,7 @@
     "script_hash": "sha256:61d23cb8e64e6a66d45eb02faf81eac9ebba575138a86c907369e89dfb6dbc12",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-15T01:16:50Z",
+  "generated_at": "2026-06-16T12:17:01Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -70,7 +70,7 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "loyal-opposition"
+          "prime-builder"
         ],
         "status": "verified"
       },
@@ -295,12 +295,13 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 34,
+      "count": 35,
       "items": [
         "alternatives-investigation",
         "arch-audit",
         "assertion-triage",
         "bridge",
+        "bridge-config",
         "bridge-propose",
         "check-deliberations",
         "code-review-audit",
@@ -362,7 +363,7 @@
         },
         "file_bridge_read_write": {
           "evidence": "bridge/INDEX.md",
-          "status": "verified"
+          "status": "unknown"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -414,7 +415,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -439,7 +440,7 @@
         },
         "file_bridge_read_write": {
           "evidence": "bridge/INDEX.md",
-          "status": "verified"
+          "status": "unknown"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -516,7 +517,7 @@
         },
         "file_bridge_read_write": {
           "evidence": "bridge/INDEX.md",
-          "status": "verified"
+          "status": "unknown"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -568,7 +569,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
@@ -593,7 +594,7 @@
         },
         "file_bridge_read_write": {
           "evidence": "bridge/INDEX.md",
-          "status": "verified"
+          "status": "unknown"
         },
         "formal_artifact_mutation_gates": {
           "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
@@ -689,11 +690,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -707,7 +708,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -721,7 +722,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {

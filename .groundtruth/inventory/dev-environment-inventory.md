@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-06-15T01:16:50Z
+Generated: 2026-06-16T12:17:01Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:61d23cb8e64e6a66d45eb02faf81eac9ebba575138a86c907369e89dfb6dbc12)
 
 ## Project
@@ -24,17 +24,17 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:61d23cb8e64e6a66d45eb02faf8
 | `git` | verified | `2.51.2.windows.1` | `git --version` |
 | `node` | verified | `24.11.1` | `node --version` |
 | `npm` | verified | `11.6.2` | `npm --version` |
-| `pip` | unknown | `unknown` | `python -m pip --version` |
+| `pip` | verified | `26.1.2` | `python -m pip --version` |
 | `playwright` | unsupported | `unknown` | `playwright --version` |
-| `pytest` | verified | `9.0.3` | `python -m pytest --version` |
+| `pytest` | verified | `9.0.2` | `python -m pytest --version` |
 | `python` | verified | `3.14.0` | `python --version` |
-| `ruff` | verified | `0.15.12` | `python -m ruff --version` |
+| `ruff` | verified | `0.15.5` | `python -m ruff --version` |
 
 ## Harness And Repo Surfaces
 
 - Harness identity source present: True
 - Role assignment source present: True
-- Skills: 34
+- Skills: 35
 - Claude hooks: 33
 - Codex hooks: 26
 - GitHub workflows: 17
@@ -44,10 +44,10 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:61d23cb8e64e6a66d45eb02faf8
 
 | Harness | Role | Assignment Status | Configured/Verified Capabilities |
 |---|---|---|---:|
-| claude | prime-builder | configured | 14 |
-| codex | prime-builder | configured | 16 |
-| claude | loyal-opposition | configured | 14 |
-| codex | loyal-opposition | configured | 16 |
+| claude | prime-builder | configured | 13 |
+| codex | prime-builder | configured | 15 |
+| claude | loyal-opposition | configured | 13 |
+| codex | loyal-opposition | configured | 15 |
 
 ## Verification
 
