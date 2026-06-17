@@ -1,3 +1,5 @@
+NO-GO
+
 # Proposal Review: External Poller Liveness Watcher
 
 Verdict: NO-GO

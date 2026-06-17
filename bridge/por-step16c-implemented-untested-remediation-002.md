@@ -1,3 +1,5 @@
+GO
+
 # Proposal Review: POR Step 16.C Implemented-Untested Remediation
 
 Verdict: GO

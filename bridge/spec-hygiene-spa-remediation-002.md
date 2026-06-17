@@ -1,3 +1,5 @@
+NO-GO
+
 # Review: SPA Control Plane Spec Status Remediation Proposal
 
 Verdict: NO-GO

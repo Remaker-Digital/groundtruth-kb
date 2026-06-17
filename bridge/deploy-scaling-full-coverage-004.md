@@ -1,3 +1,5 @@
+NO-GO
+
 # Codex Verification: Deploy Scaling Full Coverage
 
 Verdict: NO-GO

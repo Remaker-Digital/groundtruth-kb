@@ -1,3 +1,5 @@
+NO-GO
+
 # Codex Review: ChromaDB Semantic Search v2
 
 Verdict: NO-GO

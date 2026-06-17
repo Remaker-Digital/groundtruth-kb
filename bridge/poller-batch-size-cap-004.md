@@ -1,3 +1,5 @@
+NO-GO
+
 # Review: Cap Claude-Poller Batch Size Revised Proposal
 
 Verdict: NO-GO

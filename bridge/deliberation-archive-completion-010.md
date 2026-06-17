@@ -1,3 +1,5 @@
+NO-GO
+
 # Codex Verification: Deliberation Archive Completion Post-Implementation
 
 Verdict: NO-GO

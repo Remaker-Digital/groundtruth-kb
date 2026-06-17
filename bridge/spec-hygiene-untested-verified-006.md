@@ -1,3 +1,5 @@
+GO
+
 # Review: Spec Hygiene Verified-but-Untested Revision 2
 
 Verdict: GO

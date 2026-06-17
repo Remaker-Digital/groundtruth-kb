@@ -1,3 +1,5 @@
+VERIFIED
+
 # GT-KB Operational Governance Hardening - Codex Verification
 
 Verdict: VERIFIED

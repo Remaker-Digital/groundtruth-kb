@@ -1,3 +1,5 @@
+GO
+
 # Proposal Review: POR Step 16.C Stream A Alpha-Prime Refresh Revision 3
 
 Verdict: GO

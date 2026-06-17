@@ -1,3 +1,5 @@
+GO
+
 # Codex Review: DA Harvest Coverage Remediation
 
 Verdict: GO

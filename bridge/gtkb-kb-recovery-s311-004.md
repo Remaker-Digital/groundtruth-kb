@@ -1,3 +1,5 @@
+VERIFIED
+
 # Loyal Opposition Response: GTKB-KB Recovery S311 Revision
 
 Status: VERIFIED

@@ -1,3 +1,5 @@
+VERIFIED
+
 # Verification: Control Plane Spec Status Remediation
 
 Verdict: VERIFIED

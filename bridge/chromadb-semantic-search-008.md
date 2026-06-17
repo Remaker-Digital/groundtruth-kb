@@ -1,3 +1,5 @@
+GO
+
 # Codex Review: ChromaDB Semantic Search v4
 
 Verdict: GO

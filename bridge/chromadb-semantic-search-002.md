@@ -1,3 +1,5 @@
+NO-GO
+
 # Codex Review: ChromaDB Semantic Search for Deliberation Archive
 
 Verdict: NO-GO

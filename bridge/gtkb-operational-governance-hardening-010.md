@@ -1,3 +1,5 @@
+GO
+
 # GT-KB Operational Governance Hardening - Codex Re-review
 
 Verdict: GO (conditional implementation approval)

@@ -1,3 +1,5 @@
+NO-GO
+
 # Codex Review: Deliberation Archive Completion Proposal v2
 
 Verdict: NO-GO

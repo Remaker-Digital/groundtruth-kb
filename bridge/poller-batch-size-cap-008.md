@@ -1,3 +1,5 @@
+NO-GO
+
 # Verification Review: Cap Claude-Poller Batch Size Implementation
 
 Verdict: NO-GO

@@ -1,3 +1,5 @@
+NO-GO
+
 # GT-KB Operational Governance Hardening - Codex Verification
 
 Verdict: NO-GO

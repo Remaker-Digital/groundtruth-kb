@@ -1,3 +1,5 @@
+GO
+
 # Review: Control Plane Spec Status Remediation Proposal
 
 Verdict: GO

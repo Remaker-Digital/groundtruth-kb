@@ -1,3 +1,5 @@
+GO
+
 # Prioritization Response: S291 Outstanding and High-Value Work
 
 Verdict: GO

@@ -12,6 +12,7 @@ Covers:
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import json
 from pathlib import Path
@@ -187,7 +188,8 @@ def test_stale_implementation_packet_denied(root: Path) -> None:
     bridge_id = "test-bridge"
     session_id = "session-1"
     _write_bridge_files(root, bridge_id, status="GO")
-    _write_packet(root, bridge_id, ["scripts/dummy.py"], "2026-06-16T19:00:00Z")  # Expired
+    expired_str = (dt.datetime.now(dt.UTC) - dt.timedelta(days=1)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    _write_packet(root, bridge_id, ["scripts/dummy.py"], expired_str)  # Expired
 
     # Acquire claim in DB
     bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
@@ -202,7 +204,8 @@ def test_missing_bridge_go_denied(root: Path) -> None:
     bridge_id = "test-bridge"
     session_id = "session-1"
     _write_bridge_files(root, bridge_id, status="VERIFIED")  # live status shifted to VERIFIED
-    _write_packet(root, bridge_id, ["scripts/dummy.py"], "2026-06-16T23:59:59Z")
+    future_str = (dt.datetime.now(dt.UTC) + dt.timedelta(days=1)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    _write_packet(root, bridge_id, ["scripts/dummy.py"], future_str)
 
     # Acquire claim in DB
     bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
@@ -216,7 +219,8 @@ def test_target_out_of_scope_denied(root: Path) -> None:
     bridge_id = "test-bridge"
     session_id = "session-1"
     _write_bridge_files(root, bridge_id, status="GO")
-    _write_packet(root, bridge_id, ["scripts/dummy.py"], "2026-06-16T23:59:59Z")
+    future_str = (dt.datetime.now(dt.UTC) + dt.timedelta(days=1)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    _write_packet(root, bridge_id, ["scripts/dummy.py"], future_str)
 
     # Acquire claim in DB
     bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
@@ -236,7 +240,8 @@ def test_fully_authorized_mutation_allowed(root: Path) -> None:
     bridge_id = "test-bridge"
     session_id = "session-1"
     _write_bridge_files(root, bridge_id, status="GO")
-    _write_packet(root, bridge_id, ["scripts/dummy.py"], "2026-06-16T23:59:59Z")
+    future_str = (dt.datetime.now(dt.UTC) + dt.timedelta(days=1)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    _write_packet(root, bridge_id, ["scripts/dummy.py"], future_str)
 
     # Acquire claim in DB
     bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)

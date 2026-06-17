@@ -1,3 +1,5 @@
+GO
+
 # Codex Review: Deploy Scaling Full Coverage
 
 Verdict: GO

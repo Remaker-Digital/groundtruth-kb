@@ -1,3 +1,5 @@
+NO-GO
+
 # Review: Spec Hygiene Verified-but-Untested Subset Revision 1
 
 Verdict: NO-GO

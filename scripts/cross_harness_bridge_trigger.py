@@ -141,7 +141,7 @@ DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
 # dispatch failures, so the shared writer routes them to
 # dispatch-suppressions.jsonl instead of polluting dispatch-failures.jsonl and
 # burying real, actionable failures in the `diagnose` "Recent failures" view.
-EXPECTED_SUPPRESSION_REASONS = frozenset({"work_intent_already_held"})
+EXPECTED_SUPPRESSION_REASONS = frozenset({"work_intent_already_held", "headless_takeover_cooldown"})
 DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
 DEFAULT_DISPATCH_RUNS_MAX_BYTES = 200 * 1024 * 1024
 DEFAULT_GTKB_STATE_GC_AGE_DAYS = 14
@@ -818,6 +818,47 @@ def _filter_prime_selected_by_work_intent(
                 holder=holder,
             )
             continue
+
+        # Check for 30-minute headless takeover cooldown (WI-4560)
+        try:
+            from bridge_work_intent_registry import _parse_iso, now_utc
+            from bridge_work_intent_registry import claim_status as get_claim_status
+
+            claim = get_claim_status(item.document_name, project_root=project_root)
+            if claim is not None and claim.get("session_id"):
+                holder_sess = claim.get("session_id")
+                # If the claim was held by a trigger/headless dispatch session
+                if holder_sess.startswith(WORK_INTENT_TRIGGER_SESSION_PREFIX):
+                    # Check if it expired/lapsed without progress (latest status is still GO/NO-GO)
+                    latest_status = claim.get("latest_bridge_status")
+                    if latest_status in ("GO", "NO-GO"):
+                        # Get expiry timestamp
+                        expiry_str = claim.get("implementation_grace_expires_at") or claim.get("ttl_expires_at")
+                        expiry_dt = _parse_iso(expiry_str)
+                        if expiry_dt is not None:
+                            now = now_utc()
+                            elapsed = (now - expiry_dt).total_seconds()
+                            if 0 <= elapsed < 30 * 60:
+                                # Cooldown is active! Suppress headless auto-dispatch.
+                                _record_dispatch_suppression(
+                                    state_dir,
+                                    {
+                                        "ts": _now_iso(),
+                                        "dispatch_id": dispatch_id,
+                                        "recipient": recipient,
+                                        "launched": False,
+                                        "reason": "headless_takeover_cooldown",
+                                        "document_name": item.document_name,
+                                        "expired_session_id": holder_sess,
+                                        "cooldown_remaining_seconds": int(30 * 60 - elapsed),
+                                    },
+                                )
+                                held_count += 1
+                                continue
+        except Exception:
+            # Fall-soft: trigger must not break due to cooldown check errors
+            pass
+
         unheld.append(item)
     return {"ok": True, "reason": None, "selected": unheld, "held_count": held_count}
 
@@ -1217,17 +1258,16 @@ def _pid_alive(pid: int) -> bool:
             still_active = 259
             kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
             handle = kernel32.OpenProcess(process_query_limited_information, False, pid_int)
-            if not handle:
-                return False
-            try:
-                exit_code = ctypes.c_ulong()
-                if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
-                    return exit_code.value == still_active
-                return True
-            finally:
-                kernel32.CloseHandle(handle)
-        except Exception:  # noqa: BLE001 - fail-closed to not-alive
-            return False
+            if handle:
+                try:
+                    exit_code = ctypes.c_ulong()
+                    if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                        return exit_code.value == still_active
+                    return True
+                finally:
+                    kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001
+            pass
     try:
         os.kill(pid_int, 0)
     except ProcessLookupError:
@@ -2499,6 +2539,24 @@ def check_counterpart_active(target: DispatchTarget, state_dir: Path) -> bool:
     return check_target_active(target, state_dir)
 
 
+def _is_spawn_rate_limited(runs_dir: Path) -> bool:
+    """Return True if a harness was globally spawned within the last 10 seconds."""
+    if not runs_dir.is_dir():
+        return False
+    now = time.time()
+    try:
+        for p in runs_dir.glob("*.pid"):
+            try:
+                mtime = p.stat().st_mtime
+                if now - mtime < 10.0:
+                    return True
+            except OSError:
+                pass
+    except Exception:
+        pass
+    return False
+
+
 def _spawn_harness(
     *,
     target: DispatchTarget,
@@ -2576,6 +2634,16 @@ def _spawn_harness(
             "reason": "concurrency_cap_reached",
             "live_count": live_count,
             "cap": cap,
+        }
+        _record_dispatch_failure(state_dir, meta)
+        return meta
+
+    if _is_spawn_rate_limited(runs_dir):
+        meta = {
+            "dispatch_id": dispatch_id,
+            "recipient": recipient_key,
+            "launched": False,
+            "reason": "spawn_rate_limited",
         }
         _record_dispatch_failure(state_dir, meta)
         return meta
@@ -4140,10 +4208,36 @@ def _build_argparser() -> argparse.ArgumentParser:
     return parser
 
 
+def _has_stdin_data() -> bool:
+    """Return True if sys.stdin has data available to read immediately without blocking."""
+    if sys.platform == "win32":
+        import ctypes
+        import msvcrt
+
+        try:
+            handle = msvcrt.get_osfhandle(sys.stdin.fileno())
+            avail = ctypes.c_ulong()
+            if ctypes.windll.kernel32.PeekNamedPipe(handle, None, 0, None, ctypes.byref(avail), None):
+                return avail.value > 0
+        except Exception:
+            pass
+        return False
+    else:
+        import select
+
+        try:
+            r, _, _ = select.select([sys.stdin], [], [], 0)
+            return bool(r)
+        except Exception:
+            return False
+
+
 def _read_hook_context_from_stdin() -> dict[str, str] | None:
     """Read hook JSON payload from stdin without blocking manual invocations."""
     try:
         if sys.stdin.isatty():
+            return None
+        if not _has_stdin_data():
             return None
         raw = sys.stdin.read()
     except Exception:  # noqa: BLE001 - hook payload parsing is fail-soft

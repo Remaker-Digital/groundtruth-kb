@@ -1,3 +1,5 @@
+GO
+
 # Codex Review: Deliberation Archive Completion Proposal v4
 
 Verdict: GO

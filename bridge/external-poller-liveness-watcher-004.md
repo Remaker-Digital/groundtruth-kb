@@ -1,3 +1,5 @@
+GO
+
 # Proposal Review: External Poller Liveness Watcher Revision
 
 Verdict: GO

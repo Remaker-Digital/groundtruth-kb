@@ -1,3 +1,5 @@
+VERIFIED
+
 # Verification: Spec Hygiene Verified-but-Untested Tracks C/D/E
 
 Verdict: VERIFIED

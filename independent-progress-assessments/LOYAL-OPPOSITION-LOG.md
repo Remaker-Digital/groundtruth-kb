@@ -180,7 +180,7 @@
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | Antigravity (Gemini) is ready to serve as Loyal Opposition once registration and dispatch verification are verified, but is structurally blocked from Prime Builder role due to a lack of event hooks. | `memory/antigravity-integration-status.md`; `bridge/gtkb-antigravity-harness-registration-003.md`; `DOC-ANTIGRAVITY-IDE-RESEARCH-001` | Verify harness registration and complete headless dispatch verification, then activate and assign Gemini as LO. | Open |
-| Process | Claude Code is currently incapable of serving as Prime Builder due to severe background execution/auth hangs and silent no-ops discovered during headless runs. | `independent-progress-assessments/bridge-automation/claude-file-bridge-scan.ps1` | Maintain Claude Code's suspended status in registry until headless CLI execution fixes are proposed and verified. Owner AUQ 2026-05-27 (S364): defer until WI-3349 VERIFIED — the suggested topology reshuffle (suspend B; flip A to PB; activate C as LO) presumes Antigravity's LO suitability, which WI-3349 substrate verification is the precondition for. Re-surface for owner disposition once WI-3349 reaches VERIFIED. | Deferred |
+| Process | Claude Code is currently incapable of serving as Prime Builder due to severe background execution/auth hangs and silent no-ops discovered during headless runs. | `independent-progress-assessments/bridge-automation/claude-file-bridge-scan.ps1` | Maintain Claude Code's suspended status in registry until headless CLI execution fixes are proposed and verified. Owner AUQ 2026-05-27 (S364): defer until WI-3349 VERIFIED â€” the suggested topology reshuffle (suspend B; flip A to PB; activate C as LO) presumes Antigravity's LO suitability, which WI-3349 substrate verification is the precondition for. Re-surface for owner disposition once WI-3349 reaches VERIFIED. | Deferred |
 
 ---
 
@@ -261,17 +261,17 @@
 | Process | LO actionable queue is empty (0 entries); 12 GOs, 121 VERIFIED, 1 NO-GO, 5 ADVISORY, 1 DEFERRED, 44 WITHDRAWN. Steady state, all LO duties discharged at this snapshot. | `python .claude/skills/bridge/helpers/scan_bridge.py --role loyal-opposition` at 13:35:56Z. | None required; observation only. | Resolved |
 | Technical | All 12 top-of-chain GO entries are correctly classified TERMINAL-OK (`target_paths: []`, `requires_verification: false`). No mis-classification stalling Prime. | Sub-agent audit of `bridge/<slug>-002.md` through `-006.md` for the 12 GO slugs; see report. | None required; positive confirmation of WI-4278 terminal-GO filter. | Resolved |
 | Technical | `bridge_kind` taxonomy drift across bridge corpus: 25+ distinct values, 11 synonyms for "LO verdict" alone (loyal_opposition_verdict 394, verification_verdict 301, review_verdict 103, loyal_opposition_review 42, etc.). Silent classifier hazard for `scan_bridge.py`, cross-harness trigger, and dashboards. | `grep -hr "^bridge_kind:" bridge/*.md \| sort \| uniq -c \| sort -rn`; full report in `INSIGHTS-2026-06-04-13-37-LO-LOOP-EMPTY-QUEUE-AND-BRIDGE-KIND-TAXONOMY-DRIFT.md`. | Land a canonical 5-7-value `bridge_kind` enum + bridge-compliance-gate lint; migrate via re-version backfill. P2. | Open |
-| Process | `.claude/session/active-session-role.json` written at 13:33:38Z with `role=prime-builder` for my session ID (4c7620e0-be99-…) despite the session resolving as Loyal Opposition via `::init gtkb lo` at SessionStart 13:30:14Z. Parallel-session marker race (same defect class as project_s_scheduled_pb_saturation_clobber). | File contents inspected; LO startup disclosure was successfully relayed from `last-user-visible-startup-lo.md` (sha256 `cad2ad18…`). | Add atomic session-stated-role marker write with cross-session clobber rejection in `scripts/workstream_focus.py`. P2. | Open |
+| Process | `.claude/session/active-session-role.json` written at 13:33:38Z with `role=prime-builder` for my session ID (4c7620e0-be99-â€¦) despite the session resolving as Loyal Opposition via `::init gtkb lo` at SessionStart 13:30:14Z. Parallel-session marker race (same defect class as project_s_scheduled_pb_saturation_clobber). | File contents inspected; LO startup disclosure was successfully relayed from `last-user-visible-startup-lo.md` (sha256 `cad2ad18â€¦`). | Add atomic session-stated-role marker write with cross-session clobber rejection in `scripts/workstream_focus.py`. P2. | Open |
 | Process | Bridge dispatch state (`.gtkb-state/bridge-poller/dispatch-state.json`) is 3 days stale (last update 2026-06-01T18:07:51Z) despite many VERIFIED entries landing 2026-06-04 (commits `ed23f6b5`, `e0d4cc29`, `ad45a73d`, `2fa27699`, `6beb26c2`). Likely the trigger writes only on actionable-signature change, not every fire; needs confirmation before any alarm threshold is set. | `dispatch-state.json` inspection. | Add doctor staleness WARN once write semantics are confirmed. P3. | Open |
 | Technical | Stranded atomic-write tmp file `dispatch-state.json.34252-0f2d0cc7.tmp` alongside canonical `dispatch-state.json`. Single instance, no rotation pattern. | `ls .gtkb-state/bridge-poller/`. | Add cleanup of `*.tmp` stragglers in poller-state hygiene. P3. | Open |
 
 Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-04-13-37-LO-LOOP-EMPTY-QUEUE-AND-BRIDGE-KIND-TAXONOMY-DRIFT.md`.
 
-**Post-loop addendum (15:14Z, same session) — concrete cross-harness session-id co-option.**
+**Post-loop addendum (15:14Z, same session) â€” concrete cross-harness session-id co-option.**
 
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
-| Process | Work-intent claim file `.gtkb-state/work-intent/gtkb-impl-start-target-paths-preflight.json` was acquired at 15:13:12Z under this Claude session id `4c7620e0-be99-…` for a thread this session never touched. The thread's `-003.md` NO-GO was authored by Codex (harness A) under `automation: keep-working-lo`, against a `-001` by Claude Prime (harness B, session `bfc70de3-76e6-…`) and `-002` GO by Antigravity LO (harness C). Three harnesses concurrent on one thread; the LO claim holder is a fourth ID (mine) that did not invoke `bridge_claim_cli.py`. | `cat .gtkb-state/work-intent/gtkb-impl-start-target-paths-preflight.json`; head of `bridge/gtkb-impl-start-target-paths-preflight-003.md`; AXIS-2 surface at 15:13:48Z. | Investigate the Codex `keep-working-lo` automation's session-id resolution — it should never hold a claim under a remote-harness's session id. Likely related to shared dispatch-state.json or trigger-emitted env-vars. P2 follow-up to the marker-race candidate C. | Open |
+| Process | Work-intent claim file `.gtkb-state/work-intent/gtkb-impl-start-target-paths-preflight.json` was acquired at 15:13:12Z under this Claude session id `4c7620e0-be99-â€¦` for a thread this session never touched. The thread's `-003.md` NO-GO was authored by Codex (harness A) under `automation: keep-working-lo`, against a `-001` by Claude Prime (harness B, session `bfc70de3-76e6-â€¦`) and `-002` GO by Antigravity LO (harness C). Three harnesses concurrent on one thread; the LO claim holder is a fourth ID (mine) that did not invoke `bridge_claim_cli.py`. | `cat .gtkb-state/work-intent/gtkb-impl-start-target-paths-preflight.json`; head of `bridge/gtkb-impl-start-target-paths-preflight-003.md`; AXIS-2 surface at 15:13:48Z. | Investigate the Codex `keep-working-lo` automation's session-id resolution â€” it should never hold a claim under a remote-harness's session id. Likely related to shared dispatch-state.json or trigger-emitted env-vars. P2 follow-up to the marker-race candidate C. | Open |
 
 ---
 
@@ -307,7 +307,7 @@ Full advisory: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-
 
 ---
 
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+*Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 ---
 
 ### 2026-06-07 - S509 Prime Builder Implementation Handoff
@@ -545,3 +545,33 @@ Loyal Opposition (Antigravity/lo role) aligned the capability registry, generate
 |------|---------|-------------------|------------------|--------|
 | Technical | `platform_tests/scripts/test_check_skill_health.py` was failing because the checker implementation refactored the index write-checking logic to use `bridge_direct_write` on numbered files, but the unit tests still asserted the retired `index_write` finding type on `INDEX.md`. | `python -m pytest platform_tests/scripts/test_check_skill_health.py` failed. | Updated `platform_tests/scripts/test_check_skill_health.py` to match the `bridge_direct_write` naming and regex behavior. Verified that all 10 tests and all 12 harness-parity tests pass. `WI-4596` and `WI-4366` remain backlogged/open in MemBase pending the formal bridge verification flow. | Open (Implementation Staged) |
 | Process | The rule requiring a Loyal Opposition `VERIFIED` verdict before committing mutating changes was not explicitly clear across all rules, scripts, and harnesses. | Owner request to confirm the directive. | Created `WI-4613` under `PROJECT-PARALLEL-DISPATCH-REMEDIATION-SWEEP` to add this explicit constraint to `AGENTS.md`, rules, and `sweep-commit` scripts for all harnesses. | Open |
+
+---
+
+### 2026-06-16 - Loyal Opposition Queue Clearance and Status Check
+
+Loyal Opposition (Antigravity/lo role) processed all actionable bridge review and verification entries, clearing the active queue.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Actionable bridge entries were outstanding: `gtkb-inventory-string-scan-admin-cli` implementation report (v007), `gtkb-harness-c-governance-gate-parity-gap` revised blocker (v009), `agent-disposition-wi4588-protected-mutation-guard-slice1` implementation report (v003), and `gtkb-no-index-skill-template-doc-cleanout` implementation report (v015). | Bridge directory scan; preflight and clause preflight runs; test suite runs. | Author verdicts for all threads. Result: v008 (VERIFIED), v010 (NO-GO blocker confirmed), v004 (VERIFIED), and v016 (VERIFIED) successfully written to `bridge/`. All tests (scaffold, harness, quality manifest, and protected mutation guard) pass cleanly. | Resolved |
+
+---
+
+### 2026-06-17 - WI-4394 Bridge Verdict & report.txt Reconciliation
+
+Loyal Opposition (Antigravity/lo role) filed the `GO` verdict for the Git warnings fix (WI-4394) and successfully reconciled the `report.txt` vs database discrepancy. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-17-02-25-gtkb-windows-git-warnings-and-report-reconciliation.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The `gtkb-windows-git-warnings-fix` proposal (WI-4394) successfully resolved the previous global config crash issue on Windows by redirecting `XDG_CONFIG_HOME` instead of setting `GIT_CONFIG_GLOBAL=NUL`. | `bridge/gtkb-windows-git-warnings-fix-003.md` proposal; zero gaps in clause/applicability preflights. | File the `GO` verdict (`bridge/gtkb-windows-git-warnings-fix-004.md`) so Prime Builder can implement. | Resolved |
+| Process | `report.txt` had discrepancies in active count and top items with the SQLite DB. Reconciled this to a static snapshot timing discrepancy. | DB queries and `report.txt` contents matching perfectly when time-travel queried at June 12-13, 2026. | Standardize database checks to use point-in-time snapshot queries based on the generated file's timestamp. | Resolved |
+
+### 2026-06-17 - Harness C Blocker & Skill Generator Formatting Reviews
+
+Loyal Opposition (Antigravity/lo role) processed the outstanding actionable bridge entries for `gtkb-harness-c-governance-gate-parity-gap` and `gtkb-skill-generator-registry-formatting`, clearing the queue.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | `gtkb-harness-c-governance-gate-parity-gap` (WI-4543) revised blocker remains blocked due to lack of active project authorization (PAUTH) for WI-4543. | `bridge/gtkb-harness-c-governance-gate-parity-gap-013.md` and database check of active PAUTHs | File the `NO-GO` verdict (v014) to maintain the blocker state until authorization is granted. | Resolved |
+| Process | `gtkb-skill-generator-registry-formatting` (WI-4612) revised proposal successfully added the required implementation-start metadata (`target_paths` and `## Requirement Sufficiency` section). | `bridge/gtkb-skill-generator-registry-formatting-003.md`, preflight checks passed with zero gaps | File the `GO` verdict (v004) to authorize the implementation. | Resolved |

@@ -1,3 +1,5 @@
+VERIFIED
+
 # Verification Review: External Poller Liveness Watcher
 
 Verdict: VERIFIED

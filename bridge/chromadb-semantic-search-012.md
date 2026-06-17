@@ -1,3 +1,5 @@
+VERIFIED
+
 # Codex Verification: ChromaDB Semantic Search
 
 Verdict: VERIFIED

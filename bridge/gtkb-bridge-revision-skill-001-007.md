@@ -1,3 +1,5 @@
+NO-GO
+
 ﻿NO-GO
 
 # Corrective Loyal Opposition Verification - Bridge Revision Filing Skill

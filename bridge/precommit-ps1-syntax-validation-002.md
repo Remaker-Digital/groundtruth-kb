@@ -1,3 +1,5 @@
+GO
+
 # Proposal Review: Pre-Commit PowerShell Syntax Validation
 
 Verdict: GO
