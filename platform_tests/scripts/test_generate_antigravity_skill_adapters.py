@@ -14,8 +14,20 @@ import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
+CODEX_SCRIPT_PATH = REPO_ROOT / "scripts" / "generate_codex_skill_adapters.py"
 SCRIPT_PATH = REPO_ROOT / "scripts" / "generate_antigravity_skill_adapters.py"
+
+
+def _load_codex_module():
+    spec = importlib.util.spec_from_file_location("generate_codex_skill_adapters", CODEX_SCRIPT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["generate_codex_skill_adapters"] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _load_module():
@@ -232,3 +244,42 @@ def test_update_registry_is_idempotent(tmp_path: Path) -> None:
     adapters = module.build_adapters(tmp_path)
     assert module.update_registry(tmp_path, adapters) is True
     assert module.update_registry(tmp_path, adapters) is False
+
+
+@pytest.mark.parametrize(
+    ("first_generator", "second_generator"),
+    [
+        ("codex", "antigravity"),
+        ("antigravity", "codex"),
+    ],
+)
+def test_codex_and_antigravity_registry_updates_converge(
+    tmp_path: Path, first_generator: str, second_generator: str
+) -> None:
+    codex_module = _load_codex_module()
+    antigravity_module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_skill(tmp_path, "build")
+    _write_registry(tmp_path)
+
+    generators = {
+        "codex": (codex_module, codex_module.build_adapters(tmp_path)),
+        "antigravity": (antigravity_module, antigravity_module.build_adapters(tmp_path)),
+    }
+
+    first_module, first_adapters = generators[first_generator]
+    second_module, second_adapters = generators[second_generator]
+
+    assert first_module.update_registry(tmp_path, first_adapters) is True
+    assert second_module.update_registry(tmp_path, second_adapters) is True
+
+    registry_path = tmp_path / "config" / "agent-control" / "harness-capability-registry.toml"
+    converged_text = registry_path.read_text(encoding="utf-8")
+    parsed = tomllib.loads(converged_text)
+    for capability in parsed["capabilities"]:
+        assert capability["codex"]["status"] == "adapter"
+        assert capability["antigravity"]["status"] == "adapter"
+
+    assert first_module.update_registry(tmp_path, first_adapters) is False
+    assert second_module.update_registry(tmp_path, second_adapters) is False
+    assert registry_path.read_text(encoding="utf-8") == converged_text
