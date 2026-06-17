@@ -64,6 +64,7 @@ Create one local commit from the current non-ignored GT-KB worktree, preserving 
    git diff --cached --check
    & $python -m groundtruth_kb secrets scan --staged --redacted --fail-on verified-provider
    if ($py.Count -gt 0) {
+     $env:PYTHONPYCACHEPREFIX=".tmp\pycache"
      & $python -m py_compile @py
      & $python -m ruff check @py
      & $python -m ruff format --check @py

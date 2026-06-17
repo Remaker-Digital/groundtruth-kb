@@ -229,7 +229,7 @@
       "canonical_name": "gtkb-sweep-commit",
       "capability_id": "skill.gtkb-sweep-commit",
       "source_relative_path": ".claude/skills/gtkb-sweep-commit/SKILL.md",
-      "source_sha256": "2b816bb22269b98641a9d30c019f2d62888a37cf2b3062c9adf2b266e67d9c5b"
+      "source_sha256": "25541a0b5ccd0ad04341535cef9d14b9aa32950089800513a0d3e3bf7c562ae2"
     },
     {
       "adapter_relative_path": ".codex/skills/loyal-opposition-hygiene-assessment/SKILL.md",

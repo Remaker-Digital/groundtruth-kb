@@ -263,7 +263,7 @@
       "capability_id": "skill.gtkb-sweep-commit",
       "description": "Sweep and locally commit all current non-ignored GroundTruth-KB worktree changes after owner authorization. Use when the owner says to \"sweep commit\", \"commit everything\", \"commit all changes\", consolidate verified bridge work, or perform the regular GT-KB full-worktree cleanup commit. Handles GT-KB governance hooks, inventory drift, narrative-artifact approval evidence, staged credential scans, and verification before committing. Does not push unless the owner explicitly asks.",
       "source_relative_path": ".claude/skills/gtkb-sweep-commit/SKILL.md",
-      "source_sha256": "2b816bb22269b98641a9d30c019f2d62888a37cf2b3062c9adf2b266e67d9c5b"
+      "source_sha256": "25541a0b5ccd0ad04341535cef9d14b9aa32950089800513a0d3e3bf7c562ae2"
     },
     {
       "adapter_relative_path": ".api-harness/skills/loyal-opposition-hygiene-assessment/SKILL.md",
