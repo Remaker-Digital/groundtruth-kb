@@ -28,8 +28,14 @@ R7 refactoring — session 31.
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
-from typing import Optional
+
+# Suppress system-level configuration warnings
+os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
+if os.name == "nt":
+    # Redirect global configuration lookup to a safe writeable temp directory on Windows
+    os.environ["XDG_CONFIG_HOME"] = tempfile.gettempdir()
 
 # Project root: scripts/../
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -57,7 +63,7 @@ def load_env_local(
     *,
     override: bool = False,
     check_only: bool = False,
-    env_file: Optional[Path] = None,
+    env_file: Path | None = None,
 ) -> dict[str, str]:
     """Load .env.local into os.environ.
 

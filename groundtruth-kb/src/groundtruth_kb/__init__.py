@@ -5,7 +5,15 @@ Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All right
 Licensed under AGPL-3.0-or-later.
 """
 
+import os
+import tempfile
 from pathlib import Path
+
+# Suppress system-level configuration warnings
+os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
+if os.name == "nt":
+    # Redirect global configuration lookup to a safe writeable temp directory on Windows
+    os.environ["XDG_CONFIG_HOME"] = tempfile.gettempdir()
 
 from groundtruth_kb.assertion_schema import validate_assertion, validate_assertion_list
 from groundtruth_kb.assertions import format_summary, run_all_assertions, run_single_assertion
