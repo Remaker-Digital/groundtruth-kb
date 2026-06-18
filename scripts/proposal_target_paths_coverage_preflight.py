@@ -23,6 +23,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
+    BridgeEntry,
     bridge_entry,
     extract_target_paths,
     normalize_relative_path,
@@ -144,13 +145,26 @@ def _uncovered(paths: list[str], target_paths: list[str]) -> list[str]:
     return [path for path in paths if not path_authorized(packet, path)]
 
 
+def _candidate_proposal_versions(entry: BridgeEntry) -> list[tuple[str, str]]:
+    """Return versions that can contain the approved implementation proposal.
+
+    Bridge post-implementation reports are Prime-authored NEW/REVISED files too.
+    Once a GO exists, every newer NEW/REVISED belongs to the verification cycle,
+    so proposal resolution must inspect the versions older than the latest GO.
+    """
+    latest_go_index = next((index for index, (status, _) in enumerate(entry.versions) if status == "GO"), None)
+    if latest_go_index is None:
+        return entry.versions
+    return entry.versions[latest_go_index + 1 :]
+
+
 def _resolve_content_file(project_root: Path, bridge_id: str | None, content_file: str | None) -> str:
     if content_file:
         return normalize_relative_path(project_root, content_file)
     if not bridge_id:
         raise AuthorizationError("either --bridge-id or --content-file is required")
     entry = bridge_entry(project_root, bridge_id)
-    for status, rel_path in entry.versions:
+    for status, rel_path in _candidate_proposal_versions(entry):
         if status in _PRIME_PROPOSAL_STATUSES:
             return rel_path
     raise AuthorizationError(f"No NEW/REVISED proposal file found for bridge {bridge_id}")

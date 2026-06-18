@@ -42,6 +42,14 @@ note = 'null sink whitelisted'
 command = 'curl https://example.com/api/v1/path'
 note = 'URL scheme://... skipped, not a filesystem path'
 
+[[bash_parser_pass]]
+command = 'Write-Output "regex Document:\s*(\S+) bridge/gtkb-example-001.md"'
+note = 'drive-shaped substring inside regex/prose is not a standalone filesystem token'
+
+[[bash_parser_pass]]
+command = 'Write-Output "E:\GT-KB\bridge\gtkb-example-001.md"'
+note = 'quoted in-root Windows absolute bridge path is allowed'
+
 [[bash_parser_block]]
 command = 'cat C:\Users\micha\secret.txt'
 note = 'genuine out-of-root drive-letter absolute'

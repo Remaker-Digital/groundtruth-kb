@@ -13,16 +13,19 @@ REDIRECTION_RE = re.compile(r"(?:>|>>|<|\|)\s*([^\s|&;]+)")
 
 # HYG-042 (FAB-14): match only GENUINE absolute-path candidates so a relative
 # 'dir/file' token is not mis-read as an out-of-root '/file'. Three alternatives:
-#   - drive-letter absolute  C:\foo  or  C:/foo
+#   - drive-letter absolute  C:\foo  or  C:/foo, but only at a token
+#                             boundary so prose/regex snippets like
+#                             'Document:\s*' do not become 't:\s*'
 #   - UNC                     \\host\share
 #   - rooted '/...'           but ONLY at a token boundary (negative lookbehind on
-#                             a word char or '.') so 'scripts/foo' is not captured.
+#                             a word char, '.', ':', or '/') so 'scripts/foo' and
+#                             'https://example.com/path' are not captured.
 # Per-match classification in _classify_path_token() then skips null sinks and
 # URL ('://') context, translates MSYS '/c/...' to 'C:\...', and resolves a
 # rooted-driveless '/foo' as PROJECT-root-relative (the HYG-042 owner decision).
-_DRIVE_ABSOLUTE = r"[A-Za-z]:[\\/][^\s|&;'\"]*"
+_DRIVE_ABSOLUTE = r"(?<![\w.])[A-Za-z]:[\\/][^\s|&;'\"]*"
 _UNC_ABSOLUTE = r"\\\\[^\s|&;'\"]+"
-_ROOTED = r"(?<![\w.])/[^\s|&;'\"]*"
+_ROOTED = r"(?<![\w.:/])/[^\s|&;'\"]*"
 PATH_DELIMITER_RE = re.compile(rf"[\"']?({_DRIVE_ABSOLUTE}|{_UNC_ABSOLUTE}|{_ROOTED})[\"']?")
 
 # Null sinks are always allowed regardless of root (HYG-042 owner decision).

@@ -39,6 +39,22 @@ def _write_proposal(tmp_path: Path, target_paths: list[str], commands: str) -> P
     return proposal
 
 
+def _proposal_content(status: str, target_paths: list[str], commands: str) -> str:
+    return (
+        f"{status}\n\nbridge_kind: prime_proposal\n\ntarget_paths: {target_paths!r}\n".replace("'", '"')
+        + "\n## Spec-Derived Verification Plan\n\n"
+        + commands
+        + "\n"
+    )
+
+
+def _write_bridge_version(tmp_path: Path, slug: str, version: int, content: str) -> Path:
+    path = tmp_path / "bridge" / f"{slug}-{version:03d}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
 def test_flags_pytest_path_missing_from_target_paths(module, tmp_path) -> None:
     proposal = _write_proposal(
         tmp_path,
@@ -147,3 +163,70 @@ def test_fully_scoped_proposal_reports_no_gaps(module, tmp_path) -> None:
     assert result["uncovered_verification_paths"] == []
     assert result["uncovered_generator_paths"] == []
     assert result["out_of_root"] == []
+
+
+def test_bridge_id_resolution_skips_post_go_new_report(module, tmp_path) -> None:
+    slug = "example-thread"
+    _write_bridge_version(
+        tmp_path,
+        slug,
+        1,
+        _proposal_content(
+            "NEW",
+            ["platform_tests/scripts/test_example.py"],
+            "    python -m pytest platform_tests/scripts/test_example.py -q",
+        ),
+    )
+    _write_bridge_version(tmp_path, slug, 2, "GO\n\nbridge_kind: review_verdict\n")
+    _write_bridge_version(
+        tmp_path,
+        slug,
+        3,
+        "NEW\n\nbridge_kind: implementation_report\n\n## Commands Run\n\npytest platform_tests/scripts/test_report.py\n",
+    )
+
+    result, exit_code = module.run_preflight(tmp_path, bridge_id=slug, strict=True)
+
+    assert exit_code == module.EXIT_OK
+    assert result["content_file"] == f"bridge/{slug}-001.md"
+    assert result["target_paths"] == ["platform_tests/scripts/test_example.py"]
+    assert result["verdict"] == "clean"
+
+
+def test_bridge_id_resolution_uses_revised_proposal_under_go(module, tmp_path) -> None:
+    slug = "revised-thread"
+    _write_bridge_version(
+        tmp_path,
+        slug,
+        1,
+        _proposal_content(
+            "NEW",
+            ["platform_tests/scripts/test_old.py"],
+            "    python -m pytest platform_tests/scripts/test_old.py -q",
+        ),
+    )
+    _write_bridge_version(tmp_path, slug, 2, "NO-GO\n\nbridge_kind: review_verdict\n")
+    _write_bridge_version(
+        tmp_path,
+        slug,
+        3,
+        _proposal_content(
+            "REVISED",
+            ["platform_tests/scripts/test_final.py"],
+            "    python -m pytest platform_tests/scripts/test_final.py -q",
+        ),
+    )
+    _write_bridge_version(tmp_path, slug, 4, "GO\n\nbridge_kind: review_verdict\n")
+    _write_bridge_version(
+        tmp_path,
+        slug,
+        5,
+        "NEW\n\nbridge_kind: implementation_report\n\n## Commands Run\n\npytest platform_tests/scripts/test_report.py\n",
+    )
+
+    result, exit_code = module.run_preflight(tmp_path, bridge_id=slug, strict=True)
+
+    assert exit_code == module.EXIT_OK
+    assert result["content_file"] == f"bridge/{slug}-003.md"
+    assert result["target_paths"] == ["platform_tests/scripts/test_final.py"]
+    assert result["verdict"] == "clean"
