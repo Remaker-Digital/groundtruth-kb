@@ -17,7 +17,7 @@
     "audit:coverage": "node scripts/docs-coverage-audit.mjs"
   },
   "dependencies": {
-    "@docusaurus/core": "3.9.2",
+    "@docusaurus/core": "3.10.1",
     "@docusaurus/preset-classic": "3.9.2",
     "@docusaurus/theme-mermaid": "^3.9.2",
     "@mdx-js/react": "^3.0.0",
