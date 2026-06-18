@@ -7436,6 +7436,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-18T18:34:17.647270Z
   answer: "Your questions have been answered: \"Formal-artifact approval gate: do you approve the GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v5 text above (preserves v4's automatic retirement as default; adds the explicit keep-open caller election) for formalization into MemBase?\"=\"Approve v5 as drafted\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1298
+  asked_at: 2026-06-18T21:35:29.051895Z
+  question: "The VERIFIED quarantine fix is already committed. 48 unrelated/in-flight entries remain uncommitted. How should I handle the remaining tree?"
+  options:
+    - "Leave it / stand down"
+    - "Governed sweep-commit"
+    - "Just remove the $null cruft"
+    - "Adjudicate wi4232 rewrite"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d230164d32136c32
+  resolved_at: 2026-06-18T21:35:29.051895Z
+  answer: "Your questions have been answered: \"The VERIFIED quarantine fix is already committed. 48 unrelated/in-flight entries remain uncommitted. How should I handle the remaining tree?\"=\"Just remove the $null cruft\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
