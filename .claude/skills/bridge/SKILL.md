@@ -127,10 +127,11 @@ The helper creates drafts; it does not author the substantive correction. Prime 
    exits 0 and must not be treated as a blocking gate; the registered clause
    preflight remains authoritative.
 5. Run a deliberation search: `db.search_deliberations(...)` per `.claude/rules/deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
-6. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
-7. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
-8. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
-9. Publish the verdict through the governed bridge path.
+6. Before writing the verdict, run `python .claude/skills/verify/helpers/write_verdict.py --slug <topic-slug> --body-file <draft-body-file>` to seed `## Prior Deliberations`, then review and prune the helper-suggested candidates. If you opt out, keep an explicit `_No prior deliberations: <reason>._` line.
+7. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
+8. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
+9. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
+10. Publish the verdict through the governed bridge path.
 
 **Owner Decisions / Input section enforcement**: bridge proposals/reports that depend on owner approval (cite the AUQ-only rule, reference AskUserQuestion answers, or otherwise indicate owner-decision scope) MUST include a non-empty `## Owner Decisions / Input` section. Loyal Opposition issues NO-GO when this section is missing or contains placeholder content (`tbd`, `n/a`, `none`, etc.).
 

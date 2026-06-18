@@ -92,7 +92,7 @@ status = "native"
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "dc785dfda73bd4899cec3a827e5e96c76b3f2fa1a4e2bebb419cea4e91a74fdd"
+source_sha256 = "aca63561a2cf538031f54f1831bd97cf2684ec90d2d6b93e1dde91467829d635"
 
 [capabilities.antigravity]
 surface = ".agent/skills/bridge/SKILL.md"
@@ -572,7 +572,7 @@ status = "native"
 surface = ".codex/skills/proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/proposal-review/SKILL.md"
-source_sha256 = "62231bdfb6aaa649c139d5d26e16f385494e877c4861a56da33eea8b12c8a90e"
+source_sha256 = "2f199c8dc6d75752fe4b058afdcd938432f9cf68732eefb61768d9fecfc1509c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/proposal-review/SKILL.md"
@@ -857,7 +857,7 @@ status = "native"
 surface = ".codex/skills/verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/verify/SKILL.md"
-source_sha256 = "c913ade9a666389eb4b53a717567046173aa89499da83153312aa855baea8d8f"
+source_sha256 = "2512d318c380fa04acb722913ddc54f5aac1c751eab0fa46d1957ca8f30ceb2f"
 
 [capabilities.antigravity]
 surface = ".agent/skills/verify/SKILL.md"

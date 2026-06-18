@@ -80,11 +80,16 @@ Before writing the verdict file, the reviewer must:
 6. Run a deliberation search per `.claude/rules/deliberation-protocol.md`
    (`gt deliberations search <topic>`) for prior reviews on the same
    spec/WI/component.
-7. Identify the linked specifications carried forward from the `GO`'d proposal
+7. Before writing the verdict, run
+   `python .claude/skills/verify/helpers/write_verdict.py --slug <slug> --body-file <draft-body-file>`
+   to seed the draft's `## Prior Deliberations` section. Review and prune the
+   helper-suggested candidates; if you opt out, leave an explicit
+   `_No prior deliberations: <reason>._` line in the verdict.
+8. Identify the linked specifications carried forward from the `GO`'d proposal
    — the verdict must mirror the proposal's `Specification Links`.
-8. Build the spec-to-test mapping table. In Slice 1 this is done manually;
+9. Build the spec-to-test mapping table. In Slice 1 this is done manually;
    Slice 2 will provide a helper that computes candidate test commands.
-9. Execute the spec-derived tests and capture the exact commands run and the
+10. Execute the spec-derived tests and capture the exact commands run and the
    observed results.
 
 ## Verdict file template
