@@ -160,6 +160,9 @@ OPERATING_ROLE_RELATIVE_PATH = ROLE_ASSIGNMENTS_RELATIVE_PATH
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
+    "antigravity": GTKB_HARNESS_STATE_ROOT / "antigravity" / "session-lifecycle-guard.json",
+    "ollama": GTKB_HARNESS_STATE_ROOT / "ollama" / "session-lifecycle-guard.json",
+    "openrouter": GTKB_HARNESS_STATE_ROOT / "openrouter" / "session-lifecycle-guard.json",
 }
 BRIDGE_DISPATCH_ROLE_TEXT = (
     "cross-harness event-driven trigger registered as PostToolUse and Stop hooks "
@@ -7287,22 +7290,58 @@ def main(argv: list[str] | None = None) -> int:
         if args.role_assignment_path is not None
         else (args.role_record_path.resolve() if args.role_record_path is not None else None)
     )
-    role_profile = (
-        discover_role_profile(
+    override_role = None
+    if args.role_profile:
+        override_role = args.role_profile
+    else:
+        keyword = (os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD") or "").strip()
+        kw_match = re.match(r"^::init gtkb (pb|lo)$", keyword)
+        if kw_match:
+            mode = kw_match.group(1)
+            override_role = "prime-builder" if mode == "pb" else "loyal-opposition"
+
+    if override_role:
+        role_profile = override_role
+    else:
+        role_profile = discover_role_profile(
             project_root,
             harness_name=args.harness_name,
             harness_id=args.harness_id,
             role_record_path=role_record_path,
         )
-        if startup_emit_requested
-        else _role_profile_or_discovered(
-            project_root,
-            args.role_profile,
-            harness_name=args.harness_name,
-            harness_id=args.harness_id,
-            role_record_path=role_record_path,
-        )
-    )
+
+    # Persist interactive role overrides (marker files) per WI-4673
+    if override_role and args.harness_name:
+        try:
+            from scripts.gtkb_session_id import resolve_session_id, MARKER_CONTINUITY_ORDER
+            from scripts.workstream_focus import (
+                _write_session_role_marker,
+                _write_per_session_role_markers,
+                _candidate_marker_session_ids,
+            )
+        except ImportError:
+            from gtkb_session_id import resolve_session_id, MARKER_CONTINUITY_ORDER
+            from workstream_focus import (
+                _write_session_role_marker,
+                _write_per_session_role_markers,
+                _candidate_marker_session_ids,
+            )
+
+        session_id = resolve_session_id(order=MARKER_CONTINUITY_ORDER)
+        if session_id:
+            _write_session_role_marker(
+                override_role,
+                session_id,
+                "payload",
+                project_root,
+                source="session_self_initialization",
+            )
+            _write_per_session_role_markers(
+                override_role,
+                _candidate_marker_session_ids(session_id),
+                project_root,
+                source="session_self_initialization",
+            )
     lifecycle_guard_path = (
         args.lifecycle_guard_path.resolve()
         if args.lifecycle_guard_path is not None

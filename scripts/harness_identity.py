@@ -21,6 +21,9 @@ HARNESS_IDENTITIES_RELATIVE_PATH = Path("harness-state") / "harness-identities.j
 DEFAULT_HARNESS_IDS = {
     "codex": "A",
     "claude": "B",
+    "antigravity": "C",
+    "ollama": "D",
+    "openrouter": "F",
 }
 
 
