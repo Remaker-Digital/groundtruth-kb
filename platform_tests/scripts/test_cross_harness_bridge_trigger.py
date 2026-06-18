@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -2397,6 +2398,39 @@ def test_lo_dispatch_prompt_requires_preflights_before_verdicts() -> None:
     assert "NEW gtkb-ollama-dispatch-stall-retry-cap" in prompt
 
 
+def test_dispatch_prompt_pins_role_and_preflight_commands_to_repo_venv() -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-headless-worker-venv-interpreter-pin",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-headless-worker-venv-interpreter-pin-001.md",
+        },
+    )()
+
+    prompt = trigger._dispatch_prompt(target, [item], max_items=1)
+
+    venv_gt = trigger._repo_venv_command("gt")
+    venv_python = trigger._repo_venv_command("python")
+    assert f"`{venv_gt} harness roles`" in prompt
+    assert "groundtruth_kb.harness_projection" in prompt
+    assert "Do not run `python -m groundtruth_kb.harness_projection`" in prompt
+    assert "ambient bare `python` or bare `gt`" in prompt
+    assert f"`{venv_python} scripts/bridge_applicability_preflight.py --bridge-id <document-name>`" in prompt
+    assert f"`{venv_python} scripts/adr_dcl_clause_preflight.py --bridge-id <document-name>`" in prompt
+    assert "`python scripts/bridge_applicability_preflight.py" not in prompt
+    assert "`python scripts/adr_dcl_clause_preflight.py" not in prompt
+
+
 def test_harness_command_preserves_dispatch_prompt_as_single_argv_element(tmp_path: Path) -> None:
     """The canonical init keyword must remain the first line of the argv prompt."""
     trigger = _load_trigger()
@@ -2452,6 +2486,69 @@ def test_spawn_records_dispatch_failure_when_worker_command_cannot_be_built(tmp_
     records = _failure_records(state_dir)
     assert records[-1]["dispatch_id"] == "dispatch-missing-surfaces"
     assert records[-1]["reason"] == "unknown_recipient"
+
+
+def test_worker_pythonpath_prepends_package_src_without_clobbering(monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    inherited = os.pathsep.join(["C:/existing/pkg", trigger._PACKAGE_SRC, "D:/other/pkg"])
+
+    pythonpath = trigger._worker_pythonpath(inherited)
+
+    parts = pythonpath.split(os.pathsep)
+    assert parts[0] == trigger._PACKAGE_SRC
+    assert parts.count(trigger._PACKAGE_SRC) == 1
+    assert "C:/existing/pkg" in parts
+    assert "D:/other/pkg" in parts
+
+
+def test_spawn_harness_worker_env_includes_package_src(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["worker-cmd", "{{PROMPT}}"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-headless-worker-venv-interpreter-pin",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-headless-worker-venv-interpreter-pin-001.md",
+        },
+    )()
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setenv("PYTHONPATH", "C:/existing/pkg")
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-env-test",
+    )
+
+    assert meta["launched"] is True
+    env = captured["kwargs"]["env"]
+    pythonpath = env["PYTHONPATH"].split(os.pathsep)
+    assert pythonpath[0] == trigger._PACKAGE_SRC
+    assert "C:/existing/pkg" in pythonpath
 
 
 def test_harness_command_fails_closed_for_missing_or_malformed_surfaces(tmp_path: Path) -> None:

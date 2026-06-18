@@ -237,6 +237,56 @@ def test_harness_command_normalizes_executable_head(tmp_path: Path, monkeypatch:
     assert command[2] == "PROMPT-BODY"
 
 
+def test_single_harness_worker_env_includes_package_src(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _trigger()
+    dispatcher = _dispatcher()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["worker-cmd", "{{PROMPT}}"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-headless-worker-venv-interpreter-pin",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-headless-worker-venv-interpreter-pin-001.md",
+        },
+    )()
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setenv("PYTHONPATH", "C:/existing/pkg")
+    monkeypatch.setattr(dispatcher.subprocess, "Popen", fake_popen)
+
+    meta = dispatcher._spawn_worker(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        trigger=trigger,
+        dispatch_id="single-dispatch-env-test",
+    )
+
+    assert meta["launched"] is True
+    env = captured["kwargs"]["env"]
+    pythonpath = env["PYTHONPATH"].split(os.pathsep)
+    assert pythonpath[0] == trigger._PACKAGE_SRC
+    assert "C:/existing/pkg" in pythonpath
+
+
 # ---------------------------------------------------------------------------
 # Step 2 — launchability doctor check
 # ---------------------------------------------------------------------------

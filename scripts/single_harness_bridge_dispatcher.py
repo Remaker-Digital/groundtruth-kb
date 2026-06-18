@@ -647,6 +647,7 @@ def _spawn_worker(
 
     env = dict(os.environ)
     env["GTKB_PROJECT_ROOT"] = str(project_root)
+    env["PYTHONPATH"] = trigger._worker_pythonpath(env.get("PYTHONPATH"))
 
     # Strip all parent session-related environment variables
     for var in SESSION_ID_ENV_VARS:

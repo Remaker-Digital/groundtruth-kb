@@ -82,6 +82,22 @@ _PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src
 if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
+
+def _repo_venv_command(executable_name: str) -> str:
+    """Return the in-root repo venv command path used in worker instructions."""
+    bin_dir = "Scripts" if os.name == "nt" else "bin"
+    exe_name = executable_name
+    if os.name == "nt" and not exe_name.endswith(".exe"):
+        exe_name = f"{exe_name}.exe"
+    return Path("groundtruth-kb", ".venv", bin_dir, exe_name).as_posix()
+
+
+def _worker_pythonpath(inherited: str | None) -> str:
+    """Prepend the importable GT-KB package source for dispatched workers."""
+    inherited_parts = [part for part in (inherited or "").split(os.pathsep) if part]
+    return os.pathsep.join([_PACKAGE_SRC, *[part for part in inherited_parts if part != _PACKAGE_SRC]])
+
+
 from bridge_lease_registry import is_lease_held  # noqa: E402, I001
 from bridge_work_intent_registry import (  # noqa: E402, I001
     MalformedBridgeStatusError,
@@ -1724,6 +1740,11 @@ def _read_bridge_state_live(project_root: Path) -> str:
     return _render_bridge_state_text(project_root)
 
 
+def _read_index_live(project_root: Path) -> str:
+    """Compatibility alias for dispatch substrates that still request INDEX text."""
+    return _read_bridge_state_live(project_root)
+
+
 def _compute_actionable(
     index_text: str,
     project_root: Path,
@@ -1776,6 +1797,8 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
     selected = _selected_oldest_first(items, max_items)
     rows = [f"- {item.top_status} {item.document_name} {item.top_file}" for item in selected]
     selected_text = "\n".join(rows) if rows else "- No selected entries."
+    venv_gt = _repo_venv_command("gt")
+    venv_python = _repo_venv_command("python")
     harness_info_line = (
         f"Your resolved harness ID is {target.harness_id!r} ({target.command_handle!r}) "
         f"and your active role is {target.needed_role_label!r} (canonical mode: {target.canonical_mode!r})."
@@ -1784,7 +1807,9 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
         f"{harness_info_line}\n"
         "Resolve your durable harness identity from `harness-state/harness-identities.json`, "
         "then read your assigned role from `harness-state/harness-registry.json` "
-        "through the canonical `groundtruth_kb.harness_projection` or `gt harness roles` reader. "
+        "through the canonical `groundtruth_kb.harness_projection` reader using "
+        f"`{venv_gt} harness roles`. Do not run `python -m groundtruth_kb.harness_projection` "
+        "as a role reader, and do not use ambient bare `python` or bare `gt` for package-importing commands. "
         "Process the bridge entries selected below according to your declared role: "
         "Loyal Opposition reviews latest NEW or REVISED entries; "
         "Prime Builder acts on latest GO or NO-GO entries assigned to its harness. "
@@ -1799,8 +1824,8 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
     )
     loyal_opposition_preflight_line = (
         "Loyal Opposition verdict requirement: before writing GO or VERIFIED, "
-        "run `python scripts/bridge_applicability_preflight.py --bridge-id <document-name>` "
-        "and `python scripts/adr_dcl_clause_preflight.py --bridge-id <document-name>`, "
+        f"run `{venv_python} scripts/bridge_applicability_preflight.py --bridge-id <document-name>` "
+        f"and `{venv_python} scripts/adr_dcl_clause_preflight.py --bridge-id <document-name>`, "
         "then include the clean Applicability Preflight section in the verdict artifact."
     )
     canonical_keyword = f"::init gtkb {target.canonical_mode}"
@@ -2738,6 +2763,7 @@ def _spawn_harness(
 
     env = dict(os.environ)
     env["GTKB_PROJECT_ROOT"] = str(project_root)
+    env["PYTHONPATH"] = _worker_pythonpath(env.get("PYTHONPATH"))
     # Per Slice 4 D9b (Codex F1 on -006): the SessionStart hooks at
     # .claude/hooks/session_start_dispatch.py and .codex/gtkb-hooks/session_start_dispatch.py
     # enter bridge auto-dispatch mode (suppressing the normal startup disclosure
