@@ -821,15 +821,16 @@ def test_classify_dispatchable_implementation_proposal_kind(tmp_path: Path) -> N
     assert _classify_with_kind(tmp_path, "implementation_slice") == "dispatchable"
 
 
-def test_classify_dispatchable_post_implementation_kind(tmp_path: Path) -> None:
-    assert _classify_with_kind(tmp_path, "post_implementation_report") == "dispatchable"
-    assert _classify_with_kind(tmp_path, "post_implementation_report_revision") == "dispatchable"
-    assert _classify_with_kind(tmp_path, "post_impl_report") == "dispatchable"
+def test_classify_terminal_post_implementation_kind(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, "post_implementation_report") == "terminal"
+    assert _classify_with_kind(tmp_path, "post_implementation_report_revision") == "terminal"
+    assert _classify_with_kind(tmp_path, "post_impl_report") == "terminal"
+    assert _classify_with_kind(tmp_path, "implementation_report") == "terminal"
 
 
-def test_classify_dispatchable_post_implementation_kebab_variant_kind(tmp_path: Path) -> None:
+def test_classify_terminal_post_implementation_kebab_variant_kind(tmp_path: Path) -> None:
     """Kebab-norm: post-implementation-report → post_implementation_report match."""
-    assert _classify_with_kind(tmp_path, "post-implementation-report") == "dispatchable"
+    assert _classify_with_kind(tmp_path, "post-implementation-report") == "terminal"
 
 
 def test_classify_ambiguous_bare_proposal_kind(tmp_path: Path) -> None:
@@ -992,6 +993,28 @@ def test_compute_pending_prime_GO_implementation_proposal_is_dispatchable(tmp_pa
     prime, _ = n.compute_actionable_pending(parsed, project_root=root)
     assert prime[0].dispatchable is True
     assert prime[0].classification == "dispatchable"
+
+
+def test_compute_pending_prime_GO_implementation_report_is_not_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "GO", "implementation_report")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(prime) == 1
+    assert prime[0].dispatchable is False
+    assert prime[0].classification == "terminal"
+    assert prime[0].top_status == "GO"
+
+
+def test_compute_pending_prime_NO_GO_implementation_report_is_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NO-GO", "implementation_report")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(prime) == 1
+    assert prime[0].dispatchable is True
+    assert prime[0].classification == "terminal"
+    assert prime[0].top_status == "NO-GO"
 
 
 def test_compute_pending_prime_GO_bare_proposal_is_dispatchable_via_ambiguous(tmp_path: Path) -> None:

@@ -45,8 +45,8 @@ Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-
 - ``GO`` top status → Prime Builder (Prime acts). Dispatchable iff the
   bridge_kind classification is NOT terminal — terminal kinds (scoping,
   closure, parking, index_reconciliation, thread_reconciliation,
-  operational_state_change, candidate_spec_intake) have no Prime follow-up
-  after a GO verdict.
+  operational_state_change, candidate_spec_intake, implementation_report)
+  have no Prime follow-up after a GO verdict.
 - ``VERIFIED`` / ``ADVISORY`` / ``DEFERRED`` / ``WITHDRAWN`` top status →
   not actionable for either.
 
@@ -114,6 +114,12 @@ _KIND_TERMINAL_TOKENS: Final[tuple[str, ...]] = (
     "spec_intake",  # also matched by candidate_spec_intake above; explicit for symmetry
     "loyal_opposition_advisory",
     "governance_advisory",
+    # Post-implementation reports resolve through VERIFIED/NO-GO. A GO verdict
+    # over a report is a lifecycle anomaly and must not dispatch Prime as if it
+    # were implementation-start authority.
+    "post_implementation",  # post_implementation_report, post-implementation-report
+    "post_impl",  # post_impl_report
+    "implementation_report",
 )
 
 _KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
@@ -123,9 +129,6 @@ _KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
     "fix",
     "governance_proposal",
     "architecture_proposal",
-    "post_implementation",  # catches post_implementation_report, post_implementation_report_revision, post-implementation-report (after kebab-norm)
-    "post_impl",  # catches post_impl_report
-    "implementation_report",
     "prime_proposal",
 )
 
@@ -192,7 +195,7 @@ def classify_document_dispatchability(
       slices, fixes, governance/architecture proposals, post-impl reports)
     - "terminal" — bridge_kind matches a terminal token (scoping, closure,
       parking, index/thread reconciliation, operational state change, candidate
-      spec intake)
+      spec intake, implementation report)
     - "ambiguous" — bridge_kind missing, bare "proposal", "review",
       "verification", or unrecognized; falls back to status-only routing
       via the dispatchable invariant in `_derive_dispatchable`
