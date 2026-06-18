@@ -29,6 +29,8 @@ PYTHON_BIN="${PYTHON:-python}"
 # not fail open when PYTHON_BIN lacks ruff while the project venv has it.
 "$PYTHON_BIN" scripts/check_ruff_format.py --staged || exit $?
 
+"$PYTHON_BIN" scripts/check_protected_commit_authorization.py --staged || exit $?
+
 # Only proceed if PowerShell is available
 PWSH=""
 if command -v pwsh &>/dev/null; then
