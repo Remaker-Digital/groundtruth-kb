@@ -58,6 +58,31 @@ class WorkIntentRegistryError(RuntimeError):
     """Raised when a work-intent registry operation cannot be completed."""
 
 
+class MalformedBridgeStatusError(WorkIntentRegistryError):
+    """Raised when a bridge file's first-line status token cannot be parsed.
+
+    A *permanent* per-file parse error distinct from transient errors (DB
+    errors, contention). Subclass of :class:`WorkIntentRegistryError` so every
+    existing ``except WorkIntentRegistryError`` call site stays
+    backward-compatible. The dispatch batch-acquire surface in
+    ``scripts/cross_harness_bridge_trigger.py`` catches this distinct type to
+    quarantine-and-continue rather than head-of-line-blocking the entire
+    headless Prime-Builder dispatch lane on a single malformed bridge file
+    (WI-4658).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: Path | None = None,
+        offending_line: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.path = path
+        self.offending_line = offending_line
+
+
 @dataclass(frozen=True)
 class VersionState:
     latest_version: int
@@ -185,8 +210,16 @@ def _bridge_file_status(path: Path) -> str:
             continue
         if BRIDGE_FILE_STATUS_RE.fullmatch(line):
             return line
-        raise WorkIntentRegistryError(f"Bridge file has unrecognized status line: {path}: {line!r}")
-    raise WorkIntentRegistryError(f"Bridge file is empty: {path}")
+        raise MalformedBridgeStatusError(
+            f"Bridge file has unrecognized status line: {path}: {line!r}",
+            path=path,
+            offending_line=line,
+        )
+    raise MalformedBridgeStatusError(
+        f"Bridge file is empty: {path}",
+        path=path,
+        offending_line=None,
+    )
 
 
 def _thread_version_entries(thread_slug: str, *, project_root: Path | None = None) -> list[tuple[int, str, str]]:

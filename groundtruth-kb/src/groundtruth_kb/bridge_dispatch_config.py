@@ -404,6 +404,21 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
         findings.append(
             f"dispatch runtime warning: {recipient_key} last_result=unchanged with pending_count={pending_count}"
         )
+    quarantined_threads = row.get("quarantined_threads")
+    if isinstance(quarantined_threads, list) and quarantined_threads:
+        slugs: list[str] = []
+        for entry in quarantined_threads:
+            if isinstance(entry, dict):
+                slug = entry.get("slug")
+                if isinstance(slug, str) and slug:
+                    slugs.append(slug)
+        unique_slugs = sorted(set(slugs))
+        if unique_slugs:
+            findings.append(
+                f"dispatch runtime warning: {recipient_key} has "
+                f"{len(unique_slugs)} bridge thread(s) quarantined for malformed status token: "
+                f"{unique_slugs}"
+            )
     return findings
 
 

@@ -3245,3 +3245,217 @@ def test_resolve_ignores_session_stated_role_marker(tmp_path: Path) -> None:
     lo = trigger._resolve_dispatch_target("loyal-opposition", tmp_path, state_dir)
     assert pb is not None and pb.harness_id == "B", "durable PB resolution must ignore the marker"
     assert lo is not None and lo.harness_id == "A", "durable LO resolution must ignore the marker"
+
+
+# WI-4658 — _acquire_prime_work_intent_batch quarantine-and-continue tests.
+# bridge/gtkb-dispatch-malformed-status-token-quarantine-001.md (GO at -002).
+#
+# Cover the behavior change: when acquire_work_intent raises
+# MalformedBridgeStatusError (permanent per-file parse error), the batch
+# quarantines that slug and continues with the remaining selected slugs
+# instead of head-of-line-blocking the entire dispatch lane.
+
+
+def _quarantine_item(slug: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        document_name=slug,
+        top_status="GO",
+        top_file=f"bridge/{slug}-002.md",
+    )
+
+
+def _read_jsonl(path: Path) -> list[dict]:
+    if not path.is_file():
+        return []
+    rows: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return rows
+
+
+def test_wi4658_batch_quarantines_malformed_and_acquires_remaining(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A batch containing one malformed slug quarantines that slug, records a
+    structured finding, and still acquires the remaining valid slugs."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    def fake_acquire(slug, _session_id, *, ttl_seconds, project_root):
+        if slug == "bad-slug":
+            raise trigger.MalformedBridgeStatusError(
+                "Bridge file has unrecognized status line: bridge/bad-slug-002.md: 'GO test'",
+                path=tmp_path / "bridge" / "bad-slug-002.md",
+                offending_line="GO test",
+            )
+        return True
+
+    acquired_released: list[str] = []
+
+    def fake_release(slugs, *, project_root, session_id):
+        acquired_released.extend(slugs)
+
+    monkeypatch.setattr(trigger, "acquire_work_intent", fake_acquire)
+    monkeypatch.setattr(trigger, "_release_prime_work_intents", fake_release)
+
+    selected = [_quarantine_item("good-1"), _quarantine_item("bad-slug"), _quarantine_item("good-2")]
+    result = trigger._acquire_prime_work_intent_batch(
+        selected,
+        project_root=tmp_path,
+        state_dir=state_dir,
+        recipient="prime-builder:A",
+        dispatch_id="dispatch-xyz",
+        session_id="session-xyz",
+    )
+
+    assert result["ok"] is True
+    assert result["reason"] is None
+    assert result["acquired_slugs"] == ["good-1", "good-2"]
+    assert len(result["quarantined_slugs"]) == 1
+    q = result["quarantined_slugs"][0]
+    assert q["slug"] == "bad-slug"
+    assert q["offending_line"] == "GO test"
+    assert "bad-slug-002.md" in q["path"]
+    # No release of acquired slugs on quarantine (continue, not fail).
+    assert acquired_released == []
+
+    failures = _read_jsonl(state_dir / trigger.DISPATCH_FAILURES_FILENAME)
+    quarantine_records = [f for f in failures if f.get("reason") == "bridge_file_malformed_status_quarantined"]
+    assert len(quarantine_records) == 1
+    rec = quarantine_records[0]
+    assert rec["document_name"] == "bad-slug"
+    assert rec["error_type"] == "MalformedBridgeStatusError"
+    assert rec["offending_line"] == "GO test"
+
+
+def test_wi4658_batch_returns_all_slugs_quarantined_when_only_malformed_remain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When every selected slug is malformed, the batch returns ok: False with
+    reason ``all_slugs_quarantined`` so the caller does not spawn an empty
+    dispatch."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    def fake_acquire(slug, _session_id, *, ttl_seconds, project_root):
+        raise trigger.MalformedBridgeStatusError(
+            f"Bridge file has unrecognized status line: bridge/{slug}-002.md: 'GO test'",
+            path=tmp_path / "bridge" / f"{slug}-002.md",
+            offending_line="GO test",
+        )
+
+    monkeypatch.setattr(trigger, "acquire_work_intent", fake_acquire)
+    monkeypatch.setattr(trigger, "_release_prime_work_intents", lambda *args, **kwargs: None)
+
+    selected = [_quarantine_item("bad-1"), _quarantine_item("bad-2")]
+    result = trigger._acquire_prime_work_intent_batch(
+        selected,
+        project_root=tmp_path,
+        state_dir=state_dir,
+        recipient="prime-builder:A",
+        dispatch_id="dispatch-xyz",
+        session_id="session-xyz",
+    )
+
+    assert result["ok"] is False
+    assert result["reason"] == "all_slugs_quarantined"
+    assert result["acquired_slugs"] == []
+    assert {q["slug"] for q in result["quarantined_slugs"]} == {"bad-1", "bad-2"}
+
+
+def test_wi4658_batch_preserves_all_or_nothing_for_transient_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Non-malformed WorkIntentRegistryError (DB error, contention) retains
+    prior all-or-nothing semantics: the batch fails fast and previously-acquired
+    slugs are released."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    def fake_acquire(slug, _session_id, *, ttl_seconds, project_root):
+        if slug == "transient":
+            raise trigger.WorkIntentRegistryError("Database error during acquire: locked")
+        return True
+
+    released: list[str] = []
+    monkeypatch.setattr(trigger, "acquire_work_intent", fake_acquire)
+    monkeypatch.setattr(
+        trigger,
+        "_release_prime_work_intents",
+        lambda slugs, *, project_root, session_id: released.extend(slugs),
+    )
+
+    selected = [_quarantine_item("good-1"), _quarantine_item("transient"), _quarantine_item("good-2")]
+    result = trigger._acquire_prime_work_intent_batch(
+        selected,
+        project_root=tmp_path,
+        state_dir=state_dir,
+        recipient="prime-builder:A",
+        dispatch_id="dispatch-xyz",
+        session_id="session-xyz",
+    )
+
+    assert result["ok"] is False
+    assert result["reason"] == "work_intent_acquire_failed"
+    assert result["failed_slug"] == "transient"
+    assert result["acquired_slugs"] == ["good-1"]
+    # All-or-nothing: previously-acquired slugs were released.
+    assert released == ["good-1"]
+
+    failures = _read_jsonl(state_dir / trigger.DISPATCH_FAILURES_FILENAME)
+    quarantine_records = [f for f in failures if f.get("reason") == "bridge_file_malformed_status_quarantined"]
+    acquire_failure_records = [f for f in failures if f.get("reason") == "work_intent_acquire_failed"]
+    assert quarantine_records == []
+    assert len(acquire_failure_records) == 1
+
+
+def test_wi4658_batch_quarantine_then_transient_releases_acquired_skips_quarantined(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A quarantined slug followed by a transient failure: the transient
+    failure still releases acquired slugs but the quarantined slug is recorded
+    in the return value for caller persistence."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    def fake_acquire(slug, _session_id, *, ttl_seconds, project_root):
+        if slug == "malformed":
+            raise trigger.MalformedBridgeStatusError(
+                "Bridge file is empty: bridge/malformed-002.md",
+                path=tmp_path / "bridge" / "malformed-002.md",
+                offending_line=None,
+            )
+        if slug == "transient":
+            raise trigger.WorkIntentRegistryError("Database error during acquire: locked")
+        return True
+
+    monkeypatch.setattr(trigger, "acquire_work_intent", fake_acquire)
+    monkeypatch.setattr(trigger, "_release_prime_work_intents", lambda *args, **kwargs: None)
+
+    selected = [_quarantine_item("good-1"), _quarantine_item("malformed"), _quarantine_item("transient")]
+    result = trigger._acquire_prime_work_intent_batch(
+        selected,
+        project_root=tmp_path,
+        state_dir=state_dir,
+        recipient="prime-builder:A",
+        dispatch_id="dispatch-xyz",
+        session_id="session-xyz",
+    )
+
+    assert result["ok"] is False
+    assert result["reason"] == "work_intent_acquire_failed"
+    assert result["failed_slug"] == "transient"
+    assert result["acquired_slugs"] == ["good-1"]
+    # Quarantined slug is preserved in the result for caller-side persistence.
+    assert len(result["quarantined_slugs"]) == 1
+    assert result["quarantined_slugs"][0]["slug"] == "malformed"

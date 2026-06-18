@@ -187,3 +187,59 @@ def test_legacy_fallback_when_no_per_session_marker(tmp_path: Path, env) -> None
     holder = env.current_holder("go-thread", project_root=tmp_path)
     assert holder is not None
     assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+# WI-4658 — MalformedBridgeStatusError tests.
+# bridge/gtkb-dispatch-malformed-status-token-quarantine-001.md (GO at -002).
+#
+# Cover the typed permanent-error class that lets the dispatch batch-acquire
+# surface (cross_harness_bridge_trigger._acquire_prime_work_intent_batch)
+# distinguish a permanent per-file parse error (skip-and-continue) from
+# transient WorkIntentRegistryError (fail-fast).
+
+
+def _write_bridge_file(root: Path, slug: str, version: int, body: str) -> Path:
+    bridge = root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    path = bridge / f"{slug}-{version:03d}.md"
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_malformed_bridge_status_error_is_workintent_subclass(env) -> None:
+    """Backward-compat invariant: ``except WorkIntentRegistryError`` must still catch."""
+    assert issubclass(env.MalformedBridgeStatusError, env.WorkIntentRegistryError)
+
+
+def test_bridge_file_status_raises_malformed_on_unrecognized_first_line(tmp_path: Path, env) -> None:
+    """The live victim file pattern: a first-line token ``GO test`` (not a
+    canonical status word) must raise the typed error, carrying ``path`` and
+    ``offending_line`` attributes."""
+    path = _write_bridge_file(tmp_path, "victim", 2, "GO test\n\n# Body\n")
+    with pytest.raises(env.MalformedBridgeStatusError) as excinfo:
+        env._bridge_file_status(path)
+    assert excinfo.value.path == path
+    assert excinfo.value.offending_line == "GO test"
+    # The base type must still match for backward-compatible call sites.
+    assert isinstance(excinfo.value, env.WorkIntentRegistryError)
+
+
+def test_bridge_file_status_raises_malformed_on_empty_file(tmp_path: Path, env) -> None:
+    path = _write_bridge_file(tmp_path, "victim", 2, "")
+    with pytest.raises(env.MalformedBridgeStatusError) as excinfo:
+        env._bridge_file_status(path)
+    assert excinfo.value.path == path
+    assert excinfo.value.offending_line is None
+
+
+def test_bridge_file_status_returns_canonical_status_unchanged(tmp_path: Path, env) -> None:
+    """Non-regression: every canonical status token must still parse."""
+    for token in ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"):
+        path = _write_bridge_file(tmp_path, f"slug-{token.lower()}", 1, f"{token}\n\n# Body\n")
+        assert env._bridge_file_status(path) == token
+
+
+def test_bridge_file_status_skips_leading_blank_lines(tmp_path: Path, env) -> None:
+    """Pre-existing behavior: blank prefix lines do not trigger malformed-status."""
+    path = _write_bridge_file(tmp_path, "blanks", 1, "\n\n   \nGO\n\n# Body\n")
+    assert env._bridge_file_status(path) == "GO"

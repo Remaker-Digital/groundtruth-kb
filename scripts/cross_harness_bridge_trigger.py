@@ -84,6 +84,7 @@ if _PACKAGE_SRC not in sys.path:
 
 from bridge_lease_registry import is_lease_held  # noqa: E402, I001
 from bridge_work_intent_registry import (  # noqa: E402, I001
+    MalformedBridgeStatusError,
     WorkIntentRegistryError,
     acquire as acquire_work_intent,
     current_holder as current_work_intent_holder,
@@ -880,8 +881,30 @@ def _acquire_prime_work_intent_batch(
     dispatch_id: str,
     session_id: str,
 ) -> dict[str, Any]:
-    """Acquire all Prime selected slugs as an all-or-nothing batch."""
+    """Acquire all Prime selected slugs, quarantining permanently-malformed threads.
+
+    Per WI-4658 (bridge ``gtkb-dispatch-malformed-status-token-quarantine``):
+    when a single slug raises :class:`MalformedBridgeStatusError` (a *permanent*
+    per-file parse error from :func:`bridge_work_intent_registry._bridge_file_status`),
+    the slug is quarantined and skipped rather than failing the entire batch.
+    This restores headless Prime-Builder dispatch progress when a single
+    malformed canonical numbered bridge file would otherwise head-of-line-block
+    the entire dispatch lane. Quarantined slugs are recorded in
+    ``dispatch-failures.jsonl`` (reason
+    ``bridge_file_malformed_status_quarantined``) and returned in the result so
+    the caller can persist them to ``dispatch-state.json`` for health to surface.
+
+    Non-malformed :class:`WorkIntentRegistryError` exceptions (DB errors,
+    contention) and ordinary lease contention retain prior all-or-nothing
+    semantics — those are treated as transient and the batch fails fast so
+    subsequent dispatch cycles can retry.
+
+    Batch returns ``ok: False`` with reason ``all_slugs_quarantined`` when every
+    selected slug is quarantined (no acquirable work after skipping); the
+    caller should not invoke ``_spawn_harness`` in that case.
+    """
     acquired_slugs: list[str] = []
+    quarantined_slugs: list[dict[str, Any]] = []
     for item in selected:
         slug = item.document_name
         try:
@@ -891,6 +914,32 @@ def _acquire_prime_work_intent_batch(
                 ttl_seconds=WORK_INTENT_TRIGGER_TTL_SECONDS,
                 project_root=project_root,
             )
+        except MalformedBridgeStatusError as exc:
+            quarantine_entry: dict[str, Any] = {
+                "slug": slug,
+                "error_message": str(exc),
+            }
+            if exc.path is not None:
+                quarantine_entry["path"] = str(exc.path)
+            if exc.offending_line is not None:
+                quarantine_entry["offending_line"] = exc.offending_line
+            quarantined_slugs.append(quarantine_entry)
+            quarantine_payload: dict[str, Any] = {
+                "ts": _now_iso(),
+                "dispatch_id": dispatch_id,
+                "recipient": recipient,
+                "launched": False,
+                "reason": "bridge_file_malformed_status_quarantined",
+                "document_name": slug,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+            }
+            if exc.path is not None:
+                quarantine_payload["path"] = str(exc.path)
+            if exc.offending_line is not None:
+                quarantine_payload["offending_line"] = exc.offending_line
+            _record_dispatch_failure(state_dir, quarantine_payload)
+            continue
         except WorkIntentRegistryError as exc:
             acquired = False
             error_type = type(exc).__name__
@@ -918,10 +967,23 @@ def _acquire_prime_work_intent_batch(
                 "ok": False,
                 "reason": "work_intent_acquire_failed",
                 "acquired_slugs": acquired_slugs,
+                "quarantined_slugs": quarantined_slugs,
                 "failed_slug": slug,
             }
         acquired_slugs.append(slug)
-    return {"ok": True, "reason": None, "acquired_slugs": acquired_slugs}
+    if not acquired_slugs and quarantined_slugs:
+        return {
+            "ok": False,
+            "reason": "all_slugs_quarantined",
+            "acquired_slugs": acquired_slugs,
+            "quarantined_slugs": quarantined_slugs,
+        }
+    return {
+        "ok": True,
+        "reason": None,
+        "acquired_slugs": acquired_slugs,
+        "quarantined_slugs": quarantined_slugs,
+    }
 
 
 def _issue_dispatch_authorization_for_selected(
@@ -3723,6 +3785,8 @@ def run_trigger(
                                 dispatch_id=dispatch_id,
                                 session_id=work_intent_session_id,
                             )
+                            quarantined_slugs = list(acquire_result.get("quarantined_slugs") or [])
+                            recipient_state["quarantined_threads"] = quarantined_slugs
                             if not acquire_result["ok"]:
                                 recipient_state["last_result"] = acquire_result["reason"]
                                 recipient_state["last_launch"] = {
@@ -3733,6 +3797,7 @@ def run_trigger(
                                     "work_intent_session_id": work_intent_session_id,
                                     "failed_slug": acquire_result.get("failed_slug"),
                                     "released_slugs": acquire_result.get("acquired_slugs", []),
+                                    "quarantined_slugs": quarantined_slugs,
                                 }
                                 results[recipient] = recipient_state["last_launch"]
                                 recipients_state[recipient] = recipient_state
