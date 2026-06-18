@@ -57,6 +57,12 @@ def _project(tmp_path: Path) -> tuple[Path, Path]:
     return root, config
 
 
+def _write_dispatch_state(root: Path, state: dict[str, object]) -> None:
+    path = root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(state), encoding="utf-8")
+
+
 def test_bridge_dispatch_health_cli_reports_selected_targets(tmp_path: Path) -> None:
     _root, config = _project(tmp_path)
 
@@ -88,3 +94,65 @@ def test_direct_bridge_health_alias_matches_dispatch_health(tmp_path: Path) -> N
     assert direct.exit_code == 0, direct.output
     assert nested.exit_code == 0, nested.output
     assert json.loads(direct.output) == json.loads(nested.output)
+
+
+def test_bridge_dispatch_health_degrades_on_selected_runtime_failure(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_dispatch_state(
+        root,
+        {
+            "schema_version": 1,
+            "recipients": {
+                "loyal-opposition:D": {
+                    "circuit_breaker_tripped": True,
+                    "failure_class": "max_turn_exhaustion",
+                    "last_result": "provider_failure_backoff_active",
+                    "pending_count": 3,
+                    "selected_count": 1,
+                },
+                "prime-builder": {
+                    "last_launch": {"reason": "work_intent_acquire_failed"},
+                    "last_result": "work_intent_acquire_failed",
+                    "pending_count": 2,
+                    "selected_count": 1,
+                },
+            },
+        },
+    )
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+
+    assert result.exit_code == 1, result.output
+    payload = json.loads(result.output)
+    assert payload["health_status"] == "FAIL"
+    findings = "\n".join(payload["findings"])
+    assert "loyal-opposition:D circuit breaker is tripped" in findings
+    assert "loyal-opposition:D last_result=provider_failure_backoff_active" in findings
+    assert "prime-builder last_result=work_intent_acquire_failed" in findings
+    assert "prime-builder work intent acquisition failed" in findings
+
+
+def test_bridge_dispatch_health_ignores_nonselected_runtime_failure(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_dispatch_state(
+        root,
+        {
+            "schema_version": 1,
+            "recipients": {
+                "loyal-opposition:Z": {
+                    "circuit_breaker_tripped": True,
+                    "failure_class": "max_turn_exhaustion",
+                    "last_result": "provider_failure_backoff_active",
+                    "pending_count": 3,
+                    "selected_count": 1,
+                },
+            },
+        },
+    )
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["health_status"] == "PASS"
+    assert payload["findings"] == []
