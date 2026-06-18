@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
@@ -221,6 +222,22 @@ def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.Monkey
     text = oh.run_tool_loop("hello", route(root), "http://ollama.test/", 1, root)
     assert text == "done"
     assert urls == ["http://ollama.test/api/chat"]
+
+
+def test_utf8_output_stream_setup_allows_non_cp1252_final_text():
+    output_bytes = io.BytesIO()
+    stdout = io.TextIOWrapper(output_bytes, encoding="cp1252", errors="strict")
+    error_bytes = io.BytesIO()
+    stderr = io.TextIOWrapper(error_bytes, encoding="cp1252", errors="strict")
+
+    oh.ensure_utf8_output_streams(stdout, stderr)
+    print("ready \u2192 verified", file=stdout)
+    print("error \u2192 visible", file=stderr)
+    stdout.flush()
+    stderr.flush()
+
+    assert output_bytes.getvalue().decode("utf-8").splitlines() == ["ready \u2192 verified"]
+    assert error_bytes.getvalue().decode("utf-8").splitlines() == ["error \u2192 visible"]
 
 
 def test_tool_loop_fail_closed_on_max_turns(tmp_path: Path):

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fnmatch
 import json
 import os
@@ -122,6 +123,16 @@ def resolve_project_root(start: Path | None = None) -> Path:
         if (candidate / "groundtruth.toml").is_file():
             return candidate
     return current
+
+
+def ensure_utf8_output_streams(stdout: Any | None = None, stderr: Any | None = None) -> None:
+    """Make harness output safe for Unicode verdict text on Windows consoles."""
+    for stream in (stdout or sys.stdout, stderr or sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="backslashreplace")
 
 
 def _as_list(value: Any, *, field: str) -> list[str]:
@@ -883,6 +894,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    ensure_utf8_output_streams()
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     project_root = resolve_project_root(Path.cwd())
