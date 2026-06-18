@@ -157,7 +157,7 @@ def test_top_3_filters_by_approval_state(monkeypatch) -> None:
         },
     ]
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda root: synthetic)
-    monkeypatch.setattr(module, "_bridge_index_latest_status", lambda root: {})
+    monkeypatch.setattr(module, "_bridge_latest_status", lambda root: {})
     # Synthetic WI ids have no scope-classifier signal; pin to a primary-included
     # scope so the visible-items filter does not drop them.
     monkeypatch.setattr(module, "classify_dashboard_scope", lambda row: "agent_red_product")
@@ -201,7 +201,7 @@ def test_top_3_excludes_resolved_and_verified_wis(monkeypatch) -> None:
         },
     ]
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda root: synthetic)
-    monkeypatch.setattr(module, "_bridge_index_latest_status", lambda root: {})
+    monkeypatch.setattr(module, "_bridge_latest_status", lambda root: {})
     # Synthetic WI ids have no scope-classifier signal; pin to a primary-included
     # scope so the visible-items filter does not drop them.
     monkeypatch.setattr(module, "classify_dashboard_scope", lambda row: "agent_red_product")
@@ -229,7 +229,7 @@ def test_top_priority_dict_and_tuple_are_identical(monkeypatch) -> None:
             }
         ],
     )
-    monkeypatch.setattr(module, "_bridge_index_latest_status", lambda root: {})
+    monkeypatch.setattr(module, "_bridge_latest_status", lambda root: {})
     metrics, top = module._backlog_metrics(REPO_ROOT)
     assert metrics["top_priority_actions"] == top
     # Identical sequence, not just equal lengths.
@@ -250,7 +250,7 @@ def test_top_3_selection_is_deterministic(monkeypatch) -> None:
         for i in range(300, 310)
     ]
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda root: synthetic)
-    monkeypatch.setattr(module, "_bridge_index_latest_status", lambda root: {})
+    monkeypatch.setattr(module, "_bridge_latest_status", lambda root: {})
     # Synthetic WI ids have no scope-classifier signal; pin to a primary-included
     # scope so the visible-items filter does not drop them.
     monkeypatch.setattr(module, "classify_dashboard_scope", lambda row: "agent_red_product")
@@ -303,7 +303,7 @@ def test_top_3_selection_priority_then_wi_id(monkeypatch) -> None:
         },
     ]
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda root: synthetic)
-    monkeypatch.setattr(module, "_bridge_index_latest_status", lambda root: {})
+    monkeypatch.setattr(module, "_bridge_latest_status", lambda root: {})
     # Synthetic WI ids have no scope-classifier signal; pin to a primary-included
     # scope so the visible-items filter does not drop them.
     monkeypatch.setattr(module, "classify_dashboard_scope", lambda row: "agent_red_product")

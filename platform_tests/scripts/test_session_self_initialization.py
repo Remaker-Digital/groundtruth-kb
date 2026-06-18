@@ -397,6 +397,94 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     } <= subsystems
 
 
+def _scoped_client_payload() -> dict:
+    return {
+        "specifications": [
+            {"id": "GTKB-STARTUP-001", "title": "GT-KB session startup", "status": "implemented", "type": "GOV"},
+            {"id": "AR-STARTUP-001", "title": "Agent Red operations", "status": "specified", "type": "SPEC"},
+        ],
+        "work_items": [
+            {
+                "id": "GTKB-WI-001",
+                "title": "GT-KB startup metric repair",
+                "resolution_status": "open",
+            },
+            {
+                "id": "WI-AR-001",
+                "title": "Widget billing follow-up",
+                "resolution_status": "open",
+            },
+        ],
+        "tests": [
+            {
+                "id": "TEST-GTKB-001",
+                "title": "GT-KB startup test",
+                "test_file": "scripts/session_self_initialization.py",
+            },
+            {"id": "TEST-AR-001", "title": "Widget test", "test_file": "widget/tests/test_widget.py"},
+        ],
+        "deliberations": [
+            {"id": "DELIB-GTKB-001", "title": "GT-KB startup decision", "outcome": "owner_decision"},
+            {"id": "DELIB-AR-001", "title": "Agent Red widget decision", "outcome": "owner_decision"},
+        ],
+        "test_procedures_count": 2,
+    }
+
+
+def _patch_scoped_client(monkeypatch, module, *, subject: str) -> None:
+    class FakeScopedClient:
+        @classmethod
+        def from_project_root(cls, project_root):
+            return cls()
+
+        def invoke(self, operation, *, project_root):
+            return {
+                "available": True,
+                "source": "fake",
+                "source_path": "groundtruth.db",
+                "freshness": "test",
+                "subject": subject,
+                "operation": operation,
+                "application_id": "agent-red" if subject == module.FOCUS_APPLICATION else "gtkb",
+                "payload": _scoped_client_payload(),
+            }
+
+    monkeypatch.setattr(module, "GtkbScopedClient", FakeScopedClient)
+
+
+def test_database_metrics_gtkb_subject_counts_gtkb_scoped_rows(monkeypatch) -> None:
+    module = _load_module()
+    _patch_scoped_client(monkeypatch, module, subject=module.FOCUS_GTKB_INFRASTRUCTURE)
+
+    metrics = module._database_metrics(REPO_ROOT)
+
+    assert metrics["source_metadata"]["subject"] == module.FOCUS_GTKB_INFRASTRUCTURE
+    assert metrics["specifications"]["current_total"] == 1
+    assert metrics["membase"]["open_work_items"] == 1
+    assert metrics["membase"]["test_records"] == 1
+    assert metrics["deliberation_archive"]["current_total"] == 1
+    assert metrics["scope"]["included_scopes"] == ["gtkb_framework", "gtkb_upstream"]
+
+
+def test_database_metrics_application_subject_counts_agent_red_rows(monkeypatch) -> None:
+    module = _load_module()
+    _patch_scoped_client(monkeypatch, module, subject=module.FOCUS_APPLICATION)
+
+    metrics = module._database_metrics(REPO_ROOT)
+
+    assert metrics["source_metadata"]["subject"] == module.FOCUS_APPLICATION
+    assert metrics["specifications"]["current_total"] == 1
+    assert metrics["membase"]["open_work_items"] == 1
+    assert metrics["membase"]["test_records"] == 1
+    assert metrics["deliberation_archive"]["current_total"] == 1
+    assert metrics["scope"]["included_scopes"] == [
+        "agent_red_governance_adoption",
+        "agent_red_operations",
+        "agent_red_product",
+        "agent_red_release",
+    ]
+
+
 def test_prime_focus_top_priority_uses_go_no_go_bridge_signal() -> None:
     module = _load_module()
     model = {
@@ -1125,21 +1213,21 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
         encoding="utf-8",
     )
     (bridge_dir / "gtkb-tier-a-current-main-integration-001.md").write_text(
-        "# GT-KB Current Main Integration\n\nGroundTruth-KB bridge proposal.",
+        "NEW\n\n# GT-KB Current Main Integration\n\nGroundTruth-KB bridge proposal.",
         encoding="utf-8",
     )
 
     contention = module._bridge_metrics(tmp_path)
 
-    assert contention["latest_status_counts"] == {}
-    assert contention["actionable_count"] == 0
+    assert contention["latest_status_counts"] == {"NEW": 1}
+    assert contention["actionable_count"] == 1
     assert contention["raw_latest_status_counts"] == {"NEW": 1}
     assert contention["raw_review_queue_count"] == 1
     assert contention["raw_prime_response_queue_count"] == 0
     assert contention["source"] == "bridge/*.md"
     assert contention["source_read_mode"] == "versioned_bridge_file_chain"
     assert contention["derived_artifacts_authoritative"] is False
-    assert contention["live_index_available"] is True
+    assert contention["live_bridge_directory_available"] is True
     assert (
         module._render_file_bridge_scan({"metrics": {"contention": contention}})
         == "- Generated-time file bridge scan, non-authoritative after report generation: 1 latest NEW/REVISED entry identified."
@@ -1165,7 +1253,8 @@ def test_bridge_metrics_ignore_cached_startup_report_counts(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    (bridge_dir / "cached-report-must-not-win-002.md").write_text("Approved.", encoding="utf-8")
+    (bridge_dir / "cached-report-must-not-win-001.md").write_text("NEW\n\nProposal.", encoding="utf-8")
+    (bridge_dir / "cached-report-must-not-win-002.md").write_text("GO\n\nApproved.", encoding="utf-8")
     (dashboard_dir / "session-startup-report.md").write_text(
         "- Generated-time file bridge scan, non-authoritative after report generation: 99 latest NEW/REVISED entries identified.\n",
         encoding="utf-8",
@@ -1974,7 +2063,7 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     def fail_pdf_export(dashboard_path, pdf_path):
         raise AssertionError("fast hook must not export PDF")
 
-    monkeypatch.setattr(module, "_historical_agent_red_backfill", fail_historical_backfill)
+    monkeypatch.setattr(module, "_historical_dashboard_subject_backfill", fail_historical_backfill)
     monkeypatch.setattr(module, "_write_dashboard_pdf", fail_pdf_export)
 
     exit_code = module.main(
@@ -2671,13 +2760,21 @@ def test_write_session_start_json_handles_filesystem_errors_gracefully(tmp_path,
 
 
 def _make_recommender_fixture(tmp_path, backlog_items: list[dict[str, str]], index_text: str) -> Path:
-    """Build a synthetic project root with bridge/INDEX.md for recommender tests.
+    """Build a synthetic project root with status-bearing bridge files.
 
     ``backlog_items`` is a list of dicts with at least ``id``, ``title``, and
     ``body`` keys — the same shape returned by ``_backlog_items_from_membase``.
     """
     (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
     (tmp_path / "bridge" / "INDEX.md").write_text(index_text, encoding="utf-8")
+    for raw_line in index_text.splitlines():
+        line = raw_line.strip()
+        if ": bridge/" not in line:
+            continue
+        status, path_text = line.split(":", 1)
+        bridge_path = tmp_path / path_text.strip()
+        bridge_path.parent.mkdir(parents=True, exist_ok=True)
+        bridge_path.write_text(f"{status.strip()}\n\nSynthetic bridge file.\n", encoding="utf-8")
     return tmp_path
 
 
@@ -2721,8 +2818,8 @@ def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, mo
     root = _make_recommender_fixture(tmp_path, backlog_items, index)
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
     module.classify_dashboard_scope = lambda row: "gtkb"
-    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
-    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_SCOPE_INCLUDED = {"gtkb"}
 
     metrics, top = module._backlog_metrics(root)
     top_ids = [item["id"] for item in top]
@@ -2760,8 +2857,8 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatc
     root = _make_recommender_fixture(tmp_path, backlog_items, index)
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
     module.classify_dashboard_scope = lambda row: "gtkb"
-    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
-    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_SCOPE_INCLUDED = {"gtkb"}
 
     metrics, top = module._backlog_metrics(root)
     assert "GTKB-NO-BRIDGE-001" in [item["id"] for item in top]
@@ -2792,8 +2889,8 @@ def test_backlog_metrics_counts_only_implementation_active_items(tmp_path, monke
     root = _make_recommender_fixture(tmp_path, backlog_items, "")
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
     module.classify_dashboard_scope = lambda row: "gtkb"
-    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
-    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_SCOPE_INCLUDED = {"gtkb"}
 
     metrics, top = module._backlog_metrics(root)
 
@@ -2820,8 +2917,8 @@ def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, mo
     root = _make_recommender_fixture(tmp_path, backlog_items, index)
     monkeypatch.setattr(module, "_backlog_items_from_membase", lambda _root: backlog_items)
     module.classify_dashboard_scope = lambda row: "gtkb"
-    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
-    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.GTKB_DASHBOARD_SCOPE_INCLUDED = {"gtkb"}
 
     metrics, top = module._backlog_metrics(root)
     assert "GTKB-VERIFIED-WITH-RESIDUAL-001" in [item["id"] for item in top]
@@ -2843,8 +2940,17 @@ def test_recommender_5_index_parser_captures_only_latest_status_per_document(tmp
     )
     (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
     (tmp_path / "bridge" / "INDEX.md").write_text(index, encoding="utf-8")
+    for name, status in {
+        "gtkb-multi-version-008.md": "VERIFIED",
+        "gtkb-multi-version-007.md": "NEW",
+        "gtkb-multi-version-006.md": "GO",
+        "gtkb-multi-version-005.md": "REVISED",
+        "gtkb-no-go-thread-002.md": "NO-GO",
+        "gtkb-no-go-thread-001.md": "NEW",
+    }.items():
+        (tmp_path / "bridge" / name).write_text(f"{status}\n\nSynthetic bridge file.\n", encoding="utf-8")
 
-    status_map = module._bridge_index_latest_status(tmp_path)
+    status_map = module._bridge_latest_status(tmp_path)
     assert status_map == {
         "gtkb-multi-version": "VERIFIED",
         "gtkb-no-go-thread": "NO-GO",

@@ -513,18 +513,19 @@ PRIORITY_SORT_ORDER = {
     "MEDIUM": 6,
     "LOW": 7,
 }
-AGENT_RED_SCOPE_INCLUDED = {
+APPLICATION_DASHBOARD_SCOPE_INCLUDED = {
     "agent_red_product",
     "agent_red_release",
     "agent_red_operations",
     "agent_red_governance_adoption",
 }
-AGENT_RED_PRIMARY_SCOPE_INCLUDED = {
+APPLICATION_DASHBOARD_PRIMARY_SCOPE_INCLUDED = {
     "agent_red_product",
     "agent_red_release",
     "agent_red_operations",
 }
-GTKB_SCOPE_EXCLUDED = {"gtkb_framework", "gtkb_upstream"}
+GTKB_DASHBOARD_SCOPE_INCLUDED = {"gtkb_framework", "gtkb_upstream"}
+GTKB_DASHBOARD_PRIMARY_SCOPE_INCLUDED = GTKB_DASHBOARD_SCOPE_INCLUDED
 
 GTKB_EXCLUDE_TERMS = (
     "gtkb",
@@ -1027,15 +1028,27 @@ def _scope_counts(rows: list[dict[str, Any] | sqlite3.Row]) -> dict[str, int]:
     return dict(sorted(Counter(classify_dashboard_scope(row) for row in rows).items()))
 
 
-def _is_agent_red_scope(row: dict[str, Any] | sqlite3.Row, *, primary_only: bool = False) -> bool:
-    included = AGENT_RED_PRIMARY_SCOPE_INCLUDED if primary_only else AGENT_RED_SCOPE_INCLUDED
+def _dashboard_subject_scope_sets(subject: str | None) -> tuple[set[str], set[str]]:
+    if subject == FOCUS_APPLICATION:
+        return APPLICATION_DASHBOARD_SCOPE_INCLUDED, APPLICATION_DASHBOARD_PRIMARY_SCOPE_INCLUDED
+    return GTKB_DASHBOARD_SCOPE_INCLUDED, GTKB_DASHBOARD_PRIMARY_SCOPE_INCLUDED
+
+
+def _is_dashboard_subject_scope(
+    row: dict[str, Any] | sqlite3.Row,
+    *,
+    subject: str | None = None,
+    primary_only: bool = False,
+) -> bool:
+    included, primary_included = _dashboard_subject_scope_sets(subject)
+    scopes = primary_included if primary_only else included
     if isinstance(row, dict):
         if "_cached_scope" not in row:
             row["_cached_scope"] = classify_dashboard_scope(row)
         scope = row["_cached_scope"]
     else:
         scope = classify_dashboard_scope(row)
-    return scope in included
+    return scope in scopes
 
 
 def _work_item_priority_rank(row: dict[str, Any]) -> int:
@@ -1143,46 +1156,49 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
     tests = list(payload.get("tests", []))
     deliberations = list(payload.get("deliberations", []))
     test_procedures_count = int(payload.get("test_procedures_count", 0))
+    dashboard_subject = str(envelope.get("subject") or "")
 
-    agent_red_specs = [row for row in specifications if _is_agent_red_scope(row)]
-    agent_red_work_items = [row for row in work_items if _is_agent_red_scope(row)]
-    agent_red_tests = [row for row in tests if _is_agent_red_scope(row)]
-    agent_red_deliberations = [row for row in deliberations if _is_agent_red_scope(row)]
+    dashboard_specs = [row for row in specifications if _is_dashboard_subject_scope(row, subject=dashboard_subject)]
+    dashboard_work_items = [row for row in work_items if _is_dashboard_subject_scope(row, subject=dashboard_subject)]
+    dashboard_tests = [row for row in tests if _is_dashboard_subject_scope(row, subject=dashboard_subject)]
+    dashboard_deliberations = [
+        row for row in deliberations if _is_dashboard_subject_scope(row, subject=dashboard_subject)
+    ]
     open_work_items = [
         row
-        for row in agent_red_work_items
+        for row in dashboard_work_items
         if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
     ]
     return {
         "available": True,
         "source_metadata": source_metadata,
         "specifications": {
-            "current_total": len(agent_red_specs),
+            "current_total": len(dashboard_specs),
             "raw_current_total": len(specifications),
-            "status_counts": dict(sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())),
-            "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in agent_red_specs).items())),
+            "status_counts": dict(sorted(Counter(str(row.get("status") or "none") for row in dashboard_specs).items())),
+            "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in dashboard_specs).items())),
             "scope_counts": _scope_counts(specifications),
             "scope_confidence": "gtkb_current_heuristic",
         },
         "membase": {
             "work_item_status_counts": dict(
-                sorted(Counter(str(row.get("resolution_status") or "none") for row in agent_red_work_items).items())
+                sorted(Counter(str(row.get("resolution_status") or "none") for row in dashboard_work_items).items())
             ),
             "open_work_items": len(open_work_items),
             "raw_open_work_items": sum(
                 1 for row in work_items if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
             ),
-            "test_records": len(agent_red_tests),
+            "test_records": len(dashboard_tests),
             "test_procedure_records": test_procedures_count,
             "scope_counts": _scope_counts(work_items),
             "scope_confidence": "gtkb_current_heuristic",
             "project_state_rollup": _project_state_rollup(work_items),
         },
         "deliberation_archive": {
-            "current_total": len(agent_red_deliberations),
+            "current_total": len(dashboard_deliberations),
             "raw_current_total": len(deliberations),
             "outcome_counts": dict(
-                sorted(Counter(str(row.get("outcome") or "none") for row in agent_red_deliberations).items())
+                sorted(Counter(str(row.get("outcome") or "none") for row in dashboard_deliberations).items())
             ),
             "scope_counts": _scope_counts(deliberations),
             "scope_confidence": "gtkb_current_heuristic",
@@ -1190,7 +1206,7 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
         "scope": {
             "version": DASHBOARD_SCOPE_VERSION,
             "note": DASHBOARD_SCOPE_NOTE,
-            "excluded_scopes": sorted(GTKB_SCOPE_EXCLUDED),
+            "included_scopes": sorted(_dashboard_subject_scope_sets(dashboard_subject)[0]),
         },
     }
 
@@ -1287,12 +1303,14 @@ def _is_implementation_active_backlog_item(item: dict[str, Any]) -> bool:
 def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     items = _backlog_items_from_membase(project_root)
     bridge_status = _bridge_latest_status(project_root)
+    dashboard_subject = _active_work_subject(project_root)
+    included_scopes, primary_scopes = _dashboard_subject_scope_sets(dashboard_subject)
     classified = []
     for item in items:
         row = {"id": item["id"], "title": item["title"], "description": item.get("body", "")}
         classified.append({**item, "scope": classify_dashboard_scope(row)})
-    primary_items = [item for item in classified if item["scope"] in AGENT_RED_PRIMARY_SCOPE_INCLUDED]
-    visible_items = primary_items or [item for item in classified if item["scope"] in AGENT_RED_SCOPE_INCLUDED]
+    primary_items = [item for item in classified if item["scope"] in primary_scopes]
+    visible_items = primary_items or [item for item in classified if item["scope"] in included_scopes]
 
     filtered_verified_ids: list[str] = []
     filtered_stale_ids: list[str] = []
@@ -1394,7 +1412,8 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         }
         classified.append({**entry, "scope": classify_dashboard_scope(row)})
 
-    visible_entries = [entry for entry in classified if entry["scope"] in AGENT_RED_PRIMARY_SCOPE_INCLUDED]
+    _included_scopes, primary_scopes = _dashboard_subject_scope_sets(_active_work_subject(project_root))
+    visible_entries = [entry for entry in classified if entry["scope"] in primary_scopes]
     counts = Counter(entry["status"] for entry in visible_entries)
     actionable = [entry for entry in visible_entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES]
     raw_review_queue = [entry for entry in entries if entry["status"] in REVIEW_QUEUE_BRIDGE_STATUSES]
@@ -3652,7 +3671,7 @@ def _version_rows(connection: sqlite3.Connection, table: str) -> list[dict[str, 
     ]
 
 
-def _historical_agent_red_backfill(project_root: Path) -> list[dict[str, Any]]:
+def _historical_dashboard_subject_backfill(project_root: Path) -> list[dict[str, Any]]:
     db_path = project_root / "groundtruth.db"
     if not db_path.is_file():
         return []
@@ -3689,10 +3708,10 @@ def _historical_agent_red_backfill(project_root: Path) -> list[dict[str, Any]]:
                 index += 1
             indexes[table] = index
 
-        specs = [row for row in states["specifications"].values() if _is_agent_red_scope(row)]
-        work_items = [row for row in states["work_items"].values() if _is_agent_red_scope(row)]
-        tests = [row for row in states["tests"].values() if _is_agent_red_scope(row)]
-        deliberations = [row for row in states["deliberations"].values() if _is_agent_red_scope(row)]
+        specs = [row for row in states["specifications"].values() if _is_dashboard_subject_scope(row)]
+        work_items = [row for row in states["work_items"].values() if _is_dashboard_subject_scope(row)]
+        tests = [row for row in states["tests"].values() if _is_dashboard_subject_scope(row)]
+        deliberations = [row for row in states["deliberations"].values() if _is_dashboard_subject_scope(row)]
         open_work_items = [
             row for row in work_items if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
         ]
@@ -6404,7 +6423,7 @@ def write_dashboard_and_report(
     backfill_history = (
         [
             row
-            for row in _historical_agent_red_backfill(project_root)
+            for row in _historical_dashboard_subject_backfill(project_root)
             if str(row.get("generated_at", ""))[:10] < snapshot_day
         ]
         if seed_historical_backfill
