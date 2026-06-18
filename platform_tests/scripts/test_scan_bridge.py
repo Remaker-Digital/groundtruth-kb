@@ -58,6 +58,7 @@ NEW: bridge/gtkb-foo-001.md
     lo_result = helper.scan(role="loyal-opposition", index_text=index)
     assert len(prime_result["actionable"]) == 1
     assert prime_result["actionable"][0]["latest_status"] == "GO"
+    assert prime_result["blocked_non_activatable"] == []
     assert lo_result["actionable"] == []
 
 
@@ -277,3 +278,85 @@ ADVISORY: bridge/gtkb-foo-advisory-001.md
     assert prime_result["actionable"][0]["document"] == "gtkb-foo-advisory"
     assert prime_result["actionable"][0]["latest_status"] == "ADVISORY"
     assert lo_result["actionable"] == []
+
+
+def test_non_activatable_go_moved_to_blocked_bucket(helper, monkeypatch) -> None:
+    monkeypatch.setattr(helper, "_go_activatable", lambda _root, _bridge_id: (False, ["missing spec links"]))
+    index = """\
+Document: gtkb-dead-end
+GO: bridge/gtkb-dead-end-002.md
+NEW: bridge/gtkb-dead-end-001.md
+"""
+
+    result = helper.scan(role="prime-builder", index_text=index)
+
+    assert result["actionable"] == []
+    assert len(result["blocked_non_activatable"]) == 1
+    assert result["blocked_non_activatable"][0]["document"] == "gtkb-dead-end"
+    assert result["blocked_non_activatable"][0]["go_file"] == "bridge/gtkb-dead-end-002.md"
+    assert result["blocked_non_activatable"][0]["reasons"] == ["missing spec links"]
+
+
+def test_activatable_go_remains_actionable(helper, monkeypatch) -> None:
+    monkeypatch.setattr(helper, "_go_activatable", lambda _root, _bridge_id: (True, []))
+    index = """\
+Document: gtkb-ready
+GO: bridge/gtkb-ready-002.md
+NEW: bridge/gtkb-ready-001.md
+"""
+
+    result = helper.scan(role="prime-builder", index_text=index)
+
+    assert [thread["document"] for thread in result["actionable"]] == ["gtkb-ready"]
+    assert result["blocked_non_activatable"] == []
+
+
+def test_blocked_go_carries_begin_gate_reasons(helper, monkeypatch, tmp_path) -> None:
+    def fail_packet(_project_root, _bridge_id):
+        raise helper.AuthorizationError("missing spec links; missing ## Requirement Sufficiency")
+
+    monkeypatch.setattr(helper, "create_authorization_packet", fail_packet)
+
+    activatable, reasons = helper._go_activatable(tmp_path, "gtkb-blocked")
+
+    assert activatable is False
+    assert reasons == ["missing spec links", "missing ## Requirement Sufficiency"]
+
+
+def test_dispatch_terminal_go_still_filtered_before_activatability(helper, monkeypatch, tmp_path) -> None:
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_bridge_thread(bridge_dir, "gtkb-gov", "governance_review", "GO")
+    index = "Document: gtkb-gov\nGO: bridge/gtkb-gov-002.md\nNEW: bridge/gtkb-gov-001.md\n"
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(index, encoding="utf-8")
+
+    def should_not_run(_root, _bridge_id):
+        raise AssertionError("terminal GO should not reach activatability")
+
+    monkeypatch.setattr(helper, "_go_activatable", should_not_run)
+
+    result = helper.scan(role="prime-builder", index_text=index, index_path=index_path)
+
+    assert result["actionable"] == []
+    assert result["blocked_non_activatable"] == []
+
+
+def test_nogo_and_advisory_actionability_unchanged(helper, monkeypatch) -> None:
+    def should_not_run(_root, _bridge_id):
+        raise AssertionError("activatability applies only to GO entries")
+
+    monkeypatch.setattr(helper, "_go_activatable", should_not_run)
+    index = """\
+Document: gtkb-nogo
+NO-GO: bridge/gtkb-nogo-002.md
+NEW: bridge/gtkb-nogo-001.md
+
+Document: gtkb-advisory
+ADVISORY: bridge/gtkb-advisory-001.md
+"""
+
+    result = helper.scan(role="prime-builder", index_text=index)
+
+    assert {thread["document"] for thread in result["actionable"]} == {"gtkb-nogo", "gtkb-advisory"}
+    assert result["blocked_non_activatable"] == []

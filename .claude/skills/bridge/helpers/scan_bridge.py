@@ -49,12 +49,18 @@ import argparse
 import datetime as _dt
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
+SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from implementation_authorization import AuthorizationError, create_authorization_packet  # noqa: E402
 
 Role = Literal["prime-builder", "loyal-opposition"]
 
@@ -259,9 +265,36 @@ def _is_terminal_kind_go(thread: ThreadEntry, project_root: Path) -> bool:
     return any(token in bk_normalized for token in _KIND_TERMINAL_TOKENS)
 
 
+def _authorization_reasons(message: str) -> list[str]:
+    reasons = [part.strip() for part in message.split(";") if part.strip()]
+    return reasons or [message.strip()]
+
+
+def _go_activatable(project_root: Path, bridge_id: str) -> tuple[bool, list[str]]:
+    """Return whether the latest GO can mint an implementation packet.
+
+    The call is read-only: ``create_authorization_packet`` builds and validates
+    the packet but does not persist it. Synthetic compatibility scans may name a
+    GO in inline index text without a real numbered file chain; those fixture-
+    only misses fail open so old scan-shape tests stay focused on role routing.
+    """
+    try:
+        create_authorization_packet(project_root, bridge_id)
+    except AuthorizationError as exc:
+        message = str(exc)
+        if (
+            "Bridge document not found as versioned files" in message
+            or "Implementation authorization requires a GO in the bridge chain" in message
+            or "No approved proposal file found under GO" in message
+        ):
+            return True, []
+        return False, _authorization_reasons(message)
+    return True, []
+
+
 def _role_filter(
     threads: list[ThreadEntry], role: Role, project_root: Path
-) -> tuple[list[ThreadEntry], list[ThreadEntry]]:
+) -> tuple[list[ThreadEntry], list[ThreadEntry], list[dict[str, Any]]]:
     """Return (actionable, terminal_verified) for the given role.
 
     For ``prime-builder``, a latest ``GO`` whose operative Prime proposal carries
@@ -277,14 +310,23 @@ def _role_filter(
         raise ValueError(f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'")
 
     actionable: list[ThreadEntry] = []
+    blocked_non_activatable: list[dict[str, Any]] = []
     for t in threads:
         if t.latest_status not in actionable_statuses:
             continue
-        if role == "prime-builder" and t.latest_status == "GO" and _is_terminal_kind_go(t, project_root):
-            continue
+        if role == "prime-builder" and t.latest_status == "GO":
+            if _is_terminal_kind_go(t, project_root):
+                continue
+            activatable, reasons = _go_activatable(project_root, t.document)
+            if not activatable:
+                blocked = t.to_dict()
+                blocked["go_file"] = t.latest_path
+                blocked["reasons"] = reasons
+                blocked_non_activatable.append(blocked)
+                continue
         actionable.append(t)
     terminal_verified = [t for t in threads if t.latest_status in TERMINAL_STATUSES]
-    return actionable, terminal_verified
+    return actionable, terminal_verified, blocked_non_activatable
 
 
 def _summary_counts(threads: list[ThreadEntry]) -> dict[str, int]:
@@ -329,11 +371,12 @@ def scan(
         project_root = PROJECT_ROOT
 
     threads = _parse_index(index_text)
-    actionable, terminal_verified = _role_filter(threads, role, project_root)
+    actionable, terminal_verified, blocked_non_activatable = _role_filter(threads, role, project_root)
 
     return {
         "role": role,
         "actionable": [t.to_dict() for t in actionable],
+        "blocked_non_activatable": blocked_non_activatable,
         "terminal_verified": [t.to_dict() for t in terminal_verified],
         "summary": _summary_counts(threads),
         "generated_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -359,6 +402,16 @@ def _format_markdown(result: dict[str, Any]) -> str:
     if result["actionable"]:
         for thread in result["actionable"]:
             lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+    else:
+        lines.append("- (none)")
+    lines.append("")
+    lines.append(f"## Blocked (non-activatable GO) ({len(result.get('blocked_non_activatable', []))})")
+    lines.append("")
+    if result.get("blocked_non_activatable"):
+        for thread in result["blocked_non_activatable"]:
+            lines.append(f"- **{thread['document']}** -- GO at `{thread['go_file']}`")
+            for reason in thread.get("reasons", []):
+                lines.append(f"  - {reason}")
     else:
         lines.append("- (none)")
     lines.append("")
