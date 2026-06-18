@@ -432,6 +432,33 @@ def test_exact_file_target_path_authorizes_exact_protected_file(tmp_path: Path) 
     assert gate.gate_decision(payload) == {}
 
 
+@pytest.mark.parametrize(
+    ("path", "classification"),
+    [
+        (".claude/hooks/h.py", ".claude/hooks/"),
+        ("./.claude/hooks/h.py", ".claude/hooks/"),
+        (".claude/rules/x.md", ".claude/rules/"),
+        (".codex/gtkb-hooks/a.py", ".codex/gtkb-hooks/"),
+        (".github/workflows/ci.yml", ".github/"),
+        (".claude/settings.json", ".claude/settings.json"),
+        (".codex/hooks.json", ".codex/hooks.json"),
+        (".env", ".env"),
+        ("./.env.local", ".env.*"),
+        ("env.local", "env.local"),
+        ("env.staging", "env.staging"),
+    ],
+)
+def test_is_protected_path_preserves_dot_prefixed_protected_paths(path: str, classification: str) -> None:
+    assert gate.is_protected_path(path) is True
+    assert gate._protected_path_classification(path) == classification
+
+
+def test_protected_path_classification_preserves_dot_prefixed_prefixes() -> None:
+    assert gate.is_protected_path("./bridge/proposal.md") is False
+    assert gate.is_protected_path("./.gtkb-state/diagnostic.json") is False
+    assert gate.is_protected_path("./scripts/tool.py") is True
+
+
 def test_requirement_gap_blocks_authorization(tmp_path: Path) -> None:
     _write_thread(
         tmp_path,

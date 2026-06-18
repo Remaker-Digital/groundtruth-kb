@@ -60,6 +60,9 @@ def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
 PROTECTED_EXACT = {
     ".claude/settings.json",
     ".codex/hooks.json",
+    ".env",
+    "env.local",
+    "env.staging",
     "pyproject.toml",
     "groundtruth.toml",
 }
@@ -207,9 +210,18 @@ def _normalize(root: Path, path_text: str) -> str | None:
         return cleaned
 
 
+def _preserve_dot_prefixed_relative_path(relative_path: str) -> str:
+    rel = relative_path.replace("\\", "/")
+    while rel.startswith("./"):
+        rel = rel[2:]
+    return rel
+
+
 def is_protected_path(relative_path: str) -> bool:
-    rel = relative_path.replace("\\", "/").lstrip("./")
+    rel = _preserve_dot_prefixed_relative_path(relative_path)
     if rel in PROTECTED_EXACT:
+        return True
+    if rel.startswith(".env."):
         return True
     if rel.startswith(ALLOWED_WRITE_PREFIXES):
         return False
@@ -219,11 +231,13 @@ def is_protected_path(relative_path: str) -> bool:
 
 
 def _protected_path_classification(relative_path: str) -> str:
-    rel = relative_path.replace("\\", "/").lstrip("./")
+    rel = _preserve_dot_prefixed_relative_path(relative_path)
     if rel == "<unknown-mutating-target>":
         return rel
     if rel in PROTECTED_EXACT:
         return rel
+    if rel.startswith(".env."):
+        return ".env.*"
     for prefix in PROTECTED_PREFIXES:
         if rel.startswith(prefix):
             return prefix

@@ -69,9 +69,16 @@ class GuardResult(NamedTuple):
     details: str
 
 
+def _preserve_dot_prefixed_relative_path(relative_path: str) -> str:
+    rel = relative_path.replace("\\", "/")
+    while rel.startswith("./"):
+        rel = rel[2:]
+    return rel
+
+
 def is_protected_path(relative_path: str) -> bool:
     """Return True if relative_path is a protected workspace path."""
-    rel = relative_path.replace("\\", "/").lstrip("./")
+    rel = _preserve_dot_prefixed_relative_path(relative_path)
     if rel in PROTECTED_EXACT:
         return True
     if rel == ".env" or rel.startswith(".env.") or rel == "env.local" or rel == "env.staging":

@@ -101,6 +101,42 @@ def test_unprotected_targets_allowed(root: Path) -> None:
     assert res.reason_code == "not_protected"
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".claude/hooks/h.py",
+        "./.claude/hooks/h.py",
+        ".claude/rules/x.md",
+        ".codex/gtkb-hooks/a.py",
+        ".github/workflows/ci.yml",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        ".env",
+        "./.env.local",
+        "env.local",
+        "env.staging",
+    ],
+)
+def test_guard_classifies_dot_prefixed_protected_paths(root: Path, path: str) -> None:
+    res = evaluate_mutation(root, [path], harness_id="A", session_id="session-1")
+
+    assert res.allowed is False
+    assert res.reason_code == "missing_or_stale_claim"
+    assert "No active work-intent claim found" in res.details
+
+
+def test_guard_keeps_bridge_and_diagnostic_writes_unprotected(root: Path) -> None:
+    res = evaluate_mutation(
+        root,
+        ["./bridge/some-doc.md", "./.gtkb-state/diagnostic.json"],
+        harness_id="A",
+        session_id="session-1",
+    )
+
+    assert res.allowed is True
+    assert res.reason_code == "not_protected"
+
+
 def test_target_outside_project_root_denied(root: Path) -> None:
     res = evaluate_mutation(root, ["../escaped.py"], harness_id="A", session_id="session-1")
     assert res.allowed is False
