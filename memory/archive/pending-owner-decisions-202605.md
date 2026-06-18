@@ -6731,3 +6731,567 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-17T05:18:57.516709Z
   answer: "User has answered your questions: \"Commit the WI-3341 bridge thread record now?\"=\"Commit bridge record\". You can now continue with the user's answers in mind."
   notes: ""
+
+- id: DECISION-0655
+  asked_at: 2026-05-17T13:12:17.918960Z
+  question: "A clean WI-3353-only commit is blocked: four files carry WI-3353's changes interleaved with two other uncommitted threads (WI-3333's approved_files_for_go rework, currently test-failing; and the gtkb-impl-start-gate-comparison-operator-fix >= change, that thread at NO-GO). git add stages whole files. How should I commit?"
+  options:
+    - "Bundle into one commit now"
+    - "Hold the commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: caa19cea69f7212a
+  resolved_at: 2026-05-17T13:12:17.918960Z
+  answer: "User has answered your questions: \"A clean WI-3353-only commit is blocked: four files carry WI-3353's changes interleaved with two other uncommitted threads (WI-3333's approved_files_for_go rework, currently test-failing; and the gtkb-impl-start-gate-comparison-operator-fix >= change, that thread at NO-GO). git add stages whole files. How should I commit?\"=\"Bundle into one commit now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0656
+  asked_at: 2026-05-17T13:14:21.518817Z
+  question: "WI-3341 is already committed (eb3cd38c, 9a7e9aee on develop). What did you want with \"Commit\"?"
+  options:
+    - "Push develop to remote"
+    - "Nothing — already done"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 38a3ece389046cd1
+  resolved_at: 2026-05-17T13:14:21.518817Z
+  answer: "User has answered your questions: \"WI-3341 is already committed (eb3cd38c, 9a7e9aee on develop). What did you want with \"Commit\"?\"=\"Push develop to remote\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0657
+  asked_at: 2026-05-17T13:57:41.301343Z
+  question: "Phase 0 (status truth-up) turned out to be a work-item-less metadata backfill, and the underlying gap is project-wide rather than Antigravity-specific. How should I handle it?"
+  options:
+    - "Defer Phase 0, run spike"
+    - "Minimal backfill first"
+    - "Fix the systemic gap"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6850308283ee917c
+  resolved_at: 2026-05-17T13:57:41.301343Z
+  answer: "User has answered your questions: \"Phase 0 (status truth-up) turned out to be a work-item-less metadata backfill, and the underlying gap is project-wide rather than Antigravity-specific. How should I handle it?\"=\"Defer Phase 0, run spike\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0658
+  asked_at: 2026-05-17T14:36:18.174087Z
+  question: "Bridge thread `gtkb-implementation-gate-friction-hygiene` is NO-GO at -018. Codex states the approved IP-D verification scope was 32 regression tests (11 null-sink/redirect + 12 sqlite safe-read/write-disqualifier + 9 chain-walk), but the current implementation report substantiates only 19 tests, with the existing tests categorized as IP-A/IP-B/F3 and IP-C, not IP-D. Which resolution path should Prime Builder take?"
+  options:
+    - "Land remaining IP-D tests (Recommended)"
+    - "File REVISED proposal narrowing IP-D scope"
+    - "Owner waiver"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8912edfa450dca1f
+  resolved_at: 2026-05-17T14:36:18.174087Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0659
+  asked_at: 2026-05-17T14:38:00.730537Z
+  question: "Bridge thread `gtkb-implementation-gate-friction-hygiene-018` is NO-GO over IP-D scope drift: the approved proposal carried forward 32 regression tests, but the implementation report `-017` ships and verifies 19. Codex (per `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`) requires one of three closures before VERIFIED. Which path do you want to take?"
+  options:
+    - "Waiver to 19 tests"
+    - "Land all 32 tests"
+    - "Scope-reduction REVISED"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 695c99bf1b2903ef
+  resolved_at: 2026-05-17T14:38:00.730537Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0660
+  asked_at: 2026-05-17T14:40:25.365071Z
+  question: "How should Prime Builder close the gtkb-implementation-gate-friction-hygiene NO-GO at -018? Codex notes the approved IP-D scope was 32 regression tests (11 null-sink + 12 sqlite + 9 chain-walk); the landed scope is 19 tests. Three Codex-acceptable paths exist; please choose one."
+  options:
+    - "Land 13 missing IP-D tests"
+    - "Scope-reduction REVISED proposal"
+    - "Owner waiver for IP-D scope"
+    - "Defer; start GO-004 instead"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ae65cd4315119621
+  resolved_at: 2026-05-17T14:40:25.365071Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0661
+  asked_at: 2026-05-17T14:42:46.561274Z
+  question: "Bridge `gtkb-implementation-gate-friction-hygiene` reached NO-GO at -018. Codex F1 (P1): approved IP-D scope is 32 regression tests (per `-005` and reaffirmed at `-011`/`-012`/`-014`), but `-017` evidence only substantiates 19. The thread cannot reach VERIFIED without reconciling the 13-test gap. Which path should Prime Builder take?"
+  options:
+    - "Land remaining 13 IP-D tests"
+    - "Scope-reduction REVISED proposal"
+    - "Explicit owner waiver, close at 19"
+    - "Park / withdraw the thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 503ff329f78bd687
+  resolved_at: 2026-05-17T14:42:46.561274Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0662
+  asked_at: 2026-05-17T16:30:32.225613Z
+  question: "How should the bridge-notifier fix close the suppression gap? (It becomes a bridge proposal either way.)"
+  options:
+    - "Active session auto-drains"
+    - "Trigger spawns the worker"
+    - "You pick the approach"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 73f5112d60d564dd
+  resolved_at: 2026-05-17T16:30:32.225613Z
+  answer: "User has answered your questions: \"How should the bridge-notifier fix close the suppression gap? (It becomes a bridge proposal either way.)\"=\"Active session auto-drains\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0663
+  asked_at: 2026-05-17T17:12:07.547363Z
+  question: "Codex NO-GO'd WI-3359 (F2): the bridge-notifier auto-drain (a new Stop-drain hook + a SessionStart drain loop) is a new mechanism, not a small defect — so the reliability fast-lane is the wrong authorization envelope. I'll split the genuine small defect (the cross-harness trigger's ModuleNotFoundError import repair + stale-lock cleanup) into its own reliability-fast-lane thread regardless. Which authorization should the auto-drain itself (WI-3359 REVISED -003) be filed under?"
+  options:
+    - "Antigravity project (Recommended)"
+    - "New dedicated project"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d67dc0e5901e5c23
+  resolved_at: 2026-05-17T17:12:07.547363Z
+  answer: "User has answered your questions: \"Codex NO-GO'd WI-3359 (F2): the bridge-notifier auto-drain (a new Stop-drain hook + a SessionStart drain loop) is a new mechanism, not a small defect — so the reliability fast-lane is the wrong authorization envelope. I'll split the genuine small defect (the cross-harness trigger's ModuleNotFoundError import repair + stale-lock cleanup) into its own reliability-fast-lane thread regardless. Which authorization should the auto-drain itself (WI-3359 REVISED -003) be filed under?\"=\"Antigravity project (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0664
+  asked_at: 2026-05-17T17:59:13.332659Z
+  question: "Codex's bridge auto-dispatch is broken and you can't reach the Codex harness interactively — so REVISED-3 (bridge/...-007.md) has no path to a Loyal Opposition review. How should we get it reviewed?"
+  options:
+    - "Spawn Codex via CLI (Recommended)"
+    - "Claude self-reviews as LO"
+    - "Repair the dispatch trigger"
+    - "Park WI-3357"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b9b40ba4ff9792e8
+  resolved_at: 2026-05-17T17:59:13.332659Z
+  answer: "User has answered your questions: \"Codex's bridge auto-dispatch is broken and you can't reach the Codex harness interactively — so REVISED-3 (bridge/...-007.md) has no path to a Loyal Opposition review. How should we get it reviewed?\"=\"Claude self-reviews as LO\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0666
+  asked_at: 2026-05-17T20:52:03.028781Z
+  question: "WI-3344 (data-driven cross-harness dispatch) is VERIFIED at -006 and its working-tree changes are commit-ready. A parallel Claude session is also modifying files in this shared working tree. How should I handle the WI-3344 commit?"
+  options:
+    - "Leave uncommitted (Recommended)"
+    - "Commit WI-3344 now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 329b0716f87891aa
+  resolved_at: 2026-05-17T20:52:03.028781Z
+  answer: "User has answered your questions: \"WI-3344 (data-driven cross-harness dispatch) is VERIFIED at -006 and its working-tree changes are commit-ready. A parallel Claude session is also modifying files in this shared working tree. How should I handle the WI-3344 commit?\"=\"Leave uncommitted (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0667
+  asked_at: 2026-05-17T20:54:52.214257Z
+  question: "WI-3357's fix is implemented, verified at bridge -010, and committed (5bc36a1b). The one remaining step is IP-3: flipping the WI-3357 work-item row from resolution_status 'open' to 'resolved'. WI-3357 is defect-origin, so the kb-batch resolve-wis path is GOV-15-gated and requires your explicit approval. Resolve WI-3357 now, or leave the row open?"
+  options:
+    - "Resolve WI-3357 now"
+    - "Leave WI-3357 open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0b57fb92b34ae57c
+  resolved_at: 2026-05-17T20:54:52.214257Z
+  answer: "User has answered your questions: \"WI-3357's fix is implemented, verified at bridge -010, and committed (5bc36a1b). The one remaining step is IP-3: flipping the WI-3357 work-item row from resolution_status 'open' to 'resolved'. WI-3357 is defect-origin, so the kb-batch resolve-wis path is GOV-15-gated and requires your explicit approval. Resolve WI-3357 now, or leave the row open?\"=\"Resolve WI-3357 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0668
+  asked_at: 2026-05-17T21:07:07.929709Z
+  question: "DECISION-0665: should the VERIFIED WI-3344 changes be committed now, or left for a later batched commit?"
+  options:
+    - "Commit WI-3344 now"
+    - "Leave for a batched commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8303ffc50acb1b82
+  resolved_at: 2026-05-17T21:07:07.929709Z
+  answer: "User has answered your questions: \"DECISION-0665: should the VERIFIED WI-3344 changes be committed now, or left for a later batched commit?\"=\"Commit WI-3344 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0669
+  asked_at: 2026-05-17T22:11:56.110787Z
+  question: "The bridge-stop-drain Stop hook wants me to autonomously drain 86 actionable bridge items, bypassing the startup focus selection — but its own bridge thread is still pre-VERIFIED (latest status NEW at -007). How should I proceed?"
+  options:
+    - "Hold, normal startup"
+    - "Investigate autodrain thread"
+    - "Honor the auto-drain"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: abc4b1d821255723
+  resolved_at: 2026-05-17T22:11:56.110787Z
+  answer: "User has answered your questions: \"The bridge-stop-drain Stop hook wants me to autonomously drain 86 actionable bridge items, bypassing the startup focus selection — but its own bridge thread is still pre-VERIFIED (latest status NEW at -007). How should I proceed?\"=\"Hold, normal startup\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0670
+  asked_at: 2026-05-17T22:24:41.081286Z
+  question: "Bridge `gtkb-implementation-gate-friction-hygiene` is NO-GO at -018. Codex finds IP-D coverage at 19 regression tests vs. the approved 32-test scope from -005 (which the -012 GO carried forward). Which path closes the gap?"
+  options:
+    - "Land the missing 13 IP-D tests"
+    - "REVISED-19 proposal narrowing IP-D"
+    - "Owner waiver for IP-D scope reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4d59d25f52d5376b
+  resolved_at: 2026-05-17T22:24:41.081286Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0671
+  asked_at: 2026-05-17T23:09:22.757388Z
+  question: "How should the bridge/INDEX.md archival pass run? It is mechanical work (trim oldest entries below the ~200-line threshold; bridge files stay on disk). The Deterministic Services Principle and the retired-poller history bear on the choice."
+  options:
+    - "Helper-integrated trim"
+    - "Deterministic script + OS task"
+    - "/schedule AI routine"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f255c6c3af20d896
+  resolved_at: 2026-05-17T23:09:22.757388Z
+  answer: "User has answered your questions: \"How should the bridge/INDEX.md archival pass run? It is mechanical work (trim oldest entries below the ~200-line threshold; bridge files stay on disk). The Deterministic Services Principle and the retired-poller history bear on the choice.\"=\"Helper-integrated trim\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0672
+  asked_at: 2026-05-17T23:12:35.296905Z
+  question: "GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 (owner-approved S350, 2026-05-14) mandates owner-AUQ confirmation before retirement; your S357 clarification reverses that to automatic retirement on all-WIs-VERIFIED. How should I capture the corrected rule?"
+  options:
+    - "Supersede via v2"
+    - "New spec, retire old"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ff0a21997cc7f4c5
+  resolved_at: 2026-05-17T23:12:35.296905Z
+  answer: "User has answered your questions: \"GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 (owner-approved S350, 2026-05-14) mandates owner-AUQ confirmation before retirement; your S357 clarification reverses that to automatic retirement on all-WIs-VERIFIED. How should I capture the corrected rule?\"=\"Supersede via v2\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0673
+  asked_at: 2026-05-17T23:12:35.296905Z
+  question: "How should I run the Phase B/C retroactive-correction project (fix the completion machinery + reconcile in-flight artifacts) relative to the in-flight Phase A spec capture?"
+  options:
+    - "Inventory now, propose after Phase A"
+    - "Run fully in parallel now"
+    - "Hold Phase B/C for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c08fd84f912ae97c
+  resolved_at: 2026-05-17T23:12:35.296905Z
+  answer: "User has answered your questions: \"How should I run the Phase B/C retroactive-correction project (fix the completion machinery + reconcile in-flight artifacts) relative to the in-flight Phase A spec capture?\"=\"Inventory now, propose after Phase A\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0674
+  asked_at: 2026-05-17T23:12:35.296905Z
+  question: "Approve GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 version 2 (shown above) for canonical insertion into MemBase? The one substantive choice is the 'explicitly linked' definition."
+  options:
+    - "Approve as written (membership link)"
+    - "Approve, but use the envelope basis"
+    - "Revise the v2 wording first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0d8cc85dc2b5c00c
+  resolved_at: 2026-05-17T23:12:35.296905Z
+  answer: "User has answered your questions: \"Approve GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 version 2 (shown above) for canonical insertion into MemBase? The one substantive choice is the 'explicitly linked' definition.\"=\"Approve as written (membership link)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0675
+  asked_at: 2026-05-17T23:22:17.856738Z
+  question: "v2's rule is correct, but its body still frames v1 as a genuine 'reversed S350 decision' rather than a Prime Builder error. How should I correct that record?"
+  options:
+    - "Fold into the correction project"
+    - "File a standalone v3 now"
+    - "Deliberation only, no v3"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 350089b7a8794214
+  resolved_at: 2026-05-17T23:22:17.856738Z
+  answer: "User has answered your questions: \"v2's rule is correct, but its body still frames v1 as a genuine 'reversed S350 decision' rather than a Prime Builder error. How should I correct that record?\"=\"Fold into the correction project\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0676
+  asked_at: 2026-05-17T23:44:52.378404Z
+  question: "The review found 2 GOV-spec errors (the Agent-Red trio + a title) and 4 over-strict-enforcement issues (~44% of recent NO-GO churn is mechanical). How do you want to proceed with corrections?"
+  options:
+    - "Enforcement calibration first"
+    - "One combined correction project"
+    - "GOV-spec corrections first"
+    - "Report only for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 502599c432a37993
+  resolved_at: 2026-05-17T23:44:52.378404Z
+  answer: "User has answered your questions: \"The review found 2 GOV-spec errors (the Agent-Red trio + a title) and 4 over-strict-enforcement issues (~44% of recent NO-GO churn is mechanical). How do you want to proceed with corrections?\"=\"One combined correction project\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0677
+  asked_at: 2026-05-17T23:54:02.907239Z
+  question: "The WI-3344 commit you authorized (DECISION-0665) — and the autonomous loop's remaining work (WI-3342 IP-3 onward) — are blocked by the implementation-start-gate. It freezes ALL repository mutations whenever ANY post-implementation report is under Loyal Opposition review. In this multi-session environment reports are near-continuously in review — I've hit the freeze on gtkb-gov-project-retirement-spec-005 then gtkb-cross-harness-trigger-import-repair-005 back-to-back — so clean commit/edit windows are rare. The global scope of that freeze looks like a gate-design issue (a mutation to unrelated files cannot actually invalidate another report's reviewed snapshot). How should I proceed?"
+  options:
+    - "Keep retrying autonomously"
+    - "Pause the loop"
+    - "File a gate-scope fix"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dc99491ed15d9637
+  resolved_at: 2026-05-17T23:54:02.907239Z
+  answer: "User has answered your questions: \"The WI-3344 commit you authorized (DECISION-0665) — and the autonomous loop's remaining work (WI-3342 IP-3 onward) — are blocked by the implementation-start-gate. It freezes ALL repository mutations whenever ANY post-implementation report is under Loyal Opposition review. In this multi-session environment reports are near-continuously in review — I've hit the freeze on gtkb-gov-project-retirement-spec-005 then gtkb-cross-harness-trigger-import-repair-005 back-to-back — so clean commit/edit windows are rare. The global scope of that freeze looks like a gate-design issue (a mutation to unrelated files cannot actually invalidate another report's reviewed snapshot). How should I proceed?\"=\"File a gate-scope fix\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0678
+  asked_at: 2026-05-18T00:03:12.522458Z
+  question: "The S358 correction project has four workstreams. W4 (enforcement calibration) is the biggest mechanical-churn relief; W1-W3 are correctness fixes. In what order should I file the bridge proposals?"
+  options:
+    - "W4 first (churn relief)"
+    - "W1 first (correctness)"
+    - "All four in parallel"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 334a684ed5b14522
+  resolved_at: 2026-05-18T00:03:12.522458Z
+  answer: "User has answered your questions: \"The S358 correction project has four workstreams. W4 (enforcement calibration) is the biggest mechanical-churn relief; W1-W3 are correctness fixes. In what order should I file the bridge proposals?\"=\"W4 first (churn relief)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0679
+  asked_at: 2026-05-18T00:15:30.019289Z
+  question: "scripts/cross_harness_bridge_trigger.py is staged for the WI-3344 commit, but it carries ~10 extra lines beyond WI-3344's own changes — the parallel session's gtkb-cross-harness-trigger-import-repair fix, intermingled in the same imports hunk (can't be cleanly split with git add -p). How should the WI-3344 commit handle it?"
+  options:
+    - "Commit as-is, disclose it"
+    - "Hold WI-3344"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1efdcc4128e78eb2
+  resolved_at: 2026-05-18T00:15:30.019289Z
+  answer: "User has answered your questions: \"scripts/cross_harness_bridge_trigger.py is staged for the WI-3344 commit, but it carries ~10 extra lines beyond WI-3344's own changes — the parallel session's gtkb-cross-harness-trigger-import-repair fix, intermingled in the same imports hunk (can't be cleanly split with git add -p). How should the WI-3344 commit handle it?\"=\"Commit as-is, disclose it\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0680
+  asked_at: 2026-05-18T00:43:14.292358Z
+  question: "Which thread should I take next? I'll read Codex's -002 NO-GO findings and file the REVISED for whichever you pick."
+  options:
+    - "Deference-repair REVISED"
+    - "INDEX archival-trim REVISED"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fbfecee4c2bfcd47
+  resolved_at: 2026-05-18T00:43:14.292358Z
+  answer: "User has answered your questions: \"Which thread should I take next? I'll read Codex's -002 NO-GO findings and file the REVISED for whichever you pick.\"=\"Deference-repair REVISED\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0681
+  asked_at: 2026-05-18T01:10:54.281254Z
+  question: "Stand-up is complete (deliberation, project, 4 WIs, authorization all in MemBase) and the W4 enforcement-calibration proposal is fully prepared - template, verified four-fix scope, WI-3368. Drafting and filing the four workstream bridge proposals is a substantial multi-turn phase. How should I proceed?"
+  options:
+    - "Draft + file W4 now"
+    - "Draft W4, show before filing"
+    - "Pause at stand-up boundary"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4a30a042ecec74f0
+  resolved_at: 2026-05-18T01:10:54.281254Z
+  answer: "User has answered your questions: \"Stand-up is complete (deliberation, project, 4 WIs, authorization all in MemBase) and the W4 enforcement-calibration proposal is fully prepared - template, verified four-fix scope, WI-3368. Drafting and filing the four workstream bridge proposals is a substantial multi-turn phase. How should I proceed?\"=\"Draft + file W4 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0682
+  asked_at: 2026-05-18T01:53:06.061697Z
+  question: "What should I take next?"
+  options:
+    - "Implement deference-repair (Recommended)"
+    - "Revise index-archival"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 44292125f6e92a65
+  resolved_at: 2026-05-18T01:53:06.061697Z
+  answer: "User has answered your questions: \"What should I take next?\"=\"Implement deference-repair (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0683
+  asked_at: 2026-05-18T03:30:19.273413Z
+  question: "For the gtkb-bridge-index-archival-trim -005 REVISED, which F1 design should preserve VERIFIED completion evidence so event-driven pruning can't break an active project authorization's completion? (F2 origin-metadata fix is bundled regardless.)"
+  options:
+    - "Authorization-aware prune"
+    - "Consumers read the DA too"
+    - "New completion-evidence table"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3c5bd1776ea33f27
+  resolved_at: 2026-05-18T03:30:19.273413Z
+  answer: "User has answered your questions: \"For the gtkb-bridge-index-archival-trim -005 REVISED, which F1 design should preserve VERIFIED completion evidence so event-driven pruning can't break an active project authorization's completion? (F2 origin-metadata fix is bundled regardless.)\"=\"Authorization-aware prune\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0685
+  asked_at: 2026-05-18T05:23:43.049698Z
+  question: "W5 just reached GO alongside W4 — which should I take next?"
+  options:
+    - "W5 now"
+    - "Finish W4 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d16cce1995869c7e
+  resolved_at: 2026-05-18T05:23:43.049698Z
+  answer: "User has answered your questions: \"W5 just reached GO alongside W4 — which should I take next?\"=\"W5 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0686
+  asked_at: 2026-05-18T05:23:43.049698Z
+  question: "Approve these W5 token-framing corrections to all three rule files as drafted?"
+  options:
+    - "Approve all three as drafted"
+    - "I'll specify wording changes"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 125ee0bd65721e85
+  resolved_at: 2026-05-18T05:23:43.049698Z
+  answer: "User has answered your questions: \"Approve these W5 token-framing corrections to all three rule files as drafted?\"=\"Approve all three as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0687
+  asked_at: 2026-05-18T05:23:43.049698Z
+  question: "The approved CLAUDE.md correction would push the file from 301 to ~303 lines (GOV-01 cap is 300). How should I handle the CLAUDE.md passage?"
+  options:
+    - "Tighten it (line-neutral)"
+    - "Apply as approved (-> ~303)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 249b9dfe61c411b7
+  resolved_at: 2026-05-18T05:23:43.049698Z
+  answer: "User has answered your questions: \"The approved CLAUDE.md correction would push the file from 301 to ~303 lines (GOV-01 cap is 300). How should I handle the CLAUDE.md passage?\"=\"Tighten it (line-neutral)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0688
+  asked_at: 2026-05-18T05:23:43.049698Z
+  question: "Approve this tightened, line-neutral CLAUDE.md correction?"
+  options:
+    - "Approve the tightened wording"
+    - "Adjust it further"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5df732c7729d5fab
+  resolved_at: 2026-05-18T05:23:43.049698Z
+  answer: "User has answered your questions: \"Approve this tightened, line-neutral CLAUDE.md correction?\"=\"Approve the tightened wording\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0689
+  asked_at: 2026-05-18T05:51:41.181439Z
+  question: "Bridge thread `gtkb-implementation-gate-friction-hygiene` is NO-GO at -018: the GO'd IP-D scope was 32 regression tests (11 redirect / 12 sqlite / 9 chain-walk per -005), but only 19 IP-D-related tests landed. Codex requires one of three paths to close the thread. Which should I take?"
+  options:
+    - "Land remaining 13 tests"
+    - "Narrow scope via REVISED proposal"
+    - "Owner waiver"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9a7a7ebede031a10
+  resolved_at: 2026-05-18T05:51:41.181439Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0690
+  asked_at: 2026-05-18T13:23:43.850113Z
+  question: "Creating the follow-on's MemBase work item is bridge-gated. How should the deterministic groundtruth.db-in-target_paths check be tracked?"
+  options:
+    - "File reliability-fix proposal now"
+    - "Fold into post-W4 batch"
+    - "Capture as deliberation now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cc38358049abda2b
+  resolved_at: 2026-05-18T13:23:43.850113Z
+  answer: "User has answered your questions: \"Creating the follow-on's MemBase work item is bridge-gated. How should the deterministic groundtruth.db-in-target_paths check be tracked?\"=\"File reliability-fix proposal now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0691
+  asked_at: 2026-05-18T13:36:37.785056Z
+  question: "You asked for a record future sessions can reference to track Antigravity Integration status. Right now MemBase work-item records show 'backlogged' for all 15 WIs even though 7 are VERIFIED and committed — that 'status truth-up' was deferred under DECISION-0657. How should I build the tracking record?"
+  options:
+    - "Tracker file + truth-up"
+    - "Tracker file only"
+    - "MemBase truth-up only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fc5addf5905e4752
+  resolved_at: 2026-05-18T13:36:37.785056Z
+  answer: "User has answered your questions: \"You asked for a record future sessions can reference to track Antigravity Integration status. Right now MemBase work-item records show 'backlogged' for all 15 WIs even though 7 are VERIFIED and committed — that 'status truth-up' was deferred under DECISION-0657. How should I build the tracking record?\"=\"Tracker file + truth-up\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0692
+  asked_at: 2026-05-18T14:14:08.035335Z
+  question: "W1's GO'd -003 proposal omits platform_tests/scripts/test_project_verified_completion_scanner.py from its target_paths, but IP-2 breaks that file (2 failing tests). How should I bring it into W1's scope so the repair is authorized?"
+  options:
+    - "File W1 -005 REVISED"
+    - "Authorize the file directly"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 021ac4a293c239ce
+  resolved_at: 2026-05-18T14:14:08.035335Z
+  answer: "User has answered your questions: \"W1's GO'd -003 proposal omits platform_tests/scripts/test_project_verified_completion_scanner.py from its target_paths, but IP-2 breaks that file (2 failing tests). How should I bring it into W1's scope so the repair is authorized?\"=\"File W1 -005 REVISED\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0693
+  asked_at: 2026-05-18T14:24:40.406308Z
+  question: "The status truth-up turned out to need a careful per-WI completion audit (WIs are sliced; threads cross-reference sibling WI IDs), not a quick flag-flip. That competes with implementing the two GO'd threads WI-3342 and WI-3343, which is the most direct 'completion' of the project. How should I sequence the next work?"
+  options:
+    - "Implement GO'd threads first"
+    - "Narrow truth-up, then implement"
+    - "Full truth-up first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f22ed685d3e0f252
+  resolved_at: 2026-05-18T14:24:40.406308Z
+  answer: "User has answered your questions: \"The status truth-up turned out to need a careful per-WI completion audit (WIs are sliced; threads cross-reference sibling WI IDs), not a quick flag-flip. That competes with implementing the two GO'd threads WI-3342 and WI-3343, which is the most direct 'completion' of the project. How should I sequence the next work?\"=\"Implement GO'd threads first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0694
+  asked_at: 2026-05-18T16:30:13.555395Z
+  question: "The bridge scheduler design (lanes + leases + per-role concurrency) is already scoped and GO'd — the gap is implementation. Which direction should I take next?"
+  options:
+    - "Drive the scheduler program now"
+    - "Immediate throughput win only"
+    - "Finish Antigravity Integration first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a71c257a23c0c6cb
+  resolved_at: 2026-05-18T16:30:13.555395Z
+  answer: "User has answered your questions: \"The bridge scheduler design (lanes + leases + per-role concurrency) is already scoped and GO'd — the gap is implementation. Which direction should I take next?\"=\"Drive the scheduler program now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0695
+  asked_at: 2026-05-18T16:30:13.555395Z
+  question: "Filing the bridge-scheduler implementation slices is blocked: a governance gate (DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001) requires every implementation proposal to cite a Project, Work Item, and Project Authorization, and the scheduler program has no MemBase scaffolding. How should I scaffold and authorize it?"
+  options:
+    - "Full program (Slices 2-6)"
+    - "Core only (Slices 2-4)"
+    - "Hold the scheduler work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d5ff74e1299fd66c
+  resolved_at: 2026-05-18T16:30:13.555395Z
+  answer: "User has answered your questions: \"Filing the bridge-scheduler implementation slices is blocked: a governance gate (DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001) requires every implementation proposal to cite a Project, Work Item, and Project Authorization, and the scheduler program has no MemBase scaffolding. How should I scaffold and authorize it?\"=\"Full program (Slices 2-6)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0697
+  asked_at: 2026-05-18T20:09:42.277072Z
+  question: "Items 1 and 2 are complete (ADR v2 live; post-impl report at REVISED -007 awaiting Codex VERIFIED). Item 3 (revise the NO-GO'd scheduler Slice 5, then implement GO'd Slices 3/4/6) and item 4 (Antigravity onboarding) remain. You asked me to confirm priority before the scheduler-implementation block — what should I prioritize next?"
+  options:
+    - "Scheduler program (item 3)"
+    - "Antigravity first (item 4)"
+    - "Revise Slice 5, then checkpoint"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e1c71d8d43904db2
+  resolved_at: 2026-05-18T20:09:42.277072Z
+  answer: "User has answered your questions: \"Items 1 and 2 are complete (ADR v2 live; post-impl report at REVISED -007 awaiting Codex VERIFIED). Item 3 (revise the NO-GO'd scheduler Slice 5, then implement GO'd Slices 3/4/6) and item 4 (Antigravity onboarding) remain. You asked me to confirm priority before the scheduler-implementation block — what should I prioritize next?\"=\"Antigravity first (item 4)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0698
+  asked_at: 2026-05-18T20:38:28.717543Z
+  question: "NO-GO `-018` (implementation-gate friction hygiene) — approved IP-D scope was 32 regression tests; current implementation covers 19. Which remediation path?"
+  options:
+    - "Land the missing 13 tests"
+    - "REVISED proposal narrowing IP-D to 19"
+    - "Owner waiver in REVISED report"
+    - "Defer the thread — work on GO `-004` first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0001c61367724549
+  resolved_at: 2026-05-18T20:38:28.717543Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0699
+  asked_at: 2026-05-18T21:59:41.278308Z
+  question: "Bridge thread gtkb-implementation-gate-friction-hygiene-018 NO-GO: Codex requires the approved IP-D 32-test scope from -005 be satisfied, but only 19 IP-D tests landed (52 total passing). Three valid paths to closure — which do you want?"
+  options:
+    - "Land remaining ~13 IP-D tests"
+    - "REVISED proposal: narrow to 19"
+    - "Owner waiver for scope reduction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 399123b1b1e5ab04
+  resolved_at: 2026-05-18T21:59:41.278308Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0665
+  asked_at: 2026-05-17T20:48:52.979397Z
+  question: "Want me to commit the VERIFIED WI-3344 changes, or leave them for a batched commit?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: d619736913d7f917
+  resolved_at: 2026-05-17T23:04:27.508308Z
+  answer: "commit WI-3344's verified changes"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0684
+  asked_at: 2026-05-18T05:23:27.793721Z
+  question: "Want me to scan the W4/W5 `GO` files for their implementation scope, or move on W1–W3 proposal drafting?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: ba168cd66586b8e9
+  resolved_at: 2026-05-18T13:15:47.779678Z
+  answer: "answered via AUQ"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0696
+  asked_at: 2026-05-18T18:09:07.778099Z
+  question: "Owner decision needed?"
+  detected_via: prose:your_decision_q
+  status: resolved
+  question_hash: aa1f2d3bbfd3daaa
+  resolved_at: 2026-05-18T18:38:16.636162Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
