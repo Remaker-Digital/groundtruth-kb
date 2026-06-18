@@ -10,6 +10,14 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-1295
+  asked_at: 2026-06-18T16:56:27.353477Z
+  question: "owner decision, verify-first: does the defect still reproduce?"
+  detected_via: prose:your_decision_q
+  status: resolved
+  question_hash: 8cb78bde8474e2a4
+  resolved_at: 2026-06-18T17:50:30Z
+  notes: "Owner AUQ-approved clearance via session 94112412 (resume turn after restart): chose option 'Clear DECISION-1295 first, then resume'."
 - id: DECISION-1264
   asked_at: 2026-06-14T23:26:10.112237Z
   question: "Want me to dismiss the stale decisions, or is there anything else for the repo before I stand down?"
@@ -7333,6 +7341,100 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: f81eceb9243473c3
   resolved_at: 2026-06-18T06:51:43.202804Z
   answer: "Your questions have been answered: \"The deliberation is complete (program ratified, Phase 1 scoped, block-list policy decided). How do you want to close — the Phase 1 slice plan + D-P1a aren't canonical yet, so the choice is mainly about making them durable for the next session.\"=\"Persist Phase 1 scoping, then pause (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1290
+  asked_at: 2026-06-18T16:25:08.051900Z
+  question: "The headless LO review lane is down: all 3 providers (antigravity/ollama/openrouter) are circuit-broken on a deterministic Windows cp1252 UnicodeDecodeError in the worker subprocess reader (→ max-turn exhaustion before any canonical verdict). No proposal in the 28-item LO queue — including my WI-4658 dispatcher fix — can get a canonical GO/NO-GO headlessly. How do you want to unblock?"
+  options:
+    - "Run interactive Codex LO"
+    - "I author the LO-provider fix"
+    - "You fix providers directly"
+    - "Both: I author + you review"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5ca0c195945cedaf
+  resolved_at: 2026-06-18T16:25:08.051900Z
+  answer: "Your questions have been answered: \"The headless LO review lane is down: all 3 providers (antigravity/ollama/openrouter) are circuit-broken on a deterministic Windows cp1252 UnicodeDecodeError in the worker subprocess reader (→ max-turn exhaustion before any canonical verdict). No proposal in the 28-item LO queue — including my WI-4658 dispatcher fix — can get a canonical GO/NO-GO headlessly. How do you want to unblock?\"=\"Run interactive Codex LO\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1291
+  asked_at: 2026-06-18T16:51:03.300876Z
+  question: "WI-4658 fail-soft proposal is filed and queued for LO review. With the headless LO pipeline degraded, what next?"
+  options:
+    - "Investigate the LO pipeline"
+    - "Capture follow-on findings"
+    - "Monitor for this proposal's verdict"
+    - "Wrap up / something else"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f9835b6310b0d7e
+  resolved_at: 2026-06-18T16:51:03.300876Z
+  answer: "Your questions have been answered: \"WI-4658 fail-soft proposal is filed and queued for LO review. With the headless LO pipeline degraded, what next?\"=\"Investigate the LO pipeline\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1292
+  asked_at: 2026-06-18T16:51:03.300876Z
+  question: "LO pipeline investigation is complete (32 threads stuck; weak model pool + sticky-backoff amplifier). What should I do with the findings?"
+  options:
+    - "Capture findings + backlog"
+    - "File the mechanism fix now"
+    - "Unblock the reliability proposals via interactive LO"
+    - "Something else"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5aebcedc982d51da
+  resolved_at: 2026-06-18T16:51:03.300876Z
+  answer: "Your questions have been answered: \"LO pipeline investigation is complete (32 threads stuck; weak model pool + sticky-backoff amplifier). What should I do with the findings?\"=\"Capture findings + backlog\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1293
+  asked_at: 2026-06-18T16:51:41.249566Z
+  question: "Your principle (interactive role persists across contiguous/resumed sessions via the session envelope, changing only on explicit owner action) supersedes the S371 AUQ Decision 3 that explicitly rejected persisting session-stated role across compaction/resume, and requires amending DCL-SESSION-ROLE-RESOLUTION-001 / ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 / GOV-SESSION-ROLE-AUTHORITY-001 to make the durable envelope role authoritative. How should I capture and prioritize it?"
+  options:
+    - "Capture; fix in parallel"
+    - "Capture only; defer specs"
+    - "Prioritize over dispatcher fix"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 07de18d7a9eb50f8
+  resolved_at: 2026-06-18T16:51:41.249566Z
+  answer: "Your questions have been answered: \"Your principle (interactive role persists across contiguous/resumed sessions via the session envelope, changing only on explicit owner action) supersedes the S371 AUQ Decision 3 that explicitly rejected persisting session-stated role across compaction/resume, and requires amending DCL-SESSION-ROLE-RESOLUTION-001 / ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 / GOV-SESSION-ROLE-AUTHORITY-001 to make the durable envelope role authoritative. How should I capture and prioritize it?\"=\"Capture; fix in parallel\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1294
+  asked_at: 2026-06-18T16:56:27.353477Z
+  question: "Thread #4 (WI-3329): completing a project's sole authorization auto-retires the project with no opt-out, which has twice retired a project you wanted kept open as a program home (S353, S368; each needed a manual restore). The defect is verified live. Codex NO-GO'd the fast-lane fix because adding a keep-open opt-out changes GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001's semantics — it needs your explicit approval + a spec version bump before any non-fast-lane re-file. How should I proceed?"
+  options:
+    - "Approve opt-out + spec bump"
+    - "Decline — keep auto-retire absolute"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bac4a8f82f421a8a
+  resolved_at: 2026-06-18T16:56:27.353477Z
+  answer: "Your questions have been answered: \"Thread #4 (WI-3329): completing a project's sole authorization auto-retires the project with no opt-out, which has twice retired a project you wanted kept open as a program home (S353, S368; each needed a manual restore). The defect is verified live. Codex NO-GO'd the fast-lane fix because adding a keep-open opt-out changes GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001's semantics — it needs your explicit approval + a spec version bump before any non-fast-lane re-file. How should I proceed?\"=\"Approve opt-out + spec bump\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1296
+  asked_at: 2026-06-18T18:06:22.093233Z
+  question: "The quarantine fix (owner-directed priority) is claimed/in-progress by another session until 18:40Z. How should this interactive Claude Prime session proceed without colliding with the swarm?"
+  options:
+    - "Monitor the fix to VERIFIED"
+    - "Disposition an ADVISORY item"
+    - "Pick up a different unclaimed GO item"
+    - "Stand by / something else"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c568ac759d0dcc4b
+  resolved_at: 2026-06-18T18:06:22.093233Z
+  answer: "Your questions have been answered: \"The quarantine fix (owner-directed priority) is claimed/in-progress by another session until 18:40Z. How should this interactive Claude Prime session proceed without colliding with the swarm?\"=\"Monitor the fix to VERIFIED\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1297
+  asked_at: 2026-06-18T18:34:17.647270Z
+  question: "Formal-artifact approval gate: do you approve the GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v5 text above (preserves v4's automatic retirement as default; adds the explicit keep-open caller election) for formalization into MemBase?"
+  options:
+    - "Approve v5 as drafted"
+    - "Approve with edits"
+    - "Hold for review"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8688ca282e886ae3
+  resolved_at: 2026-06-18T18:34:17.647270Z
+  answer: "Your questions have been answered: \"Formal-artifact approval gate: do you approve the GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v5 text above (preserves v4's automatic retirement as default; adds the explicit keep-open caller election) for formalization into MemBase?\"=\"Approve v5 as drafted\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
