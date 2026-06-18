@@ -364,6 +364,66 @@ def bridge_health_cmd(ctx: click.Context, json_output: bool) -> None:
     _emit_bridge_dispatch_health(ctx, json_output=json_output)
 
 
+@bridge_group.command("show")
+@click.argument("slug")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool) -> None:
+    """Show one bridge thread's version chain."""
+    from groundtruth_kb.bridge.read_commands import show_thread
+
+    config = _resolve_config(ctx)
+    payload = show_thread(config.project_root, slug)
+    if payload is None:
+        if json_output:
+            click.echo(json.dumps({"error": "bridge_thread_not_found", "slug": slug}, indent=2, sort_keys=True))
+        else:
+            click.echo(f"Bridge thread not found: {slug}", err=True)
+        ctx.exit(1)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Bridge thread: {payload['slug']}")
+    click.echo(f"Latest status: {payload['latest_status']}")
+    click.echo(f"Latest path: {payload['latest_path']}")
+    click.echo("Versions:")
+    for version in payload["version_chain"]:
+        status = version["status"] or "(unknown)"
+        click.echo(f"- {version['version']:03d} {status} {version['path']}")
+
+
+@bridge_group.command("threads")
+@click.option("--wi", "wi_id", required=True, help="Work item id to search for, e.g. WI-4634.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool) -> None:
+    """List bridge threads that cite a work item."""
+    from groundtruth_kb.bridge.read_commands import threads_for_work_item
+
+    config = _resolve_config(ctx)
+    try:
+        payload = threads_for_work_item(config.project_root, wi_id)
+    except ValueError as exc:
+        click.echo(str(exc), err=True)
+        ctx.exit(2)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Bridge threads citing {payload['work_item']}: {payload['match_count']}")
+    caveat = payload["coverage_caveat"]
+    click.echo(
+        "Coverage: "
+        f"{caveat['threads_with_work_item_metadata']} of {caveat['total_threads']} threads carry Work Item metadata."
+    )
+    if not payload["threads"]:
+        click.echo("- (none)")
+        return
+    for thread in payload["threads"]:
+        click.echo(f"- {thread['slug']} ({thread['latest_status']} at {thread['latest_path']})")
+        for citing_path in thread["citing_paths"]:
+            click.echo(f"  cites: {citing_path}")
+
+
 @bridge_dispatch_group.command("config")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
