@@ -690,10 +690,28 @@ def test_has_spec_derived_verification_accepts_spec_to_test_mapping_heading(auth
     assert auth_module.has_spec_derived_verification(markdown)
 
 
+def test_has_spec_derived_verification_accepts_h2_plan_with_generic_h3_evidence(auth_module):
+    """A qualifying h2 verification section includes generic h3 evidence."""
+    markdown = "## Verification Plan\n\n### Evidence\n\nRun `python -m pytest platform_tests/scripts/test_x.py -q`.\n"
+    assert auth_module.has_spec_derived_verification(markdown)
+
+
+def test_has_spec_derived_verification_accepts_h2_spec_plan_with_generic_h3_body(auth_module):
+    """A spec-derived h2 plan is recognized when its body sits under h3."""
+    markdown = "## Spec-Derived Verification Plan\n\n### Evidence\n\nDerived from the linked specifications.\n"
+    assert auth_module.has_spec_derived_verification(markdown)
+
+
 def test_has_spec_derived_verification_rejects_bare_test_plan_without_evidence(auth_module):
     """A bare 'Test Plan' heading with no test-command evidence is rejected
     (governance floor preserved)."""
     markdown = "## Test Plan\n\nWe will think carefully about correctness.\n"
+    assert not auth_module.has_spec_derived_verification(markdown)
+
+
+def test_has_spec_derived_verification_rejects_h2_test_plan_h3_without_evidence(auth_module):
+    """Nested h3 parsing does not widen bare Test Plan acceptance."""
+    markdown = "## Test Plan\n\n### Evidence\n\nWe will think carefully about correctness.\n"
     assert not auth_module.has_spec_derived_verification(markdown)
 
 

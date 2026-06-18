@@ -46,6 +46,7 @@ _SPEC_ID_RE = re.compile(r"\b[A-Z][A-Z0-9]*-[A-Z0-9][A-Z0-9-]*\b")
 # HYG-046 (FAB-14): match h2 AND h3 headings so a '### Requirement Sufficiency'
 # (or any h3-headed section) is not silently invisible to the section scan.
 SECTION_RE = re.compile(r"^#{2,3}\s+(.+?)\s*$", re.MULTILINE)
+SECTION_LEVEL_RE = re.compile(r"^(#{2,3})\s+(.+?)\s*$", re.MULTILINE)
 # Heading substrings that mark a section as a spec-derived verification plan.
 # Substring match (not equality) so a heading like "Test Plan (spec-to-test
 # mapping)" is accepted, matching what the bridge clause-preflight already
@@ -421,6 +422,20 @@ def _iter_sections(markdown: str):
         start = match.end()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
         yield match.group(1).strip(), markdown[start:end].strip()
+
+
+def _iter_section_spans(markdown: str):
+    """Yield heading spans whose body includes nested deeper subsections."""
+    matches = list(SECTION_LEVEL_RE.finditer(markdown))
+    for index, match in enumerate(matches):
+        level = len(match.group(1))
+        start = match.end()
+        end = len(markdown)
+        for later in matches[index + 1 :]:
+            if len(later.group(1)) <= level:
+                end = later.start()
+                break
+        yield level, match.group(2).strip(), markdown[start:end].strip()
 
 
 def section_body(markdown: str, heading: str) -> str:
@@ -874,7 +889,7 @@ def has_spec_derived_verification(markdown: str) -> bool:
     heading-anchored, so a proposal Loyal Opposition can legitimately GO is not
     then rejected by ``begin`` purely on verification-section heading wording.
     """
-    for heading, body in _iter_sections(markdown):
+    for _level, heading, body in _iter_section_spans(markdown):
         if not body:
             continue
         normalized = heading.lower().replace("–", "-").replace("—", "-")
