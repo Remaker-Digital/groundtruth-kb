@@ -408,6 +408,28 @@ def test_missing_operative_file_fails_closed(preflight, tmp_path):
     assert "gate fails closed" in report
 
 
+def test_missing_clauses_config_fails_closed(preflight, tmp_path, capsys):
+    """WI-4637: a missing mandatory clause registry cannot satisfy the gate."""
+    missing_config = tmp_path / "missing-clauses.toml"
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            "test-missing-clauses-config",
+            "--clauses-config",
+            str(missing_config),
+            "--bridge-dir",
+            str(bridge_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert rc == preflight.EXIT_CANNOT_EVALUATE
+    assert "clauses config not found" in captured.err
+
+
 def test_explicit_owner_waiver_clears_blocking_gap(preflight, tmp_path):
     """Change 2: an explicit ``Owner waiver: <clause_id> — <DELIB-ID> — <reason>``
     line in the bridge content satisfies the gate without satisfying-evidence text.

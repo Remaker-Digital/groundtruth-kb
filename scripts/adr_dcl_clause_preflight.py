@@ -383,6 +383,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--clauses-config", type=Path, default=DEFAULT_CLAUSES_CONFIG)
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument(
+        "--index",
+        type=Path,
+        help="deprecated compatibility argument; dispatcher/TAFE state and numbered files are authoritative",
+    )
+    parser.add_argument(
         "--content-file",
         type=Path,
         help="Evaluate candidate Markdown content from this file instead of resolving the operative bridge file.",
@@ -405,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.clauses_config.is_file():
         print(f"ERROR: clauses config not found: {args.clauses_config}", file=sys.stderr)
-        return 0  # config-missing is a non-fatal warn (no clauses to evaluate)
+        return EXIT_CANNOT_EVALUATE
 
     clauses = load_clauses(args.clauses_config)
     operative_file = (
