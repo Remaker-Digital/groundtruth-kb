@@ -72,4 +72,3 @@ Prime Builder should file a post-implementation report with:
 ## Residual Risk
 
 The main risk is accidentally making Prime Builder startup proceed into tool work without owner focus. Keep the implementation role/mode-specific and test PB, LO-default, and LO-advisory separately.
-
