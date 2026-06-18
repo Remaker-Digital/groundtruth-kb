@@ -7,23 +7,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/spec-before-code.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-before-code.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/kb-not-markdown.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/kb-not-markdown.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/destructive-gate.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/destructive-gate.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/credential-scan.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/credential-scan.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/scanner-safe-writer.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/scanner-safe-writer.py\""
           },
           {
             "type": "command",
@@ -108,11 +108,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/session-start-governance.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-governance.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/assertion-check.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
           },
           {
             "type": "command",
@@ -135,7 +135,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/assertion-check.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
           }
         ]
       }
@@ -145,11 +145,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/delib-search-tracker.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-tracker.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/owner-decision-capture.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
           },
           {
             "type": "command",
@@ -162,7 +162,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/spec-event-surfacer.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\""
           }
         ]
       },
@@ -170,7 +170,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/owner-decision-capture.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
           }
         ]
       },
@@ -276,15 +276,15 @@
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/delib-search-gate.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-gate.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/intake-classifier.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/gov09-capture.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
           },
           {
             "type": "command",
@@ -317,7 +317,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/intake-classifier.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
           }
         ]
       },
@@ -325,7 +325,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/gov09-capture.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
           }
         ]
       }
