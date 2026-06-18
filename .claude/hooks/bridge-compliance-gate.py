@@ -73,6 +73,7 @@ BRIDGE_STATUS_TOKENS = (
     "BLOCKED",
 )
 BRIDGE_VERSIONED_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
+LO_VERDICT_BRIDGE_FILE_RE = re.compile(r"^.+\.lo-verdict\.md$", re.IGNORECASE)
 BRIDGE_FILE_STATUS_RE = re.compile(
     r"^[#>*\-\s`]*(?:" + "|".join(re.escape(status) for status in BRIDGE_STATUS_TOKENS) + r")\b",
     re.IGNORECASE,
@@ -480,6 +481,13 @@ def _is_bridge_markdown_file(file_path: str) -> bool:
     if not normalized.endswith(".md"):
         return False
     return "/bridge/" in f"/{normalized}" and bool(BRIDGE_VERSIONED_FILE_RE.match(Path(normalized).name))
+
+
+def _is_lo_verdict_bridge_file(file_path: str) -> bool:
+    normalized = file_path.replace("\\", "/")
+    if not normalized.endswith(".md"):
+        return False
+    return "/bridge/" in f"/{normalized}" and bool(LO_VERDICT_BRIDGE_FILE_RE.match(Path(normalized).name))
 
 
 def _extract_bridge_id_from_path(file_path: str) -> str | None:
@@ -1202,6 +1210,12 @@ def _deny_reason_for_content(
             "[Governance] Retired bridge aggregate files are not live or writable bridge surfaces. "
             "Use dispatcher/TAFE state plus status-bearing versioned bridge files."
         )
+    if _is_lo_verdict_bridge_file(file_path):
+        return (
+            "[Governance] Noncanonical bridge verdict files are not writable authority. "
+            "Write the next numbered bridge/<slug>-NNN.md file through the governed bridge path "
+            "instead of bridge/*.lo-verdict.md."
+        )
 
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
@@ -1565,7 +1579,9 @@ def main() -> None:
         emit_ask("PreToolUse", heading_ask_reason)
         sys.exit(0)
 
-    ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
+    ask_reason = None
+    if not (_is_bridge_markdown_file(file_path) or _is_lo_verdict_bridge_file(file_path)):
+        ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
     if ask_reason:
         emit_ask("PreToolUse", ask_reason)
         sys.exit(0)

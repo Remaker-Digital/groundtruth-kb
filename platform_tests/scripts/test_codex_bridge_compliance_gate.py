@@ -22,10 +22,22 @@ AUTHOR_METADATA = (
     "author_model_version: 5.5\n"
     "author_model_configuration: Extra High\n"
 )
+WORK_INTENT_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
 
 
 @pytest.fixture(autouse=True)
-def manage_work_intent_claims():
+def manage_work_intent_claims(monkeypatch: pytest.MonkeyPatch):
+    for env_var in WORK_INTENT_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
     subprocess.run(
         ["python", "scripts/bridge_claim_cli.py", "claim", "test-codex-deny", "--session-id", "test"],
         cwd=str(REPO_ROOT),
@@ -79,6 +91,11 @@ def test_adapter_extracts_common_bash_bridge_write_patterns() -> None:
     adapter = _load_adapter()
     samples = [
         ("cat > bridge/example-thread-001.md <<'EOF'\nNEW\nEOF\n", "bridge/example-thread-001.md", "NEW\n"),
+        (
+            "cat > bridge/example-thread-001.lo-verdict.md <<'EOF'\nGO\nEOF\n",
+            "bridge/example-thread-001.lo-verdict.md",
+            "GO\n",
+        ),
         ("printf 'NEW\\n' > bridge/example-thread-001.md", "bridge/example-thread-001.md", "NEW\n"),
         ("echo 'NEW' > bridge/example-thread-001.md", "bridge/example-thread-001.md", "NEW"),
         (
@@ -118,6 +135,31 @@ def test_adapter_denies_non_compliant_bridge_write() -> None:
     reason = output["hookSpecificOutput"]["permissionDecisionReason"]
     assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert "Specification Links" in reason
+
+
+def test_adapter_denies_noncanonical_lo_verdict_write() -> None:
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "cat > bridge/test-codex-deny-001.lo-verdict.md <<'EOF'\nGO\n\n# Review\nEOF\n"},
+        "cwd": str(REPO_ROOT),
+        "session_id": "test",
+    }
+
+    result = subprocess.run(
+        ["python", str(ADAPTER_PATH)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "bridge/*.lo-verdict.md" in reason
 
 
 def test_adapter_allows_compliant_bridge_write() -> None:

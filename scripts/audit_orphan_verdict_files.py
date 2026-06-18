@@ -13,6 +13,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 VERDICT_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
 _CANONICAL_BRIDGE_FILE_RE = re.compile(r"^.+-\d{3,}\.md$")
+_LO_VERDICT_SUFFIX = ".lo-verdict.md"
+_VERDICT_LINE_RE = re.compile(r"^\s*Verdict:\s*(NO-GO|VERIFIED|GO)\b", re.IGNORECASE | re.MULTILINE)
+_STATUS_TOKEN_RE = re.compile(r"\b(NO-GO|VERIFIED|GO)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -35,8 +38,49 @@ def first_non_blank_line(path: Path) -> str | None:
     return None
 
 
+def _first_non_blank_line_from_text(text: str) -> str | None:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _normalize_status(value: str) -> str:
+    return value.strip().upper()
+
+
+def _is_lo_verdict_filename(path: Path) -> bool:
+    return path.name.lower().endswith(_LO_VERDICT_SUFFIX)
+
+
+def _lo_verdict_status_from_text(text: str, first_line: str | None) -> str | None:
+    if first_line and _normalize_status(first_line) in VERDICT_STATUSES:
+        return _normalize_status(first_line)
+    verdict_line = _VERDICT_LINE_RE.search(text)
+    if verdict_line:
+        return _normalize_status(verdict_line.group(1))
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        heading = line.lstrip("#").strip()
+        lowered = heading.lower()
+        if lowered == "verdict":
+            for later_line in lines[index + 1 : index + 6]:
+                candidate = _normalize_status(later_line)
+                if candidate in VERDICT_STATUSES:
+                    return candidate
+                if candidate:
+                    break
+        if "loyal opposition" not in lowered or "verdict" not in lowered:
+            continue
+        status_match = _STATUS_TOKEN_RE.search(heading)
+        if status_match:
+            return _normalize_status(status_match.group(1))
+    return None
+
+
 def audit_bridge_dir(bridge_dir: Path) -> list[OrphanVerdictFile]:
-    """Return non-canonical files whose first non-blank line is a verdict token."""
+    """Return non-canonical files that carry bridge-verdict authority signals."""
     if not bridge_dir.exists():
         return []
     if not bridge_dir.is_dir():
@@ -44,16 +88,29 @@ def audit_bridge_dir(bridge_dir: Path) -> list[OrphanVerdictFile]:
 
     orphans: list[OrphanVerdictFile] = []
     for path in sorted(bridge_dir.glob("*.md"), key=lambda item: item.name):
-        first_line = first_non_blank_line(path)
-        if first_line not in VERDICT_STATUSES:
-            continue
         if is_canonical_bridge_filename(path):
+            continue
+        text = path.read_text(encoding="utf-8")
+        first_line = _first_non_blank_line_from_text(text)
+        normalized_first_line = _normalize_status(first_line or "")
+        if normalized_first_line in VERDICT_STATUSES:
+            detected_status = normalized_first_line
+            reason = "verdict-shaped file name is not canonical <slug>-NNN.md"
+        elif _is_lo_verdict_filename(path):
+            detected_status = _lo_verdict_status_from_text(text, first_line)
+            if detected_status is None:
+                continue
+            reason = (
+                "noncanonical .lo-verdict.md file carries verdict content and must be "
+                "reconciled to numbered bridge history"
+            )
+        else:
             continue
         orphans.append(
             OrphanVerdictFile(
                 path=path.as_posix(),
-                first_line_status=first_line,
-                reason="verdict-shaped file name is not canonical <slug>-NNN.md",
+                first_line_status=detected_status,
+                reason=reason,
             )
         )
     return orphans

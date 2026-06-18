@@ -100,3 +100,20 @@ def test_extract_bridge_writes_preserves_versioned_bridge_file_behavior(tmp_path
     assert len(writes) == 1
     assert writes[0].file_path == "bridge/sample-003.md"
     assert writes[0].content == "NEW\n\nbridge_kind: implementation_report\n"
+
+
+def test_extract_bridge_writes_includes_lo_verdict_file(tmp_path: Path) -> None:
+    adapter = _load_adapter()
+    patch = """*** Begin Patch
+*** Add File: bridge/sample-003.lo-verdict.md
++GO
++
++# Loyal Opposition Verdict
+*** End Patch
+"""
+
+    writes = adapter.extract_bridge_writes(patch, root=tmp_path)
+
+    assert len(writes) == 1
+    assert writes[0].file_path == "bridge/sample-003.lo-verdict.md"
+    assert writes[0].content == "GO\n\n# Loyal Opposition Verdict\n"

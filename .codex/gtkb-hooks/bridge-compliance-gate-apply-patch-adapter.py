@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 SKIPPED_DIAGNOSTIC = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "last-bridge-audit-apply-patch-skipped.json"
 BRIDGE_VERSIONED_FILE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
+BRIDGE_LO_VERDICT_FILE_RE = re.compile(r"^bridge/.+\.lo-verdict\.md$", re.IGNORECASE)
 _RETIRED_BRIDGE_AGGREGATE_FILE = ("bridge", "INDEX.md")
 
 
@@ -114,7 +115,11 @@ def _is_bridge_target(path_text: str) -> bool:
     normalized = path_text.replace("\\", "/").lstrip("./")
     parts = tuple(Path(normalized).parts)
     retired_aggregate = len(parts) >= 2 and parts[-2:] == _RETIRED_BRIDGE_AGGREGATE_FILE
-    return retired_aggregate or bool(BRIDGE_VERSIONED_FILE_RE.match(normalized))
+    return (
+        retired_aggregate
+        or bool(BRIDGE_VERSIONED_FILE_RE.match(normalized))
+        or bool(BRIDGE_LO_VERDICT_FILE_RE.match(normalized))
+    )
 
 
 def _is_patch_file_header(line: str) -> bool:

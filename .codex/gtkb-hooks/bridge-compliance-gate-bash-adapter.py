@@ -15,12 +15,14 @@ CANONICAL_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py
 SKIPPED_DIAGNOSTIC = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "last-bridge-audit-skipped.json"
 BRIDGE_FILE_WRITE_PATTERNS = (
     re.compile(
-        r"(?P<cmd>cat|printf|echo)\b(?P<body>.*?)(?:>\s*|>>\s*)(?P<path>bridge/[^\s\"']+-\d{3}\.md)",
+        r"(?P<cmd>cat|printf|echo)\b(?P<body>.*?)(?:>\s*|>>\s*)"
+        r"(?P<path>bridge/[^\s\"']+(?:-\d{3}|\.lo-verdict)\.md)",
         re.IGNORECASE | re.DOTALL,
     ),
-    re.compile(r"\btee\s+(?P<path>bridge/[^\s\"']+-\d{3}\.md)", re.IGNORECASE),
+    re.compile(r"\btee\s+(?P<path>bridge/[^\s\"']+(?:-\d{3}|\.lo-verdict)\.md)", re.IGNORECASE),
     re.compile(
-        r"(?:Path\(|open\()\s*[\"'](?P<path>bridge/[^\"']+-\d{3}\.md)[\"'].*?write(?:_text)?\((?P<body>.*?)\)",
+        r"(?:Path\(|open\()\s*[\"'](?P<path>bridge/[^\"']+(?:-\d{3}|\.lo-verdict)\.md)[\"']"
+        r".*?write(?:_text)?\((?P<body>.*?)\)",
         re.IGNORECASE | re.DOTALL,
     ),
 )
@@ -44,7 +46,9 @@ def _bash_command(payload: dict[str, Any]) -> str:
 
 def _extract_heredoc(command: str) -> tuple[str, str] | None:
     match = re.search(
-        r"cat\s*(?:>\s*|>>\s*)(?P<path>bridge/[^\s\"']+-\d{3}\.md)\s*<<\s*['\"]?(?P<tag>[A-Za-z0-9_:-]+)['\"]?\s*\n",
+        r"cat\s*(?:>\s*|>>\s*)"
+        r"(?P<path>bridge/[^\s\"']+(?:-\d{3}|\.lo-verdict)\.md)\s*"
+        r"<<\s*['\"]?(?P<tag>[A-Za-z0-9_:-]+)['\"]?\s*\n",
         command,
         re.IGNORECASE,
     )
@@ -69,7 +73,11 @@ def _unquote_literal(value: str) -> str:
 
 def extract_bridge_write(command: str) -> tuple[str, str] | None:
     """Extract bridge target and candidate content from common Bash write shapes."""
-    if re.search(r"cat\s*(?:>\s*|>>\s*)bridge/[^\s\"']+-\d{3}\.md\s*<<", command, re.IGNORECASE):
+    if re.search(
+        r"cat\s*(?:>\s*|>>\s*)bridge/[^\s\"']+(?:-\d{3}|\.lo-verdict)\.md\s*<<",
+        command,
+        re.IGNORECASE,
+    ):
         return _extract_heredoc(command)
     heredoc = _extract_heredoc(command)
     if heredoc:
@@ -81,7 +89,7 @@ def extract_bridge_write(command: str) -> tuple[str, str] | None:
         path = match.group("path")
         body = match.groupdict().get("body") or ""
         return path, _unquote_literal(body.strip())
-    if re.search(r"bridge/[^\s\"']+-\d{3}\.md", command):
+    if re.search(r"bridge/[^\s\"']+(?:-\d{3}|\.lo-verdict)\.md", command):
         _write_skipped("bridge file write content extraction failed", command)
     return None
 

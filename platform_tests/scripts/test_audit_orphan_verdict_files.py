@@ -59,6 +59,56 @@ def test_non_verdict_noncanonical_file_not_flagged(tmp_path: Path) -> None:
     assert audit["orphans"] == []
 
 
+def test_flags_heading_first_lo_verdict_file(tmp_path: Path) -> None:
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    _write(
+        bridge_dir / "gtkb-example-thread-001.lo-verdict.md",
+        "# Loyal Opposition Review\n\nVerdict: GO\n",
+    )
+
+    audit = module.build_audit(tmp_path)
+
+    assert audit["orphan_count"] == 1
+    assert audit["orphans"][0]["first_line_status"] == "GO"
+    assert audit["orphans"][0]["path"].endswith("gtkb-example-thread-001.lo-verdict.md")
+    assert ".lo-verdict.md" in audit["orphans"][0]["reason"]
+
+
+def test_flags_lo_verdict_section_followed_by_status(tmp_path: Path) -> None:
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    _write(
+        bridge_dir / "gtkb-example-thread-001.lo-verdict.md",
+        "## Loyal Opposition Verdict: gtkb-example-thread\n\n## Verdict\n\nNO-GO\n",
+    )
+
+    audit = module.build_audit(tmp_path)
+
+    assert audit["orphan_count"] == 1
+    assert audit["orphans"][0]["first_line_status"] == "NO-GO"
+
+
+def test_non_verdict_bridge_markdown_with_verdict_line_not_flagged(tmp_path: Path) -> None:
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    _write(bridge_dir / "gtkb-example-thread-notes.md", "# Notes\n\nVerdict: GO\n")
+
+    audit = module.build_audit(tmp_path)
+
+    assert audit["orphans"] == []
+
+
+def test_lo_verdict_without_verdict_content_not_flagged(tmp_path: Path) -> None:
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    _write(bridge_dir / "gtkb-example-thread-001.lo-verdict.md", "# Notes\n\nNo verdict here.\n")
+
+    audit = module.build_audit(tmp_path)
+
+    assert audit["orphans"] == []
+
+
 def test_canonical_slug_containing_digits_not_flagged(tmp_path: Path) -> None:
     module = _load_module()
     bridge_dir = tmp_path / "bridge"
