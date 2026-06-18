@@ -462,11 +462,17 @@ def _write_relay_cache(
     *,
     sha: str | None = None,
     byte_length: int | None = None,
+    role_mode: str | None = None,
 ) -> None:
     """Write a harness-scoped startup-disclosure relay cache file + metadata sidecar."""
     diagnostics.mkdir(parents=True, exist_ok=True)
     encoded = body.encode("utf-8")
-    diagnostics.joinpath("last-user-visible-startup.md").write_text(body, encoding="utf-8", newline="\n")
+    suffix = f"-{role_mode}" if role_mode in {"pb", "lo"} else ""
+    diagnostics.joinpath(f"last-user-visible-startup{suffix}.md").write_text(
+        body,
+        encoding="utf-8",
+        newline="\n",
+    )
     from datetime import datetime
 
     now_str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -477,7 +483,9 @@ def _write_relay_cache(
         "byte_length": byte_length if byte_length is not None else len(encoded),
         "sha256": sha if sha is not None else hashlib.sha256(encoded).hexdigest(),
     }
-    diagnostics.joinpath("last-user-visible-startup.meta.json").write_text(
+    if role_mode in {"pb", "lo"}:
+        meta["role_mode"] = role_mode
+    diagnostics.joinpath(f"last-user-visible-startup{suffix}.meta.json").write_text(
         json.dumps(meta), encoding="utf-8", newline="\n"
     )
 
@@ -528,6 +536,80 @@ def test_startup_gate_message_authorizes_one_read_only_read(tmp_path, monkeypatc
     assert "verbatim" in lowered
     assert "acknowledgement" in lowered
     assert "do not use tools" not in lowered, "the contradictory blanket tool prohibition must be gone"
+
+
+def test_lo_default_startup_gate_continues_to_harness_action(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    _seed_registry(tmp_path, {"A": ("codex", ["loyal-opposition"], "active")})
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
+    _write_startup_gate_guard(tmp_path)
+    _write_relay_cache(
+        tmp_path / ".codex" / "gtkb-hooks",
+        "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nlo body",
+        role_mode="lo",
+    )
+
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "::init gtkb lo", "session_id": "session-lo"},
+        tmp_path,
+    )
+    context = response["hookSpecificOutput"]["additionalContext"]
+
+    assert "harness-only Loyal Opposition startup action" in context
+    assert "status-bearing versioned files under `bridge/`" in context
+    assert "process actionable latest `NEW` / `REVISED` bridge entries oldest-to-newest by default" in context
+    assert "stop and wait for the next owner message" not in context
+
+
+def test_lo_advisory_startup_gate_asks_before_auto_process(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    _seed_registry(tmp_path, {"A": ("codex", ["loyal-opposition"], "active")})
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
+    _write_startup_gate_guard(tmp_path)
+    _write_relay_cache(
+        tmp_path / ".codex" / "gtkb-hooks",
+        "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nlo body",
+        role_mode="lo",
+    )
+
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb advisory"},
+        tmp_path,
+    )
+    context = response["hookSpecificOutput"]["additionalContext"]
+
+    assert "harness-only Loyal Opposition advisory startup action" in context
+    assert "ask Mike whether to switch to auto-process" in context
+    assert "Do not write verdict files or auto-process bridge entries in advisory mode" in context
+    assert "stop and wait for the next owner message" not in context
+
+
+def test_prime_builder_startup_gate_still_waits_after_disclosure(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    _seed_registry(tmp_path, {"A": ("codex", ["prime-builder"], "active")})
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
+    _write_startup_gate_guard(tmp_path)
+    _write_relay_cache(
+        tmp_path / ".codex" / "gtkb-hooks",
+        "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\npb body",
+        role_mode="pb",
+    )
+
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "::init gtkb pb", "session_id": "session-pb"},
+        tmp_path,
+    )
+    context = response["hookSpecificOutput"]["additionalContext"]
+
+    assert "stop and wait for the next owner message" in context
+    assert "must not choose, map, or begin session work" in context
+    assert "process actionable latest `NEW` / `REVISED`" not in context
 
 
 def test_startup_gate_does_not_consult_shared_dashboard_report(tmp_path, monkeypatch) -> None:
@@ -1051,8 +1133,8 @@ def test_startup_focus_lines_include_role_slot_topology_mode_init_keyword_and_br
     assert module.TOPOLOGY_MODE_SINGLE in lines
     assert "First owner message" in lines
     assert "init-keyword matcher" in lines
-    assert "bridge/INDEX.md" in lines
-    assert "canonical handoff/review" in lines
+    assert "dispatcher/TAFE state plus status-bearing numbered bridge files" in lines
+    assert "startup snapshots are non-canonical" in lines
 
 
 def test_save_state_persists_topology_mode_default(tmp_path, monkeypatch) -> None:

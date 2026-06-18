@@ -965,6 +965,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in prime_context
     assert "on no-match, process the prompt as normal task content" in prime_context
     assert "wait for Mike's next message before choosing or mapping session work" in prime_context
+    assert "render the startup disclosure and wait for the next message" in prime_context
     assert "## User-Visible Startup Message" not in prime_context
     prime_disclosure = module._startup_disclosure(prime_result)
     assert prime_disclosure == prime_report
@@ -990,6 +991,10 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "routes the first owner message through the init-keyword matcher" in loyal_context
     assert "DCL-SESSION-START-INIT-KEYWORD-MATCHING-001" in loyal_context
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" in loyal_context
+    assert "process actionable `NEW` / `REVISED` entries oldest-to-newest by default" in loyal_context
+    assert "ask Mike whether to switch to auto-process before writing verdict files" in loyal_context
+    assert "render the startup disclosure and wait for the next message" not in loyal_context
+    assert "wait for the next owner message before tool use" not in loyal_context
     assert "## User-Visible Startup Message" not in loyal_context
     loyal_disclosure = module._startup_disclosure(loyal_result)
     assert loyal_disclosure == loyal_report

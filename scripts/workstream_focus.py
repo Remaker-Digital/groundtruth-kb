@@ -1559,18 +1559,76 @@ def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str |
     }
 
 
-def _startup_gate_message() -> str:
+def _startup_role_mode_from_registry(project_root: Path | None = None) -> str | None:
+    root = (project_root or _project_root_from_env()).resolve()
+    if not (root / ROLE_ASSIGNMENTS_RELATIVE_PATH).is_file():
+        return None
+    try:
+        role, _document, _path = role_for_harness(
+            root,
+            harness_id=_resolved_harness_id(root),
+            harness_name=_resolved_harness_name(),
+            ensure_prime_on_startup=False,
+        )
+    except Exception:  # noqa: BLE001 - init-keyword relay must fail soft.
+        return None
+    if role == ROLE_LOYAL_OPPOSITION:
+        return "lo"
+    if role in {ROLE_PRIME_BUILDER, ROLE_ACTING_PRIME_BUILDER}:
+        return "pb"
+    return None
+
+
+def _startup_effective_role_mode(prompt: str, project_root: Path | None = None) -> str | None:
+    return _startup_role_mode_from_prompt(prompt) or _startup_role_mode_from_registry(project_root)
+
+
+def _startup_gate_action_guard(role_mode: str | None) -> str:
+    if role_mode == "lo":
+        return (
+            "Do not perform ordinary task work, map session focus, or run broad exploration before relaying "
+            "the disclosure. The harness-only Loyal Opposition startup action described below is the permitted "
+            "continuation after the disclosure relay."
+        )
+    return (
+        "Do not perform ordinary task work, mutate files, map session focus, or run broad exploration on this "
+        "disclosure-relay turn."
+    )
+
+
+def _startup_gate_followup_instruction(role_mode: str | None, init_mode: str | None) -> str:
+    if role_mode == "lo" and init_mode == "advisory":
+        return (
+            "After relaying the cached disclosure, continue only with the harness-only Loyal Opposition "
+            "advisory startup action: read current TAFE/dispatcher bridge state and status-bearing versioned "
+            "files under `bridge/`, report the live scan result, and ask Mike whether to switch to "
+            "auto-process. Do not write verdict files or auto-process bridge entries in advisory mode."
+        )
+    if role_mode == "lo":
+        return (
+            "After relaying the cached disclosure, continue with the harness-only Loyal Opposition startup "
+            "action: read current TAFE/dispatcher bridge state and status-bearing versioned files under "
+            "`bridge/`, report the live scan result, and process actionable latest `NEW` / `REVISED` bridge "
+            "entries oldest-to-newest by default. Do not stop after disclosure relay when the bridge startup "
+            "action is still pending."
+        )
+    return (
+        "After relaying the cached disclosure, stop and wait for the next owner message. Prime Builder startup "
+        "must not choose, map, or begin session work until Mike supplies focus or an unambiguous concrete task."
+    )
+
+
+def _startup_gate_message(role_mode: str | None = None, *, init_mode: str | None = None) -> str:
     return (
         "GTKB STARTUP INPUT GATE (init-keyword match): the prompt matched the "
         "GroundTruth-KB init keyword, so the startup-disclosure relay path is active. "
-        "Do not perform ordinary task work, mutate files, map session focus, or run "
-        "broad exploration on this disclosure-relay turn. The owner-visible startup "
-        "disclosure is NOT inlined in this payload; it is held in a harness-scoped "
-        "cache file so this payload stays bounded. If the startup disclosure is not "
-        "already fully present in model context, perform exactly one read-only "
-        "filesystem read of the cache file named below, relay its content verbatim "
-        "as the owner-visible startup disclosure, then stop and wait for the next "
-        "owner message. Do not replace the disclosure with a short acknowledgement."
+        f"{_startup_gate_action_guard(role_mode)} "
+        "The owner-visible startup disclosure is NOT inlined in this payload; it is held in a harness-scoped "
+        "cache file so this payload stays bounded. If the startup disclosure is not already fully present in "
+        "model context, perform exactly one read-only filesystem read of the cache file named below, then relay "
+        "its content verbatim as the owner-visible startup disclosure. "
+        f"{_startup_gate_followup_instruction(role_mode, init_mode)} "
+        "Do not replace the disclosure with a short acknowledgement."
     )
 
 
@@ -1585,9 +1643,15 @@ def _startup_relay_failure_context(reason: str) -> str:
     )
 
 
-def _startup_gate_response(project_root: Path | None = None, *, role_mode: str | None = None) -> dict[str, Any]:
-    message = _startup_gate_message()
+def _startup_gate_response(
+    project_root: Path | None = None,
+    *,
+    role_mode: str | None = None,
+    init_mode: str | None = None,
+) -> dict[str, Any]:
     pointer = _startup_relay_pointer(project_root, role_mode=role_mode)
+    if pointer is None and role_mode is not None:
+        pointer = _startup_relay_pointer(project_root, role_mode=None)
     if pointer is None:
         diagnostic = _startup_relay_failure_context(
             "the cache file or its metadata sidecar is missing, empty, or malformed"
@@ -1599,6 +1663,7 @@ def _startup_gate_response(project_root: Path | None = None, *, role_mode: str |
                 "additionalContext": diagnostic,
             },
         }
+    message = _startup_gate_message(role_mode or pointer.get("role_mode"), init_mode=init_mode)
     if not pointer["consistent"]:
         diagnostic = _startup_relay_failure_context(
             f"cache file {pointer['cache_path']} does not match its metadata sidecar "
@@ -1692,8 +1757,9 @@ def _consume_discard_first_prompt_gate(
     # so only interactive owner-typed declarations produce a marker, per
     # DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001's INTERACTIVE_OVERRIDE_AUTHORIZED
     # receiver decision.
-    role_mode = _startup_role_mode_from_prompt(prompt)
-    role_profile = _MODE_TO_ROLE_PROFILE.get(role_mode or "")
+    explicit_role_mode = _startup_role_mode_from_prompt(prompt)
+    role_mode = _startup_effective_role_mode(prompt, project_root)
+    role_profile = _MODE_TO_ROLE_PROFILE.get(explicit_role_mode or "")
     headless_dispatch = bool(os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV))
     if role_profile and not headless_dispatch:
         resolved_id, source_label = _resolve_session_id(session_id)
@@ -1724,8 +1790,10 @@ def _consume_discard_first_prompt_gate(
             )
             if per_session_written:
                 state["startup_session_role_per_session_markers_written"] = per_session_written
+    if role_mode:
+        state["startup_init_role_mode"] = role_mode
     _write_lifecycle_guard(state, project_root)
-    return _startup_gate_response(project_root, role_mode=role_mode)
+    return _startup_gate_response(project_root, role_mode=role_mode, init_mode=init_match.mode)
 
 
 def _clear_startup_response_pending_for_followup(project_root: Path | None = None) -> None:

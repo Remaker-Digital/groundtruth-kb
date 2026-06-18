@@ -4386,17 +4386,40 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
 
 def _render_fresh_session_input_semantics(model: dict[str, Any]) -> str:
     lines = [
-        "- The harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 and DCL-SESSION-START-INIT-KEYWORD-MATCHING-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the harness-specific startup disclosure and wait for the next owner message before tool use; on no-match, process the prompt as normal task content.",
+        "- The harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 and DCL-SESSION-START-INIT-KEYWORD-MATCHING-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the harness-specific startup disclosure; on no-match, process the prompt as normal task content.",
     ]
     if _is_loyal_opposition_model(model):
         lines.append(
-            "- After presenting this startup disclosure, execute the harness-only Loyal Opposition startup action before ordinary task work."
+            "- After presenting this startup disclosure in default mode, execute the harness-only Loyal Opposition startup action before ordinary task work: verify live bridge state, report the live scan, and process actionable `NEW` / `REVISED` entries oldest-to-newest by default."
+        )
+        lines.append(
+            "- In `init gtkb advisory` mode, report the live scan and ask Mike whether to switch to auto-process before writing verdict files or processing bridge entries."
         )
     else:
         lines.append(
             "- After presenting this startup disclosure and the session-focus choices, wait for Mike's next message before choosing or mapping session work."
         )
     return "\n".join(lines)
+
+
+def _render_init_keyword_relay_instruction(model: dict[str, Any]) -> str:
+    if _is_loyal_opposition_model(model):
+        return (
+            "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through "
+            "the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on default LO match "
+            "(e.g., `init gtkb`), render the cached startup disclosure, then continue with the harness-only "
+            "Loyal Opposition startup action; on advisory match (e.g., `init gtkb advisory`), report the live "
+            "scan and ask Mike whether to switch to auto-process; on no-match, process the prompt as normal "
+            "task content. The startup disclosure is generated at SessionStart time and cached for lazy "
+            "injection by the matcher; it is not unconditionally relayed."
+        )
+    return (
+        "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through the "
+        "init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on match (e.g., `init gtkb`, "
+        "`init gtkb advisory`), render the startup disclosure and wait for the next message; on no-match, "
+        "process the prompt as normal task content. The startup disclosure is generated at SessionStart time "
+        "and cached for lazy injection by the matcher; it is not unconditionally relayed."
+    )
 
 
 def _render_startup_pruning(model: dict[str, Any]) -> str:
@@ -6803,7 +6826,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
                 f"- Prime Builder focus-menu preservation rule: when the startup message contains a session-focus menu, "
                 f"the A/B/C recommendations and D full focus list must remain present; the full focus list must include all {focus_option_count} labels in order."
             ),
-            "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the startup disclosure and wait for the next message; on no-match, process the prompt as normal task content. The startup disclosure is generated at SessionStart time and cached for lazy injection by the matcher; it is not unconditionally relayed.",
+            _render_init_keyword_relay_instruction(model),
             "- Only an init-keyword match relays startup disclosure; a non-matching first owner message is ordinary task input and may be mapped normally.",
             "- When the init-keyword path renders cached startup content, do not replace the startup message with a shorter final answer after rendering it.",
             "- The AI harness is not responsible for composing role, mode, bridge, process, or focus content during startup.",
