@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -1087,7 +1088,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert "## Loyal Opposition Startup Task" not in report
     assert "## Session Startup" not in report
     assert "### Project State Rollup" in report
-    assert "MemBase table: current_work_items" in report
+    assert "MemBase tables: current_work_items + current_project_work_item_memberships" in report
     assert "active projects:" in report
     assert "Strategic self-improvement directive" in report
     assert "review/consideration backlog items" in report
@@ -1146,7 +1147,9 @@ def test_project_state_rollup_groups_active_membase_projects() -> None:
         [
             {
                 "id": "WI-1",
-                "project_name": "GTKB-A",
+                "project_name": "",
+                "canonical_project_id": "PROJECT-GTKB-A",
+                "canonical_project_name": "GTKB-A",
                 "title": "Second item",
                 "resolution_status": "open",
                 "priority": "P2",
@@ -1154,7 +1157,9 @@ def test_project_state_rollup_groups_active_membase_projects() -> None:
             },
             {
                 "id": "WI-2",
-                "project_name": "GTKB-A",
+                "project_name": "LEGACY-WRONG",
+                "canonical_project_id": "PROJECT-GTKB-A",
+                "canonical_project_name": "GTKB-A",
                 "title": "First item",
                 "resolution_status": "in_progress",
                 "priority": "P0",
@@ -1162,7 +1167,9 @@ def test_project_state_rollup_groups_active_membase_projects() -> None:
             },
             {
                 "id": "WI-3",
-                "project_name": "GTKB-B",
+                "project_name": "",
+                "canonical_project_id": "PROJECT-GTKB-B",
+                "canonical_project_name": "GTKB-B",
                 "title": "Single item",
                 "resolution_status": "deferred",
                 "priority": "low",
@@ -1170,7 +1177,9 @@ def test_project_state_rollup_groups_active_membase_projects() -> None:
             },
             {
                 "id": "WI-4",
-                "project_name": "GTKB-C",
+                "project_name": "",
+                "canonical_project_id": "PROJECT-GTKB-C",
+                "canonical_project_name": "GTKB-C",
                 "title": "Done item",
                 "resolution_status": "resolved",
                 "priority": "P0",
@@ -1178,7 +1187,9 @@ def test_project_state_rollup_groups_active_membase_projects() -> None:
             },
             {
                 "id": "WI-5",
-                "project_name": "",
+                "project_name": "LEGACY-SHOULD-NOT-GROUP",
+                "canonical_project_id": None,
+                "canonical_project_name": None,
                 "title": "Ungrouped item",
                 "resolution_status": "open",
                 "priority": "P1",
@@ -1187,18 +1198,138 @@ def test_project_state_rollup_groups_active_membase_projects() -> None:
         ]
     )
 
-    assert rollup["source"] == "MemBase table: current_work_items"
+    assert rollup["source"] == "MemBase tables: current_work_items + current_project_work_item_memberships"
+    assert rollup["project_group_field"] == "current_project_work_item_memberships.project_id"
     assert rollup["total_current_work_items"] == 5
     assert rollup["non_terminal_work_items"] == 4
     assert rollup["active_project_count"] == 2
     assert rollup["ungrouped_non_terminal_count"] == 1
     assert [project["project"] for project in rollup["projects"]] == ["GTKB-A", "GTKB-B"]
+    assert [project["project_id"] for project in rollup["projects"]] == ["PROJECT-GTKB-A", "PROJECT-GTKB-B"]
     assert rollup["projects"][0]["top_id"] == "WI-2"
 
     rendered = module._render_project_state_rollup({"metrics": {"membase": {"project_state_rollup": rollup}}})
     assert "Current work items: 5; non-terminal: 4; active projects: 2" in rendered
     assert "`GTKB-A`: 2 non-terminal" in rendered
     assert "top: `WI-2` - First item [in_progress, P0, order 1]." in rendered
+
+
+def _load_scoped_client_module():
+    scoped_client_path = REPO_ROOT / "scripts" / "gtkb_scoped_client.py"
+    spec = importlib.util.spec_from_file_location("gtkb_scoped_client_test_module", scoped_client_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["gtkb_scoped_client_test_module"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_project_state_rollup_matches_canonical_membership_orphan_count(tmp_path) -> None:
+    module = _load_module()
+    scoped_client_module = _load_scoped_client_module()
+    project_root = tmp_path
+    (project_root / "groundtruth.toml").write_text(
+        "\n".join(
+            [
+                "[scoped_service]",
+                'default_subject = "gtkb_infrastructure"',
+                'application_id = "gtkb"',
+                'project_root = "."',
+                'allowed_read_operations = ["dashboard.summary.read"]',
+                'runtime_root = ".gtkb-state"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    db_path = project_root / "groundtruth.db"
+    connection = sqlite3.connect(db_path)
+    try:
+        connection.executescript(
+            """
+            CREATE TABLE current_specifications(id TEXT, title TEXT, status TEXT, type TEXT);
+            CREATE TABLE current_work_items(
+                id TEXT,
+                title TEXT,
+                resolution_status TEXT,
+                project_name TEXT,
+                priority TEXT,
+                implementation_order INTEGER
+            );
+            CREATE TABLE current_tests(id TEXT, title TEXT, test_file TEXT);
+            CREATE TABLE current_deliberations(id TEXT, title TEXT, outcome TEXT);
+            CREATE TABLE current_projects(id TEXT, name TEXT, status TEXT);
+            CREATE TABLE current_project_work_item_memberships(
+                id TEXT,
+                project_id TEXT,
+                work_item_id TEXT,
+                membership_role TEXT,
+                membership_order INTEGER,
+                status TEXT
+            );
+            CREATE TABLE test_procedures(id TEXT);
+            """
+        )
+        connection.executemany(
+            "INSERT INTO current_work_items VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                ("WI-1", "Canonical member", "open", "", "P1", 10),
+                ("WI-2", "True orphan", "open", "LEGACY-ONLY", "P2", 20),
+                ("WI-3", "Terminal member", "resolved", "", "P0", 1),
+            ],
+        )
+        connection.executemany(
+            "INSERT INTO current_projects VALUES (?, ?, ?)",
+            [
+                ("PROJECT-B", "Beta", "active"),
+                ("PROJECT-A", "Alpha", "active"),
+            ],
+        )
+        connection.executemany(
+            "INSERT INTO current_project_work_item_memberships VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                ("PWM-B-WI-1", "PROJECT-B", "WI-1", "member", 20, "active"),
+                ("PWM-A-WI-1", "PROJECT-A", "WI-1", "member", 1, "active"),
+                ("PWM-A-WI-3", "PROJECT-A", "WI-3", "member", 1, "active"),
+                ("PWM-INACTIVE-WI-2", "PROJECT-B", "WI-2", "member", 1, "inactive"),
+            ],
+        )
+        connection.commit()
+
+        envelope = scoped_client_module.GtkbScopedClient.from_project_root(project_root).invoke(
+            scoped_client_module.DASHBOARD_SUMMARY_READ,
+            project_root=project_root,
+        )
+        work_items = envelope["payload"]["work_items"]
+        by_id = {row["id"]: row for row in work_items}
+        assert by_id["WI-1"]["project_name"] == ""
+        assert by_id["WI-1"]["canonical_project_id"] == "PROJECT-A"
+        assert by_id["WI-1"]["canonical_project_name"] == "Alpha"
+        assert by_id["WI-1"]["canonical_project_membership_order"] == 1
+        assert by_id["WI-2"]["canonical_project_id"] is None
+
+        rollup = module._project_state_rollup(work_items)
+        expected_orphans = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM current_work_items w
+            WHERE w.resolution_status IN ('open', 'in_progress', 'deferred', 'blocked')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM current_project_work_item_memberships m
+                  WHERE m.work_item_id = w.id
+                    AND m.status = 'active'
+              )
+            """
+        ).fetchone()[0]
+    finally:
+        connection.close()
+
+    assert expected_orphans == 1
+    assert rollup["ungrouped_non_terminal_count"] == expected_orphans
+    assert [project["project"] for project in rollup["projects"]] == ["Alpha"]
+    assert [project["project_id"] for project in rollup["projects"]] == ["PROJECT-A"]
 
 
 def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> None:

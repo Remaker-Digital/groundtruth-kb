@@ -192,7 +192,7 @@ class GtkbScopedClient:
         self._config = config
 
     @classmethod
-    def from_project_root(cls, project_root: Path | None = None) -> "GtkbScopedClient":
+    def from_project_root(cls, project_root: Path | None = None) -> GtkbScopedClient:
         config = load_scoped_service_config(project_root)
         return cls(config)
 
@@ -275,6 +275,45 @@ class GtkbScopedClient:
             rows_by_table: dict[str, list[dict[str, Any]]] = {}
             for table in _DASHBOARD_SUMMARY_TABLES:
                 rows_by_table[table] = [dict(row) for row in connection.execute(f"SELECT * FROM {table}")]
+            primary_project_memberships: dict[str, dict[str, Any]] = {}
+            membership_rows = connection.execute(
+                """
+                SELECT
+                    m.id AS membership_id,
+                    m.work_item_id AS work_item_id,
+                    m.project_id AS project_id,
+                    m.membership_role AS membership_role,
+                    m.membership_order AS membership_order,
+                    p.name AS project_name
+                FROM current_project_work_item_memberships m
+                LEFT JOIN current_projects p ON p.id = m.project_id
+                WHERE m.status = 'active'
+                ORDER BY
+                    m.work_item_id,
+                    m.membership_order IS NULL,
+                    m.membership_order,
+                    m.project_id
+                """
+            ).fetchall()
+            for membership_row in membership_rows:
+                membership = dict(membership_row)
+                work_item_id = str(membership.get("work_item_id") or "")
+                if work_item_id and work_item_id not in primary_project_memberships:
+                    primary_project_memberships[work_item_id] = membership
+            work_items = []
+            for row in rows_by_table["current_work_items"]:
+                enriched = dict(row)
+                membership = primary_project_memberships.get(str(enriched.get("id") or ""))
+                enriched["canonical_project_id"] = membership.get("project_id") if membership else None
+                enriched["canonical_project_name"] = membership.get("project_name") if membership else None
+                enriched["canonical_project_membership_id"] = membership.get("membership_id") if membership else None
+                enriched["canonical_project_membership_role"] = (
+                    membership.get("membership_role") if membership else None
+                )
+                enriched["canonical_project_membership_order"] = (
+                    membership.get("membership_order") if membership else None
+                )
+                work_items.append(enriched)
             test_procedures_count = int(connection.execute("SELECT COUNT(*) FROM test_procedures").fetchone()[0])
         finally:
             connection.close()
@@ -282,7 +321,7 @@ class GtkbScopedClient:
         envelope["available"] = True
         envelope["payload"] = {
             "specifications": rows_by_table["current_specifications"],
-            "work_items": rows_by_table["current_work_items"],
+            "work_items": work_items,
             "tests": rows_by_table["current_tests"],
             "deliberations": rows_by_table["current_deliberations"],
             "test_procedures_count": test_procedures_count,

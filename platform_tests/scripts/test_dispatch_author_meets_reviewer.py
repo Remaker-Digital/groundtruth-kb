@@ -103,7 +103,7 @@ def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refus
 
     bridge_id = "test-self-review"
     (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text(
-        "author_harness_id: D\nauthor_session_context_id: dispatch-session-1\n# content\n",
+        "NEW\n\nauthor_harness_id: D\nauthor_session_context_id: dispatch-session-1\n# content\n",
         encoding="utf-8",
     )
     (root / "bridge" / "INDEX.md").write_text(
@@ -146,7 +146,7 @@ def test_dispatch_fails_closed_when_author_session_metadata_missing(
 
     bridge_id = "test-missing-session"
     (root / "bridge" / f"gtkb-{bridge_id}-001.md").write_text(
-        "author_harness_id: D\n# content\n",
+        "NEW\n\nauthor_harness_id: D\n# content\n",
         encoding="utf-8",
     )
     (root / "bridge" / "INDEX.md").write_text(

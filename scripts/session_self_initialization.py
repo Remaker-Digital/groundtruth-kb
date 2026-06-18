@@ -1068,6 +1068,7 @@ def _work_item_order_value(row: dict[str, Any]) -> int:
 
 def _project_state_rollup(work_items: list[dict[str, Any]]) -> dict[str, Any]:
     grouped: dict[str, list[dict[str, Any]]] = {}
+    project_labels: dict[str, str] = {}
     ungrouped_non_terminal: list[dict[str, Any]] = []
     status_counts = Counter(str(row.get("resolution_status") or "none") for row in work_items)
 
@@ -1075,14 +1076,16 @@ def _project_state_rollup(work_items: list[dict[str, Any]]) -> dict[str, Any]:
         status = str(row.get("resolution_status") or "")
         if status not in NON_TERMINAL_WORK_ITEM_STATUSES:
             continue
-        project_name = str(row.get("project_name") or "").strip()
-        if not project_name:
+        project_id = str(row.get("canonical_project_id") or "").strip()
+        if not project_id:
             ungrouped_non_terminal.append(row)
             continue
-        grouped.setdefault(project_name, []).append(row)
+        project_label = str(row.get("canonical_project_name") or project_id).strip()
+        project_labels.setdefault(project_id, project_label or project_id)
+        grouped.setdefault(project_id, []).append(row)
 
     projects: list[dict[str, Any]] = []
-    for project_name, rows in grouped.items():
+    for project_id, rows in grouped.items():
         sorted_rows = sorted(
             rows,
             key=lambda row: (
@@ -1094,7 +1097,8 @@ def _project_state_rollup(work_items: list[dict[str, Any]]) -> dict[str, Any]:
         top = sorted_rows[0]
         projects.append(
             {
-                "project": project_name,
+                "project": project_labels.get(project_id, project_id),
+                "project_id": project_id,
                 "non_terminal_count": len(rows),
                 "status_counts": dict(
                     sorted(Counter(str(row.get("resolution_status") or "none") for row in rows).items())
@@ -1107,11 +1111,17 @@ def _project_state_rollup(work_items: list[dict[str, Any]]) -> dict[str, Any]:
             }
         )
 
-    projects.sort(key=lambda project: (-int(project["non_terminal_count"]), str(project["project"])))
+    projects.sort(
+        key=lambda project: (
+            -int(project["non_terminal_count"]),
+            str(project["project"]).casefold(),
+            str(project["project_id"]),
+        )
+    )
     return {
         "available": True,
-        "source": "MemBase table: current_work_items",
-        "project_group_field": "project_name",
+        "source": "MemBase tables: current_work_items + current_project_work_item_memberships",
+        "project_group_field": "current_project_work_item_memberships.project_id",
         "total_current_work_items": len(work_items),
         "status_counts": dict(sorted(status_counts.items())),
         "non_terminal_work_items": sum(int(project["non_terminal_count"]) for project in projects)
@@ -4370,7 +4380,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
             "- Live bridge authority: current bridge state must be determined from TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; this generated report is not authoritative after generation.",
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read current TAFE/dispatcher bridge state and versioned bridge files directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
-            "- Project-state startup rule: include a compact current-state report for every active MemBase project group using `current_work_items.project_name`; distinguish bridge queue state, git drift, release blockers, and Prime-actionable bridge responses.",
+            "- Project-state startup rule: include a compact current-state report for every active MemBase project group using `current_project_work_item_memberships.project_id`; distinguish bridge queue state, git drift, release blockers, and Prime-actionable bridge responses.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
             "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual TAFE/dispatcher bridge scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
