@@ -56,6 +56,31 @@ def test_negated_gap_phrase_is_sufficient_not_gap():
     assert requirement_sufficiency_state(md) == "sufficient"
 
 
+def test_sufficiency_declaration_precedes_future_gap_context():
+    proposal = _ROOT / "bridge" / "gtkb-stale-git-worktree-autogc-diagnosis-001.md"
+    md = proposal.read_text(encoding="utf-8")
+    assert requirement_sufficiency_state(md) == "sufficient"
+
+
+def test_sufficiency_declaration_does_not_hide_present_tense_gap():
+    md = _doc(
+        "##",
+        "Existing requirements are sufficient, but new or revised requirement required before implementation.",
+    )
+    assert requirement_sufficiency_state(md) == "gap"
+
+
+def test_gap_declaration_precedes_later_sufficiency_context():
+    md = _doc(
+        "##",
+        (
+            "New or revised requirement required before implementation. "
+            "After that requirement lands, existing requirements are sufficient."
+        ),
+    )
+    assert requirement_sufficiency_state(md) == "gap"
+
+
 def test_absent_section_is_missing():
     md = "# Proposal\n\n## Summary\n\nNo sufficiency section here.\n"
     assert requirement_sufficiency_state(md) == "missing"
