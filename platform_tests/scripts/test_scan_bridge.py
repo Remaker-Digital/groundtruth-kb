@@ -9,17 +9,24 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+TEMPLATE_HELPER_PATH = (
+    PROJECT_ROOT / "groundtruth-kb" / "templates" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+)
+
+
+def _load_module(path: Path, module_name: str):
+    import sys
+
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _load_helper():
-    import sys
-
-    spec = importlib.util.spec_from_file_location("scan_bridge", HELPER_PATH)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["scan_bridge"] = module
-    spec.loader.exec_module(module)
-    return module
+    return _load_module(HELPER_PATH, "scan_bridge")
 
 
 @pytest.fixture(scope="module")
@@ -260,6 +267,13 @@ def test_terminal_tokens_parity_with_canonical_notify(helper) -> None:
     from groundtruth_kb.bridge import notify
 
     assert set(helper._KIND_TERMINAL_TOKENS) == set(notify._KIND_TERMINAL_TOKENS)
+
+
+def test_template_terminal_tokens_parity_with_live_helper(helper) -> None:
+    """The managed template helper must not drift from the live helper."""
+    template_helper = _load_module(TEMPLATE_HELPER_PATH, "scan_bridge_template")
+
+    assert set(template_helper._KIND_TERMINAL_TOKENS) == set(helper._KIND_TERMINAL_TOKENS)
 
 
 def test_advisory_actionable_for_prime_not_lo(helper) -> None:
