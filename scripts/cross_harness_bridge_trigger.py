@@ -197,9 +197,13 @@ FATAL_WORKER_OUTPUT_MARKERS = (
     ("OpenRouter completions request failed", "provider_failure"),
     ("OpenRouter API returned error", "provider_failure"),
     ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
+    ("IneligibleTierError", "harness_unavailable_tier"),
+    ("ineligible tier", "harness_unavailable_tier"),
+    ("individuals tier", "harness_unavailable_tier"),
     ("guard denied Write", "guard_denied_write"),
     ("guard denied", "guard_denial"),
 )
+NON_RETRYABLE_WORKER_FAILURE_CLASSES = frozenset({"harness_unavailable_tier"})
 NON_LAUNCHED_FAILURE_REASONS = frozenset(
     {
         "all_slugs_quarantined",
@@ -3183,8 +3187,19 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             recipient_state.pop("last_failure_reason", None)
         else:
             # Failure!
+            if launch_signature:
+                # A failed launch is not a completed dispatch for dedupe
+                # purposes. Keep the failed batch signature on last_launch for
+                # retry/backoff checks, but clear both dispatch signature
+                # fields so retry timing, not stale equality, governs re-arm.
+                recipient_state["last_dispatched_signature"] = None
+                recipient_state["signature"] = None
+                recipient_state["last_suppressed_signature"] = None
+
             failure_count = recipient_state.get("failure_count", 0) + 1
             recipient_state["failure_count"] = failure_count
+            if failure_reason in NON_RETRYABLE_WORKER_FAILURE_CLASSES:
+                recipient_state["non_retryable_failure"] = True
             if failure_count >= max_retries:
                 recipient_state["circuit_breaker_tripped"] = True
                 recipient_state["circuit_breaker_tripped_at"] = _now_iso()
@@ -3252,6 +3267,13 @@ def _failure_class_from_previous(previous_failure: dict[str, Any]) -> str:
     return str(error_type or "provider_failure")
 
 
+def _prior_failed_launch_signature(prior: dict[str, Any]) -> Any:
+    launch = prior.get("last_launch")
+    if isinstance(launch, dict) and launch.get("signature") is not None:
+        return launch.get("signature")
+    return _prior_dispatched_signature(prior)
+
+
 def _retry_delay_active_for_prior(prior: dict[str, Any], retry_delay_seconds: int) -> bool:
     prior_last_launch = prior.get("last_launch")
     prior_launched_at = prior_last_launch.get("launched_at") if isinstance(prior_last_launch, dict) else None
@@ -3274,17 +3296,36 @@ def _provider_failure_backoff_skip(
     """Return skip evidence when a target has failed this same selected batch."""
     if not prior:
         return None
-    if _prior_dispatched_signature(prior) != signature:
+
+    failed_launch_signature = _prior_failed_launch_signature(prior)
+    same_failed_batch = failed_launch_signature == signature
+    previous_failure = _detect_previous_launch_failure(prior, recipient=recipient, signature=signature)
+    if previous_failure is not None:
+        failure_class = _failure_class_from_previous(previous_failure)
+        if failure_class in NON_RETRYABLE_WORKER_FAILURE_CLASSES or prior.get("non_retryable_failure"):
+            _record_dispatch_failure(state_dir, previous_failure)
+            return {
+                "reason": "provider_failure_backoff_active",
+                "failure_class": failure_class,
+                "backoff_source": "non_retryable_worker_failure",
+                "previous_launch_failed": previous_failure,
+            }
+
+    if not same_failed_batch:
         return None
 
-    previous_failure = _detect_previous_launch_failure(prior, recipient=recipient, signature=signature)
     if previous_failure is not None:
         _record_dispatch_failure(state_dir, previous_failure)
         failure_class = _failure_class_from_previous(previous_failure)
+    else:
+        failure_class = str(prior.get("last_failure_reason") or "provider_failure")
+
+    if prior.get("non_retryable_failure"):
         return {
             "reason": "provider_failure_backoff_active",
             "failure_class": failure_class,
-            "previous_launch_failed": previous_failure,
+            "backoff_source": "non_retryable_worker_failure",
+            **({"previous_launch_failed": previous_failure} if previous_failure is not None else {}),
         }
 
     failure_count = prior.get("failure_count", 0)
@@ -3300,16 +3341,18 @@ def _provider_failure_backoff_skip(
         if not _circuit_breaker_half_open_allowed(prior, retry_delay_seconds):
             return {
                 "reason": "provider_failure_backoff_active",
-                "failure_class": str(prior.get("last_failure_reason") or "circuit_breaker_active"),
+                "failure_class": failure_class,
                 "backoff_source": "circuit_breaker_active",
+                **({"previous_launch_failed": previous_failure} if previous_failure is not None else {}),
             }
         return None
 
     if _retry_delay_active_for_prior(prior, retry_delay_seconds):
         return {
             "reason": "provider_failure_backoff_active",
-            "failure_class": str(prior.get("last_failure_reason") or "retry_delay_enforced"),
+            "failure_class": failure_class,
             "backoff_source": "retry_delay_enforced",
+            **({"previous_launch_failed": previous_failure} if previous_failure is not None else {}),
         }
     return None
 

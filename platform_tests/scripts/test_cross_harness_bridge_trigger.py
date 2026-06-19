@@ -525,6 +525,56 @@ def test_retry_delay_enforced_within_launch_window(tmp_path: Path) -> None:
     assert retried["results"]["loyal-opposition"]["reason"] == "retry_delay_enforced"
 
 
+def test_failed_launch_exit_processing_clears_dispatch_dedupe_signals(tmp_path: Path) -> None:
+    """WI-4679: a processed launch failure clears dispatch dedupe fields.
+
+    The failed launch keeps its own signature for retry/backoff evidence, but
+    the recipient's completed-dispatch signatures are cleared so the unchanged
+    selected batch is governed by retry timing instead of permanent dedupe.
+    """
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+    dispatch_id = "prior-failed-launch"
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+
+    now = datetime.now(UTC)
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    signature = state["recipients"]["loyal-opposition:A"]["last_dispatched_signature"]
+    launch = {
+        "dispatch_id": dispatch_id,
+        "recipient": "loyal-opposition:A",
+        "launched": True,
+        "launched_at": (now - timedelta(seconds=10)).isoformat(),
+        "signature": signature,
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["example-thread"],
+        "primary_bridge_id": "example-thread",
+    }
+    for key in ("loyal-opposition:A", "loyal-opposition"):
+        state["recipients"][key]["last_launch"] = dict(launch)
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert retried["results"]["loyal-opposition"]["reason"] == "retry_delay_enforced"
+    retried_state = retried["dispatch_state"]["recipients"]["loyal-opposition:A"]
+    assert retried_state["failure_count"] == 1
+    assert retried_state["last_dispatched_signature"] is None
+    assert retried_state["signature"] is None
+    assert retried_state["last_launch"]["signature"] == signature
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-2-dispatch-state-idempotence
 # ──────────────────────────────────────────────────────────────────────────
@@ -2807,6 +2857,7 @@ def test_lo_provider_failure_backoff_falls_back_after_max_turn_marker(
             "reviewer_precedence": 10,
             "reason": "provider_failure_backoff_active",
             "failure_class": "max_turn_exhaustion",
+            "backoff_source": "retry_delay_enforced",
         }
     ]
     assert fallback["dispatch_state"]["recipients"]["loyal-opposition:D"]["last_result"] == (
@@ -2816,6 +2867,173 @@ def test_lo_provider_failure_backoff_falls_back_after_max_turn_marker(
     assert any(
         record.get("reason") == "previous_launch_failed"
         and record.get("matched_markers", [{}])[0].get("label") == "max_turn_exhaustion"
+        for record in failures
+    )
+
+
+def test_lo_provider_failure_backoff_retries_preferred_after_retry_window(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4679: same-batch provider failure does not permanently demote a target."""
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"], "max_items": 1}},
+                reviewer_precedence=10,
+            ),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=20,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "D"
+
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    stderr_path = runs_dir / "prior-ollama-old.stderr.log"
+    stderr_path.write_text("ollama_harness: max-turn exhaustion before final assistant text\n", encoding="utf-8")
+
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    d_state = state["recipients"]["loyal-opposition:D"]
+    signature = d_state["last_dispatched_signature"]
+    launch = {
+        "dispatch_id": "prior-ollama-old",
+        "recipient": "loyal-opposition:D",
+        "launched": True,
+        "launched_at": (datetime.now(UTC) - timedelta(seconds=3600)).isoformat(),
+        "stderr_path": str(stderr_path),
+        "signature": signature,
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["example-thread"],
+        "primary_bridge_id": "example-thread",
+        "exit_code": 1,
+        "exit_code_processed": True,
+    }
+    for key in ("loyal-opposition:D", "loyal-opposition"):
+        state["recipients"][key]["failure_count"] = 1
+        state["recipients"][key]["last_result"] = "launched"
+        state["recipients"][key]["last_launch"] = dict(launch)
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+    retry = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = retry["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "D"
+    assert "fallback_skipped_candidates" not in result
+
+
+def test_lo_gemini_ineligible_tier_demotes_candidate_with_cleared_signature(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4679: fatal Gemini tier output demotes C and falls through to F."""
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "C",
+                "gemini",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["gemini", "-p", "{{PROMPT}}"]}},
+                reviewer_precedence=10,
+            ),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=20,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "C"
+
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    stderr_path = runs_dir / "prior-gemini.stderr.log"
+    stderr_path.write_text("IneligibleTierError: deprecated individuals tier is not eligible\n", encoding="utf-8")
+
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    c_state = state["recipients"]["loyal-opposition:C"]
+    signature = c_state["last_dispatched_signature"]
+    launch = {
+        "dispatch_id": "prior-gemini",
+        "recipient": "loyal-opposition:C",
+        "launched": True,
+        "launched_at": (datetime.now(UTC) - timedelta(seconds=3600)).isoformat(),
+        "stderr_path": str(stderr_path),
+        "signature": signature,
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["example-thread"],
+        "primary_bridge_id": "example-thread",
+        "exit_code": 1,
+        "exit_code_processed": True,
+    }
+    for key in ("loyal-opposition:C", "loyal-opposition"):
+        state["recipients"][key]["failure_count"] = 1
+        state["recipients"][key]["last_dispatched_signature"] = None
+        state["recipients"][key]["signature"] = None
+        state["recipients"][key]["last_result"] = "harness_unavailable_tier"
+        state["recipients"][key]["last_launch"] = dict(launch)
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+    fallback = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = fallback["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "F"
+    assert result["fallback_skipped_candidates"] == [
+        {
+            "recipient": "loyal-opposition:C",
+            "needed_role_label": "loyal-opposition",
+            "harness_id": "C",
+            "command_handle": "gemini",
+            "reviewer_precedence": 10,
+            "reason": "provider_failure_backoff_active",
+            "failure_class": "harness_unavailable_tier",
+            "backoff_source": "non_retryable_worker_failure",
+        }
+    ]
+    failures = _failure_records(state_dir)
+    assert any(
+        record.get("reason") == "previous_launch_failed"
+        and record.get("matched_markers", [{}])[0].get("label") == "harness_unavailable_tier"
         for record in failures
     )
 
@@ -2903,6 +3121,7 @@ def test_lo_exit_zero_without_verdict_backs_off_and_falls_back(
             "reviewer_precedence": 10,
             "reason": "provider_failure_backoff_active",
             "failure_class": "no_verdict_produced",
+            "backoff_source": "retry_delay_enforced",
         }
     ]
     failures = _failure_records(state_dir)
