@@ -236,6 +236,13 @@ def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | Non
 
 Before you can write any bridge verdict, you MUST acquire the work-intent claim: python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command reports an existing holder, treat that JSON output as claim evidence — not as a harness crash. Do not proceed to Write until the claim command returns success.
 
+Before final Write/Edit of any bridge verdict, assemble a draft verdict body
+with the required status token and sections, then run the shared verify helper:
+python .claude/skills/verify/helpers/write_verdict.py --slug <document-slug> --body-file <draft-body-file>
+Review and prune the helper-seeded Prior Deliberations before writing the next
+numbered bridge verdict file. If the helper cannot run, preserve its failure
+output in the verdict evidence instead of silently omitting Prior Deliberations.
+
 Use the GT-KB file bridge as the authoritative workflow surface. Read the full
 versioned bridge-file chain for the target document before acting, and use
 gt bridge dispatch config, gt bridge dispatch status, and gt bridge dispatch
@@ -369,7 +376,9 @@ def _resolve_tool_path(project_root: Path, path_text: str, *, allow_missing: boo
     candidate = raw if raw.is_absolute() else project_root / raw
     try:
         resolved = candidate.resolve(strict=not allow_missing)
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
+        if not allow_missing:
+            raise OpenRouterHarnessError(f"file not found: {path_text}") from exc
         resolved = candidate.resolve(strict=False)
     except OSError as exc:
         raise OpenRouterHarnessError(f"tool path could not be resolved: {path_text}") from exc
@@ -615,10 +624,20 @@ def _dispatch_edit(
         project_root,
         guard_runner=guard_runner,
     )
-    content = path.read_text(encoding="utf-8")
+    try:
+        content = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise OpenRouterHarnessError(f"file not found: {_relative_path(project_root, path)}") from exc
+    except OSError as exc:
+        raise OpenRouterHarnessError(f"failed to read file {_relative_path(project_root, path)}: {exc}") from exc
+
     if old_string not in content:
         raise OpenRouterHarnessError(f"old_string not found in {_relative_path(project_root, path)}")
-    path.write_text(content.replace(old_string, new_string, 1), encoding="utf-8")
+
+    try:
+        path.write_text(content.replace(old_string, new_string, 1), encoding="utf-8")
+    except OSError as exc:
+        raise OpenRouterHarnessError(f"failed to write file {_relative_path(project_root, path)}: {exc}") from exc
     return f"edited {_relative_path(project_root, path)}"
 
 

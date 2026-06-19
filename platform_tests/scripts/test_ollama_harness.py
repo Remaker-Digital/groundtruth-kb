@@ -606,3 +606,16 @@ def test_help_command_exits_zero():
     assert completed.returncode == 0
     assert "--prompt" in completed.stdout
     assert "--endpoint" in completed.stdout
+
+
+def test_dispatch_edit_raises_on_missing_file(tmp_path: Path):
+    root = make_root(tmp_path)
+    records: list[tuple[str, dict, dict]] = []
+    with pytest.raises(oh.OllamaHarnessError, match="file not found"):
+        oh.dispatch_tool_call(
+            "Edit",
+            {"path": "non_existent_file.txt", "old_string": "foo", "new_string": "bar"},
+            metadata(),
+            root,
+            guard_runner=allow_runner(records),
+        )

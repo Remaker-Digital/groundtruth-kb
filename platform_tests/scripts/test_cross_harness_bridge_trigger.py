@@ -2909,6 +2909,31 @@ def test_lo_exit_zero_without_verdict_backs_off_and_falls_back(
     assert any(record.get("reason") == "no_verdict_produced" for record in failures)
 
 
+def test_wi4578_non_launched_failure_is_previous_launch_failure() -> None:
+    """A failed pre-spawn launch must not collapse to unchanged on the next cycle."""
+    trigger = _load_trigger()
+
+    failure = trigger._detect_previous_launch_failure(
+        {
+            "last_launch": {
+                "dispatch_id": "prior-spawn-rate-limited",
+                "launched": False,
+                "reason": "spawn_rate_limited",
+                "launched_at": "2026-06-19T17:37:33+00:00",
+            }
+        },
+        recipient="loyal-opposition:C",
+        signature="same-signature",
+    )
+
+    assert failure is not None
+    assert failure["reason"] == "previous_launch_failed"
+    assert failure["error_type"] == "spawn_rate_limited"
+    assert failure["matched_markers"] == [
+        {"field": "last_launch.reason", "marker": "spawn_rate_limited", "label": "spawn_rate_limited"}
+    ]
+
+
 def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

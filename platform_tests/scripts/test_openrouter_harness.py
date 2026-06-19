@@ -84,6 +84,22 @@ def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     assert "gt bridge dispatch\nhealth" in prompt
 
 
+def test_bridge_review_prompt_seeds_prior_deliberations_before_verdict_write(tmp_path: Path):
+    root = make_root(tmp_path)
+    prompt = orh.build_system_prompt("bridge-review", route(root))
+
+    assert prompt is not None
+    claim_index = prompt.index("python scripts\\bridge_claim_cli.py claim <document-slug>")
+    helper_index = prompt.index("python .claude/skills/verify/helpers/write_verdict.py")
+    bridge_workflow_index = prompt.index("Use the GT-KB file bridge")
+    assert claim_index < helper_index < bridge_workflow_index
+    assert (
+        "python .claude/skills/verify/helpers/write_verdict.py --slug <document-slug> --body-file <draft-body-file>"
+    ) in prompt
+    assert "Review and prune the helper-seeded Prior Deliberations" in prompt
+    assert "silently omitting Prior Deliberations" in prompt
+
+
 def test_bridge_write_invokes_required_guard_sequence(tmp_path: Path):
     root = make_root(tmp_path)
     records: list[tuple[str, dict, dict]] = []
@@ -216,3 +232,16 @@ def test_bridge_bash_read_reference_still_uses_bash_guards(tmp_path: Path):
     suffixes = [Path(path).as_posix().split("repo/")[-1] for path, _, _ in records]
     assert result == "Document: fixture\n"
     assert suffixes == [guard.as_posix() for guard in orh.BASH_GUARDS]
+
+
+def test_dispatch_edit_raises_on_missing_file(tmp_path: Path):
+    root = make_root(tmp_path)
+    records: list[tuple[str, dict, dict]] = []
+    with pytest.raises(orh.OpenRouterHarnessError, match="file not found"):
+        orh.dispatch_tool_call(
+            "Edit",
+            {"path": "non_existent_file.txt", "old_string": "foo", "new_string": "bar"},
+            metadata(),
+            root,
+            guard_runner=allow_runner(records),
+        )

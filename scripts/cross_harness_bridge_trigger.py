@@ -200,6 +200,18 @@ FATAL_WORKER_OUTPUT_MARKERS = (
     ("guard denied Write", "guard_denied_write"),
     ("guard denied", "guard_denial"),
 )
+NON_LAUNCHED_FAILURE_REASONS = frozenset(
+    {
+        "all_slugs_quarantined",
+        "dispatch_target_resolution_failed",
+        "implementation_authorization_packet_failed",
+        "no_active_target_for_role",
+        "no_ready_target_for_role",
+        "spawn_rate_limited",
+        "target_unlaunchable",
+        "work_intent_acquire_failed",
+    }
+)
 PRIOR_LAUNCH_LOG_READ_LIMIT_BYTES = 64 * 1024
 
 # WI-3265 (bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md, Codex
@@ -667,6 +679,21 @@ def _detect_previous_launch_failure(
     launch = prior.get("last_launch")
     if not isinstance(launch, dict):
         return None
+
+    launch_reason = str(launch.get("reason") or "")
+    if launch.get("launched") is False and launch_reason in NON_LAUNCHED_FAILURE_REASONS:
+        return {
+            "ts": _now_iso(),
+            "dispatch_id": _now_iso() + "-previous-launch-failed",
+            "recipient": recipient,
+            "launched": False,
+            "reason": "previous_launch_failed",
+            "error_type": launch_reason,
+            "prior_dispatch_id": launch.get("dispatch_id"),
+            "prior_launched_at": launch.get("launched_at"),
+            "signature": signature,
+            "matched_markers": [{"field": "last_launch.reason", "marker": launch_reason, "label": launch_reason}],
+        }
 
     matched, inspected_paths = _matched_worker_output_markers(launch)
     if matched:
@@ -3164,6 +3191,8 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             reason = failure_reason or "subprocess_execution_failed"
             last_launch["exit_failure_reason"] = reason
             recipient_state["last_failure_reason"] = reason
+            recipient_state["last_result"] = reason
+            recipient_state["failure_class"] = reason
 
             # Since it failed, write to dispatch failures log as well
             _record_dispatch_failure(

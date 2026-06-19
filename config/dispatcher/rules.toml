@@ -18,13 +18,13 @@ dispatch_availability = 90
 tags = ["prime-builder", "event-source"]
 
 [harnesses.B]
-description = "Claude Code: Prime Builder for interactive work; not a dispatched PB target."
-can_receive_dispatch = false
+description = "Claude Code: active Prime Builder; headless-dispatchable PB fallback (A wins on cost by default)."
+can_receive_dispatch = true
 can_fire_events = true
 dispatch_cost = 70
 dispatch_quality = 95
 dispatch_availability = 75
-tags = ["prime-builder", "interactive-only", "event-source"]
+tags = ["prime-builder", "event-source"]
 
 [harnesses.C]
 description = "Antigravity: Loyal Opposition dispatch target."

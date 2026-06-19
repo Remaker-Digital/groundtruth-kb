@@ -59,6 +59,9 @@ DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+PACKAGE_SRC_DIR = PROJECT_ROOT / "groundtruth-kb" / "src"
+if str(PACKAGE_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SRC_DIR))
 
 from implementation_authorization import AuthorizationError, create_authorization_packet  # noqa: E402
 
@@ -71,6 +74,7 @@ TERMINAL_STATUSES = frozenset({"VERIFIED"})
 # Prime-authored proposal statuses. ``bridge_kind`` metadata lives on the
 # operative Prime proposal (latest NEW/REVISED), NOT on the Codex GO verdict.
 _PRIME_VERSION_STATUSES = frozenset({"NEW", "REVISED"})
+_NONTERMINAL_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO"})
 
 # Terminal-kind ``bridge_kind`` substring tokens. MIRROR of
 # ``groundtruth_kb.bridge.notify._KIND_TERMINAL_TOKENS``. A latest-``GO`` whose
@@ -203,7 +207,20 @@ def _status_from_bridge_file(path: Path) -> str | None:
     return None
 
 
-def _render_state_from_version_files(project_root: Path) -> str:
+def _thread_from_rows(slug: str, rows: list[tuple[int, str, str]]) -> ThreadEntry | None:
+    ordered = sorted(rows, key=lambda row: row[0], reverse=True)
+    versions = tuple(VersionEntry(status=status, path=rel_path) for _version, status, rel_path in ordered)
+    if not versions:
+        return None
+    return ThreadEntry(
+        document=slug,
+        latest_status=versions[0].status,
+        latest_path=versions[0].path,
+        version_chain=versions,
+    )
+
+
+def _scan_rows_from_version_files(project_root: Path) -> dict[str, list[tuple[int, str, str]]]:
     bridge_dir = project_root / "bridge"
     grouped: dict[str, list[tuple[int, str, str]]] = {}
     for path in bridge_dir.glob("*.md"):
@@ -220,14 +237,54 @@ def _render_state_from_version_files(project_root: Path) -> str:
         except ValueError:
             rel_path = path.as_posix()
         grouped.setdefault(slug, []).append((version, status, rel_path))
+    return grouped
 
+
+def _acknowledged_archived_nonterminal_slugs(project_root: Path) -> set[str]:
+    try:
+        from groundtruth_kb.bridge.versioned_files import (
+            candidate_is_archived,
+            load_acknowledged_archived_slugs,
+            scan_expected_documents,
+        )
+    except Exception:
+        return set()
+    try:
+        expected_docs = scan_expected_documents(project_root)
+    except Exception:
+        return set()
+    acknowledged = load_acknowledged_archived_slugs(project_root)
+    archived: set[str] = set()
+    for slug, doc in expected_docs.items():
+        latest_status = _status_from_bridge_file(project_root / doc.files[-1])
+        if latest_status not in _NONTERMINAL_STATUSES:
+            continue
+        if candidate_is_archived(slug, expected_docs, acknowledged, project_root):
+            archived.add(slug)
+    return archived
+
+
+def _render_state_from_version_files_with_archived(project_root: Path) -> tuple[str, list[ThreadEntry]]:
+    grouped = _scan_rows_from_version_files(project_root)
+    archived_slugs = _acknowledged_archived_nonterminal_slugs(project_root)
     lines: list[str] = []
+    excluded_archived: list[ThreadEntry] = []
     for slug in sorted(grouped):
+        if slug in archived_slugs:
+            thread = _thread_from_rows(slug, grouped[slug])
+            if thread is not None:
+                excluded_archived.append(thread)
+            continue
         lines.append(f"Document: {slug}")
         for _version, status, rel_path in sorted(grouped[slug], key=lambda row: row[0], reverse=True):
             lines.append(f"{status}: {rel_path}")
         lines.append("")
-    return "\n".join(lines)
+    return "\n".join(lines), excluded_archived
+
+
+def _render_state_from_version_files(project_root: Path) -> str:
+    text, _excluded_archived = _render_state_from_version_files_with_archived(project_root)
+    return text
 
 
 def _operative_prime_path(thread: ThreadEntry) -> str | None:
@@ -363,15 +420,17 @@ def scan(
     """
     if index_text is None:
         project_root = index_path.resolve().parent.parent if index_path is not None else PROJECT_ROOT
-        index_text = _render_state_from_version_files(project_root)
+        index_text, excluded_archived = _render_state_from_version_files_with_archived(project_root)
     elif index_path is not None:
         # Inline text but an explicit index path: resolve operative bridge files
         # relative to that path's project root (used by terminal-kind tests).
         project_root = index_path.resolve().parent.parent
+        excluded_archived = []
     else:
         # Inline text with no path: operative files (if any) resolve under the
         # real project root; absent fixture files fail-open to actionable.
         project_root = PROJECT_ROOT
+        excluded_archived = []
 
     threads = _parse_index(index_text)
     actionable, terminal_verified, blocked_non_activatable = _role_filter(threads, role, project_root)
@@ -380,6 +439,7 @@ def scan(
         "role": role,
         "actionable": [t.to_dict() for t in actionable],
         "blocked_non_activatable": blocked_non_activatable,
+        "excluded_archived": [t.to_dict() for t in excluded_archived],
         "terminal_verified": [t.to_dict() for t in terminal_verified],
         "summary": _summary_counts(threads),
         "generated_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -415,6 +475,14 @@ def _format_markdown(result: dict[str, Any]) -> str:
             lines.append(f"- **{thread['document']}** -- GO at `{thread['go_file']}`")
             for reason in thread.get("reasons", []):
                 lines.append(f"  - {reason}")
+    else:
+        lines.append("- (none)")
+    lines.append("")
+    lines.append(f"## Excluded Archived Nonterminal ({len(result.get('excluded_archived', []))})")
+    lines.append("")
+    if result.get("excluded_archived"):
+        for thread in result["excluded_archived"]:
+            lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
     else:
         lines.append("- (none)")
     lines.append("")

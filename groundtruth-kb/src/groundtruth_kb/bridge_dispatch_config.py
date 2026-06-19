@@ -19,16 +19,38 @@ DISPATCH_ROLES = (ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION)
 
 DEFAULT_SELECTION_ORDER = ("availability", "cost", "quality", "reviewer_precedence", "harness_id")
 RUNTIME_FAILURE_RESULTS = {
+    "all_slugs_quarantined",
+    "circuit_breaker_active",
+    "dispatch_target_resolution_failed",
+    "implementation_authorization_packet_failed",
+    "launch_failed",
+    "no_active_target_for_role",
+    "no_ready_target_for_role",
     "provider_failure_backoff_active",
+    "provider_failure",
+    "retry_delay_enforced",
+    "spawn_rate_limited",
+    "target_unlaunchable",
     "work_intent_acquire_failed",
     "max_turn_exhaustion",
     "no_verdict_produced",
 }
 RUNTIME_FAILURE_CLASSES = {
+    "guard_denial",
+    "guard_denied_write",
     "max_turn_exhaustion",
+    "missing_bridge_verdict",
+    "no_verdict_produced",
+    "process_terminated_abruptly",
     "provider_failure",
     "provider_failure_backoff_active",
+    "provider_configuration_failure",
+    "subprocess_execution_failed",
     "work_intent_acquire_failed",
+}
+RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
+    "previous_launch_failed",
+    "subprocess_execution_failed",
 }
 
 
@@ -381,12 +403,13 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
     last_result = str(row.get("last_result") or "").strip()
     last_launch = row.get("last_launch") if isinstance(row.get("last_launch"), dict) else {}
     launch_reason = str(last_launch.get("reason") or "").strip()
+    launch_exit_failure = str(last_launch.get("exit_failure_reason") or "").strip()
 
     if row.get("circuit_breaker_tripped") is True and has_pending_work:
         findings.append(
             f"dispatch runtime failure: {recipient_key} circuit breaker is tripped with pending_count={pending_count}"
         )
-    if last_result in RUNTIME_FAILURE_RESULTS and has_pending_work:
+    if (last_result in RUNTIME_FAILURE_RESULTS or last_result.endswith("_dispatch_not_ready")) and has_pending_work:
         findings.append(
             f"dispatch runtime failure: {recipient_key} last_result={last_result} with pending_count={pending_count}"
         )
@@ -395,11 +418,37 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
             "dispatch runtime failure: "
             f"{recipient_key} failure_class={failure_class} with pending_count={pending_count}"
         )
+    if launch_reason in RUNTIME_FAILURE_LAUNCH_REASONS and has_pending_work:
+        findings.append(
+            "dispatch runtime failure: "
+            f"{recipient_key} last_launch.reason={launch_reason} with pending_count={pending_count}"
+        )
+    if launch_exit_failure in RUNTIME_FAILURE_RESULTS | RUNTIME_FAILURE_CLASSES and has_pending_work:
+        findings.append(
+            "dispatch runtime failure: "
+            f"{recipient_key} last_launch.exit_failure_reason={launch_exit_failure} "
+            f"with pending_count={pending_count}"
+        )
     if launch_reason == "work_intent_acquire_failed" and has_pending_work:
         findings.append(
             "dispatch runtime failure: "
             f"{recipient_key} work intent acquisition failed with pending_count={pending_count}"
         )
+    fallback_skipped = row.get("fallback_skipped_candidates")
+    if isinstance(fallback_skipped, list) and has_pending_work:
+        for candidate in fallback_skipped:
+            if not isinstance(candidate, dict):
+                continue
+            reason = str(candidate.get("reason") or "").strip()
+            candidate_recipient = str(candidate.get("recipient") or candidate.get("harness_id") or "").strip()
+            failure_label = str(candidate.get("failure_class") or "").strip()
+            if reason in RUNTIME_FAILURE_RESULTS or reason.endswith("_dispatch_not_ready"):
+                suffix = f", failure_class={failure_label}" if failure_label else ""
+                findings.append(
+                    "dispatch runtime failure: "
+                    f"{recipient_key} skipped fallback {candidate_recipient} reason={reason}{suffix} "
+                    f"with pending_count={pending_count}"
+                )
     if last_result == "unchanged" and has_pending_work:
         findings.append(
             f"dispatch runtime warning: {recipient_key} last_result=unchanged with pending_count={pending_count}"

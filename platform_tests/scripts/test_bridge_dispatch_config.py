@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 import tomllib
@@ -9,6 +10,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
+SCAN_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
 
 from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     collect_bridge_dispatch_status,
@@ -227,6 +229,15 @@ def _write_dispatch_state(root: Path, recipients: dict[str, dict]) -> None:
     )
 
 
+def _load_scan_helper():
+    spec = importlib.util.spec_from_file_location("scan_bridge_wi4578_regression", SCAN_HELPER_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["scan_bridge_wi4578_regression"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_wi4658_health_warns_when_quarantined_threads_present(tmp_path: Path) -> None:
     """A recipient state row carrying quarantined_threads emits a WARN-level
     finding so health is no longer topology-only PASS."""
@@ -331,3 +342,93 @@ def test_wi4658_health_ignores_non_dict_quarantine_entries(tmp_path: Path) -> No
     assert len(quarantine_findings) == 1
     assert "1 bridge thread(s)" in quarantine_findings[0]
     assert "['good']" in quarantine_findings[0]
+
+
+def test_wi4578_health_fails_for_blocked_runtime_candidates(tmp_path: Path) -> None:
+    """Pending LO work plus readiness/backoff/spawn blockers is a runtime FAIL."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition": {
+                "pending_count": 2,
+                "selected_count": 2,
+                "last_result": "unchanged",
+                "last_launch": {"reason": "spawn_rate_limited"},
+                "fallback_skipped_candidates": [
+                    {"recipient": "loyal-opposition:D", "reason": "ollama_dispatch_not_ready"},
+                    {
+                        "recipient": "loyal-opposition:F",
+                        "reason": "provider_failure_backoff_active",
+                        "failure_class": "process_terminated_abruptly",
+                    },
+                ],
+            },
+            "loyal-opposition:D": {
+                "pending_count": 2,
+                "selected_count": 1,
+                "last_result": "ollama_dispatch_not_ready",
+            },
+            "loyal-opposition:F": {
+                "pending_count": 2,
+                "selected_count": 2,
+                "last_result": "provider_failure_backoff_active",
+                "failure_class": "process_terminated_abruptly",
+            },
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "FAIL"
+    findings = "\n".join(status.health_findings)
+    assert "last_launch.reason=spawn_rate_limited" in findings
+    assert "reason=ollama_dispatch_not_ready" in findings
+    assert "reason=provider_failure_backoff_active" in findings
+    assert "failure_class=process_terminated_abruptly" in findings
+
+
+def test_wi4578_health_fails_for_exit_zero_no_verdict_evidence(tmp_path: Path) -> None:
+    """Exit-zero LO completion without a verdict is runtime failure evidence."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:D": {
+                "pending_count": 1,
+                "selected_count": 1,
+                "last_result": "launched",
+                "last_launch": {"exit_failure_reason": "no_verdict_produced"},
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "FAIL"
+    assert any("last_launch.exit_failure_reason=no_verdict_produced" in f for f in status.health_findings)
+
+
+def test_wi4578_manual_scan_excludes_acknowledged_archived_nonterminal(tmp_path: Path) -> None:
+    """Manual scan uses the archive-aware bridge state for live actionable rows."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir(parents=True)
+    (tmp_path / "config" / "governance").mkdir(parents=True)
+    (tmp_path / "config" / "governance" / "tafe-acknowledged-archived-bridges.toml").write_text(
+        """
+[[acknowledged]]
+slug = "archived-new"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (bridge_dir / "archived-new-001.md").write_text("NEW\n\n# Archived thread\n", encoding="utf-8")
+    (bridge_dir / "live-new-001.md").write_text("NEW\n\n# Live thread\n", encoding="utf-8")
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text("", encoding="utf-8")
+
+    helper = _load_scan_helper()
+    result = helper.scan(role="loyal-opposition", index_path=index_path)
+
+    assert [thread["document"] for thread in result["actionable"]] == ["live-new"]
+    assert [thread["document"] for thread in result["excluded_archived"]] == ["archived-new"]
+    assert result["summary"] == {"NEW": 1}
