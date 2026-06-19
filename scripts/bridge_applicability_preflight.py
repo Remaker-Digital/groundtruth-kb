@@ -58,6 +58,7 @@ SPEC_LINK_HEADING_LOOSE_RE: Final[re.Pattern[str]] = re.compile(
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
 RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
 WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b")
+DOCUMENT_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Document:\s*([A-Za-z0-9_.-]+)\s*$")
 # PATH_TOKEN_RE is imported from implementation_authorization (HYG-046 single
 # source; previously a drifted local copy that lacked 'memory/').
 TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
@@ -459,6 +460,14 @@ def _display_path(path: Path) -> str:
         return str(path)
 
 
+def _derive_bridge_id_from_content_file(content_file: Path) -> str:
+    content = content_file.read_text(encoding="utf-8")
+    document_match = DOCUMENT_DECLARATION_RE.search(content)
+    if document_match:
+        return document_match.group(1)
+    return re.sub(r"-\d{3}$", "", content_file.stem)
+
+
 def format_markdown(packet: dict[str, Any]) -> str:
     operative = packet.get("operative_version")
     operative_path = operative["path"] if isinstance(operative, dict) else "(none)"
@@ -500,7 +509,10 @@ def format_markdown(packet: dict[str, Any]) -> str:
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bridge-id", required=True, help="Bridge document name / versioned bridge-thread slug.")
+    parser.add_argument(
+        "--bridge-id",
+        help="Bridge document name / versioned bridge-thread slug. Optional when --content-file is supplied.",
+    )
     parser.add_argument(
         "--content-file", type=Path, default=None, help="Evaluate pending Markdown content from a file."
     )
@@ -512,7 +524,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _build_arg_parser().parse_args(argv)
+    parser = _build_arg_parser()
+    args = parser.parse_args(argv)
+    if args.bridge_id is None:
+        if args.content_file is None:
+            parser.error("--bridge-id is required unless --content-file is supplied")
+        args.bridge_id = _derive_bridge_id_from_content_file(args.content_file)
     packet = build_packet(
         bridge_id=args.bridge_id,
         bridge_dir=args.bridge_dir,

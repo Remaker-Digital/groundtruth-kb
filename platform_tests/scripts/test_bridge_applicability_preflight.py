@@ -8,6 +8,7 @@ ADR-ISOLATION-APPLICATION-PLACEMENT-001.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -232,6 +233,50 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["preflight_passed"] is True
     assert packet["missing_required_specs"] == []
     assert packet["missing_advisory_specs"] == []
+
+
+def test_preflight_cli_derives_bridge_id_from_content_file_document(tmp_path: Path, capsys) -> None:
+    pending = tmp_path / "pending.md"
+    pending.write_text(
+        """
+NEW
+
+Document: application-move
+
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Specification Links
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001
+""",
+        encoding="utf-8",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+
+    rc = preflight.main(
+        [
+            "--content-file",
+            str(pending),
+            "--bridge-dir",
+            str(tmp_path / "missing-bridge"),
+            "--config",
+            str(config),
+            "--db",
+            str(tmp_path / "missing.db"),
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    packet = json.loads(captured.out)
+    assert rc == 0
+    assert packet["bridge_document_name"] == "application-move"
+    assert packet["content_source"]["mode"] == "pending_content"
+    assert packet["operative_version"] is None
 
 
 def test_withdrawn_status_is_parsed_as_terminal_operative_version(tmp_path: Path) -> None:

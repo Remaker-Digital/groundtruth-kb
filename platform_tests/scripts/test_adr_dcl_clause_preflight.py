@@ -551,6 +551,44 @@ def test_content_file_mode_reports_blocking_gap_before_index_entry(preflight, tm
     assert f"Operative file: `{candidate}" in report or "candidate-gap.md" in report
 
 
+def test_content_file_mode_derives_bridge_id_from_document_metadata(preflight, tmp_path):
+    """Content-file mode should not require a placeholder --bridge-id when the
+    candidate draft carries bridge Document metadata.
+    """
+    candidate = tmp_path / "candidate-derived.md"
+    candidate.write_text(
+        "NEW\n\n"
+        "Document: test-content-file-derived\n\n"
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- ADR-ISOLATION-APPLICATION-PLACEMENT-001 - project root boundary\n\n"
+        "## Files Changed\n\n"
+        "- scripts/foo.py (new, under E:\\GT-KB\\scripts\\)\n"
+        "All outputs reside in-root under E:\\GT-KB.\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "candidate-derived-report.md"
+
+    rc = preflight.main(
+        [
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(tmp_path / "missing-bridge"),
+            "--index",
+            str(tmp_path / "missing-index.md"),
+            "--content-file",
+            str(candidate),
+            "--out",
+            str(out),
+        ]
+    )
+
+    assert rc == 0
+    report = out.read_text(encoding="utf-8")
+    assert "Bridge id: `test-content-file-derived`" in report
+
+
 def test_content_file_relative_path_does_not_crash(preflight, tmp_path, monkeypatch):
     """Regression (WI-3325): a project-root-relative ``--content-file`` argument
     must not crash ``render_markdown``'s ``relative_to(PROJECT_ROOT)`` call.

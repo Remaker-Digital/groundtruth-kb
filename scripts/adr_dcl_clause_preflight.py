@@ -61,6 +61,7 @@ TARGET_PATHS_DECLARATION_RE = re.compile(
     r"^\s*(?:\*\*)?target_paths?(?:\*\*)?\s*[:=]",
     re.IGNORECASE,
 )
+DOCUMENT_DECLARATION_RE = re.compile(r"(?im)^\s*Document:\s*([A-Za-z0-9_.-]+)\s*$")
 
 
 @dataclass(frozen=True)
@@ -373,13 +374,24 @@ def _resolve_content_file(raw: Path) -> Path:
     return (Path.cwd() / raw).resolve()
 
 
+def _derive_bridge_id_from_content_file(content_file: Path) -> str:
+    content = content_file.read_text(encoding="utf-8")
+    document_match = DOCUMENT_DECLARATION_RE.search(content)
+    if document_match:
+        return document_match.group(1)
+    return re.sub(r"-\d{3}$", "", content_file.stem)
+
+
 EXIT_BLOCKING_GAP = 5  # matches scripts/bridge_applicability_preflight.py convention
 EXIT_CANNOT_EVALUATE = EXIT_BLOCKING_GAP
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bridge-id", required=True, help="bridge thread id (without -NNN.md suffix)")
+    parser.add_argument(
+        "--bridge-id",
+        help="bridge thread id (without -NNN.md suffix). Optional when --content-file is supplied.",
+    )
     parser.add_argument("--clauses-config", type=Path, default=DEFAULT_CLAUSES_CONFIG)
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument(
@@ -407,6 +419,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.content_file is not None:
         args.content_file = _resolve_content_file(args.content_file)
+    if args.bridge_id is None:
+        if args.content_file is None:
+            parser.error("--bridge-id is required unless --content-file is supplied")
+        args.bridge_id = _derive_bridge_id_from_content_file(args.content_file)
 
     if not args.clauses_config.is_file():
         print(f"ERROR: clauses config not found: {args.clauses_config}", file=sys.stderr)
