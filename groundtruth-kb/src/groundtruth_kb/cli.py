@@ -3243,6 +3243,32 @@ def projects_authorizations(ctx: click.Context, project_id: str, include_termina
         )
 
 
+@projects_cmd.command("show-authorization")
+@click.argument("authorization_id")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_show_authorization(ctx: click.Context, authorization_id: str, json_output: bool) -> None:
+    """Show one current project authorization by ID."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        authorization = db.get_project_authorization(authorization_id)
+    finally:
+        db.close()
+    if authorization is None:
+        click.echo(f"Project authorization {authorization_id} not found.")
+        raise SystemExit(1)
+    if json_output:
+        click.echo(json.dumps(authorization, indent=2, sort_keys=True))
+        return
+    click.echo(
+        f"{authorization['id']}\t{authorization['project_id']}\t"
+        f"{authorization['status']}\t{authorization['authorization_name']}"
+    )
+    click.echo(f"  scope: {authorization.get('scope_summary') or ''}")
+    click.echo(f"  owner decision: {authorization.get('owner_decision_deliberation_id') or ''}")
+
+
 @projects_cmd.command("revoke-authorization")
 @click.argument("authorization_id")
 @click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
@@ -4893,6 +4919,122 @@ def spec_cmd() -> None:
     """Governed specification artifact commands."""
 
 
+def _echo_spec_row(row: dict[str, Any]) -> None:
+    click.echo(f"{row['id']} (version {row.get('version', '?')})")
+    click.echo(f"  title:       {row.get('title', '')}")
+    click.echo(f"  status:      {row.get('status', '')}")
+    if row.get("type"):
+        click.echo(f"  type:        {row['type']}")
+    if row.get("priority"):
+        click.echo(f"  priority:    {row['priority']}")
+    if row.get("section"):
+        click.echo(f"  section:     {row['section']}")
+    if row.get("handle"):
+        click.echo(f"  handle:      {row['handle']}")
+    if row.get("authority"):
+        click.echo(f"  authority:   {row['authority']}")
+    if row.get("testability"):
+        click.echo(f"  testability: {row['testability']}")
+    description = row.get("description", "") or ""
+    if description:
+        click.echo("  description:")
+        for line in description.splitlines():
+            click.echo(f"    {line}")
+
+
+@spec_cmd.command("show")
+@click.argument("spec_id")
+@click.option("--history", is_flag=True, default=False, help="Show the full version history.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def spec_show_cmd(ctx: click.Context, spec_id: str, history: bool, json_output: bool) -> None:
+    """Show a specification by ID."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    try:
+        if history:
+            rows = db.get_spec_history(spec_id)
+            if not rows:
+                click.echo(f"Specification {spec_id} not found.")
+                raise SystemExit(1)
+            if json_output:
+                click.echo(json.dumps(rows, indent=2, default=str))
+                return
+            click.echo(f"Version history for {spec_id} ({len(rows)} version(s)):")
+            for row in rows:
+                click.echo(f"--- version {row.get('version', '?')} ---")
+                _echo_spec_row(row)
+            return
+
+        row = db.get_spec(spec_id)
+        if row is None:
+            click.echo(f"Specification {spec_id} not found.")
+            raise SystemExit(1)
+        if json_output:
+            click.echo(json.dumps(row, indent=2, default=str))
+            return
+        _echo_spec_row(row)
+    finally:
+        db.close()
+
+
+@spec_cmd.command("list")
+@click.option("--status", default=None, help="Filter by lifecycle status.")
+@click.option("--priority", default=None, help="Filter by priority.")
+@click.option("--section", default=None, help="Filter by section substring.")
+@click.option("--handle", default=None, help="Filter by exact handle.")
+@click.option("--tag", default=None, help="Filter by tag.")
+@click.option("--search", default=None, help="Search title and description.")
+@click.option("--type", "spec_type", default=None, help="Filter by spec type.")
+@click.option("--authority", default=None, help="Filter by authority.")
+@click.option("--testability", default=None, help="Filter by testability.")
+@click.option("--limit", type=int, default=None, help="CLI-side slice; returns the first N rows.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def spec_list_cmd(
+    ctx: click.Context,
+    status: str | None,
+    priority: str | None,
+    section: str | None,
+    handle: str | None,
+    tag: str | None,
+    search: str | None,
+    spec_type: str | None,
+    authority: str | None,
+    testability: str | None,
+    limit: int | None,
+    json_output: bool,
+) -> None:
+    """List current specifications with deterministic filters."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    try:
+        rows = db.list_specs(
+            status=status,
+            priority=priority,
+            section=section,
+            handle=handle,
+            tag=tag,
+            search=search,
+            type=spec_type,
+            authority=authority,
+            testability=testability,
+        )
+    finally:
+        db.close()
+    if limit is not None and limit >= 0:
+        rows = rows[:limit]
+    if json_output:
+        click.echo(json.dumps(rows, indent=2, default=str))
+        return
+    if not rows:
+        click.echo("No specifications match the given filters.")
+        return
+    click.echo(f"{len(rows)} specification(s):")
+    for row in rows:
+        click.echo(f"  {row['id']} v{row.get('version', '?')} [{row.get('status', '')}]: {row.get('title', '')}")
+
+
 @spec_cmd.command("record")
 @click.option("--id", "spec_id", required=True, help="Specification ID, e.g. GOV-FOO-001 or REQ-FOO-001")
 @click.option("--title", required=True, help="Human-readable title")
@@ -5088,6 +5230,104 @@ def spec_update_cmd(
         click.echo(json.dumps(result["approval_packet"], indent=2, sort_keys=True))
         return
     click.echo(f"{result['id']} v{result['to_version']}")
+
+
+# --- gt tests ----------------------------------------------------------------
+
+
+@main.group("tests")
+def tests_cmd() -> None:
+    """Governed test artifact read commands."""
+
+
+def _echo_test_row(row: dict[str, Any]) -> None:
+    click.echo(f"{row['id']} (version {row.get('version', '?')})")
+    click.echo(f"  title:       {row.get('title', '')}")
+    click.echo(f"  spec_id:     {row.get('spec_id', '')}")
+    click.echo(f"  type:        {row.get('test_type', '')}")
+    if row.get("last_result"):
+        click.echo(f"  last_result: {row['last_result']}")
+    if row.get("test_file"):
+        click.echo(f"  test_file:   {row['test_file']}")
+    if row.get("test_function"):
+        click.echo(f"  function:    {row['test_function']}")
+    expected = row.get("expected_outcome", "") or ""
+    if expected:
+        click.echo(f"  expected:    {expected}")
+
+
+@tests_cmd.command("show")
+@click.argument("test_id")
+@click.option("--history", is_flag=True, default=False, help="Show the full version history.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def tests_show_cmd(ctx: click.Context, test_id: str, history: bool, json_output: bool) -> None:
+    """Show a test artifact by ID."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    try:
+        if history:
+            rows = db.get_test_history(test_id)
+            if not rows:
+                click.echo(f"Test {test_id} not found.")
+                raise SystemExit(1)
+            if json_output:
+                click.echo(json.dumps(rows, indent=2, default=str))
+                return
+            click.echo(f"Version history for {test_id} ({len(rows)} version(s)):")
+            for row in rows:
+                click.echo(f"--- version {row.get('version', '?')} ---")
+                _echo_test_row(row)
+            return
+
+        row = db.get_test(test_id)
+        if row is None:
+            click.echo(f"Test {test_id} not found.")
+            raise SystemExit(1)
+        if json_output:
+            click.echo(json.dumps(row, indent=2, default=str))
+            return
+        _echo_test_row(row)
+    finally:
+        db.close()
+
+
+@tests_cmd.command("list")
+@click.option("--spec-id", default=None, help="Filter by linked specification.")
+@click.option("--test-type", default=None, help="Filter by test type.")
+@click.option("--last-result", default=None, help="Filter by last result.")
+@click.option("--limit", type=int, default=None, help="CLI-side slice; returns the first N rows.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def tests_list_cmd(
+    ctx: click.Context,
+    spec_id: str | None,
+    test_type: str | None,
+    last_result: str | None,
+    limit: int | None,
+    json_output: bool,
+) -> None:
+    """List current test artifacts with deterministic filters."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    try:
+        rows = db.list_tests(spec_id=spec_id, test_type=test_type, last_result=last_result)
+    finally:
+        db.close()
+    if limit is not None and limit >= 0:
+        rows = rows[:limit]
+    if json_output:
+        click.echo(json.dumps(rows, indent=2, default=str))
+        return
+    if not rows:
+        click.echo("No tests match the given filters.")
+        return
+    click.echo(f"{len(rows)} test(s):")
+    for row in rows:
+        click.echo(
+            f"  {row['id']} v{row.get('version', '?')} "
+            f"[{row.get('test_type', '')}/{row.get('last_result') or '-'}]: {row.get('title', '')}"
+        )
 
 
 # ── gt deliberations ──────────────────────────────────────────────
@@ -5408,42 +5648,59 @@ def deliberations_record(
     click.echo(result["id"])
 
 
-@deliberations.command("get")
-@click.argument("deliberation_id")
-@click.option("--history", is_flag=True, default=False, help="Show the full version history")
-@click.option("--json", "json_output", is_flag=True, default=False)
-@click.pass_context
-def deliberations_get(
+def _show_deliberation(
     ctx: click.Context,
     deliberation_id: str,
     history: bool,
     json_output: bool,
 ) -> None:
-    """Show a deliberation by ID (latest version by default)."""
     config = _resolve_config(ctx)
     db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
-    if history:
-        rows = db.get_deliberation_history(deliberation_id)
-        if not rows:
+    try:
+        if history:
+            rows = db.get_deliberation_history(deliberation_id)
+            if not rows:
+                click.echo(f"Deliberation {deliberation_id} not found.")
+                raise SystemExit(1)
+            if json_output:
+                click.echo(json.dumps(rows, indent=2, default=str))
+                return
+            click.echo(f"Version history for {deliberation_id} ({len(rows)} version(s)):")
+            for row in rows:
+                click.echo(f"--- version {row.get('version', '?')} ---")
+                _echo_deliberation_row(row)
+            return
+
+        single_row = db.get_deliberation(deliberation_id)
+        if single_row is None:
             click.echo(f"Deliberation {deliberation_id} not found.")
             raise SystemExit(1)
         if json_output:
-            click.echo(json.dumps(rows, indent=2, default=str))
+            click.echo(json.dumps(single_row, indent=2, default=str))
             return
-        click.echo(f"Version history for {deliberation_id} ({len(rows)} version(s)):")
-        for row in rows:
-            click.echo(f"--- version {row.get('version', '?')} ---")
-            _echo_deliberation_row(row)
-        return
+        _echo_deliberation_row(single_row)
+    finally:
+        db.close()
 
-    single_row = db.get_deliberation(deliberation_id)
-    if single_row is None:
-        click.echo(f"Deliberation {deliberation_id} not found.")
-        raise SystemExit(1)
-    if json_output:
-        click.echo(json.dumps(single_row, indent=2, default=str))
-        return
-    _echo_deliberation_row(single_row)
+
+@deliberations.command("get")
+@click.argument("deliberation_id")
+@click.option("--history", is_flag=True, default=False, help="Show the full version history")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def deliberations_get(ctx: click.Context, deliberation_id: str, history: bool, json_output: bool) -> None:
+    """Show a deliberation by ID (latest version by default)."""
+    _show_deliberation(ctx, deliberation_id, history, json_output)
+
+
+@deliberations.command("show")
+@click.argument("deliberation_id")
+@click.option("--history", is_flag=True, default=False, help="Show the full version history")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def deliberations_show(ctx: click.Context, deliberation_id: str, history: bool, json_output: bool) -> None:
+    """Show a deliberation by ID (alias for get)."""
+    _show_deliberation(ctx, deliberation_id, history, json_output)
 
 
 @deliberations.command("list")

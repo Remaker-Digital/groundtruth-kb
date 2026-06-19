@@ -130,6 +130,11 @@ def test_project_authorization_cli_is_append_only_and_visible(tmp_path: Path) ->
     listed = _invoke_json(config_path, "projects", "authorizations", "PROJECT-SCOPED-IMPL")
     assert [row["id"] for row in listed] == ["PAUTH-SCOPED-IMPL"]
 
+    shown_authorization = _invoke_json(config_path, "projects", "show-authorization", "PAUTH-SCOPED-IMPL")
+    assert shown_authorization["id"] == "PAUTH-SCOPED-IMPL"
+    assert shown_authorization["project_id"] == "PROJECT-SCOPED-IMPL"
+    assert shown_authorization["allowed_mutation_classes_parsed"] == ["source", "tests"]
+
     revoked = _invoke_json(
         config_path,
         "projects",
