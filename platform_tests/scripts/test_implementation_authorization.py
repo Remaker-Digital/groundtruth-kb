@@ -554,6 +554,90 @@ def test_list_returns_empty_when_by_bridge_dir_absent(auth_module, tmp_path):
     assert rows == []
 
 
+def test_clear_active_packet_if_terminal_deletes_current_only(auth_module, tmp_path):
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _begin_packet(auth_module, tmp_path, slug)
+    _write_proposal(tmp_path, slug, version=3, status="NEW", target_paths=["scripts/dummy.py"])
+    _write_verdict(tmp_path, slug, version=4, verdict="VERIFIED")
+
+    current_path = auth_module.packet_path(tmp_path)
+    named_path = auth_module.packet_path_for_bridge(tmp_path, slug)
+    result = auth_module.clear_active_packet_if_terminal(tmp_path)
+
+    assert result == {"cleared": True, "bridge_id": slug, "reason": "thread VERIFIED"}
+    assert not current_path.exists()
+    assert named_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("latest_status", "writer"),
+    [
+        ("GO", None),
+        (
+            "NEW",
+            lambda root, slug: _write_proposal(root, slug, version=3, status="NEW", target_paths=["scripts/dummy.py"]),
+        ),
+        (
+            "REVISED",
+            lambda root, slug: _write_proposal(
+                root, slug, version=3, status="REVISED", target_paths=["scripts/dummy.py"]
+            ),
+        ),
+        ("NO-GO", lambda root, slug: _write_verdict(root, slug, version=3, verdict="NO-GO")),
+    ],
+)
+def test_clear_active_packet_if_terminal_preserves_in_flight_packets(auth_module, tmp_path, latest_status, writer):
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path, slug=f"in-flight-{latest_status.lower()}")
+    _begin_packet(auth_module, tmp_path, slug)
+    if writer is not None:
+        writer(tmp_path, slug)
+
+    current_path = auth_module.packet_path(tmp_path)
+    result = auth_module.clear_active_packet_if_terminal(tmp_path)
+
+    assert result["cleared"] is False
+    assert result["bridge_id"] == slug
+    if latest_status == "GO":
+        assert result["reason"] == "thread not VERIFIED (state=latest_is_go)"
+    else:
+        assert result["reason"].startswith("thread not VERIFIED")
+    assert current_path.exists()
+
+
+def test_clear_active_packet_if_terminal_noops_without_current(auth_module, tmp_path):
+    result = auth_module.clear_active_packet_if_terminal(tmp_path)
+
+    assert result == {"cleared": False, "bridge_id": None, "reason": "no active packet"}
+
+
+def test_wrap_clear_impl_start_packet_script_emits_summary(auth_module, tmp_path):
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path, slug="wrap-clear")
+    _begin_packet(auth_module, tmp_path, slug)
+    _write_proposal(tmp_path, slug, version=3, status="NEW", target_paths=["scripts/dummy.py"])
+    _write_verdict(tmp_path, slug, version=4, verdict="VERIFIED")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "wrap_clear_impl_start_packet.py"),
+            "--project-root",
+            str(tmp_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0
+    prefix, payload = completed.stdout.strip().split(" ", 1)
+    assert prefix == "implementation_start_packet_clear"
+    assert json.loads(payload) == {"cleared": True, "bridge_id": slug, "reason": "thread VERIFIED"}
+    assert not auth_module.packet_path(tmp_path).exists()
+
+
 # ---------------------------------------------------------------------------
 # F2-001 / WI-4452 regression: current.json plus named-packet fallback
 # ---------------------------------------------------------------------------
@@ -788,6 +872,18 @@ def test_requirement_sufficiency_gap_takes_precedence(auth_module):
         "required before implementation.\n"
     )
     assert auth_module.requirement_sufficiency_state(markdown) == "gap"
+
+
+def test_requirement_sufficiency_future_scoped_gap_is_sufficient(auth_module):
+    """Ensure that future-scoped gap sentences match as sufficient."""
+    markdown = (
+        "## Requirement Sufficiency\n\n"
+        "Existing requirements sufficient for umbrella decomposition. "
+        "New or revised requirements may be required by specific child WIs "
+        "before source implementation; those decisions belong in the child proposals, "
+        "not this umbrella.\n"
+    )
+    assert auth_module.requirement_sufficiency_state(markdown) == "sufficient"
 
 
 def test_requirement_sufficiency_state_rejects_unapproved_phrase(auth_module):

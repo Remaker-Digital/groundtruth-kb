@@ -466,7 +466,7 @@ REQUIREMENT_SUFFICIENCY_RE = re.compile(
 # Back-compat 1-tuple alias for any remaining iterator-style consumer.
 REQUIREMENT_SUFFICIENCY_RES = (REQUIREMENT_SUFFICIENCY_RE,)
 _FUTURE_SCOPED_GAP_CONTEXT_RE = re.compile(
-    r"(?i)\b(?:would|could|might)\b[^.]{0,80}?\b(?:only|later|future|follow-?on|separate)\b"
+    r"(?i)\b(?:would|could|might|may)\b[^.]{0,80}?\b(?:only|later|future|follow-?on|separate|child)\b"
 )
 
 
@@ -1260,6 +1260,67 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _raw_active_packet(project_root: Path) -> tuple[dict[str, Any] | None, str | None]:
+    path = packet_path(project_root)
+    if not path.is_file():
+        return None, "no active packet"
+    try:
+        packet = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, f"active packet unreadable: {exc}"
+    if not isinstance(packet, dict):
+        return None, "active packet is not a JSON object"
+    return packet, None
+
+
+def _packet_post_go_state(project_root: Path, packet: dict[str, Any]) -> tuple[str | None, str | None]:
+    bridge_id = str(packet.get("bridge_id") or "").strip()
+    go_file = str(packet.get("go_file") or "").strip()
+    if not bridge_id:
+        return None, "active packet missing bridge_id"
+    if not go_file:
+        return None, "active packet missing go_file"
+    try:
+        entry = bridge_entry(project_root, bridge_id)
+    except AuthorizationError as exc:
+        return None, f"bridge state unresolved: {exc}"
+
+    statuses_after_go: list[str] = []
+    for status, path in entry.versions:
+        if path == go_file:
+            if status != "GO":
+                return None, f"bridge GO file status changed: {go_file} is now {status}"
+            return _post_go_chain_state(statuses_after_go), None
+        statuses_after_go.append(status)
+    return None, f"bridge GO file not found in chain: {go_file}"
+
+
+def clear_active_packet_if_terminal(project_root: Path, *, force: bool = False) -> dict[str, Any]:
+    """Clear the active implementation packet only after its thread is terminal.
+
+    This removes the shared ``current.json`` pointer while preserving the
+    by-bridge named cache. It is intentionally fail-soft for wrap-up use: absent
+    or unreadable state returns a no-op result instead of blocking the wrap.
+    """
+    path = packet_path(project_root)
+    packet, error = _raw_active_packet(project_root)
+    if packet is None:
+        return {"cleared": False, "bridge_id": None, "reason": error or "no active packet"}
+
+    bridge_id = str(packet.get("bridge_id") or "").strip() or None
+    if force:
+        path.unlink(missing_ok=True)
+        return {"cleared": True, "bridge_id": bridge_id, "reason": "forced"}
+
+    state, state_error = _packet_post_go_state(project_root, packet)
+    if state_error is not None:
+        return {"cleared": False, "bridge_id": bridge_id, "reason": state_error}
+    if state == "terminal":
+        path.unlink(missing_ok=True)
+        return {"cleared": True, "bridge_id": bridge_id, "reason": "thread VERIFIED"}
+    return {"cleared": False, "bridge_id": bridge_id, "reason": f"thread not VERIFIED (state={state})"}
 
 
 def path_authorized(packet: dict[str, Any], relative_path: str) -> bool:
