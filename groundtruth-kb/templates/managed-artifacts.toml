@@ -2,7 +2,7 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 63 records = 19 hooks + 11 rules + 11 skills + 4 files + 14 settings-hook-registrations + 4 gitignore-patterns.
+# 62 records = 18 hooks + 11 rules + 11 skills + 4 files + 14 settings-hook-registrations + 4 gitignore-patterns.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -88,19 +88,6 @@ ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 notes = "PreToolUse credential-pattern scanner; product-managed because the credential catalog is shared framework policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook.scheduler"
-template_path = "hooks/scheduler.py"
-target_path = ".claude/hooks/scheduler.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Scheduler hook placeholder; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -905,4 +892,3 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "transient"
 notes = "Template-only narrative-artifact approval gate coverage record per WI-4225; not scaffolded, upgrade-managed, or doctor-required until a separate bridge approval assigns lifecycle profiles."
-

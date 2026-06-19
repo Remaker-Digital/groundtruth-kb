@@ -30,7 +30,6 @@ hook.intake-classifier	gt-kb-managed
 hook.kb-not-markdown	gt-kb-managed
 hook.owner-decision-capture	gt-kb-managed
 hook.scanner-safe-writer	gt-kb-managed
-hook.scheduler	gt-kb-managed
 hook.session-health	gt-kb-managed
 hook.session-start-governance	gt-kb-managed
 hook.spec-before-code	gt-kb-managed

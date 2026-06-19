@@ -54,7 +54,7 @@ def _registry_records() -> list[ManagedArtifact]:
 
 
 def test_registry_total_matches_current_manifest() -> None:
-    """63 total = 19 hooks + 11 rules + 11 skills + 4 files + 14 settings + 4 gitignore.
+    """62 total = 18 hooks + 11 rules + 11 skills + 4 files + 14 settings + 4 gitignore.
 
     Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
     bridge -006 GO): spec-event-surfacer.py is an active hook with a paired
@@ -85,7 +85,7 @@ def test_registry_total_matches_current_manifest() -> None:
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
     # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
     # Retired dead-stub hook cleanup removed two hooks and two settings registrations.
-    assert len(records) == 63, f"expected 63 total registry records; got {len(records)}"
+    assert len(records) == 62, f"expected 62 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
@@ -99,7 +99,7 @@ def test_registry_class_counts_match_proposal() -> None:
     for r in records:
         counts[r.class_] = counts.get(r.class_, 0) + 1
     assert counts == {
-        "hook": 19,
+        "hook": 18,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
         "skill": 11,
         "file": 4,  # GTKB-ISOLATION-017 Slice 3/4 records + WI-4225 template-only coverage record
@@ -243,7 +243,7 @@ def _file_target_paths(records: list[ManagedArtifact]) -> set[str]:
 
 
 def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
-    """local-only scaffold copies all 14 hooks plus the 4 initial local-only rules.
+    """local-only scaffold copies all 13 hooks plus the 4 initial local-only rules.
 
     Post-canonical-terminology-surface: local-only initial rules grew from 1
     (prime-builder) to 3 with the addition of ``canonical-terminology.md`` and
@@ -251,9 +251,9 @@ def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
     MECHANICAL: 3 → 4 with the addition of ``canonical-terminology-policy.toml``.
     """
     scaffolded = artifacts_for_scaffold("local-only")
-    # 14 hooks
+    # 13 hooks
     hooks = [r for r in scaffolded if r.class_ == "hook"]
-    assert len(hooks) == 14
+    assert len(hooks) == 13
     # 4 rules (prime-builder + canonical-terminology surface + canonical-terminology-policy)
     rules = [r for r in scaffolded if r.class_ == "rule"]
     rule_paths = {r.target_path for r in rules if isinstance(r, FileArtifact)}
@@ -285,7 +285,7 @@ def test_scaffold_dual_agent_copies_everything() -> None:
     for r in scaffolded:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
-        "hook": 19,
+        "hook": 18,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
         "skill": 11,
         "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
@@ -594,18 +594,18 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 62 records:
-    # 19 hooks + 11 rules + 11 skills + 3 files + 14 settings + 4 gitignore.
-    assert len(dual_agent) == 62
+    # dual-agent sees all 61 records:
+    # 18 hooks + 11 rules + 11 skills + 3 files + 14 settings + 4 gitignore.
+    assert len(dual_agent) == 61
 
     local_only = load_managed_artifacts("local-only")
-    # local-only sees all 14 ORIGINAL hooks + rule.prime-builder + 2
+    # local-only sees all 13 ORIGINAL hooks + rule.prime-builder + 2
     # canonical-terminology rules + 1 canonical-terminology-policy
     # (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL) + 3 file-class
-    # records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 21. The 5 new
+    # records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 20. The 5 new
     # governance hooks are dual-agent-only, and the 3 new gitignore rows
     # are dual-agent-only.
-    assert len(local_only) == 21
+    assert len(local_only) == 20
 
 
 def test_find_artifact_by_id_raises_on_unknown() -> None:

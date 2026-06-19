@@ -32,7 +32,6 @@ hook.intake-classifier
 hook.kb-not-markdown
 hook.owner-decision-capture
 hook.scanner-safe-writer
-hook.scheduler
 hook.session-health
 hook.session-start-governance
 hook.spec-before-code
