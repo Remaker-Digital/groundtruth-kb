@@ -63,6 +63,7 @@ Use this matrix before editing anything. Every row must be updated, explicitly d
 | Bridge state | TAFE-backed bridge state, dispatcher status/health, and versioned bridge files | Ensure proposals, reports, GO/NO-GO, and VERIFIED entries are current and latest-status accurate. Do not consult or recreate aggregate queue artifacts. |
 | Future work, unresolved blockers, drift risks | MemBase backlog/current work items or explicit deferred/blocker section | Create or link backlog candidates when authorized; otherwise preserve the candidate and reason. |
 | Session operating state | `memory/MEMORY.md` and wrap summary/report | Update current status, recent session notes, quick references, and known caveats. |
+| Implementation-start packet | `.gtkb-state/implementation-authorizations/current.json` plus the by-bridge named cache | Run `python scripts/wrap_clear_impl_start_packet.py`; record the cleared/no-op result. The helper clears only the active pointer when its associated bridge thread is VERIFIED. |
 | Cross-session continuity | `session_prompts` plus the handoff prompt | Insert a self-contained handoff prompt or record why insertion is blocked. |
 | Verification evidence | Test output, assertion output, wrap scanner outputs, bridge reports | Record commands, outcomes, failures, and any skipped verification with reasons. |
 | Ignored local evidence | Wrap summary references, not git staging | Name relevant ignored paths and explain whether they are evidence, scratch, or generated artifacts. |
@@ -128,6 +129,7 @@ Run the narrow verification relevant to the session's changes. Prefer repo-nativ
 python -m pytest <target> -q --tb=short
 python -m ruff check .
 python -m ruff format --check .
+python scripts/wrap_clear_impl_start_packet.py
 ```
 
 Also record:
@@ -135,6 +137,7 @@ Also record:
 - assertion results and new failures;
 - wrap scanner outputs and unresolved findings;
 - bridge applicability/ADR-DCL preflight results when bridge-backed implementation occurred;
+- implementation-start packet clear/no-op result from `scripts/wrap_clear_impl_start_packet.py`;
 - tests intentionally skipped, with the reason.
 
 New failures become work items or blockers. Existing tracked failures should be cited, not rediscovered from memory.
