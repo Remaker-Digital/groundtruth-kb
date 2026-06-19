@@ -31,6 +31,15 @@ def _write_skill(project_root: Path, directory: str, name: str | None = None) ->
     )
 
 
+def _write_reference(project_root: Path, directory: str, relative_path: str, content: bytes | str) -> None:
+    reference_path = project_root / ".claude" / "skills" / directory / "references" / relative_path
+    reference_path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(content, bytes):
+        reference_path.write_bytes(content)
+    else:
+        reference_path.write_text(content, encoding="utf-8")
+
+
 def _write_registry(project_root: Path) -> None:
     registry_path = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
@@ -95,6 +104,68 @@ def test_check_mode_reports_adapter_drift_without_writing(tmp_path: Path) -> Non
         ".codex/skills/MANIFEST.json",
     ]
     assert not (tmp_path / ".codex").exists()
+
+
+def test_generate_mirrors_canonical_references(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_reference(tmp_path, "review", "nested/example.md", "Reference body.\n")
+    _write_reference(tmp_path, "review", "data.bin", b"\x00\x01reference")
+    _write_registry(tmp_path)
+
+    changed, _adapters = module.generate(tmp_path)
+
+    assert ".codex/skills/review/references/nested/example.md" in changed
+    assert ".codex/skills/review/references/data.bin" in changed
+    assert (tmp_path / ".codex" / "skills" / "review" / "references" / "nested" / "example.md").read_text(
+        encoding="utf-8"
+    ) == "Reference body.\n"
+    assert (tmp_path / ".codex" / "skills" / "review" / "references" / "data.bin").read_bytes() == b"\x00\x01reference"
+
+
+def test_check_reports_missing_reference_as_drift(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_reference(tmp_path, "review", "taxonomy.md", "Canonical reference.\n")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+    adapter_reference = tmp_path / ".codex" / "skills" / "review" / "references" / "taxonomy.md"
+    adapter_reference.unlink()
+
+    changed, _adapters = module.generate(tmp_path, check=True)
+
+    assert ".codex/skills/review/references/taxonomy.md" in changed
+    assert not adapter_reference.exists()
+
+
+def test_generate_removes_orphan_reference(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_reference(tmp_path, "review", "taxonomy.md", "Canonical reference.\n")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+    orphan = tmp_path / ".codex" / "skills" / "review" / "references" / "stale.md"
+    orphan.write_text("stale\n", encoding="utf-8")
+
+    changed, _adapters = module.generate(tmp_path)
+
+    assert ".codex/skills/review/references/stale.md" in changed
+    assert not orphan.exists()
+
+
+def test_generate_materializes_all_drifting_references() -> None:
+    module = _load_module()
+    for adapter in module.build_adapters(REPO_ROOT):
+        canonical_references = (REPO_ROOT / adapter.source_relative_path).parent / "references"
+        canonical_files = sorted(path for path in canonical_references.rglob("*") if path.is_file())
+        if not canonical_files:
+            continue
+        adapter_references = (REPO_ROOT / adapter.adapter_relative_path).parent / "references"
+        for canonical_file in canonical_files:
+            relative_reference = canonical_file.relative_to(canonical_references)
+            adapter_file = adapter_references / relative_reference
+            assert adapter_file.is_file(), f"missing Codex reference mirror for {adapter_file.relative_to(REPO_ROOT)}"
+            assert adapter_file.read_bytes() == canonical_file.read_bytes()
 
 
 def _write_skill_with_frontmatter(project_root: Path, directory: str, frontmatter_lines: str) -> None:

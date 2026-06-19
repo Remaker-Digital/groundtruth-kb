@@ -239,6 +239,17 @@ def _write_if_changed(path: Path, content: str, *, check: bool) -> bool:
     return True
 
 
+def _write_bytes_if_changed(path: Path, content: bytes, *, check: bool) -> bool:
+    existing = path.read_bytes() if path.is_file() else None
+    if existing == content:
+        return False
+    if check:
+        return True
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return True
+
+
 def _manifest_content(adapters: list[SkillAdapter]) -> str:
     payload = {
         "schema_version": 1,
@@ -333,6 +344,45 @@ def _remove_orphan_adapters(project_root: Path, adapters: list[SkillAdapter], *,
     return orphans
 
 
+def _remove_empty_directories(path: Path, stop_at: Path) -> None:
+    current = path
+    while current != stop_at and current.exists():
+        try:
+            current.rmdir()
+        except OSError:
+            return
+        current = current.parent
+
+
+def _sync_reference_mirror(project_root: Path, adapter: SkillAdapter, *, check: bool) -> list[str]:
+    source_skill_dir = (project_root / adapter.source_relative_path).parent
+    source_references = source_skill_dir / "references"
+    adapter_skill_dir = (project_root / adapter.adapter_relative_path).parent
+    adapter_references = adapter_skill_dir / "references"
+
+    changed: list[str] = []
+    expected_reference_files: set[Path] = set()
+
+    if source_references.is_dir():
+        for source_file in sorted(path for path in source_references.rglob("*") if path.is_file()):
+            relative_reference = source_file.relative_to(source_references)
+            adapter_file = adapter_references / relative_reference
+            expected_reference_files.add(adapter_file)
+            if _write_bytes_if_changed(adapter_file, source_file.read_bytes(), check=check):
+                changed.append(_relative_path(project_root, adapter_file))
+
+    if adapter_references.is_dir():
+        for adapter_file in sorted(path for path in adapter_references.rglob("*") if path.is_file()):
+            if adapter_file in expected_reference_files:
+                continue
+            changed.append(_relative_path(project_root, adapter_file))
+            if not check:
+                adapter_file.unlink()
+                _remove_empty_directories(adapter_file.parent, adapter_references.parent)
+
+    return changed
+
+
 def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], list[str]]:
     project_root = project_root.resolve()
     adapters = build_adapters(project_root)
@@ -345,6 +395,7 @@ def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], lis
         rendered = render_adapter(source_text, adapter, generated_at=generated_at)
         if _write_if_changed(adapter_path, rendered, check=check):
             changed.append(adapter.adapter_relative_path)
+        changed.extend(_sync_reference_mirror(project_root, adapter, check=check))
 
     manifest_path = project_root / CODEX_SKILLS_RELATIVE_PATH / MANIFEST_NAME
     if _write_if_changed(manifest_path, _manifest_content(adapters), check=check):
