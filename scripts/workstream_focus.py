@@ -1532,17 +1532,41 @@ def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str |
     harness_id = _resolved_harness_id(root)
     harness_id_ok = meta.get("harness_id") in (None, harness_id)
     role_ok = role_mode is None or meta.get("role_mode") == role_mode
-    freshness_ok = _startup_relay_cache_fresh(meta, root)
     disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
-    consistent = (
+    consistent_except_freshness = (
         harness_ok
         and harness_id_ok
         and role_ok
-        and freshness_ok
         and disclosure_ok
         and meta.get("sha256") == actual_sha
         and meta.get("byte_length") == len(actual_bytes)
     )
+    freshness_ok = _startup_relay_cache_fresh(meta, root)
+    headless_dispatch = bool(os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"))
+
+    if consistent_except_freshness and not freshness_ok and not headless_dispatch:
+        try:
+            try:
+                from scripts import session_start_dispatch_core as _core
+            except ImportError:
+                import session_start_dispatch_core as _core
+            _core.HARNESS_NAME = _resolved_harness_name() or "codex"
+            _core.OUT_DIR = _startup_diagnostic_dir(root)
+            role_mode_to_use = role_mode or meta.get("role_mode") or "pb"
+            role_profile = _core._MODE_TO_ROLE_PROFILE.get(role_mode_to_use)
+            if role_profile:
+                report = _core._render_role_startup_report(role_profile)
+                if report:
+                    _core._write_startup_relay_cache(report, role_mode=role_mode)
+                    body = cache_path.read_text(encoding="utf-8")
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                    actual_bytes = body.encode("utf-8")
+                    actual_sha = hashlib.sha256(actual_bytes).hexdigest()
+                    freshness_ok = _startup_relay_cache_fresh(meta, root)
+        except Exception:
+            pass
+
+    consistent = consistent_except_freshness and freshness_ok
     try:
         rel_path = cache_path.relative_to(root).as_posix()
     except ValueError:

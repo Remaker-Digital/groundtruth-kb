@@ -1509,3 +1509,198 @@ def test_assert_readiness_subject_scope_permits_single_green() -> None:
     module = _load_module()
     module.assert_readiness_subject_scope(application_green=True, gtkb_green=False, dual_scope_declared=False)
     module.assert_readiness_subject_scope(application_green=False, gtkb_green=True, dual_scope_declared=False)
+
+
+def _mock_dispatch_core(monkeypatch, module, fake_render) -> None:
+    import sys
+
+    if str(module.PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(module.PROJECT_ROOT))
+    try:
+        import scripts.session_start_dispatch_core as _core_pkg
+
+        monkeypatch.setattr(_core_pkg, "_render_role_startup_report", fake_render)
+    except (ImportError, AttributeError):
+        pass
+
+    if str(module.PROJECT_ROOT / "scripts") not in sys.path:
+        sys.path.insert(0, str(module.PROJECT_ROOT / "scripts"))
+    try:
+        import session_start_dispatch_core as _core_top
+
+        monkeypatch.setattr(_core_top, "_render_role_startup_report", fake_render)
+    except (ImportError, AttributeError):
+        pass
+
+
+def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    _write_startup_gate_guard(tmp_path)
+
+    body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
+    stale_time_str = "2026-06-19T00:00:00Z"
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    diagnostics.mkdir(parents=True, exist_ok=True)
+    cache_file = diagnostics / "last-user-visible-startup.md"
+    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file.write_text(body_text, encoding="utf-8", newline="\n")
+
+    encoded = body_text.encode("utf-8")
+    meta = {
+        "harness_name": "codex",
+        "harness_id": "A",
+        "generated_at": stale_time_str,
+        "byte_length": len(encoded),
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+    meta_file.write_text(json.dumps(meta), encoding="utf-8", newline="\n")
+
+    new_body = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSelf-healed body"
+    _mock_dispatch_core(monkeypatch, module, lambda role_profile: new_body)
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        tmp_path,
+    )
+
+    assert cache_file.read_text(encoding="utf-8").strip() == new_body.strip()
+    new_meta = json.loads(meta_file.read_text(encoding="utf-8"))
+    assert new_meta["generated_at"] != stale_time_str
+    assert "STARTUP RELAY FAILURE" not in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_startup_gate_no_self_heal_on_non_freshness_inconsistency(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    _write_startup_gate_guard(tmp_path)
+
+    body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
+    stale_time_str = "2026-06-19T00:00:00Z"
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    diagnostics.mkdir(parents=True, exist_ok=True)
+    cache_file = diagnostics / "last-user-visible-startup.md"
+    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file.write_text(body_text, encoding="utf-8", newline="\n")
+
+    meta = {
+        "harness_name": "codex",
+        "harness_id": "A",
+        "generated_at": stale_time_str,
+        "byte_length": len(body_text.encode("utf-8")),
+        "sha256": "wrong_sha_hash_value_here",
+    }
+    meta_file.write_text(json.dumps(meta), encoding="utf-8", newline="\n")
+
+    called = False
+
+    def _fake_render(role_profile):
+        nonlocal called
+        called = True
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSelf-healed body"
+
+    _mock_dispatch_core(monkeypatch, module, _fake_render)
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        tmp_path,
+    )
+
+    assert not called
+    assert cache_file.read_text(encoding="utf-8") == body_text
+    assert "STARTUP RELAY FAILURE" in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_startup_gate_no_self_heal_on_headless_dispatch(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "poller-run-123")
+    _write_startup_gate_guard(tmp_path)
+
+    body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
+    stale_time_str = "2026-06-19T00:00:00Z"
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    diagnostics.mkdir(parents=True, exist_ok=True)
+    cache_file = diagnostics / "last-user-visible-startup.md"
+    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file.write_text(body_text, encoding="utf-8", newline="\n")
+
+    encoded = body_text.encode("utf-8")
+    meta = {
+        "harness_name": "codex",
+        "harness_id": "A",
+        "generated_at": stale_time_str,
+        "byte_length": len(encoded),
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+    meta_file.write_text(json.dumps(meta), encoding="utf-8", newline="\n")
+
+    called = False
+
+    def _fake_render(role_profile):
+        nonlocal called
+        called = True
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSelf-healed body"
+
+    _mock_dispatch_core(monkeypatch, module, _fake_render)
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        tmp_path,
+    )
+
+    assert not called
+    assert cache_file.read_text(encoding="utf-8") == body_text
+    assert "STARTUP RELAY FAILURE" in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_startup_gate_no_self_heal_on_fresh_consistent_cache(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    _write_startup_gate_guard(tmp_path)
+
+    body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
+    from datetime import datetime
+
+    now_str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    diagnostics.mkdir(parents=True, exist_ok=True)
+    cache_file = diagnostics / "last-user-visible-startup.md"
+    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file.write_text(body_text, encoding="utf-8", newline="\n")
+
+    encoded = body_text.encode("utf-8")
+    meta = {
+        "harness_name": "codex",
+        "harness_id": "A",
+        "generated_at": now_str,
+        "byte_length": len(encoded),
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+    meta_file.write_text(json.dumps(meta), encoding="utf-8", newline="\n")
+
+    called = False
+
+    def _fake_render(role_profile):
+        nonlocal called
+        called = True
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSelf-healed body"
+
+    _mock_dispatch_core(monkeypatch, module, _fake_render)
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        tmp_path,
+    )
+
+    assert not called
+    assert cache_file.read_text(encoding="utf-8") == body_text
+    assert "STARTUP RELAY FAILURE" not in response["hookSpecificOutput"]["additionalContext"]
