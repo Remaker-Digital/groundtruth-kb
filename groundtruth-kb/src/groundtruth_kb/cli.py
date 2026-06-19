@@ -3305,6 +3305,11 @@ def projects_revoke_authorization(
 @click.argument("authorization_id")
 @click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
 @click.option("--change-reason", required=True, help="History reason for completion.")
+@click.option(
+    "--keep-project-open",
+    is_flag=True,
+    help="Complete the authorization without retiring the project when it is the sole active authorization.",
+)
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
 def projects_complete_authorization(
@@ -3312,15 +3317,17 @@ def projects_complete_authorization(
     authorization_id: str,
     changed_by: str,
     change_reason: str,
+    keep_project_open: bool,
     json_output: bool,
 ) -> None:
     """Complete a project-scoped implementation authorization.
 
-    ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2: project completion
+    ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v5: project completion
     and retirement are automatic once every membership-linked work item is
-    VERIFIED. This subcommand is the explicit-invocation surface; it does not
-    gate on an owner decision. The owner-directed ``retire`` subcommand is the
-    separate path for retirements outside the automatic VERIFIED gate.
+    VERIFIED unless the caller explicitly elects ``--keep-project-open``. This
+    subcommand is the explicit-invocation surface; it does not gate on an owner
+    decision. The owner-directed ``retire`` subcommand is the separate path for
+    retirements outside the automatic VERIFIED gate.
     """
     config = _resolve_config(ctx)
     db, service = _project_service(ctx)
@@ -3330,6 +3337,7 @@ def projects_complete_authorization(
             project_root=config.project_root,
             changed_by=changed_by,
             change_reason=change_reason,
+            retire_project=not keep_project_open,
         )
     except ProjectLifecycleError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -5799,6 +5807,14 @@ def deliberations_search(
     rows = db.search_deliberations(query, limit=limit)
 
     if semantic_only:
+        status = db._deliberation_search_status()
+        if status.get("semantic_degraded"):
+            reason = status.get("degradation_reason") or "unknown"
+            click.echo(
+                "Error: --semantic-only could not run semantic search; "
+                f"ChromaDB degraded to SQLite LIKE fallback (reason: {reason})."
+            )
+            raise SystemExit(1)
         rows = [r for r in rows if r.get("search_method") == "semantic"]
 
     if json_output:

@@ -695,18 +695,22 @@ class ProjectLifecycleService:
         project_root: Path,
         changed_by: str = PROJECTS_CHANGED_BY,
         change_reason: str,
+        retire_project: bool = True,
     ) -> dict[str, Any]:
         """Transition an active project authorization to ``completed`` and, when
-        it was the project's sole active authorization, retire the project and
-        collectively retire its associated work items and membership links.
+        elected by the caller and it was the project's sole active authorization,
+        retire the project and collectively retire its associated work items and
+        membership links.
 
-        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v2: completion and
+        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v5: completion and
         retirement are automatic once every gating work item is VERIFIED. There
         is no owner-confirmation gate - owner AUQ governs project START
         (authorization creation and approval), not completion. The gating set
         is the project's explicitly-linked work items: the active
         project-to-work-item membership links (v2's "explicitly linked"
         definition), not the authorization envelope's ``included_work_item_ids``.
+        ``retire_project=False`` is the explicit v5 keep-open caller election;
+        the default preserves automatic project retirement.
         """
         norm_auth_id = _require_nonempty(authorization_id, "authorization_id")
 
@@ -773,7 +777,7 @@ class ProjectLifecycleService:
         ]
         project_retired = False
         retired_work_items: list[str] = []
-        if not other_active:
+        if retire_project and not other_active:
             self.retire_project(
                 project_id,
                 changed_by=changed_by,

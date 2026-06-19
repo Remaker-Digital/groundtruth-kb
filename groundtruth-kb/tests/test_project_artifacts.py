@@ -198,7 +198,7 @@ def _write_verified_bridge(project_root: Path, wi_verified: dict[str, bool]) -> 
     for index, (wi, verified) in enumerate(sorted(wi_verified.items())):
         slug = f"gtkb-thread-{index}"
         top = "VERIFIED" if verified else "GO"
-        (bridge / f"{slug}-001.md").write_text(f"# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8")
+        (bridge / f"{slug}-001.md").write_text(f"{top}\n\n# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8")
         lines += [f"Document: {slug}", f"{top}: bridge/{slug}-001.md", ""]
     (bridge / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -428,6 +428,24 @@ def test_complete_sole_active_authorization_retires_project(tmp_path) -> None:
         )
         assert result["project_retired"] is True
         assert db.get_project("PROJECT-X")["status"] == "retired"
+    finally:
+        db.close()
+
+
+def test_complete_sole_active_authorization_can_keep_project_open(tmp_path) -> None:
+    db = _seed_completion_env(tmp_path)
+    try:
+        service = ProjectLifecycleService(db)
+        result = service.complete_project_authorization(
+            "PAUTH-X",
+            project_root=tmp_path,
+            change_reason="complete",
+            retire_project=False,
+        )
+        assert result["authorization"]["status"] == "completed"
+        assert result["project_retired"] is False
+        assert result["retired_work_items"] == []
+        assert db.get_project("PROJECT-X")["status"] == "active"
     finally:
         db.close()
 

@@ -65,6 +65,75 @@ def _seed_project_authorization_inputs(tmp_path: Path) -> None:
         db.close()
 
 
+def _write_verified_bridge(project_root: Path, work_item_id: str) -> None:
+    bridge = project_root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    slug = "gtkb-project-authorization-cli-completion"
+    (bridge / f"{slug}-001.md").write_text(
+        f"VERIFIED\n\n# Proposal {slug}\n\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+    (bridge / "INDEX.md").write_text(
+        "\n".join(["# Bridge Index", "", f"Document: {slug}", f"VERIFIED: bridge/{slug}-001.md", ""]),
+        encoding="utf-8",
+    )
+
+
+def _seed_completion_cli_env(tmp_path: Path, *, project_id: str, authorization_id: str, work_item_id: str) -> None:
+    _write_verified_bridge(tmp_path, work_item_id)
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.insert_deliberation(
+            "DELIB-TEST-COMPLETE-AUTH",
+            "owner_conversation",
+            "Owner approved completion test authorization",
+            "Owner approved the completion test project for implementation.",
+            "{}",
+            "test",
+            "seed owner decision",
+            outcome="owner_decision",
+        )
+        db.insert_spec(
+            "SPEC-COMPLETE-AUTH",
+            "Completion authorization spec",
+            "verified",
+            "test",
+            "seed spec",
+        )
+        db.insert_work_item(
+            work_item_id,
+            "Completion authorization work item",
+            "new",
+            "platform",
+            "open",
+            "test",
+            "seed work item",
+        )
+        db.insert_project("Completion Authorization", "test", "create project", id=project_id, status="active")
+        db.link_project_work_item(project_id, work_item_id, "test", "link work item")
+        db.insert_project_authorization(
+            project_id,
+            "Completion authorization approval",
+            "DELIB-TEST-COMPLETE-AUTH",
+            "Implement completion authorization behavior.",
+            "test",
+            "authorize implementation project",
+            id=authorization_id,
+            included_work_item_ids=[work_item_id],
+            included_spec_ids=["SPEC-COMPLETE-AUTH"],
+        )
+        db.add_project_artifact_link(
+            project_id,
+            "bridge_thread",
+            "gtkb-project-authorization-cli-completion",
+            "test",
+            "seed implements link",
+            relationship="implements",
+        )
+    finally:
+        db.close()
+
+
 def test_project_authorization_cli_is_append_only_and_visible(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path)
     _seed_project_authorization_inputs(tmp_path)
@@ -151,3 +220,69 @@ def test_project_authorization_cli_is_append_only_and_visible(tmp_path: Path) ->
     assert [(row["id"], row["status"], row["version"]) for row in all_authorizations] == [
         ("PAUTH-SCOPED-IMPL", "revoked", 2)
     ]
+
+
+def test_complete_authorization_cli_keep_project_open(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    _seed_completion_cli_env(
+        tmp_path,
+        project_id="PROJECT-COMPLETE-KEEP",
+        authorization_id="PAUTH-COMPLETE-KEEP",
+        work_item_id="WI-9001",
+    )
+
+    result = CliRunner().invoke(
+        cli_main,
+        [
+            "--config",
+            str(config_path),
+            "projects",
+            "complete-authorization",
+            "PAUTH-COMPLETE-KEEP",
+            "--change-reason",
+            "complete authorization",
+            "--keep-project-open",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Completed project authorization PAUTH-COMPLETE-KEEP." in result.output
+    assert "Project retired." not in result.output
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        assert db.get_project_authorization("PAUTH-COMPLETE-KEEP")["status"] == "completed"
+        assert db.get_project("PROJECT-COMPLETE-KEEP")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_complete_authorization_cli_default_retires_project(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    _seed_completion_cli_env(
+        tmp_path,
+        project_id="PROJECT-COMPLETE-RETIRE",
+        authorization_id="PAUTH-COMPLETE-RETIRE",
+        work_item_id="WI-9002",
+    )
+
+    result = CliRunner().invoke(
+        cli_main,
+        [
+            "--config",
+            str(config_path),
+            "projects",
+            "complete-authorization",
+            "PAUTH-COMPLETE-RETIRE",
+            "--change-reason",
+            "complete authorization",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Completed project authorization PAUTH-COMPLETE-RETIRE. Project retired." in result.output
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        assert db.get_project_authorization("PAUTH-COMPLETE-RETIRE")["status"] == "completed"
+        assert db.get_project("PROJECT-COMPLETE-RETIRE")["status"] == "retired"
+    finally:
+        db.close()
