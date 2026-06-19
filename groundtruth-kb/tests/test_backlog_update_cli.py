@@ -172,6 +172,110 @@ def test_backlog_update_related_bridge_threads(runner: CliRunner, project_dir: P
         db.close()
 
 
+@pytest.mark.parametrize(
+    "bad_value",
+    [
+        "[bridge/example-001.md,bridge/example-002.md]",
+        '{"not": "an array"}',
+        '"bridge/example-001.md"',
+    ],
+)
+def test_backlog_update_rejects_malformed_related_bridge_threads(
+    runner: CliRunner,
+    project_dir: Path,
+    bad_value: str,
+) -> None:
+    _seed_db(project_dir)
+
+    result = runner.invoke(
+        main,
+        [
+            *_config_args(project_dir),
+            "backlog",
+            "update",
+            "WI-IMPROVEMENT",
+            "--related-bridge-threads",
+            bad_value,
+            "--change-reason",
+            "try malformed bridge threads",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--related-bridge-threads" in result.output
+    assert "expected a JSON array of strings" in result.output
+
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        latest = db.get_work_item("WI-IMPROVEMENT")
+        assert latest is not None
+        assert latest["related_bridge_threads"] is None
+        assert len(db.get_work_item_history("WI-IMPROVEMENT")) == 1
+    finally:
+        db.close()
+
+
+def test_backlog_resolve_preserves_valid_related_bridge_threads(runner: CliRunner, project_dir: Path) -> None:
+    _seed_db(project_dir)
+    threads_json = '["bridge/example-001.md","bridge/example-002.md"]'
+
+    result = runner.invoke(
+        main,
+        [
+            *_config_args(project_dir),
+            "backlog",
+            "resolve",
+            "WI-IMPROVEMENT",
+            "--related-bridge-threads",
+            threads_json,
+            "--change-reason",
+            "resolve with bridge evidence",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Resolved work item WI-IMPROVEMENT." in result.output
+
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        latest = db.get_work_item("WI-IMPROVEMENT")
+        assert latest is not None
+        assert latest["resolution_status"] == "resolved"
+        assert latest["stage"] == "resolved"
+        assert latest["related_bridge_threads"] == threads_json
+    finally:
+        db.close()
+
+
+def test_backlog_resolve_rejects_malformed_related_bridge_threads(runner: CliRunner, project_dir: Path) -> None:
+    _seed_db(project_dir)
+
+    result = runner.invoke(
+        main,
+        [
+            *_config_args(project_dir),
+            "backlog",
+            "resolve",
+            "WI-IMPROVEMENT",
+            "--related-bridge-threads",
+            '"bridge/example-001.md"',
+            "--change-reason",
+            "try malformed bridge evidence",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--related-bridge-threads" in result.output
+    assert "expected a JSON array of strings" in result.output
+
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        latest = db.get_work_item("WI-IMPROVEMENT")
+        assert latest is not None
+        assert latest["resolution_status"] == "open"
+        assert latest["stage"] == "created"
+        assert latest["related_bridge_threads"] is None
+    finally:
+        db.close()
+
+
 def test_backlog_update_gov15_status_only_bypass_closed(runner: CliRunner, project_dir: Path) -> None:
     """T6a: GOV-15 status-only bypass CLOSED (negative test)."""
     _seed_db(project_dir)

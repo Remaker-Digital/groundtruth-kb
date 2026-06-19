@@ -272,6 +272,28 @@ def test_add_preserves_source_owner_directive_and_links(tmp_path: Path) -> None:
     assert json.loads(row["depends_on_work_items"]) == ["WI-9000"]
 
 
+@pytest.mark.parametrize(
+    ("option", "bad_value"),
+    [
+        ("--related-spec-ids", "[SPEC-1000,SPEC-1001]"),
+        ("--related-deliberation-ids", '{"not": "an array"}'),
+        ("--related-bridge-threads", '"bridge/gtkb-example-001.md"'),
+        ("--depends-on-work-items", '["WI-9000", 42]'),
+    ],
+)
+def test_add_rejects_malformed_json_list_fields(tmp_path: Path, option: str, bad_value: str) -> None:
+    root, config = _project(tmp_path)
+    db_path = root / "groundtruth.db"
+
+    with mock.patch.dict("os.environ", {"GTKB_HARNESS_NAME": "claude"}):
+        result = CliRunner().invoke(main, _add_args(config, option, bad_value))
+
+    assert result.exit_code != 0
+    assert option in result.output
+    assert "expected a JSON array of strings" in result.output
+    assert _wi_count(db_path) == 0
+
+
 # ---------------------------------------------------------------------------
 # T9 - the created row round-trips through ``backlog list``
 # ---------------------------------------------------------------------------

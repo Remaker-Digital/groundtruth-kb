@@ -27,6 +27,7 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,6 +63,13 @@ _DEFAULT_PRIORITY = "P3"
 # regression test ``test_add_does_not_emit_fallback_changed_by`` can assert
 # their absence.
 _FORBIDDEN_CHANGED_BY = ("gt-backlog-add", "unknown", "prime-builder/unknown")
+
+_JSON_LIST_FIELDS = (
+    ("--related-spec-ids", "related_spec_ids_at_creation"),
+    ("--related-deliberation-ids", "related_deliberation_ids"),
+    ("--related-bridge-threads", "related_bridge_threads"),
+    ("--depends-on-work-items", "depends_on_work_items"),
+)
 
 
 @dataclass(frozen=True)
@@ -113,7 +121,22 @@ def _validate_request(request: BacklogAddRequest) -> str:
     if priority not in BACKLOG_ADD_PRIORITIES:
         allowed = ", ".join(BACKLOG_ADD_PRIORITIES)
         raise BacklogAddError(f"--priority must be one of: {allowed}")
+
+    for option_name, field_name in _JSON_LIST_FIELDS:
+        _validate_json_string_array(getattr(request, field_name), option_name)
     return priority
+
+
+def _validate_json_string_array(value: str | None, option_name: str) -> None:
+    """Reject malformed structured link values before any DB write."""
+    if value is None:
+        return
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise BacklogAddError(f"{option_name} is invalid: expected a JSON array of strings") from exc
+    if not isinstance(parsed, list) or any(not isinstance(item, str) for item in parsed):
+        raise BacklogAddError(f"{option_name} is invalid: expected a JSON array of strings")
 
 
 def _resolve_changed_by() -> str:

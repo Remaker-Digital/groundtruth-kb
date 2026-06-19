@@ -6,6 +6,7 @@ Authority: bridge/gtkb-backlog-update-cli-slice-1-003.md (REVISED-1), Codex GO a
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -54,6 +55,18 @@ def _resolve_changed_by() -> str:
     from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
     return cast(str, resolve_changed_by())
+
+
+def _validate_json_string_array(value: str | None, option_name: str) -> None:
+    """Reject malformed structured link values before any DB write."""
+    if value is None:
+        return
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise BacklogUpdateError(f"{option_name} is invalid: expected a JSON array of strings") from exc
+    if not isinstance(parsed, list) or any(not isinstance(item, str) for item in parsed):
+        raise BacklogUpdateError(f"{option_name} is invalid: expected a JSON array of strings")
 
 
 def _verify_text_edit_gate(db: KnowledgeDB, current: dict[str, Any], request: BacklogUpdateRequest) -> None:
@@ -129,6 +142,8 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
 
     if request.priority is not None and request.priority not in {"P0", "P1", "P2", "P3"}:
         raise BacklogUpdateError("Invalid priority. Allowed: P0, P1, P2, P3")
+
+    _validate_json_string_array(request.related_bridge_threads, "--related-bridge-threads")
 
     # Attribution is resolved BEFORE opening any write path
     changed_by = _resolve_changed_by()
