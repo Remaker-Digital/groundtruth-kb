@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -194,6 +195,11 @@ def _format_markdown(result: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("slug", help="Bridge thread slug (e.g., gtkb-bridge-convenience-verbs)")
     parser.add_argument("--bridge-dir", default=None, help="Path to bridge/ (defaults to project bridge/)")
