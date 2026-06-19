@@ -58,6 +58,11 @@ def _invoke(config: Path, *args: str) -> object:
     return CliRunner().invoke(main, ["--config", str(config), "harness", *args])
 
 
+def _invoke_gt(config: Path, *args: str) -> object:
+    """Invoke the gt CLI under the given config without a command-group prefix."""
+    return CliRunner().invoke(main, ["--config", str(config), *args])
+
+
 def _seed_harness_roles(root: Path, roles: dict[str, list[str]]) -> None:
     db_path = root / "groundtruth.db"
     db = KnowledgeDB(db_path=db_path)
@@ -112,6 +117,7 @@ def _seed_role_workspace(root: Path) -> None:
     index_path = root / "bridge" / "INDEX.md"
     index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text("Document: seed\nVERIFIED: bridge/seed-001.md\n", encoding="utf-8")
+    (index_path.parent / "seed-001.md").write_text("VERIFIED\n\n# Seed Bridge Fixture\n", encoding="utf-8")
 
 
 def _read_role_map(root: Path) -> dict:
@@ -160,6 +166,31 @@ def test_harness_register_rejects_initial_role(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0
     assert "registration is separate" in result.output
+
+
+def test_harness_roles_cli_preserves_registry_projection_bytes(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    registry_path = root / "harness-state" / "harness-registry.json"
+    before = registry_path.read_bytes()
+
+    result = _invoke(config, "roles")
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["harnesses"][0]["id"] == "A"
+    assert registry_path.read_bytes() == before
+
+
+def test_bridge_dispatch_read_clis_preserve_registry_projection_bytes(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+    registry_path = root / "harness-state" / "harness-registry.json"
+
+    for command in (("bridge", "dispatch", "config"), ("bridge", "dispatch", "status")):
+        before = registry_path.read_bytes()
+        result = _invoke_gt(config, *command)
+        assert result.exit_code == 0, result.output
+        assert registry_path.read_bytes() == before
 
 
 # --- T-HC-2: full lifecycle -------------------------------------------------

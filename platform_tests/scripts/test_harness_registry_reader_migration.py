@@ -53,6 +53,7 @@ if str(_REPO_ROOT) not in sys.path:
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.harness_projection import (  # noqa: E402
     generate_harness_projection,
+    read_roles,
 )
 
 from scripts.harness_identity import (  # noqa: E402
@@ -237,6 +238,44 @@ def test_projection_reader_accessors_resolve_from_projection(tmp_path: Path) -> 
     assert role_set_for_id(document, "B") == {ROLE_PRIME_BUILDER}
     assert id_for_name(document, "codex") == "A"
     assert id_for_name(document, "claude") == "B"
+
+
+def test_read_roles_preserves_projection_bytes(tmp_path: Path) -> None:
+    """Canonical role reads must not rewrite the hot-path registry projection."""
+    _seed_registry(
+        tmp_path,
+        {
+            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
+            "B": ("claude", [ROLE_PRIME_BUILDER]),
+        },
+    )
+    registry_path = tmp_path / "harness-state" / "harness-registry.json"
+    before = registry_path.read_bytes()
+
+    document = read_roles(tmp_path)
+
+    assert [record["id"] for record in document["harnesses"]] == ["A", "B"]
+    assert registry_path.read_bytes() == before
+
+
+def test_generate_harness_projection_preserves_bytes_when_only_timestamp_differs(tmp_path: Path) -> None:
+    """No-op refreshes must not dirty the projection just to update generated_at."""
+    db = _seed_registry(
+        tmp_path,
+        {
+            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
+            "B": ("claude", [ROLE_PRIME_BUILDER]),
+        },
+    )
+    registry_path = tmp_path / "harness-state" / "harness-registry.json"
+    document = json.loads(registry_path.read_text(encoding="utf-8"))
+    document["generated_at"] = "2000-01-01T00:00:00Z"
+    sentinel = (json.dumps(document, indent=2, sort_keys=True) + "\n").replace("\n", "\r\n").encode("utf-8")
+    registry_path.write_bytes(sentinel)
+
+    generate_harness_projection(db, tmp_path)
+
+    assert registry_path.read_bytes() == sentinel
 
 
 def test_golden_value_role_resolution_matches_pre_migration(tmp_path: Path) -> None:

@@ -255,10 +255,27 @@ def _write_projection(path: Path, document: dict[str, Any]) -> Path:
     ``scripts/harness_roles.py:write_role_assignments``.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
+    if _projection_matches_existing_except_generated_at(path, document):
+        return path
     tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
     tmp.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(tmp, path)
     return path
+
+
+def _projection_matches_existing_except_generated_at(path: Path, document: dict[str, Any]) -> bool:
+    """True when writing would only advance the projection timestamp."""
+    try:
+        existing = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(existing, dict):
+        return False
+    existing_without_timestamp = dict(existing)
+    document_without_timestamp = dict(document)
+    existing_without_timestamp.pop("generated_at", None)
+    document_without_timestamp.pop("generated_at", None)
+    return existing_without_timestamp == document_without_timestamp
 
 
 def generate_harness_projection(

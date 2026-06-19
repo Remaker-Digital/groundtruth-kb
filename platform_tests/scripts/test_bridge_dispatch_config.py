@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     select_dispatch_candidates,
 )
 from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text  # noqa: E402
+from groundtruth_kb.harness_projection import read_roles  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -107,6 +109,36 @@ def test_collect_status_keeps_role_and_dispatchability_orthogonal(tmp_path: Path
     assert claude["role"] == ["prime-builder"]
     assert claude["can_receive_dispatch"] is False
     assert claude["can_fire_events"] is True
+
+
+def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    registry_path = tmp_path / "harness-state" / "harness-registry.json"
+    before = registry_path.read_bytes()
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.selected_by_role["prime-builder"]
+    assert registry_path.read_bytes() == before
+
+
+def test_wi4661_live_harness_b_is_headless_dispatchable() -> None:
+    rules = tomllib.loads((REPO_ROOT / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
+    harness_b_rules = rules["harnesses"]["B"]
+
+    assert harness_b_rules["can_receive_dispatch"] is True
+    assert "interactive-only" not in harness_b_rules["tags"]
+
+    projection = read_roles(REPO_ROOT)
+    harness_b = next(row for row in projection["harnesses"] if row["id"] == "B")
+    assert harness_b["role"] == ["prime-builder"]
+    assert harness_b["status"] == "active"
+
+    status_payload = collect_bridge_dispatch_status(REPO_ROOT).to_json_dict()
+    harness_b_status = next(row for row in status_payload["harnesses"] if row["id"] == "B")
+    assert harness_b_status["can_receive_dispatch"] is True
+    prime_candidate_ids = [row["id"] for row in status_payload["selected_by_role"]["prime-builder"]]
+    assert "B" in prime_candidate_ids
 
 
 def test_config_overlay_can_disable_dispatchability(tmp_path: Path) -> None:
